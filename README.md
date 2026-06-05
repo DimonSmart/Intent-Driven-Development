@@ -1,1 +1,1 @@
-Spec Guided Dev is a refined reincarnation of Spec Driven Dev: a practical AI-assisted development method where living product specifications guide implementation while preserving engineering judgment.
+Intent-Driven-Development is a refined reincarnation of Spec Driven Dev: a practical AI-assisted development method where living product specifications guide implementation while preserving engineering judgment.
