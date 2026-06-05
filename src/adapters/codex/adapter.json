@@ -1,0 +1,8 @@
+{
+  "agent": "codex",
+  "entryPoint": "AGENTS.md",
+  "skillsRoot": ".agents/skills",
+  "supportsSkills": true,
+  "supportsFrontMatter": true,
+  "generatedHeader": true
+}

@@ -1,0 +1,8 @@
+{
+  "agent": "claude",
+  "entryPoint": "CLAUDE.md",
+  "skillsRoot": ".claude/skills",
+  "supportsSkills": true,
+  "supportsFrontMatter": true,
+  "generatedHeader": true
+}

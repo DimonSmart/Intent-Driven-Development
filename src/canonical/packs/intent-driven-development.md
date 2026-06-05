@@ -1,0 +1,25 @@
+# Intent-Driven Development Pack
+
+Use Intent-Driven Development for durable product intent.
+
+## Required Reading
+
+Read these concepts before deciding whether a specification change is needed:
+
+- A specification is a durable product description, not a task list.
+- Current normative intent lives directly under `.specs/`.
+- Archived documents are historical and are not current intent.
+- Semantic changes must be represented in specifications or ADRs.
+
+## Method Summary
+
+Use `.specs/` when a change affects product behavior, domain contracts,
+architectural shape, durable patterns, compatibility expectations, non-goals,
+acceptance criteria, verification rules, or shared behavior.
+
+Do not create or modify specifications for local tasks, temporary status,
+ordinary dependency updates, formatting, small refactoring, or implementation
+details that do not define the product.
+
+Numbered documents give intent a stable identity. Preserve references by number
+when titles or filenames change.
