@@ -103,14 +103,36 @@ internal sealed class Generator(string repoRoot)
             var frontMatterPath = Path.Combine(adapterDir, "skill-frontmatter.md");
             var frontMatter = adapter.SupportsFrontMatter ? ReadRequired(frontMatterPath) : "";
             var skillsRoot = Path.Combine(repoRoot, "src", "canonical", "skills");
+            var skillDescriptionPath = Path.Combine(skillsRoot, "skill-descriptions.json");
+            var skillDescriptions = ReadSkillDescriptions(skillDescriptionPath);
+            var skillPaths = Directory.GetFiles(skillsRoot, "spec-*.md").OrderBy(Path.GetFileName).ToArray();
+            var skillNames = skillPaths.Select(Path.GetFileNameWithoutExtension).ToHashSet(StringComparer.Ordinal);
 
-            foreach (var skillPath in Directory.GetFiles(skillsRoot, "spec-*.md").OrderBy(Path.GetFileName))
+            foreach (var skillName in skillDescriptions.Keys.OrderBy(name => name, StringComparer.Ordinal))
+            {
+                if (!skillNames.Contains(skillName))
+                {
+                    throw new InvalidOperationException($"Unused skill description: {skillName}.");
+                }
+            }
+
+            foreach (var skillPath in skillPaths)
             {
                 var skillName = Path.GetFileNameWithoutExtension(skillPath);
+                if (!skillDescriptions.TryGetValue(skillName, out var skillDescription) ||
+                    string.IsNullOrWhiteSpace(skillDescription))
+                {
+                    throw new InvalidOperationException($"Missing skill description for {skillName} in src/canonical/skills/skill-descriptions.json.");
+                }
+
                 var content = ReadRequired(skillPath);
                 if (adapter.SupportsFrontMatter)
                 {
-                    content = JoinBlocks(frontMatter.Replace("{{skillName}}", skillName), content);
+                    content = JoinBlocks(
+                        frontMatter
+                            .Replace("{{skillName}}", skillName)
+                            .Replace("{{skillDescription}}", skillDescription),
+                        content);
                 }
 
                 var relativePath = Path.Combine(adapter.SkillsRoot!, skillName, "SKILL.md");
@@ -207,6 +229,13 @@ internal sealed class Generator(string repoRoot)
 
     private static string ReadRequired(string path) =>
         File.Exists(path) ? File.ReadAllText(path) : throw new FileNotFoundException("Required file not found.", path);
+
+    private static IReadOnlyDictionary<string, string> ReadSkillDescriptions(string path)
+    {
+        var json = ReadRequired(path);
+        return JsonSerializer.Deserialize<Dictionary<string, string>>(json) ??
+            throw new InvalidOperationException($"Invalid skill descriptions in {path}.");
+    }
 
     private static string JoinBlocks(params string[] blocks) =>
         string.Join(Environment.NewLine + Environment.NewLine, blocks.Select(block => block.Trim()));
