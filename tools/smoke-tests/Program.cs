@@ -61,7 +61,14 @@ void ExpectNoDirectory(string relativePath)
 
 void ExpectSkillFiles(string skillsRoot)
 {
-    var expected = new[] { "spec-import", "spec-create", "spec-update-from-implementation" };
+    var expected = new[]
+    {
+        "spec-import",
+        "spec-create",
+        "spec-update-from-implementation",
+        "spec-reorganize"
+    };
+
     foreach (var skill in expected)
     {
         ExpectFile($"{skillsRoot}/{skill}/SKILL.md");
