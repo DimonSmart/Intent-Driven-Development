@@ -10,6 +10,11 @@ The idea is simple:
 > Generate agent-specific instructions from that source.
 > Let AI help with implementation, but keep engineering judgment in the loop.
 
+The guiding rule:
+
+> Specifications should be complete enough to rebuild the product from scratch,
+> and strict enough not to become a task tracker.
+
 This is close to Spec-Driven Development, but with a different emphasis.
 
 The specification is not a magic executable artifact. It does not replace

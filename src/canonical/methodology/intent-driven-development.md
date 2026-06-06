@@ -3,6 +3,11 @@
 Intent-Driven Development is an AI-assisted development method where a living
 specification guides implementation without replacing engineering judgment.
 
+Guiding rule:
+
+> Specifications should be complete enough to rebuild the product from scratch,
+> and strict enough not to become a task tracker.
+
 In AI development, the key skill is no longer just writing code, but describing
 intent precisely enough that both humans and AI agents can act on it.
 

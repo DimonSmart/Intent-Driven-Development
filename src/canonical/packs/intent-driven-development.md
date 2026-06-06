@@ -8,6 +8,8 @@ Read these concepts before deciding whether a specification change is needed:
 
 - Intent is stable product truth that future implementations must preserve.
 - A specification is a durable product description, not a task list.
+- Specifications should be complete enough to rebuild the product from scratch,
+  and strict enough not to become a task tracker.
 - Current normative intent lives directly under `.specs/`.
 - Archived documents are historical and are not current intent.
 - Implementation evidence is not product intent by itself.
