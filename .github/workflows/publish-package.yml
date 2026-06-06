@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     steps:
       - name: Checkout
@@ -20,6 +22,12 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          registry-url: https://registry.npmjs.org
+
       - name: Run check
         run: pwsh ./scripts/Check.ps1
 
@@ -27,17 +35,17 @@ jobs:
         id: extract_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Pack
-        run: |
-          dotnet pack IntentDrivenDevelopment.Package/IntentDrivenDevelopment.Package.csproj \
-            --configuration Release \
-            --output artifacts \
-            -p:PackageVersion=${{ steps.extract_version.outputs.VERSION }}
+      - name: Pack release artifacts
+        run: pwsh ./scripts/Pack-Release.ps1 -Version ${{ steps.extract_version.outputs.VERSION }} -SkipCheck
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ./artifacts/*.nupkg
+          files: |
+            ./artifacts/intent-driven-development-v${{ steps.extract_version.outputs.VERSION }}.zip
+            ./artifacts/checksums.txt
+            ./artifacts/*.nupkg
+            ./artifacts/*.tgz
           draft: false
           prerelease: false
           generate_release_notes: true
@@ -50,3 +58,13 @@ jobs:
             --api-key ${{ secrets.NUGET_API_KEY }} \
             --source https://api.nuget.org/v3/index.json \
             --skip-duplicate
+
+      - name: Publish to npm
+        if: ${{ env.NPM_TOKEN != '' }}
+        run: npm publish ./artifacts/intent-driven-development-${{ steps.extract_version.outputs.VERSION }}.tgz
+        env:
+          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
+
+      - name: Skip npm publish
+        if: ${{ env.NPM_TOKEN == '' }}
+        run: echo "NPM_TOKEN is not configured; npm publish skipped. The npm package archive is attached to the GitHub Release."

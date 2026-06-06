@@ -187,6 +187,7 @@ IDD adapters may use it to keep the main conversation focused.
 src/canonical/      canonical methodology, project files, skills, and packs
 src/adapters/       target-specific entry points and skill front matter
 generated/          generated files for each AI coding agent system
+npm/                universal CLI delivery wrapper
 tools/generate/     C# generator
 tools/smoke-tests/  smoke tests for generated output
 scripts/            local check and release helper scripts
@@ -225,6 +226,40 @@ In practice, this means:
 
 The check should prove that the generated agent files are still reproducible and
 valid enough to use.
+
+## Distribution
+
+Intent-Driven Development is release-first.
+
+The canonical versioned artifact is the GitHub Release archive. It contains the
+canonical source, adapters, generated target files, manifest, license, README,
+and checksums for the released content.
+
+Recommended distribution:
+
+```text
+- GitHub Releases for versioned artifacts
+- npm/npx for universal CLI installation
+- NuGet for .NET-friendly consumption
+```
+
+Use npm/npx when you want to install generated agent files into any project
+without requiring the .NET SDK:
+
+```bash
+npx intent-driven-development list-targets
+npx intent-driven-development install --target claude
+npx intent-driven-development install --target codex
+npx intent-driven-development install --target copilot
+npx intent-driven-development install --target gemini
+```
+
+Use NuGet when a .NET-friendly package is the most convenient way to consume the
+same canonical methodology, adapters, and generated files:
+
+```powershell
+dotnet add package DimonSmart.IntentDrivenDevelopment
+```
 
 ## What This Method Optimizes For
 
@@ -280,8 +315,15 @@ The script runs the local check, creates the next `vMAJOR.MINOR.PATCH` tag, and
 pushes it.
 
 Then `.github/workflows/publish-package.yml` packs
-`DimonSmart.IntentDrivenDevelopment`, creates a GitHub Release, and publishes
-the package to NuGet.
+the release archive, checksums, `DimonSmart.IntentDrivenDevelopment`, and the
+npm package archive. It creates a GitHub Release, publishes the NuGet package,
+and publishes npm only when `NPM_TOKEN` is configured.
+
+Local release packaging uses the same script as CI:
+
+```powershell
+.\scripts\Pack-Release.ps1 -Version 1.0.0
+```
 
 ## Summary
 

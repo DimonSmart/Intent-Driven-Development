@@ -1,5 +1,6 @@
 generated/
 artifacts/
+manifest.json
 bin/
 obj/
 
