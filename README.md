@@ -161,6 +161,21 @@ The generated files are useful. They are just not authoritative.
 If something important changes, update the canonical source and regenerate the
 target files.
 
+## Context Discipline
+
+IDD avoids large universal workflows that read many files, generate many
+intermediate artifacts, and leave long reasoning traces in the main agent
+conversation.
+
+Specification work should be split into small focused skills.
+
+A skill should read only the specifications needed for the current decision.
+Large specification-maintenance operations should return a compact result: the
+proposed change, conflicts, affected files, and verification notes.
+
+When an AI coding tool supports isolated or forked execution for heavy skills,
+IDD adapters may use it to keep the main conversation focused.
+
 ## Repository Layout
 
 ```text
