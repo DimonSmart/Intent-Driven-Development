@@ -76,9 +76,40 @@ A specification should answer one question:
 
 > If we delete the implementation, can we rebuild the product from these files?
 
+In this method, intent means stable product truth that future implementations
+must preserve.
+
+A task says what to do next. Intent says what must remain true after the task is
+done.
+
 If the answer is yes, the specification is useful.
 
 If the answer is no, it is probably just a task list, a note, or a chat summary.
+
+## One-Page Mental Model
+
+Ask one question first:
+
+> Does this change affect what future implementations must preserve?
+
+If yes, update or create a specification or ADR.
+
+If no, keep it in a task, issue, pull request, commit message, or chat.
+
+If unsure, create a spike or ask for clarification before turning it into
+normative product intent.
+
+| Change | Goes to `.specs/`? | Reason |
+| --- | --- | --- |
+| Product behavior changes | Yes | Future implementations must preserve it |
+| Domain contract changes | Yes | It affects product meaning |
+| Accepted architecture changes | Yes | It constrains future implementation |
+| Acceptance criteria or verification changes | Yes | It changes how correctness is judged |
+| Local task or TODO | No | It describes work, not product truth |
+| Temporary implementation status | No | It may be obsolete tomorrow |
+| Formatting or small refactoring | No | It does not change product intent |
+| Generated agent output | No | Generated files are not authoritative |
+| Existing implementation differs from spec | Not automatically | Implementation evidence is not intent by itself |
 
 ## What Goes Into Specifications
 
@@ -109,9 +140,7 @@ Bad specification content:
 - duplicated instruction files
 ```
 
-A task says what to do next.
-
-A specification says what should remain true after the task is done.
+A specification says what should remain true after the work is done.
 
 ## How Agents Fit In
 
