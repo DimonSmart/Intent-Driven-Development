@@ -3,5 +3,7 @@ artifacts/
 manifest.json
 bin/
 obj/
+!npm/bin/
+!npm/bin/**
 
 /.vs
