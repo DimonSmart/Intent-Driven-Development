@@ -66,7 +66,8 @@ void ExpectSkillFiles(string skillsRoot)
         "spec-import",
         "spec-create",
         "spec-update-from-implementation",
-        "spec-reorganize"
+        "spec-reorganize",
+        "spec-check-implementation"
     };
 
     foreach (var skill in expected)
