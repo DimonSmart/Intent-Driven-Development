@@ -113,19 +113,37 @@ function Copy-NpmSource {
     Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE") -Destination $packageContentRoot -Force
 }
 
+function Invoke-RequiredCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$Command,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Description
+    )
+
+    & $Command
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Description failed with exit code $LASTEXITCODE."
+    }
+}
+
 New-Item -ItemType Directory -Force -Path $artifactsRoot | Out-Null
 Remove-DirectoryIfExists $releaseContentRoot
 Remove-DirectoryIfExists $npmStagingRoot
-Remove-FileIfExists $releaseZipPath
 Remove-FileIfExists $artifactChecksumsPath
+Get-ChildItem -LiteralPath $artifactsRoot -Filter "intent-driven-development-v*.zip" -File | Remove-Item -Force
 Get-ChildItem -LiteralPath $artifactsRoot -Filter "*.nupkg" -File | Remove-Item -Force
 Get-ChildItem -LiteralPath $artifactsRoot -Filter "*.tgz" -File | Remove-Item -Force
 
 if (-not $SkipCheck) {
     & (Join-Path $repoRoot "scripts/Check.ps1")
+    if ($LASTEXITCODE -ne 0) {
+        throw "Check failed with exit code $LASTEXITCODE."
+    }
 }
 else {
-    dotnet run --project tools/generate
+    Invoke-RequiredCommand -Description "Generator" -Command { dotnet run --project tools/generate }
 }
 
 Write-Manifest $manifestPath
@@ -141,19 +159,29 @@ Write-Checksums $releaseContentRoot $contentChecksumsPath
 
 Compress-Archive -Path (Join-Path $releaseContentRoot "*") -DestinationPath $releaseZipPath -Force
 
-dotnet pack IntentDrivenDevelopment.Package/IntentDrivenDevelopment.Package.csproj `
-    --configuration Release `
-    --output artifacts `
-    -p:PackageVersion=$Version
+Invoke-RequiredCommand -Description "NuGet package pack" -Command {
+    dotnet pack IntentDrivenDevelopment.Package/IntentDrivenDevelopment.Package.csproj `
+        --configuration Release `
+        --output artifacts `
+        -p:PackageVersion=$Version `
+        -p:Version=$Version
+}
+
+Invoke-RequiredCommand -Description ".NET tool package pack" -Command {
+    dotnet pack tools/idd-tool/IntentDrivenDevelopment.Tool.csproj `
+        --configuration Release `
+        --output artifacts `
+        -p:PackageVersion=$Version `
+        -p:Version=$Version
+}
 
 Copy-NpmSource
-npm pack $npmStagingRoot --pack-destination $artifactsRoot
+Invoke-RequiredCommand -Description "npm package pack" -Command { npm pack $npmStagingRoot --pack-destination $artifactsRoot }
 
 $artifactFiles = @(
     $releaseZipPath
-    (Get-ChildItem -LiteralPath $artifactsRoot -Filter "*.nupkg" -File | Select-Object -First 1).FullName
     (Get-ChildItem -LiteralPath $artifactsRoot -Filter "*.tgz" -File | Select-Object -First 1).FullName
-)
+) + (Get-ChildItem -LiteralPath $artifactsRoot -Filter "*.nupkg" -File | ForEach-Object { $_.FullName })
 
 $artifactLines = $artifactFiles |
     Sort-Object |

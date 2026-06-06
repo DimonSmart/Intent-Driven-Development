@@ -189,6 +189,7 @@ src/adapters/       target-specific entry points and skill front matter
 generated/          generated files for each AI coding agent system
 npm/                universal CLI delivery wrapper
 tools/generate/     C# generator
+tools/idd-tool/     .NET global tool CLI installer
 tools/smoke-tests/  smoke tests for generated output
 scripts/            local check and release helper scripts
 ```
@@ -240,7 +241,8 @@ Recommended distribution:
 ```text
 - GitHub Releases for versioned artifacts
 - npm/npx for universal CLI installation
-- NuGet for .NET-friendly consumption
+- .NET tool for .NET-friendly CLI installation
+- NuGet package for .NET-friendly file consumption
 ```
 
 Use npm/npx when you want to install generated agent files into any project
@@ -259,6 +261,14 @@ same canonical methodology, adapters, and generated files:
 
 ```powershell
 dotnet add package DimonSmart.IntentDrivenDevelopment
+```
+
+Use the .NET global tool when you want a .NET-native installer command:
+
+```powershell
+dotnet tool install --global DimonSmart.IntentDrivenDevelopment.Tool
+intent-driven-development list-targets
+intent-driven-development install --target codex
 ```
 
 ## What This Method Optimizes For
@@ -315,9 +325,10 @@ The script runs the local check, creates the next `vMAJOR.MINOR.PATCH` tag, and
 pushes it.
 
 Then `.github/workflows/publish-package.yml` packs
-the release archive, checksums, `DimonSmart.IntentDrivenDevelopment`, and the
-npm package archive. It creates a GitHub Release, publishes the NuGet package,
-and publishes npm only when `NPM_TOKEN` is configured.
+the release archive, checksums, `DimonSmart.IntentDrivenDevelopment`,
+`DimonSmart.IntentDrivenDevelopment.Tool`, and the npm package archive. It
+creates a GitHub Release, publishes the NuGet packages, and publishes npm only
+when `NPM_TOKEN` is configured.
 
 Local release packaging uses the same script as CI:
 
