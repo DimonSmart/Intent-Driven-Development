@@ -6,7 +6,7 @@ tool-specific instruction files.
 
 The idea is simple:
 
-> Keep the product intent in one living specification.
+> Keep product intent in one canonical specification set.
 > Generate agent-specific instructions from that source.
 > Let AI help with implementation, but keep engineering judgment in the loop.
 

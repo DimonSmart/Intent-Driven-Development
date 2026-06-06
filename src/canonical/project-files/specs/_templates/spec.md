@@ -4,6 +4,11 @@
 
 Describe the durable product intent.
 
+## Related Specifications
+
+List related specs, ADRs, or spikes that define adjacent, shared, or dependent
+intent.
+
 ## Behavior
 
 Describe observable behavior and domain contracts.

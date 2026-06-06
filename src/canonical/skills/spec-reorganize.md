@@ -85,10 +85,10 @@ spec or section to extract, or a target spec to consolidate into.
 
 ## Workflow
 
-1. Read `.specs/README.md`, `.specs/INDEX.md`, and relevant current numbered
+1. Identify the concrete reorganization focus from the request.
+2. If no concrete focus is present, stop and ask for one.
+3. Read `.specs/README.md`, `.specs/INDEX.md`, and relevant current numbered
    documents directly under `.specs/`.
-2. Identify the concrete reorganization focus from the request.
-3. If no concrete focus is present, stop and ask for one.
 4. Find current specification fragments related to the focus.
 5. Classify found fragments as:
 
