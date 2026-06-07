@@ -43,6 +43,33 @@ The important part is the first one.
 Product intent should survive tool changes, agent changes, and implementation
 attempts.
 
+## Current Model
+
+Main instruction files are small routers:
+
+```text
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+.github/copilot-instructions.md
+```
+
+They say when to use IDD, where product intent lives, and which focused skills
+to load.
+
+Detailed IDD workflows live in skills:
+
+```text
+.claude/skills/*
+.agents/skills/*
+.github/skills/*
+```
+
+Project product intent lives in `.specs/`.
+
+Do not put full methodology into `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, or
+`.github/copilot-instructions.md`.
+
 ## How It Differs from Spec-Driven Development
 
 Spec-Driven Development has a good core idea: describe what should be built
@@ -154,14 +181,15 @@ instruction formats. That is a tooling detail.
 
 The project should not make one agent's format the source of truth.
 
-IDD keeps canonical methodology and project rules in source files, then
-generates agent-specific output from them.
+IDD keeps canonical methodology, compact bootstrap packs, project rules, and
+skills in source files, then generates agent-specific output from them.
 
 ```text
-canonical source -> adapters -> generated agent files
+canonical source -> adapters -> generated agent files and skills
 ```
 
-The generated files are useful. They are just not authoritative.
+In this repository, `src/canonical/` is authoritative and `generated/` is build
+output.
 
 If something important changes, update the canonical source and regenerate the
 target files.
@@ -185,6 +213,9 @@ IDD adapters may use it to keep the main conversation focused.
 
 ```text
 src/canonical/      canonical methodology, project files, skills, and packs
+src/canonical/packs/ compact bootstrap content for main instruction files
+src/canonical/methodology/ full methodology for skills and project docs
+src/canonical/skills/ task-specific workflows
 src/adapters/       target-specific entry points and skill front matter
 generated/          generated files for each AI coding agent system
 npm/                universal CLI delivery wrapper
@@ -255,6 +286,16 @@ npx intent-driven-development install --target codex
 npx intent-driven-development install --target copilot
 npx intent-driven-development install --target gemini
 ```
+
+The default install mode is compact:
+
+```bash
+npx intent-driven-development install --target claude --entry minimal
+```
+
+Use `--entry none` to install only skills for targets that support them. Use
+`--entry full` only as a legacy/debug mode for environments that cannot load
+skills reliably.
 
 Use NuGet when a .NET-friendly package is the most convenient way to consume the
 same canonical methodology, adapters, and generated files:

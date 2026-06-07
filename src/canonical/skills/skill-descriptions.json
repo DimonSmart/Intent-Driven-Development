@@ -1,7 +1,7 @@
 {
-  "spec-create": "Create a new IDD spec, ADR, or spike for durable product intent. Do not use for local tasks or temporary implementation notes.",
-  "spec-import": "Import existing durable product intent into the IDD .specs structure while preserving meaning and keeping conflicts visible.",
-  "spec-reorganize": "Reorganize existing .specs intent around a concrete topic, source, or target without changing product meaning.",
-  "spec-check-implementation": "Compare focused implementation evidence against current .specs intent and classify matches, mismatches, missing specs, or unclear intent.",
-  "spec-update-from-implementation": "Update current specs from verified implementation behavior only after explicit confirmation that the behavior is intended product intent."
+  "spec-create": "Create a new IDD spec, ADR, or spike for durable product intent.",
+  "spec-import": "Import existing durable product intent into the IDD `.specs/` structure.",
+  "spec-reorganize": "Reorganize existing `.specs/` intent without changing product meaning.",
+  "spec-check-implementation": "Check whether implementation behavior matches durable product intent in `.specs/`.",
+  "spec-update-from-implementation": "Update specs from confirmed implementation behavior intended as product intent."
 }

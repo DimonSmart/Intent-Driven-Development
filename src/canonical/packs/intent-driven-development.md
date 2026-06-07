@@ -1,30 +1,15 @@
-# Intent-Driven Development Pack
+This project uses Intent-Driven Development.
 
-Use Intent-Driven Development for durable product intent.
+Current product intent lives in `.specs/`.
 
-## Required Reading
+Use IDD only when working with durable product intent.
 
-Read these concepts before deciding whether a specification change is needed:
+Do not load the whole `.specs/` directory by default. Read
+`.specs/README.md`, `.specs/INDEX.md`, then only relevant numbered specs.
 
-- Intent is stable product truth that future implementations must preserve.
-- A specification is a durable product description, not a task list.
-- Specifications should be complete enough to rebuild the product from scratch,
-  and strict enough not to become a task tracker.
-- Current normative intent lives directly under `.specs/`.
-- Archived documents are historical and are not current intent.
-- Implementation evidence is not product intent by itself.
-- Semantic changes must be represented in specifications or ADRs.
+{{skillGuidance}}
 
-## Method Summary
+Do not put local tasks, temporary implementation notes, generated plans, or chat
+history into `.specs/`.
 
-Use `.specs/` when a change affects product behavior, domain contracts,
-architectural shape, durable patterns, compatibility expectations, non-goals,
-acceptance criteria, verification rules, or shared behavior.
-
-Do not create or modify specifications for local tasks, temporary status,
-ordinary dependency updates, formatting, small refactoring, or implementation
-details that do not define the product. Generated agent output is not
-authoritative.
-
-Numbered documents give intent a stable identity. Preserve references by number
-when titles or filenames change.
+{{workflowGuidance}}

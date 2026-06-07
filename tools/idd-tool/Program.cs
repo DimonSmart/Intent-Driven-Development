@@ -42,8 +42,8 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         Console.WriteLine("""
             Usage:
               intent-driven-development init [--force]
-              intent-driven-development install --target <target> [--force]
-              intent-driven-development install --all [--force]
+              intent-driven-development install --target <target> [--entry minimal|none|full] [--force]
+              intent-driven-development install --all [--entry minimal|none|full] [--force]
               intent-driven-development list-targets
               intent-driven-development version
             """);
@@ -94,12 +94,13 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
     private int Install()
     {
         var commandArgs = args.Skip(1).ToArray();
-        EnsureNoUnknownOptions(commandArgs, "--target", "--all", "--force");
+        EnsureNoUnknownOptions(commandArgs, "--target", "--all", "--entry", "--force");
 
         var manifest = ReadManifest();
         var force = commandArgs.Contains("--force", StringComparer.Ordinal);
         var installAll = commandArgs.Contains("--all", StringComparer.Ordinal);
         var target = ValueAfter(commandArgs, "--target");
+        var entryMode = ParseEntryMode(ValueAfter(commandArgs, "--entry"));
 
         if (installAll && target is not null)
         {
@@ -112,9 +113,9 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         }
 
         var targets = installAll ? manifest.Targets : [ValidateTarget(manifest, target!)];
-        var plannedFiles = CollectTargetFiles(targets);
+        var plannedFiles = CollectTargetFiles(manifest, targets, entryMode);
         CopyPlannedFiles(plannedFiles, Directory.GetCurrentDirectory(), force);
-        Console.WriteLine($"Installed {string.Join(", ", targets)}.");
+        Console.WriteLine($"Installed {string.Join(", ", targets)} with {entryMode} entry.");
         return 0;
     }
 
@@ -172,7 +173,23 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         throw new ToolException($"Unknown target: {target}" + Environment.NewLine + $"Available targets: {string.Join(", ", manifest.Targets)}");
     }
 
-    private static IReadOnlyList<PlannedFile> CollectTargetFiles(IEnumerable<string> targets)
+    private static EntryMode ParseEntryMode(string? value)
+    {
+        if (value is null)
+        {
+            return EntryMode.Minimal;
+        }
+
+        return value switch
+        {
+            "minimal" => EntryMode.Minimal,
+            "none" => EntryMode.None,
+            "full" => EntryMode.Full,
+            _ => throw new ToolException($"Unknown entry mode: {value}" + Environment.NewLine + "Available entry modes: minimal, none, full")
+        };
+    }
+
+    private static IReadOnlyList<PlannedFile> CollectTargetFiles(Manifest manifest, IEnumerable<string> targets, EntryMode entryMode)
     {
         var contentRoot = FindContentRoot();
         var byRelativePath = new Dictionary<string, PlannedFile>(StringComparer.Ordinal);
@@ -188,7 +205,15 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
             foreach (var sourcePath in Directory.GetFiles(sourceRoot, "*", SearchOption.AllDirectories))
             {
                 var relativePath = Normalize(Path.GetRelativePath(sourceRoot, sourcePath));
-                var hash = Sha256(sourcePath);
+                if (entryMode != EntryMode.Minimal &&
+                    manifest.EntryPoints.TryGetValue(target, out var entryPoint) &&
+                    StringComparer.Ordinal.Equals(relativePath, Normalize(entryPoint)))
+                {
+                    continue;
+                }
+
+                var content = File.ReadAllBytes(sourcePath);
+                var hash = Sha256(content);
 
                 if (byRelativePath.TryGetValue(relativePath, out var existing))
                 {
@@ -200,11 +225,63 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
                     continue;
                 }
 
-                byRelativePath.Add(relativePath, new PlannedFile(relativePath, sourcePath, hash));
+                byRelativePath.Add(relativePath, new PlannedFile(relativePath, content, hash));
+            }
+
+            if (entryMode == EntryMode.Full)
+            {
+                var fullEntry = BuildFullEntry(contentRoot, manifest, target);
+                if (byRelativePath.TryGetValue(fullEntry.RelativePath, out var existing))
+                {
+                    if (!StringComparer.Ordinal.Equals(existing.Hash, fullEntry.Hash))
+                    {
+                        throw new ToolException($"Conflicting bundled files for path: {fullEntry.RelativePath}");
+                    }
+
+                    continue;
+                }
+
+                byRelativePath.Add(fullEntry.RelativePath, fullEntry);
             }
         }
 
         return byRelativePath.Values.ToArray();
+    }
+
+    private static PlannedFile BuildFullEntry(string contentRoot, Manifest manifest, string target)
+    {
+        if (!manifest.EntryPoints.TryGetValue(target, out var entryPoint))
+        {
+            throw new ToolException($"No entry point configured for target: {target}");
+        }
+
+        var blocks = new[]
+        {
+            ReadRequired(Path.Combine(contentRoot, "src", "adapters", target, "entry.md")),
+            ReadRequired(Path.Combine(contentRoot, "src", "canonical", "packs", "intent-driven-development.md"))
+                .Replace("{{skillGuidance}}", "Use the generated IDD skills when they are available for the target.", StringComparison.Ordinal)
+                .Replace("{{workflowGuidance}}", "This file and installed IDD skills are workflow guidance.\nThey are not product specifications.", StringComparison.Ordinal),
+            ReadCanonicalMethodology(contentRoot)
+        };
+
+        var content = Header + string.Join(Environment.NewLine + Environment.NewLine, blocks.Select(block => block.Trim())) + Environment.NewLine;
+        var bytes = System.Text.Encoding.UTF8.GetBytes(content);
+        return new PlannedFile(Normalize(entryPoint), bytes, Sha256(bytes));
+    }
+
+    private static string ReadCanonicalMethodology(string contentRoot)
+    {
+        var methodologyRoot = Path.Combine(contentRoot, "src", "canonical", "methodology");
+        var names = new[]
+        {
+            "intent-driven-development.md",
+            "numbering.md",
+            "document-types.md",
+            "semantic-changes.md",
+            "agent-workflow.md"
+        };
+
+        return string.Join(Environment.NewLine + Environment.NewLine, names.Select(name => ReadRequired(Path.Combine(methodologyRoot, name)).Trim()));
     }
 
     private static void CopyPlannedFiles(IReadOnlyList<PlannedFile> files, string destinationRoot, bool force)
@@ -225,7 +302,7 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         {
             var destination = Path.Combine(destinationRoot, file.RelativePath);
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            File.Copy(file.SourcePath, destination, overwrite: true);
+            File.WriteAllBytes(destination, file.Content);
         }
     }
 
@@ -262,7 +339,7 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
                 throw new ToolException($"Unknown option: {arg}");
             }
 
-            if (arg == "--target")
+            if (arg is "--target" or "--entry")
             {
                 index++;
             }
@@ -285,8 +362,20 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         return commandArgs[index + 1];
     }
 
-    private static string Sha256(string path) =>
-        Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))).ToLowerInvariant();
+    private const string Header = """
+        <!--
+        Generated from Intent-Driven-Development canonical sources.
+        Do not edit this file directly.
+        Edit files under src/canonical instead.
+        -->
+
+        """;
+
+    private static string ReadRequired(string path) =>
+        File.Exists(path) ? File.ReadAllText(path) : throw new ToolException($"Required bundled file not found: {path}");
+
+    private static string Sha256(byte[] content) =>
+        Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
 
     private static string Normalize(string value) => value.Replace('\\', '/');
 
@@ -305,6 +394,13 @@ internal sealed record Manifest(
     string[] Targets,
     Dictionary<string, string> EntryPoints);
 
-internal sealed record PlannedFile(string RelativePath, string SourcePath, string Hash);
+internal sealed record PlannedFile(string RelativePath, byte[] Content, string Hash);
+
+internal enum EntryMode
+{
+    Minimal,
+    None,
+    Full
+}
 
 internal sealed class ToolException(string message) : Exception(message);

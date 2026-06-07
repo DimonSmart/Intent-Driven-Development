@@ -38,6 +38,8 @@ static string FindRepoRoot()
 
 internal sealed class Generator(string repoRoot)
 {
+    private const int EntryPointLineLimit = 80;
+
     private const string Header = """
         <!--
         Generated from Intent-Driven-Development canonical sources.
@@ -89,9 +91,10 @@ internal sealed class Generator(string repoRoot)
     {
         var files = new List<GeneratedFile>();
         var entry = ReadRequired(Path.Combine(adapterDir, "entry.md"));
-        var pack = ReadRequired(Path.Combine(repoRoot, "src", "canonical", "packs", "intent-driven-development.md"));
-        var methodology = ReadCanonicalMethodology();
-        files.Add(new GeneratedFile(adapter.EntryPoint, WithHeader(adapter, JoinBlocks(entry, pack, methodology))));
+        var pack = BuildPack(adapter);
+        var entryPoint = WithHeader(adapter, JoinBlocks(entry, pack));
+        GuardEntryPointSize(adapter.EntryPoint, entryPoint);
+        files.Add(new GeneratedFile(adapter.EntryPoint, entryPoint));
 
         if (adapter.SupportsSkills)
         {
@@ -144,19 +147,41 @@ internal sealed class Generator(string repoRoot)
         return files;
     }
 
-    private string ReadCanonicalMethodology()
+    private string BuildPack(AdapterConfig adapter)
     {
-        var methodologyRoot = Path.Combine(repoRoot, "src", "canonical", "methodology");
-        var names = new[]
-        {
-            "intent-driven-development.md",
-            "numbering.md",
-            "document-types.md",
-            "semantic-changes.md",
-            "agent-workflow.md"
-        };
+        var pack = ReadRequired(Path.Combine(repoRoot, "src", "canonical", "packs", "intent-driven-development.md"));
+        var skillGuidance = adapter.SupportsSkills
+            ? """
+              Use IDD skills for specific workflows:
+              - `spec-create`
+              - `spec-import`
+              - `spec-reorganize`
+              - `spec-check-implementation`
+              - `spec-update-from-implementation`
+              """
+            : """
+              This target does not use generated IDD skills. Keep IDD work focused and
+              read only the documents needed for the current task.
+              """;
+        var workflowGuidance = adapter.SupportsSkills
+            ? "This file and installed IDD skills are workflow guidance.\nThey are not product specifications."
+            : "This file is workflow guidance.\nIt is not a product specification.";
 
-        return JoinBlocks(names.Select(name => ReadRequired(Path.Combine(methodologyRoot, name))).ToArray());
+        return pack
+            .Replace("{{skillGuidance}}", skillGuidance.Trim(), StringComparison.Ordinal)
+            .Replace("{{workflowGuidance}}", workflowGuidance.Trim(), StringComparison.Ordinal);
+    }
+
+    private static void GuardEntryPointSize(string relativePath, string content)
+    {
+        var lineCount = content.ReplaceLineEndings("\n").Split('\n').Length;
+        if (lineCount > EntryPointLineLimit)
+        {
+            throw new InvalidOperationException(
+                $"Entry point is too large: {relativePath} has {lineCount} lines, limit is {EntryPointLineLimit}." +
+                Environment.NewLine +
+                "Move detailed workflow into skills or path-scoped instructions.");
+        }
     }
 
     private IReadOnlyList<GeneratedFile> BuildProjectFiles(AdapterConfig adapter)

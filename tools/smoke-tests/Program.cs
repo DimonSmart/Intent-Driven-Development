@@ -23,10 +23,14 @@ ExpectSkillFiles("generated/copilot/.github/skills");
 ExpectGeneratedHeaders();
 ExpectNoGeneratedText("Worklog-driven development");
 ExpectNoGeneratedText(".worklog");
+ExpectNoGeneratedText("Generated files are not source of truth");
 ExpectNoCanonicalAgentCoupling();
 ExpectNoEntryIncludes("generated/claude/CLAUDE.md", "AGENTS.md");
 ExpectNoEntryIncludes("generated/gemini/GEMINI.md", "AGENTS.md");
+ExpectEntryPointLineLimits();
+ExpectNoFullMethodologyInEntryPoints();
 ExpectAllSkillsGenerated();
+ExpectInstallEntryNone();
 ExpectGeneratorCheckPasses();
 ExpectSecondRunStable();
 
@@ -129,6 +133,43 @@ void ExpectNoEntryIncludes(string relativePath, string forbidden)
     }
 }
 
+void ExpectEntryPointLineLimits()
+{
+    foreach (var relativePath in EntryPoints())
+    {
+        var content = File.ReadAllText(Path.Combine(repoRoot, relativePath));
+        var lineCount = content.ReplaceLineEndings("\n").Split('\n').Length;
+        if (lineCount > 80)
+        {
+            failures.Add($"Entry point exceeds 80 lines: {relativePath} has {lineCount} lines.");
+        }
+    }
+}
+
+void ExpectNoFullMethodologyInEntryPoints()
+{
+    var forbidden = new[]
+    {
+        "## Required Reading",
+        "## Method Summary",
+        "## Classification Rules",
+        "## Output Format",
+        "Specifications should be complete enough to rebuild the product from scratch"
+    };
+
+    foreach (var relativePath in EntryPoints())
+    {
+        var content = File.ReadAllText(Path.Combine(repoRoot, relativePath));
+        foreach (var text in forbidden)
+        {
+            if (content.Contains(text, StringComparison.OrdinalIgnoreCase))
+            {
+                failures.Add($"Entry point contains full methodology text '{text}': {relativePath}");
+            }
+        }
+    }
+}
+
 void ExpectAllSkillsGenerated()
 {
     var canonicalSkills = Directory
@@ -169,6 +210,40 @@ void ExpectGeneratorCheckPasses()
     }
 }
 
+void ExpectInstallEntryNone()
+{
+    var tempRoot = Path.Combine(Path.GetTempPath(), "idd-smoke-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(tempRoot);
+
+    try
+    {
+        var toolProject = Path.Combine(repoRoot, "tools", "idd-tool");
+        var exitCode = RunProcess("dotnet", $"run --project \"{toolProject}\" -- install --target claude --entry none", tempRoot);
+        if (exitCode != 0)
+        {
+            failures.Add("Install with --entry none failed.");
+            return;
+        }
+
+        if (File.Exists(Path.Combine(tempRoot, "CLAUDE.md")))
+        {
+            failures.Add("Install with --entry none created CLAUDE.md.");
+        }
+
+        if (!File.Exists(Path.Combine(tempRoot, ".claude", "skills", "spec-create", "SKILL.md")))
+        {
+            failures.Add("Install with --entry none did not install skills.");
+        }
+    }
+    finally
+    {
+        if (Directory.Exists(tempRoot))
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+}
+
 void ExpectSecondRunStable()
 {
     var before = SnapshotGeneratedFiles();
@@ -200,11 +275,11 @@ string[] SnapshotGeneratedFiles() =>
         .OrderBy(value => value)
         .ToArray();
 
-int RunProcess(string fileName, string arguments)
+int RunProcess(string fileName, string arguments, string? workingDirectory = null)
 {
     using var process = Process.Start(new ProcessStartInfo(fileName, arguments)
     {
-        WorkingDirectory = repoRoot,
+        WorkingDirectory = workingDirectory ?? repoRoot,
         RedirectStandardOutput = true,
         RedirectStandardError = true,
         UseShellExecute = false
@@ -225,6 +300,14 @@ int RunProcess(string fileName, string arguments)
 }
 
 string Relative(string path) => Path.GetRelativePath(repoRoot, path).Replace('\\', '/');
+
+string[] EntryPoints() =>
+[
+    "generated/claude/CLAUDE.md",
+    "generated/codex/AGENTS.md",
+    "generated/gemini/GEMINI.md",
+    "generated/copilot/.github/copilot-instructions.md"
+];
 
 static string FindRepoRoot()
 {
