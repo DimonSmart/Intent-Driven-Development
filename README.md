@@ -1,26 +1,34 @@
 # Intent-Driven Development
 
-> **If the codebase disappeared, an AI agent should be able to rebuild the product from the specifications.**
->
-> **That only works when specifications contain product truth, not task noise.**
+## The thought experiment
 
-AI can generate code quickly.
+Delete the entire implementation.
 
-Long-term software development fails in a different place: project memory turns into garbage. Specifications get mixed with tasks, generated plans, implementation notes, temporary fixes and old decisions. After a while, nobody knows what is still true and what was just part of yesterday's AI session.
+Keep only the specifications.
 
-**Intent-Driven Development** is a specification system for long-running AI-assisted development.
+Can an AI coding agent rebuild the product from them?
 
-Its goal is simple:
+If the specs contain only what helps recreate the product, and nothing that is just temporary task noise, they are good specs.
 
-> Keep specifications clean enough that any AI coding agent can recreate the product from scratch, using only what actually helps to build the product.
-
-## Why not just Spec-Driven Development?
+## Why another take on spec-driven development?
 
 Spec-Driven Development made the right move: start from a spec.
 
-Intent-Driven Development keeps that idea, but adds a stricter rule:
+But in practice, many spec-driven workflows slowly turn specs into a pile of tasks, test notes, code fragments, bug-fix plans, TODOs, and temporary decisions. That does not make specifications stronger. It makes them harder to use as product intent.
 
-> **The spec is not a task tracker.**
+In this project, a specification is the description of the product we want to have, even when the current implementation temporarily differs from that ideal state. Deviations can be tracked separately; they should not rewrite the meaning of the target product.
+
+## What this project provides
+
+This project provides the **Intent-Driven Development** methodology and a set of supporting skills for different AI coding agents.
+
+The skills help agents create, review, reconcile, import, and index specifications without turning them into task logs.
+
+## Why not just Spec-Driven Development?
+
+Intent-Driven Development goes further. It keeps the specification pointed at the product, while separating durable product intent from temporary tasks, test work, bug fixes, TODOs, and implementation noise.
+
+That difference matters in long-running AI-assisted development. Spec-driven workflows can drown in their own artifacts. Intent-Driven Development is designed to stay useful after many agent sessions, many fixes, and many changes of plan.
 
 | Spec-Driven Development | Intent-Driven Development |
 | --- | --- |
@@ -39,9 +47,8 @@ Not:
 
 > What did the agent do today?
 
-Tasks change.  
-Plans change.  
-Agents change.  
+Tasks change. Plans change. Agents change.
+
 Product intent should stay stable.
 
 ## Documentation
