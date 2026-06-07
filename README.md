@@ -1,391 +1,51 @@
 # Intent-Driven Development
 
-Intent-Driven Development is a practical way to use AI coding agents without
-turning the project into a pile of disconnected prompts, generated plans, and
-tool-specific instruction files.
+> **If the codebase disappeared, an AI agent should be able to rebuild the product from the specifications.**
+>
+> **That only works when specifications contain product truth, not task noise.**
 
-The idea is simple:
+AI can generate code quickly.
 
-> Keep product intent in one canonical specification set.
-> Generate agent-specific instructions from that source.
-> Let AI help with implementation, but keep engineering judgment in the loop.
+Long-term software development fails in a different place: project memory turns into garbage. Specifications get mixed with tasks, generated plans, implementation notes, temporary fixes and old decisions. After a while, nobody knows what is still true and what was just part of yesterday's AI session.
 
-The guiding rule:
+**Intent-Driven Development** is a specification system for long-running AI-assisted development.
 
-> Specifications should be complete enough to rebuild the product from scratch,
-> and strict enough not to become a task tracker.
+Its goal is simple:
 
-This is close to Spec-Driven Development, but with a different emphasis.
+> Keep specifications clean enough that any AI coding agent can recreate the product from scratch, using only what actually helps to build the product.
 
-The specification is not a magic executable artifact. It does not replace
-architecture, code review, testing, or human responsibility. It is a stable
-description of what the product should become.
+## Why not just Spec-Driven Development?
 
-## Why This Exists
+Spec-Driven Development made the right move: start from a spec.
 
-AI coding agents are useful, but they have a weak memory model.
+Intent-Driven Development keeps that idea, but adds a stricter rule:
 
-A chat can contain the right decision today and lose it tomorrow. One agent can
-know the project rules while another agent sees only a local prompt. A generated
-instruction file can drift from the real product intent. After several
-iterations, nobody is completely sure which file is the source of truth.
+> **The spec is not a task tracker.**
 
-Intent-Driven Development fixes that by separating three things:
+| Spec-Driven Development | Intent-Driven Development |
+| --- | --- |
+| Spec, plan and tasks often live too close together | Product intent and temporary work are separated |
+| Generated tasks can start looking like truth | Generated artifacts are disposable |
+| The workflow is often tied to one tool | Product intent stays independent from AI agents |
+| Good for starting features | Better for keeping a project coherent over time |
 
-```text
-product intent      durable product knowledge
-agent instructions  generated target formats
-implementation      code, tests, scripts, and concrete changes
-```
+## Core idea
 
-The important part is the first one.
+A specification should answer:
 
-Product intent should survive tool changes, agent changes, and implementation
-attempts.
+> **What product are we building?**
 
-## Current Model
+Not:
 
-Main instruction files are small routers:
+> What did the agent do today?
 
-```text
-CLAUDE.md
-AGENTS.md
-GEMINI.md
-.github/copilot-instructions.md
-```
+Tasks change.  
+Plans change.  
+Agents change.  
+Product intent should stay stable.
 
-They say when to use IDD, where product intent lives, and which focused skills
-to load.
+## Documentation
 
-Detailed IDD workflows live in skills:
-
-```text
-.claude/skills/*
-.agents/skills/*
-.github/skills/*
-```
-
-Project product intent lives in `.specs/`.
-
-Do not put full methodology into `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, or
-`.github/copilot-instructions.md`.
-
-## How It Differs from Spec-Driven Development
-
-Spec-Driven Development has a good core idea: describe what should be built
-before asking an AI agent to build it.
-
-The problem starts when the specification becomes too many things at once:
-
-```text
-- product description
-- task tracker
-- implementation plan
-- generated checklist
-- temporary chat memory
-- tool-specific command input
-```
-
-That works for small demos. It becomes noisy in a real project.
-
-Intent-Driven Development keeps the useful part and removes the rest.
-
-| Spec-Driven Development                                   | Intent-Driven Development                                     |
-| --------------------------------------------------------- | ------------------------------------------------------------- |
-| The spec often drives a feature workflow                  | The spec describes the target product state                   |
-| Tasks may become part of the spec flow                    | Tasks are temporary and should not become product memory      |
-| The workflow is often tied to one agent or command system | Agents are target formats generated from one canonical source |
-| Generated plans can look authoritative                    | Engineering judgment stays explicit                          |
-| The spec can become a process artifact                    | The spec remains product knowledge                            |
-
-This is why the method is called Intent-Driven Development.
-
-The point is not to worship the spec. The point is to keep the intent stable.
-
-## Core Idea
-
-A specification should answer one question:
-
-> If we delete the implementation, can we rebuild the product from these files?
-
-In this method, intent means stable product truth that future implementations
-must preserve.
-
-A task says what to do next. Intent says what must remain true after the task is
-done.
-
-If the answer is yes, the specification is useful.
-
-If the answer is no, it is probably just a task list, a note, or a chat summary.
-
-## One-Page Mental Model
-
-Ask one question first:
-
-> Does this change affect what future implementations must preserve?
-
-If yes, update or create a specification or ADR.
-
-If no, keep it in a task, issue, pull request, commit message, or chat.
-
-If unsure, create a spike or ask for clarification before turning it into
-normative product intent.
-
-| Change | Goes to `.specs/`? | Reason |
-| --- | --- | --- |
-| Product behavior changes | Yes | Future implementations must preserve it |
-| Domain contract changes | Yes | It affects product meaning |
-| Accepted architecture changes | Yes | It constrains future implementation |
-| Acceptance criteria or verification changes | Yes | It changes how correctness is judged |
-| Local task or TODO | No | It describes work, not product truth |
-| Temporary implementation status | No | It may be obsolete tomorrow |
-| Formatting or small refactoring | No | It does not change product intent |
-| Generated agent output | No | Generated files are not authoritative |
-| Existing implementation differs from spec | Not automatically | Implementation evidence is not intent by itself |
-
-## What Goes Into Specifications
-
-Good specification content:
-
-```text
-- product behavior
-- user scenarios
-- domain contracts
-- important technical constraints
-- architecture decisions that define the product
-- framework or library choices when they are part of the product identity
-- compatibility requirements
-- non-goals
-- acceptance criteria
-- verification rules
-```
-
-Bad specification content:
-
-```text
-- temporary tasks
-- what we are doing today
-- local implementation notes
-- outdated plans
-- generated agent output
-- chat history
-- duplicated instruction files
-```
-
-A specification says what should remain true after the work is done.
-
-## How Agents Fit In
-
-Codex, Claude, Gemini, GitHub Copilot, and other AI coding agents have different
-instruction formats. That is a tooling detail.
-
-The project should not make one agent's format the source of truth.
-
-IDD keeps canonical methodology, compact bootstrap packs, project rules, and
-skills in source files, then generates agent-specific output from them.
-
-```text
-canonical source -> adapters -> generated agent files and skills
-```
-
-In this repository, `src/canonical/` is authoritative and `generated/` is build
-output.
-
-If something important changes, update the canonical source and regenerate the
-target files.
-
-## Context Discipline
-
-IDD avoids large universal workflows that read many files, generate many
-intermediate artifacts, and leave long reasoning traces in the main agent
-conversation.
-
-Specification work should be split into small focused skills.
-
-A skill should read only the specifications needed for the current decision.
-Large specification-maintenance operations should return a compact result: the
-proposed change, conflicts, affected files, and verification notes.
-
-When an AI coding tool supports isolated or forked execution for heavy skills,
-IDD adapters may use it to keep the main conversation focused.
-
-## Repository Layout
-
-```text
-src/canonical/      canonical methodology, project files, skills, and packs
-src/canonical/packs/ compact bootstrap content for main instruction files
-src/canonical/methodology/ full methodology for skills and project docs
-src/canonical/skills/ task-specific workflows
-src/adapters/       target-specific entry points and skill front matter
-generated/          generated files for each AI coding agent system
-npm/                universal CLI delivery wrapper
-tools/generate/     C# generator
-tools/idd-tool/     .NET global tool CLI installer
-tools/smoke-tests/  smoke tests for generated output
-scripts/            local check and release helper scripts
-```
-
-Edit files under `src/canonical/` and `src/adapters/`.
-
-Then run:
-
-```powershell
-.\scripts\Check.ps1
-```
-
-The `generated/` directory is intentionally ignored by git.
-
-It is reproducible output from the canonical source and adapters. Do not edit it
-as product knowledge.
-
-## Workflow
-
-The usual workflow is:
-
-```text
-1. Update canonical methodology or adapters.
-2. Run the local check.
-3. Review generated output.
-4. Use generated files with the target AI coding agent.
-5. Keep durable decisions in canonical specs, not in chat.
-```
-
-In practice, this means:
-
-```powershell
-.\scripts\Check.ps1
-```
-
-The check should prove that the generated agent files are still reproducible and
-valid enough to use.
-
-## Distribution
-
-Intent-Driven Development is release-first.
-
-The canonical versioned artifact is the GitHub Release archive. It contains the
-canonical source, adapters, generated target files, manifest, license, README,
-and checksums for the released content.
-
-Recommended distribution:
-
-```text
-- GitHub Releases for versioned artifacts
-- npm/npx for universal CLI installation
-- .NET tool for .NET-friendly CLI installation
-- NuGet package for .NET-friendly file consumption
-```
-
-Use npm/npx when you want to install generated agent files into any project
-without requiring the .NET SDK:
-
-```bash
-npx intent-driven-development list-targets
-npx intent-driven-development install --target claude
-npx intent-driven-development install --target codex
-npx intent-driven-development install --target copilot
-npx intent-driven-development install --target gemini
-```
-
-The default install mode is compact:
-
-```bash
-npx intent-driven-development install --target claude --entry minimal
-```
-
-Use `--entry none` to install only skills for targets that support them. Use
-`--entry full` only as a legacy/debug mode for environments that cannot load
-skills reliably.
-
-Use NuGet when a .NET-friendly package is the most convenient way to consume the
-same canonical methodology, adapters, and generated files:
-
-```powershell
-dotnet add package DimonSmart.IntentDrivenDevelopment
-```
-
-Use the .NET global tool when you want a .NET-native installer command:
-
-```powershell
-dotnet tool install --global DimonSmart.IntentDrivenDevelopment.Tool
-intent-driven-development list-targets
-intent-driven-development install --target codex
-```
-
-## What This Method Optimizes For
-
-IDD is useful when the project has:
-
-```text
-- more than one AI coding agent
-- long-lived product rules
-- repeated implementation sessions
-- architectural constraints that should not be rediscovered every time
-- generated agent instructions
-- a need to keep project knowledge outside chat history
-```
-
-It is less useful for one-off experiments where the code will be thrown away.
-
-## Non-Goals
-
-IDD deliberately does not try to do several things.
-
-```text
-- Do not turn specifications into a task tracker.
-- Do not store agent-specific instruction copies as the source of truth.
-- Do not build Claude or Gemini instructions on top of Codex AGENTS.md.
-- Do not update CopilotInstructions as a canonical source.
-- Do not create a pull request back to CopilotInstructions.
-- Do not use legacy terminology in canonical methodology or skills.
-```
-
-The method is intentionally boring here.
-
-There should be one canonical source. Everything else is generated, adapted, or
-temporary.
-
-Migration notes from the older project model are in
-`src/canonical/methodology/migration-from-copilotinstructions.md`.
-
-## Release
-
-Pull requests and pushes to `main` run:
-
-```text
-.github/workflows/idd-smoke.yml
-```
-
-Release publication follows the tag-based flow:
-
-```powershell
-.\publish-next-version.ps1
-```
-
-The script runs the local check, creates the next `vMAJOR.MINOR.PATCH` tag, and
-pushes it.
-
-Then `.github/workflows/publish-package.yml` packs
-the release archive, checksums, `DimonSmart.IntentDrivenDevelopment`,
-`DimonSmart.IntentDrivenDevelopment.Tool`, and the npm package archive. It
-creates a GitHub Release, publishes the NuGet packages, and publishes npm only
-when `NPM_TOKEN` is configured.
-
-Local release packaging uses the same script as CI:
-
-```powershell
-.\scripts\Pack-Release.ps1 -Version 1.0.0
-```
-
-## Summary
-
-Intent-Driven Development is Spec-Guided Dev without turning the spec into a
-task tracker or an AI command script.
-
-The specification is the product memory.
-
-The adapters are translation layers.
-
-The generated files are delivery formats for specific agents.
-
-The engineer still owns the result.
+- [Getting Started](docs/getting-started.md)
+- [Methodology](docs/methodology.md)
+- [Project Internals, Distribution and Release Flow](docs/project-maintenance.md)
