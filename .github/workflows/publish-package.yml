@@ -44,7 +44,7 @@ jobs:
           files: |
             ./artifacts/intent-driven-development-v${{ steps.extract_version.outputs.VERSION }}.zip
             ./artifacts/checksums.txt
-            ./artifacts/*.nupkg
+            ./artifacts/DimonSmart.IntentDrivenDevelopment.Tool.${{ steps.extract_version.outputs.VERSION }}.nupkg
             ./artifacts/*.tgz
           draft: false
           prerelease: false
@@ -52,14 +52,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish to NuGet
+      - name: Publish .NET tool to NuGet
         run: |
-          for package in ./artifacts/*.nupkg; do
-            dotnet nuget push "$package" \
-              --api-key ${{ secrets.NUGET_API_KEY }} \
-              --source https://api.nuget.org/v3/index.json \
-              --skip-duplicate
-          done
+          dotnet nuget push "./artifacts/DimonSmart.IntentDrivenDevelopment.Tool.${{ steps.extract_version.outputs.VERSION }}.nupkg" \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
 
       - name: Publish to npm
         if: ${{ env.NPM_TOKEN != '' }}
