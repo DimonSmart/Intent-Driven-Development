@@ -159,14 +159,6 @@ Write-Checksums $releaseContentRoot $contentChecksumsPath
 
 Compress-Archive -Path (Join-Path $releaseContentRoot "*") -DestinationPath $releaseZipPath -Force
 
-Invoke-RequiredCommand -Description "NuGet package pack" -Command {
-    dotnet pack IntentDrivenDevelopment.Package/IntentDrivenDevelopment.Package.csproj `
-        --configuration Release `
-        --output artifacts `
-        -p:PackageVersion=$Version `
-        -p:Version=$Version
-}
-
 Invoke-RequiredCommand -Description ".NET tool package pack" -Command {
     dotnet pack tools/idd-tool/IntentDrivenDevelopment.Tool.csproj `
         --configuration Release `
@@ -178,10 +170,16 @@ Invoke-RequiredCommand -Description ".NET tool package pack" -Command {
 Copy-NpmSource
 Invoke-RequiredCommand -Description "npm package pack" -Command { npm pack $npmStagingRoot --pack-destination $artifactsRoot }
 
+$toolPackagePath = Join-Path $artifactsRoot "DimonSmart.IntentDrivenDevelopment.Tool.$Version.nupkg"
+if (-not (Test-Path -LiteralPath $toolPackagePath)) {
+    throw "Expected .NET tool package not found: $toolPackagePath"
+}
+
 $artifactFiles = @(
     $releaseZipPath
     (Get-ChildItem -LiteralPath $artifactsRoot -Filter "*.tgz" -File | Select-Object -First 1).FullName
-) + (Get-ChildItem -LiteralPath $artifactsRoot -Filter "*.nupkg" -File | ForEach-Object { $_.FullName })
+    $toolPackagePath
+)
 
 $artifactLines = $artifactFiles |
     Sort-Object |
