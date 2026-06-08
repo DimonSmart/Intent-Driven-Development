@@ -20,7 +20,7 @@ ExpectNoDirectory("generated/gemini/.github/skills");
 ExpectFile("generated/copilot/.github/copilot-instructions.md");
 ExpectSkillFiles("generated/copilot/.github/skills");
 
-ExpectGeneratedHeaders();
+ExpectNoGeneratedHeaderComments();
 ExpectNoGeneratedText("Worklog-driven development");
 ExpectNoGeneratedText(".worklog");
 ExpectNoGeneratedText("Generated files are not source of truth");
@@ -81,14 +81,14 @@ void ExpectSkillFiles(string skillsRoot)
     }
 }
 
-void ExpectGeneratedHeaders()
+void ExpectNoGeneratedHeaderComments()
 {
     foreach (var path in GeneratedFiles())
     {
         var text = File.ReadAllText(path);
-        if (!text.ReplaceLineEndings("\n").StartsWith("<!--\nGenerated from Intent-Driven-Development canonical sources.", StringComparison.Ordinal))
+        if (text.Contains("Generated from Intent-Driven-Development canonical sources.", StringComparison.Ordinal))
         {
-            failures.Add($"Missing generated header: {Relative(path)}");
+            failures.Add($"Generated header comment is present: {Relative(path)}");
         }
     }
 }

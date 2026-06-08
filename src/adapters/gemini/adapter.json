@@ -3,6 +3,5 @@
   "entryPoint": "GEMINI.md",
   "skillsRoot": null,
   "supportsSkills": false,
-  "supportsFrontMatter": false,
-  "generatedHeader": true
+  "supportsFrontMatter": false
 }
