@@ -11,12 +11,14 @@
     <Authors>DimonSmart</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
     <Description>.NET global tool installer for Intent-Driven Development generated AI coding agent files.</Description>
   </PropertyGroup>
 
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="/" Visible="false" />
     <None Include="..\..\LICENSE" Pack="true" PackagePath="/" Visible="false" />
+    <None Include="icon.png" Pack="true" PackagePath="/" Visible="false" />
     <Content Include="..\..\manifest.json" Pack="true" PackagePath="tools/$(TargetFramework)/any/package-content/manifest.json" Condition="Exists('..\..\manifest.json')" />
     <Content Include="..\..\README.md" Pack="true" PackagePath="tools/$(TargetFramework)/any/package-content/" />
     <Content Include="..\..\LICENSE" Pack="true" PackagePath="tools/$(TargetFramework)/any/package-content/" />
