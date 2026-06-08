@@ -143,7 +143,6 @@ internal sealed class Generator(string repoRoot)
             }
         }
 
-        files.AddRange(BuildProjectFiles(adapter));
         return files;
     }
 
@@ -182,20 +181,6 @@ internal sealed class Generator(string repoRoot)
                 Environment.NewLine +
                 "Move detailed workflow into skills or path-scoped instructions.");
         }
-    }
-
-    private IReadOnlyList<GeneratedFile> BuildProjectFiles(AdapterConfig adapter)
-    {
-        var files = new List<GeneratedFile>();
-        var specsRoot = Path.Combine(repoRoot, "src", "canonical", "project-files", "specs");
-        foreach (var sourcePath in Directory.GetFiles(specsRoot, "*.md", SearchOption.AllDirectories).OrderBy(path => path))
-        {
-            var relative = Path.GetRelativePath(specsRoot, sourcePath);
-            var target = Path.Combine(".specs", relative);
-            files.Add(new GeneratedFile(target, WithHeader(adapter, ReadRequired(sourcePath))));
-        }
-
-        return files;
     }
 
     private static IReadOnlyList<string> CheckFiles(string outputRoot, IReadOnlyList<GeneratedFile> expectedFiles)

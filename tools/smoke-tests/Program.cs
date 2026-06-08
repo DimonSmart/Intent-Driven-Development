@@ -31,6 +31,7 @@ ExpectEntryPointLineLimits();
 ExpectNoFullMethodologyInEntryPoints();
 ExpectAllSkillsGenerated();
 ExpectInstallEntryNone();
+ExpectInstallAllAfterInit();
 ExpectGeneratorCheckPasses();
 ExpectSecondRunStable();
 
@@ -233,6 +234,51 @@ void ExpectInstallEntryNone()
         if (!File.Exists(Path.Combine(tempRoot, ".claude", "skills", "spec-create", "SKILL.md")))
         {
             failures.Add("Install with --entry none did not install skills.");
+        }
+    }
+    finally
+    {
+        if (Directory.Exists(tempRoot))
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+}
+
+void ExpectInstallAllAfterInit()
+{
+    var tempRoot = Path.Combine(Path.GetTempPath(), "idd-smoke-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(tempRoot);
+
+    try
+    {
+        var toolProject = Path.Combine(repoRoot, "tools", "idd-tool");
+        var initExitCode = RunProcess("dotnet", $"run --project \"{toolProject}\" -- init", tempRoot);
+        if (initExitCode != 0)
+        {
+            failures.Add("Init failed before install --all.");
+            return;
+        }
+
+        var installExitCode = RunProcess("dotnet", $"run --project \"{toolProject}\" -- install --all", tempRoot);
+        if (installExitCode != 0)
+        {
+            failures.Add("Install --all failed after init.");
+            return;
+        }
+
+        foreach (var relativePath in new[]
+        {
+            "CLAUDE.md",
+            "AGENTS.md",
+            "GEMINI.md",
+            ".github/copilot-instructions.md"
+        })
+        {
+            if (!File.Exists(Path.Combine(tempRoot, relativePath)))
+            {
+                failures.Add($"Install --all after init did not create {relativePath}.");
+            }
         }
     }
     finally
