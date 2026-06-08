@@ -57,6 +57,7 @@ function Copy-ReleasePath([string]$RelativePath) {
 
 function Write-Manifest([string]$Path) {
     $entryPoints = [ordered]@{}
+    $targetCapabilities = [ordered]@{}
     $targets = @()
 
     Get-ChildItem -LiteralPath (Join-Path $repoRoot "src/adapters") -Directory |
@@ -65,6 +66,9 @@ function Write-Manifest([string]$Path) {
             $adapter = Get-Content -LiteralPath (Join-Path $_.FullName "adapter.json") -Raw | ConvertFrom-Json
             $targets += $adapter.agent
             $entryPoints[$adapter.agent] = $adapter.entryPoint
+            $targetCapabilities[$adapter.agent] = [ordered]@{
+                supportsSkills = [bool]$adapter.supportsSkills
+            }
         }
 
     $manifest = [ordered]@{
@@ -74,6 +78,7 @@ function Write-Manifest([string]$Path) {
         generatedRoot = "generated"
         targets = $targets
         entryPoints = $entryPoints
+        targetCapabilities = $targetCapabilities
     }
 
     $json = $manifest | ConvertTo-Json -Depth 10

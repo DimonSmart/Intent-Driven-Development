@@ -31,7 +31,14 @@ ExpectEntryPointLineLimits();
 ExpectNoFullMethodologyInEntryPoints();
 ExpectAllSkillsGenerated();
 ExpectInstallEntryNone();
+ExpectInstallGeminiEntryNoneRejected();
 ExpectInstallAllAfterInit();
+ExpectNpmListTargets();
+ExpectNpmInstallDefaultMinimal();
+ExpectNpmInstallEntryNone();
+ExpectNpmInstallEntryFull();
+ExpectNpmRejectsGeminiEntryNone();
+ExpectNpmRejectsUnknownEntryMode();
 ExpectGeneratorCheckPasses();
 ExpectSecondRunStable();
 
@@ -235,6 +242,39 @@ void ExpectInstallEntryNone()
         {
             failures.Add("Install with --entry none did not install skills.");
         }
+
+        if (!File.Exists(Path.Combine(tempRoot, ".specs", "README.md")))
+        {
+            failures.Add("Install with --entry none did not install .specs.");
+        }
+    }
+    finally
+    {
+        if (Directory.Exists(tempRoot))
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+}
+
+void ExpectInstallGeminiEntryNoneRejected()
+{
+    var tempRoot = Path.Combine(Path.GetTempPath(), "idd-smoke-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(tempRoot);
+
+    try
+    {
+        var toolProject = Path.Combine(repoRoot, "tools", "idd-tool");
+        var result = RunProcessResult("dotnet", $"run --project \"{toolProject}\" -- install --target gemini --entry none", tempRoot);
+        if (result.ExitCode == 0)
+        {
+            failures.Add("Gemini install with --entry none succeeded unexpectedly.");
+        }
+
+        if (!result.StandardError.Contains("Target gemini does not support generated skills", StringComparison.Ordinal))
+        {
+            failures.Add("Gemini install with --entry none did not report unsupported generated skills.");
+        }
     }
     finally
     {
@@ -290,6 +330,213 @@ void ExpectInstallAllAfterInit()
     }
 }
 
+void ExpectNpmListTargets()
+{
+    WithNpmFixture(fixtureRoot =>
+    {
+        var script = Path.Combine(fixtureRoot, "bin", "intent-driven-development.js");
+        var result = RunProcessResult("node", $"\"{script}\" list-targets", fixtureRoot);
+        var expected = string.Join(Environment.NewLine, new[] { "claude", "codex", "copilot", "gemini" });
+        var actual = result.StandardOutput.Trim().ReplaceLineEndings(Environment.NewLine);
+
+        if (result.ExitCode != 0)
+        {
+            failures.Add("npm list-targets failed.");
+        }
+
+        if (!StringComparer.Ordinal.Equals(actual, expected))
+        {
+            failures.Add($"npm list-targets returned unexpected output: {actual}");
+        }
+    });
+}
+
+void ExpectNpmInstallDefaultMinimal()
+{
+    WithNpmInstall("install --target claude", installRoot =>
+    {
+        ExpectTempFile(installRoot, "CLAUDE.md", "npm default minimal install did not create CLAUDE.md.");
+        ExpectTempFile(installRoot, ".claude/skills/spec-create/SKILL.md", "npm default minimal install did not install skills.");
+        ExpectTempFile(installRoot, ".specs/README.md", "npm default minimal install did not install .specs.");
+    });
+}
+
+void ExpectNpmInstallEntryNone()
+{
+    WithNpmInstall("install --target claude --entry none", installRoot =>
+    {
+        if (File.Exists(Path.Combine(installRoot, "CLAUDE.md")))
+        {
+            failures.Add("npm install with --entry none created CLAUDE.md.");
+        }
+
+        ExpectTempFile(installRoot, ".claude/skills/spec-create/SKILL.md", "npm install with --entry none did not install skills.");
+        ExpectTempFile(installRoot, ".specs/README.md", "npm install with --entry none did not install .specs.");
+    });
+}
+
+void ExpectNpmInstallEntryFull()
+{
+    WithNpmInstall("install --target claude --entry full", installRoot =>
+    {
+        var entryPath = Path.Combine(installRoot, "CLAUDE.md");
+        ExpectTempFile(installRoot, "CLAUDE.md", "npm install with --entry full did not create CLAUDE.md.");
+        if (File.Exists(entryPath))
+        {
+            var content = File.ReadAllText(entryPath);
+            if (!content.Contains("Specifications should be complete enough to rebuild the product from scratch", StringComparison.Ordinal))
+            {
+                failures.Add("npm install with --entry full did not include canonical methodology content.");
+            }
+        }
+
+        ExpectTempFile(installRoot, ".claude/skills/spec-create/SKILL.md", "npm install with --entry full did not install skills.");
+        ExpectTempFile(installRoot, ".specs/README.md", "npm install with --entry full did not install .specs.");
+    });
+}
+
+void ExpectNpmRejectsGeminiEntryNone()
+{
+    WithNpmFixture(fixtureRoot =>
+    {
+        var script = Path.Combine(fixtureRoot, "bin", "intent-driven-development.js");
+        var installRoot = Path.Combine(Path.GetTempPath(), "idd-smoke-npm-install-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(installRoot);
+
+        try
+        {
+            var result = RunProcessResult("node", $"\"{script}\" install --target gemini --entry none", installRoot);
+            if (result.ExitCode == 0)
+            {
+                failures.Add("npm Gemini install with --entry none succeeded unexpectedly.");
+            }
+
+            if (!result.StandardError.Contains("Target gemini does not support generated skills", StringComparison.Ordinal))
+            {
+                failures.Add("npm Gemini install with --entry none did not report unsupported generated skills.");
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(installRoot))
+            {
+                Directory.Delete(installRoot, recursive: true);
+            }
+        }
+    });
+}
+
+void ExpectNpmRejectsUnknownEntryMode()
+{
+    WithNpmFixture(fixtureRoot =>
+    {
+        var script = Path.Combine(fixtureRoot, "bin", "intent-driven-development.js");
+        var installRoot = Path.Combine(Path.GetTempPath(), "idd-smoke-npm-install-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(installRoot);
+
+        try
+        {
+            var result = RunProcessResult("node", $"\"{script}\" install --target claude --entry compact", installRoot);
+            if (result.ExitCode == 0)
+            {
+                failures.Add("npm install with unknown entry mode succeeded unexpectedly.");
+            }
+
+            if (!result.StandardError.Contains("Unknown entry mode: compact", StringComparison.Ordinal))
+            {
+                failures.Add("npm install with unknown entry mode did not report the invalid mode.");
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(installRoot))
+            {
+                Directory.Delete(installRoot, recursive: true);
+            }
+        }
+    });
+}
+
+void WithNpmInstall(string arguments, Action<string> assertions)
+{
+    WithNpmFixture(fixtureRoot =>
+    {
+        var script = Path.Combine(fixtureRoot, "bin", "intent-driven-development.js");
+        var installRoot = Path.Combine(Path.GetTempPath(), "idd-smoke-npm-install-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(installRoot);
+
+        try
+        {
+            var result = RunProcessResult("node", $"\"{script}\" {arguments}", installRoot);
+            if (result.ExitCode != 0)
+            {
+                failures.Add($"npm {arguments} failed.");
+                return;
+            }
+
+            assertions(installRoot);
+        }
+        finally
+        {
+            if (Directory.Exists(installRoot))
+            {
+                Directory.Delete(installRoot, recursive: true);
+            }
+        }
+    });
+}
+
+void WithNpmFixture(Action<string> action)
+{
+    var fixtureRoot = Path.Combine(Path.GetTempPath(), "idd-smoke-npm-fixture-" + Guid.NewGuid().ToString("N"));
+
+    try
+    {
+        Directory.CreateDirectory(fixtureRoot);
+        Directory.CreateDirectory(Path.Combine(fixtureRoot, "package-content"));
+        File.Copy(Path.Combine(repoRoot, "npm", "package.json"), Path.Combine(fixtureRoot, "package.json"));
+        CopyDirectoryRecursive(Path.Combine(repoRoot, "npm", "bin"), Path.Combine(fixtureRoot, "bin"));
+        File.Copy(Path.Combine(repoRoot, "manifest.json"), Path.Combine(fixtureRoot, "package-content", "manifest.json"));
+        CopyDirectoryRecursive(Path.Combine(repoRoot, "generated"), Path.Combine(fixtureRoot, "package-content", "generated"));
+        CopyDirectoryRecursive(Path.Combine(repoRoot, "src"), Path.Combine(fixtureRoot, "package-content", "src"));
+        File.Copy(Path.Combine(repoRoot, "README.md"), Path.Combine(fixtureRoot, "package-content", "README.md"));
+        File.Copy(Path.Combine(repoRoot, "LICENSE"), Path.Combine(fixtureRoot, "package-content", "LICENSE"));
+
+        action(fixtureRoot);
+    }
+    finally
+    {
+        if (Directory.Exists(fixtureRoot))
+        {
+            Directory.Delete(fixtureRoot, recursive: true);
+        }
+    }
+}
+
+void ExpectTempFile(string root, string relativePath, string failure)
+{
+    if (!File.Exists(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar))))
+    {
+        failures.Add(failure);
+    }
+}
+
+void CopyDirectoryRecursive(string source, string destination)
+{
+    Directory.CreateDirectory(destination);
+    foreach (var directory in Directory.GetDirectories(source, "*", SearchOption.AllDirectories))
+    {
+        Directory.CreateDirectory(Path.Combine(destination, Path.GetRelativePath(source, directory)));
+    }
+
+    foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+    {
+        var destinationPath = Path.Combine(destination, Path.GetRelativePath(source, file));
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+        File.Copy(file, destinationPath, overwrite: true);
+    }
+}
+
 void ExpectSecondRunStable()
 {
     var before = SnapshotGeneratedFiles();
@@ -323,6 +570,11 @@ string[] SnapshotGeneratedFiles() =>
 
 int RunProcess(string fileName, string arguments, string? workingDirectory = null)
 {
+    return RunProcessResult(fileName, arguments, workingDirectory).ExitCode;
+}
+
+ProcessResult RunProcessResult(string fileName, string arguments, string? workingDirectory = null)
+{
     using var process = Process.Start(new ProcessStartInfo(fileName, arguments)
     {
         WorkingDirectory = workingDirectory ?? repoRoot,
@@ -334,15 +586,24 @@ int RunProcess(string fileName, string arguments, string? workingDirectory = nul
     if (process is null)
     {
         failures.Add($"Could not start process: {fileName}");
-        return 1;
+        return new ProcessResult(1, "", $"Could not start process: {fileName}");
     }
 
-    process.OutputDataReceived += (_, e) => { if (e.Data is not null) Console.WriteLine(e.Data); };
-    process.ErrorDataReceived += (_, e) => { if (e.Data is not null) Console.Error.WriteLine(e.Data); };
-    process.BeginOutputReadLine();
-    process.BeginErrorReadLine();
+    var standardOutput = process.StandardOutput.ReadToEnd();
+    var standardError = process.StandardError.ReadToEnd();
     process.WaitForExit();
-    return process.ExitCode;
+
+    if (!string.IsNullOrWhiteSpace(standardOutput))
+    {
+        Console.Write(standardOutput);
+    }
+
+    if (!string.IsNullOrWhiteSpace(standardError))
+    {
+        Console.Error.Write(standardError);
+    }
+
+    return new ProcessResult(process.ExitCode, standardOutput, standardError);
 }
 
 string Relative(string path) => Path.GetRelativePath(repoRoot, path).Replace('\\', '/');
@@ -371,3 +632,5 @@ static string FindRepoRoot()
 
     throw new InvalidOperationException("Could not locate repository root.");
 }
+
+internal sealed record ProcessResult(int ExitCode, string StandardOutput, string StandardError);

@@ -113,9 +113,10 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         }
 
         var targets = installAll ? manifest.Targets : [ValidateTarget(manifest, target!)];
+        ValidateEntryModeCapabilities(manifest, targets, entryMode, installAll);
         var plannedFiles = CollectTargetFiles(manifest, targets, entryMode);
         CopyPlannedFiles(plannedFiles, Directory.GetCurrentDirectory(), force);
-        Console.WriteLine($"Installed {string.Join(", ", targets)} with {entryMode} entry.");
+        Console.WriteLine($"Installed {string.Join(", ", targets)} with {FormatEntryMode(entryMode)} entry.");
         return 0;
     }
 
@@ -189,6 +190,58 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         };
     }
 
+    private static string FormatEntryMode(EntryMode entryMode) =>
+        entryMode.ToString().ToLowerInvariant();
+
+    private static void ValidateEntryModeCapabilities(Manifest manifest, IReadOnlyList<string> targets, EntryMode entryMode, bool installAll)
+    {
+        if (entryMode != EntryMode.None)
+        {
+            return;
+        }
+
+        if (manifest.TargetCapabilities is null)
+        {
+            throw new ToolException("Bundled manifest does not define targetCapabilities.");
+        }
+
+        var incompatible = targets
+            .Where(target => !SupportsGeneratedSkills(manifest, target))
+            .ToArray();
+
+        if (incompatible.Length == 0)
+        {
+            return;
+        }
+
+        if (installAll)
+        {
+            throw new ToolException(
+                $"The following targets do not support generated skills: {string.Join(", ", incompatible)}." +
+                Environment.NewLine +
+                "--entry none would install no entry point and no skills for those targets." +
+                Environment.NewLine +
+                "Use --entry minimal or install skill-capable targets explicitly.");
+        }
+
+        var target = incompatible[0];
+        throw new ToolException(
+            $"Target {target} does not support generated skills. --entry none would install no entry point and no skills." +
+            Environment.NewLine +
+            "Use --entry minimal or --entry full for this target.");
+    }
+
+    private static bool SupportsGeneratedSkills(Manifest manifest, string target)
+    {
+        if (manifest.TargetCapabilities is null ||
+            !manifest.TargetCapabilities.TryGetValue(target, out var capabilities))
+        {
+            throw new ToolException($"Bundled manifest does not define targetCapabilities for target: {target}");
+        }
+
+        return capabilities.SupportsSkills;
+    }
+
     private static IReadOnlyList<PlannedFile> CollectTargetFiles(Manifest manifest, IEnumerable<string> targets, EntryMode entryMode)
     {
         var contentRoot = FindContentRoot();
@@ -245,6 +298,29 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
             }
         }
 
+        var projectFilesRoot = Path.Combine(contentRoot, "src", "canonical", "project-files", "specs");
+        if (Directory.Exists(projectFilesRoot))
+        {
+            foreach (var sourcePath in Directory.GetFiles(projectFilesRoot, "*", SearchOption.AllDirectories))
+            {
+                var relativePath = Normalize(Path.Combine(".specs", Path.GetRelativePath(projectFilesRoot, sourcePath)));
+                var content = File.ReadAllBytes(sourcePath);
+                var plannedFile = new PlannedFile(relativePath, content, Sha256(content));
+
+                if (byRelativePath.TryGetValue(relativePath, out var existing))
+                {
+                    if (!StringComparer.Ordinal.Equals(existing.Hash, plannedFile.Hash))
+                    {
+                        throw new ToolException($"Conflicting bundled files for path: {relativePath}");
+                    }
+
+                    continue;
+                }
+
+                byRelativePath.Add(relativePath, plannedFile);
+            }
+        }
+
         return byRelativePath.Values.ToArray();
     }
 
@@ -287,8 +363,13 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
     private static void CopyPlannedFiles(IReadOnlyList<PlannedFile> files, string destinationRoot, bool force)
     {
         var conflicts = files
+            .Where(file =>
+            {
+                var destination = Path.Combine(destinationRoot, file.RelativePath);
+                return File.Exists(destination) &&
+                    !StringComparer.Ordinal.Equals(Sha256(File.ReadAllBytes(destination)), file.Hash);
+            })
             .Select(file => file.RelativePath)
-            .Where(relativePath => File.Exists(Path.Combine(destinationRoot, relativePath)))
             .ToArray();
 
         if (conflicts.Length > 0 && !force)
@@ -383,7 +464,10 @@ internal sealed record Manifest(
     string CanonicalSource,
     string GeneratedRoot,
     string[] Targets,
-    Dictionary<string, string> EntryPoints);
+    Dictionary<string, string> EntryPoints,
+    Dictionary<string, TargetCapabilities> TargetCapabilities);
+
+internal sealed record TargetCapabilities(bool SupportsSkills);
 
 internal sealed record PlannedFile(string RelativePath, byte[] Content, string Hash);
 

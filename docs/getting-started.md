@@ -2,6 +2,8 @@
 
 Intent-Driven Development can be installed into another repository through the universal npm wrapper or through the .NET tool.
 
+This repository ships canonical methodology and generated target-specific delivery files. The installed agent files are generated from the canonical source, not edited as the source of truth.
+
 Use npm/npx when you want to install generated agent files into any project without requiring the .NET SDK:
 
 ```bash

@@ -164,8 +164,16 @@ IDD deliberately does not try to do several things.
 
 There should be one canonical source. Everything else is generated, adapted, or temporary.
 
+## Relation to Spec-Guided Development and Spec-Driven Development
+
+Spec-Driven Development starts from a useful idea: describe what should be built before asking an AI agent to build it.
+
+Intent-Driven Development keeps that idea, but narrows the source of truth to durable product intent. Tasks, temporary plans, implementation notes, generated checklists, and agent-specific command files are not product intent.
+
+In that sense, IDD can be described as a spec-guided approach: specifications guide development, but they do not become a task tracker or an AI command script.
+
 ## Summary
 
-Intent-Driven Development is Spec-Guided Dev without turning the spec into a task tracker or an AI command script.
+Intent-Driven Development keeps product memory in specifications, keeps agent files as delivery formats, and keeps temporary work outside the source of truth.
 
 The specification is the product memory. The adapters are translation layers. The generated files are delivery formats for specific agents. The engineer still owns the result.
