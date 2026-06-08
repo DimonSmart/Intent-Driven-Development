@@ -109,7 +109,6 @@ Recommended distribution:
 - GitHub Releases for versioned artifacts
 - npm/npx for universal CLI installation
 - .NET tool for .NET-friendly CLI installation
-- NuGet package for .NET-friendly file consumption
 ```
 
 The npm package is a universal CLI delivery wrapper. Bundled methodology and generated files are copied from the versioned GitHub Release content during packaging.
@@ -122,12 +121,6 @@ npx intent-driven-development install --target claude
 npx intent-driven-development install --target codex
 npx intent-driven-development install --target copilot
 npx intent-driven-development install --target gemini
-```
-
-Use NuGet when a .NET-friendly package is the most convenient way to consume the same canonical methodology, adapters, and generated files:
-
-```powershell
-dotnet add package DimonSmart.IntentDrivenDevelopment
 ```
 
 Use the .NET global tool when you want a .NET-native installer command:
@@ -154,7 +147,7 @@ Release publication follows the tag-based flow:
 
 The script runs the local check, creates the next `vMAJOR.MINOR.PATCH` tag, and pushes it.
 
-Then `.github/workflows/publish-package.yml` packs the release archive, checksums, `DimonSmart.IntentDrivenDevelopment`, `DimonSmart.IntentDrivenDevelopment.Tool`, and the npm package archive. It creates a GitHub Release, publishes the NuGet packages, and publishes npm only when `NPM_TOKEN` is configured.
+Then `.github/workflows/publish-package.yml` packs the release archive, checksums, `DimonSmart.IntentDrivenDevelopment.Tool`, and the npm package archive. It creates a GitHub Release, publishes the .NET tool package to NuGet, and publishes npm only when `NPM_TOKEN` is configured.
 
 Local release packaging uses the same script as CI:
 

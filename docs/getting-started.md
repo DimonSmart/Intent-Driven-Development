@@ -30,12 +30,6 @@ intent-driven-development list-targets
 intent-driven-development install --target codex
 ```
 
-Use NuGet when a .NET-friendly package is the most convenient way to consume the same canonical methodology, adapters, and generated files:
-
-```powershell
-dotnet add package DimonSmart.IntentDrivenDevelopment
-```
-
 ## Starting a Project
 
 In a target repository, initialize IDD and install the agent format you use:
