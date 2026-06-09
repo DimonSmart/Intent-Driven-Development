@@ -59,6 +59,14 @@ product behavior, or source-specific wrapper text from imported methodologies.
    - task/refactor/cleanup specs;
    - semantic conflicts;
    - obsolete references;
+   - `.specs` archive directory;
+   - `Archived` section in `INDEX.md`;
+   - archive references in skills or docs;
+   - obsolete documents that should be deleted;
+   - process-only documents that should be deleted;
+   - duplicated specs that should be merged or deleted;
+   - ADRs incorrectly moved out of the current document set;
+   - spikes that are resolved but still kept as current research;
    - specs that should be ADR;
    - specs that should be spike;
    - missing shared specs;
@@ -95,7 +103,7 @@ Short list of the most important structural problems.
 
 ### Finding: <short title>
 
-- Type: oversized | undersized | mixed-scope | duplicate | scattered-model | conflict | task-like | stale-reference | missing-shared-spec | adr-candidate | spike-candidate
+- Type: oversized | undersized | mixed-scope | duplicate | scattered-model | conflict | task-like | stale-reference | missing-shared-spec | adr-candidate | spike-candidate | archive-concept | delete-candidate | obsolete-current-doc | resolved-spike | superseded-adr-status-missing
 - Specs:
 - Problem:
 - Recommended action:
@@ -106,7 +114,7 @@ Short list of the most important structural problems.
 
 ## Proposed Reorganization Plan
 
-Ordered list of recommended split/merge/extract/archive actions.
+Ordered list of recommended split/merge/extract/delete actions.
 
 ## Product Decisions Required
 

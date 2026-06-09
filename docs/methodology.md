@@ -124,6 +124,22 @@ Generated agent output is not authoritative. It can help deliver the method into
 
 Implementation evidence is also not intent by itself. When the implementation differs from the specification, decide whether the product intent changed before changing `.specs/`.
 
+## Document Lifecycle
+
+Git stores history.
+
+`.specs/` stores only current product intent, ADRs, and active spikes.
+
+When product intent evolves inside the same product area, update the existing spec directly.
+
+When a product area is replaced by a substantially different product area, delete the old spec and create a new owning spec.
+
+Delete obsolete, duplicated, task-like, process-only, or incorrect documents from the working tree. Do not preserve old spec versions in a separate directory.
+
+ADRs are decision records. If a durable decision changes, keep the old ADR in place, mark it as `Superseded`, and create a new ADR for the replacing decision.
+
+Resolved spikes should be deleted after their outcome is captured in a spec or ADR, unless they remain useful as active research.
+
 ## Context Discipline
 
 IDD avoids large universal workflows that read many files, generate many intermediate artifacts, and leave long reasoning traces in the main agent conversation.

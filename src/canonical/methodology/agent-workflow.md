@@ -5,7 +5,8 @@ patterns, inspect `.specs/README.md`, `.specs/INDEX.md`, and the numbered
 current documents directly under `.specs/`.
 
 Use only current numbered documents in `.specs/` as normative product intent.
-Archived documents are historical context.
+There is no `.specs` archive lifecycle. Do not inspect deleted Git history
+unless the user explicitly asks for historical investigation.
 
 When implementation and specification disagree, do not assume the
 implementation is the new intent.

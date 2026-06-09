@@ -22,7 +22,16 @@ An ADR answers why a decision seemed correct, which alternatives were
 considered, and which consequences were accepted.
 
 Accepted ADRs must not be rewritten semantically. If the decision changes,
-archive the old ADR and create a new ADR that replaces it.
+mark the old ADR as `Superseded` and create a new ADR that replaces it.
+
+ADR status values are:
+
+```text
+Proposed | Accepted | Superseded | Rejected
+```
+
+ADRs are decision records, not current behavior specs. Do not archive ADRs. The
+replacing ADR should reference the superseded ADR.
 
 ## spike
 
@@ -31,3 +40,7 @@ product or architecture decision.
 
 A spike should state the question, constraints, evaluation method, result, and
 recommended follow-up.
+
+A spike is active research only while the question is unresolved. When resolved,
+move durable product behavior into a spec, move durable architecture decisions
+into an ADR, and delete the spike unless it remains useful as active research.

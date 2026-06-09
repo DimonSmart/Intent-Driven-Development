@@ -69,7 +69,9 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
 
 - Use only current numbered documents directly under `.specs/` as normative
   product intent.
-- Treat archived documents as historical context only.
+- There is no `.specs` archive lifecycle.
+- Do not inspect deleted Git history unless the user explicitly asks for
+  historical investigation.
 - Do not treat implementation as product intent by itself.
 - Do not update specifications unless the user explicitly confirms that the
   implementation represents current product intent.
@@ -374,4 +376,4 @@ This skill does not:
 - replace tests;
 - replace code review;
 - run broad repository audits without focus;
-- treat archived specs as current intent.
+- inspect deleted history as current intent.

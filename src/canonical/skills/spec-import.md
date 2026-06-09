@@ -23,7 +23,6 @@ mode: apply-safe
 autoNormalize: true
 conflictMode: report-only
 allowNewSpecs: true
-allowArchive: true
 ```
 
 Supported modes:
@@ -33,7 +32,6 @@ mode: propose | apply-safe
 autoNormalize: true
 conflictMode: report-only
 allowNewSpecs: true
-allowArchive: true
 ```
 
 `apply-safe` may apply structural changes that preserve product meaning. It must
@@ -120,7 +118,7 @@ This is not a fixed enum. Prefer areas that match the actual product.
    - durable product intent;
    - architecture decision;
    - unresolved research / spike;
-   - historical context;
+   - obsolete source material;
    - task/progress/status notes;
    - implementation-only cleanup/refactor notes;
    - obsolete source-specific wrapper text.
@@ -140,8 +138,8 @@ This is not a fixed enum. Prefer areas that match the actual product.
 ## Source Triage
 
 Identify the source methodology and conventions before importing. Look for
-README or index files, templates, lifecycle markers, document types, archives,
-generated files, task sections, ADRs, spikes, research, and implementation
+README or index files, templates, lifecycle markers, document types, generated
+files, task sections, ADRs, spikes, research, and implementation
 sections.
 
 Use source-specific conventions as hints only. Classify each document and
@@ -181,12 +179,13 @@ Possible import actions:
 
 ```text
 import-current
-import-archive
 convert-to-adr
 convert-to-spike
 extract-fragments
 skip-process-only
 skip-generated
+delete-obsolete
+delete-duplicate
 needs-review
 ```
 
@@ -217,6 +216,10 @@ source-wrapper
 ```
 
 Import durable intent. Drop process noise.
+
+Do not import obsolete or process-only source material into an archive. Skip or
+delete source material that has no current product intent. Preserve old
+versions only through Git history.
 
 ## Conflict Handling
 
@@ -251,8 +254,7 @@ Prefer:
 - one shared spec for common reusable behavior;
 - feature specs for user-visible capabilities;
 - ADRs for durable architectural decisions;
-- spikes for unresolved questions;
-- archive files for useful obsolete intent.
+- spikes for active unresolved questions.
 
 Avoid:
 
@@ -261,6 +263,9 @@ Avoid:
 - duplicate specs for the same behavior;
 - specs named after temporary work items;
 - specs that describe how the migration was performed.
+
+Create current specs only for durable current product intent. Create ADRs only
+for durable decision records. Create spikes only for active unresolved research.
 
 ## Workflow
 
@@ -279,8 +284,8 @@ Avoid:
    - separate ADR and spike material;
    - reject task/refactor/cleanup notes as current specs.
 8. Propose or infer target files.
-9. Write normalized current specs, ADRs, spikes, or archive material according
-   to mode and safety.
+9. Write normalized current specs, ADRs, or active spikes according to mode and
+   safety.
 10. Keep conflicts visible and unresolved.
 11. Update `.specs/INDEX.md`.
 12. Write an import report for non-trivial imports.
@@ -288,9 +293,10 @@ Avoid:
 
 ## Import Report
 
-For non-trivial imports, create an import report outside current numbered specs,
-for example `.specs/import-report.md` or
-`.specs/archive/import-report-YYYYMMDD.md`.
+For non-trivial imports, create or update `.specs/import-report.md`.
+
+The import report is not normative product intent. It must not be listed as a
+current spec.
 
 Include:
 
@@ -301,7 +307,7 @@ Include:
 - fragments extracted from task/process documents;
 - structural normalization decisions;
 - conflicts found;
-- obsolete documents archived;
+- obsolete documents skipped or deleted;
 - documents requiring human review;
 - shared topics consolidated;
 - source-to-target mapping.

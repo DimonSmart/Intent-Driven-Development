@@ -80,7 +80,8 @@ Before changing `.specs/`, decide:
 
 ## Project Directory
 
-IDD projects use `.specs/` for current normative product intent:
+IDD projects use `.specs/` for current product intent and current
+decision/research records:
 
 ```text
 .specs/
@@ -90,14 +91,39 @@ IDD projects use `.specs/` for current normative product intent:
     spec.md
     adr.md
     spike.md
-  archive/
 ```
 
 Use these meanings:
 
 ```text
-.specs/              current normative product intent
-.specs/archive/      old normative product intent
+.specs/              current product intent, ADRs, and active spikes
 ```
 
 Small product-neutral changes belong in commit messages, not in `.specs/`.
+
+## Document Lifecycle
+
+`.specs/` contains only the current working model of product intent and current
+decision/research records.
+
+Git is the only history mechanism. Do not preserve obsolete specs in an
+archive directory.
+
+When product intent evolves within the same product area, update the existing
+spec directly.
+
+When a product area is replaced by a substantially different product area,
+delete the old spec and create a new owning spec.
+
+When a document is obsolete, duplicated, task-like, process-only, incorrect, or
+no longer useful as current product intent, delete it.
+
+ADRs are decision records. They are not archived when superseded. If a durable
+decision changes, keep the old ADR in place, mark it as `Superseded`, and
+create a new ADR that replaces or supersedes it.
+
+Spikes are research records. When a spike is resolved, either convert its
+outcome into a spec or ADR and delete the spike, or keep the spike only if it
+is still useful as active research.
+
+Deleted documents remain available through Git history.
