@@ -143,8 +143,10 @@ internal sealed class Generator(string repoRoot)
         var skillGuidance = adapter.SupportsSkills
             ? """
               Use IDD skills for specific workflows:
+              - `spec-audit`
               - `spec-create`
               - `spec-import`
+              - `spec-lint`
               - `spec-reorganize`
               - `spec-check-implementation`
               - `spec-update-from-implementation`

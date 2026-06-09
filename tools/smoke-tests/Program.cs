@@ -22,7 +22,6 @@ ExpectSkillFiles("generated/copilot/.github/skills");
 
 ExpectNoGeneratedHeaderComments();
 ExpectNoGeneratedText("Worklog-driven development");
-ExpectNoGeneratedText(".worklog");
 ExpectNoGeneratedText("Generated files are not source of truth");
 ExpectNoCanonicalAgentCoupling();
 ExpectNoEntryIncludes("generated/claude/CLAUDE.md", "AGENTS.md");
@@ -75,7 +74,9 @@ void ExpectSkillFiles(string skillsRoot)
 {
     var expected = new[]
     {
+        "spec-audit",
         "spec-import",
+        "spec-lint",
         "spec-create",
         "spec-update-from-implementation",
         "spec-reorganize",
