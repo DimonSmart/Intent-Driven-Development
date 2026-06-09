@@ -17,7 +17,7 @@ split/merge decisions", "find structural problems", or "look across all specs".
 - Do not reorganize specs.
 - Do not resolve product conflicts.
 - Do not read the whole project unless needed to understand spec references.
-- Recommend `spec-reorganize` for focused follow-up work.
+- Recommend `spec-normalize-current` for focused follow-up work.
 - Recommend `spec-import` only when the problem is unnormalized raw source
   material.
 - Report uncertainty explicitly.
@@ -77,7 +77,7 @@ product behavior, or source-specific wrapper text from imported methodologies.
 ## Structural Diagnostics
 
 Use the same structural normalization concepts as `spec-import` and
-`spec-reorganize`, but only for diagnosis.
+`spec-normalize-current`, but only for diagnosis.
 
 Look for durable product areas such as product overview, panels, command line,
 file operations, viewer, editor, shared text format / encoding / BOM / EOL, UI
@@ -138,7 +138,7 @@ Expected behavior:
 - use `spec-audit`;
 - do not edit files;
 - produce findings and a reorganization plan;
-- identify which follow-up actions should use `spec-reorganize`.
+- identify which follow-up actions should use `spec-normalize-current`.
 
 ## Non-goals
 

@@ -79,9 +79,9 @@ void ExpectSkillFiles(string skillsRoot)
         "spec-import",
         "spec-implement",
         "spec-lint",
-        "spec-create",
+        "spec-new-document",
         "spec-update-from-implementation",
-        "spec-reorganize",
+        "spec-normalize-current",
         "spec-check-implementation"
     };
 
@@ -241,7 +241,7 @@ void ExpectInstallEntryNone()
             failures.Add("Install with --entry none created CLAUDE.md.");
         }
 
-        if (!File.Exists(Path.Combine(tempRoot, ".claude", "skills", "spec-create", "SKILL.md")))
+        if (!File.Exists(Path.Combine(tempRoot, ".claude", "skills", "spec-new-document", "SKILL.md")))
         {
             failures.Add("Install with --entry none did not install skills.");
         }
@@ -359,7 +359,7 @@ void ExpectNpmInstallDefaultMinimal()
     WithNpmInstall("install --target claude", installRoot =>
     {
         ExpectTempFile(installRoot, "CLAUDE.md", "npm default minimal install did not create CLAUDE.md.");
-        ExpectTempFile(installRoot, ".claude/skills/spec-create/SKILL.md", "npm default minimal install did not install skills.");
+        ExpectTempFile(installRoot, ".claude/skills/spec-new-document/SKILL.md", "npm default minimal install did not install skills.");
         ExpectTempFile(installRoot, ".specs/README.md", "npm default minimal install did not install .specs.");
     });
 }
@@ -373,7 +373,7 @@ void ExpectNpmInstallEntryNone()
             failures.Add("npm install with --entry none created CLAUDE.md.");
         }
 
-        ExpectTempFile(installRoot, ".claude/skills/spec-create/SKILL.md", "npm install with --entry none did not install skills.");
+        ExpectTempFile(installRoot, ".claude/skills/spec-new-document/SKILL.md", "npm install with --entry none did not install skills.");
         ExpectTempFile(installRoot, ".specs/README.md", "npm install with --entry none did not install .specs.");
     });
 }
@@ -393,7 +393,7 @@ void ExpectNpmInstallEntryFull()
             }
         }
 
-        ExpectTempFile(installRoot, ".claude/skills/spec-create/SKILL.md", "npm install with --entry full did not install skills.");
+        ExpectTempFile(installRoot, ".claude/skills/spec-new-document/SKILL.md", "npm install with --entry full did not install skills.");
         ExpectTempFile(installRoot, ".specs/README.md", "npm install with --entry full did not install .specs.");
     });
 }

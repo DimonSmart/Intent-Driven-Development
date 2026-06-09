@@ -33,7 +33,7 @@ leaving the full exploration trace in the main conversation.
 If the target agent supports isolated, forked, or subagent execution, adapter
 authors may use it for heavy specification-maintenance skills.
 
-`spec-reorganize` may inspect multiple specifications, but it must still be
+`spec-normalize-current` may inspect multiple specifications, but it must still be
 focused by a concrete topic, source, or target.
 
 It should return a compact reorganization plan:

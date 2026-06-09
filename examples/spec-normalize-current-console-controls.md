@@ -1,13 +1,13 @@
-# Example: Reorganizing Console Control Mouse Behavior
+# Example: Normalizing Console Control Mouse Behavior
 
-This example shows how `spec-reorganize` moves existing intent to a better
-location without changing product meaning.
+This example shows how `spec-normalize-current` moves existing intent to a
+better location without changing product meaning.
 
 ## Request
 
 ```text
-Use spec-reorganize to collect all current intent about mouse support in console
-controls and move it into a dedicated specification.
+Use spec-normalize-current to collect all current intent about mouse support in
+console controls and move it into a dedicated specification.
 ```
 
 ## Before
@@ -53,7 +53,7 @@ Dialog buttons can be activated with mouse clicks.
 
 ## Reorganization
 
-`spec-reorganize` identifies:
+`spec-normalize-current` identifies:
 
 - common behavior: console controls support mouse interaction;
 - control-specific behavior: menu clicks, table row selection, wheel scrolling,

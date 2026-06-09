@@ -1,4 +1,4 @@
-# spec-reorganize
+# spec-normalize-current
 
 Use this skill to perform focused structural normalization over accepted current
 specs without changing product meaning.
@@ -6,7 +6,7 @@ specs without changing product meaning.
 Formula:
 
 ```text
-spec-reorganize = focused structural normalization over accepted current specs
+spec-normalize-current = focused structural normalization over accepted current specs
 ```
 
 This skill works on an already accepted `.specs` structure, so it is more
@@ -42,7 +42,7 @@ The request must provide at least one concrete focus:
 Examples:
 
 ```text
-Use spec-reorganize with:
+Use spec-normalize-current with:
 --specs 0033,0046,0014,0048
 --topic "text encoding / BOM / EOL"
 --target new
@@ -50,7 +50,7 @@ Use spec-reorganize with:
 ```
 
 ```text
-Use spec-reorganize with:
+Use spec-normalize-current with:
 --specs 0019,0054
 --topic "Paranoid copy retry"
 --target 0019.spec-paranoid-copy-resume.md
@@ -71,15 +71,15 @@ Do not run this skill if the user only asks to:
 - rewrite documentation.
 
 If the request is broad, such as "review all specs" or "find structural
-problems", do not run spec-reorganize. Use `spec-audit` first.
+problems", do not run spec-normalize-current. Use `spec-audit` first.
 
-If no concrete reorganization focus is provided, do not inspect or rewrite the
+If no concrete normalization focus is provided, do not inspect or rewrite the
 specification set. Respond with:
 
 ```text
-Cannot run spec-reorganize without a concrete reorganization focus.
+Cannot run spec-normalize-current without a concrete normalization focus.
 
-For broad structural diagnostics, use spec-audit first. For reorganization,
+For broad structural diagnostics, use spec-audit first. For normalization,
 specify a topic to collect, a source spec or section to extract, or a target
 spec to consolidate into.
 ```
@@ -185,7 +185,7 @@ Support these scenarios:
 
 ## Workflow
 
-1. Identify the concrete reorganization focus.
+1. Identify the concrete normalization focus.
 2. If no concrete focus is present, stop and direct broad requests to
    `spec-audit`.
 3. Read `.specs/README.md`, `.specs/INDEX.md`, and only relevant current
@@ -256,7 +256,7 @@ Expected behavior:
 User request:
 
 ```text
-Use spec-reorganize to extract the Controls section from
+Use spec-normalize-current to extract the Controls section from
 0003.spec-console-ui.md into a dedicated console controls specification.
 ```
 
@@ -288,13 +288,13 @@ Expected behavior:
 Bad request:
 
 ```text
-Use spec-reorganize to clean up the specs.
+Use spec-normalize-current to clean up the specs.
 ```
 
 Expected response:
 
 ```text
-Cannot run spec-reorganize without a concrete reorganization focus.
+Cannot run spec-normalize-current without a concrete normalization focus.
 
 Use spec-audit first to find broad structural problems.
 ```

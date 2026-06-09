@@ -145,11 +145,11 @@ internal sealed class Generator(string repoRoot)
               Use IDD skills for specific workflows:
               - `spec-audit`
               - `spec-change`
-              - `spec-create`
               - `spec-implement`
               - `spec-import`
               - `spec-lint`
-              - `spec-reorganize`
+              - `spec-new-document`
+              - `spec-normalize-current`
               - `spec-check-implementation`
               - `spec-update-from-implementation`
 
@@ -167,7 +167,7 @@ internal sealed class Generator(string repoRoot)
               changes product intent, use `spec-change` first.
 
               When the user asks to create a new feature: use `spec-change` if
-              the feature extends an existing product area. Use `spec-create`
+              the feature extends an existing product area. Use `spec-new-document`
               only if the feature needs a new durable product area, ADR, or
               spike.
 

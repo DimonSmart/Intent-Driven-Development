@@ -391,5 +391,5 @@ Do not use this skill for:
 - creating a project plan or implementation backlog.
 
 Use `spec-audit` for broad structural diagnostics without edits. Use
-`spec-reorganize` for focused normalization of existing current specs after
-import.
+`spec-normalize-current` for focused normalization of existing current specs
+after import.
