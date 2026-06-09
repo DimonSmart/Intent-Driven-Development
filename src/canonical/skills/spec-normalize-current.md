@@ -13,6 +13,10 @@ This skill works on an already accepted `.specs` structure, so it is more
 cautious than import. It requires a concrete focus and must not run a broad
 rewrite of `.specs`.
 
+Use it for later maintenance of an existing `.specs` tree. Do not use it as a
+manual cleanup phase required after `spec-import`; a successful import already
+includes the normalization needed for mechanical consistency.
+
 ## Parameters
 
 Describe the operation with parameters like:
@@ -38,6 +42,9 @@ The request must provide at least one concrete focus:
 1. Topic focus: a topic to collect across current specifications.
 2. Source focus: a specific spec, section, or fragment to extract or move.
 3. Target focus: an existing or desired target specification.
+4. Mechanical cleanup focus: an existing lint failure such as stale archive
+   directory, process report under `.specs`, broken obvious relation remap,
+   stale index, or legacy section shape.
 
 Examples:
 
@@ -156,6 +163,11 @@ Support these scenarios:
 - merge tiny spec X into a larger existing spec;
 - move misplaced behavior from one spec to another;
 - delete task-like, process-only, obsolete, duplicated, or incorrect documents;
+- delete `.specs/archive`;
+- remove import/process reports from `.specs`;
+- regenerate `INDEX.md` from actual current numbered documents;
+- fix broken relation references where the remap is obvious;
+- normalize current document shapes;
 - replace moved fragments with references;
 - update `INDEX.md`;
 - preserve product meaning.
@@ -179,8 +191,17 @@ Support these scenarios:
 - Do not archive obsolete documents.
 - Delete documents that no longer belong in the current working tree.
 - Git history is the only history mechanism.
+- Remove process-only import reports from `.specs`; if a persistent report is
+  explicitly needed, move it outside `.specs`.
+- Numeric `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar
+  relation references must point to existing current numbered documents.
+- Remove historical-only relations or rewrite them when the current target is
+  obvious from the existing document set.
+- Regenerate `INDEX.md` from actual current numbered documents when the index is
+  stale.
 - If deleting a document would lose current product intent, stop and report the
   conflict.
+- Report unresolved semantic ambiguity instead of guessing.
 - Stop and ask for confirmation when the operation would change product meaning.
 
 ## Workflow
@@ -209,7 +230,14 @@ Support these scenarios:
 10. Preserve local exceptions and feature-specific behavior.
 11. Keep conflicts visible and unresolved.
 12. Update `INDEX.md` when the document set or document roles change.
-13. Run relevant verification.
+13. For mechanical cleanup focus:
+    - delete `.specs/archive` if it exists;
+    - remove process reports from `.specs`;
+    - regenerate `INDEX.md`;
+    - fix broken relation references where the remap is obvious;
+    - normalize document shapes;
+    - report unresolved semantic ambiguity.
+14. Run relevant verification.
 
 ## Conflict Handling
 

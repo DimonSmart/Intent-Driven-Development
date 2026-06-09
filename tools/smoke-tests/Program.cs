@@ -29,6 +29,7 @@ ExpectNoEntryIncludes("generated/gemini/GEMINI.md", "AGENTS.md");
 ExpectEntryPointLineLimits();
 ExpectNoFullMethodologyInEntryPoints();
 ExpectAllSkillsGenerated();
+ExpectSpecImportLintCleanContract();
 ExpectInstallEntryNone();
 ExpectInstallGeminiEntryNoneRejected();
 ExpectInstallAllAfterInit();
@@ -208,6 +209,64 @@ void ExpectAllSkillsGenerated()
         if (!canonicalSkills.SequenceEqual(generatedSkills))
         {
             failures.Add($"Generated skills do not match canonical skills: {root}");
+        }
+    }
+}
+
+void ExpectSpecImportLintCleanContract()
+{
+    var skillPaths = new[]
+    {
+        "generated/codex/.agents/skills/spec-import/SKILL.md",
+        "generated/claude/.claude/skills/spec-import/SKILL.md",
+        "generated/copilot/.github/skills/spec-import/SKILL.md"
+    };
+
+    var required = new[]
+    {
+        "Import is not complete until the generated `.specs` tree is mechanically",
+        "no `.specs/archive`",
+        "Do not create `.specs/import-report.md`.",
+        "## Source-to-target Remap",
+        "A numeric relation may be written only if the referenced target document",
+        "Regenerate `.specs/INDEX.md` from actual current numbered documents after",
+        "## Post-import Cleanup",
+        "Continue fixing mechanical errors until none remain.",
+        "`spec-lint` would return no errors.",
+        "`spec-normalize-current` only for later maintenance"
+    };
+
+    var forbidden = new[]
+    {
+        "For non-trivial imports, create or update `.specs/import-report.md`",
+        "Use `spec-normalize-current` for focused normalization of existing current specs after import",
+        "Write an import report for non-trivial imports."
+    };
+
+    foreach (var relativePath in skillPaths)
+    {
+        var fullPath = Path.Combine(repoRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(fullPath))
+        {
+            failures.Add($"Missing spec-import generated skill for contract check: {relativePath}");
+            continue;
+        }
+
+        var content = File.ReadAllText(fullPath);
+        foreach (var text in required)
+        {
+            if (!content.Contains(text, StringComparison.Ordinal))
+            {
+                failures.Add($"spec-import generated skill is missing required text '{text}': {relativePath}");
+            }
+        }
+
+        foreach (var text in forbidden)
+        {
+            if (content.Contains(text, StringComparison.Ordinal))
+            {
+                failures.Add($"spec-import generated skill contains obsolete text '{text}': {relativePath}");
+            }
         }
     }
 }

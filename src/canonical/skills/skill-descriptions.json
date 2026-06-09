@@ -4,7 +4,7 @@
   "spec-implement": "Implement behavior from current `.specs/` product intent and verify the code against the relevant specification.",
   "spec-new-document": "Create a new owning IDD spec, ADR, or spike only when no existing current document owns the area or decision.",
   "spec-check-implementation": "Check whether implementation behavior matches durable product intent in `.specs/`.",
-  "spec-import": "Import raw source material into a structurally normalized IDD `.specs/` structure.",
+  "spec-import": "Import raw source material into a normalized lint-clean IDD `.specs/` structure.",
   "spec-lint": "Run mechanical `.specs/` consistency checks without editing files.",
   "spec-normalize-current": "Perform focused structural normalization of existing `.specs/` intent without changing product meaning.",
   "spec-update-from-implementation": "Update specs from confirmed implementation behavior intended as product intent."

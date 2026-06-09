@@ -27,8 +27,12 @@ Check that:
 - every current spec listed in `INDEX.md` exists;
 - every current numbered spec under `.specs/` is listed in `INDEX.md`;
 - `.specs` has no archive directory;
+- `.specs/import-report.md` does not exist;
+- generated, import, task, progress, or process reports are not stored under
+  `.specs`;
 - `INDEX.md` has no `Archived` section;
 - no current spec links to deleted document storage;
+- no file under `.specs` references `.specs/archive/...`;
 - skills do not contain an archive-enabling flag;
 - skills do not contain an archive import action;
 - skills do not recommend archiving obsolete specs;
@@ -36,9 +40,10 @@ Check that:
   preservation candidates;
 - templates/support docs are not listed as current specs;
 - required sections exist, or missing sections are reported;
+- `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar numeric
+  relation references point to existing current numbered docs;
 - Related Specifications links point to existing files or valid external
   references;
-- Replaces/Supersedes links point to existing files;
 - specs do not contain obvious stale `.worklog` references except in
   source/history sections;
 - specs do not contain task/progress/status language in normative sections;
@@ -52,8 +57,13 @@ Check that:
 `spec-lint` must fail if:
 
 - an archive directory exists under `.specs`;
+- `.specs/import-report.md` exists;
+- generated, import, task, progress, or process reports exist under `.specs`;
 - `INDEX.md` contains an `Archived` section;
 - `INDEX.md` links to deleted document storage;
+- any file under `.specs` references `.specs/archive/...`;
+- any numeric `Related`, `Replaces`, `Supersedes`, `Depends on`, or similar
+  relation points to a missing current numbered doc;
 - any skill contains an archive-enabling flag;
 - any skill contains an archive import action;
 - any skill recommends moving specs to archive;
