@@ -7,8 +7,12 @@ if ($LASTEXITCODE -ne 0) {
 
 Set-Location $repoRoot
 
-dotnet run --project tools/generate
-dotnet run --project tools/generate -- --check
-dotnet run --project tools/smoke-tests
+dotnet build tools/generate/Generate.csproj --nologo
+dotnet build tools/idd-tool/IntentDrivenDevelopment.Tool.csproj --nologo
+dotnet build tools/smoke-tests/SmokeTests.csproj --nologo
+
+dotnet exec tools/generate/bin/Debug/net10.0/Generate.dll
+dotnet exec tools/generate/bin/Debug/net10.0/Generate.dll --check
+dotnet exec tools/smoke-tests/bin/Debug/net10.0/SmokeTests.dll
 
 Write-Host "Check completed."

@@ -3,6 +3,8 @@ using System.Security.Cryptography;
 
 var repoRoot = FindRepoRoot();
 var failures = new List<string>();
+var generatorDll = Path.Combine(repoRoot, "tools", "generate", "bin", "Debug", "net10.0", "Generate.dll");
+var toolDll = Path.Combine(repoRoot, "tools", "idd-tool", "bin", "Debug", "net10.0", "IntentDrivenDevelopment.Tool.dll");
 
 RunGenerator();
 
@@ -314,7 +316,7 @@ void ExpectSpecImportLintCleanContract()
 
 void ExpectGeneratorCheckPasses()
 {
-    var exitCode = RunProcess("dotnet", "run --project tools/generate -- --check");
+    var exitCode = RunProcess("dotnet", $"exec \"{generatorDll}\" --check");
     if (exitCode != 0)
     {
         failures.Add("Generator check failed.");
@@ -328,8 +330,7 @@ void ExpectInstallEntryNone()
 
     try
     {
-        var toolProject = Path.Combine(repoRoot, "tools", "idd-tool");
-        var exitCode = RunProcess("dotnet", $"run --project \"{toolProject}\" -- install --target claude --entry none", tempRoot);
+        var exitCode = RunProcess("dotnet", $"exec \"{toolDll}\" install --target claude --entry none", tempRoot);
         if (exitCode != 0)
         {
             failures.Add("Install with --entry none failed.");
@@ -367,8 +368,7 @@ void ExpectInstallGeminiEntryNoneRejected()
 
     try
     {
-        var toolProject = Path.Combine(repoRoot, "tools", "idd-tool");
-        var result = RunProcessResult("dotnet", $"run --project \"{toolProject}\" -- install --target gemini --entry none", tempRoot);
+        var result = RunProcessResult("dotnet", $"exec \"{toolDll}\" install --target gemini --entry none", tempRoot);
         if (result.ExitCode == 0)
         {
             failures.Add("Gemini install with --entry none succeeded unexpectedly.");
@@ -395,15 +395,14 @@ void ExpectInstallAllAfterInit()
 
     try
     {
-        var toolProject = Path.Combine(repoRoot, "tools", "idd-tool");
-        var initExitCode = RunProcess("dotnet", $"run --project \"{toolProject}\" -- init", tempRoot);
+        var initExitCode = RunProcess("dotnet", $"exec \"{toolDll}\" init", tempRoot);
         if (initExitCode != 0)
         {
             failures.Add("Init failed before install --all.");
             return;
         }
 
-        var installExitCode = RunProcess("dotnet", $"run --project \"{toolProject}\" -- install --all", tempRoot);
+        var installExitCode = RunProcess("dotnet", $"exec \"{toolDll}\" install --all", tempRoot);
         if (installExitCode != 0)
         {
             failures.Add("Install --all failed after init.");
@@ -653,7 +652,7 @@ void ExpectSecondRunStable()
 
 void RunGenerator()
 {
-    var exitCode = RunProcess("dotnet", "run --project tools/generate");
+    var exitCode = RunProcess("dotnet", $"exec \"{generatorDll}\"");
     if (exitCode != 0)
     {
         failures.Add("Generator failed.");
