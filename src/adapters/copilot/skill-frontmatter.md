@@ -1,4 +1,0 @@
----
-name: {{skillName}}
-description: {{skillDescription}}
----

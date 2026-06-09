@@ -44,10 +44,19 @@ internal sealed class Generator(string repoRoot)
     {
         var errors = new List<string>();
         var adaptersRoot = Path.Combine(repoRoot, "src", "adapters");
-        foreach (var adapterDir in Directory.GetDirectories(adaptersRoot).OrderBy(Path.GetFileName))
+        var adapterDefinitions = Directory
+            .GetDirectories(adaptersRoot)
+            .OrderBy(Path.GetFileName)
+            .Select(adapterDir => new AdapterDefinition(adapterDir, ReadAdapter(adapterDir)))
+            .ToArray();
+        var knownAdapterNames = adapterDefinitions
+            .Select(definition => definition.Config.Agent)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var adapterDefinition in adapterDefinitions)
         {
-            var adapter = ReadAdapter(adapterDir);
-            var expectedFiles = BuildFiles(adapterDir, adapter);
+            var adapter = adapterDefinition.Config;
+            var expectedFiles = BuildFiles(adapterDefinition.Directory, adapter, knownAdapterNames);
             var outputRoot = Path.Combine(repoRoot, "generated", adapter.Agent);
 
             if (checkOnly)
@@ -78,7 +87,10 @@ internal sealed class Generator(string repoRoot)
         }) ?? throw new InvalidOperationException($"Invalid adapter config in {adapterDir}.");
     }
 
-    private IReadOnlyList<GeneratedFile> BuildFiles(string adapterDir, AdapterConfig adapter)
+    private IReadOnlyList<GeneratedFile> BuildFiles(
+        string adapterDir,
+        AdapterConfig adapter,
+        IReadOnlySet<string> knownAdapterNames)
     {
         var files = new List<GeneratedFile>();
         var entry = ReadRequired(Path.Combine(adapterDir, "entry.md"));
@@ -94,11 +106,9 @@ internal sealed class Generator(string repoRoot)
                 throw new InvalidOperationException($"{adapter.Agent} supports skills but has no skillsRoot.");
             }
 
-            var frontMatterPath = Path.Combine(adapterDir, "skill-frontmatter.md");
-            var frontMatter = adapter.SupportsFrontMatter ? ReadRequired(frontMatterPath) : "";
             var skillsRoot = Path.Combine(repoRoot, "src", "canonical", "skills");
             var skillDescriptionPath = Path.Combine(skillsRoot, "skill-descriptions.json");
-            var skillDescriptions = ReadSkillDescriptions(skillDescriptionPath);
+            var skillDescriptions = ReadSkillDescriptions(skillDescriptionPath, knownAdapterNames);
             var skillPaths = Directory.GetFiles(skillsRoot, "spec-*.md").OrderBy(Path.GetFileName).ToArray();
             var skillNames = skillPaths.Select(Path.GetFileNameWithoutExtension).ToHashSet(StringComparer.Ordinal);
 
@@ -113,8 +123,7 @@ internal sealed class Generator(string repoRoot)
             foreach (var skillPath in skillPaths)
             {
                 var skillName = Path.GetFileNameWithoutExtension(skillPath);
-                if (!skillDescriptions.TryGetValue(skillName, out var skillDescription) ||
-                    string.IsNullOrWhiteSpace(skillDescription))
+                if (!skillDescriptions.TryGetValue(skillName, out var skillDescription))
                 {
                     throw new InvalidOperationException($"Missing skill description for {skillName} in src/canonical/skills/skill-descriptions.json.");
                 }
@@ -123,9 +132,7 @@ internal sealed class Generator(string repoRoot)
                 if (adapter.SupportsFrontMatter)
                 {
                     content = JoinBlocks(
-                        frontMatter
-                            .Replace("{{skillName}}", skillName)
-                            .Replace("{{skillDescription}}", skillDescription),
+                        BuildSkillFrontMatter(skillName, skillDescription, adapter.Agent),
                         content);
                 }
 
@@ -255,11 +262,205 @@ internal sealed class Generator(string repoRoot)
     private static string ReadRequired(string path) =>
         File.Exists(path) ? File.ReadAllText(path) : throw new FileNotFoundException("Required file not found.", path);
 
-    private static IReadOnlyDictionary<string, string> ReadSkillDescriptions(string path)
+    private static IReadOnlyDictionary<string, SkillDescription> ReadSkillDescriptions(
+        string path,
+        IReadOnlySet<string> knownAdapterNames)
     {
         var json = ReadRequired(path);
-        return JsonSerializer.Deserialize<Dictionary<string, string>>(json) ??
-            throw new InvalidOperationException($"Invalid skill descriptions in {path}.");
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidOperationException($"Invalid skill descriptions in {path}: root must be a JSON object.");
+        }
+
+        var descriptions = new Dictionary<string, SkillDescription>(StringComparer.Ordinal);
+        foreach (var skillProperty in document.RootElement.EnumerateObject())
+        {
+            descriptions.Add(
+                skillProperty.Name,
+                ReadSkillDescription(path, skillProperty.Name, skillProperty.Value, knownAdapterNames));
+        }
+
+        return descriptions;
+    }
+
+    private static SkillDescription ReadSkillDescription(
+        string path,
+        string skillName,
+        JsonElement value,
+        IReadOnlySet<string> knownAdapterNames)
+    {
+        if (value.ValueKind == JsonValueKind.String)
+        {
+            var description = value.GetString();
+            GuardDescription(path, skillName, description);
+            return new SkillDescription(description!, Adapters: null);
+        }
+
+        if (value.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidOperationException($"Invalid skill description for {skillName} in {path}: expected string or object.");
+        }
+
+        if (!value.TryGetProperty("description", out var descriptionElement) ||
+            descriptionElement.ValueKind != JsonValueKind.String)
+        {
+            throw new InvalidOperationException($"Invalid skill description for {skillName} in {path}: description is required.");
+        }
+
+        var objectDescription = descriptionElement.GetString();
+        GuardDescription(path, skillName, objectDescription);
+
+        IReadOnlyDictionary<string, AdapterSkillMetadata>? adapters = null;
+        if (value.TryGetProperty("adapters", out var adaptersElement))
+        {
+            if (adaptersElement.ValueKind != JsonValueKind.Object)
+            {
+                throw new InvalidOperationException($"Invalid skill description for {skillName} in {path}: adapters must be an object.");
+            }
+
+            var adapterMetadata = new Dictionary<string, AdapterSkillMetadata>(StringComparer.Ordinal);
+            foreach (var adapterProperty in adaptersElement.EnumerateObject())
+            {
+                if (!knownAdapterNames.Contains(adapterProperty.Name))
+                {
+                    throw new InvalidOperationException(
+                        $"Invalid skill description for {skillName} in {path}: unknown adapter '{adapterProperty.Name}'.");
+                }
+
+                adapterMetadata.Add(
+                    adapterProperty.Name,
+                    ReadAdapterSkillMetadata(path, skillName, adapterProperty.Name, adapterProperty.Value));
+            }
+
+            adapters = adapterMetadata;
+        }
+
+        return new SkillDescription(objectDescription!, adapters);
+    }
+
+    private static AdapterSkillMetadata ReadAdapterSkillMetadata(
+        string path,
+        string skillName,
+        string adapterName,
+        JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidOperationException(
+                $"Invalid metadata for {skillName}/{adapterName} in {path}: adapter metadata must be an object.");
+        }
+
+        IReadOnlyDictionary<string, JsonElement>? frontMatter = null;
+        if (value.TryGetProperty("frontmatter", out var frontMatterElement))
+        {
+            if (frontMatterElement.ValueKind != JsonValueKind.Object)
+            {
+                throw new InvalidOperationException(
+                    $"Invalid frontmatter for {skillName}/{adapterName} in {path}: frontmatter must be an object.");
+            }
+
+            var fields = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+            foreach (var field in frontMatterElement.EnumerateObject())
+            {
+                if (StringComparer.Ordinal.Equals(field.Name, "name") ||
+                    StringComparer.Ordinal.Equals(field.Name, "description"))
+                {
+                    throw new InvalidOperationException(
+                        $"Invalid frontmatter for {skillName}/{adapterName} in {path}: '{field.Name}' is generated automatically and cannot be overridden.");
+                }
+
+                GuardSupportedFrontMatterValue(path, skillName, adapterName, field.Name, field.Value);
+                fields.Add(field.Name, field.Value.Clone());
+            }
+
+            frontMatter = fields;
+        }
+
+        return new AdapterSkillMetadata(frontMatter);
+    }
+
+    private static void GuardDescription(string path, string skillName, string? description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            throw new InvalidOperationException($"Invalid skill description for {skillName} in {path}: description cannot be empty.");
+        }
+    }
+
+    private static void GuardSupportedFrontMatterValue(
+        string path,
+        string skillName,
+        string adapterName,
+        string fieldName,
+        JsonElement value)
+    {
+        if (value.ValueKind is JsonValueKind.String or JsonValueKind.True or JsonValueKind.False or JsonValueKind.Number)
+        {
+            return;
+        }
+
+        if (value.ValueKind == JsonValueKind.Array &&
+            value.EnumerateArray().All(item => item.ValueKind == JsonValueKind.String))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Invalid frontmatter for {skillName}/{adapterName} in {path}: '{fieldName}' must be a string, bool, number, or string array.");
+    }
+
+    private static string BuildSkillFrontMatter(string skillName, SkillDescription skillDescription, string adapterName)
+    {
+        var lines = new List<string>
+        {
+            "---",
+            $"name: {ToYamlString(skillName)}",
+            $"description: {ToYamlString(skillDescription.Description)}"
+        };
+
+        if (skillDescription.Adapters?.TryGetValue(adapterName, out var adapterMetadata) == true &&
+            adapterMetadata.Frontmatter is not null)
+        {
+            foreach (var field in adapterMetadata.Frontmatter)
+            {
+                lines.Add($"{field.Key}: {ToYamlValue(field.Value)}");
+            }
+        }
+
+        lines.Add("---");
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private static string ToYamlValue(JsonElement value) =>
+        value.ValueKind switch
+        {
+            JsonValueKind.String => ToYamlString(value.GetString() ?? ""),
+            JsonValueKind.True => "true",
+            JsonValueKind.False => "false",
+            JsonValueKind.Number => value.GetRawText(),
+            JsonValueKind.Array => "[" + string.Join(", ", value.EnumerateArray().Select(item => ToYamlString(item.GetString() ?? ""))) + "]",
+            _ => throw new InvalidOperationException($"Unsupported YAML frontmatter value: {value.ValueKind}.")
+        };
+
+    private static string ToYamlString(string value)
+    {
+        if (NeedsQuotedYamlString(value))
+        {
+            return JsonSerializer.Serialize(value);
+        }
+
+        return value;
+    }
+
+    private static bool NeedsQuotedYamlString(string value)
+    {
+        if (value.Length == 0 || !StringComparer.Ordinal.Equals(value, value.Trim()))
+        {
+            return true;
+        }
+
+        return value.Any(character => character is ':' or '[' or ']' or '{' or '}' or '#' or '\r' or '\n' or '"' or '\'');
     }
 
     private static string JoinBlocks(params string[] blocks) =>
@@ -274,5 +475,14 @@ internal sealed record AdapterConfig(
     string? SkillsRoot,
     bool SupportsSkills,
     bool SupportsFrontMatter);
+
+internal sealed record AdapterDefinition(string Directory, AdapterConfig Config);
+
+internal sealed record SkillDescription(
+    string Description,
+    IReadOnlyDictionary<string, AdapterSkillMetadata>? Adapters);
+
+internal sealed record AdapterSkillMetadata(
+    IReadOnlyDictionary<string, JsonElement>? Frontmatter);
 
 internal sealed record GeneratedFile(string RelativePath, string Content);

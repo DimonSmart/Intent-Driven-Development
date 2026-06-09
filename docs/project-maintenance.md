@@ -50,7 +50,7 @@ src/canonical/       canonical methodology, project files, skills, and packs
 src/canonical/packs/ compact bootstrap content for main instruction files
 src/canonical/methodology/ full methodology for skills and project docs
 src/canonical/skills/ task-specific workflows
-src/adapters/        target-specific entry points and skill front matter
+src/adapters/        target-specific entry points and adapter capabilities
 generated/           generated files for each AI coding agent system
 npm/                 universal CLI delivery wrapper
 tools/generate/      C# generator
@@ -76,6 +76,16 @@ The `generated/` directory is intentionally ignored by git. It is reproducible o
 Canonical files define the method, project `.specs/` files, reusable skills, and instruction packs. Agent-specific adapters may change paths, entry point names, front matter, and supported features, but they must not change the meaning of canonical content.
 
 Generated files are delivery formats for specific agents. They are not product knowledge, and they should not be edited directly.
+
+## Skill Metadata
+
+`src/canonical/skills/skill-descriptions.json` stores skill descriptions and optional adapter-specific metadata.
+
+Canonical skill body remains agent-neutral.
+
+Adapter-specific behavior, such as Claude Code frontmatter fields, belongs to `adapters.<adapter>.frontmatter`.
+
+Do not put Claude-specific frontmatter directly into canonical skill markdown.
 
 ## Workflow
 

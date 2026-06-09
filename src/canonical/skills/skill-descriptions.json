@@ -1,11 +1,63 @@
 {
-  "spec-audit": "Diagnose `.specs/` structure and recommend reorganizations without editing files.",
-  "spec-change": "Update current product intent from a user-requested behavior change, preferring existing specs over new specs.",
-  "spec-implement": "Implement behavior from current `.specs/` product intent and verify the code against the relevant specification.",
-  "spec-new-document": "Create a new owning IDD spec, ADR, or spike only when no existing current document owns the area or decision.",
-  "spec-check-implementation": "Check whether implementation behavior matches durable product intent in `.specs/`.",
-  "spec-import": "Import raw source material into a normalized lint-clean IDD `.specs/` structure.",
-  "spec-lint": "Run mechanical `.specs/` consistency checks without editing files.",
-  "spec-normalize-current": "Perform focused structural normalization of existing `.specs/` intent without changing product meaning.",
-  "spec-update-from-implementation": "Update specs from confirmed implementation behavior intended as product intent."
+  "spec-audit": {
+    "description": "Diagnose `.specs/` structure and recommend reorganizations without editing files.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "argument-hint": "[scope or audit focus]",
+          "allowed-tools": "Read Glob Grep"
+        }
+      }
+    }
+  },
+  "spec-change": {
+    "description": "Update current product intent from a user-requested behavior change, preferring existing specs over new specs."
+  },
+  "spec-implement": {
+    "description": "Implement behavior from current `.specs/` product intent and verify the code against the relevant specification."
+  },
+  "spec-new-document": {
+    "description": "Create a new owning IDD spec, ADR, or spike only when no existing current document owns the area or decision."
+  },
+  "spec-check-implementation": {
+    "description": "Check whether implementation behavior matches durable product intent in `.specs/`."
+  },
+  "spec-import": {
+    "description": "Import raw source material into a structurally normalized IDD `.specs/` structure.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "argument-hint": "[source roots] [--mode propose|apply-safe]"
+        }
+      }
+    }
+  },
+  "spec-lint": {
+    "description": "Run mechanical `.specs/` consistency checks without editing files.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "argument-hint": "[optional spec path or scope]",
+          "allowed-tools": "Read Glob Grep Bash"
+        }
+      }
+    }
+  },
+  "spec-normalize-current": {
+    "description": "Perform focused structural normalization of existing `.specs/` intent without changing product meaning.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "argument-hint": "--specs <ids> --topic <topic> --target <file|new> --mode propose|apply"
+        }
+      }
+    }
+  },
+  "spec-update-from-implementation": {
+    "description": "Update specs from confirmed implementation behavior intended as product intent."
+  }
 }

@@ -29,6 +29,7 @@ ExpectNoEntryIncludes("generated/gemini/GEMINI.md", "AGENTS.md");
 ExpectEntryPointLineLimits();
 ExpectNoFullMethodologyInEntryPoints();
 ExpectAllSkillsGenerated();
+ExpectClaudeSkillMetadata();
 ExpectSpecImportLintCleanContract();
 ExpectInstallEntryNone();
 ExpectInstallGeminiEntryNoneRejected();
@@ -209,6 +210,46 @@ void ExpectAllSkillsGenerated()
         if (!canonicalSkills.SequenceEqual(generatedSkills))
         {
             failures.Add($"Generated skills do not match canonical skills: {root}");
+        }
+    }
+}
+
+void ExpectClaudeSkillMetadata()
+{
+    var specAuditPath = Path.Combine(repoRoot, "generated/claude/.claude/skills/spec-audit/SKILL.md".Replace('/', Path.DirectorySeparatorChar));
+    if (!File.Exists(specAuditPath))
+    {
+        failures.Add("Missing Claude spec-audit skill for frontmatter check.");
+    }
+    else
+    {
+        var content = File.ReadAllText(specAuditPath);
+        foreach (var text in new[]
+        {
+            "context: fork",
+            "agent: Explore",
+            "argument-hint: \"[scope or audit focus]\"",
+            "allowed-tools: Read Glob Grep"
+        })
+        {
+            if (!content.Contains(text, StringComparison.Ordinal))
+            {
+                failures.Add($"Claude spec-audit skill is missing frontmatter '{text}'.");
+            }
+        }
+    }
+
+    var specChangePath = Path.Combine(repoRoot, "generated/claude/.claude/skills/spec-change/SKILL.md".Replace('/', Path.DirectorySeparatorChar));
+    if (!File.Exists(specChangePath))
+    {
+        failures.Add("Missing Claude spec-change skill for frontmatter check.");
+    }
+    else
+    {
+        var content = File.ReadAllText(specChangePath);
+        if (content.Contains("context: fork", StringComparison.Ordinal))
+        {
+            failures.Add("Claude spec-change skill unexpectedly has context: fork.");
         }
     }
 }
