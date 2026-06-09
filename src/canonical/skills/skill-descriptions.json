@@ -1,5 +1,7 @@
 {
   "spec-audit": "Diagnose `.specs/` structure and recommend reorganizations without editing files.",
+  "spec-change": "Update current product intent from a user-requested behavior change, preferring existing specs over new specs.",
+  "spec-implement": "Implement behavior from current `.specs/` product intent and verify the code against the relevant specification.",
   "spec-create": "Create a new IDD spec, ADR, or spike for durable product intent.",
   "spec-check-implementation": "Check whether implementation behavior matches durable product intent in `.specs/`.",
   "spec-import": "Import raw source material into a structurally normalized IDD `.specs/` structure.",

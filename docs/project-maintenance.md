@@ -97,6 +97,30 @@ In practice, this means:
 
 The check should prove that the generated agent files are still reproducible and valid enough to use.
 
+## Example: Changing Existing Command Completion Behavior
+
+Request:
+
+```text
+Command completion should not accept the first suggestion by default.
+The default selected item should mean no completion.
+```
+
+Correct routing:
+
+```text
+spec-change:
+  update .specs/0018.spec-command-history-completion.md
+
+spec-implement:
+  update command completion behavior and tests
+
+spec-check-implementation:
+  verify implementation against 0018
+```
+
+Do not create a new spec, because command completion is already owned by 0018.
+
 ## Distribution
 
 Intent-Driven Development is release-first.

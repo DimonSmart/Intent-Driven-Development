@@ -75,7 +75,9 @@ void ExpectSkillFiles(string skillsRoot)
     var expected = new[]
     {
         "spec-audit",
+        "spec-change",
         "spec-import",
+        "spec-implement",
         "spec-lint",
         "spec-create",
         "spec-update-from-implementation",
