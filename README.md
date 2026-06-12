@@ -1,14 +1,13 @@
 # Intent-Driven Development
 
-## The thought experiment
-
-Delete the entire implementation.
-
-Keep only the specifications.
-
-Can an AI coding agent rebuild the product from them?
-
-If the specs contain only what helps recreate the product, and nothing that is just temporary task noise, they are good specs.
+> Run a simple thought experiment.
+>
+> Delete the entire implementation.
+> Keep only the specifications.
+>
+> Can an AI coding agent rebuild the product from them?
+>
+> If the specs contain enough intent to recreate the product, and not enough temporary noise to become a task tracker, they are good specs.
 
 ## Why another take on spec-driven development?
 
