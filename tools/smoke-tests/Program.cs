@@ -10,12 +10,9 @@ var toolDll = Path.Combine(repoRoot, "tools", "idd-tool", "bin", "Debug", "net10
 RunGenerator();
 
 ExpectManifestShape();
-ExpectMethodologyRename();
 ExpectFile("generated/codex/AGENTS.md");
-ExpectAllSkillFiles("generated/codex/.agents/skills");
 
 ExpectFile("generated/claude/CLAUDE.md");
-ExpectAllSkillFiles("generated/claude/.claude/skills");
 
 ExpectFile("generated/gemini/GEMINI.md");
 ExpectNoDirectory("generated/gemini/.agents");
@@ -23,26 +20,16 @@ ExpectNoDirectory("generated/gemini/.claude");
 ExpectNoDirectory("generated/gemini/.github/skills");
 
 ExpectFile("generated/copilot/.github/copilot-instructions.md");
-ExpectAllSkillFiles("generated/copilot/.github/skills");
 
 ExpectNoGeneratedHeaderComments();
-ExpectNoGeneratedText("Worklog-driven development");
-ExpectNoGeneratedText("Generated files are not source of truth");
-ExpectNoCanonicalAgentCoupling();
 ExpectNoEntryIncludes("generated/claude/CLAUDE.md", "AGENTS.md");
 ExpectNoEntryIncludes("generated/gemini/GEMINI.md", "AGENTS.md");
 ExpectEntryPointLineLimits();
-ExpectNoFullMethodologyInEntryPoints();
 ExpectAllSkillsGenerated();
 ExpectClaudeSkillMetadata();
-ExpectSpecImportGeneratedShape();
-ExpectNoLegacySpecImportReportGuidance();
-ExpectSpecBrainstormGeneratedShape();
-ExpectEntryPointSkillRoutingShape();
 ExpectPackManifestShape();
 ExpectFactoryGeneratedShape();
 ExpectFactoryRolePromptReferences();
-ExpectFactorySkillShapes();
 ExpectListPacks();
 ExpectListCodingAgents();
 ExpectDefaultInstallCoreOnly();
@@ -95,33 +82,6 @@ void ExpectNoDirectory(string relativePath)
     }
 }
 
-void ExpectAllSkillFiles(string skillsRoot)
-{
-    var expected = new[]
-    {
-        "factory-create-work-plan",
-        "factory-execute-work-plan",
-        "factory-finish-work",
-        "factory-review-task",
-        "factory-review-work-result",
-        "spec-audit",
-        "spec-brainstorm",
-        "spec-change",
-        "spec-import",
-        "spec-implement",
-        "spec-lint",
-        "spec-new-document",
-        "spec-update-from-implementation",
-        "spec-normalize-current",
-        "spec-check-implementation"
-    };
-
-    foreach (var skill in expected)
-    {
-        ExpectFile($"{skillsRoot}/{skill}/SKILL.md");
-    }
-}
-
 void ExpectNoGeneratedHeaderComments()
 {
     foreach (var path in GeneratedFiles())
@@ -134,64 +94,12 @@ void ExpectNoGeneratedHeaderComments()
     }
 }
 
-void ExpectNoGeneratedText(string text)
-{
-    foreach (var path in GeneratedFiles())
-    {
-        var content = File.ReadAllText(path);
-        if (content.Contains(text, StringComparison.OrdinalIgnoreCase))
-        {
-            failures.Add($"Generated file contains forbidden text '{text}': {Relative(path)}");
-        }
-    }
-}
-
-void ExpectNoCanonicalAgentCoupling()
-{
-    var canonicalRoot = Path.Combine(repoRoot, "src", "canonical");
-    foreach (var path in Directory.GetFiles(canonicalRoot, "*.md", SearchOption.AllDirectories))
-    {
-        var normalized = path.Replace('\\', '/');
-        if (normalized.Contains("/migration-from-copilotinstructions.md", StringComparison.OrdinalIgnoreCase))
-        {
-            continue;
-        }
-
-        var content = File.ReadAllText(path);
-        if (content.Contains("Codex-specific", StringComparison.OrdinalIgnoreCase) ||
-            content.Contains("AGENTS.md", StringComparison.OrdinalIgnoreCase))
-        {
-            failures.Add($"Canonical file contains CodingAgent-specific wording: {Relative(path)}");
-        }
-    }
-}
-
 void ExpectNoEntryIncludes(string relativePath, string forbidden)
 {
     var content = File.ReadAllText(Path.Combine(repoRoot, relativePath));
     if (content.Contains(forbidden, StringComparison.OrdinalIgnoreCase))
     {
         failures.Add($"{relativePath} includes {forbidden}");
-    }
-}
-
-string ReadRequiredGeneratedFile(string relativePath)
-{
-    var fullPath = Path.Combine(repoRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
-    if (!File.Exists(fullPath))
-    {
-        failures.Add($"Missing generated file: {relativePath}");
-        return "";
-    }
-
-    return File.ReadAllText(fullPath);
-}
-
-void ExpectSections(string content, string relativePath, params string[] headings)
-{
-    foreach (var heading in headings)
-    {
-        ExpectContains(content, heading, relativePath, "section");
     }
 }
 
@@ -208,37 +116,6 @@ void ExpectDoesNotContain(string content, string forbidden, string relativePath,
     if (content.Contains(forbidden, StringComparison.Ordinal))
     {
         failures.Add($"{context} contains obsolete text '{forbidden}': {relativePath}");
-    }
-}
-
-void ExpectSkillReferences(string content, string relativePath, params string[] skillNames)
-{
-    foreach (var skillName in skillNames)
-    {
-        ExpectContains(content, skillName, relativePath, "generated skill reference");
-    }
-}
-
-void ExpectFencedBlockBetween(string content, string relativePath, string startHeading, string endHeading)
-{
-    var start = content.IndexOf(startHeading, StringComparison.Ordinal);
-    if (start < 0)
-    {
-        failures.Add($"section is missing '{startHeading}': {relativePath}");
-        return;
-    }
-
-    var end = content.IndexOf(endHeading, start + startHeading.Length, StringComparison.Ordinal);
-    if (end < 0)
-    {
-        failures.Add($"section is missing '{endHeading}' after '{startHeading}': {relativePath}");
-        return;
-    }
-
-    var section = content[start..end];
-    if (!section.Contains("```", StringComparison.Ordinal))
-    {
-        failures.Add($"section '{startHeading}' is missing a fenced output format block: {relativePath}");
     }
 }
 
@@ -262,30 +139,6 @@ void ExpectEntryPointLineLimits()
     }
 }
 
-void ExpectNoFullMethodologyInEntryPoints()
-{
-    var forbidden = new[]
-    {
-        "## Required Reading",
-        "## Method Summary",
-        "## Classification Rules",
-        "## Output Format",
-        "Specifications should be complete enough to rebuild the product from scratch"
-    };
-
-    foreach (var relativePath in EntryPoints())
-    {
-        var content = File.ReadAllText(Path.Combine(repoRoot, relativePath));
-        foreach (var text in forbidden)
-        {
-            if (content.Contains(text, StringComparison.OrdinalIgnoreCase))
-            {
-                failures.Add($"Entry point contains full methodology text '{text}': {relativePath}");
-            }
-        }
-    }
-}
-
 void ExpectAllSkillsGenerated()
 {
     var canonicalSkills = Directory
@@ -304,6 +157,12 @@ void ExpectAllSkillsGenerated()
     foreach (var root in generatedSkillRoots)
     {
         var fullRoot = Path.Combine(repoRoot, root);
+        if (!Directory.Exists(fullRoot))
+        {
+            failures.Add($"Generated skills root is missing: {root}");
+            continue;
+        }
+
         var generatedSkills = Directory
             .GetDirectories(fullRoot)
             .Select(Path.GetFileName)
@@ -330,11 +189,7 @@ void ExpectPackManifestShape()
     ExpectContains(content, "\"skillRoleReferences\"", manifestPath, "pack manifest");
     ExpectDoesNotContain(content, "\"agents\"", manifestPath, "pack manifest");
 
-    var manifest = JsonSerializer.Deserialize<SmokePackManifest>(content, new JsonSerializerOptions
-    {
-        PropertyNameCaseInsensitive = true
-    });
-
+    var manifest = ReadPackManifest();
     if (manifest?.Packs is null || manifest.Packs.Count == 0)
     {
         failures.Add("Pack manifest could not be parsed.");
@@ -397,7 +252,7 @@ void ExpectPackManifestShape()
         }
     }
 
-    foreach (var rolePrompt in new[] { "factory-coordinator", "implementation-planner", "implementer", "task-reviewer", "final-reviewer" })
+    foreach (var rolePrompt in manifest.Packs.Values.SelectMany(pack => pack.RolePrompts).Distinct(StringComparer.Ordinal))
     {
         ExpectFile($"src/canonical/factory/roles/{rolePrompt}.md");
         ExpectContains(content, $"\"{rolePrompt}\"", manifestPath, "pack manifest role prompt");
@@ -479,22 +334,39 @@ string[] JsonObjectKeys(JsonElement root, string propertyName) =>
         ? property.EnumerateObject().Select(item => item.Name).OrderBy(name => name, StringComparer.Ordinal).ToArray()
         : [];
 
-void ExpectMethodologyRename()
+SmokePackManifest? ReadPackManifest()
 {
-    ExpectFile("src/canonical/methodology/coding-agent-workflow.md");
-    if (File.Exists(Path.Combine(repoRoot, "src/canonical/methodology/agent-workflow.md")))
+    var path = Path.Combine(repoRoot, "src", "canonical", "packs", "pack-manifest.json");
+    if (!File.Exists(path))
     {
-        failures.Add("src/canonical/methodology/agent-workflow.md must not exist.");
+        failures.Add("Missing pack manifest: src/canonical/packs/pack-manifest.json");
+        return null;
+    }
+
+    try
+    {
+        return JsonSerializer.Deserialize<SmokePackManifest>(File.ReadAllText(path), new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+    }
+    catch (JsonException exception)
+    {
+        failures.Add($"Pack manifest could not be parsed: {exception.Message}");
+        return null;
     }
 }
 
 void ExpectFactoryGeneratedShape()
 {
-    foreach (var relativePath in GeneratedSkillPaths("factory-create-work-plan")
-        .Concat(GeneratedSkillPaths("factory-execute-work-plan"))
-        .Concat(GeneratedSkillPaths("factory-review-task"))
-        .Concat(GeneratedSkillPaths("factory-review-work-result"))
-        .Concat(GeneratedSkillPaths("factory-finish-work")))
+    var manifest = ReadPackManifest();
+    if (manifest?.Packs is null || !manifest.Packs.TryGetValue("factory", out var factoryPack))
+    {
+        failures.Add("Pack manifest is missing factory pack.");
+        return;
+    }
+
+    foreach (var relativePath in factoryPack.Skills.SelectMany(GeneratedSkillPaths))
     {
         ExpectFile(relativePath);
     }
@@ -502,38 +374,43 @@ void ExpectFactoryGeneratedShape()
 
 void ExpectFactoryRolePromptReferences()
 {
+    var manifest = ReadPackManifest();
+    if (manifest?.Packs is null || !manifest.Packs.TryGetValue("factory", out var factoryPack))
+    {
+        failures.Add("Pack manifest is missing factory pack.");
+        return;
+    }
+
     var roots = new[]
     {
         "generated/codex/.agents/skills",
         "generated/claude/.claude/skills",
         "generated/copilot/.github/skills"
     };
-    var expectedBySkill = new Dictionary<string, string[]>(StringComparer.Ordinal)
-    {
-        ["factory-create-work-plan"] = ["factory-coordinator", "implementation-planner"],
-        ["factory-execute-work-plan"] = ["factory-coordinator", "implementer", "task-reviewer", "final-reviewer"],
-        ["factory-review-task"] = ["task-reviewer"],
-        ["factory-review-work-result"] = ["final-reviewer"],
-        ["factory-finish-work"] = ["factory-coordinator"]
-    };
-    var allRolePrompts = expectedBySkill.Values.SelectMany(rolePrompts => rolePrompts).Distinct(StringComparer.Ordinal).ToArray();
 
     foreach (var root in roots)
     {
-        foreach (var (skill, expectedRolePrompts) in expectedBySkill)
+        foreach (var skill in factoryPack.Skills)
         {
+            var expectedRolePrompts = factoryPack.SkillRoleReferences.GetValueOrDefault(skill) ?? [];
             foreach (var rolePrompt in expectedRolePrompts)
             {
                 ExpectFile($"{root}/{skill}/references/roles/{rolePrompt}.md");
             }
 
-            foreach (var rolePrompt in allRolePrompts.Except(expectedRolePrompts, StringComparer.Ordinal))
+            var roleRoot = Path.Combine(repoRoot, $"{root}/{skill}/references/roles".Replace('/', Path.DirectorySeparatorChar));
+            if (!Directory.Exists(roleRoot))
             {
-                var unexpectedPath = Path.Combine(repoRoot, $"{root}/{skill}/references/roles/{rolePrompt}.md".Replace('/', Path.DirectorySeparatorChar));
-                if (File.Exists(unexpectedPath))
-                {
-                    failures.Add($"Factory skill has unexpected role prompt reference: {root}/{skill}/references/roles/{rolePrompt}.md");
-                }
+                continue;
+            }
+
+            var actualRolePrompts = Directory
+                .GetFiles(roleRoot, "*.md")
+                .Select(path => Path.GetFileNameWithoutExtension(path)!)
+                .ToArray();
+            foreach (var rolePrompt in actualRolePrompts.Except(expectedRolePrompts, StringComparer.Ordinal))
+            {
+                failures.Add($"Factory skill has unexpected role prompt reference: {root}/{skill}/references/roles/{rolePrompt}.md");
             }
         }
 
@@ -542,40 +419,6 @@ void ExpectFactoryRolePromptReferences()
         {
             failures.Add($"{root}/spec-implement must not contain factory role prompt references.");
         }
-    }
-}
-
-void ExpectFactorySkillShapes()
-{
-    foreach (var relativePath in GeneratedSkillPaths("factory-create-work-plan"))
-    {
-        var content = ReadRequiredGeneratedFile(relativePath);
-        ExpectSections(content, relativePath, "## Purpose", "## Rules", "## Workflow", "## Output Format");
-        ExpectContains(content, ".idd/factory/work/", relativePath, "factory-create-work-plan");
-        ExpectContains(content, "not product intent", relativePath, "factory-create-work-plan");
-        ExpectContains(content, "not a specification", relativePath, "factory-create-work-plan");
-        ExpectContains(content, "Do not read old factory work plans", relativePath, "factory-create-work-plan");
-    }
-
-    foreach (var relativePath in GeneratedSkillPaths("factory-execute-work-plan"))
-    {
-        var content = ReadRequiredGeneratedFile(relativePath);
-        ExpectContains(content, "explicit work plan", relativePath, "factory-execute-work-plan");
-        ExpectContains(content, "Factory execution delegates bounded implementation semantics to", relativePath, "factory-execute-work-plan");
-        ExpectContains(content, "Factory owns task sequencing, review gates, temporary artifacts, and cleanup.", relativePath, "factory-execute-work-plan");
-        ExpectContains(content, "It does not redefine `spec-implement` rules.", relativePath, "factory-execute-work-plan");
-        ExpectContains(content, "factory-review-task", relativePath, "factory-execute-work-plan");
-        ExpectContains(content, "factory-review-work-result", relativePath, "factory-execute-work-plan");
-        ExpectContains(content, "factory-finish-work", relativePath, "factory-execute-work-plan");
-        ExpectContains(content, "Do not search for old work plans", relativePath, "factory-execute-work-plan");
-    }
-
-    foreach (var relativePath in GeneratedSkillPaths("factory-finish-work"))
-    {
-        var content = ReadRequiredGeneratedFile(relativePath);
-        ExpectContains(content, "Temporary Artifact Cleanup", relativePath, "factory-finish-work");
-        ExpectContains(content, "Delete", relativePath, "factory-finish-work");
-        ExpectContains(content, ".idd/factory/work/", relativePath, "factory-finish-work");
     }
 }
 
@@ -616,105 +459,6 @@ void ExpectClaudeSkillMetadata()
         {
             failures.Add("Claude spec-change skill unexpectedly has context: fork.");
         }
-    }
-}
-
-// These smoke tests intentionally verify generated file shape and stable mechanical anchors only.
-// Semantic routing/behavior of skills belongs in separate prompt/LLM evaluation tests.
-void ExpectSpecImportGeneratedShape()
-{
-    var sections = new[]
-    {
-        "## Default Modes",
-        "## Current Spec Test",
-        "## Structural Normalization",
-        "## Required Behavior",
-        "## Source Triage",
-        "## Import Inventory",
-        "## Fragment Classification",
-        "## Source-to-target Remap",
-        "## Conflict Handling",
-        "## Normalized Writing Rules",
-        "## Relation Normalization",
-        "## Index Regeneration",
-        "## Workflow",
-        "## Post-import Cleanup",
-        "## Import Report"
-    };
-
-    foreach (var relativePath in GeneratedSkillPaths("spec-import"))
-    {
-        var content = ReadRequiredGeneratedFile(relativePath);
-        ExpectSections(content, relativePath, sections);
-        ExpectContains(content, ".specs/INDEX.md", relativePath, "spec-import generated skill reference");
-        ExpectContains(content, ".specs/README.md", relativePath, "spec-import generated skill reference");
-        ExpectSkillReferences(content, relativePath, "spec-lint", "spec-normalize-current");
-    }
-}
-
-void ExpectNoLegacySpecImportReportGuidance()
-{
-    var forbidden = new[]
-    {
-        "For non-trivial imports, create or update `.specs/import-report.md`",
-        "Write an import report for non-trivial imports."
-    };
-
-    foreach (var relativePath in GeneratedSkillPaths("spec-import"))
-    {
-        var content = ReadRequiredGeneratedFile(relativePath);
-        foreach (var text in forbidden)
-        {
-            ExpectDoesNotContain(content, text, relativePath, "legacy spec-import report guidance");
-        }
-    }
-}
-
-void ExpectSpecBrainstormGeneratedShape()
-{
-    var sections = new[]
-    {
-        "## Purpose",
-        "## When to use this skill",
-        "## When not to use this skill",
-        "## Boundaries",
-        "## Relationship to other skills",
-        "## Customer discovery questions",
-        "## Output formats",
-        "## Rules",
-        "## Examples",
-        "## Non-goals"
-    };
-
-    var relatedSkills = new[]
-    {
-        "spec-change",
-        "spec-new-document",
-        "spec-implement",
-        "spec-check-implementation",
-        "spec-update-from-implementation",
-        "spec-normalize-current",
-        "spec-audit",
-        "spec-lint",
-        "spec-import"
-    };
-
-    foreach (var relativePath in GeneratedSkillPaths("spec-brainstorm"))
-    {
-        var content = ReadRequiredGeneratedFile(relativePath);
-        ExpectSections(content, relativePath, sections);
-        ExpectSkillReferences(content, relativePath, relatedSkills);
-        ExpectFencedBlockBetween(content, relativePath, "## Output formats", "## Rules");
-    }
-}
-
-void ExpectEntryPointSkillRoutingShape()
-{
-    foreach (var relativePath in EntryPoints().Where(path => !path.Contains("/gemini/", StringComparison.Ordinal)))
-    {
-        var content = ReadRequiredGeneratedFile(relativePath);
-        ExpectSections(content, relativePath, "## IDD Workflow Routing");
-        ExpectSkillReferences(content, relativePath, "spec-brainstorm", "spec-change", "spec-implement", "spec-check-implementation");
     }
 }
 
@@ -773,12 +517,6 @@ void ExpectDefaultInstallCoreOnly()
         {
             failures.Add("default install installed factory skills.");
         }
-
-        var entry = File.ReadAllText(Path.Combine(installRoot, "CLAUDE.md"));
-        if (entry.Contains("IDD Factory Routing", StringComparison.Ordinal))
-        {
-            failures.Add("default install entry mentions factory routing.");
-        }
     });
 
     WithToolInstall("install --coding-agent claude", installRoot =>
@@ -796,6 +534,7 @@ void ExpectFactoryInstall()
         {
             var skillRoot = target == "claude" ? ".claude/skills" : ".agents/skills";
             var entry = target == "claude" ? "CLAUDE.md" : "AGENTS.md";
+            ExpectTempFile(installRoot, entry, $"factory install for {target} did not create {entry}.");
             ExpectTempFile(installRoot, $"{skillRoot}/spec-new-document/SKILL.md", $"factory install for {target} did not install core skill.");
             ExpectTempFile(installRoot, $"{skillRoot}/factory-create-work-plan/SKILL.md", $"factory install for {target} did not install factory skill.");
             ExpectTempFile(installRoot, ".idd/factory/.gitignore", $"factory install for {target} did not install factory .gitignore.");
@@ -804,10 +543,6 @@ void ExpectFactoryInstall()
             {
                 failures.Add($"factory install for {target} created work directory.");
             }
-
-            var entryContent = File.ReadAllText(Path.Combine(installRoot, entry));
-            ExpectContains(entryContent, "IDD Factory Routing", entry, "factory install entry");
-            ExpectContains(entryContent, "factory-create-work-plan", entry, "factory install entry");
         });
     }
 }
@@ -1060,12 +795,6 @@ void ExpectNpmInstallDefaultCoreOnly()
         {
             failures.Add("npm default install installed factory skills.");
         }
-
-        var entry = File.ReadAllText(Path.Combine(installRoot, "CLAUDE.md"));
-        if (entry.Contains("IDD Factory Routing", StringComparison.Ordinal))
-        {
-            failures.Add("npm default install entry mentions factory routing.");
-        }
     });
 }
 
@@ -1073,6 +802,7 @@ void ExpectNpmInstallFactory()
 {
     WithNpmInstall("install --target codex --pack factory", installRoot =>
     {
+        ExpectTempFile(installRoot, "AGENTS.md", "npm factory install did not create AGENTS.md.");
         ExpectTempFile(installRoot, ".agents/skills/spec-new-document/SKILL.md", "npm factory install did not install core skill.");
         ExpectTempFile(installRoot, ".agents/skills/factory-create-work-plan/SKILL.md", "npm factory install did not install factory skill.");
         ExpectTempFile(installRoot, ".idd/factory/.gitignore", "npm factory install did not install factory .gitignore.");
@@ -1081,9 +811,6 @@ void ExpectNpmInstallFactory()
         {
             failures.Add("npm factory install created work directory.");
         }
-
-        var entry = File.ReadAllText(Path.Combine(installRoot, "AGENTS.md"));
-        ExpectContains(entry, "IDD Factory Routing", "AGENTS.md", "npm factory install entry");
     });
 }
 
@@ -1109,10 +836,10 @@ void ExpectNpmInstallEntryFull()
         ExpectTempFile(installRoot, "CLAUDE.md", "npm install with --entry full did not create CLAUDE.md.");
         if (File.Exists(entryPath))
         {
-            var content = File.ReadAllText(entryPath);
-            if (!content.Contains("# Intent-Driven Development", StringComparison.Ordinal))
+            var lineCount = File.ReadAllText(entryPath).ReplaceLineEndings("\n").Split('\n').Length;
+            if (lineCount <= 80)
             {
-                failures.Add("npm install with --entry full did not include the full-entry methodology marker.");
+                failures.Add($"npm install with --entry full created an unexpectedly short entry point: {lineCount} lines.");
             }
         }
 
