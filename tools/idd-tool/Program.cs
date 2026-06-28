@@ -23,7 +23,8 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
 
             return command switch
             {
-                "list-targets" => ListTargets(),
+                "list-targets" => ListCodingAgents(),
+                "list-coding-agents" => ListCodingAgents(),
                 "list-packs" => ListPacks(),
                 "version" => PrintVersion(),
                 "init" => Init(),
@@ -43,19 +44,21 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         Console.WriteLine("""
             Usage:
               intent-driven-development init [--force]
-              intent-driven-development install --target <target> [--pack <pack>]... [--entry minimal|none|full] [--force]
+              intent-driven-development install --target <coding-agent> [--pack <pack>]... [--entry minimal|none|full] [--force]
+              intent-driven-development install --coding-agent <coding-agent> [--pack <pack>]... [--entry minimal|none|full] [--force]
               intent-driven-development install --all [--pack <pack>]... [--entry minimal|none|full] [--force]
               intent-driven-development list-targets
+              intent-driven-development list-coding-agents
               intent-driven-development list-packs
               intent-driven-development version
             """);
     }
 
-    private int ListTargets()
+    private int ListCodingAgents()
     {
-        foreach (var target in ReadManifest().Targets)
+        foreach (var codingAgent in ReadManifest().CodingAgents)
         {
-            Console.WriteLine(target);
+            Console.WriteLine(codingAgent);
         }
 
         return 0;
@@ -106,34 +109,41 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
     private int Install()
     {
         var commandArgs = args.Skip(1).ToArray();
-        EnsureNoUnknownOptions(commandArgs, "--target", "--all", "--entry", "--force", "--pack");
+        EnsureNoUnknownOptions(commandArgs, "--target", "--coding-agent", "--all", "--entry", "--force", "--pack");
 
         var manifest = ReadManifest();
         var force = commandArgs.Contains("--force", StringComparer.Ordinal);
         var installAll = commandArgs.Contains("--all", StringComparer.Ordinal);
         var target = ValueAfter(commandArgs, "--target");
+        var codingAgentOption = ValueAfter(commandArgs, "--coding-agent");
+        if (target is not null && codingAgentOption is not null)
+        {
+            return Fail("Use either --target or --coding-agent, not both.");
+        }
+
+        var codingAgent = codingAgentOption ?? target;
         var entryMode = ParseEntryMode(ValueAfter(commandArgs, "--entry"));
         var selectedPacks = ResolvePacks(manifest, ValuesAfter(commandArgs, "--pack"));
 
-        if (installAll && target is not null)
+        if (installAll && codingAgent is not null)
         {
-            return Fail("Use either --all or --target <target>, not both.");
+            return Fail("Use either --all or --target <coding-agent>, not both.");
         }
 
-        if (!installAll && target is null)
+        if (!installAll && codingAgent is null)
         {
-            return Fail("Missing target. Use --target <target> or --all.");
+            return Fail("Missing CodingAgent. Use --target <coding-agent>, --coding-agent <coding-agent>, or --all.");
         }
 
-        var targets = installAll ? manifest.Targets : [ValidateTarget(manifest, target!)];
-        ValidateEntryModeCapabilities(manifest, targets, entryMode, installAll);
-        ValidatePackTargetCapabilities(manifest, targets, selectedPacks);
-        var plannedFiles = CollectTargetFiles(manifest, targets, entryMode, selectedPacks);
+        var codingAgents = installAll ? manifest.CodingAgents : [ValidateCodingAgent(manifest, codingAgent!)];
+        ValidateEntryModeCapabilities(manifest, codingAgents, entryMode, installAll);
+        ValidatePackCodingAgentCapabilities(manifest, codingAgents, selectedPacks);
+        var plannedFiles = CollectCodingAgentFiles(manifest, codingAgents, entryMode, selectedPacks);
         CopyPlannedFiles(plannedFiles, Directory.GetCurrentDirectory(), force);
         var packText = IsDefaultPackSelection(manifest, selectedPacks)
             ? ""
             : $" and packs: {string.Join(", ", selectedPacks)}";
-        Console.WriteLine($"Installed {string.Join(", ", targets)} with {FormatEntryMode(entryMode)} entry{packText}.");
+        Console.WriteLine($"Installed {string.Join(", ", codingAgents)} with {FormatEntryMode(entryMode)} entry{packText}.");
         return 0;
     }
 
@@ -181,14 +191,14 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         throw new ToolException("Could not locate bundled Intent-Driven Development content.");
     }
 
-    private static string ValidateTarget(Manifest manifest, string target)
+    private static string ValidateCodingAgent(Manifest manifest, string codingAgent)
     {
-        if (manifest.Targets.Contains(target, StringComparer.Ordinal))
+        if (manifest.CodingAgents.Contains(codingAgent, StringComparer.Ordinal))
         {
-            return target;
+            return codingAgent;
         }
 
-        throw new ToolException($"Unknown target: {target}" + Environment.NewLine + $"Available targets: {string.Join(", ", manifest.Targets)}");
+        throw new ToolException($"Unknown CodingAgent: {codingAgent}" + Environment.NewLine + $"Available CodingAgents: {string.Join(", ", manifest.CodingAgents)}");
     }
 
     private static EntryMode ParseEntryMode(string? value)
@@ -210,20 +220,20 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
     private static string FormatEntryMode(EntryMode entryMode) =>
         entryMode.ToString().ToLowerInvariant();
 
-    private static void ValidateEntryModeCapabilities(Manifest manifest, IReadOnlyList<string> targets, EntryMode entryMode, bool installAll)
+    private static void ValidateEntryModeCapabilities(Manifest manifest, IReadOnlyList<string> codingAgents, EntryMode entryMode, bool installAll)
     {
         if (entryMode != EntryMode.None)
         {
             return;
         }
 
-        if (manifest.TargetCapabilities is null)
+        if (manifest.CodingAgentCapabilities is null)
         {
-            throw new ToolException("Bundled manifest does not define targetCapabilities.");
+            throw new ToolException("Bundled manifest does not define codingAgentCapabilities.");
         }
 
-        var incompatible = targets
-            .Where(target => !SupportsGeneratedSkills(manifest, target))
+        var incompatible = codingAgents
+            .Where(codingAgent => !SupportsGeneratedSkills(manifest, codingAgent))
             .ToArray();
 
         if (incompatible.Length == 0)
@@ -234,26 +244,26 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         if (installAll)
         {
             throw new ToolException(
-                $"The following targets do not support generated skills: {string.Join(", ", incompatible)}." +
+                $"The following CodingAgents do not support generated skills: {string.Join(", ", incompatible)}." +
                 Environment.NewLine +
-                "--entry none would install no entry point and no skills for those targets." +
+                "--entry none would install no entry point and no skills for those CodingAgents." +
                 Environment.NewLine +
-                "Use --entry minimal or install skill-capable targets explicitly.");
+                "Use --entry minimal or install skill-capable CodingAgents explicitly.");
         }
 
-        var target = incompatible[0];
+        var codingAgent = incompatible[0];
         throw new ToolException(
-            $"Target {target} does not support generated skills. --entry none would install no entry point and no skills." +
+            $"CodingAgent {codingAgent} does not support generated skills. --entry none would install no entry point and no skills." +
             Environment.NewLine +
-            "Use --entry minimal or --entry full for this target.");
+            "Use --entry minimal or --entry full for this CodingAgent.");
     }
 
-    private static bool SupportsGeneratedSkills(Manifest manifest, string target)
+    private static bool SupportsGeneratedSkills(Manifest manifest, string codingAgent)
     {
-        if (manifest.TargetCapabilities is null ||
-            !manifest.TargetCapabilities.TryGetValue(target, out var capabilities))
+        if (manifest.CodingAgentCapabilities is null ||
+            !manifest.CodingAgentCapabilities.TryGetValue(codingAgent, out var capabilities))
         {
-            throw new ToolException($"Bundled manifest does not define targetCapabilities for target: {target}");
+            throw new ToolException($"Bundled manifest does not define codingAgentCapabilities for CodingAgent: {codingAgent}");
         }
 
         return capabilities.SupportsSkills;
@@ -311,7 +321,7 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         return defaultPacks.SequenceEqual(selectedPacks.OrderBy(name => name, StringComparer.Ordinal), StringComparer.Ordinal);
     }
 
-    private static void ValidatePackTargetCapabilities(Manifest manifest, IReadOnlyList<string> targets, IReadOnlyList<string> selectedPacks)
+    private static void ValidatePackCodingAgentCapabilities(Manifest manifest, IReadOnlyList<string> codingAgents, IReadOnlyList<string> selectedPacks)
     {
         var selectedSkills = SelectedSkills(manifest, selectedPacks);
         if (selectedSkills.Count == 0)
@@ -319,13 +329,13 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
             return;
         }
 
-        var incompatible = targets
-            .Where(target => !SupportsGeneratedSkills(manifest, target))
+        var incompatible = codingAgents
+            .Where(codingAgent => !SupportsGeneratedSkills(manifest, codingAgent))
             .ToArray();
 
         if (incompatible.Length > 0 && selectedPacks.Contains("factory", StringComparer.Ordinal))
         {
-            throw new ToolException($"Factory pack requires generated skills. Unsupported targets: {string.Join(", ", incompatible)}.");
+            throw new ToolException($"Factory pack requires generated skills. Unsupported CodingAgents: {string.Join(", ", incompatible)}.");
         }
     }
 
@@ -387,9 +397,9 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         return selectedSkills;
     }
 
-    private static IReadOnlyList<PlannedFile> CollectTargetFiles(
+    private static IReadOnlyList<PlannedFile> CollectCodingAgentFiles(
         Manifest manifest,
-        IEnumerable<string> targets,
+        IEnumerable<string> codingAgents,
         EntryMode entryMode,
         IReadOnlyList<string> selectedPacks)
     {
@@ -397,18 +407,18 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         var byRelativePath = new Dictionary<string, PlannedFile>(StringComparer.Ordinal);
         var selectedSkills = SelectedSkills(manifest, selectedPacks);
 
-        foreach (var target in targets)
+        foreach (var codingAgent in codingAgents)
         {
-            var sourceRoot = Path.Combine(contentRoot, "generated", target);
+            var sourceRoot = Path.Combine(contentRoot, "generated", codingAgent);
             if (!Directory.Exists(sourceRoot))
             {
-                throw new ToolException($"Bundled generated target not found: {target}");
+                throw new ToolException($"Bundled generated CodingAgent not found: {codingAgent}");
             }
 
             foreach (var sourcePath in Directory.GetFiles(sourceRoot, "*", SearchOption.AllDirectories))
             {
                 var relativePath = Normalize(Path.GetRelativePath(sourceRoot, sourcePath));
-                if (manifest.EntryPoints.TryGetValue(target, out var entryPoint) &&
+                if (manifest.EntryPoints.TryGetValue(codingAgent, out var entryPoint) &&
                     StringComparer.Ordinal.Equals(relativePath, Normalize(entryPoint)))
                 {
                     continue;
@@ -438,7 +448,7 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
 
             if (entryMode != EntryMode.None)
             {
-                var fullEntry = BuildEntry(contentRoot, manifest, target, entryMode, selectedPacks);
+                var fullEntry = BuildEntry(contentRoot, manifest, codingAgent, entryMode, selectedPacks);
                 if (byRelativePath.TryGetValue(fullEntry.RelativePath, out var existing))
                 {
                     if (!StringComparer.Ordinal.Equals(existing.Hash, fullEntry.Hash))
@@ -503,21 +513,21 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
     private static PlannedFile BuildEntry(
         string contentRoot,
         Manifest manifest,
-        string target,
+        string codingAgent,
         EntryMode entryMode,
         IReadOnlyList<string> selectedPacks)
     {
-        if (!manifest.EntryPoints.TryGetValue(target, out var entryPoint))
+        if (!manifest.EntryPoints.TryGetValue(codingAgent, out var entryPoint))
         {
-            throw new ToolException($"No entry point configured for target: {target}");
+            throw new ToolException($"No entry point configured for CodingAgent: {codingAgent}");
         }
 
         var blocks = new List<string>
         {
-            ReadRequired(Path.Combine(contentRoot, "src", "adapters", target, "entry.md")),
+            ReadRequired(Path.Combine(contentRoot, "src", "adapters", codingAgent, "entry.md")),
             ReadRequired(Path.Combine(contentRoot, "src", "canonical", "packs", "intent-driven-development.md"))
-                .Replace("{{skillGuidance}}", BuildSkillGuidance(manifest, target, selectedPacks), StringComparison.Ordinal)
-                .Replace("{{workflowGuidance}}", BuildWorkflowGuidance(manifest, target), StringComparison.Ordinal)
+                .Replace("{{skillGuidance}}", BuildSkillGuidance(manifest, codingAgent, selectedPacks), StringComparison.Ordinal)
+                .Replace("{{workflowGuidance}}", BuildWorkflowGuidance(manifest, codingAgent), StringComparison.Ordinal)
         };
 
         if (entryMode == EntryMode.Full)
@@ -530,12 +540,12 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         return new PlannedFile(Normalize(entryPoint), bytes, Sha256(bytes));
     }
 
-    private static string BuildSkillGuidance(Manifest manifest, string target, IReadOnlyList<string> selectedPacks)
+    private static string BuildSkillGuidance(Manifest manifest, string codingAgent, IReadOnlyList<string> selectedPacks)
     {
-        if (!SupportsGeneratedSkills(manifest, target))
+        if (!SupportsGeneratedSkills(manifest, codingAgent))
         {
             return """
-                This target does not use generated IDD skills. Keep IDD work focused and
+                This CodingAgent does not use generated IDD skills. Keep IDD work focused and
                 read only the documents needed for the current task.
                 """;
         }
@@ -564,7 +574,7 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
                 ## IDD Factory Routing
 
                 Use factory skills only for planned implementation orchestration,
-                multi-step execution, task slicing, or agentic factory-style work.
+                multi-step execution, task slicing, or factory role based work.
 
                 - Use `factory-create-work-plan` to create a temporary Factory Work Plan.
                 - Use `factory-execute-work-plan` to execute an explicit Factory Work Plan.
@@ -581,8 +591,8 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         return string.Join(Environment.NewLine + Environment.NewLine, blocks.Select(block => block.Trim()));
     }
 
-    private static string BuildWorkflowGuidance(Manifest manifest, string target) =>
-        SupportsGeneratedSkills(manifest, target)
+    private static string BuildWorkflowGuidance(Manifest manifest, string codingAgent) =>
+        SupportsGeneratedSkills(manifest, codingAgent)
             ? "This file and installed IDD skills are workflow guidance.\nThey are not product specifications."
             : "This file is workflow guidance.\nIt is not a product specification.";
 
@@ -661,7 +671,7 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
                 throw new ToolException($"Unknown option: {arg}");
             }
 
-            if (arg is "--target" or "--entry" or "--pack")
+            if (arg is "--target" or "--coding-agent" or "--entry" or "--pack")
             {
                 index++;
             }
@@ -721,24 +731,45 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
     }
 }
 
-internal sealed record Manifest(
-    string Name,
-    string Version,
-    string CanonicalSource,
-    string GeneratedRoot,
-    string[] Targets,
-    Dictionary<string, string> EntryPoints,
-    Dictionary<string, TargetCapabilities> TargetCapabilities,
-    Dictionary<string, PackDefinition> Packs);
+internal sealed class Manifest
+{
+    public required string Name { get; init; }
+    public required string Version { get; init; }
+    public required string CanonicalSource { get; init; }
+    public required string GeneratedRoot { get; init; }
+    public required Dictionary<string, string> EntryPoints { get; init; }
+    public required Dictionary<string, PackDefinition> Packs { get; init; }
 
-internal sealed record TargetCapabilities(bool SupportsSkills);
+    [JsonPropertyName("codingAgents")]
+    public string[]? CodingAgentsField { get; init; }
+
+    [JsonPropertyName("targets")]
+    public string[]? Targets { get; init; }
+
+    [JsonPropertyName("codingAgentCapabilities")]
+    public Dictionary<string, CodingAgentCapabilities>? CodingAgentCapabilitiesField { get; init; }
+
+    [JsonPropertyName("targetCapabilities")]
+    public Dictionary<string, CodingAgentCapabilities>? TargetCapabilities { get; init; }
+
+    // Compatibility: older release manifests used target/targetCapabilities.
+    [JsonIgnore]
+    public string[] CodingAgents => CodingAgentsField ?? Targets ?? [];
+
+    [JsonIgnore]
+    public Dictionary<string, CodingAgentCapabilities>? CodingAgentCapabilities =>
+        CodingAgentCapabilitiesField ?? TargetCapabilities;
+}
+
+internal sealed record CodingAgentCapabilities(bool SupportsSkills);
 
 internal sealed record PackDefinition(
     string Description,
     bool Default,
     string[] Requires,
     string[] Skills,
-    string[] Agents,
+    string[] RolePrompts,
+    Dictionary<string, string[]> SkillRoleReferences,
     ProjectFileDefinition[] ProjectFiles);
 
 internal sealed record ProjectFileDefinition(string Source, string Destination);

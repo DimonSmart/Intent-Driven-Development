@@ -18,8 +18,8 @@ function main() {
     return;
   }
 
-  if (command === "list-targets") {
-    readManifest().targets.forEach((target) => console.log(target));
+  if (command === "list-targets" || command === "list-coding-agents") {
+    codingAgents(readManifest()).forEach((codingAgent) => console.log(codingAgent));
     return;
   }
 
@@ -53,9 +53,11 @@ function main() {
 function printUsage() {
   console.log(`Usage:
   intent-driven-development init [--force]
-  intent-driven-development install --target <target> [--pack <pack>]... [--entry minimal|none|full] [--force]
+  intent-driven-development install --target <coding-agent> [--pack <pack>]... [--entry minimal|none|full] [--force]
+  intent-driven-development install --coding-agent <coding-agent> [--pack <pack>]... [--entry minimal|none|full] [--force]
   intent-driven-development install --all [--pack <pack>]... [--entry minimal|none|full] [--force]
   intent-driven-development list-targets
+  intent-driven-development list-coding-agents
   intent-driven-development list-packs
   intent-driven-development version`);
 }
@@ -69,30 +71,36 @@ function readManifest() {
 }
 
 function install(args) {
-  ensureNoUnknownArgs(args, ["--target", "--all", "--entry", "--force", "--pack"]);
+  ensureNoUnknownArgs(args, ["--target", "--coding-agent", "--all", "--entry", "--force", "--pack"]);
 
   const manifest = readManifest();
   const force = args.includes("--force");
   const installAll = args.includes("--all");
   const target = valueAfter(args, "--target");
+  const codingAgentOption = valueAfter(args, "--coding-agent");
+  if (target && codingAgentOption) {
+    fail("Use either --target or --coding-agent, not both.");
+  }
+
+  const codingAgent = codingAgentOption || target;
   const entryMode = parseEntryMode(valueAfter(args, "--entry"));
   const selectedPacks = resolvePacks(manifest, valuesAfter(args, "--pack"));
 
-  if (installAll && target) {
-    fail("Use either --all or --target <target>, not both.");
+  if (installAll && codingAgent) {
+    fail("Use either --all or --target <coding-agent>, not both.");
   }
 
-  if (!installAll && !target) {
-    fail("Missing target. Use --target <target> or --all.");
+  if (!installAll && !codingAgent) {
+    fail("Missing CodingAgent. Use --target <coding-agent>, --coding-agent <coding-agent>, or --all.");
   }
 
-  const targets = installAll ? manifest.targets : [validateTarget(manifest, target)];
-  validateEntryModeCapabilities(manifest, targets, entryMode, installAll);
-  validatePackTargetCapabilities(manifest, targets, selectedPacks);
-  const plannedFiles = collectTargetFiles(manifest, targets, entryMode, selectedPacks);
+  const selectedCodingAgents = installAll ? codingAgents(manifest) : [validateCodingAgent(manifest, codingAgent)];
+  validateEntryModeCapabilities(manifest, selectedCodingAgents, entryMode, installAll);
+  validatePackCodingAgentCapabilities(manifest, selectedCodingAgents, selectedPacks);
+  const plannedFiles = collectCodingAgentFiles(manifest, selectedCodingAgents, entryMode, selectedPacks);
   copyPlannedFiles(plannedFiles, process.cwd(), force);
   const packText = isDefaultPackSelection(manifest, selectedPacks) ? "" : ` and packs: ${selectedPacks.join(", ")}`;
-  console.log(`Installed ${targets.join(", ")} with ${entryMode} entry${packText}.`);
+  console.log(`Installed ${selectedCodingAgents.join(", ")} with ${entryMode} entry${packText}.`);
 }
 
 function initProject(force) {
@@ -111,12 +119,20 @@ function initProject(force) {
   console.log("Initialized .specs.");
 }
 
-function validateTarget(manifest, target) {
-  if (manifest.targets.includes(target)) {
-    return target;
+function codingAgents(manifest) {
+  return manifest.codingAgents || manifest.targets || [];
+}
+
+function codingAgentCapabilities(manifest) {
+  return manifest.codingAgentCapabilities || manifest.targetCapabilities;
+}
+
+function validateCodingAgent(manifest, codingAgent) {
+  if (codingAgents(manifest).includes(codingAgent)) {
+    return codingAgent;
   }
 
-  fail(`Unknown target: ${target}\nAvailable targets: ${manifest.targets.join(", ")}`);
+  fail(`Unknown CodingAgent: ${codingAgent}\nAvailable CodingAgents: ${codingAgents(manifest).join(", ")}`);
 }
 
 function parseEntryMode(value) {
@@ -131,34 +147,34 @@ function parseEntryMode(value) {
   fail(`Unknown entry mode: ${value}\nAvailable entry modes: minimal, none, full`);
 }
 
-function validateEntryModeCapabilities(manifest, targets, entryMode, installAll) {
+function validateEntryModeCapabilities(manifest, selectedCodingAgents, entryMode, installAll) {
   if (entryMode !== "none") {
     return;
   }
 
-  if (!manifest.targetCapabilities) {
-    fail("Bundled manifest does not define targetCapabilities.");
+  if (!codingAgentCapabilities(manifest)) {
+    fail("Bundled manifest does not define codingAgentCapabilities.");
   }
 
-  const incompatible = targets.filter((target) => !supportsGeneratedSkills(manifest, target));
+  const incompatible = selectedCodingAgents.filter((codingAgent) => !supportsGeneratedSkills(manifest, codingAgent));
   if (incompatible.length === 0) {
     return;
   }
 
   if (installAll) {
-    fail(`The following targets do not support generated skills: ${incompatible.join(", ")}.
---entry none would install no entry point and no skills for those targets.
-Use --entry minimal or install skill-capable targets explicitly.`);
+    fail(`The following CodingAgents do not support generated skills: ${incompatible.join(", ")}.
+--entry none would install no entry point and no skills for those CodingAgents.
+Use --entry minimal or install skill-capable CodingAgents explicitly.`);
   }
 
-  fail(`Target ${incompatible[0]} does not support generated skills. --entry none would install no entry point and no skills.
-Use --entry minimal or --entry full for this target.`);
+  fail(`CodingAgent ${incompatible[0]} does not support generated skills. --entry none would install no entry point and no skills.
+Use --entry minimal or --entry full for this CodingAgent.`);
 }
 
-function supportsGeneratedSkills(manifest, target) {
-  const capabilities = manifest.targetCapabilities && manifest.targetCapabilities[target];
+function supportsGeneratedSkills(manifest, codingAgent) {
+  const capabilities = codingAgentCapabilities(manifest) && codingAgentCapabilities(manifest)[codingAgent];
   if (!capabilities) {
-    fail(`Bundled manifest does not define targetCapabilities for target: ${target}`);
+    fail(`Bundled manifest does not define codingAgentCapabilities for CodingAgent: ${codingAgent}`);
   }
 
   return capabilities.supportsSkills === true;
@@ -203,14 +219,14 @@ function isDefaultPackSelection(manifest, selectedPacks) {
   return defaults.join("\0") === [...selectedPacks].sort().join("\0");
 }
 
-function validatePackTargetCapabilities(manifest, targets, selectedPacks) {
+function validatePackCodingAgentCapabilities(manifest, selectedCodingAgents, selectedPacks) {
   if (!selectedPacks.includes("factory")) {
     return;
   }
 
-  const incompatible = targets.filter((target) => !supportsGeneratedSkills(manifest, target));
+  const incompatible = selectedCodingAgents.filter((codingAgent) => !supportsGeneratedSkills(manifest, codingAgent));
   if (incompatible.length > 0) {
-    fail(`Factory pack requires generated skills. Unsupported targets: ${incompatible.join(", ")}.`);
+    fail(`Factory pack requires generated skills. Unsupported CodingAgents: ${incompatible.join(", ")}.`);
   }
 }
 
@@ -261,21 +277,21 @@ function selectedSkills(manifest, selectedPacks) {
   return skills;
 }
 
-function collectTargetFiles(manifest, targets, entryMode, selectedPacks) {
+function collectCodingAgentFiles(manifest, selectedCodingAgents, entryMode, selectedPacks) {
   const byRelativePath = new Map();
   const skills = selectedSkills(manifest, selectedPacks);
 
-  for (const target of targets) {
-    const sourceRoot = path.join(contentRoot, "generated", target);
+  for (const codingAgent of selectedCodingAgents) {
+    const sourceRoot = path.join(contentRoot, "generated", codingAgent);
     if (!fs.existsSync(sourceRoot)) {
-      fail(`Bundled generated target not found: ${target}`);
+      fail(`Bundled generated CodingAgent not found: ${codingAgent}`);
     }
 
     for (const file of listFiles(sourceRoot)) {
       const relativePath = normalize(path.relative(sourceRoot, file));
       if (
-        manifest.entryPoints[target] &&
-        relativePath === normalize(manifest.entryPoints[target])
+        manifest.entryPoints[codingAgent] &&
+        relativePath === normalize(manifest.entryPoints[codingAgent])
       ) {
         continue;
       }
@@ -304,7 +320,7 @@ function collectTargetFiles(manifest, targets, entryMode, selectedPacks) {
     }
 
     if (entryMode !== "none") {
-      const fullEntry = buildEntry(manifest, target, entryMode, selectedPacks);
+      const fullEntry = buildEntry(manifest, codingAgent, entryMode, selectedPacks);
       const existing = byRelativePath.get(fullEntry.relativePath);
       if (existing) {
         if (existing.hash !== fullEntry.hash) {
@@ -360,17 +376,17 @@ function generatedSkillName(relativePath) {
   return parts[index + 1];
 }
 
-function buildEntry(manifest, target, entryMode, selectedPacks) {
-  const entryPoint = manifest.entryPoints[target];
+function buildEntry(manifest, codingAgent, entryMode, selectedPacks) {
+  const entryPoint = manifest.entryPoints[codingAgent];
   if (!entryPoint) {
-    fail(`No entry point configured for target: ${target}`);
+    fail(`No entry point configured for CodingAgent: ${codingAgent}`);
   }
 
   const blocks = [
-    readRequired(path.join(contentRoot, "src", "adapters", target, "entry.md")),
+    readRequired(path.join(contentRoot, "src", "adapters", codingAgent, "entry.md")),
     readRequired(path.join(contentRoot, "src", "canonical", "packs", "intent-driven-development.md"))
-      .replace("{{skillGuidance}}", buildSkillGuidance(manifest, target, selectedPacks))
-      .replace("{{workflowGuidance}}", buildWorkflowGuidance(manifest, target))
+      .replace("{{skillGuidance}}", buildSkillGuidance(manifest, codingAgent, selectedPacks))
+      .replace("{{workflowGuidance}}", buildWorkflowGuidance(manifest, codingAgent))
   ];
 
   if (entryMode === "full") {
@@ -387,9 +403,9 @@ function buildEntry(manifest, target, entryMode, selectedPacks) {
   };
 }
 
-function buildSkillGuidance(manifest, target, selectedPacks) {
-  if (!supportsGeneratedSkills(manifest, target)) {
-    return `This target does not use generated IDD skills. Keep IDD work focused and
+function buildSkillGuidance(manifest, codingAgent, selectedPacks) {
+  if (!supportsGeneratedSkills(manifest, codingAgent)) {
+    return `This CodingAgent does not use generated IDD skills. Keep IDD work focused and
 read only the documents needed for the current task.`;
   }
 
@@ -410,7 +426,7 @@ spike.`
     blocks.push(`## IDD Factory Routing
 
 Use factory skills only for planned implementation orchestration,
-multi-step execution, task slicing, or agentic factory-style work.
+multi-step execution, task slicing, or factory role based work.
 
 - Use \`factory-create-work-plan\` to create a temporary Factory Work Plan.
 - Use \`factory-execute-work-plan\` to execute an explicit Factory Work Plan.
@@ -426,8 +442,8 @@ Do not read old factory work plans unless the user explicitly provides the exact
   return blocks.join("\n\n");
 }
 
-function buildWorkflowGuidance(manifest, target) {
-  return supportsGeneratedSkills(manifest, target)
+function buildWorkflowGuidance(manifest, codingAgent) {
+  return supportsGeneratedSkills(manifest, codingAgent)
     ? "This file and installed IDD skills are workflow guidance.\nThey are not product specifications."
     : "This file is workflow guidance.\nIt is not a product specification.";
 }
@@ -516,7 +532,7 @@ function ensureNoUnknownArgs(args, known) {
       fail(`Unknown option: ${arg}`);
     }
 
-    if (arg === "--target" || arg === "--entry" || arg === "--pack") {
+    if (arg === "--target" || arg === "--coding-agent" || arg === "--entry" || arg === "--pack") {
       index += 1;
     }
   }

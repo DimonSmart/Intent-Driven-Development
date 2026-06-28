@@ -5,6 +5,9 @@
 Review the result of one completed task against the task brief, relevant specs,
 code quality, and verification evidence.
 
+This skill is the review workflow contract. The local task-reviewer role prompt
+is an optional reference for review focus; it does not own product intent.
+
 ## Rules
 
 - Review one task only.
@@ -21,7 +24,8 @@ code quality, and verification evidence.
    Work Plan.
 2. Read only the relevant current specs needed for the task scope.
 3. Review the implementation evidence and verification output for that task.
-4. Write a task review in the same `.idd/factory/work/<current-work-dir>/`
+4. Use the local `references/roles/` task-reviewer prompt when present.
+5. Write a task review in the same `.idd/factory/work/<current-work-dir>/`
    directory when a file artifact is useful.
 
 ## Output Format

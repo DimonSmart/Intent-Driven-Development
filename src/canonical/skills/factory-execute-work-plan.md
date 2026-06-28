@@ -7,6 +7,11 @@ Execute one explicit Factory Work Plan.
 Factory execution coordinates temporary implementation work. It must not turn
 plans, task briefs, reviews, or logs into product intent.
 
+Factory execution delegates bounded implementation semantics to
+`spec-implement`.
+Factory owns task sequencing, review gates, temporary artifacts, and cleanup.
+It does not redefine `spec-implement` rules.
+
 In future versions, Factory Work Plan tasks may be backed by an external Work
 Item Provider. The current implementation uses temporary local markdown files
 only.
@@ -36,7 +41,7 @@ only.
 2. Confirm the work directory from the plan. Supporting files belong beside the
    plan, for example `task-001-brief.md`, `task-001-review.md`, and
    `final-review.md`.
-3. Use the local `references/agents/` role prompts when dispatching or
+3. Use the local `references/roles/` role prompts when dispatching or
    simulating planner, implementer, reviewer, and coordinator work.
 4. Execute tasks in plan order.
 5. Stop on `BLOCKED` or missing context. Do not silently continue through a

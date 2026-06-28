@@ -4,6 +4,10 @@
 
 Review the whole result after all Factory Work Plan tasks are complete.
 
+This skill is the final review workflow contract. The local final-reviewer role
+prompt is an optional reference for review focus; it does not own product
+intent.
+
 ## Rules
 
 - Review the whole branch/result, not only the last task.
@@ -21,9 +25,10 @@ Review the whole result after all Factory Work Plan tasks are complete.
 1. Read the explicit work plan and per-task review outputs for the current work
    directory.
 2. Review the full diff/result against relevant current specs.
-3. Check that `.idd/factory/work/` artifacts remain temporary and are not placed
+3. Use the local `references/roles/` final-reviewer prompt when present.
+4. Check that `.idd/factory/work/` artifacts remain temporary and are not placed
    under `.specs/`.
-4. Write `final-review.md` in the same work directory when a file artifact is
+5. Write `final-review.md` in the same work directory when a file artifact is
    useful.
 
 ## Output Format

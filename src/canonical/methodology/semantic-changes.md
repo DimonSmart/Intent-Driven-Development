@@ -1,6 +1,6 @@
 # Semantic Changes
 
-A change is semantic when it changes what future coding agents should build,
+A change is semantic when it changes what future CodingAgents should build,
 preserve, avoid, depend on, or verify.
 
 Semantic changes include product behavior, domain contracts, supported

@@ -4,10 +4,12 @@ Universal CLI installer for Intent-Driven Development release artifacts.
 
 ```bash
 npx intent-driven-development list-targets
+npx intent-driven-development list-coding-agents
 npx intent-driven-development list-packs
 npx intent-driven-development init
 npx intent-driven-development install --target claude
 npx intent-driven-development install --target codex --pack factory
+npx intent-driven-development install --coding-agent codex --pack factory
 npx intent-driven-development install --target claude --entry minimal
 npx intent-driven-development install --target claude --entry none
 npx intent-driven-development install --target claude --entry full
@@ -15,10 +17,12 @@ npx intent-driven-development install --all
 ```
 
 `minimal` is the default compact entry point.
-`none` installs only skills and `.specs` for targets that support generated skills.
+`none` installs only skills and `.specs` for CodingAgents that support generated skills.
 `full` installs a larger entry point with embedded methodology for legacy/debug scenarios.
 
-For targets without generated skills, such as `gemini`, `--entry none` is rejected.
+For CodingAgents without generated skills, such as `gemini`, `--entry none` is rejected.
+
+`--target` is the CLI compatibility name for selecting a CodingAgent.
 
 Core IDD is installed by default. The optional `factory` pack adds temporary
 execution orchestration and automatically includes core:

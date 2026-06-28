@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Text.Json;
 
 var repoRoot = FindRepoRoot();
 var failures = new List<string>();
@@ -38,9 +39,10 @@ ExpectSpecBrainstormGeneratedShape();
 ExpectEntryPointSkillRoutingShape();
 ExpectPackManifestShape();
 ExpectFactoryGeneratedShape();
-ExpectFactoryAgentReferences();
+ExpectFactoryRolePromptReferences();
 ExpectFactorySkillShapes();
 ExpectListPacks();
+ExpectListCodingAgents();
 ExpectDefaultInstallCoreOnly();
 ExpectFactoryInstall();
 ExpectFactoryUnsupportedTargetRejected();
@@ -48,6 +50,7 @@ ExpectInstallEntryNone();
 ExpectInstallGeminiEntryNoneRejected();
 ExpectInstallAllAfterInit();
 ExpectNpmListTargets();
+ExpectNpmListCodingAgents();
 ExpectNpmListPacks();
 ExpectNpmInstallDefaultMinimal();
 ExpectNpmInstallDefaultCoreOnly();
@@ -314,35 +317,91 @@ void ExpectAllSkillsGenerated()
 
 void ExpectPackManifestShape()
 {
-    var content = File.ReadAllText(Path.Combine(repoRoot, "src/canonical/packs/pack-manifest.json"));
-    ExpectContains(content, "\"core\"", "src/canonical/packs/pack-manifest.json", "pack manifest");
-    ExpectContains(content, "\"factory\"", "src/canonical/packs/pack-manifest.json", "pack manifest");
-    ExpectContains(content, "\"requires\"", "src/canonical/packs/pack-manifest.json", "pack manifest");
-    ExpectContains(content, "\"projectFiles\"", "src/canonical/packs/pack-manifest.json", "pack manifest");
+    const string manifestPath = "src/canonical/packs/pack-manifest.json";
+    var fullManifestPath = Path.Combine(repoRoot, manifestPath);
+    var content = File.ReadAllText(fullManifestPath);
+    ExpectContains(content, "\"core\"", manifestPath, "pack manifest");
+    ExpectContains(content, "\"factory\"", manifestPath, "pack manifest");
+    ExpectContains(content, "\"requires\"", manifestPath, "pack manifest");
+    ExpectContains(content, "\"projectFiles\"", manifestPath, "pack manifest");
+    ExpectContains(content, "\"rolePrompts\"", manifestPath, "pack manifest");
+    ExpectContains(content, "\"skillRoleReferences\"", manifestPath, "pack manifest");
+    ExpectDoesNotContain(content, "\"agents\"", manifestPath, "pack manifest");
 
+    var manifest = JsonSerializer.Deserialize<SmokePackManifest>(content, new JsonSerializerOptions
+    {
+        PropertyNameCaseInsensitive = true
+    });
+
+    if (manifest?.Packs is null || manifest.Packs.Count == 0)
+    {
+        failures.Add("Pack manifest could not be parsed.");
+        return;
+    }
+
+    var canonicalSkills = Directory.GetFiles(Path.Combine(repoRoot, "src", "canonical", "skills"), "*.md")
+        .Select(path => Path.GetFileNameWithoutExtension(path)!)
+        .ToHashSet(StringComparer.Ordinal);
+    var skillOwners = new Dictionary<string, string>(StringComparer.Ordinal);
     foreach (var skillPath in Directory.GetFiles(Path.Combine(repoRoot, "src", "canonical", "skills"), "*.md"))
     {
         var skillName = Path.GetFileNameWithoutExtension(skillPath);
-        var matches = 0;
-        foreach (var packSkill in new[] { content })
-        {
-            if (packSkill.Contains($"\"{skillName}\"", StringComparison.Ordinal))
-            {
-                matches++;
-            }
-        }
-
-        if (matches != 1)
+        var owners = manifest.Packs
+            .Where(item => item.Value.Skills.Contains(skillName, StringComparer.Ordinal))
+            .Select(item => item.Key)
+            .ToArray();
+        if (owners.Length != 1)
         {
             failures.Add($"Canonical skill is not owned by exactly one pack: {skillName}");
         }
+        else
+        {
+            skillOwners[skillName!] = owners[0];
+        }
     }
 
-    foreach (var agent in new[] { "factory-coordinator", "implementation-planner", "implementer", "task-reviewer", "final-reviewer" })
+    foreach (var (packName, pack) in manifest.Packs)
     {
-        ExpectFile($"src/canonical/agents/{agent}.md");
-        ExpectContains(content, $"\"{agent}\"", "src/canonical/packs/pack-manifest.json", "pack manifest agent");
+        foreach (var skill in pack.Skills)
+        {
+            if (!canonicalSkills.Contains(skill))
+            {
+                failures.Add($"Pack '{packName}' lists missing canonical skill: {skill}");
+            }
+        }
+
+        foreach (var (skill, rolePrompts) in pack.SkillRoleReferences)
+        {
+            if (!pack.Skills.Contains(skill, StringComparer.Ordinal))
+            {
+                failures.Add($"Pack '{packName}' has role references for non-owned skill: {skill}");
+            }
+
+            foreach (var rolePrompt in rolePrompts)
+            {
+                if (!pack.RolePrompts.Contains(rolePrompt, StringComparer.Ordinal))
+                {
+                    failures.Add($"Pack '{packName}' skill '{skill}' references undeclared role prompt: {rolePrompt}");
+                }
+            }
+        }
     }
+
+    foreach (var skill in canonicalSkills)
+    {
+        if (!skillOwners.ContainsKey(skill))
+        {
+            failures.Add($"Canonical skill file is not listed in exactly one pack: {skill}");
+        }
+    }
+
+    foreach (var rolePrompt in new[] { "factory-coordinator", "implementation-planner", "implementer", "task-reviewer", "final-reviewer" })
+    {
+        ExpectFile($"src/canonical/factory/roles/{rolePrompt}.md");
+        ExpectContains(content, $"\"{rolePrompt}\"", manifestPath, "pack manifest role prompt");
+    }
+
+    ExpectNoDirectory("src/canonical/agents");
 }
 
 void ExpectFactoryGeneratedShape()
@@ -357,7 +416,7 @@ void ExpectFactoryGeneratedShape()
     }
 }
 
-void ExpectFactoryAgentReferences()
+void ExpectFactoryRolePromptReferences()
 {
     var roots = new[]
     {
@@ -365,24 +424,39 @@ void ExpectFactoryAgentReferences()
         "generated/claude/.claude/skills",
         "generated/copilot/.github/skills"
     };
-    var factorySkills = new[]
+    var expectedBySkill = new Dictionary<string, string[]>(StringComparer.Ordinal)
     {
-        "factory-create-work-plan",
-        "factory-execute-work-plan",
-        "factory-review-task",
-        "factory-review-work-result",
-        "factory-finish-work"
+        ["factory-create-work-plan"] = ["factory-coordinator", "implementation-planner"],
+        ["factory-execute-work-plan"] = ["factory-coordinator", "implementer", "task-reviewer", "final-reviewer"],
+        ["factory-review-task"] = ["task-reviewer"],
+        ["factory-review-work-result"] = ["final-reviewer"],
+        ["factory-finish-work"] = ["factory-coordinator"]
     };
-    var agents = new[] { "factory-coordinator", "implementation-planner", "implementer", "task-reviewer", "final-reviewer" };
+    var allRolePrompts = expectedBySkill.Values.SelectMany(rolePrompts => rolePrompts).Distinct(StringComparer.Ordinal).ToArray();
 
     foreach (var root in roots)
     {
-        foreach (var skill in factorySkills)
+        foreach (var (skill, expectedRolePrompts) in expectedBySkill)
         {
-            foreach (var agent in agents)
+            foreach (var rolePrompt in expectedRolePrompts)
             {
-                ExpectFile($"{root}/{skill}/references/agents/{agent}.md");
+                ExpectFile($"{root}/{skill}/references/roles/{rolePrompt}.md");
             }
+
+            foreach (var rolePrompt in allRolePrompts.Except(expectedRolePrompts, StringComparer.Ordinal))
+            {
+                var unexpectedPath = Path.Combine(repoRoot, $"{root}/{skill}/references/roles/{rolePrompt}.md".Replace('/', Path.DirectorySeparatorChar));
+                if (File.Exists(unexpectedPath))
+                {
+                    failures.Add($"Factory skill has unexpected role prompt reference: {root}/{skill}/references/roles/{rolePrompt}.md");
+                }
+            }
+        }
+
+        var specImplementRoles = Path.Combine(repoRoot, $"{root}/spec-implement/references/roles".Replace('/', Path.DirectorySeparatorChar));
+        if (Directory.Exists(specImplementRoles))
+        {
+            failures.Add($"{root}/spec-implement must not contain factory role prompt references.");
         }
     }
 }
@@ -583,6 +657,23 @@ void ExpectListPacks()
     }
 }
 
+void ExpectListCodingAgents()
+{
+    var result = RunProcessResult("dotnet", $"exec \"{toolDll}\" list-coding-agents");
+    var expected = string.Join(Environment.NewLine, new[] { "claude", "codex", "copilot", "gemini" });
+    var actual = result.StandardOutput.Trim().ReplaceLineEndings(Environment.NewLine);
+
+    if (result.ExitCode != 0)
+    {
+        failures.Add("list-coding-agents failed.");
+    }
+
+    if (!StringComparer.Ordinal.Equals(actual, expected))
+    {
+        failures.Add($"list-coding-agents returned unexpected output: {actual}");
+    }
+}
+
 void ExpectDefaultInstallCoreOnly()
 {
     WithToolInstall("install --target claude", installRoot =>
@@ -601,6 +692,12 @@ void ExpectDefaultInstallCoreOnly()
         {
             failures.Add("default install entry mentions factory routing.");
         }
+    });
+
+    WithToolInstall("install --coding-agent claude", installRoot =>
+    {
+        ExpectTempFile(installRoot, "CLAUDE.md", "install --coding-agent did not create CLAUDE.md.");
+        ExpectTempFile(installRoot, ".claude/skills/spec-new-document/SKILL.md", "install --coding-agent did not install core skill.");
     });
 }
 
@@ -731,7 +828,7 @@ void ExpectInstallGeminiEntryNoneRejected()
             failures.Add("Gemini install with --entry none succeeded unexpectedly.");
         }
 
-        if (!result.StandardError.Contains("Target gemini does not support generated skills", StringComparison.Ordinal))
+        if (!result.StandardError.Contains("CodingAgent gemini does not support generated skills", StringComparison.Ordinal))
         {
             failures.Add("Gemini install with --entry none did not report unsupported generated skills.");
         }
@@ -810,6 +907,27 @@ void ExpectNpmListTargets()
     });
 }
 
+void ExpectNpmListCodingAgents()
+{
+    WithNpmFixture(fixtureRoot =>
+    {
+        var script = Path.Combine(fixtureRoot, "bin", "intent-driven-development.js");
+        var result = RunProcessResult("node", $"\"{script}\" list-coding-agents", fixtureRoot);
+        var expected = string.Join(Environment.NewLine, new[] { "claude", "codex", "copilot", "gemini" });
+        var actual = result.StandardOutput.Trim().ReplaceLineEndings(Environment.NewLine);
+
+        if (result.ExitCode != 0)
+        {
+            failures.Add("npm list-coding-agents failed.");
+        }
+
+        if (!StringComparer.Ordinal.Equals(actual, expected))
+        {
+            failures.Add($"npm list-coding-agents returned unexpected output: {actual}");
+        }
+    });
+}
+
 void ExpectNpmListPacks()
 {
     WithNpmFixture(fixtureRoot =>
@@ -838,6 +956,12 @@ void ExpectNpmInstallDefaultMinimal()
         ExpectTempFile(installRoot, "CLAUDE.md", "npm default minimal install did not create CLAUDE.md.");
         ExpectTempFile(installRoot, ".claude/skills/spec-new-document/SKILL.md", "npm default minimal install did not install skills.");
         ExpectTempFile(installRoot, ".specs/README.md", "npm default minimal install did not install .specs.");
+    });
+
+    WithNpmInstall("install --coding-agent claude", installRoot =>
+    {
+        ExpectTempFile(installRoot, "CLAUDE.md", "npm install --coding-agent did not create CLAUDE.md.");
+        ExpectTempFile(installRoot, ".claude/skills/spec-new-document/SKILL.md", "npm install --coding-agent did not install skills.");
     });
 }
 
@@ -926,7 +1050,7 @@ void ExpectNpmRejectsGeminiEntryNone()
                 failures.Add("npm Gemini install with --entry none succeeded unexpectedly.");
             }
 
-            if (!result.StandardError.Contains("Target gemini does not support generated skills", StringComparison.Ordinal))
+            if (!result.StandardError.Contains("CodingAgent gemini does not support generated skills", StringComparison.Ordinal))
             {
                 failures.Add("npm Gemini install with --entry none did not report unsupported generated skills.");
             }
@@ -1211,3 +1335,16 @@ static string FindRepoRoot()
 }
 
 internal sealed record ProcessResult(int ExitCode, string StandardOutput, string StandardError);
+
+internal sealed record SmokePackManifest(Dictionary<string, SmokePackDefinition> Packs);
+
+internal sealed record SmokePackDefinition(
+    string Description,
+    bool Default,
+    string[] Requires,
+    string[] Skills,
+    string[] RolePrompts,
+    Dictionary<string, string[]> SkillRoleReferences,
+    SmokeProjectFileDefinition[] ProjectFiles);
+
+internal sealed record SmokeProjectFileDefinition(string Source, string Destination);

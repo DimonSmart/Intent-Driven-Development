@@ -4,6 +4,10 @@
 
 Finish a factory run by reporting results and cleaning temporary artifacts.
 
+This skill is the finish workflow contract. The local coordinator role prompt
+is an optional reference for cleanup and reporting focus; it does not own
+product intent.
+
 ## Rules
 
 - Summarize what was implemented.
@@ -24,9 +28,10 @@ Finish a factory run by reporting results and cleaning temporary artifacts.
 
 1. Read the explicit current work plan and final review result.
 2. Report implementation, specs used, verification, review result, and risks.
-3. Delete only the current `.idd/factory/work/<current-work-dir>/` directory when
+3. Use the local `references/roles/` coordinator prompt when present.
+4. Delete only the current `.idd/factory/work/<current-work-dir>/` directory when
    cleanup is allowed.
-4. Leave `.idd/factory/.gitignore` and `.idd/factory/README.md` in place.
+5. Leave `.idd/factory/.gitignore` and `.idd/factory/README.md` in place.
 
 ## Output Format
 

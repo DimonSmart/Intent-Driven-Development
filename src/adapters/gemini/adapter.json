@@ -1,5 +1,5 @@
 {
-  "agent": "gemini",
+  "codingAgent": "gemini",
   "entryPoint": "GEMINI.md",
   "skillsRoot": null,
   "supportsSkills": false,

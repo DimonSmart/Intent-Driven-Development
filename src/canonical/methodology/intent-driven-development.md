@@ -9,17 +9,17 @@ Guiding rule:
 > and strict enough not to become a task tracker.
 
 In AI development, the key skill is no longer just writing code, but describing
-intent precisely enough that both humans and AI agents can act on it.
+intent precisely enough that both humans and CodingAgents can act on it.
 
 ## Intent
 
 Intent is a stable statement of what future implementations must preserve.
 
 Intent describes what should remain true about the product after tasks,
-refactorings, bug fixes, agent sessions, and tool changes.
+refactorings, bug fixes, CodingAgent sessions, and tool changes.
 
 Intent is not the current task, current implementation shape, temporary chat
-memory, generated agent output, or local development status.
+memory, generated CodingAgent output, or local development status.
 
 Examples:
 
@@ -28,7 +28,7 @@ Examples:
 - "Add the login page tomorrow" is a task.
 - "LoginForm.tsx currently uses React Hook Form" is an implementation detail
   unless that library choice is an accepted product-defining constraint.
-- "The agent generated a checklist for login implementation" is generated
+- "The CodingAgent generated a checklist for login implementation" is generated
   output, not intent.
 - "The current implementation forgot password reset" is an implementation gap,
   not intent by itself.
@@ -60,7 +60,7 @@ Specifications do not include:
 - ordinary dependency updates;
 - formatting;
 - small refactoring;
-- generated agent output;
+- generated CodingAgent output;
 - current implementation gaps.
 
 ## Decision Flow

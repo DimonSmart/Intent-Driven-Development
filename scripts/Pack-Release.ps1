@@ -57,16 +57,17 @@ function Copy-ReleasePath([string]$RelativePath) {
 
 function Write-Manifest([string]$Path) {
     $entryPoints = [ordered]@{}
-    $targetCapabilities = [ordered]@{}
-    $targets = @()
+    $codingAgentCapabilities = [ordered]@{}
+    $codingAgents = @()
 
     Get-ChildItem -LiteralPath (Join-Path $repoRoot "src/adapters") -Directory |
         Sort-Object Name |
         ForEach-Object {
             $adapter = Get-Content -LiteralPath (Join-Path $_.FullName "adapter.json") -Raw | ConvertFrom-Json
-            $targets += $adapter.agent
-            $entryPoints[$adapter.agent] = $adapter.entryPoint
-            $targetCapabilities[$adapter.agent] = [ordered]@{
+            $codingAgent = if ($adapter.codingAgent) { $adapter.codingAgent } else { $adapter.agent }
+            $codingAgents += $codingAgent
+            $entryPoints[$codingAgent] = $adapter.entryPoint
+            $codingAgentCapabilities[$codingAgent] = [ordered]@{
                 supportsSkills = [bool]$adapter.supportsSkills
             }
         }
@@ -83,9 +84,12 @@ function Write-Manifest([string]$Path) {
         version = $Version
         canonicalSource = "src/canonical"
         generatedRoot = "generated"
-        targets = $targets
+        codingAgents = $codingAgents
+        codingAgentCapabilities = $codingAgentCapabilities
+        # Compatibility fields for package consumers that still read target names.
+        targets = $codingAgents
         entryPoints = $entryPoints
-        targetCapabilities = $targetCapabilities
+        targetCapabilities = $codingAgentCapabilities
         packs = $packManifest.packs
     }
 

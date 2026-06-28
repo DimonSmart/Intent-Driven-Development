@@ -1,24 +1,24 @@
 # Methodology
 
-Intent-Driven Development is a practical way to use AI coding agents without turning the project into disconnected prompts, generated plans, and tool-specific instruction files.
+Intent-Driven Development is a practical way to use CodingAgents without turning the project into disconnected prompts, generated plans, and tool-specific instruction files.
 
 The specification is not a magic executable artifact. It does not replace architecture, code review, testing, or human responsibility. It is a stable description of what the product should become.
 
 ## Why This Exists
 
-AI coding agents are useful, but they have a weak memory model.
+CodingAgents are useful, but they have a weak memory model.
 
-A chat can contain the right decision today and lose it tomorrow. One agent can know the project rules while another agent sees only a local prompt. A generated instruction file can drift from the real product intent. After several iterations, nobody is completely sure which file is the source of truth.
+A chat can contain the right decision today and lose it tomorrow. One CodingAgent can know the project rules while another CodingAgent sees only a local prompt. A generated instruction file can drift from the real product intent. After several iterations, nobody is completely sure which file is the source of truth.
 
 Intent-Driven Development separates three things:
 
 ```text
-product intent      durable product knowledge
-agent instructions  generated target formats
-implementation      code, tests, scripts, and concrete changes
+product intent               durable product knowledge
+CodingAgent instructions     generated CodingAgent formats
+implementation               code, tests, scripts, and concrete changes
 ```
 
-Product intent should survive tool changes, agent changes, and implementation attempts.
+Product intent should survive tool changes, CodingAgent changes, and implementation attempts.
 
 ## Intent
 
@@ -34,7 +34,7 @@ If the answer is yes, the specification is useful. If the answer is no, it is pr
 
 ## How It Differs from Spec-Driven Development
 
-Spec-Driven Development has a good core idea: describe what should be built before asking an AI agent to build it.
+Spec-Driven Development has a good core idea: describe what should be built before asking a CodingAgent to build it.
 
 The problem starts when the specification becomes too many things at once:
 
@@ -53,7 +53,7 @@ Intent-Driven Development keeps the useful part and removes the rest.
 | --- | --- |
 | The spec often drives a feature workflow | The spec describes the target product state |
 | Tasks may become part of the spec flow | Tasks are temporary and should not become product memory |
-| The workflow is often tied to one agent or command system | Agents are target formats generated from one canonical source |
+| The workflow is often tied to one CodingAgent or command system | CodingAgent files are generated from one canonical source |
 | Generated plans can look authoritative | Engineering judgment stays explicit |
 | The spec can become a process artifact | The spec remains product knowledge |
 
@@ -80,7 +80,7 @@ If unsure, create a spike or ask for clarification before turning it into normat
 | Local task or TODO | No | It describes work, not product truth |
 | Temporary implementation status | No | It may be obsolete tomorrow |
 | Formatting or small refactoring | No | It does not change product intent |
-| Generated agent output | No | Generated files are not authoritative |
+| Generated CodingAgent output | No | Generated files are not authoritative |
 | Existing implementation differs from spec | Not automatically | Implementation evidence is not intent by itself |
 
 ## What Goes Into Specifications
@@ -107,7 +107,7 @@ Bad specification content:
 - what we are doing today
 - local implementation notes
 - outdated plans
-- generated agent output
+- generated CodingAgent output
 - chat history
 - duplicated instruction files
 ```
@@ -120,7 +120,7 @@ Tasks, issues, pull requests, commit messages, and chat are good places for temp
 
 Specifications and ADRs are for durable product truth. A specification describes behavior, contracts, constraints, non-goals, and verification rules. An ADR records an accepted architecture decision when that decision constrains future implementation.
 
-Generated agent output is not authoritative. It can help deliver the method into a specific tool, but it should not become product memory.
+Generated CodingAgent output is not authoritative. It can help deliver the method into a specific tool, but it should not become product memory.
 
 Implementation evidence is also not intent by itself. When the implementation differs from the specification, decide whether the product intent changed before changing `.specs/`.
 
@@ -142,24 +142,24 @@ Resolved spikes should be deleted after their outcome is captured in a spec or A
 
 ## Context Discipline
 
-IDD avoids large universal workflows that read many files, generate many intermediate artifacts, and leave long reasoning traces in the main agent conversation.
+IDD avoids large universal workflows that read many files, generate many intermediate artifacts, and leave long reasoning traces in the main CodingAgent conversation.
 
 Specification work should be split into small focused skills. A skill should read only the specifications needed for the current decision.
 
 Large specification-maintenance operations should return a compact result: the proposed change, conflicts, affected files, and verification notes.
 
-When an AI coding tool supports isolated or forked execution for heavy skills, IDD adapters may use it to keep the main conversation focused.
+When a CodingAgent supports isolated or forked execution for heavy skills, IDD adapters may use it to keep the main conversation focused.
 
 ## What This Method Optimizes For
 
 IDD is useful when the project has:
 
 ```text
-- more than one AI coding agent
+- more than one CodingAgent
 - long-lived product rules
 - repeated implementation sessions
 - architectural constraints that should not be rediscovered every time
-- generated agent instructions
+- generated CodingAgent instructions
 - a need to keep project knowledge outside chat history
 ```
 
@@ -171,7 +171,7 @@ IDD deliberately does not try to do several things.
 
 ```text
 - Do not turn specifications into a task tracker.
-- Do not store agent-specific instruction copies as the source of truth.
+- Do not store CodingAgent-specific instruction copies as the source of truth.
 - Do not build Claude or Gemini instructions on top of Codex AGENTS.md.
 - Do not update CopilotInstructions as a canonical source.
 - Do not create a pull request back to CopilotInstructions.
@@ -182,14 +182,14 @@ There should be one canonical source. Everything else is generated, adapted, or 
 
 ## Relation to Spec-Guided Development and Spec-Driven Development
 
-Spec-Driven Development starts from a useful idea: describe what should be built before asking an AI agent to build it.
+Spec-Driven Development starts from a useful idea: describe what should be built before asking a CodingAgent to build it.
 
-Intent-Driven Development keeps that idea, but narrows the source of truth to durable product intent. Tasks, temporary plans, implementation notes, generated checklists, and agent-specific command files are not product intent.
+Intent-Driven Development keeps that idea, but narrows the source of truth to durable product intent. Tasks, temporary plans, implementation notes, generated checklists, and CodingAgent-specific command files are not product intent.
 
 In that sense, IDD can be described as a spec-guided approach: specifications guide development, but they do not become a task tracker or an AI command script.
 
 ## Summary
 
-Intent-Driven Development keeps product memory in specifications, keeps agent files as delivery formats, and keeps temporary work outside the source of truth.
+Intent-Driven Development keeps product memory in specifications, keeps CodingAgent files as delivery formats, and keeps temporary work outside the source of truth.
 
-The specification is the product memory. The adapters are translation layers. The generated files are delivery formats for specific agents. The engineer still owns the result.
+The specification is the product memory. The adapters are translation layers. The generated files are delivery formats for specific CodingAgents. The engineer still owns the result.

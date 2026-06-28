@@ -1,4 +1,4 @@
-# Agent Workflow
+# CodingAgent Workflow
 
 Before changing behavior, contracts, architecture, or durable implementation
 patterns, inspect `.specs/README.md`, `.specs/INDEX.md`, and the numbered
@@ -30,7 +30,7 @@ Prefer focused specification reads:
 Large maintenance operations should produce compact summaries instead of
 leaving the full exploration trace in the main conversation.
 
-If the target agent supports isolated, forked, or subagent execution, adapter
+If the CodingAgent supports isolated, forked, or subagent execution, adapter
 authors may use it for heavy specification-maintenance skills.
 
 `spec-normalize-current` may inspect multiple specifications, but it must still be
@@ -47,5 +47,5 @@ It should return a compact reorganization plan:
 It should not dump unrelated specification analysis into the main conversation.
 
 Run verification commands that match the repository and the affected behavior.
-If generated agent files exist, regenerate them instead of editing them
+If generated CodingAgent files exist, regenerate them instead of editing them
 manually.

@@ -1,6 +1,6 @@
 # Specification Index
 
-This index helps humans and agents find relevant current specifications. It is
+This index helps humans and CodingAgents find relevant current specifications. It is
 not the source of truth.
 
 Current numbered documents directly under `.specs/` contain normative product

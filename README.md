@@ -5,7 +5,7 @@
 > Delete the entire implementation.
 > Keep only the specifications.
 >
-> Can an AI coding agent rebuild the product from them?
+> Can a CodingAgent rebuild the product from them?
 >
 > If the specs contain enough intent to recreate the product, and not enough temporary noise to become a task tracker, they are good specs.
 
@@ -19,9 +19,9 @@ In this project, a specification is the description of the product we want to ha
 
 ## What this project provides
 
-This project provides the **Intent-Driven Development** methodology and a set of supporting skills for different AI coding agents.
+This project provides the **Intent-Driven Development** methodology and a set of supporting skills for different CodingAgents such as Codex, Claude, Gemini, and GitHub Copilot.
 
-The core skills help agents create, review, reconcile, import, implement, and
+The core skills help CodingAgents create, review, reconcile, import, implement, and
 index specifications without turning them into task logs.
 
 Core IDD is the default install. It owns durable product intent in `.specs/`.
@@ -32,6 +32,8 @@ implementation work:
 ```bash
 intent-driven-development install --target codex --pack factory
 ```
+
+`--target` is the CLI compatibility name for selecting a CodingAgent.
 
 Factory work artifacts live under `.idd/factory/work/`, are ignored by git by
 default, and should be deleted after the task unless explicitly kept or
@@ -44,13 +46,13 @@ implemented now.
 
 Intent-Driven Development goes further. It keeps the specification pointed at the product, while separating durable product intent from temporary tasks, test work, bug fixes, TODOs, and implementation noise.
 
-That difference matters in long-running AI-assisted development. Spec-driven workflows can drown in their own artifacts. Intent-Driven Development is designed to stay useful after many agent sessions, many fixes, and many changes of plan.
+That difference matters in long-running AI-assisted development. Spec-driven workflows can drown in their own artifacts. Intent-Driven Development is designed to stay useful after many CodingAgent sessions, many fixes, and many changes of plan.
 
 | Spec-Driven Development | Intent-Driven Development |
 | --- | --- |
 | Spec, plan and tasks often live too close together | Product intent and temporary work are separated |
 | Generated tasks can start looking like truth | Generated artifacts are disposable |
-| The workflow is often tied to one tool | Product intent stays independent from AI agents |
+| The workflow is often tied to one tool | Product intent stays independent from CodingAgents |
 | Good for starting features | Better for keeping a project coherent over time |
 
 ## Core idea
@@ -61,9 +63,9 @@ A specification should answer:
 
 Not:
 
-> What did the agent do today?
+> What did the CodingAgent do today?
 
-Tasks change. Plans change. Agents change.
+Tasks change. Plans change. CodingAgents change.
 
 Product intent should stay stable.
 

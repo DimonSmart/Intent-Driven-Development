@@ -16,7 +16,8 @@
         "spec-check-implementation",
         "spec-update-from-implementation"
       ],
-      "agents": [],
+      "rolePrompts": [],
+      "skillRoleReferences": {},
       "projectFiles": [
         {
           "source": "src/canonical/project-files/specs",
@@ -37,13 +38,34 @@
         "factory-review-work-result",
         "factory-finish-work"
       ],
-      "agents": [
+      "rolePrompts": [
         "factory-coordinator",
         "implementation-planner",
         "implementer",
         "task-reviewer",
         "final-reviewer"
       ],
+      "skillRoleReferences": {
+        "factory-create-work-plan": [
+          "factory-coordinator",
+          "implementation-planner"
+        ],
+        "factory-execute-work-plan": [
+          "factory-coordinator",
+          "implementer",
+          "task-reviewer",
+          "final-reviewer"
+        ],
+        "factory-review-task": [
+          "task-reviewer"
+        ],
+        "factory-review-work-result": [
+          "final-reviewer"
+        ],
+        "factory-finish-work": [
+          "factory-coordinator"
+        ]
+      },
       "projectFiles": [
         {
           "source": "src/canonical/project-files/factory",

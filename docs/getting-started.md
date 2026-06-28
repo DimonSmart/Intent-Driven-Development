@@ -2,15 +2,17 @@
 
 Intent-Driven Development can be installed into another repository through the universal npm wrapper or through the .NET tool.
 
-This repository ships canonical methodology and generated target-specific delivery files. The installed agent files are generated from the canonical source, not edited as the source of truth.
+This repository ships canonical methodology and generated CodingAgent-specific delivery files. The installed CodingAgent files are generated from the canonical source, not edited as the source of truth.
 
-Use npm/npx when you want to install generated agent files into any project without requiring the .NET SDK:
+Use npm/npx when you want to install generated CodingAgent files into any project without requiring the .NET SDK:
 
 ```bash
 npx intent-driven-development list-targets
+npx intent-driven-development list-coding-agents
 npx intent-driven-development list-packs
 npx intent-driven-development init
 npx intent-driven-development install --target claude
+npx intent-driven-development install --coding-agent codex
 npx intent-driven-development install --target codex
 npx intent-driven-development install --target copilot
 npx intent-driven-development install --target gemini
@@ -23,7 +25,9 @@ The default install mode is compact:
 npx intent-driven-development install --target claude --entry minimal
 ```
 
-Use `--entry none` to install only skills for targets that support them. Use `--entry full` only as a legacy or debug mode for environments that cannot load skills reliably.
+Use `--entry none` to install only skills for CodingAgents that support them. Use `--entry full` only as a legacy or debug mode for environments that cannot load skills reliably.
+
+`--target` is the CLI compatibility name for selecting a CodingAgent.
 
 Core IDD is installed by default. It installs the durable `.specs/` intent layer
 and the `spec-*` skills.
@@ -55,20 +59,21 @@ Use the .NET global tool when you want a .NET-native installer command:
 ```powershell
 dotnet tool install --global DimonSmart.IntentDrivenDevelopment.Tool
 intent-driven-development list-targets
+intent-driven-development list-coding-agents
 intent-driven-development list-packs
 intent-driven-development install --target codex
 ```
 
 ## Starting a Project
 
-In a target repository, initialize IDD and install the agent format you use:
+In a target repository, initialize IDD and install the CodingAgent format you use:
 
 ```bash
 npx intent-driven-development init
 npx intent-driven-development install --target codex
 ```
 
-For multiple agents, install each target explicitly or use `--all`:
+For multiple CodingAgents, install each CodingAgent explicitly or use `--all`:
 
 ```bash
 npx intent-driven-development install --all
@@ -78,7 +83,7 @@ Project product intent lives in `.specs/`. Keep durable product decisions there.
 
 ## Updating
 
-Install from the current released package again when you want to refresh generated agent files:
+Install from the current released package again when you want to refresh generated CodingAgent files:
 
 ```bash
 npx intent-driven-development install --all
@@ -99,4 +104,4 @@ When changing this repository itself, run the local check:
 .\scripts\Check.ps1
 ```
 
-The check regenerates target output, verifies that generated files are reproducible, and runs smoke tests.
+The check regenerates CodingAgent output, verifies that generated files are reproducible, and runs smoke tests.

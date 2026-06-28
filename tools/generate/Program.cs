@@ -49,8 +49,8 @@ internal sealed class Generator(string repoRoot)
             .OrderBy(Path.GetFileName)
             .Select(adapterDir => new AdapterDefinition(adapterDir, ReadAdapter(adapterDir)))
             .ToArray();
-        var knownAdapterNames = adapterDefinitions
-            .Select(definition => definition.Config.Agent)
+        var supportedCodingAgents = adapterDefinitions
+            .Select(definition => definition.Config.CodingAgent)
             .ToHashSet(StringComparer.Ordinal);
         var packManifest = ReadPackManifest();
         ValidatePackManifest(packManifest);
@@ -58,8 +58,8 @@ internal sealed class Generator(string repoRoot)
         foreach (var adapterDefinition in adapterDefinitions)
         {
             var adapter = adapterDefinition.Config;
-            var expectedFiles = BuildFiles(adapterDefinition.Directory, adapter, knownAdapterNames, packManifest);
-            var outputRoot = Path.Combine(repoRoot, "generated", adapter.Agent);
+            var expectedFiles = BuildFiles(adapterDefinition.Directory, adapter, supportedCodingAgents, packManifest);
+            var outputRoot = Path.Combine(repoRoot, "generated", adapter.CodingAgent);
 
             if (checkOnly)
             {
@@ -83,10 +83,23 @@ internal sealed class Generator(string repoRoot)
     private AdapterConfig ReadAdapter(string adapterDir)
     {
         var json = File.ReadAllText(Path.Combine(adapterDir, "adapter.json"));
-        return JsonSerializer.Deserialize<AdapterConfig>(json, new JsonSerializerOptions
+        var rawConfig = JsonSerializer.Deserialize<RawAdapterConfig>(json, new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
         }) ?? throw new InvalidOperationException($"Invalid adapter config in {adapterDir}.");
+
+        var codingAgent = rawConfig.CodingAgent ?? rawConfig.Agent;
+        if (string.IsNullOrWhiteSpace(codingAgent))
+        {
+            throw new InvalidOperationException($"Invalid adapter config in {adapterDir}: codingAgent is required.");
+        }
+
+        return new AdapterConfig(
+            codingAgent,
+            rawConfig.EntryPoint,
+            rawConfig.SkillsRoot,
+            rawConfig.SupportsSkills,
+            rawConfig.SupportsFrontMatter);
     }
 
     private IReadOnlyList<GeneratedFile> BuildFiles(
@@ -106,7 +119,7 @@ internal sealed class Generator(string repoRoot)
         {
             if (string.IsNullOrWhiteSpace(adapter.SkillsRoot))
             {
-                throw new InvalidOperationException($"{adapter.Agent} supports skills but has no skillsRoot.");
+                throw new InvalidOperationException($"{adapter.CodingAgent} supports skills but has no skillsRoot.");
             }
 
             var skillsRoot = Path.Combine(repoRoot, "src", "canonical", "skills");
@@ -135,7 +148,7 @@ internal sealed class Generator(string repoRoot)
                 if (adapter.SupportsFrontMatter)
                 {
                     content = JoinBlocks(
-                        BuildSkillFrontMatter(skillName, skillDescription, adapter.Agent),
+                        BuildSkillFrontMatter(skillName, skillDescription, adapter.CodingAgent),
                         content);
                 }
 
@@ -144,7 +157,7 @@ internal sealed class Generator(string repoRoot)
 
                 if (IsFactorySkill(packManifest, skillName))
                 {
-                    AddFactoryAgentReferences(files, adapter.SkillsRoot!, skillName, packManifest);
+                    AddFactoryRolePromptReferences(files, adapter.SkillsRoot!, skillName, packManifest);
                 }
             }
         }
@@ -169,7 +182,7 @@ internal sealed class Generator(string repoRoot)
         }
 
         var skillsRoot = Path.Combine(repoRoot, "src", "canonical", "skills");
-        var agentsRoot = Path.Combine(repoRoot, "src", "canonical", "agents");
+        var factoryRolesRoot = Path.Combine(repoRoot, "src", "canonical", "factory", "roles");
         var canonicalSkills = Directory
             .GetFiles(skillsRoot, "*.md")
             .Select(path => Path.GetFileNameWithoutExtension(path)!)
@@ -201,12 +214,43 @@ internal sealed class Generator(string repoRoot)
                 skillOwners.Add(skill, packName);
             }
 
-            foreach (var agent in pack.Agents)
+            foreach (var rolePrompt in pack.RolePrompts)
             {
-                var path = Path.Combine(agentsRoot, agent + ".md");
+                var path = Path.Combine(factoryRolesRoot, rolePrompt + ".md");
                 if (!File.Exists(path))
                 {
-                    throw new InvalidOperationException($"Pack '{packName}' references missing agent '{agent}'.");
+                    throw new InvalidOperationException($"Pack '{packName}' references missing role prompt '{rolePrompt}'.");
+                }
+            }
+
+            foreach (var (skill, rolePrompts) in pack.SkillRoleReferences)
+            {
+                if (!pack.Skills.Contains(skill, StringComparer.Ordinal))
+                {
+                    throw new InvalidOperationException($"Pack '{packName}' has skillRoleReferences for skill '{skill}' that is not owned by that pack.");
+                }
+
+                foreach (var rolePrompt in rolePrompts)
+                {
+                    if (!pack.RolePrompts.Contains(rolePrompt, StringComparer.Ordinal))
+                    {
+                        throw new InvalidOperationException($"Pack '{packName}' skill '{skill}' references undeclared role prompt '{rolePrompt}'.");
+                    }
+                }
+            }
+        }
+
+        var declaredRolePrompts = manifest.Packs.Values
+            .SelectMany(pack => pack.RolePrompts)
+            .ToHashSet(StringComparer.Ordinal);
+        if (Directory.Exists(factoryRolesRoot))
+        {
+            foreach (var path in Directory.GetFiles(factoryRolesRoot, "*.md"))
+            {
+                var rolePrompt = Path.GetFileNameWithoutExtension(path);
+                if (!declaredRolePrompts.Contains(rolePrompt))
+                {
+                    throw new InvalidOperationException($"Factory role prompt file is not declared by a pack: {rolePrompt}.");
                 }
             }
         }
@@ -254,18 +298,22 @@ internal sealed class Generator(string repoRoot)
         manifest.Packs.TryGetValue("factory", out var factoryPack) &&
         factoryPack.Skills.Contains(skillName, StringComparer.Ordinal);
 
-    private void AddFactoryAgentReferences(
+    private void AddFactoryRolePromptReferences(
         List<GeneratedFile> files,
         string skillsRoot,
         string skillName,
         PackManifest manifest)
     {
-        var agentsRoot = Path.Combine(repoRoot, "src", "canonical", "agents");
-        var factoryAgents = manifest.Packs["factory"].Agents;
-        foreach (var agent in factoryAgents)
+        var factoryRolesRoot = Path.Combine(repoRoot, "src", "canonical", "factory", "roles");
+        if (!manifest.Packs["factory"].SkillRoleReferences.TryGetValue(skillName, out var rolePrompts))
         {
-            var content = ReadRequired(Path.Combine(agentsRoot, agent + ".md"));
-            var relativePath = Path.Combine(skillsRoot, skillName, "references", "agents", agent + ".md");
+            return;
+        }
+
+        foreach (var rolePrompt in rolePrompts)
+        {
+            var content = ReadRequired(Path.Combine(factoryRolesRoot, rolePrompt + ".md"));
+            var relativePath = Path.Combine(skillsRoot, skillName, "references", "roles", rolePrompt + ".md");
             files.Add(new GeneratedFile(relativePath, NormalizeContent(content)));
         }
     }
@@ -316,7 +364,7 @@ internal sealed class Generator(string repoRoot)
               task. Prefer updating the existing owning spec.
               """
             : """
-              This target does not use generated IDD skills. Keep IDD work focused and
+              This CodingAgent does not use generated IDD skills. Keep IDD work focused and
               read only the documents needed for the current task.
               """;
         var workflowGuidance = adapter.SupportsSkills
@@ -603,8 +651,16 @@ internal sealed class Generator(string repoRoot)
     private static string Normalize(string path) => path.Replace('\\', '/');
 }
 
+internal sealed record RawAdapterConfig(
+    string? CodingAgent,
+    string? Agent,
+    string EntryPoint,
+    string? SkillsRoot,
+    bool SupportsSkills,
+    bool SupportsFrontMatter);
+
 internal sealed record AdapterConfig(
-    string Agent,
+    string CodingAgent,
     string EntryPoint,
     string? SkillsRoot,
     bool SupportsSkills,
@@ -628,7 +684,8 @@ internal sealed record PackDefinition(
     bool Default,
     string[] Requires,
     string[] Skills,
-    string[] Agents,
+    string[] RolePrompts,
+    Dictionary<string, string[]> SkillRoleReferences,
     ProjectFileDefinition[] ProjectFiles);
 
 internal sealed record ProjectFileDefinition(string Source, string Destination);

@@ -1,5 +1,5 @@
 {
-  "agent": "claude",
+  "codingAgent": "claude",
   "entryPoint": "CLAUDE.md",
   "skillsRoot": ".claude/skills",
   "supportsSkills": true,

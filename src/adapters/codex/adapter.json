@@ -1,5 +1,5 @@
 {
-  "agent": "codex",
+  "codingAgent": "codex",
   "entryPoint": "AGENTS.md",
   "skillsRoot": ".agents/skills",
   "supportsSkills": true,

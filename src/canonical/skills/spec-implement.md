@@ -58,8 +58,12 @@ first.
 `spec-implement` implements one focused behavior from current specs.
 
 It does not create or execute Factory Work Plans.
-When used from `idd-factory`, treat the factory task brief as the local task
-scope and `.specs/` as normative product intent.
+When used from factory execution, the factory task brief is only the local task
+scope.
+The normative product intent still comes from `.specs/`.
+
+Factory may sequence tasks and reviews, but it must not redefine implementation
+rules.
 
 Do not expand a factory task into adjacent work unless required by the relevant
 spec.

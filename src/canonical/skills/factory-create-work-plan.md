@@ -5,6 +5,10 @@
 Create a temporary Factory Work Plan from the current user request, current
 `.specs/` intent, and relevant repository evidence.
 
+This skill is the workflow contract. Factory role prompts are optional local
+references that may help structure planning, but they do not own durable
+product intent.
+
 Factory Work Plans are temporary execution state. They are not product intent,
 not product specifications, not ADRs, and not durable project documentation.
 
@@ -41,9 +45,11 @@ only.
 4. Inspect repository evidence needed to identify likely code and test areas.
 5. Stop and route to the appropriate spec skill if durable product intent is
    missing, unclear, or wrong.
-6. Create one work directory using this shape:
+6. Use local `references/roles/` role prompts only when they are present and
+   relevant to this workflow.
+7. Create one work directory using this shape:
    `.idd/factory/work/<yyyyMMdd-HHmmss>-<slug>/`.
-7. Write the work plan to:
+8. Write the work plan to:
    `.idd/factory/work/<yyyyMMdd-HHmmss>-<slug>/work-plan.md`.
 
 ## Output Format
