@@ -151,6 +151,7 @@ internal sealed class Generator(string repoRoot)
             ? """
               Use IDD skills for specific workflows:
               - `spec-audit`
+              - `spec-brainstorm`
               - `spec-change`
               - `spec-implement`
               - `spec-import`
@@ -165,8 +166,15 @@ internal sealed class Generator(string repoRoot)
               When the user asks to change product behavior: use `spec-change`,
               then `spec-implement`, then `spec-check-implementation`.
 
+              For a new feature or behavior change with unclear,
+              implementation-shaped, over-specified, or likely simpler intent:
+              use `spec-brainstorm` before `spec-change`. After it produces a
+              confirmed specification-ready intent, use `spec-change`.
+
               When the user asks to implement behavior already described in
               `.specs/`: use `spec-implement`, then `spec-check-implementation`.
+              Do not use `spec-brainstorm` when current specs are already clear
+              and the user asks to implement them.
 
               When the user reports a possible bug: use
               `spec-check-implementation`; if the current spec is clear, fix

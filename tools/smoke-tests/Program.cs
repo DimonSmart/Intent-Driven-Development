@@ -33,6 +33,7 @@ ExpectNoFullMethodologyInEntryPoints();
 ExpectAllSkillsGenerated();
 ExpectClaudeSkillMetadata();
 ExpectSpecImportLintCleanContract();
+ExpectSpecBrainstormBoundaryContract();
 ExpectInstallEntryNone();
 ExpectInstallGeminiEntryNoneRejected();
 ExpectInstallAllAfterInit();
@@ -79,6 +80,7 @@ void ExpectSkillFiles(string skillsRoot)
     var expected = new[]
     {
         "spec-audit",
+        "spec-brainstorm",
         "spec-change",
         "spec-import",
         "spec-implement",
@@ -309,6 +311,60 @@ void ExpectSpecImportLintCleanContract()
             if (content.Contains(text, StringComparison.Ordinal))
             {
                 failures.Add($"spec-import generated skill contains obsolete text '{text}': {relativePath}");
+            }
+        }
+    }
+}
+
+void ExpectSpecBrainstormBoundaryContract()
+{
+    var skillPaths = new[]
+    {
+        "generated/codex/.agents/skills/spec-brainstorm/SKILL.md",
+        "generated/claude/.claude/skills/spec-brainstorm/SKILL.md",
+        "generated/copilot/.github/skills/spec-brainstorm/SKILL.md"
+    };
+
+    var required = new[]
+    {
+        "spec-brainstorm = proposed solution + customer discovery + intent clarification + simplification options",
+        "This skill clarifies intent. It does not update specifications, design architecture, or implement code.",
+        "`spec-brainstorm` does not edit files by default.",
+        "After the product intent is confirmed, use `spec-change`",
+        "Do not use this skill when the relevant current specification is already clear and the user asks to implement it"
+    };
+
+    var forbidden = new[]
+    {
+        "Implement the code",
+        "Update `.specs/` directly",
+        "Create the new spec",
+        "Design the architecture"
+    };
+
+    foreach (var relativePath in skillPaths)
+    {
+        var fullPath = Path.Combine(repoRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(fullPath))
+        {
+            failures.Add($"Missing spec-brainstorm generated skill for contract check: {relativePath}");
+            continue;
+        }
+
+        var content = File.ReadAllText(fullPath);
+        foreach (var text in required)
+        {
+            if (!content.Contains(text, StringComparison.Ordinal))
+            {
+                failures.Add($"spec-brainstorm generated skill is missing required text '{text}': {relativePath}");
+            }
+        }
+
+        foreach (var text in forbidden)
+        {
+            if (content.Contains(text, StringComparison.Ordinal))
+            {
+                failures.Add($"spec-brainstorm generated skill contains forbidden text '{text}': {relativePath}");
             }
         }
     }
