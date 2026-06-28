@@ -12,6 +12,10 @@ dotnet build tools/idd-tool/IntentDrivenDevelopment.Tool.csproj --nologo
 dotnet build tools/smoke-tests/SmokeTests.csproj --nologo
 
 dotnet exec tools/generate/bin/Debug/net10.0/Generate.dll
+if (-not (Test-Path -LiteralPath (Join-Path $repoRoot "manifest.json"))) {
+    throw "Generator did not create manifest.json."
+}
+
 dotnet exec tools/generate/bin/Debug/net10.0/Generate.dll --check
 dotnet exec tools/smoke-tests/bin/Debug/net10.0/SmokeTests.dll
 

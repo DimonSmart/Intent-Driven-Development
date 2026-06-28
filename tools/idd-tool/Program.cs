@@ -605,7 +605,7 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
             "numbering.md",
             "document-types.md",
             "semantic-changes.md",
-            "agent-workflow.md"
+            "coding-agent-workflow.md"
         };
 
         return string.Join(Environment.NewLine + Environment.NewLine, names.Select(name => ReadRequired(Path.Combine(methodologyRoot, name)).Trim()));

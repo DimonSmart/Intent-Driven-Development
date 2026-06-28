@@ -55,48 +55,6 @@ function Copy-ReleasePath([string]$RelativePath) {
     Copy-Item -LiteralPath $source -Destination $destination -Recurse -Force
 }
 
-function Write-Manifest([string]$Path) {
-    $entryPoints = [ordered]@{}
-    $codingAgentCapabilities = [ordered]@{}
-    $codingAgents = @()
-
-    Get-ChildItem -LiteralPath (Join-Path $repoRoot "src/adapters") -Directory |
-        Sort-Object Name |
-        ForEach-Object {
-            $adapter = Get-Content -LiteralPath (Join-Path $_.FullName "adapter.json") -Raw | ConvertFrom-Json
-            $codingAgent = if ($adapter.codingAgent) { $adapter.codingAgent } else { $adapter.agent }
-            $codingAgents += $codingAgent
-            $entryPoints[$codingAgent] = $adapter.entryPoint
-            $codingAgentCapabilities[$codingAgent] = [ordered]@{
-                supportsSkills = [bool]$adapter.supportsSkills
-            }
-        }
-
-    $packManifestPath = Join-Path $repoRoot "src/canonical/packs/pack-manifest.json"
-    if (-not (Test-Path -LiteralPath $packManifestPath)) {
-        throw "Pack manifest not found: $packManifestPath"
-    }
-
-    $packManifest = Get-Content -LiteralPath $packManifestPath -Raw | ConvertFrom-Json
-
-    $manifest = [ordered]@{
-        name = "Intent-Driven Development"
-        version = $Version
-        canonicalSource = "src/canonical"
-        generatedRoot = "generated"
-        codingAgents = $codingAgents
-        codingAgentCapabilities = $codingAgentCapabilities
-        # Compatibility fields for package consumers that still read target names.
-        targets = $codingAgents
-        entryPoints = $entryPoints
-        targetCapabilities = $codingAgentCapabilities
-        packs = $packManifest.packs
-    }
-
-    $json = $manifest | ConvertTo-Json -Depth 10
-    Set-Content -LiteralPath $Path -Value $json -Encoding utf8NoBOM
-}
-
 function Write-Checksums([string]$Root, [string]$OutputPath) {
     $lines = Get-ChildItem -LiteralPath $Root -Recurse -File |
         Where-Object { $_.FullName -ne $OutputPath } |
@@ -159,11 +117,14 @@ if (-not $SkipCheck) {
         throw "Check failed with exit code $LASTEXITCODE."
     }
 }
-else {
-    Invoke-RequiredCommand -Description "Generator" -Command { dotnet run --project tools/generate }
+
+Invoke-RequiredCommand -Description "Generator" -Command {
+    dotnet run --project tools/generate -- --manifest-version $Version
 }
 
-Write-Manifest $manifestPath
+Invoke-RequiredCommand -Description "Generator check" -Command {
+    dotnet run --project tools/generate -- --check --manifest-version $Version
+}
 
 New-Item -ItemType Directory -Force -Path $releaseContentRoot | Out-Null
 Copy-ReleasePath "src/canonical"

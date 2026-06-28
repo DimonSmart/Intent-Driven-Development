@@ -24,7 +24,10 @@ only.
 - Execute only the tasks in the work plan.
 - For each task, create a bounded task brief in the same work directory when
   useful.
-- Use `spec-implement` principles inside each implementation task.
+- Factory execution delegates bounded implementation semantics to
+  `spec-implement`.
+- Factory owns task sequencing, review gates, temporary artifacts, and cleanup.
+- It does not redefine `spec-implement` rules.
 - After each task, run `factory-review-task`.
 - If task review fails, fix and re-review before continuing.
 - After all tasks, run `factory-review-work-result`.

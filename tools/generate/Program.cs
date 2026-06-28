@@ -1,14 +1,15 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 var repoRoot = FindRepoRoot();
-var checkOnly = args.Contains("--check", StringComparer.OrdinalIgnoreCase);
+var options = ParseOptions(args);
 var generator = new Generator(repoRoot);
-var result = generator.Run(checkOnly);
+var result = generator.Run(options.CheckOnly, options.ManifestVersion);
 
 if (result.Count == 0)
 {
-    Console.WriteLine(checkOnly ? "Generated files are current." : "Generated files updated.");
+    Console.WriteLine(options.CheckOnly ? "Generated files are current." : "Generated files updated.");
     return 0;
 }
 
@@ -18,6 +19,41 @@ foreach (var item in result)
 }
 
 return 1;
+
+static GeneratorOptions ParseOptions(string[] args)
+{
+    var checkOnly = false;
+    var manifestVersion = "0.0.0-local";
+
+    for (var index = 0; index < args.Length; index++)
+    {
+        var arg = args[index];
+        if (StringComparer.Ordinal.Equals(arg, "--check"))
+        {
+            checkOnly = true;
+            continue;
+        }
+
+        if (StringComparer.Ordinal.Equals(arg, "--manifest-version"))
+        {
+            if (index + 1 >= args.Length || args[index + 1].StartsWith("--", StringComparison.Ordinal))
+            {
+                Console.Error.WriteLine("Missing value for --manifest-version.");
+                Environment.ExitCode = 1;
+                return new GeneratorOptions(checkOnly, manifestVersion);
+            }
+
+            manifestVersion = args[++index];
+            continue;
+        }
+
+        Console.Error.WriteLine($"Unknown option: {arg}");
+        Environment.ExitCode = 1;
+        return new GeneratorOptions(checkOnly, manifestVersion);
+    }
+
+    return new GeneratorOptions(checkOnly, manifestVersion);
+}
 
 static string FindRepoRoot()
 {
@@ -40,8 +76,13 @@ internal sealed class Generator(string repoRoot)
 {
     private const int EntryPointLineLimit = 80;
 
-    public IReadOnlyList<string> Run(bool checkOnly)
+    public IReadOnlyList<string> Run(bool checkOnly, string manifestVersion)
     {
+        if (Environment.ExitCode != 0)
+        {
+            return ["Invalid generator arguments."];
+        }
+
         var errors = new List<string>();
         var adaptersRoot = Path.Combine(repoRoot, "src", "adapters");
         var adapterDefinitions = Directory
@@ -77,7 +118,126 @@ internal sealed class Generator(string repoRoot)
             }
         }
 
+        var manifest = BuildManifest(adapterDefinitions, packManifest, manifestVersion);
+        var manifestPath = Path.Combine(repoRoot, "manifest.json");
+        if (checkOnly)
+        {
+            errors.AddRange(CheckSingleFile(manifestPath, manifest));
+        }
+        else
+        {
+            File.WriteAllText(manifestPath, manifest, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        }
+
         return errors;
+    }
+
+    private static IReadOnlyList<string> CheckSingleFile(string fullPath, string expectedContent)
+    {
+        if (!File.Exists(fullPath))
+        {
+            return [$"Missing generated file: {Path.GetRelativePath(Directory.GetCurrentDirectory(), fullPath)}"];
+        }
+
+        var actual = File.ReadAllText(fullPath);
+        if (!StringComparer.Ordinal.Equals(actual, expectedContent))
+        {
+            return [$"Outdated generated file: {Path.GetRelativePath(Directory.GetCurrentDirectory(), fullPath)}"];
+        }
+
+        return [];
+    }
+
+    private static string BuildManifest(
+        IReadOnlyList<AdapterDefinition> adapterDefinitions,
+        PackManifest packManifest,
+        string manifestVersion)
+    {
+        var orderedAdapters = adapterDefinitions
+            .OrderBy(definition => definition.Config.CodingAgent, StringComparer.Ordinal)
+            .ToArray();
+        var codingAgents = JsonStringArray(orderedAdapters.Select(definition => definition.Config.CodingAgent));
+        var targetAliases = JsonStringArray(orderedAdapters.Select(definition => definition.Config.CodingAgent));
+        var entryPoints = new JsonObject();
+        var codingAgentCapabilities = new JsonObject();
+        var targetCapabilities = new JsonObject();
+
+        foreach (var adapterDefinition in orderedAdapters)
+        {
+            var adapter = adapterDefinition.Config;
+            entryPoints.Add(adapter.CodingAgent, adapter.EntryPoint);
+            codingAgentCapabilities.Add(adapter.CodingAgent, new JsonObject
+            {
+                ["supportsSkills"] = adapter.SupportsSkills
+            });
+            targetCapabilities.Add(adapter.CodingAgent, new JsonObject
+            {
+                ["supportsSkills"] = adapter.SupportsSkills
+            });
+        }
+
+        var manifest = new JsonObject
+        {
+            ["name"] = "Intent-Driven Development",
+            ["version"] = manifestVersion,
+            ["canonicalSource"] = "src/canonical",
+            ["generatedRoot"] = "generated",
+            ["codingAgents"] = codingAgents,
+            ["codingAgentCapabilities"] = codingAgentCapabilities,
+            ["targets"] = targetAliases,
+            ["entryPoints"] = entryPoints,
+            ["targetCapabilities"] = targetCapabilities,
+            ["packs"] = BuildPacksNode(packManifest)
+        };
+
+        return manifest.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n";
+    }
+
+    private static JsonObject BuildPacksNode(PackManifest packManifest)
+    {
+        var packs = new JsonObject();
+        foreach (var (packName, pack) in packManifest.Packs.OrderBy(item => item.Key, StringComparer.Ordinal))
+        {
+            var skillRoleReferences = new JsonObject();
+            foreach (var (skill, rolePrompts) in pack.SkillRoleReferences.OrderBy(item => item.Key, StringComparer.Ordinal))
+            {
+                skillRoleReferences.Add(skill, JsonStringArray(rolePrompts));
+            }
+
+            var projectFiles = new JsonArray();
+            foreach (var projectFile in pack.ProjectFiles)
+            {
+                projectFiles.Add(new JsonObject
+                {
+                    ["source"] = projectFile.Source,
+                    ["destination"] = projectFile.Destination
+                });
+            }
+
+            packs.Add(packName, new JsonObject
+            {
+                ["description"] = pack.Description,
+                ["default"] = pack.Default,
+                ["requires"] = JsonStringArray(pack.Requires),
+                ["skills"] = JsonStringArray(pack.Skills),
+                ["rolePrompts"] = JsonStringArray(pack.RolePrompts),
+                ["skillRoleReferences"] = skillRoleReferences,
+                ["projectFiles"] = projectFiles
+            });
+        }
+
+        return packs;
+    }
+
+    private static JsonArray JsonStringArray(IEnumerable<string> values)
+    {
+        var array = new JsonArray();
+        foreach (var value in values)
+        {
+            array.Add(value);
+        }
+
+        return array;
     }
 
     private AdapterConfig ReadAdapter(string adapterDir)
@@ -689,3 +849,5 @@ internal sealed record PackDefinition(
     ProjectFileDefinition[] ProjectFiles);
 
 internal sealed record ProjectFileDefinition(string Source, string Destination);
+
+internal sealed record GeneratorOptions(bool CheckOnly, string ManifestVersion);

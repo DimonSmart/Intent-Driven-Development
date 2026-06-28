@@ -455,7 +455,7 @@ function readCanonicalMethodology() {
     "numbering.md",
     "document-types.md",
     "semantic-changes.md",
-    "agent-workflow.md"
+    "coding-agent-workflow.md"
   ];
 
   return names

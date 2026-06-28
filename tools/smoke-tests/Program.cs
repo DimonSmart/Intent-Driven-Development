@@ -9,6 +9,8 @@ var toolDll = Path.Combine(repoRoot, "tools", "idd-tool", "bin", "Debug", "net10
 
 RunGenerator();
 
+ExpectManifestShape();
+ExpectMethodologyRename();
 ExpectFile("generated/codex/AGENTS.md");
 ExpectAllSkillFiles("generated/codex/.agents/skills");
 
@@ -159,7 +161,7 @@ void ExpectNoCanonicalAgentCoupling()
         if (content.Contains("Codex-specific", StringComparison.OrdinalIgnoreCase) ||
             content.Contains("AGENTS.md", StringComparison.OrdinalIgnoreCase))
         {
-            failures.Add($"Canonical file contains agent-specific wording: {Relative(path)}");
+            failures.Add($"Canonical file contains CodingAgent-specific wording: {Relative(path)}");
         }
     }
 }
@@ -404,6 +406,88 @@ void ExpectPackManifestShape()
     ExpectNoDirectory("src/canonical/agents");
 }
 
+void ExpectManifestShape()
+{
+    const string manifestPath = "manifest.json";
+    var fullManifestPath = Path.Combine(repoRoot, manifestPath);
+    if (!File.Exists(fullManifestPath))
+    {
+        failures.Add("Generator did not create manifest.json.");
+        return;
+    }
+
+    using var document = JsonDocument.Parse(File.ReadAllText(fullManifestPath));
+    var root = document.RootElement;
+    ExpectJsonProperty(root, "codingAgents", manifestPath);
+    ExpectJsonProperty(root, "targets", manifestPath);
+    ExpectJsonProperty(root, "codingAgentCapabilities", manifestPath);
+    ExpectJsonProperty(root, "targetCapabilities", manifestPath);
+    ExpectJsonProperty(root, "entryPoints", manifestPath);
+    ExpectJsonProperty(root, "packs", manifestPath);
+
+    var codingAgents = JsonStringArray(root, "codingAgents");
+    var targets = JsonStringArray(root, "targets");
+    if (!codingAgents.SequenceEqual(targets, StringComparer.Ordinal))
+    {
+        failures.Add("manifest.json codingAgents and targets differ.");
+    }
+
+    var codingAgentCapabilityKeys = JsonObjectKeys(root, "codingAgentCapabilities");
+    var targetCapabilityKeys = JsonObjectKeys(root, "targetCapabilities");
+    if (!codingAgentCapabilityKeys.SequenceEqual(targetCapabilityKeys, StringComparer.Ordinal))
+    {
+        failures.Add("manifest.json codingAgentCapabilities and targetCapabilities keys differ.");
+    }
+
+    if (!root.TryGetProperty("packs", out var packs) || packs.ValueKind != JsonValueKind.Object)
+    {
+        failures.Add("manifest.json packs must be an object.");
+        return;
+    }
+
+    if (!packs.TryGetProperty("core", out _))
+    {
+        failures.Add("manifest.json is missing packs.core.");
+    }
+
+    if (!packs.TryGetProperty("factory", out var factoryPack))
+    {
+        failures.Add("manifest.json is missing packs.factory.");
+    }
+    else
+    {
+        ExpectJsonProperty(factoryPack, "rolePrompts", manifestPath);
+        ExpectJsonProperty(factoryPack, "skillRoleReferences", manifestPath);
+    }
+}
+
+void ExpectJsonProperty(JsonElement element, string propertyName, string relativePath)
+{
+    if (!element.TryGetProperty(propertyName, out _))
+    {
+        failures.Add($"{relativePath} is missing '{propertyName}'.");
+    }
+}
+
+string[] JsonStringArray(JsonElement root, string propertyName) =>
+    root.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.Array
+        ? property.EnumerateArray().Select(item => item.GetString() ?? "").ToArray()
+        : [];
+
+string[] JsonObjectKeys(JsonElement root, string propertyName) =>
+    root.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.Object
+        ? property.EnumerateObject().Select(item => item.Name).OrderBy(name => name, StringComparer.Ordinal).ToArray()
+        : [];
+
+void ExpectMethodologyRename()
+{
+    ExpectFile("src/canonical/methodology/coding-agent-workflow.md");
+    if (File.Exists(Path.Combine(repoRoot, "src/canonical/methodology/agent-workflow.md")))
+    {
+        failures.Add("src/canonical/methodology/agent-workflow.md must not exist.");
+    }
+}
+
 void ExpectFactoryGeneratedShape()
 {
     foreach (var relativePath in GeneratedSkillPaths("factory-create-work-plan")
@@ -477,6 +561,9 @@ void ExpectFactorySkillShapes()
     {
         var content = ReadRequiredGeneratedFile(relativePath);
         ExpectContains(content, "explicit work plan", relativePath, "factory-execute-work-plan");
+        ExpectContains(content, "Factory execution delegates bounded implementation semantics to", relativePath, "factory-execute-work-plan");
+        ExpectContains(content, "Factory owns task sequencing, review gates, temporary artifacts, and cleanup.", relativePath, "factory-execute-work-plan");
+        ExpectContains(content, "It does not redefine `spec-implement` rules.", relativePath, "factory-execute-work-plan");
         ExpectContains(content, "factory-review-task", relativePath, "factory-execute-work-plan");
         ExpectContains(content, "factory-review-work-result", relativePath, "factory-execute-work-plan");
         ExpectContains(content, "factory-finish-work", relativePath, "factory-execute-work-plan");
@@ -1197,6 +1284,12 @@ void WithNpmFixture(Action<string> action)
         Directory.CreateDirectory(Path.Combine(fixtureRoot, "package-content"));
         File.Copy(Path.Combine(repoRoot, "npm", "package.json"), Path.Combine(fixtureRoot, "package.json"));
         CopyDirectoryRecursive(Path.Combine(repoRoot, "npm", "bin"), Path.Combine(fixtureRoot, "bin"));
+        if (!File.Exists(Path.Combine(repoRoot, "manifest.json")))
+        {
+            failures.Add("manifest.json is missing before npm fixture copy. RunGenerator must create it.");
+            return;
+        }
+
         File.Copy(Path.Combine(repoRoot, "manifest.json"), Path.Combine(fixtureRoot, "package-content", "manifest.json"));
         CopyDirectoryRecursive(Path.Combine(repoRoot, "generated"), Path.Combine(fixtureRoot, "package-content", "generated"));
         CopyDirectoryRecursive(Path.Combine(repoRoot, "src"), Path.Combine(fixtureRoot, "package-content", "src"));
