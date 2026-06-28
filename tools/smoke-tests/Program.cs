@@ -32,9 +32,10 @@ ExpectEntryPointLineLimits();
 ExpectNoFullMethodologyInEntryPoints();
 ExpectAllSkillsGenerated();
 ExpectClaudeSkillMetadata();
-ExpectSpecImportLintCleanContract();
-ExpectSpecBrainstormBoundaryContract();
-ExpectSpecBrainstormRoutingGuidance();
+ExpectSpecImportGeneratedShape();
+ExpectNoLegacySpecImportReportGuidance();
+ExpectSpecBrainstormGeneratedShape();
+ExpectEntryPointSkillRoutingShape();
 ExpectInstallEntryNone();
 ExpectInstallGeminiEntryNoneRejected();
 ExpectInstallAllAfterInit();
@@ -151,6 +152,80 @@ void ExpectNoEntryIncludes(string relativePath, string forbidden)
     }
 }
 
+string ReadRequiredGeneratedFile(string relativePath)
+{
+    var fullPath = Path.Combine(repoRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+    if (!File.Exists(fullPath))
+    {
+        failures.Add($"Missing generated file: {relativePath}");
+        return "";
+    }
+
+    return File.ReadAllText(fullPath);
+}
+
+void ExpectSections(string content, string relativePath, params string[] headings)
+{
+    foreach (var heading in headings)
+    {
+        ExpectContains(content, heading, relativePath, "section");
+    }
+}
+
+void ExpectContains(string content, string expected, string relativePath, string context)
+{
+    if (!content.Contains(expected, StringComparison.Ordinal))
+    {
+        failures.Add($"{context} is missing '{expected}': {relativePath}");
+    }
+}
+
+void ExpectDoesNotContain(string content, string forbidden, string relativePath, string context)
+{
+    if (content.Contains(forbidden, StringComparison.Ordinal))
+    {
+        failures.Add($"{context} contains obsolete text '{forbidden}': {relativePath}");
+    }
+}
+
+void ExpectSkillReferences(string content, string relativePath, params string[] skillNames)
+{
+    foreach (var skillName in skillNames)
+    {
+        ExpectContains(content, skillName, relativePath, "generated skill reference");
+    }
+}
+
+void ExpectFencedBlockBetween(string content, string relativePath, string startHeading, string endHeading)
+{
+    var start = content.IndexOf(startHeading, StringComparison.Ordinal);
+    if (start < 0)
+    {
+        failures.Add($"section is missing '{startHeading}': {relativePath}");
+        return;
+    }
+
+    var end = content.IndexOf(endHeading, start + startHeading.Length, StringComparison.Ordinal);
+    if (end < 0)
+    {
+        failures.Add($"section is missing '{endHeading}' after '{startHeading}': {relativePath}");
+        return;
+    }
+
+    var section = content[start..end];
+    if (!section.Contains("```", StringComparison.Ordinal))
+    {
+        failures.Add($"section '{startHeading}' is missing a fenced output format block: {relativePath}");
+    }
+}
+
+string[] GeneratedSkillPaths(string skillName) =>
+[
+    $"generated/codex/.agents/skills/{skillName}/SKILL.md",
+    $"generated/claude/.claude/skills/{skillName}/SKILL.md",
+    $"generated/copilot/.github/skills/{skillName}/SKILL.md"
+];
+
 void ExpectEntryPointLineLimits()
 {
     foreach (var relativePath in EntryPoints())
@@ -259,150 +334,102 @@ void ExpectClaudeSkillMetadata()
     }
 }
 
-void ExpectSpecImportLintCleanContract()
+// These smoke tests intentionally verify generated file shape and stable mechanical anchors only.
+// Semantic routing/behavior of skills belongs in separate prompt/LLM evaluation tests.
+void ExpectSpecImportGeneratedShape()
 {
-    var skillPaths = new[]
+    var sections = new[]
     {
-        "generated/codex/.agents/skills/spec-import/SKILL.md",
-        "generated/claude/.claude/skills/spec-import/SKILL.md",
-        "generated/copilot/.github/skills/spec-import/SKILL.md"
-    };
-
-    var required = new[]
-    {
-        "Import is not complete until the generated `.specs` tree is mechanically",
-        "no `.specs/archive`",
-        "Do not create `.specs/import-report.md`.",
+        "## Default Modes",
+        "## Current Spec Test",
+        "## Structural Normalization",
+        "## Required Behavior",
+        "## Source Triage",
+        "## Import Inventory",
+        "## Fragment Classification",
         "## Source-to-target Remap",
-        "A numeric relation may be written only if the referenced target document",
-        "Regenerate `.specs/INDEX.md` from actual current numbered documents after",
+        "## Conflict Handling",
+        "## Normalized Writing Rules",
+        "## Relation Normalization",
+        "## Index Regeneration",
+        "## Workflow",
         "## Post-import Cleanup",
-        "Continue fixing mechanical errors until none remain.",
-        "`spec-lint` would return no errors.",
-        "`spec-normalize-current` only for later maintenance"
+        "## Import Report"
     };
 
+    foreach (var relativePath in GeneratedSkillPaths("spec-import"))
+    {
+        var content = ReadRequiredGeneratedFile(relativePath);
+        ExpectSections(content, relativePath, sections);
+        ExpectContains(content, ".specs/INDEX.md", relativePath, "spec-import generated skill reference");
+        ExpectContains(content, ".specs/README.md", relativePath, "spec-import generated skill reference");
+        ExpectSkillReferences(content, relativePath, "spec-lint", "spec-normalize-current");
+    }
+}
+
+void ExpectNoLegacySpecImportReportGuidance()
+{
     var forbidden = new[]
     {
         "For non-trivial imports, create or update `.specs/import-report.md`",
-        "Use `spec-normalize-current` for focused normalization of existing current specs after import",
         "Write an import report for non-trivial imports."
     };
 
-    foreach (var relativePath in skillPaths)
+    foreach (var relativePath in GeneratedSkillPaths("spec-import"))
     {
-        var fullPath = Path.Combine(repoRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
-        if (!File.Exists(fullPath))
-        {
-            failures.Add($"Missing spec-import generated skill for contract check: {relativePath}");
-            continue;
-        }
-
-        var content = File.ReadAllText(fullPath);
-        foreach (var text in required)
-        {
-            if (!content.Contains(text, StringComparison.Ordinal))
-            {
-                failures.Add($"spec-import generated skill is missing required text '{text}': {relativePath}");
-            }
-        }
-
+        var content = ReadRequiredGeneratedFile(relativePath);
         foreach (var text in forbidden)
         {
-            if (content.Contains(text, StringComparison.Ordinal))
-            {
-                failures.Add($"spec-import generated skill contains obsolete text '{text}': {relativePath}");
-            }
+            ExpectDoesNotContain(content, text, relativePath, "legacy spec-import report guidance");
         }
     }
 }
 
-void ExpectSpecBrainstormBoundaryContract()
+void ExpectSpecBrainstormGeneratedShape()
 {
-    var skillPaths = new[]
+    var sections = new[]
     {
-        "generated/codex/.agents/skills/spec-brainstorm/SKILL.md",
-        "generated/claude/.claude/skills/spec-brainstorm/SKILL.md",
-        "generated/copilot/.github/skills/spec-brainstorm/SKILL.md"
+        "## Purpose",
+        "## When to use this skill",
+        "## When not to use this skill",
+        "## Boundaries",
+        "## Relationship to other skills",
+        "## Customer discovery questions",
+        "## Output formats",
+        "## Rules",
+        "## Examples",
+        "## Non-goals"
     };
 
-    var required = new[]
+    var relatedSkills = new[]
     {
-        "spec-brainstorm = proposed solution + customer discovery + intent clarification + simplification options",
-        "This skill clarifies intent. It does not update specifications, design architecture, or implement code.",
-        "`spec-brainstorm` never edits files.",
-        "If the user confirms a product direction and asks to persist it, stop and hand",
-        "off to `spec-change`.",
-        "Do not load the whole `.specs/` tree.",
-        "## Handoff To `spec-change`",
-        "Do not automatically continue into `spec-change`.",
-        "without editing specs, planning implementation, or writing code",
-        "After the product intent is confirmed, use `spec-change`",
-        "the relevant current specification is already clear and the user asks to implement it"
+        "spec-change",
+        "spec-new-document",
+        "spec-implement",
+        "spec-check-implementation",
+        "spec-update-from-implementation",
+        "spec-normalize-current",
+        "spec-audit",
+        "spec-lint",
+        "spec-import"
     };
 
-    var forbidden = new[]
+    foreach (var relativePath in GeneratedSkillPaths("spec-brainstorm"))
     {
-        "does not edit files by default",
-        "without editing specs or discussing implementation",
-        "Implement the code",
-        "Update `.specs/` directly",
-        "Create the new spec",
-        "Design the architecture"
-    };
-
-    foreach (var relativePath in skillPaths)
-    {
-        var fullPath = Path.Combine(repoRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
-        if (!File.Exists(fullPath))
-        {
-            failures.Add($"Missing spec-brainstorm generated skill for contract check: {relativePath}");
-            continue;
-        }
-
-        var content = File.ReadAllText(fullPath);
-        foreach (var text in required)
-        {
-            if (!content.Contains(text, StringComparison.Ordinal))
-            {
-                failures.Add($"spec-brainstorm generated skill is missing required text '{text}': {relativePath}");
-            }
-        }
-
-        foreach (var text in forbidden)
-        {
-            if (content.Contains(text, StringComparison.Ordinal))
-            {
-                failures.Add($"spec-brainstorm generated skill contains forbidden text '{text}': {relativePath}");
-            }
-        }
+        var content = ReadRequiredGeneratedFile(relativePath);
+        ExpectSections(content, relativePath, sections);
+        ExpectSkillReferences(content, relativePath, relatedSkills);
+        ExpectFencedBlockBetween(content, relativePath, "## Output formats", "## Rules");
     }
 }
 
-void ExpectSpecBrainstormRoutingGuidance()
+void ExpectEntryPointSkillRoutingShape()
 {
-    var required = new[]
-    {
-        "For a new feature or behavior change with unclear,",
-        "implementation-shaped, over-specified, or likely simpler intent:",
-        "use `spec-brainstorm` before `spec-change`.",
-        "When the user asks to implement behavior already described in",
-        "`.specs/`: use `spec-implement`, then `spec-check-implementation`.",
-        "Do not use `spec-brainstorm` when current specs are already clear",
-        "When the user asks to change product behavior: use `spec-change`,"
-    };
-
     foreach (var relativePath in EntryPoints().Where(path => !path.Contains("/gemini/", StringComparison.Ordinal)))
     {
-        var fullPath = Path.Combine(repoRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
-        var content = File.ReadAllText(fullPath);
-        foreach (var text in required)
-        {
-            if (!content.Contains(text, StringComparison.Ordinal))
-            {
-                failures.Add($"Entry point is missing spec-brainstorm routing text '{text}': {relativePath}");
-            }
-        }
+        var content = ReadRequiredGeneratedFile(relativePath);
+        ExpectSections(content, relativePath, "## IDD Workflow Routing");
+        ExpectSkillReferences(content, relativePath, "spec-brainstorm", "spec-change", "spec-implement", "spec-check-implementation");
     }
 }
 
@@ -578,9 +605,9 @@ void ExpectNpmInstallEntryFull()
         if (File.Exists(entryPath))
         {
             var content = File.ReadAllText(entryPath);
-            if (!content.Contains("Specifications should be complete enough to rebuild the product from scratch", StringComparison.Ordinal))
+            if (!content.Contains("# Intent-Driven Development", StringComparison.Ordinal))
             {
-                failures.Add("npm install with --entry full did not include canonical methodology content.");
+                failures.Add("npm install with --entry full did not include the full-entry methodology marker.");
             }
         }
 
