@@ -24,6 +24,7 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
             return command switch
             {
                 "list-targets" => ListTargets(),
+                "list-packs" => ListPacks(),
                 "version" => PrintVersion(),
                 "init" => Init(),
                 "install" => Install(),
@@ -42,9 +43,10 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         Console.WriteLine("""
             Usage:
               intent-driven-development init [--force]
-              intent-driven-development install --target <target> [--entry minimal|none|full] [--force]
-              intent-driven-development install --all [--entry minimal|none|full] [--force]
+              intent-driven-development install --target <target> [--pack <pack>]... [--entry minimal|none|full] [--force]
+              intent-driven-development install --all [--pack <pack>]... [--entry minimal|none|full] [--force]
               intent-driven-development list-targets
+              intent-driven-development list-packs
               intent-driven-development version
             """);
     }
@@ -54,6 +56,16 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         foreach (var target in ReadManifest().Targets)
         {
             Console.WriteLine(target);
+        }
+
+        return 0;
+    }
+
+    private int ListPacks()
+    {
+        foreach (var pack in ReadManifest().Packs.Keys.OrderBy(name => name, StringComparer.Ordinal))
+        {
+            Console.WriteLine(pack);
         }
 
         return 0;
@@ -94,13 +106,14 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
     private int Install()
     {
         var commandArgs = args.Skip(1).ToArray();
-        EnsureNoUnknownOptions(commandArgs, "--target", "--all", "--entry", "--force");
+        EnsureNoUnknownOptions(commandArgs, "--target", "--all", "--entry", "--force", "--pack");
 
         var manifest = ReadManifest();
         var force = commandArgs.Contains("--force", StringComparer.Ordinal);
         var installAll = commandArgs.Contains("--all", StringComparer.Ordinal);
         var target = ValueAfter(commandArgs, "--target");
         var entryMode = ParseEntryMode(ValueAfter(commandArgs, "--entry"));
+        var selectedPacks = ResolvePacks(manifest, ValuesAfter(commandArgs, "--pack"));
 
         if (installAll && target is not null)
         {
@@ -114,9 +127,13 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
 
         var targets = installAll ? manifest.Targets : [ValidateTarget(manifest, target!)];
         ValidateEntryModeCapabilities(manifest, targets, entryMode, installAll);
-        var plannedFiles = CollectTargetFiles(manifest, targets, entryMode);
+        ValidatePackTargetCapabilities(manifest, targets, selectedPacks);
+        var plannedFiles = CollectTargetFiles(manifest, targets, entryMode, selectedPacks);
         CopyPlannedFiles(plannedFiles, Directory.GetCurrentDirectory(), force);
-        Console.WriteLine($"Installed {string.Join(", ", targets)} with {FormatEntryMode(entryMode)} entry.");
+        var packText = IsDefaultPackSelection(manifest, selectedPacks)
+            ? ""
+            : $" and packs: {string.Join(", ", selectedPacks)}";
+        Console.WriteLine($"Installed {string.Join(", ", targets)} with {FormatEntryMode(entryMode)} entry{packText}.");
         return 0;
     }
 
@@ -242,10 +259,143 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         return capabilities.SupportsSkills;
     }
 
-    private static IReadOnlyList<PlannedFile> CollectTargetFiles(Manifest manifest, IEnumerable<string> targets, EntryMode entryMode)
+    private static IReadOnlyList<string> ResolvePacks(Manifest manifest, IReadOnlyList<string> requestedPacks)
+    {
+        ValidatePackManifest(manifest);
+        var selected = new HashSet<string>(StringComparer.Ordinal);
+
+        if (requestedPacks.Count == 0)
+        {
+            foreach (var (packName, pack) in manifest.Packs)
+            {
+                if (pack.Default)
+                {
+                    AddPackWithDependencies(manifest, packName, selected);
+                }
+            }
+        }
+        else
+        {
+            foreach (var packName in requestedPacks.Distinct(StringComparer.Ordinal))
+            {
+                if (!manifest.Packs.ContainsKey(packName))
+                {
+                    throw new ToolException($"Unknown pack: {packName}" + Environment.NewLine + $"Available packs: {string.Join(", ", manifest.Packs.Keys.OrderBy(name => name, StringComparer.Ordinal))}");
+                }
+
+                AddPackWithDependencies(manifest, packName, selected);
+            }
+        }
+
+        return selected.OrderBy(name => name, StringComparer.Ordinal).ToArray();
+    }
+
+    private static void AddPackWithDependencies(Manifest manifest, string packName, HashSet<string> selected)
+    {
+        foreach (var dependency in manifest.Packs[packName].Requires)
+        {
+            AddPackWithDependencies(manifest, dependency, selected);
+        }
+
+        selected.Add(packName);
+    }
+
+    private static bool IsDefaultPackSelection(Manifest manifest, IReadOnlyList<string> selectedPacks)
+    {
+        var defaultPacks = manifest.Packs
+            .Where(item => item.Value.Default)
+            .Select(item => item.Key)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        return defaultPacks.SequenceEqual(selectedPacks.OrderBy(name => name, StringComparer.Ordinal), StringComparer.Ordinal);
+    }
+
+    private static void ValidatePackTargetCapabilities(Manifest manifest, IReadOnlyList<string> targets, IReadOnlyList<string> selectedPacks)
+    {
+        var selectedSkills = SelectedSkills(manifest, selectedPacks);
+        if (selectedSkills.Count == 0)
+        {
+            return;
+        }
+
+        var incompatible = targets
+            .Where(target => !SupportsGeneratedSkills(manifest, target))
+            .ToArray();
+
+        if (incompatible.Length > 0 && selectedPacks.Contains("factory", StringComparer.Ordinal))
+        {
+            throw new ToolException($"Factory pack requires generated skills. Unsupported targets: {string.Join(", ", incompatible)}.");
+        }
+    }
+
+    private static void ValidatePackManifest(Manifest manifest)
+    {
+        foreach (var (packName, pack) in manifest.Packs)
+        {
+            foreach (var dependency in pack.Requires)
+            {
+                if (!manifest.Packs.ContainsKey(dependency))
+                {
+                    throw new ToolException($"Pack '{packName}' requires unknown pack '{dependency}'.");
+                }
+            }
+        }
+
+        foreach (var packName in manifest.Packs.Keys)
+        {
+            ValidatePackDependencyAcyclic(manifest, packName, [], []);
+        }
+    }
+
+    private static void ValidatePackDependencyAcyclic(
+        Manifest manifest,
+        string packName,
+        HashSet<string> visiting,
+        HashSet<string> visited)
+    {
+        if (visited.Contains(packName))
+        {
+            return;
+        }
+
+        if (!visiting.Add(packName))
+        {
+            throw new ToolException($"Pack dependency cycle includes '{packName}'.");
+        }
+
+        foreach (var dependency in manifest.Packs[packName].Requires)
+        {
+            ValidatePackDependencyAcyclic(manifest, dependency, visiting, visited);
+        }
+
+        visiting.Remove(packName);
+        visited.Add(packName);
+    }
+
+    private static HashSet<string> SelectedSkills(Manifest manifest, IReadOnlyList<string> selectedPacks)
+    {
+        var selectedSkills = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var packName in selectedPacks)
+        {
+            foreach (var skill in manifest.Packs[packName].Skills)
+            {
+                selectedSkills.Add(skill);
+            }
+        }
+
+        return selectedSkills;
+    }
+
+    private static IReadOnlyList<PlannedFile> CollectTargetFiles(
+        Manifest manifest,
+        IEnumerable<string> targets,
+        EntryMode entryMode,
+        IReadOnlyList<string> selectedPacks)
     {
         var contentRoot = FindContentRoot();
         var byRelativePath = new Dictionary<string, PlannedFile>(StringComparer.Ordinal);
+        var selectedSkills = SelectedSkills(manifest, selectedPacks);
 
         foreach (var target in targets)
         {
@@ -258,9 +408,14 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
             foreach (var sourcePath in Directory.GetFiles(sourceRoot, "*", SearchOption.AllDirectories))
             {
                 var relativePath = Normalize(Path.GetRelativePath(sourceRoot, sourcePath));
-                if (entryMode != EntryMode.Minimal &&
-                    manifest.EntryPoints.TryGetValue(target, out var entryPoint) &&
+                if (manifest.EntryPoints.TryGetValue(target, out var entryPoint) &&
                     StringComparer.Ordinal.Equals(relativePath, Normalize(entryPoint)))
+                {
+                    continue;
+                }
+
+                if (TryGetGeneratedSkillName(relativePath, out var skillName) &&
+                    !selectedSkills.Contains(skillName))
                 {
                     continue;
                 }
@@ -281,9 +436,9 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
                 byRelativePath.Add(relativePath, new PlannedFile(relativePath, content, hash));
             }
 
-            if (entryMode == EntryMode.Full)
+            if (entryMode != EntryMode.None)
             {
-                var fullEntry = BuildFullEntry(contentRoot, manifest, target);
+                var fullEntry = BuildEntry(contentRoot, manifest, target, entryMode, selectedPacks);
                 if (byRelativePath.TryGetValue(fullEntry.RelativePath, out var existing))
                 {
                     if (!StringComparer.Ordinal.Equals(existing.Hash, fullEntry.Hash))
@@ -298,12 +453,17 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
             }
         }
 
-        var projectFilesRoot = Path.Combine(contentRoot, "src", "canonical", "project-files", "specs");
-        if (Directory.Exists(projectFilesRoot))
+        foreach (var projectFile in selectedPacks.SelectMany(pack => manifest.Packs[pack].ProjectFiles))
         {
+            var projectFilesRoot = Path.Combine(contentRoot, projectFile.Source);
+            if (!Directory.Exists(projectFilesRoot))
+            {
+                throw new ToolException($"Bundled project files not found: {projectFile.Source}");
+            }
+
             foreach (var sourcePath in Directory.GetFiles(projectFilesRoot, "*", SearchOption.AllDirectories))
             {
-                var relativePath = Normalize(Path.Combine(".specs", Path.GetRelativePath(projectFilesRoot, sourcePath)));
+                var relativePath = Normalize(Path.Combine(projectFile.Destination, Path.GetRelativePath(projectFilesRoot, sourcePath)));
                 var content = File.ReadAllBytes(sourcePath);
                 var plannedFile = new PlannedFile(relativePath, content, Sha256(content));
 
@@ -324,26 +484,107 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         return byRelativePath.Values.ToArray();
     }
 
-    private static PlannedFile BuildFullEntry(string contentRoot, Manifest manifest, string target)
+    private static bool TryGetGeneratedSkillName(string relativePath, out string skillName)
+    {
+        var parts = Normalize(relativePath).Split('/');
+        for (var index = 0; index < parts.Length - 1; index++)
+        {
+            if (StringComparer.Ordinal.Equals(parts[index], "skills") && index + 1 < parts.Length)
+            {
+                skillName = parts[index + 1];
+                return true;
+            }
+        }
+
+        skillName = "";
+        return false;
+    }
+
+    private static PlannedFile BuildEntry(
+        string contentRoot,
+        Manifest manifest,
+        string target,
+        EntryMode entryMode,
+        IReadOnlyList<string> selectedPacks)
     {
         if (!manifest.EntryPoints.TryGetValue(target, out var entryPoint))
         {
             throw new ToolException($"No entry point configured for target: {target}");
         }
 
-        var blocks = new[]
+        var blocks = new List<string>
         {
             ReadRequired(Path.Combine(contentRoot, "src", "adapters", target, "entry.md")),
             ReadRequired(Path.Combine(contentRoot, "src", "canonical", "packs", "intent-driven-development.md"))
-                .Replace("{{skillGuidance}}", "Use the generated IDD skills when they are available for the target.", StringComparison.Ordinal)
-                .Replace("{{workflowGuidance}}", "This file and installed IDD skills are workflow guidance.\nThey are not product specifications.", StringComparison.Ordinal),
-            ReadCanonicalMethodology(contentRoot)
+                .Replace("{{skillGuidance}}", BuildSkillGuidance(manifest, target, selectedPacks), StringComparison.Ordinal)
+                .Replace("{{workflowGuidance}}", BuildWorkflowGuidance(manifest, target), StringComparison.Ordinal)
         };
+
+        if (entryMode == EntryMode.Full)
+        {
+            blocks.Add(ReadCanonicalMethodology(contentRoot));
+        }
 
         var content = string.Join(Environment.NewLine + Environment.NewLine, blocks.Select(block => block.Trim())) + Environment.NewLine;
         var bytes = System.Text.Encoding.UTF8.GetBytes(content);
         return new PlannedFile(Normalize(entryPoint), bytes, Sha256(bytes));
     }
+
+    private static string BuildSkillGuidance(Manifest manifest, string target, IReadOnlyList<string> selectedPacks)
+    {
+        if (!SupportsGeneratedSkills(manifest, target))
+        {
+            return """
+                This target does not use generated IDD skills. Keep IDD work focused and
+                read only the documents needed for the current task.
+                """;
+        }
+
+        var selectedSkills = SelectedSkills(manifest, selectedPacks)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .Select(name => $"- `{name}`");
+        var blocks = new List<string>
+        {
+            "Use installed IDD skills for specific workflows:" + Environment.NewLine + string.Join(Environment.NewLine, selectedSkills),
+            """
+            ## IDD Workflow Routing
+
+            Use `spec-brainstorm` when product intent is unclear.
+            Use `spec-change` when durable product behavior must change.
+            Use `spec-implement` for one focused behavior already covered by
+            `.specs/`, then use `spec-check-implementation`.
+            Use `spec-new-document` only for a new durable product area, ADR, or
+            spike.
+            """
+        };
+
+        if (selectedPacks.Contains("factory", StringComparer.Ordinal))
+        {
+            blocks.Add("""
+                ## IDD Factory Routing
+
+                Use factory skills only for planned implementation orchestration,
+                multi-step execution, task slicing, or agentic factory-style work.
+
+                - Use `factory-create-work-plan` to create a temporary Factory Work Plan.
+                - Use `factory-execute-work-plan` to execute an explicit Factory Work Plan.
+                - Use `factory-review-task` after each bounded task.
+                - Use `factory-review-work-result` after all tasks are complete.
+                - Use `factory-finish-work` to summarize and clean temporary factory artifacts.
+
+                Factory work plans are temporary execution state.
+                They are not specs and must not be stored in `.specs/`.
+                Do not read old factory work plans unless the user explicitly provides the exact path.
+                """);
+        }
+
+        return string.Join(Environment.NewLine + Environment.NewLine, blocks.Select(block => block.Trim()));
+    }
+
+    private static string BuildWorkflowGuidance(Manifest manifest, string target) =>
+        SupportsGeneratedSkills(manifest, target)
+            ? "This file and installed IDD skills are workflow guidance.\nThey are not product specifications."
+            : "This file is workflow guidance.\nIt is not a product specification.";
 
     private static string ReadCanonicalMethodology(string contentRoot)
     {
@@ -420,7 +661,7 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
                 throw new ToolException($"Unknown option: {arg}");
             }
 
-            if (arg is "--target" or "--entry")
+            if (arg is "--target" or "--entry" or "--pack")
             {
                 index++;
             }
@@ -441,6 +682,28 @@ internal sealed class IntentDrivenDevelopmentTool(string[] args)
         }
 
         return commandArgs[index + 1];
+    }
+
+    private static IReadOnlyList<string> ValuesAfter(IReadOnlyList<string> commandArgs, string option)
+    {
+        var values = new List<string>();
+        for (var index = 0; index < commandArgs.Count; index++)
+        {
+            if (!StringComparer.Ordinal.Equals(commandArgs[index], option))
+            {
+                continue;
+            }
+
+            if (index + 1 >= commandArgs.Count || commandArgs[index + 1].StartsWith("--", StringComparison.Ordinal))
+            {
+                throw new ToolException($"Missing value for {option}.");
+            }
+
+            values.Add(commandArgs[index + 1]);
+            index++;
+        }
+
+        return values;
     }
 
     private static string ReadRequired(string path) =>
@@ -465,9 +728,20 @@ internal sealed record Manifest(
     string GeneratedRoot,
     string[] Targets,
     Dictionary<string, string> EntryPoints,
-    Dictionary<string, TargetCapabilities> TargetCapabilities);
+    Dictionary<string, TargetCapabilities> TargetCapabilities,
+    Dictionary<string, PackDefinition> Packs);
 
 internal sealed record TargetCapabilities(bool SupportsSkills);
+
+internal sealed record PackDefinition(
+    string Description,
+    bool Default,
+    string[] Requires,
+    string[] Skills,
+    string[] Agents,
+    ProjectFileDefinition[] ProjectFiles);
+
+internal sealed record ProjectFileDefinition(string Source, string Destination);
 
 internal sealed record PlannedFile(string RelativePath, byte[] Content, string Hash);
 

@@ -21,7 +21,24 @@ In this project, a specification is the description of the product we want to ha
 
 This project provides the **Intent-Driven Development** methodology and a set of supporting skills for different AI coding agents.
 
-The skills help agents create, review, reconcile, import, and index specifications without turning them into task logs.
+The core skills help agents create, review, reconcile, import, implement, and
+index specifications without turning them into task logs.
+
+Core IDD is the default install. It owns durable product intent in `.specs/`.
+
+An optional `factory` pack adds temporary execution orchestration for planned
+implementation work:
+
+```bash
+intent-driven-development install --target codex --pack factory
+```
+
+Factory work artifacts live under `.idd/factory/work/`, are ignored by git by
+default, and should be deleted after the task unless explicitly kept or
+committed. Factory work plans are not specifications; durable product intent
+belongs in `.specs/`. Future task-system integrations may use external work
+item providers, but no Jira, GitHub Issues, or persistent task database is
+implemented now.
 
 ## Why not just Spec-Driven Development?
 

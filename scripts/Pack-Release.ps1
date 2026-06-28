@@ -71,6 +71,13 @@ function Write-Manifest([string]$Path) {
             }
         }
 
+    $packManifestPath = Join-Path $repoRoot "src/canonical/packs/pack-manifest.json"
+    if (-not (Test-Path -LiteralPath $packManifestPath)) {
+        throw "Pack manifest not found: $packManifestPath"
+    }
+
+    $packManifest = Get-Content -LiteralPath $packManifestPath -Raw | ConvertFrom-Json
+
     $manifest = [ordered]@{
         name = "Intent-Driven Development"
         version = $Version
@@ -79,6 +86,7 @@ function Write-Manifest([string]$Path) {
         targets = $targets
         entryPoints = $entryPoints
         targetCapabilities = $targetCapabilities
+        packs = $packManifest.packs
     }
 
     $json = $manifest | ConvertTo-Json -Depth 10

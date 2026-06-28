@@ -9,10 +9,10 @@ var toolDll = Path.Combine(repoRoot, "tools", "idd-tool", "bin", "Debug", "net10
 RunGenerator();
 
 ExpectFile("generated/codex/AGENTS.md");
-ExpectSkillFiles("generated/codex/.agents/skills");
+ExpectAllSkillFiles("generated/codex/.agents/skills");
 
 ExpectFile("generated/claude/CLAUDE.md");
-ExpectSkillFiles("generated/claude/.claude/skills");
+ExpectAllSkillFiles("generated/claude/.claude/skills");
 
 ExpectFile("generated/gemini/GEMINI.md");
 ExpectNoDirectory("generated/gemini/.agents");
@@ -20,7 +20,7 @@ ExpectNoDirectory("generated/gemini/.claude");
 ExpectNoDirectory("generated/gemini/.github/skills");
 
 ExpectFile("generated/copilot/.github/copilot-instructions.md");
-ExpectSkillFiles("generated/copilot/.github/skills");
+ExpectAllSkillFiles("generated/copilot/.github/skills");
 
 ExpectNoGeneratedHeaderComments();
 ExpectNoGeneratedText("Worklog-driven development");
@@ -36,14 +36,27 @@ ExpectSpecImportGeneratedShape();
 ExpectNoLegacySpecImportReportGuidance();
 ExpectSpecBrainstormGeneratedShape();
 ExpectEntryPointSkillRoutingShape();
+ExpectPackManifestShape();
+ExpectFactoryGeneratedShape();
+ExpectFactoryAgentReferences();
+ExpectFactorySkillShapes();
+ExpectListPacks();
+ExpectDefaultInstallCoreOnly();
+ExpectFactoryInstall();
+ExpectFactoryUnsupportedTargetRejected();
 ExpectInstallEntryNone();
 ExpectInstallGeminiEntryNoneRejected();
 ExpectInstallAllAfterInit();
 ExpectNpmListTargets();
+ExpectNpmListPacks();
 ExpectNpmInstallDefaultMinimal();
+ExpectNpmInstallDefaultCoreOnly();
+ExpectNpmInstallFactory();
 ExpectNpmInstallEntryNone();
 ExpectNpmInstallEntryFull();
 ExpectNpmRejectsGeminiEntryNone();
+ExpectNpmRejectsFactoryForGemini();
+ExpectNpmRejectsUnknownPack();
 ExpectNpmRejectsUnknownEntryMode();
 ExpectGeneratorCheckPasses();
 ExpectSecondRunStable();
@@ -77,10 +90,15 @@ void ExpectNoDirectory(string relativePath)
     }
 }
 
-void ExpectSkillFiles(string skillsRoot)
+void ExpectAllSkillFiles(string skillsRoot)
 {
     var expected = new[]
     {
+        "factory-create-work-plan",
+        "factory-execute-work-plan",
+        "factory-finish-work",
+        "factory-review-task",
+        "factory-review-work-result",
         "spec-audit",
         "spec-brainstorm",
         "spec-change",
@@ -266,7 +284,7 @@ void ExpectNoFullMethodologyInEntryPoints()
 void ExpectAllSkillsGenerated()
 {
     var canonicalSkills = Directory
-        .GetFiles(Path.Combine(repoRoot, "src", "canonical", "skills"), "spec-*.md")
+        .GetFiles(Path.Combine(repoRoot, "src", "canonical", "skills"), "*.md")
         .Select(Path.GetFileNameWithoutExtension)
         .OrderBy(name => name)
         .ToArray();
@@ -291,6 +309,112 @@ void ExpectAllSkillsGenerated()
         {
             failures.Add($"Generated skills do not match canonical skills: {root}");
         }
+    }
+}
+
+void ExpectPackManifestShape()
+{
+    var content = File.ReadAllText(Path.Combine(repoRoot, "src/canonical/packs/pack-manifest.json"));
+    ExpectContains(content, "\"core\"", "src/canonical/packs/pack-manifest.json", "pack manifest");
+    ExpectContains(content, "\"factory\"", "src/canonical/packs/pack-manifest.json", "pack manifest");
+    ExpectContains(content, "\"requires\"", "src/canonical/packs/pack-manifest.json", "pack manifest");
+    ExpectContains(content, "\"projectFiles\"", "src/canonical/packs/pack-manifest.json", "pack manifest");
+
+    foreach (var skillPath in Directory.GetFiles(Path.Combine(repoRoot, "src", "canonical", "skills"), "*.md"))
+    {
+        var skillName = Path.GetFileNameWithoutExtension(skillPath);
+        var matches = 0;
+        foreach (var packSkill in new[] { content })
+        {
+            if (packSkill.Contains($"\"{skillName}\"", StringComparison.Ordinal))
+            {
+                matches++;
+            }
+        }
+
+        if (matches != 1)
+        {
+            failures.Add($"Canonical skill is not owned by exactly one pack: {skillName}");
+        }
+    }
+
+    foreach (var agent in new[] { "factory-coordinator", "implementation-planner", "implementer", "task-reviewer", "final-reviewer" })
+    {
+        ExpectFile($"src/canonical/agents/{agent}.md");
+        ExpectContains(content, $"\"{agent}\"", "src/canonical/packs/pack-manifest.json", "pack manifest agent");
+    }
+}
+
+void ExpectFactoryGeneratedShape()
+{
+    foreach (var relativePath in GeneratedSkillPaths("factory-create-work-plan")
+        .Concat(GeneratedSkillPaths("factory-execute-work-plan"))
+        .Concat(GeneratedSkillPaths("factory-review-task"))
+        .Concat(GeneratedSkillPaths("factory-review-work-result"))
+        .Concat(GeneratedSkillPaths("factory-finish-work")))
+    {
+        ExpectFile(relativePath);
+    }
+}
+
+void ExpectFactoryAgentReferences()
+{
+    var roots = new[]
+    {
+        "generated/codex/.agents/skills",
+        "generated/claude/.claude/skills",
+        "generated/copilot/.github/skills"
+    };
+    var factorySkills = new[]
+    {
+        "factory-create-work-plan",
+        "factory-execute-work-plan",
+        "factory-review-task",
+        "factory-review-work-result",
+        "factory-finish-work"
+    };
+    var agents = new[] { "factory-coordinator", "implementation-planner", "implementer", "task-reviewer", "final-reviewer" };
+
+    foreach (var root in roots)
+    {
+        foreach (var skill in factorySkills)
+        {
+            foreach (var agent in agents)
+            {
+                ExpectFile($"{root}/{skill}/references/agents/{agent}.md");
+            }
+        }
+    }
+}
+
+void ExpectFactorySkillShapes()
+{
+    foreach (var relativePath in GeneratedSkillPaths("factory-create-work-plan"))
+    {
+        var content = ReadRequiredGeneratedFile(relativePath);
+        ExpectSections(content, relativePath, "## Purpose", "## Rules", "## Workflow", "## Output Format");
+        ExpectContains(content, ".idd/factory/work/", relativePath, "factory-create-work-plan");
+        ExpectContains(content, "not product intent", relativePath, "factory-create-work-plan");
+        ExpectContains(content, "not a specification", relativePath, "factory-create-work-plan");
+        ExpectContains(content, "Do not read old factory work plans", relativePath, "factory-create-work-plan");
+    }
+
+    foreach (var relativePath in GeneratedSkillPaths("factory-execute-work-plan"))
+    {
+        var content = ReadRequiredGeneratedFile(relativePath);
+        ExpectContains(content, "explicit work plan", relativePath, "factory-execute-work-plan");
+        ExpectContains(content, "factory-review-task", relativePath, "factory-execute-work-plan");
+        ExpectContains(content, "factory-review-work-result", relativePath, "factory-execute-work-plan");
+        ExpectContains(content, "factory-finish-work", relativePath, "factory-execute-work-plan");
+        ExpectContains(content, "Do not search for old work plans", relativePath, "factory-execute-work-plan");
+    }
+
+    foreach (var relativePath in GeneratedSkillPaths("factory-finish-work"))
+    {
+        var content = ReadRequiredGeneratedFile(relativePath);
+        ExpectContains(content, "Temporary Artifact Cleanup", relativePath, "factory-finish-work");
+        ExpectContains(content, "Delete", relativePath, "factory-finish-work");
+        ExpectContains(content, ".idd/factory/work/", relativePath, "factory-finish-work");
     }
 }
 
@@ -442,6 +566,120 @@ void ExpectGeneratorCheckPasses()
     }
 }
 
+void ExpectListPacks()
+{
+    var result = RunProcessResult("dotnet", $"exec \"{toolDll}\" list-packs");
+    var expected = string.Join(Environment.NewLine, new[] { "core", "factory" });
+    var actual = result.StandardOutput.Trim().ReplaceLineEndings(Environment.NewLine);
+
+    if (result.ExitCode != 0)
+    {
+        failures.Add("list-packs failed.");
+    }
+
+    if (!StringComparer.Ordinal.Equals(actual, expected))
+    {
+        failures.Add($"list-packs returned unexpected output: {actual}");
+    }
+}
+
+void ExpectDefaultInstallCoreOnly()
+{
+    WithToolInstall("install --target claude", installRoot =>
+    {
+        ExpectTempFile(installRoot, "CLAUDE.md", "default install did not create CLAUDE.md.");
+        ExpectTempFile(installRoot, ".claude/skills/spec-new-document/SKILL.md", "default install did not install core skill.");
+        ExpectTempFile(installRoot, ".specs/README.md", "default install did not install .specs.");
+
+        if (File.Exists(Path.Combine(installRoot, ".claude/skills/factory-create-work-plan/SKILL.md".Replace('/', Path.DirectorySeparatorChar))))
+        {
+            failures.Add("default install installed factory skills.");
+        }
+
+        var entry = File.ReadAllText(Path.Combine(installRoot, "CLAUDE.md"));
+        if (entry.Contains("IDD Factory Routing", StringComparison.Ordinal))
+        {
+            failures.Add("default install entry mentions factory routing.");
+        }
+    });
+}
+
+void ExpectFactoryInstall()
+{
+    foreach (var target in new[] { "claude", "codex" })
+    {
+        WithToolInstall($"install --target {target} --pack factory", installRoot =>
+        {
+            var skillRoot = target == "claude" ? ".claude/skills" : ".agents/skills";
+            var entry = target == "claude" ? "CLAUDE.md" : "AGENTS.md";
+            ExpectTempFile(installRoot, $"{skillRoot}/spec-new-document/SKILL.md", $"factory install for {target} did not install core skill.");
+            ExpectTempFile(installRoot, $"{skillRoot}/factory-create-work-plan/SKILL.md", $"factory install for {target} did not install factory skill.");
+            ExpectTempFile(installRoot, ".idd/factory/.gitignore", $"factory install for {target} did not install factory .gitignore.");
+
+            if (Directory.Exists(Path.Combine(installRoot, ".idd/factory/work".Replace('/', Path.DirectorySeparatorChar))))
+            {
+                failures.Add($"factory install for {target} created work directory.");
+            }
+
+            var entryContent = File.ReadAllText(Path.Combine(installRoot, entry));
+            ExpectContains(entryContent, "IDD Factory Routing", entry, "factory install entry");
+            ExpectContains(entryContent, "factory-create-work-plan", entry, "factory install entry");
+        });
+    }
+}
+
+void ExpectFactoryUnsupportedTargetRejected()
+{
+    var tempRoot = Path.Combine(Path.GetTempPath(), "idd-smoke-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(tempRoot);
+
+    try
+    {
+        var result = RunProcessResult("dotnet", $"exec \"{toolDll}\" install --target gemini --pack factory", tempRoot);
+        if (result.ExitCode == 0)
+        {
+            failures.Add("Factory install for Gemini succeeded unexpectedly.");
+        }
+
+        if (!result.StandardError.Contains("Factory pack requires generated skills", StringComparison.Ordinal))
+        {
+            failures.Add("Factory install for Gemini did not report unsupported generated skills.");
+        }
+    }
+    finally
+    {
+        if (Directory.Exists(tempRoot))
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+}
+
+void WithToolInstall(string arguments, Action<string> assertions)
+{
+    var installRoot = Path.Combine(Path.GetTempPath(), "idd-smoke-install-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(installRoot);
+
+    try
+    {
+        var result = RunProcessResult("dotnet", $"exec \"{toolDll}\" {arguments}", installRoot);
+        if (result.ExitCode != 0)
+        {
+            failures.Add($"{arguments} failed.");
+            return;
+        }
+
+        assertions(installRoot);
+    }
+    finally
+    {
+        if (Directory.Exists(installRoot))
+        {
+            Directory.Delete(installRoot, recursive: true);
+        }
+    }
+}
+
 void ExpectInstallEntryNone()
 {
     var tempRoot = Path.Combine(Path.GetTempPath(), "idd-smoke-" + Guid.NewGuid().ToString("N"));
@@ -572,6 +810,27 @@ void ExpectNpmListTargets()
     });
 }
 
+void ExpectNpmListPacks()
+{
+    WithNpmFixture(fixtureRoot =>
+    {
+        var script = Path.Combine(fixtureRoot, "bin", "intent-driven-development.js");
+        var result = RunProcessResult("node", $"\"{script}\" list-packs", fixtureRoot);
+        var expected = string.Join(Environment.NewLine, new[] { "core", "factory" });
+        var actual = result.StandardOutput.Trim().ReplaceLineEndings(Environment.NewLine);
+
+        if (result.ExitCode != 0)
+        {
+            failures.Add("npm list-packs failed.");
+        }
+
+        if (!StringComparer.Ordinal.Equals(actual, expected))
+        {
+            failures.Add($"npm list-packs returned unexpected output: {actual}");
+        }
+    });
+}
+
 void ExpectNpmInstallDefaultMinimal()
 {
     WithNpmInstall("install --target claude", installRoot =>
@@ -579,6 +838,41 @@ void ExpectNpmInstallDefaultMinimal()
         ExpectTempFile(installRoot, "CLAUDE.md", "npm default minimal install did not create CLAUDE.md.");
         ExpectTempFile(installRoot, ".claude/skills/spec-new-document/SKILL.md", "npm default minimal install did not install skills.");
         ExpectTempFile(installRoot, ".specs/README.md", "npm default minimal install did not install .specs.");
+    });
+}
+
+void ExpectNpmInstallDefaultCoreOnly()
+{
+    WithNpmInstall("install --target claude", installRoot =>
+    {
+        if (File.Exists(Path.Combine(installRoot, ".claude/skills/factory-create-work-plan/SKILL.md".Replace('/', Path.DirectorySeparatorChar))))
+        {
+            failures.Add("npm default install installed factory skills.");
+        }
+
+        var entry = File.ReadAllText(Path.Combine(installRoot, "CLAUDE.md"));
+        if (entry.Contains("IDD Factory Routing", StringComparison.Ordinal))
+        {
+            failures.Add("npm default install entry mentions factory routing.");
+        }
+    });
+}
+
+void ExpectNpmInstallFactory()
+{
+    WithNpmInstall("install --target codex --pack factory", installRoot =>
+    {
+        ExpectTempFile(installRoot, ".agents/skills/spec-new-document/SKILL.md", "npm factory install did not install core skill.");
+        ExpectTempFile(installRoot, ".agents/skills/factory-create-work-plan/SKILL.md", "npm factory install did not install factory skill.");
+        ExpectTempFile(installRoot, ".idd/factory/.gitignore", "npm factory install did not install factory .gitignore.");
+
+        if (Directory.Exists(Path.Combine(installRoot, ".idd/factory/work".Replace('/', Path.DirectorySeparatorChar))))
+        {
+            failures.Add("npm factory install created work directory.");
+        }
+
+        var entry = File.ReadAllText(Path.Combine(installRoot, "AGENTS.md"));
+        ExpectContains(entry, "IDD Factory Routing", "AGENTS.md", "npm factory install entry");
     });
 }
 
@@ -635,6 +929,68 @@ void ExpectNpmRejectsGeminiEntryNone()
             if (!result.StandardError.Contains("Target gemini does not support generated skills", StringComparison.Ordinal))
             {
                 failures.Add("npm Gemini install with --entry none did not report unsupported generated skills.");
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(installRoot))
+            {
+                Directory.Delete(installRoot, recursive: true);
+            }
+        }
+    });
+}
+
+void ExpectNpmRejectsFactoryForGemini()
+{
+    WithNpmFixture(fixtureRoot =>
+    {
+        var script = Path.Combine(fixtureRoot, "bin", "intent-driven-development.js");
+        var installRoot = Path.Combine(Path.GetTempPath(), "idd-smoke-npm-install-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(installRoot);
+
+        try
+        {
+            var result = RunProcessResult("node", $"\"{script}\" install --target gemini --pack factory", installRoot);
+            if (result.ExitCode == 0)
+            {
+                failures.Add("npm factory install for Gemini succeeded unexpectedly.");
+            }
+
+            if (!result.StandardError.Contains("Factory pack requires generated skills", StringComparison.Ordinal))
+            {
+                failures.Add("npm factory install for Gemini did not report unsupported generated skills.");
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(installRoot))
+            {
+                Directory.Delete(installRoot, recursive: true);
+            }
+        }
+    });
+}
+
+void ExpectNpmRejectsUnknownPack()
+{
+    WithNpmFixture(fixtureRoot =>
+    {
+        var script = Path.Combine(fixtureRoot, "bin", "intent-driven-development.js");
+        var installRoot = Path.Combine(Path.GetTempPath(), "idd-smoke-npm-install-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(installRoot);
+
+        try
+        {
+            var result = RunProcessResult("node", $"\"{script}\" install --target claude --pack bogus", installRoot);
+            if (result.ExitCode == 0)
+            {
+                failures.Add("npm install with unknown pack succeeded unexpectedly.");
+            }
+
+            if (!result.StandardError.Contains("Unknown pack: bogus", StringComparison.Ordinal))
+            {
+                failures.Add("npm install with unknown pack did not report the invalid pack.");
             }
         }
         finally

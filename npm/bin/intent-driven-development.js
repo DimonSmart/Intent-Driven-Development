@@ -23,6 +23,11 @@ function main() {
     return;
   }
 
+  if (command === "list-packs") {
+    Object.keys(readManifest().packs).sort().forEach((pack) => console.log(pack));
+    return;
+  }
+
   if (command === "version") {
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
     const manifest = readManifest();
@@ -48,9 +53,10 @@ function main() {
 function printUsage() {
   console.log(`Usage:
   intent-driven-development init [--force]
-  intent-driven-development install --target <target> [--entry minimal|none|full] [--force]
-  intent-driven-development install --all [--entry minimal|none|full] [--force]
+  intent-driven-development install --target <target> [--pack <pack>]... [--entry minimal|none|full] [--force]
+  intent-driven-development install --all [--pack <pack>]... [--entry minimal|none|full] [--force]
   intent-driven-development list-targets
+  intent-driven-development list-packs
   intent-driven-development version`);
 }
 
@@ -63,13 +69,14 @@ function readManifest() {
 }
 
 function install(args) {
-  ensureNoUnknownArgs(args, ["--target", "--all", "--entry", "--force"]);
+  ensureNoUnknownArgs(args, ["--target", "--all", "--entry", "--force", "--pack"]);
 
   const manifest = readManifest();
   const force = args.includes("--force");
   const installAll = args.includes("--all");
   const target = valueAfter(args, "--target");
   const entryMode = parseEntryMode(valueAfter(args, "--entry"));
+  const selectedPacks = resolvePacks(manifest, valuesAfter(args, "--pack"));
 
   if (installAll && target) {
     fail("Use either --all or --target <target>, not both.");
@@ -81,9 +88,11 @@ function install(args) {
 
   const targets = installAll ? manifest.targets : [validateTarget(manifest, target)];
   validateEntryModeCapabilities(manifest, targets, entryMode, installAll);
-  const plannedFiles = collectTargetFiles(manifest, targets, entryMode);
+  validatePackTargetCapabilities(manifest, targets, selectedPacks);
+  const plannedFiles = collectTargetFiles(manifest, targets, entryMode, selectedPacks);
   copyPlannedFiles(plannedFiles, process.cwd(), force);
-  console.log(`Installed ${targets.join(", ")} with ${entryMode} entry.`);
+  const packText = isDefaultPackSelection(manifest, selectedPacks) ? "" : ` and packs: ${selectedPacks.join(", ")}`;
+  console.log(`Installed ${targets.join(", ")} with ${entryMode} entry${packText}.`);
 }
 
 function initProject(force) {
@@ -155,8 +164,106 @@ function supportsGeneratedSkills(manifest, target) {
   return capabilities.supportsSkills === true;
 }
 
-function collectTargetFiles(manifest, targets, entryMode) {
+function resolvePacks(manifest, requestedPacks) {
+  validatePackManifest(manifest);
+  const selected = new Set();
+
+  if (requestedPacks.length === 0) {
+    for (const [packName, pack] of Object.entries(manifest.packs)) {
+      if (pack.default === true) {
+        addPackWithDependencies(manifest, packName, selected);
+      }
+    }
+  } else {
+    for (const packName of [...new Set(requestedPacks)]) {
+      if (!manifest.packs[packName]) {
+        fail(`Unknown pack: ${packName}\nAvailable packs: ${Object.keys(manifest.packs).sort().join(", ")}`);
+      }
+
+      addPackWithDependencies(manifest, packName, selected);
+    }
+  }
+
+  return Array.from(selected).sort();
+}
+
+function addPackWithDependencies(manifest, packName, selected) {
+  for (const dependency of manifest.packs[packName].requires || []) {
+    addPackWithDependencies(manifest, dependency, selected);
+  }
+
+  selected.add(packName);
+}
+
+function isDefaultPackSelection(manifest, selectedPacks) {
+  const defaults = Object.entries(manifest.packs)
+    .filter(([, pack]) => pack.default === true)
+    .map(([name]) => name)
+    .sort();
+  return defaults.join("\0") === [...selectedPacks].sort().join("\0");
+}
+
+function validatePackTargetCapabilities(manifest, targets, selectedPacks) {
+  if (!selectedPacks.includes("factory")) {
+    return;
+  }
+
+  const incompatible = targets.filter((target) => !supportsGeneratedSkills(manifest, target));
+  if (incompatible.length > 0) {
+    fail(`Factory pack requires generated skills. Unsupported targets: ${incompatible.join(", ")}.`);
+  }
+}
+
+function validatePackManifest(manifest) {
+  if (!manifest.packs) {
+    fail("Bundled manifest does not define packs.");
+  }
+
+  for (const [packName, pack] of Object.entries(manifest.packs)) {
+    for (const dependency of pack.requires || []) {
+      if (!manifest.packs[dependency]) {
+        fail(`Pack '${packName}' requires unknown pack '${dependency}'.`);
+      }
+    }
+  }
+
+  for (const packName of Object.keys(manifest.packs)) {
+    validatePackDependencyAcyclic(manifest, packName, new Set(), new Set());
+  }
+}
+
+function validatePackDependencyAcyclic(manifest, packName, visiting, visited) {
+  if (visited.has(packName)) {
+    return;
+  }
+
+  if (visiting.has(packName)) {
+    fail(`Pack dependency cycle includes '${packName}'.`);
+  }
+
+  visiting.add(packName);
+  for (const dependency of manifest.packs[packName].requires || []) {
+    validatePackDependencyAcyclic(manifest, dependency, visiting, visited);
+  }
+
+  visiting.delete(packName);
+  visited.add(packName);
+}
+
+function selectedSkills(manifest, selectedPacks) {
+  const skills = new Set();
+  for (const packName of selectedPacks) {
+    for (const skill of manifest.packs[packName].skills || []) {
+      skills.add(skill);
+    }
+  }
+
+  return skills;
+}
+
+function collectTargetFiles(manifest, targets, entryMode, selectedPacks) {
   const byRelativePath = new Map();
+  const skills = selectedSkills(manifest, selectedPacks);
 
   for (const target of targets) {
     const sourceRoot = path.join(contentRoot, "generated", target);
@@ -167,10 +274,14 @@ function collectTargetFiles(manifest, targets, entryMode) {
     for (const file of listFiles(sourceRoot)) {
       const relativePath = normalize(path.relative(sourceRoot, file));
       if (
-        entryMode !== "minimal" &&
         manifest.entryPoints[target] &&
         relativePath === normalize(manifest.entryPoints[target])
       ) {
+        continue;
+      }
+
+      const skillName = generatedSkillName(relativePath);
+      if (skillName && !skills.has(skillName)) {
         continue;
       }
 
@@ -192,8 +303,8 @@ function collectTargetFiles(manifest, targets, entryMode) {
       });
     }
 
-    if (entryMode === "full") {
-      const fullEntry = buildFullEntry(manifest, target);
+    if (entryMode !== "none") {
+      const fullEntry = buildEntry(manifest, target, entryMode, selectedPacks);
       const existing = byRelativePath.get(fullEntry.relativePath);
       if (existing) {
         if (existing.hash !== fullEntry.hash) {
@@ -207,10 +318,15 @@ function collectTargetFiles(manifest, targets, entryMode) {
     }
   }
 
-  const projectFilesRoot = path.join(contentRoot, "src", "canonical", "project-files", "specs");
-  if (fs.existsSync(projectFilesRoot)) {
-    for (const file of listFiles(projectFilesRoot)) {
-      const relativePath = normalize(path.join(".specs", path.relative(projectFilesRoot, file)));
+  for (const packName of selectedPacks) {
+    for (const projectFile of manifest.packs[packName].projectFiles || []) {
+      const projectFilesRoot = path.join(contentRoot, projectFile.source);
+      if (!fs.existsSync(projectFilesRoot)) {
+        fail(`Bundled project files not found: ${projectFile.source}`);
+      }
+
+      for (const file of listFiles(projectFilesRoot)) {
+        const relativePath = normalize(path.join(projectFile.destination, path.relative(projectFilesRoot, file)));
       const content = fs.readFileSync(file);
       const existing = byRelativePath.get(relativePath);
       if (existing) {
@@ -227,13 +343,24 @@ function collectTargetFiles(manifest, targets, entryMode) {
         content: null,
         hash: sha256(content)
       });
+      }
     }
   }
 
   return Array.from(byRelativePath.values());
 }
 
-function buildFullEntry(manifest, target) {
+function generatedSkillName(relativePath) {
+  const parts = normalize(relativePath).split("/");
+  const index = parts.indexOf("skills");
+  if (index === -1 || index + 1 >= parts.length) {
+    return null;
+  }
+
+  return parts[index + 1];
+}
+
+function buildEntry(manifest, target, entryMode, selectedPacks) {
   const entryPoint = manifest.entryPoints[target];
   if (!entryPoint) {
     fail(`No entry point configured for target: ${target}`);
@@ -242,10 +369,13 @@ function buildFullEntry(manifest, target) {
   const blocks = [
     readRequired(path.join(contentRoot, "src", "adapters", target, "entry.md")),
     readRequired(path.join(contentRoot, "src", "canonical", "packs", "intent-driven-development.md"))
-      .replace("{{skillGuidance}}", "Use the generated IDD skills when they are available for the target.")
-      .replace("{{workflowGuidance}}", "This file and installed IDD skills are workflow guidance.\nThey are not product specifications."),
-    readCanonicalMethodology()
+      .replace("{{skillGuidance}}", buildSkillGuidance(manifest, target, selectedPacks))
+      .replace("{{workflowGuidance}}", buildWorkflowGuidance(manifest, target))
   ];
+
+  if (entryMode === "full") {
+    blocks.push(readCanonicalMethodology());
+  }
 
   const content = `${blocks.map((block) => block.trim()).join("\n\n")}\n`;
   const buffer = Buffer.from(content, "utf8");
@@ -255,6 +385,51 @@ function buildFullEntry(manifest, target) {
     content: buffer,
     hash: sha256(buffer)
   };
+}
+
+function buildSkillGuidance(manifest, target, selectedPacks) {
+  if (!supportsGeneratedSkills(manifest, target)) {
+    return `This target does not use generated IDD skills. Keep IDD work focused and
+read only the documents needed for the current task.`;
+  }
+
+  const skills = Array.from(selectedSkills(manifest, selectedPacks)).sort().map((skill) => `- \`${skill}\``).join("\n");
+  const blocks = [
+    `Use installed IDD skills for specific workflows:\n${skills}`,
+    `## IDD Workflow Routing
+
+Use \`spec-brainstorm\` when product intent is unclear.
+Use \`spec-change\` when durable product behavior must change.
+Use \`spec-implement\` for one focused behavior already covered by
+\`.specs/\`, then use \`spec-check-implementation\`.
+Use \`spec-new-document\` only for a new durable product area, ADR, or
+spike.`
+  ];
+
+  if (selectedPacks.includes("factory")) {
+    blocks.push(`## IDD Factory Routing
+
+Use factory skills only for planned implementation orchestration,
+multi-step execution, task slicing, or agentic factory-style work.
+
+- Use \`factory-create-work-plan\` to create a temporary Factory Work Plan.
+- Use \`factory-execute-work-plan\` to execute an explicit Factory Work Plan.
+- Use \`factory-review-task\` after each bounded task.
+- Use \`factory-review-work-result\` after all tasks are complete.
+- Use \`factory-finish-work\` to summarize and clean temporary factory artifacts.
+
+Factory work plans are temporary execution state.
+They are not specs and must not be stored in \`.specs/\`.
+Do not read old factory work plans unless the user explicitly provides the exact path.`);
+  }
+
+  return blocks.join("\n\n");
+}
+
+function buildWorkflowGuidance(manifest, target) {
+  return supportsGeneratedSkills(manifest, target)
+    ? "This file and installed IDD skills are workflow guidance.\nThey are not product specifications."
+    : "This file is workflow guidance.\nIt is not a product specification.";
 }
 
 function readCanonicalMethodology() {
@@ -341,10 +516,29 @@ function ensureNoUnknownArgs(args, known) {
       fail(`Unknown option: ${arg}`);
     }
 
-    if (arg === "--target" || arg === "--entry") {
+    if (arg === "--target" || arg === "--entry" || arg === "--pack") {
       index += 1;
     }
   }
+}
+
+function valuesAfter(args, option) {
+  const values = [];
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] !== option) {
+      continue;
+    }
+
+    const value = args[index + 1];
+    if (!value || value.startsWith("--")) {
+      fail(`Missing value for ${option}.`);
+    }
+
+    values.push(value);
+    index += 1;
+  }
+
+  return values;
 }
 
 function valueAfter(args, option) {

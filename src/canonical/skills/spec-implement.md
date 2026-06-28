@@ -53,6 +53,19 @@ Stop before implementation and use spec-change.
 Do not silently implement new durable behavior without updating product intent
 first.
 
+## Relationship to Factory
+
+`spec-implement` implements one focused behavior from current specs.
+
+It does not create or execute Factory Work Plans.
+When used from `idd-factory`, treat the factory task brief as the local task
+scope and `.specs/` as normative product intent.
+
+Do not expand a factory task into adjacent work unless required by the relevant
+spec.
+Report changed files, tests, verification, and concerns back to the factory
+workflow.
+
 ## Example
 
 If `.specs/0018.spec-command-history-completion.md` says command completion must

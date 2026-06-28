@@ -4,8 +4,10 @@ Universal CLI installer for Intent-Driven Development release artifacts.
 
 ```bash
 npx intent-driven-development list-targets
+npx intent-driven-development list-packs
 npx intent-driven-development init
 npx intent-driven-development install --target claude
+npx intent-driven-development install --target codex --pack factory
 npx intent-driven-development install --target claude --entry minimal
 npx intent-driven-development install --target claude --entry none
 npx intent-driven-development install --target claude --entry full
@@ -17,6 +19,18 @@ npx intent-driven-development install --all
 `full` installs a larger entry point with embedded methodology for legacy/debug scenarios.
 
 For targets without generated skills, such as `gemini`, `--entry none` is rejected.
+
+Core IDD is installed by default. The optional `factory` pack adds temporary
+execution orchestration and automatically includes core:
+
+```bash
+npx intent-driven-development install --target claude --pack factory
+```
+
+Factory work artifacts live under `.idd/factory/work/`, are ignored by git by
+default, and are not product specifications. They should not be reused
+automatically for unrelated tasks. Durable product intent belongs in `.specs/`.
+Future external Work Item Provider integration is not implemented yet.
 
 The package is a delivery wrapper. Bundled methodology and generated files are
 copied from the versioned GitHub Release content during packaging.

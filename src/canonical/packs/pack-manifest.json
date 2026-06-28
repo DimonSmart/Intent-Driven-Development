@@ -1,0 +1,55 @@
+{
+  "packs": {
+    "core": {
+      "description": "Core Intent-Driven Development specification workflows.",
+      "default": true,
+      "requires": [],
+      "skills": [
+        "spec-audit",
+        "spec-brainstorm",
+        "spec-change",
+        "spec-import",
+        "spec-implement",
+        "spec-lint",
+        "spec-new-document",
+        "spec-normalize-current",
+        "spec-check-implementation",
+        "spec-update-from-implementation"
+      ],
+      "agents": [],
+      "projectFiles": [
+        {
+          "source": "src/canonical/project-files/specs",
+          "destination": ".specs"
+        }
+      ]
+    },
+    "factory": {
+      "description": "Optional temporary execution orchestration workflows for implementing current specs.",
+      "default": false,
+      "requires": [
+        "core"
+      ],
+      "skills": [
+        "factory-create-work-plan",
+        "factory-execute-work-plan",
+        "factory-review-task",
+        "factory-review-work-result",
+        "factory-finish-work"
+      ],
+      "agents": [
+        "factory-coordinator",
+        "implementation-planner",
+        "implementer",
+        "task-reviewer",
+        "final-reviewer"
+      ],
+      "projectFiles": [
+        {
+          "source": "src/canonical/project-files/factory",
+          "destination": "."
+        }
+      ]
+    }
+  }
+}

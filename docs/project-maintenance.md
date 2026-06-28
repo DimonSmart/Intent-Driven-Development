@@ -25,6 +25,10 @@ Detailed IDD workflows live in skills:
 
 Project product intent lives in `.specs/`.
 
+Optional factory execution state lives under `.idd/factory/work/` when the
+factory pack is installed and used. Factory artifacts are temporary work files,
+not specifications.
+
 Do not put full methodology into `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, or `.github/copilot-instructions.md`.
 
 ## How Agents Fit In
@@ -47,7 +51,8 @@ If something important changes, update the canonical source and regenerate the t
 
 ```text
 src/canonical/       canonical methodology, project files, skills, and packs
-src/canonical/packs/ compact bootstrap content for main instruction files
+src/canonical/packs/ compact bootstrap content and pack manifest
+src/canonical/agents/ platform-neutral factory role prompts
 src/canonical/methodology/ full methodology for skills and project docs
 src/canonical/skills/ task-specific workflows
 src/adapters/        target-specific entry points and adapter capabilities
@@ -86,6 +91,22 @@ Canonical skill body remains agent-neutral.
 Adapter-specific behavior, such as Claude Code frontmatter fields, belongs to `adapters.<adapter>.frontmatter`.
 
 Do not put Claude-specific frontmatter directly into canonical skill markdown.
+
+## Packs
+
+Pack membership is defined in `src/canonical/packs/pack-manifest.json`.
+
+`core` is the default pack. It owns `.specs/` project files and the `spec-*`
+skills.
+
+`factory` is optional. It depends on core and installs factory skills, role
+prompt references, and `.idd/factory/.gitignore`. It must not place work plans,
+task briefs, review notes, or logs in `.specs/`.
+
+Generated bundles may contain all skill-capable target files, but installers
+copy only the skills and project files selected by packs. Core-only entry
+routing must not mention factory skills. Factory-enabled entry routing may
+mention factory only as temporary execution orchestration.
 
 ## Workflow
 
@@ -151,6 +172,7 @@ Use npm/npx when you want to install generated agent files into any project with
 
 ```bash
 npx intent-driven-development list-targets
+npx intent-driven-development list-packs
 npx intent-driven-development install --target claude
 npx intent-driven-development install --target codex
 npx intent-driven-development install --target copilot
@@ -162,6 +184,7 @@ Use the .NET global tool when you want a .NET-native installer command:
 ```powershell
 dotnet tool install --global DimonSmart.IntentDrivenDevelopment.Tool
 intent-driven-development list-targets
+intent-driven-development list-packs
 intent-driven-development install --target codex
 ```
 

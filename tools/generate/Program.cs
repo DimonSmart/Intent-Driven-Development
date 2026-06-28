@@ -52,11 +52,13 @@ internal sealed class Generator(string repoRoot)
         var knownAdapterNames = adapterDefinitions
             .Select(definition => definition.Config.Agent)
             .ToHashSet(StringComparer.Ordinal);
+        var packManifest = ReadPackManifest();
+        ValidatePackManifest(packManifest);
 
         foreach (var adapterDefinition in adapterDefinitions)
         {
             var adapter = adapterDefinition.Config;
-            var expectedFiles = BuildFiles(adapterDefinition.Directory, adapter, knownAdapterNames);
+            var expectedFiles = BuildFiles(adapterDefinition.Directory, adapter, knownAdapterNames, packManifest);
             var outputRoot = Path.Combine(repoRoot, "generated", adapter.Agent);
 
             if (checkOnly)
@@ -90,7 +92,8 @@ internal sealed class Generator(string repoRoot)
     private IReadOnlyList<GeneratedFile> BuildFiles(
         string adapterDir,
         AdapterConfig adapter,
-        IReadOnlySet<string> knownAdapterNames)
+        IReadOnlySet<string> knownAdapterNames,
+        PackManifest packManifest)
     {
         var files = new List<GeneratedFile>();
         var entry = ReadRequired(Path.Combine(adapterDir, "entry.md"));
@@ -109,7 +112,7 @@ internal sealed class Generator(string repoRoot)
             var skillsRoot = Path.Combine(repoRoot, "src", "canonical", "skills");
             var skillDescriptionPath = Path.Combine(skillsRoot, "skill-descriptions.json");
             var skillDescriptions = ReadSkillDescriptions(skillDescriptionPath, knownAdapterNames);
-            var skillPaths = Directory.GetFiles(skillsRoot, "spec-*.md").OrderBy(Path.GetFileName).ToArray();
+            var skillPaths = Directory.GetFiles(skillsRoot, "*.md").OrderBy(Path.GetFileName).ToArray();
             var skillNames = skillPaths.Select(Path.GetFileNameWithoutExtension).ToHashSet(StringComparer.Ordinal);
 
             foreach (var skillName in skillDescriptions.Keys.OrderBy(name => name, StringComparer.Ordinal))
@@ -138,10 +141,133 @@ internal sealed class Generator(string repoRoot)
 
                 var relativePath = Path.Combine(adapter.SkillsRoot!, skillName, "SKILL.md");
                 files.Add(new GeneratedFile(relativePath, NormalizeContent(content)));
+
+                if (IsFactorySkill(packManifest, skillName))
+                {
+                    AddFactoryAgentReferences(files, adapter.SkillsRoot!, skillName, packManifest);
+                }
             }
         }
 
         return files;
+    }
+
+    private PackManifest ReadPackManifest()
+    {
+        var json = ReadRequired(Path.Combine(repoRoot, "src", "canonical", "packs", "pack-manifest.json"));
+        return JsonSerializer.Deserialize<PackManifest>(json, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        }) ?? throw new InvalidOperationException("Invalid pack manifest.");
+    }
+
+    private void ValidatePackManifest(PackManifest manifest)
+    {
+        if (manifest.Packs.Count == 0)
+        {
+            throw new InvalidOperationException("Pack manifest must define at least one pack.");
+        }
+
+        var skillsRoot = Path.Combine(repoRoot, "src", "canonical", "skills");
+        var agentsRoot = Path.Combine(repoRoot, "src", "canonical", "agents");
+        var canonicalSkills = Directory
+            .GetFiles(skillsRoot, "*.md")
+            .Select(path => Path.GetFileNameWithoutExtension(path)!)
+            .ToHashSet(StringComparer.Ordinal);
+        var skillOwners = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (var (packName, pack) in manifest.Packs)
+        {
+            foreach (var requiredPack in pack.Requires)
+            {
+                if (!manifest.Packs.ContainsKey(requiredPack))
+                {
+                    throw new InvalidOperationException($"Pack '{packName}' requires unknown pack '{requiredPack}'.");
+                }
+            }
+
+            foreach (var skill in pack.Skills)
+            {
+                if (!canonicalSkills.Contains(skill))
+                {
+                    throw new InvalidOperationException($"Pack '{packName}' references missing skill '{skill}'.");
+                }
+
+                if (skillOwners.TryGetValue(skill, out var existingOwner))
+                {
+                    throw new InvalidOperationException($"Skill '{skill}' is owned by both '{existingOwner}' and '{packName}'.");
+                }
+
+                skillOwners.Add(skill, packName);
+            }
+
+            foreach (var agent in pack.Agents)
+            {
+                var path = Path.Combine(agentsRoot, agent + ".md");
+                if (!File.Exists(path))
+                {
+                    throw new InvalidOperationException($"Pack '{packName}' references missing agent '{agent}'.");
+                }
+            }
+        }
+
+        foreach (var skill in canonicalSkills)
+        {
+            if (!skillOwners.ContainsKey(skill))
+            {
+                throw new InvalidOperationException($"Canonical skill is not owned by a pack: {skill}.");
+            }
+        }
+
+        foreach (var packName in manifest.Packs.Keys)
+        {
+            ValidatePackDependencyAcyclic(manifest, packName, [], []);
+        }
+    }
+
+    private static void ValidatePackDependencyAcyclic(
+        PackManifest manifest,
+        string packName,
+        HashSet<string> visiting,
+        HashSet<string> visited)
+    {
+        if (visited.Contains(packName))
+        {
+            return;
+        }
+
+        if (!visiting.Add(packName))
+        {
+            throw new InvalidOperationException($"Pack dependency cycle includes '{packName}'.");
+        }
+
+        foreach (var dependency in manifest.Packs[packName].Requires)
+        {
+            ValidatePackDependencyAcyclic(manifest, dependency, visiting, visited);
+        }
+
+        visiting.Remove(packName);
+        visited.Add(packName);
+    }
+
+    private bool IsFactorySkill(PackManifest manifest, string skillName) =>
+        manifest.Packs.TryGetValue("factory", out var factoryPack) &&
+        factoryPack.Skills.Contains(skillName, StringComparer.Ordinal);
+
+    private void AddFactoryAgentReferences(
+        List<GeneratedFile> files,
+        string skillsRoot,
+        string skillName,
+        PackManifest manifest)
+    {
+        var agentsRoot = Path.Combine(repoRoot, "src", "canonical", "agents");
+        var factoryAgents = manifest.Packs["factory"].Agents;
+        foreach (var agent in factoryAgents)
+        {
+            var content = ReadRequired(Path.Combine(agentsRoot, agent + ".md"));
+            var relativePath = Path.Combine(skillsRoot, skillName, "references", "agents", agent + ".md");
+            files.Add(new GeneratedFile(relativePath, NormalizeContent(content)));
+        }
     }
 
     private string BuildPack(AdapterConfig adapter)
@@ -494,3 +620,15 @@ internal sealed record AdapterSkillMetadata(
     IReadOnlyDictionary<string, JsonElement>? Frontmatter);
 
 internal sealed record GeneratedFile(string RelativePath, string Content);
+
+internal sealed record PackManifest(Dictionary<string, PackDefinition> Packs);
+
+internal sealed record PackDefinition(
+    string Description,
+    bool Default,
+    string[] Requires,
+    string[] Skills,
+    string[] Agents,
+    ProjectFileDefinition[] ProjectFiles);
+
+internal sealed record ProjectFileDefinition(string Source, string Destination);
