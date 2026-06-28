@@ -34,6 +34,7 @@ ExpectAllSkillsGenerated();
 ExpectClaudeSkillMetadata();
 ExpectSpecImportLintCleanContract();
 ExpectSpecBrainstormBoundaryContract();
+ExpectSpecBrainstormRoutingGuidance();
 ExpectInstallEntryNone();
 ExpectInstallGeminiEntryNoneRejected();
 ExpectInstallAllAfterInit();
@@ -329,13 +330,21 @@ void ExpectSpecBrainstormBoundaryContract()
     {
         "spec-brainstorm = proposed solution + customer discovery + intent clarification + simplification options",
         "This skill clarifies intent. It does not update specifications, design architecture, or implement code.",
-        "`spec-brainstorm` does not edit files by default.",
+        "`spec-brainstorm` never edits files.",
+        "If the user confirms a product direction and asks to persist it, stop and hand",
+        "off to `spec-change`.",
+        "Do not load the whole `.specs/` tree.",
+        "## Handoff To `spec-change`",
+        "Do not automatically continue into `spec-change`.",
+        "without editing specs, planning implementation, or writing code",
         "After the product intent is confirmed, use `spec-change`",
-        "Do not use this skill when the relevant current specification is already clear and the user asks to implement it"
+        "the relevant current specification is already clear and the user asks to implement it"
     };
 
     var forbidden = new[]
     {
+        "does not edit files by default",
+        "without editing specs or discussing implementation",
         "Implement the code",
         "Update `.specs/` directly",
         "Create the new spec",
@@ -365,6 +374,33 @@ void ExpectSpecBrainstormBoundaryContract()
             if (content.Contains(text, StringComparison.Ordinal))
             {
                 failures.Add($"spec-brainstorm generated skill contains forbidden text '{text}': {relativePath}");
+            }
+        }
+    }
+}
+
+void ExpectSpecBrainstormRoutingGuidance()
+{
+    var required = new[]
+    {
+        "For a new feature or behavior change with unclear,",
+        "implementation-shaped, over-specified, or likely simpler intent:",
+        "use `spec-brainstorm` before `spec-change`.",
+        "When the user asks to implement behavior already described in",
+        "`.specs/`: use `spec-implement`, then `spec-check-implementation`.",
+        "Do not use `spec-brainstorm` when current specs are already clear",
+        "When the user asks to change product behavior: use `spec-change`,"
+    };
+
+    foreach (var relativePath in EntryPoints().Where(path => !path.Contains("/gemini/", StringComparison.Ordinal)))
+    {
+        var fullPath = Path.Combine(repoRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        var content = File.ReadAllText(fullPath);
+        foreach (var text in required)
+        {
+            if (!content.Contains(text, StringComparison.Ordinal))
+            {
+                failures.Add($"Entry point is missing spec-brainstorm routing text '{text}': {relativePath}");
             }
         }
     }

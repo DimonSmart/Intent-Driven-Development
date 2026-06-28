@@ -13,7 +13,7 @@
     }
   },
   "spec-brainstorm": {
-    "description": "Clarify real product intent before changing specs, using focused customer-development questions and simplification options without editing specs or discussing implementation."
+    "description": "Clarify real product intent before changing specs, using focused customer-development questions and simplification options without editing specs, planning implementation, or writing code."
   },
   "spec-change": {
     "description": "Update current product intent from a user-requested behavior change, preferring existing specs over new specs."

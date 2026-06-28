@@ -49,8 +49,6 @@ Use this skill when:
 
 ## When not to use this skill
 
-Do not use this skill when the relevant current specification is already clear and the user asks to implement it.
-
 Do not use this skill when:
 
 - the relevant current specification is already clear and the user asks to implement it;
@@ -64,7 +62,10 @@ Do not use this skill when:
 
 ## Boundaries
 
-`spec-brainstorm` does not edit files by default.
+`spec-brainstorm` never edits files.
+
+If the user confirms a product direction and asks to persist it, stop and hand
+off to `spec-change`.
 
 It must not:
 
@@ -82,6 +83,27 @@ It must not:
 
 The output of this skill may become input for `spec-change`, but only after the
 user confirms the intended product direction.
+
+Do not automatically continue into `spec-change`. First present the clarified
+intent or simplification proposal and wait for explicit user confirmation.
+
+## Reading Existing Specs
+
+Do not load the whole `.specs/` tree.
+
+If the brainstorm concerns an existing product area, read only enough context to
+avoid brainstorming in a vacuum:
+
+1. `.specs/README.md`;
+2. `.specs/INDEX.md`;
+3. the likely owning current spec, if it can be identified cheaply.
+
+Use existing specs only to understand current product intent and ownership
+boundaries.
+
+Do not treat current implementation as product intent.
+
+Do not update specs from this skill.
 
 ## Relationship to other skills
 
@@ -385,6 +407,16 @@ Use when the intent is clear enough to become a spec change.
 
 - ...
 
+## Handoff To `spec-change`
+
+- Confirmed direction:
+- Owning product area:
+- Candidate existing spec, if known:
+- Minimum useful version:
+- Accepted simplifications:
+- Explicitly out of scope:
+- Open product questions:
+
 ## Next Step
 
 Use `spec-change` to update the owning current spec or create the correct IDD
@@ -395,10 +427,10 @@ document if no current document owns the area.
 
 - Do not jump to code.
 - Do not create an implementation plan.
-- Do not update `.specs/` unless a later explicit request invokes
-  `spec-change`.
+- Do not update `.specs/`.
 - Do not discuss architecture unless it is necessary to expose accidental
   complexity.
+- Do not automatically continue into `spec-change`.
 - Do not assume the user's proposed solution is the real requirement.
 - Do not force simplification if the user confirms that the complexity is
   essential.
