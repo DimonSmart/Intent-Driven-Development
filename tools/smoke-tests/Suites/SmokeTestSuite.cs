@@ -38,6 +38,7 @@ internal sealed partial class SmokeTestSuite
         ExpectAllSkillsGenerated();
         ExpectClaudeSkillMetadata();
         ExpectPackManifestShape();
+        ExpectNoLegacyPublicNames();
         ExpectFactoryGeneratedShape();
         ExpectFactoryRolePromptReferences();
         ExpectListPacks();

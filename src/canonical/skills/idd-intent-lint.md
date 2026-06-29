@@ -75,7 +75,7 @@ semantic review.
 ## Output Format
 
 ```md
-# Spec Lint Report
+# IDD Intent Lint Report
 
 ## Result
 

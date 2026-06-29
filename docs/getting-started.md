@@ -30,7 +30,7 @@ Use `--entry none` to install only skills for CodingAgents that support them. Us
 `--target` is the CLI compatibility name for selecting a CodingAgent.
 
 Core IDD is installed by default. It installs the durable `.idd/intent/` intent layer
-and the `spec-*` skills.
+and the `idd-intent-*` and `idd-code-*` skills.
 
 ## Optional Factory Pack
 

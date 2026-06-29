@@ -88,7 +88,7 @@ This is not a fixed enum.
 ## Report Format
 
 ```md
-# Spec Audit Report
+# IDD Intent Audit Report
 
 ## Summary
 

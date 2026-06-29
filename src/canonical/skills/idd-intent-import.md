@@ -1,6 +1,6 @@
 # idd-intent-import
 
-Use this skill to import raw specification material into a normalized IDD
+Use this skill to import raw intent material into a normalized IDD
 `.idd/intent/` structure.
 
 Formula:
@@ -11,7 +11,7 @@ idd-intent-import = import + mandatory normalization + lint gate
 
 Use it when old `.worklog` content, GitHub Spec Kit folders, issue/task docs,
 ADRs, research notes, implementation notes, or other sources must become a
-coherent current product specification set.
+coherent current product intent document set.
 
 Import is a migration of meaning, not a mechanical conversion from old files to
 new files. Source files are evidence. They are not the desired target structure.
@@ -55,14 +55,14 @@ allowNewSpecs: true
 `apply-safe` may apply structural changes that preserve product meaning. It must
 not resolve product conflicts or invent new product decisions.
 
-## Current Spec Test
+## Current spec test
 
-Current specs describe target product state, not the history of work.
+Current spec documents describe target product state, not the history of work.
 
 A spec answers:
 
 ```text
-If the implementation is deleted but the specs remain, can the product be rebuilt?
+If the implementation is deleted but the intent documents remain, can the product be rebuilt?
 ```
 
 Therefore current specs may contain:
@@ -180,7 +180,7 @@ For GitHub Spec Kit / Spec Driven Development-like sources:
 
 ## Import Inventory
 
-Create an import inventory before writing target specs.
+Create an import inventory before writing target documents.
 
 For each source, track:
 
@@ -336,73 +336,115 @@ Avoid:
 - specs named after temporary work items;
 - specs that describe how the migration was performed.
 
-Create current specs only for durable current product intent. Create ADRs only
-for durable decision records. Create spikes only for active unresolved research.
+Create current spec documents only for durable current product intent. Create
+adr documents only for durable decision records. Create spike documents only for
+active unresolved research.
 
 Imported current documents must use current IDD document shapes. Do not preserve
 legacy section layout when the document becomes current normative intent.
 
-Minimum shape for `Spec`:
+Minimum shape for `spec` documents:
 
 ```md
-# 0000 - Title
+# NNNN.spec-short-title
 
-Type: Spec
-Status: Current
+## Intent
 
-## Context
+Describe the durable product intent.
 
-## Scope / Behavior
+## Related Specifications
+
+List related specs, ADRs, or spikes that define adjacent, shared, or dependent
+intent.
+
+## Behavior
+
+Describe observable behavior and domain contracts.
+
+## Architecture And Patterns
+
+Describe product-defining architecture, implementation patterns, and library or
+framework choices.
 
 ## Non-goals
 
-## Acceptance criteria
+List behavior or scope that is intentionally excluded.
 
-## Source history
+## Acceptance Criteria
+
+List conditions that must hold for the specification to be satisfied.
+
+## Verification
+
+List checks that verify the implementation.
 ```
 
-Minimum shape for `ADR`:
+Minimum shape for `adr` documents:
 
 ```md
-# 0000 - Title
+# NNNN.adr-short-title
 
-Type: ADR
-Status: Accepted | Proposed | Deprecated | Superseded
+## Status
+
+Proposed | Accepted | Superseded | Rejected
 
 ## Context
 
+Describe the decision context.
+
 ## Decision
+
+Describe the chosen decision.
+
+## Alternatives Considered
+
+List alternatives and why they were not chosen.
 
 ## Consequences
 
-## Related specs
+Describe accepted tradeoffs and follow-up constraints.
 
-## Source history
+## Supersedes
+
+Reference the superseded ADR when this ADR replaces an earlier decision.
 ```
 
-Minimum shape for `Spike`:
+Minimum shape for `spike` documents:
 
 ```md
-# 0000 - Title
+# NNNN.spike-short-title
 
-Type: Spike
-Status: Open | Resolved
+A spike is active research only while the question is unresolved. When resolved,
+move durable product behavior into a spec, move durable architecture decisions
+into an ADR, and delete the spike unless it remains useful as active research.
 
 ## Question
 
-## Findings
+State the uncertainty or hypothesis being tested.
 
-## Result / Recommendation
+## Constraints
 
-## Follow-up
+List constraints for the investigation.
+
+## Method
+
+Describe how the spike is evaluated.
+
+## Result
+
+Record what was learned.
+
+## Recommendation
+
+State the proposed follow-up.
 ```
 
 If a spike already has `Result` or `Recommendation` and is no longer active
 research, import must choose one of these outcomes:
 
-- convert the result into a Spec or ADR if it defines current product intent;
+- convert the result into a spec or adr if it defines current product intent;
 - delete or skip it if it is only historical research;
-- keep it as Spike only if the question is still active and unresolved.
+- keep it as a spike only if the question is still active and unresolved.
 
 ## Relation Normalization
 
@@ -449,12 +491,13 @@ the final target index.
 Minimum structure:
 
 ```md
-# Specs Index
+# IDD Intent Index
 
-| ID | Type | Status | Title | Summary |
-|----|------|--------|-------|---------|
-| 0001 | Spec | Current | ... | ... |
-| 0002 | ADR | Accepted | ... | ... |
+| Document | Role | Area | Notes | Replaces |
+| --- | --- | --- | --- | --- |
+| 0001.spec-product-overview.md | spec | Product overview | ... | |
+| 0002.adr-rendering-architecture.md | adr | Rendering | ... | |
+| 0003.spike-input-layer-feasibility.md | spike | Input layer | ... | |
 ```
 
 Rules:

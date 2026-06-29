@@ -17,7 +17,7 @@ npx intent-driven-development install --all
 ```
 
 `minimal` is the default compact entry point.
-`none` installs only skills and `.idd/intent` for CodingAgents that support generated skills.
+`none` installs only generated skills and `.idd/intent/` for CodingAgents that support generated skills.
 `full` installs a larger entry point with embedded methodology for legacy/debug scenarios.
 
 For CodingAgents without generated skills, such as `gemini`, `--entry none` is rejected.
