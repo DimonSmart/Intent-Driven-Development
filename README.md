@@ -1,76 +1,54 @@
 # Intent-Driven Development
 
-> Run a simple thought experiment.
+<p align="center">
+  <img src="docs/assets/idd-hero.png" alt="Intent-Driven Development hero image: durable product intent above temporary work artifacts" />
+</p>
+
+> Run a thought experiment.
 >
-> Delete the entire implementation.
-> Keep only the specifications.
->
-> Can a CodingAgent rebuild the product from them?
->
-> If the specs contain enough intent to recreate the product, and not enough temporary noise to become a task tracker, they are good specs.
+> Delete the implementation.  
+> Keep only the intent.  
+> Can a CodingAgent rebuild the product?
 
-## Why another take on spec-driven development?
+Intent-Driven Development is a methodology for keeping durable product intent in the repository while keeping temporary work artifacts disposable.
 
-Spec-Driven Development made the right move: start from a spec.
+Product intent is product memory. Tasks, TODOs, generated plans, PR notes, chat summaries, and temporary implementation notes are not product truth.
 
-But in practice, many spec-driven workflows slowly turn specs into a pile of tasks, test notes, code fragments, bug-fix plans, TODOs, and temporary decisions. That does not make specifications stronger. It makes them harder to use as product intent.
+## The Problem
 
-In this project, a specification is the description of the product we want to have, even when the current implementation temporarily differs from that ideal state. Deviations can be tracked separately; they should not rewrite the meaning of the target product.
+AI coding tools generate code, plans, checklists, summaries, and instruction files quickly. Over time, those artifacts can start pretending to be the source of truth.
 
-## What this project provides
+IDD exists to prevent that. The implementation can change. The tools can change. The CodingAgent can change. The durable product intent should remain stable.
 
-This project provides the **Intent-Driven Development** methodology and a set of supporting skills for different CodingAgents such as Codex, Claude, Gemini, and GitHub Copilot.
+## What IDD Is
 
-The core skills help CodingAgents create, review, reconcile, import, implement, and
-index specifications without turning them into task logs.
+IDD treats specifications and ADRs as durable product memory. They describe what the product is supposed to become and what future implementations must preserve.
 
-Core IDD is the default install. It owns durable product intent in `.idd/intent/`.
+Temporary work belongs elsewhere: tasks, pull requests, chats, generated plans, and local implementation notes can guide the current change, but they do not define the product.
 
-An optional `factory` pack adds temporary execution orchestration for planned
-implementation work:
+Core IDD is the default install. It creates the durable intent layer in `.idd/intent/`. Optional execution orchestration, such as the factory pack, is for temporary work and must not become the canonical specification.
 
-```bash
-intent-driven-development install --target codex --pack factory
-```
+## Why It Is Different
 
-`--target` is the CLI compatibility name for selecting a CodingAgent.
-
-Factory work artifacts live under `.idd/factory/work/`, are ignored by git by
-default, and should be deleted after the task unless explicitly kept or
-committed. Factory work plans are not specifications; durable product intent
-belongs in `.idd/intent/`. Future task-system integrations may use external work
-item providers, but no Jira, GitHub Issues, or persistent task database is
-implemented now.
-
-## Why not just Spec-Driven Development?
-
-Intent-Driven Development goes further. It keeps the specification pointed at the product, while separating durable product intent from temporary tasks, test work, bug fixes, TODOs, and implementation noise.
-
-That difference matters in long-running AI-assisted development. Spec-driven workflows can drown in their own artifacts. Intent-Driven Development is designed to stay useful after many CodingAgent sessions, many fixes, and many changes of plan.
-
-| Spec-Driven Development | Intent-Driven Development |
+| Ordinary spec-driven workflow | Intent-Driven Development |
 | --- | --- |
-| Spec, plan and tasks often live too close together | Product intent and temporary work are separated |
-| Generated tasks can start looking like truth | Generated artifacts are disposable |
-| The workflow is often tied to one tool | Product intent stays independent from CodingAgents |
-| Good for starting features | Better for keeping a project coherent over time |
+| Specs often mix with plans, tasks, and status notes | Product intent stays separate from temporary work |
+| Generated artifacts can look authoritative | Generated artifacts stay disposable |
+| Tool-specific files can drift into product memory | CodingAgent files are delivery/adaptation formats |
+| A workflow may depend on one CodingAgent | The source of truth remains tool-independent |
 
-## Core idea
+IDD is not just another spec-driven workflow. It is stricter about separating product memory from task history.
 
-A specification should answer:
+## Who It Is For
 
-> **What product are we building?**
+IDD is useful for long-lived projects, multiple CodingAgents, repeated implementation sessions, architectural rules that should survive resets, and product knowledge that should not live only in chat history.
 
-Not:
+It is less useful for throwaway experiments where the code and the decisions will both be discarded.
 
-> What did the CodingAgent do today?
+## Start Here
 
-Tasks change. Plans change. CodingAgents change.
+- [Getting Started](docs/getting-started.md) - install IDD, choose a CodingAgent target, and initialize a project.
+- [Methodology](docs/methodology.md) - understand durable product intent, temporary work artifacts, and how IDD differs from spec-driven workflows.
+- [Project Maintenance](docs/project-maintenance.md) - maintain this repository, generated CodingAgent files, packs, checks, and releases.
 
-Product intent should stay stable.
-
-## Documentation
-
-- [Getting Started](docs/getting-started.md)
-- [Methodology](docs/methodology.md)
-- [Project Internals, Distribution and Release Flow](docs/project-maintenance.md)
+The engineer still owns the result. IDD keeps the product memory clear enough for humans and CodingAgents to use it.
