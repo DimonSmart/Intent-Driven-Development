@@ -1,11 +1,11 @@
 # CodingAgent Workflow
 
 Before changing behavior, contracts, architecture, or durable implementation
-patterns, inspect `.specs/README.md`, `.specs/INDEX.md`, and the numbered
-current documents directly under `.specs/`.
+patterns, inspect `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and the numbered
+current documents directly under `.idd/intent/`.
 
-Use only current numbered documents in `.specs/` as normative product intent.
-There is no `.specs` archive lifecycle. Do not inspect deleted Git history
+Use only current numbered documents in `.idd/intent/` as normative product intent.
+There is no `.idd/intent` archive lifecycle. Do not inspect deleted Git history
 unless the user explicitly asks for historical investigation.
 
 When implementation and specification disagree, do not assume the
@@ -22,8 +22,8 @@ Do not load the whole specification set unless the task requires it.
 
 Prefer focused specification reads:
 
-- read `.specs/README.md`;
-- read `.specs/INDEX.md`;
+- read `.idd/intent/README.md`;
+- read `.idd/intent/INDEX.md`;
 - read only relevant current numbered documents;
 - avoid importing large unrelated context into the main conversation.
 
@@ -33,7 +33,7 @@ leaving the full exploration trace in the main conversation.
 If the CodingAgent supports isolated, forked, or subagent execution, adapter
 authors may use it for heavy specification-maintenance skills.
 
-`spec-normalize-current` may inspect multiple specifications, but it must still be
+`idd-intent-normalize-current` may inspect multiple specifications, but it must still be
 focused by a concrete topic, source, or target.
 
 It should return a compact reorganization plan:

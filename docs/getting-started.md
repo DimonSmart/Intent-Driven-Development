@@ -29,13 +29,13 @@ Use `--entry none` to install only skills for CodingAgents that support them. Us
 
 `--target` is the CLI compatibility name for selecting a CodingAgent.
 
-Core IDD is installed by default. It installs the durable `.specs/` intent layer
+Core IDD is installed by default. It installs the durable `.idd/intent/` intent layer
 and the `spec-*` skills.
 
 ## Optional Factory Pack
 
 The factory pack adds temporary execution orchestration workflows for
-implementing current `.specs/` intent.
+implementing current `.idd/intent/` intent.
 
 Install:
 
@@ -49,7 +49,7 @@ under `.idd/factory/`; temporary work artifacts are created under
 
 `.idd/factory/work/` is ignored by git by default. Factory work plans are not
 product specifications and must not be reused automatically for unrelated later
-tasks. Durable product intent belongs in `.specs/`.
+tasks. Durable product intent belongs in `.idd/intent/`.
 
 Future task-system integration may use an external Work Item Provider or Task
 Backend. The current implementation uses temporary local markdown files only.
@@ -79,7 +79,7 @@ For multiple CodingAgents, install each CodingAgent explicitly or use `--all`:
 npx intent-driven-development install --all
 ```
 
-Project product intent lives in `.specs/`. Keep durable product decisions there. Keep tasks, temporary plans, pull request notes, chat summaries, and implementation status outside specifications.
+Project product intent lives in `.idd/intent/`. Keep durable product decisions there. Keep tasks, temporary plans, pull request notes, chat summaries, and implementation status outside specifications.
 
 ## Updating
 

@@ -1,29 +1,29 @@
-# spec-implement
+# idd-code-implement
 
 Use this skill when the user asks to implement behavior that is already
-specified, or when `spec-change` has just updated the relevant spec.
+specified, or when `idd-intent-change` has just updated the relevant spec.
 
 Formula:
 
 ```text
-spec-implement = current spec intent + code change + verification
+idd-code-implement = current spec intent + code change + verification
 ```
 
 ## Rules
 
-- Current `.specs/` documents are the source of product intent.
+- Current `.idd/intent/` documents are the source of product intent.
 - Do not implement durable product behavior that is missing from specs.
 - If the request changes product behavior and specs are not updated yet, use
-  `spec-change` first.
-- Read `.specs/README.md`, `.specs/INDEX.md`, and only relevant current specs.
-- Do not read the whole `.specs/` directory by default.
+  `idd-intent-change` first.
+- Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and only relevant current specs.
+- Do not read the whole `.idd/intent/` directory by default.
 - Do not copy implementation plans or temporary notes into specs.
 - Prefer the smallest code change that satisfies the relevant acceptance
   criteria.
 - Add or update tests when the behavior can be tested.
 - Run relevant verification.
 - After implementation, perform a focused implementation/spec check using
-  `spec-check-implementation`.
+  `idd-code-check-implementation`.
 
 ## Workflow
 
@@ -33,7 +33,7 @@ spec-implement = current spec intent + code change + verification
 4. Implement the smallest change that satisfies the spec.
 5. Add or update tests.
 6. Run relevant verification.
-7. Run or recommend focused `spec-check-implementation`.
+7. Run or recommend focused `idd-code-check-implementation`.
 8. Report:
 
    - specs used as intent;
@@ -47,7 +47,7 @@ spec-implement = current spec intent + code change + verification
 If the requested behavior is not covered by current specs:
 
 ```text
-Stop before implementation and use spec-change.
+Stop before implementation and use idd-intent-change.
 ```
 
 Do not silently implement new durable behavior without updating product intent
@@ -55,12 +55,12 @@ first.
 
 ## Relationship to Factory
 
-`spec-implement` implements one focused behavior from current specs.
+`idd-code-implement` implements one focused behavior from current specs.
 
 It does not create or execute Factory Work Plans.
 When used from factory execution, the factory task brief is only the local task
 scope.
-The normative product intent still comes from `.specs/`.
+The normative product intent still comes from `.idd/intent/`.
 
 Factory may sequence tasks and reviews, but it must not redefine implementation
 rules.
@@ -72,6 +72,6 @@ workflow.
 
 ## Example
 
-If `.specs/0018.spec-command-history-completion.md` says command completion must
+If `.idd/intent/0018.spec-command-history-completion.md` says command completion must
 have a neutral default selection, implement that behavior in command completion
 code and tests, then verify the implementation against spec 0018.

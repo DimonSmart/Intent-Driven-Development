@@ -14,42 +14,29 @@ internal sealed class EntryPointBuilder(RepositoryLayout layout)
         var pack = RequiredFileReader.Read(Path.Combine(layout.PacksRoot, "intent-driven-development.md"));
         var skillGuidance = adapter.SupportsSkills
             ? """
-              Use IDD skills for specific workflows:
-              - `spec-audit`
-              - `spec-brainstorm`
-              - `spec-change`
-              - `spec-implement`
-              - `spec-import`
-              - `spec-lint`
-              - `spec-new-document`
-              - `spec-normalize-current`
-              - `spec-check-implementation`
-              - `spec-update-from-implementation`
+              Use installed IDD skills for specific workflows:
+              - `idd-intent-audit`
+              - `idd-intent-brainstorm`
+              - `idd-intent-change`
+              - `idd-intent-import`
+              - `idd-intent-lint`
+              - `idd-intent-new-document`
+              - `idd-intent-normalize-current`
+              - `idd-code-implement`
+              - `idd-code-check-implementation`
+              - `idd-code-update-intent`
 
               ## IDD Workflow Routing
 
-              When the user asks to change product behavior: use `spec-change`,
-              then `spec-implement`, then `spec-check-implementation`.
+              Use `idd-intent-brainstorm` when product intent is unclear.
 
-              For a new feature or behavior change with unclear,
-              implementation-shaped, over-specified, or likely simpler intent:
-              use `spec-brainstorm` before `spec-change`. After it produces a
-              confirmed specification-ready intent, use `spec-change`.
+              Use `idd-intent-change` when durable product behavior must change.
 
-              When the user asks to implement behavior already described in
-              `.specs/`: use `spec-implement`, then `spec-check-implementation`.
-              Do not use `spec-brainstorm` when current specs are already clear
-              and the user asks to implement them.
+              Use `idd-code-implement` for one focused behavior already covered by
+              `.idd/intent/`, then use `idd-code-check-implementation`.
 
-              When the user reports a possible bug: use
-              `spec-check-implementation`; if the current spec is clear, fix
-              implementation with `spec-implement`; if the desired behavior
-              changes product intent, use `spec-change` first.
-
-              When the user asks to create a new feature: use `spec-change` if
-              the feature extends an existing product area. Use `spec-new-document`
-              only if the feature needs a new durable product area, ADR, or
-              spike.
+              Use `idd-intent-new-document` only for a new durable product area,
+              ADR, or spike.
 
               Do not create a new spec merely because the user described a new
               task. Prefer updating the existing owning spec.

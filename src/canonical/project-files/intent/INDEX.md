@@ -3,7 +3,7 @@
 This index helps humans and CodingAgents find relevant current specifications. It is
 not the source of truth.
 
-Current numbered documents directly under `.specs/` contain normative product
+Current numbered documents directly under `.idd/intent/` contain normative product
 intent, ADRs, or active spikes.
 
 Git history is the source for deleted or previous document versions.

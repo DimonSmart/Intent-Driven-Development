@@ -61,20 +61,20 @@ internal sealed partial class SmokeTestSuite
                 }
             }
 
-            var specImplementRoles = Path.Combine(repoRoot, $"{root}/spec-implement/references/roles".Replace('/', Path.DirectorySeparatorChar));
+            var specImplementRoles = Path.Combine(repoRoot, $"{root}/idd-code-implement/references/roles".Replace('/', Path.DirectorySeparatorChar));
             if (Directory.Exists(specImplementRoles))
             {
-                failures.Add($"{root}/spec-implement must not contain factory role prompt references.");
+                failures.Add($"{root}/idd-code-implement must not contain factory role prompt references.");
             }
         }
     }
 
     void ExpectClaudeSkillMetadata()
     {
-        var specAuditPath = Path.Combine(repoRoot, "generated/claude/.claude/skills/spec-audit/SKILL.md".Replace('/', Path.DirectorySeparatorChar));
+        var specAuditPath = Path.Combine(repoRoot, "generated/claude/.claude/skills/idd-intent-audit/SKILL.md".Replace('/', Path.DirectorySeparatorChar));
         if (!File.Exists(specAuditPath))
         {
-            failures.Add("Missing Claude spec-audit skill for frontmatter check.");
+            failures.Add("Missing Claude idd-intent-audit skill for frontmatter check.");
         }
         else
         {
@@ -89,22 +89,22 @@ internal sealed partial class SmokeTestSuite
             {
                 if (!content.Contains(text, StringComparison.Ordinal))
                 {
-                    failures.Add($"Claude spec-audit skill is missing frontmatter '{text}'.");
+                    failures.Add($"Claude idd-intent-audit skill is missing frontmatter '{text}'.");
                 }
             }
         }
 
-        var specChangePath = Path.Combine(repoRoot, "generated/claude/.claude/skills/spec-change/SKILL.md".Replace('/', Path.DirectorySeparatorChar));
+        var specChangePath = Path.Combine(repoRoot, "generated/claude/.claude/skills/idd-intent-change/SKILL.md".Replace('/', Path.DirectorySeparatorChar));
         if (!File.Exists(specChangePath))
         {
-            failures.Add("Missing Claude spec-change skill for frontmatter check.");
+            failures.Add("Missing Claude idd-intent-change skill for frontmatter check.");
         }
         else
         {
             var content = File.ReadAllText(specChangePath);
             if (content.Contains("context: fork", StringComparison.Ordinal))
             {
-                failures.Add("Claude spec-change skill unexpectedly has context: fork.");
+                failures.Add("Claude idd-intent-change skill unexpectedly has context: fork.");
             }
         }
     }
@@ -157,10 +157,12 @@ internal sealed partial class SmokeTestSuite
         WithToolInstall("install --target claude", installRoot =>
         {
             ExpectTempFile(installRoot, "CLAUDE.md", "default install did not create CLAUDE.md.");
-            ExpectTempFile(installRoot, ".claude/skills/spec-new-document/SKILL.md", "default install did not install core skill.");
-            ExpectTempFile(installRoot, ".specs/README.md", "default install did not install .specs.");
+            ExpectTempFile(installRoot, ".claude/skills/idd-intent-new-document/SKILL.md", "default install did not install core skill.");
+            ExpectTempFile(installRoot, ".idd/intent/README.md", "default install did not install .idd/intent.");
+            ExpectTempFile(installRoot, ".idd/intent/INDEX.md", "default install did not install .idd/intent index.");
+            ExpectTempMissing(installRoot, LegacySpecsDirectory, "default install created legacy specs directory.");
 
-            if (File.Exists(Path.Combine(installRoot, ".claude/skills/factory-create-work-plan/SKILL.md".Replace('/', Path.DirectorySeparatorChar))))
+            if (File.Exists(Path.Combine(installRoot, ".claude/skills/idd-factory-create-work-plan/SKILL.md".Replace('/', Path.DirectorySeparatorChar))))
             {
                 failures.Add("default install installed factory skills.");
             }
@@ -169,7 +171,7 @@ internal sealed partial class SmokeTestSuite
         WithToolInstall("install --coding-agent claude", installRoot =>
         {
             ExpectTempFile(installRoot, "CLAUDE.md", "install --coding-agent did not create CLAUDE.md.");
-            ExpectTempFile(installRoot, ".claude/skills/spec-new-document/SKILL.md", "install --coding-agent did not install core skill.");
+            ExpectTempFile(installRoot, ".claude/skills/idd-intent-new-document/SKILL.md", "install --coding-agent did not install core skill.");
         });
     }
 
@@ -182,9 +184,12 @@ internal sealed partial class SmokeTestSuite
                 var skillRoot = target == "claude" ? ".claude/skills" : ".agents/skills";
                 var entry = target == "claude" ? "CLAUDE.md" : "AGENTS.md";
                 ExpectTempFile(installRoot, entry, $"factory install for {target} did not create {entry}.");
-                ExpectTempFile(installRoot, $"{skillRoot}/spec-new-document/SKILL.md", $"factory install for {target} did not install core skill.");
-                ExpectTempFile(installRoot, $"{skillRoot}/factory-create-work-plan/SKILL.md", $"factory install for {target} did not install factory skill.");
+                ExpectTempFile(installRoot, $"{skillRoot}/idd-intent-new-document/SKILL.md", $"factory install for {target} did not install core skill.");
+                ExpectTempFile(installRoot, $"{skillRoot}/idd-factory-create-work-plan/SKILL.md", $"factory install for {target} did not install factory skill.");
+                ExpectTempFile(installRoot, ".idd/intent/README.md", $"factory install for {target} did not install .idd/intent.");
+                ExpectTempFile(installRoot, ".idd/intent/INDEX.md", $"factory install for {target} did not install .idd/intent index.");
                 ExpectTempFile(installRoot, ".idd/factory/.gitignore", $"factory install for {target} did not install factory .gitignore.");
+                ExpectTempMissing(installRoot, LegacySpecsDirectory, $"factory install for {target} created legacy specs directory.");
 
                 if (Directory.Exists(Path.Combine(installRoot, ".idd/factory/work".Replace('/', Path.DirectorySeparatorChar))))
                 {
@@ -265,14 +270,14 @@ internal sealed partial class SmokeTestSuite
                 failures.Add("Install with --entry none created CLAUDE.md.");
             }
 
-            if (!File.Exists(Path.Combine(tempRoot, ".claude", "skills", "spec-new-document", "SKILL.md")))
+            if (!File.Exists(Path.Combine(tempRoot, ".claude", "skills", "idd-intent-new-document", "SKILL.md")))
             {
                 failures.Add("Install with --entry none did not install skills.");
             }
 
-            if (!File.Exists(Path.Combine(tempRoot, ".specs", "README.md")))
+            if (!File.Exists(Path.Combine(tempRoot, ".idd/intent", "README.md")))
             {
-                failures.Add("Install with --entry none did not install .specs.");
+                failures.Add("Install with --entry none did not install .idd/intent.");
             }
         }
         finally

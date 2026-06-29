@@ -65,14 +65,14 @@ Specifications do not include:
 
 ## Decision Flow
 
-Before changing `.specs/`, decide:
+Before changing `.idd/intent/`, decide:
 
 1. Does the change affect future product behavior, domain contracts, accepted
    architecture, compatibility, non-goals, acceptance criteria, or verification
    rules?
 2. If yes, update the smallest relevant current specification or ADR.
 3. If the change is only a task, temporary status, formatting, refactoring, or
-   incidental implementation detail, do not update `.specs/`.
+   incidental implementation detail, do not update `.idd/intent/`.
 4. If implementation and specification disagree, do not assume the
    implementation is the new intent.
 5. If intent is unclear, keep the uncertainty visible and create a spike or ask
@@ -80,11 +80,11 @@ Before changing `.specs/`, decide:
 
 ## Project Directory
 
-IDD projects use `.specs/` for current product intent and current
+IDD projects use `.idd/intent/` for current product intent and current
 decision/research records:
 
 ```text
-.specs/
+.idd/intent/
   README.md
   INDEX.md
   _templates/
@@ -96,14 +96,14 @@ decision/research records:
 Use these meanings:
 
 ```text
-.specs/              current product intent, ADRs, and active spikes
+.idd/intent/              current product intent, ADRs, and active spikes
 ```
 
-Small product-neutral changes belong in commit messages, not in `.specs/`.
+Small product-neutral changes belong in commit messages, not in `.idd/intent/`.
 
 ## Document Lifecycle
 
-`.specs/` contains only the current working model of product intent and current
+`.idd/intent/` contains only the current working model of product intent and current
 decision/research records.
 
 Git is the only history mechanism. Do not preserve obsolete specs in an

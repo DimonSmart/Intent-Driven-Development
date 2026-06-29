@@ -1,4 +1,4 @@
-# spec-normalize-current
+# idd-intent-normalize-current
 
 Use this skill to perform focused structural normalization over accepted current
 specs without changing product meaning.
@@ -6,15 +6,15 @@ specs without changing product meaning.
 Formula:
 
 ```text
-spec-normalize-current = focused structural normalization over accepted current specs
+idd-intent-normalize-current = focused structural normalization over accepted current specs
 ```
 
-This skill works on an already accepted `.specs` structure, so it is more
+This skill works on an already accepted `.idd/intent` structure, so it is more
 cautious than import. It requires a concrete focus and must not run a broad
-rewrite of `.specs`.
+rewrite of `.idd/intent`.
 
-Use it for later maintenance of an existing `.specs` tree. Do not use it as a
-manual cleanup phase required after `spec-import`; a successful import already
+Use it for later maintenance of an existing `.idd/intent` tree. Do not use it as a
+manual cleanup phase required after `idd-intent-import`; a successful import already
 includes the normalization needed for mechanical consistency.
 
 ## Parameters
@@ -43,13 +43,13 @@ The request must provide at least one concrete focus:
 2. Source focus: a specific spec, section, or fragment to extract or move.
 3. Target focus: an existing or desired target specification.
 4. Mechanical cleanup focus: an existing lint failure such as stale archive
-   directory, process report under `.specs`, broken obvious relation remap,
+   directory, process report under `.idd/intent`, broken obvious relation remap,
    stale index, or legacy section shape.
 
 Examples:
 
 ```text
-Use spec-normalize-current with:
+Use idd-intent-normalize-current with:
 --specs 0033,0046,0014,0048
 --topic "text encoding / BOM / EOL"
 --target new
@@ -57,7 +57,7 @@ Use spec-normalize-current with:
 ```
 
 ```text
-Use spec-normalize-current with:
+Use idd-intent-normalize-current with:
 --specs 0019,0054
 --topic "Paranoid copy retry"
 --target 0019.spec-paranoid-copy-resume.md
@@ -78,15 +78,15 @@ Do not run this skill if the user only asks to:
 - rewrite documentation.
 
 If the request is broad, such as "review all specs" or "find structural
-problems", do not run spec-normalize-current. Use `spec-audit` first.
+problems", do not run idd-intent-normalize-current. Use `idd-intent-audit` first.
 
 If no concrete normalization focus is provided, do not inspect or rewrite the
 specification set. Respond with:
 
 ```text
-Cannot run spec-normalize-current without a concrete normalization focus.
+Cannot run idd-intent-normalize-current without a concrete normalization focus.
 
-For broad structural diagnostics, use spec-audit first. For normalization,
+For broad structural diagnostics, use idd-intent-audit first. For normalization,
 specify a topic to collect, a source spec or section to extract, or a target
 spec to consolidate into.
 ```
@@ -163,8 +163,8 @@ Support these scenarios:
 - merge tiny spec X into a larger existing spec;
 - move misplaced behavior from one spec to another;
 - delete task-like, process-only, obsolete, duplicated, or incorrect documents;
-- delete `.specs/archive`;
-- remove import/process reports from `.specs`;
+- delete `.idd/intent/archive`;
+- remove import/process reports from `.idd/intent`;
 - regenerate `INDEX.md` from actual current numbered documents;
 - fix broken relation references where the remap is obvious;
 - normalize current document shapes;
@@ -181,7 +181,7 @@ Support these scenarios:
 - Do not choose one side of a conflict.
 - Do not treat implementation as product intent.
 - Do not rewrite specs for style only.
-- Do not normalize wording across the whole `.specs/` directory.
+- Do not normalize wording across the whole `.idd/intent/` directory.
 - Do not turn tasks, temporary status, generated output, or chat history into
   normative intent.
 - Keep source-specific behavior in the source spec when it is not general.
@@ -191,8 +191,8 @@ Support these scenarios:
 - Do not archive obsolete documents.
 - Delete documents that no longer belong in the current working tree.
 - Git history is the only history mechanism.
-- Remove process-only import reports from `.specs`; if a persistent report is
-  explicitly needed, move it outside `.specs`.
+- Remove process-only import reports from `.idd/intent`; if a persistent report is
+  explicitly needed, move it outside `.idd/intent`.
 - Numeric `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar
   relation references must point to existing current numbered documents.
 - Remove historical-only relations or rewrite them when the current target is
@@ -208,8 +208,8 @@ Support these scenarios:
 
 1. Identify the concrete normalization focus.
 2. If no concrete focus is present, stop and direct broad requests to
-   `spec-audit`.
-3. Read `.specs/README.md`, `.specs/INDEX.md`, and only relevant current
+   `idd-intent-audit`.
+3. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and only relevant current
    numbered specs.
 4. Find current fragments related to the focus.
 5. Classify fragments as:
@@ -231,8 +231,8 @@ Support these scenarios:
 11. Keep conflicts visible and unresolved.
 12. Update `INDEX.md` when the document set or document roles change.
 13. For mechanical cleanup focus:
-    - delete `.specs/archive` if it exists;
-    - remove process reports from `.specs`;
+    - delete `.idd/intent/archive` if it exists;
+    - remove process reports from `.idd/intent`;
     - regenerate `INDEX.md`;
     - fix broken relation references where the remap is obvious;
     - normalize document shapes;
@@ -284,7 +284,7 @@ Expected behavior:
 User request:
 
 ```text
-Use spec-normalize-current to extract the Controls section from
+Use idd-intent-normalize-current to extract the Controls section from
 0003.spec-console-ui.md into a dedicated console controls specification.
 ```
 
@@ -316,15 +316,15 @@ Expected behavior:
 Bad request:
 
 ```text
-Use spec-normalize-current to clean up the specs.
+Use idd-intent-normalize-current to clean up the specs.
 ```
 
 Expected response:
 
 ```text
-Cannot run spec-normalize-current without a concrete normalization focus.
+Cannot run idd-intent-normalize-current without a concrete normalization focus.
 
-Use spec-audit first to find broad structural problems.
+Use idd-intent-audit first to find broad structural problems.
 ```
 
 ## Non-goals
@@ -337,7 +337,7 @@ This skill does not:
 - update product intent;
 - infer new requirements from implementation;
 - create a new feature spec from a task;
-- normalize the whole `.specs` directory.
+- normalize the whole `.idd/intent` directory.
 
-Use `spec-audit` for broad structural diagnostics. Use `spec-import` when raw
+Use `idd-intent-audit` for broad structural diagnostics. Use `idd-intent-import` when raw
 external material is being imported.

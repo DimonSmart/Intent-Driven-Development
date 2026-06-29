@@ -1,19 +1,19 @@
 # Example: Normalizing Console Control Mouse Behavior
 
-This example shows how `spec-normalize-current` moves existing intent to a
+This example shows how `idd-intent-normalize-current` moves existing intent to a
 better location without changing product meaning.
 
 ## Request
 
 ```text
-Use spec-normalize-current to collect all current intent about mouse support in
+Use idd-intent-normalize-current to collect all current intent about mouse support in
 console controls and move it into a dedicated specification.
 ```
 
 ## Before
 
 ```text
-.specs/
+.idd/intent/
   0001.spec-main-menu.md
   0002.spec-table-view.md
   0003.spec-dialogs.md
@@ -53,7 +53,7 @@ Dialog buttons can be activated with mouse clicks.
 
 ## Reorganization
 
-`spec-normalize-current` identifies:
+`idd-intent-normalize-current` identifies:
 
 - common behavior: console controls support mouse interaction;
 - control-specific behavior: menu clicks, table row selection, wheel scrolling,
@@ -69,7 +69,7 @@ It creates a dedicated shared specification:
 ## After
 
 ```text
-.specs/
+.idd/intent/
   0001.spec-main-menu.md
   0002.spec-table-view.md
   0003.spec-dialogs.md

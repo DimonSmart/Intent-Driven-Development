@@ -1,42 +1,42 @@
 {
   "packs": {
     "core": {
-      "description": "Core Intent-Driven Development specification workflows.",
+      "description": "Core Intent-Driven Development intent workflows.",
       "default": true,
       "requires": [],
       "skills": [
-        "spec-audit",
-        "spec-brainstorm",
-        "spec-change",
-        "spec-import",
-        "spec-implement",
-        "spec-lint",
-        "spec-new-document",
-        "spec-normalize-current",
-        "spec-check-implementation",
-        "spec-update-from-implementation"
+        "idd-intent-audit",
+        "idd-intent-brainstorm",
+        "idd-intent-change",
+        "idd-intent-import",
+        "idd-code-implement",
+        "idd-intent-lint",
+        "idd-intent-new-document",
+        "idd-intent-normalize-current",
+        "idd-code-check-implementation",
+        "idd-code-update-intent"
       ],
       "rolePrompts": [],
       "skillRoleReferences": {},
       "projectFiles": [
         {
-          "source": "src/canonical/project-files/specs",
-          "destination": ".specs"
+          "source": "src/canonical/project-files/intent",
+          "destination": ".idd/intent"
         }
       ]
     },
     "factory": {
-      "description": "Optional temporary execution orchestration workflows for implementing current specs.",
+      "description": "Optional temporary execution orchestration workflows for implementing current IDD intent.",
       "default": false,
       "requires": [
         "core"
       ],
       "skills": [
-        "factory-create-work-plan",
-        "factory-execute-work-plan",
-        "factory-review-task",
-        "factory-review-work-result",
-        "factory-finish-work"
+        "idd-factory-create-work-plan",
+        "idd-factory-execute-work-plan",
+        "idd-factory-review-task",
+        "idd-factory-review-work-result",
+        "idd-factory-finish-work"
       ],
       "rolePrompts": [
         "factory-coordinator",
@@ -46,23 +46,23 @@
         "final-reviewer"
       ],
       "skillRoleReferences": {
-        "factory-create-work-plan": [
+        "idd-factory-create-work-plan": [
           "factory-coordinator",
           "implementation-planner"
         ],
-        "factory-execute-work-plan": [
+        "idd-factory-execute-work-plan": [
           "factory-coordinator",
           "implementer",
           "task-reviewer",
           "final-reviewer"
         ],
-        "factory-review-task": [
+        "idd-factory-review-task": [
           "task-reviewer"
         ],
-        "factory-review-work-result": [
+        "idd-factory-review-work-result": [
           "final-reviewer"
         ],
-        "factory-finish-work": [
+        "idd-factory-finish-work": [
           "factory-coordinator"
         ]
       },

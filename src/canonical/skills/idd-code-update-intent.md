@@ -1,4 +1,4 @@
-# spec-update-from-implementation
+# idd-code-update-intent
 
 Use this skill to update a current specification from verified implementation
 behavior when the user explicitly confirms that the implementation represents
@@ -6,11 +6,11 @@ current product intent.
 
 Implementation evidence is not product intent by itself.
 
-Use `spec-update-from-implementation` when implementation behavior already exists
+Use `idd-code-update-intent` when implementation behavior already exists
 and the user explicitly confirms that this implementation is current product
 intent.
 
-Use `spec-change` when the user describes desired future behavior before
+Use `idd-intent-change` when the user describes desired future behavior before
 implementation.
 
 ## Rules
@@ -45,8 +45,8 @@ implementation.
 
 ## Workflow
 
-1. Read `.specs/README.md`, `.specs/INDEX.md`, and relevant current numbered
-   documents directly under `.specs/`.
+1. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and relevant current numbered
+   documents directly under `.idd/intent/`.
 2. Inspect the implementation and verification evidence.
 3. Identify observable behavior and durable architecture that may represent
    current product intent.

@@ -44,28 +44,31 @@ read only the documents needed for the current task.`;
     `Use installed IDD skills for specific workflows:\n${skills}`,
     `## IDD Workflow Routing
 
-Use \`spec-brainstorm\` when product intent is unclear.
-Use \`spec-change\` when durable product behavior must change.
-Use \`spec-implement\` for one focused behavior already covered by
-\`.specs/\`, then use \`spec-check-implementation\`.
-Use \`spec-new-document\` only for a new durable product area, ADR, or
-spike.`
+Use \`idd-intent-brainstorm\` when product intent is unclear.
+Use \`idd-intent-change\` when durable product behavior must change.
+Use \`idd-code-implement\` for one focused behavior already covered by
+\`.idd/intent/\`, then use \`idd-code-check-implementation\`.
+Use \`idd-intent-new-document\` only for a new durable product area, ADR, or
+spike.
+
+Do not create a new spec merely because the user described a new task. Prefer
+updating the existing owning spec.`
   ];
 
   if (selectedPacks.includes("factory")) {
     blocks.push(`## IDD Factory Routing
 
-Use factory skills only for planned implementation orchestration,
+Use IDD factory skills only for planned implementation orchestration,
 multi-step execution, task slicing, or factory role based work.
 
-- Use \`factory-create-work-plan\` to create a temporary Factory Work Plan.
-- Use \`factory-execute-work-plan\` to execute an explicit Factory Work Plan.
-- Use \`factory-review-task\` after each bounded task.
-- Use \`factory-review-work-result\` after all tasks are complete.
-- Use \`factory-finish-work\` to summarize and clean temporary factory artifacts.
+- Use \`idd-factory-create-work-plan\` to create a temporary Factory Work Plan.
+- Use \`idd-factory-execute-work-plan\` to execute an explicit Factory Work Plan.
+- Use \`idd-factory-review-task\` after each bounded task.
+- Use \`idd-factory-review-work-result\` after all tasks are complete.
+- Use \`idd-factory-finish-work\` to summarize and clean temporary factory artifacts.
 
 Factory work plans are temporary execution state.
-They are not specs and must not be stored in \`.specs/\`.
+They are not specs and must not be stored in \`.idd/intent/\`.
 Do not read old factory work plans unless the user explicitly provides the exact path.`);
   }
 

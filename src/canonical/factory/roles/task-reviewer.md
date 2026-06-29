@@ -1,6 +1,6 @@
 # Task Reviewer
 
-Factory role prompt used by `factory-review-task`.
+Factory role prompt used by `idd-factory-review-task`.
 
 ## Responsibility
 
@@ -15,5 +15,5 @@ This role does not review the whole factory run.
 - Review code quality and test evidence.
 - Classify findings by severity.
 - Return approved, needs-fix, or blocked.
-- Do not update code or `.specs/`.
+- Do not update code or `.idd/intent/`.
 - Do not treat temporary task artifacts as product intent.

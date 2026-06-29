@@ -1,14 +1,14 @@
-# spec-audit
+# idd-intent-audit
 
-Use this skill to diagnose the structure of `.specs` without editing files.
+Use this skill to diagnose the structure of `.idd/intent` without editing files.
 
 Formula:
 
 ```text
-spec-audit = broad structural diagnostics, no file edits
+idd-intent-audit = broad structural diagnostics, no file edits
 ```
 
-Use it for requests such as "review current `.specs` structure", "find bad
+Use it for requests such as "review current `.idd/intent` structure", "find bad
 split/merge decisions", "find structural problems", or "look across all specs".
 
 ## Rules
@@ -17,8 +17,8 @@ split/merge decisions", "find structural problems", or "look across all specs".
 - Do not reorganize specs.
 - Do not resolve product conflicts.
 - Do not read the whole project unless needed to understand spec references.
-- Recommend `spec-normalize-current` for focused follow-up work.
-- Recommend `spec-import` only when the problem is unnormalized raw source
+- Recommend `idd-intent-normalize-current` for focused follow-up work.
+- Recommend `idd-intent-import` only when the problem is unnormalized raw source
   material.
 - Report uncertainty explicitly.
 
@@ -43,8 +43,8 @@ product behavior, or source-specific wrapper text from imported methodologies.
 
 ## Required Behavior
 
-1. Read `.specs/README.md`.
-2. Read `.specs/INDEX.md`.
+1. Read `.idd/intent/README.md`.
+2. Read `.idd/intent/INDEX.md`.
 3. Read headings, Intent, Scope/Behavior, Related specs, Non-goals, and
    Acceptance Criteria from current specs.
 4. Do not read the whole project without necessity.
@@ -59,7 +59,7 @@ product behavior, or source-specific wrapper text from imported methodologies.
    - task/refactor/cleanup specs;
    - semantic conflicts;
    - obsolete references;
-   - `.specs` archive directory;
+   - `.idd/intent` archive directory;
    - `Archived` section in `INDEX.md`;
    - archive references in skills or docs;
    - obsolete documents that should be deleted;
@@ -76,8 +76,8 @@ product behavior, or source-specific wrapper text from imported methodologies.
 
 ## Structural Diagnostics
 
-Use the same structural normalization concepts as `spec-import` and
-`spec-normalize-current`, but only for diagnosis.
+Use the same structural normalization concepts as `idd-intent-import` and
+`idd-intent-normalize-current`, but only for diagnosis.
 
 Look for durable product areas such as product overview, panels, command line,
 file operations, viewer, editor, shared text format / encoding / BOM / EOL, UI
@@ -130,15 +130,15 @@ Specs or areas that look coherent and should not be reorganized.
 User request:
 
 ```text
-Review current `.specs` structure and find bad split/merge decisions.
+Review current `.idd/intent` structure and find bad split/merge decisions.
 ```
 
 Expected behavior:
 
-- use `spec-audit`;
+- use `idd-intent-audit`;
 - do not edit files;
 - produce findings and a reorganization plan;
-- identify which follow-up actions should use `spec-normalize-current`.
+- identify which follow-up actions should use `idd-intent-normalize-current`.
 
 ## Non-goals
 
@@ -150,4 +150,4 @@ Do not use this skill to:
 - verify implementation against specs;
 - lint mechanical consistency only.
 
-Use `spec-lint` for cheap mechanical validation.
+Use `idd-intent-lint` for cheap mechanical validation.

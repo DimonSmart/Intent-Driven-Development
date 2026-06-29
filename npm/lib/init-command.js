@@ -7,19 +7,19 @@ const { copyDirectory, ensureNoUnknownArgs } = require("./fs-utils");
 function initProject(args) {
   ensureNoUnknownArgs(args, ["--force"]);
   const force = args.includes("--force");
-  const source = path.join(contentRoot, "src", "canonical", "project-files", "specs");
-  const destination = path.join(process.cwd(), ".specs");
+  const source = path.join(contentRoot, "src", "canonical", "project-files", "intent");
+  const destination = path.join(process.cwd(), ".idd/intent");
 
   if (!fs.existsSync(source)) {
     fail(`Bundled canonical project files not found: ${source}`);
   }
 
   if (fs.existsSync(destination) && !force) {
-    fail("File already exists: .specs\nUse --force to overwrite.");
+    fail("File already exists: .idd/intent\nUse --force to overwrite.");
   }
 
   copyDirectory(source, destination, force);
-  console.log("Initialized .specs.");
+  console.log("Initialized .idd/intent.");
 }
 
 module.exports = { initProject };

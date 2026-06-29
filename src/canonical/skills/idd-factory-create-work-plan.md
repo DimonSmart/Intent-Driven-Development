@@ -1,9 +1,9 @@
-# factory-create-work-plan
+# idd-factory-create-work-plan
 
 ## Purpose
 
 Create a temporary Factory Work Plan from the current user request, current
-`.specs/` intent, and relevant repository evidence.
+`.idd/intent/` intent, and relevant repository evidence.
 
 This skill is the workflow contract. Factory role prompts are optional local
 references that may help structure planning, but they do not own durable
@@ -18,15 +18,15 @@ only.
 
 ## Rules
 
-- Read `.specs/README.md`, `.specs/INDEX.md`, and only relevant current specs.
-- Do not read the whole `.specs/` directory by default.
+- Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and only relevant current specs.
+- Do not read the whole `.idd/intent/` directory by default.
 - Do not write or modify code.
-- Do not write into `.specs/`.
+- Do not write into `.idd/intent/`.
 - Do not treat implementation as product intent.
 - If requested durable behavior is missing from specs, stop and route to
-  `spec-change` or `spec-brainstorm`.
-- If intent is unclear, route to `spec-brainstorm`.
-- If an architecture decision is missing, route to `spec-new-document` for an
+  `idd-intent-change` or `idd-intent-brainstorm`.
+- If intent is unclear, route to `idd-intent-brainstorm`.
+- If an architecture decision is missing, route to `idd-intent-new-document` for an
   ADR or spike when appropriate.
 - Create a work plan only for behavior already covered by current specs or
   explicitly confirmed as task-only implementation work.
@@ -39,7 +39,7 @@ only.
 
 1. Identify whether the user is asking for planned implementation orchestration,
    task slicing, multi-step execution, or factory-style work.
-2. Read `.specs/README.md` and `.specs/INDEX.md`.
+2. Read `.idd/intent/README.md` and `.idd/intent/INDEX.md`.
 3. Read only the relevant current specs, ADRs, and active spikes needed to
    understand the requested implementation task.
 4. Inspect repository evidence needed to identify likely code and test areas.

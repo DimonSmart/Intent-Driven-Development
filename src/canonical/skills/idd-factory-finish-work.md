@@ -1,4 +1,4 @@
-# factory-finish-work
+# idd-factory-finish-work
 
 ## Purpose
 
@@ -18,7 +18,7 @@ product intent.
   asked to keep or commit factory artifacts.
 - If deletion is unsafe because artifacts were explicitly requested as
   evidence, do not delete silently.
-- Never delete `.specs/`.
+- Never delete `.idd/intent/`.
 - Never delete code, tests, or durable documentation as part of factory cleanup.
 - Do not read unrelated previous work plans.
 - Factory artifacts are temporary execution state, not product intent and not a

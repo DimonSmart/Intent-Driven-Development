@@ -17,7 +17,7 @@ npx intent-driven-development install --all
 ```
 
 `minimal` is the default compact entry point.
-`none` installs only skills and `.specs` for CodingAgents that support generated skills.
+`none` installs only skills and `.idd/intent` for CodingAgents that support generated skills.
 `full` installs a larger entry point with embedded methodology for legacy/debug scenarios.
 
 For CodingAgents without generated skills, such as `gemini`, `--entry none` is rejected.
@@ -33,7 +33,7 @@ npx intent-driven-development install --target claude --pack factory
 
 Factory work artifacts live under `.idd/factory/work/`, are ignored by git by
 default, and are not product specifications. They should not be reused
-automatically for unrelated tasks. Durable product intent belongs in `.specs/`.
+automatically for unrelated tasks. Durable product intent belongs in `.idd/intent/`.
 Future external Work Item Provider integration is not implemented yet.
 
 The package is a delivery wrapper. Bundled methodology and generated files are

@@ -1,7 +1,7 @@
-# spec-check-implementation
+# idd-code-check-implementation
 
 Use this skill to check whether the current implementation satisfies current
-`.specs/` product intent.
+`.idd/intent/` product intent.
 
 This skill compares implementation evidence with current specifications and
 classifies differences. It does not silently change specifications or code.
@@ -67,9 +67,9 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
 
 ## Rules
 
-- Use only current numbered documents directly under `.specs/` as normative
+- Use only current numbered documents directly under `.idd/intent/` as normative
   product intent.
-- There is no `.specs` archive lifecycle.
+- There is no `.idd/intent` archive lifecycle.
 - Do not inspect deleted Git history unless the user explicitly asks for
   historical investigation.
 - Do not treat implementation as product intent by itself.
@@ -101,8 +101,8 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
 
 1. Identify the concrete check focus from the request.
 2. If no concrete focus is present, stop and ask for one.
-3. Read `.specs/README.md`, `.specs/INDEX.md`, and relevant current numbered
-   documents directly under `.specs/`.
+3. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and relevant current numbered
+   documents directly under `.idd/intent/`.
 4. Inspect the focused implementation evidence:
 
    - code;
@@ -130,10 +130,10 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
    - fix implementation;
    - add or update tests;
    - ask for product intent confirmation;
-   - update product intent using `spec-change`;
-   - create a new spec, ADR, or spike using `spec-new-document` only when no
+   - update product intent using `idd-intent-change`;
+   - create a new spec, ADR, or spike using `idd-intent-new-document` only when no
      existing current spec owns the area;
-   - update spec from implementation using `spec-update-from-implementation`
+   - update spec from implementation using `idd-code-update-intent`
      only after explicit confirmation;
    - create a spike if the correct intent requires research.
 
@@ -243,8 +243,8 @@ Recommended next step:
 
 ```text
 Ask whether this behavior is intended product intent. If the user describes a
-desired behavior, use spec-change. If the user confirms existing implementation
-as intent, use spec-update-from-implementation.
+desired behavior, use idd-intent-change. If the user confirms existing implementation
+as intent, use idd-code-update-intent.
 ```
 
 ### `unclear-intent`
@@ -299,34 +299,34 @@ implementation bug.
 Good request:
 
 ```text
-Use spec-check-implementation to verify whether console table mouse behavior
+Use idd-code-check-implementation to verify whether console table mouse behavior
 matches the current specs.
 ```
 
 Good request:
 
 ```text
-Use spec-check-implementation to check the authentication implementation against
+Use idd-code-check-implementation to check the authentication implementation against
 0003.spec-authentication.md.
 ```
 
 Good request:
 
 ```text
-Use spec-check-implementation to classify why OTP login tests fail against the
+Use idd-code-check-implementation to classify why OTP login tests fail against the
 current product intent.
 ```
 
 Bad request:
 
 ```text
-Use spec-check-implementation to check the whole project.
+Use idd-code-check-implementation to check the whole project.
 ```
 
 Response:
 
 ```text
-Cannot run spec-check-implementation without a concrete check focus.
+Cannot run idd-code-check-implementation without a concrete check focus.
 
 Specify one of:
 - an implementation area;
@@ -336,34 +336,34 @@ Specify one of:
 
 ## Relationship To Other Skills
 
-Use `spec-change` when the user describes desired future product behavior before
+Use `idd-intent-change` when the user describes desired future product behavior before
 implementation or wants to change current behavior.
 
-Use `spec-implement` when current specs are clear and implementation should be
+Use `idd-code-implement` when current specs are clear and implementation should be
 changed to match them.
 
-Use `spec-new-document` when durable product intent needs a new spec, ADR, or
+Use `idd-intent-new-document` when durable product intent needs a new spec, ADR, or
 spike.
 
-Use `spec-update-from-implementation` only when the user explicitly confirms
+Use `idd-code-update-intent` only when the user explicitly confirms
 that verified implementation behavior represents current product intent.
 
-Use `spec-normalize-current` when existing intent should be moved to a better
+Use `idd-intent-normalize-current` when existing intent should be moved to a better
 location without changing meaning.
 
-Use `spec-check-implementation` before those actions when the problem is a
+Use `idd-code-check-implementation` before those actions when the problem is a
 possible mismatch between implementation and current specs.
 
 ## Routing After Findings
 
 - If current spec is clear and implementation violates it, recommend
-  `spec-implement`.
-- If user wants to change current behavior, recommend `spec-change` before code
+  `idd-code-implement`.
+- If user wants to change current behavior, recommend `idd-intent-change` before code
   changes.
 - If implementation contains desired behavior not yet specified, recommend
-  `spec-update-from-implementation` only after explicit user confirmation.
+  `idd-code-update-intent` only after explicit user confirmation.
 - If product intent is missing and user describes desired behavior, recommend
-  `spec-change`, not `spec-new-document`, unless no existing spec owns the area.
+  `idd-intent-change`, not `idd-intent-new-document`, unless no existing spec owns the area.
 
 ## Non-Goals
 

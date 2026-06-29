@@ -1,4 +1,4 @@
-# spec-new-document
+# idd-intent-new-document
 
 Use this skill to create a new owning specification, ADR, or spike when no
 existing current document owns the product area or decision.
@@ -19,8 +19,8 @@ rules, state the mismatch and use the correct document type.
 
 - Do not use this skill for changing behavior already covered by an existing
   current spec.
-- Use `spec-change` for user-requested changes to existing product behavior.
-- Use `spec-new-document` only when a new durable product area, ADR, or spike is
+- Use `idd-intent-change` for user-requested changes to existing product behavior.
+- Use `idd-intent-new-document` only when a new durable product area, ADR, or spike is
   needed.
 - Do not create a spec for task-level changes.
 - Do not create a spec for an ordinary dependency update.
@@ -46,16 +46,16 @@ rules, state the mismatch and use the correct document type.
 
 ## Workflow
 
-1. Read `.specs/README.md`, `.specs/INDEX.md`, and relevant current numbered
-   documents directly under `.specs/`.
+1. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and relevant current numbered
+   documents directly under `.idd/intent/`.
 2. Determine the document type from the explicit input or from the change.
 3. Before creating a new document, search `INDEX.md` and relevant current specs
    for an existing owner of the product area.
-4. If an owner exists, stop and use `spec-change`.
+4. If an owner exists, stop and use `idd-intent-change`.
 5. If current intent already exists, update the existing current document
    instead of creating a duplicate.
 6. Find the next number by scanning current numbered documents directly under
-   `.specs/`. Do not scan or create an archive directory. Deleted document
+   `.idd/intent/`. Do not scan or create an archive directory. Deleted document
    numbers are not reused.
 7. Create the document from the matching template.
 8. Update `INDEX.md` when a numbered document is added.

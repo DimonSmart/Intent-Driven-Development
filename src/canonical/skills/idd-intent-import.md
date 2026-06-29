@@ -1,12 +1,12 @@
-# spec-import
+# idd-intent-import
 
 Use this skill to import raw specification material into a normalized IDD
-`.specs/` structure.
+`.idd/intent/` structure.
 
 Formula:
 
 ```text
-spec-import = import + mandatory normalization + lint gate
+idd-intent-import = import + mandatory normalization + lint gate
 ```
 
 Use it when old `.worklog` content, GitHub Spec Kit folders, issue/task docs,
@@ -16,20 +16,20 @@ coherent current product specification set.
 Import is a migration of meaning, not a mechanical conversion from old files to
 new files. Source files are evidence. They are not the desired target structure.
 
-Import is not complete until the generated `.specs` tree is mechanically
+Import is not complete until the generated `.idd/intent` tree is mechanically
 consistent.
 
 For successful apply-safe import, the expected final state is:
 
-- no `.specs/archive`;
-- no process-only import reports under `.specs`;
-- all current numbered documents are listed in `.specs/INDEX.md`;
-- all current documents listed in `.specs/INDEX.md` exist;
+- no `.idd/intent/archive`;
+- no process-only import reports under `.idd/intent`;
+- all current numbered documents are listed in `.idd/intent/INDEX.md`;
+- all current documents listed in `.idd/intent/INDEX.md` exist;
 - all numeric `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar
   references point to existing current documents;
 - imported current specs, ADRs, and active spikes follow the current document
   shape;
-- `spec-lint` would return no errors.
+- `idd-intent-lint` would return no errors.
 
 Warnings may remain only for genuinely semantic ambiguity. Mechanical errors
 must be fixed before finishing the import.
@@ -129,7 +129,7 @@ This is not a fixed enum. Prefer areas that match the actual product.
 
 ## Required Behavior
 
-1. Read `.specs/README.md`, `.specs/INDEX.md`, and existing current specs when
+1. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and existing current specs when
    they exist.
 2. Read the requested source files or directories.
 3. Split source material into:
@@ -150,8 +150,8 @@ This is not a fixed enum. Prefer areas that match the actual product.
 11. Extract repeated common models into shared specs.
 12. Keep semantic conflicts visible and do not resolve them automatically.
 13. Build and apply a source-to-target remap before writing final relations.
-14. Regenerate `.specs/INDEX.md` from actual current numbered documents.
-15. Run or simulate `spec-lint` and fix mechanical errors before finishing.
+14. Regenerate `.idd/intent/INDEX.md` from actual current numbered documents.
+15. Run or simulate `idd-intent-lint` and fix mechanical errors before finishing.
 16. Keep a short source reference only when it helps traceability; do not turn a
     spec into an imported journal.
 
@@ -241,8 +241,8 @@ Do not import obsolete or process-only source material into an archive. Skip or
 delete source material that has no current product intent. Preserve old
 versions only through Git history.
 
-Never create `.specs/archive`.
-Never move obsolete imported documents into `.specs/archive`.
+Never create `.idd/intent/archive`.
+Never move obsolete imported documents into `.idd/intent/archive`.
 Never preserve skipped, obsolete, duplicate, process-only, task-like, or
 historical source files as archived specs.
 Git history is the archive.
@@ -284,7 +284,7 @@ needs-review
 Rules:
 
 - A numeric relation may be written only if the referenced target document
-  exists in current `.specs`.
+  exists in current `.idd/intent`.
 - If source document A was absorbed by target document B, references to A must
   be rewritten to B when the relation is still meaningful.
 - If source document A was skipped as process-only, duplicate, obsolete,
@@ -442,7 +442,7 @@ Source history is not a normative relation.
 
 ## Index Regeneration
 
-Regenerate `.specs/INDEX.md` from actual current numbered documents after
+Regenerate `.idd/intent/INDEX.md` from actual current numbered documents after
 import. Never leave placeholder index content. Never rely on the source index as
 the final target index.
 
@@ -459,7 +459,7 @@ Minimum structure:
 
 Rules:
 
-- every current numbered document under `.specs/` must be listed;
+- every current numbered document under `.idd/intent/` must be listed;
 - every listed document must exist;
 - process reports, templates, README files, and support docs must not be listed
   as current specs;
@@ -467,7 +467,7 @@ Rules:
 
 ## Workflow
 
-1. Read `.specs/README.md`, `.specs/INDEX.md`, and relevant existing current
+1. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and relevant existing current
    specs.
 2. Read the requested source roots.
 3. Discover source methodology and lifecycle conventions.
@@ -488,38 +488,38 @@ Rules:
 11. Keep conflicts visible and unresolved.
 12. Run post-import cleanup.
 13. Return the import report in the assistant response, or write it outside
-    `.specs` only when persistent output is explicitly needed.
+    `.idd/intent` only when persistent output is explicitly needed.
 14. Run relevant repository checks.
 
 ## Post-import Cleanup
 
 Before finishing:
 
-1. Delete `.specs/archive` if it exists.
-2. Remove import/process reports from `.specs`.
-3. Regenerate `.specs/INDEX.md`.
+1. Delete `.idd/intent/archive` if it exists.
+2. Remove import/process reports from `.idd/intent`.
+3. Regenerate `.idd/intent/INDEX.md`.
 4. Validate and rewrite numeric relations through the source-to-target map.
 5. Normalize current specs, ADRs, and spikes to current section shapes.
 6. Reclassify resolved spikes.
 7. Remove or merge task-like, process-only, duplicate, and historical-only docs.
-8. Run or simulate `spec-lint`.
+8. Run or simulate `idd-intent-lint`.
 9. Continue fixing mechanical errors until none remain.
 
 ## Import Report
 
-Do not create `.specs/import-report.md`.
+Do not create `.idd/intent/import-report.md`.
 
 Import reports are process output, not product intent. They must not be stored
-inside `.specs`.
+inside `.idd/intent`.
 
 Prefer returning the import report in the assistant response. If a persistent
-report is explicitly needed, write it outside `.specs`, for example:
+report is explicitly needed, write it outside `.idd/intent`, for example:
 
 - `.intent-driven-development/import-report.md`;
 - `docs/import-report.md`.
 
-The report must not recommend creating `.specs/archive` or link to
-`.specs/archive/...`.
+The report must not recommend creating `.idd/intent/archive` or link to
+`.idd/intent/archive/...`.
 
 Include:
 
@@ -554,14 +554,14 @@ Before finishing, check:
 - Existing specs were updated when appropriate.
 - Conflicts are visible and unresolved.
 - ADR-worthy decisions and spike-worthy research are separated.
-- `.specs/INDEX.md` is regenerated from actual current numbered documents.
+- `.idd/intent/INDEX.md` is regenerated from actual current numbered documents.
 - numeric relations point only to existing current documents.
-- no process/import report remains under `.specs`.
-- no `.specs/archive` directory exists.
+- no process/import report remains under `.idd/intent`.
+- no `.idd/intent/archive` directory exists.
 - imported specs, ADRs, and active spikes use current document shapes.
 - resolved spikes are converted, removed, or justified as still-active
   research.
-- `spec-lint` would return no errors.
+- `idd-intent-lint` would return no errors.
 - The resulting specs describe target product state, not work history.
 
 ## Examples
@@ -584,7 +584,7 @@ Expected import behavior:
 - extract shared text encoding/BOM/EOL behavior into a dedicated spec;
 - do not import the cleanup task as a current product spec;
 - report the Append conflict as a product decision;
-- update `.specs/INDEX.md`.
+- update `.idd/intent/INDEX.md`.
 
 ### Import legacy `.worklog` with broken historical references
 
@@ -599,15 +599,15 @@ Input:
 
 Expected import behavior:
 
-- do not create `.specs/archive`;
-- do not create `.specs/import-report.md`;
+- do not create `.idd/intent/archive`;
+- do not create `.idd/intent/import-report.md`;
 - build source-to-target mapping;
 - rewrite references to current targets when documents were absorbed or merged;
 - remove historical-only relations;
-- regenerate `.specs/INDEX.md`;
+- regenerate `.idd/intent/INDEX.md`;
 - normalize specs, ADRs, and active spikes to current shapes;
 - convert or remove resolved spikes;
-- finish with no `spec-lint` errors.
+- finish with no `idd-intent-lint` errors.
 
 ### Spec Kit-like source
 
@@ -636,13 +636,13 @@ Expected import behavior:
 Do not use this skill for:
 
 - full quality review of all existing specs when import was not requested;
-- broad diagnostics of current `.specs` structure without import;
+- broad diagnostics of current `.idd/intent` structure without import;
 - rewriting specifications just to make them nicer;
 - deriving requirements from code;
 - automatically resolving product conflicts;
-- moving tasks into `.specs/`;
+- moving tasks into `.idd/intent/`;
 - creating a project plan or implementation backlog.
 
-Use `spec-audit` for broad structural diagnostics without edits. Use
-`spec-normalize-current` only for later maintenance of an existing `.specs`
+Use `idd-intent-audit` for broad structural diagnostics without edits. Use
+`idd-intent-normalize-current` only for later maintenance of an existing `.idd/intent`
 tree, not as a required manual cleanup after import.

@@ -71,7 +71,7 @@ If no, keep it in a task, issue, pull request, commit message, or chat.
 
 If unsure, create a spike or ask for clarification before turning it into normative product intent.
 
-| Change | Goes to `.specs/`? | Reason |
+| Change | Goes to `.idd/intent/`? | Reason |
 | --- | --- | --- |
 | Product behavior changes | Yes | Future implementations must preserve it |
 | Domain contract changes | Yes | It affects product meaning |
@@ -122,13 +122,13 @@ Specifications and ADRs are for durable product truth. A specification describes
 
 Generated CodingAgent output is not authoritative. It can help deliver the method into a specific tool, but it should not become product memory.
 
-Implementation evidence is also not intent by itself. When the implementation differs from the specification, decide whether the product intent changed before changing `.specs/`.
+Implementation evidence is also not intent by itself. When the implementation differs from the specification, decide whether the product intent changed before changing `.idd/intent/`.
 
 ## Document Lifecycle
 
 Git stores history.
 
-`.specs/` stores only current product intent, ADRs, and active spikes.
+`.idd/intent/` stores only current product intent, ADRs, and active spikes.
 
 When product intent evolves inside the same product area, update the existing spec directly.
 

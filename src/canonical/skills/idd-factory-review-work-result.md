@@ -1,4 +1,4 @@
-# factory-review-work-result
+# idd-factory-review-work-result
 
 ## Purpose
 
@@ -27,7 +27,7 @@ intent.
 2. Review the full diff/result against relevant current specs.
 3. Use the local `references/roles/` final-reviewer prompt when present.
 4. Check that `.idd/factory/work/` artifacts remain temporary and are not placed
-   under `.specs/`.
+   under `.idd/intent/`.
 5. Write `final-review.md` in the same work directory when a file artifact is
    useful.
 

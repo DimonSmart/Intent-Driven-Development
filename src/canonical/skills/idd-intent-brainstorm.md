@@ -1,6 +1,6 @@
-# spec-brainstorm
+# idd-intent-brainstorm
 
-Use this skill before changing `.specs/` when the user describes a product idea,
+Use this skill before changing `.idd/intent/` when the user describes a product idea,
 feature, behavior change, or requirement whose real product intent may be
 unclear, over-specified, implementation-shaped, or unnecessarily complex.
 
@@ -9,7 +9,7 @@ This skill clarifies intent. It does not update specifications, design architect
 Formula:
 
 ```text
-spec-brainstorm = proposed solution + customer discovery + intent clarification + simplification options
+idd-intent-brainstorm = proposed solution + customer discovery + intent clarification + simplification options
 ```
 
 ## Purpose
@@ -45,7 +45,7 @@ Use this skill when:
 - the user is unsure what the product should do;
 - the user asks to brainstorm the product behavior or intent;
 - the requested behavior may belong in specs, but the exact intent is not ready
-  for `spec-change`.
+  for `idd-intent-change`.
 
 ## When not to use this skill
 
@@ -56,20 +56,20 @@ Do not use this skill when:
 - the task is only a local refactor, cleanup, dependency update, build fix, or
   implementation detail;
 - the request is about checking implementation against current specs;
-- the request is about importing, linting, auditing, or normalizing `.specs/`;
+- the request is about importing, linting, auditing, or normalizing `.idd/intent/`;
 - the request is mainly architectural and should be handled as an ADR or spike;
 - the user explicitly asks not to discuss product intent.
 
 ## Boundaries
 
-`spec-brainstorm` never edits files.
+`idd-intent-brainstorm` never edits files.
 
 If the user confirms a product direction and asks to persist it, stop and hand
-off to `spec-change`.
+off to `idd-intent-change`.
 
 It must not:
 
-- update `.specs/`;
+- update `.idd/intent/`;
 - create new specs;
 - create ADRs;
 - create spikes;
@@ -81,21 +81,21 @@ It must not:
 - import external source material;
 - treat the current implementation as product intent.
 
-The output of this skill may become input for `spec-change`, but only after the
+The output of this skill may become input for `idd-intent-change`, but only after the
 user confirms the intended product direction.
 
-Do not automatically continue into `spec-change`. First present the clarified
+Do not automatically continue into `idd-intent-change`. First present the clarified
 intent or simplification proposal and wait for explicit user confirmation.
 
 ## Reading Existing Specs
 
-Do not load the whole `.specs/` tree.
+Do not load the whole `.idd/intent/` tree.
 
 If the brainstorm concerns an existing product area, read only enough context to
 avoid brainstorming in a vacuum:
 
-1. `.specs/README.md`;
-2. `.specs/INDEX.md`;
+1. `.idd/intent/README.md`;
+2. `.idd/intent/INDEX.md`;
 3. the likely owning current spec, if it can be identified cheaply.
 
 Use existing specs only to understand current product intent and ownership
@@ -107,32 +107,32 @@ Do not update specs from this skill.
 
 ## Relationship to other skills
 
-Use `spec-brainstorm` before `spec-change` when the desired product intent is not
+Use `idd-intent-brainstorm` before `idd-intent-change` when the desired product intent is not
 clear enough to write or update specs.
 
-Use `spec-change` when the user has confirmed a desired product behavior change
-and `.specs/` should be updated.
+Use `idd-intent-change` when the user has confirmed a desired product behavior change
+and `.idd/intent/` should be updated.
 
-Use `spec-new-document` only when a new durable product area, ADR, or spike is
+Use `idd-intent-new-document` only when a new durable product area, ADR, or spike is
 needed and no existing current document owns the area.
 
-Use `spec-implement` when current specs already describe the behavior to build.
+Use `idd-code-implement` when current specs already describe the behavior to build.
 
-Use `spec-check-implementation` when the task is to compare implementation
+Use `idd-code-check-implementation` when the task is to compare implementation
 behavior with current specs.
 
-Use `spec-update-from-implementation` only when implementation behavior already
+Use `idd-code-update-intent` only when implementation behavior already
 exists and the user explicitly confirms that it represents current product
 intent.
 
-Use `spec-normalize-current` when accepted current specs need focused structural
+Use `idd-intent-normalize-current` when accepted current specs need focused structural
 normalization without changing product meaning.
 
-Use `spec-audit` for broad structural diagnostics over `.specs/`.
+Use `idd-intent-audit` for broad structural diagnostics over `.idd/intent/`.
 
-Use `spec-lint` for cheap mechanical validation.
+Use `idd-intent-lint` for cheap mechanical validation.
 
-Use `spec-import` when raw external source material must become normalized IDD
+Use `idd-intent-import` when raw external source material must become normalized IDD
 specs.
 
 ## Customer discovery questions
@@ -243,7 +243,7 @@ are changed.
    - minimal first version.
 
 8. Recommend a specification direction.
-9. Stop before editing `.specs/`.
+9. Stop before editing `.idd/intent/`.
 10. Tell the user which follow-up skill should be used next.
 
 ## Output formats
@@ -275,7 +275,7 @@ Use when more information is needed.
 
 ## Next Step
 
-After the product intent is confirmed, use `spec-change` to update `.specs/`.
+After the product intent is confirmed, use `idd-intent-change` to update `.idd/intent/`.
 ```
 
 ### Intent simplification proposal
@@ -355,7 +355,7 @@ Upgrade path:
 
 ## Next Step
 
-If the user confirms the direction, use `spec-change`.
+If the user confirms the direction, use `idd-intent-change`.
 ```
 
 ### Specification-ready intent
@@ -407,7 +407,7 @@ Use when the intent is clear enough to become a spec change.
 
 - ...
 
-## Handoff To `spec-change`
+## Handoff To `idd-intent-change`
 
 - Confirmed direction:
 - Owning product area:
@@ -419,7 +419,7 @@ Use when the intent is clear enough to become a spec change.
 
 ## Next Step
 
-Use `spec-change` to update the owning current spec or create the correct IDD
+Use `idd-intent-change` to update the owning current spec or create the correct IDD
 document if no current document owns the area.
 ```
 
@@ -427,10 +427,10 @@ document if no current document owns the area.
 
 - Do not jump to code.
 - Do not create an implementation plan.
-- Do not update `.specs/`.
+- Do not update `.idd/intent/`.
 - Do not discuss architecture unless it is necessary to expose accidental
   complexity.
-- Do not automatically continue into `spec-change`.
+- Do not automatically continue into `idd-intent-change`.
 - Do not assume the user's proposed solution is the real requirement.
 - Do not force simplification if the user confirms that the complexity is
   essential.
@@ -475,7 +475,7 @@ Expected behavior:
 - distinguish document search, customer grouping, manual tagging reduction, and
   document-type detection;
 - propose non-AI alternatives if they satisfy the desired outcome;
-- recommend `spec-change` only after the outcome is confirmed.
+- recommend `idd-intent-change` only after the outcome is confirmed.
 
 ### Already clear spec
 
@@ -487,8 +487,8 @@ Implement spec 0018.
 
 Expected behavior:
 
-- do not use `spec-brainstorm`;
-- use `spec-implement`.
+- do not use `idd-intent-brainstorm`;
+- use `idd-code-implement`.
 
 ### Confirmed behavior change
 
@@ -501,8 +501,8 @@ suggestion by default.
 
 Expected behavior:
 
-- do not use `spec-brainstorm`;
-- use `spec-change`.
+- do not use `idd-intent-brainstorm`;
+- use `idd-intent-change`.
 
 ## Non-goals
 
@@ -515,6 +515,6 @@ This skill does not:
 - design architecture;
 - compare implementation with specs;
 - update specs from implementation;
-- normalize or audit `.specs/`;
+- normalize or audit `.idd/intent/`;
 - perform a broad product discovery process;
 - replace user confirmation of product intent.

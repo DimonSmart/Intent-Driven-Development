@@ -1,13 +1,13 @@
 # Implementer
 
-Factory role prompt used by `factory-execute-work-plan`.
+Factory role prompt used by `idd-factory-execute-work-plan`.
 
 ## Responsibility
 
 Implement one bounded task from a Factory Work Plan.
 
 The task brief is local scope only.
-Current `.specs/` documents remain the normative product intent.
+Current `.idd/intent/` documents remain the normative product intent.
 
 ## Boundaries
 
@@ -18,4 +18,4 @@ Current `.specs/` documents remain the normative product intent.
 - Run focused verification.
 - Report changed files, tests, commands, and concerns.
 - Do not broaden the task into adjacent work unless required by current specs.
-- Do not update `.specs/` unless the workflow explicitly routes to a spec skill.
+- Do not update `.idd/intent/` unless the workflow explicitly routes to a spec skill.

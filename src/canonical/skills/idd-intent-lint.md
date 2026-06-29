@@ -1,14 +1,14 @@
-# spec-lint
+# idd-intent-lint
 
-Use this skill to perform cheap mechanical validation over `.specs`.
+Use this skill to perform cheap mechanical validation over `.idd/intent`.
 
 Formula:
 
 ```text
-spec-lint = cheap mechanical validation, not semantic review
+idd-intent-lint = cheap mechanical validation, not semantic review
 ```
 
-Use it when the user asks whether `.specs` is mechanically consistent.
+Use it when the user asks whether `.idd/intent` is mechanically consistent.
 
 ## Rules
 
@@ -22,17 +22,17 @@ Use it when the user asks whether `.specs` is mechanically consistent.
 
 Check that:
 
-- `.specs/README.md` exists;
-- `.specs/INDEX.md` exists;
+- `.idd/intent/README.md` exists;
+- `.idd/intent/INDEX.md` exists;
 - every current spec listed in `INDEX.md` exists;
-- every current numbered spec under `.specs/` is listed in `INDEX.md`;
-- `.specs` has no archive directory;
-- `.specs/import-report.md` does not exist;
+- every current numbered spec under `.idd/intent/` is listed in `INDEX.md`;
+- `.idd/intent` has no archive directory;
+- `.idd/intent/import-report.md` does not exist;
 - generated, import, task, progress, or process reports are not stored under
-  `.specs`;
+  `.idd/intent`;
 - `INDEX.md` has no `Archived` section;
 - no current spec links to deleted document storage;
-- no file under `.specs` references `.specs/archive/...`;
+- no file under `.idd/intent` references `.idd/intent/archive/...`;
 - skills do not contain an archive-enabling flag;
 - skills do not contain an archive import action;
 - skills do not recommend archiving obsolete specs;
@@ -54,14 +54,14 @@ Check that:
 - spike files are marked as non-normative research or unresolved
   investigation.
 
-`spec-lint` must fail if:
+`idd-intent-lint` must fail if:
 
-- an archive directory exists under `.specs`;
-- `.specs/import-report.md` exists;
-- generated, import, task, progress, or process reports exist under `.specs`;
+- an archive directory exists under `.idd/intent`;
+- `.idd/intent/import-report.md` exists;
+- generated, import, task, progress, or process reports exist under `.idd/intent`;
 - `INDEX.md` contains an `Archived` section;
 - `INDEX.md` links to deleted document storage;
-- any file under `.specs` references `.specs/archive/...`;
+- any file under `.idd/intent` references `.idd/intent/archive/...`;
 - any numeric `Related`, `Replaces`, `Supersedes`, `Depends on`, or similar
   relation points to a missing current numbered doc;
 - any skill contains an archive-enabling flag;
@@ -99,12 +99,12 @@ Concrete file-level recommendations.
 User request:
 
 ```text
-Check whether `.specs` is mechanically consistent.
+Check whether `.idd/intent` is mechanically consistent.
 ```
 
 Expected behavior:
 
-- use `spec-lint`;
+- use `idd-intent-lint`;
 - check `INDEX.md`, files, links, required sections, and stale `.worklog`
   references;
 - report pass/fail and warnings;
@@ -120,4 +120,4 @@ Do not use this skill to:
 - decide whether product behavior is correct;
 - perform implementation conformance checks.
 
-Use `spec-audit` for broad structural diagnostics.
+Use `idd-intent-audit` for broad structural diagnostics.

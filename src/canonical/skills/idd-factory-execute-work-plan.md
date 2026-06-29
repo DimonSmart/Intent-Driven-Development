@@ -1,4 +1,4 @@
-# factory-execute-work-plan
+# idd-factory-execute-work-plan
 
 ## Purpose
 
@@ -8,9 +8,9 @@ Factory execution coordinates temporary implementation work. It must not turn
 plans, task briefs, reviews, or logs into product intent.
 
 Factory execution delegates bounded implementation semantics to
-`spec-implement`.
+`idd-code-implement`.
 Factory owns task sequencing, review gates, temporary artifacts, and cleanup.
-It does not redefine `spec-implement` rules.
+It does not redefine `idd-code-implement` rules.
 
 In future versions, Factory Work Plan tasks may be backed by an external Work
 Item Provider. The current implementation uses temporary local markdown files
@@ -25,17 +25,17 @@ only.
 - For each task, create a bounded task brief in the same work directory when
   useful.
 - Factory execution delegates bounded implementation semantics to
-  `spec-implement`.
+  `idd-code-implement`.
 - Factory owns task sequencing, review gates, temporary artifacts, and cleanup.
-- It does not redefine `spec-implement` rules.
-- After each task, run `factory-review-task`.
+- It does not redefine `idd-code-implement` rules.
+- After each task, run `idd-factory-review-task`.
 - If task review fails, fix and re-review before continuing.
-- After all tasks, run `factory-review-work-result`.
-- Finish with `factory-finish-work`.
+- After all tasks, run `idd-factory-review-work-result`.
+- Finish with `idd-factory-finish-work`.
 - Do not modify specs unless the work plan explicitly says the current user
   request includes a spec update flow.
 - If implementation reveals missing or wrong product intent, stop and route to
-  `spec-change` or `spec-update-from-implementation` only after explicit user
+  `idd-intent-change` or `idd-code-update-intent` only after explicit user
   confirmation.
 
 ## Workflow
@@ -50,7 +50,7 @@ only.
 5. Stop on `BLOCKED` or missing context. Do not silently continue through a
    blocked task.
 6. Keep temporary execution artifacts under `.idd/factory/work/`; never write
-   them into `.specs/`.
+   them into `.idd/intent/`.
 
 ## Statuses
 

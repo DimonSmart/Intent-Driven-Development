@@ -4,8 +4,8 @@ internal sealed class InitCommand
     {
         EnsureNoUnknownOptions(commandArgs, "--force");
         var force = commandArgs.Contains("--force", StringComparer.Ordinal);
-        var source = new ContentLayout(ContentRootLocator.Find()).SpecsRoot;
-        var destination = Path.Combine(Directory.GetCurrentDirectory(), ".specs");
+        var source = new ContentLayout(ContentRootLocator.Find()).IntentRoot;
+        var destination = Path.Combine(Directory.GetCurrentDirectory(), ".idd/intent");
 
         if (!Directory.Exists(source))
         {
@@ -14,11 +14,11 @@ internal sealed class InitCommand
 
         if (Directory.Exists(destination) && !force)
         {
-            return Fail("File already exists: .specs" + Environment.NewLine + "Use --force to overwrite.");
+            return Fail("File already exists: .idd/intent" + Environment.NewLine + "Use --force to overwrite.");
         }
 
         DirectoryCopier.Copy(source, destination, force);
-        Console.WriteLine("Initialized .specs.");
+        Console.WriteLine("Initialized .idd/intent.");
         return 0;
     }
 

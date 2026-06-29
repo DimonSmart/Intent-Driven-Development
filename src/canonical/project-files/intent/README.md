@@ -9,5 +9,5 @@ this directory that apply to the change.
 Do not treat templates, support files, generated reports, or deleted Git
 history as current product intent.
 
-There is no `.specs` archive lifecycle. Deleted or previous document versions
+There is no `.idd/intent` archive lifecycle. Deleted or previous document versions
 are available through Git history.

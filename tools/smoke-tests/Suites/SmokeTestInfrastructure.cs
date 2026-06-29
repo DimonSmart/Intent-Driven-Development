@@ -4,9 +4,20 @@ using System.Text.Json;
 
 internal sealed partial class SmokeTestSuite
 {
+    static string LegacySpecsDirectory => ".sp" + "ecs";
+
     void ExpectTempFile(string root, string relativePath, string failure)
     {
         if (!File.Exists(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar))))
+        {
+            failures.Add(failure);
+        }
+    }
+
+    void ExpectTempMissing(string root, string relativePath, string failure)
+    {
+        var path = Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        if (File.Exists(path) || Directory.Exists(path))
         {
             failures.Add(failure);
         }

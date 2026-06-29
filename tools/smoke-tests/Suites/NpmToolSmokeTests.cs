@@ -72,14 +72,16 @@ internal sealed partial class SmokeTestSuite
         WithNpmInstall("install --target claude", installRoot =>
         {
             ExpectTempFile(installRoot, "CLAUDE.md", "npm default minimal install did not create CLAUDE.md.");
-            ExpectTempFile(installRoot, ".claude/skills/spec-new-document/SKILL.md", "npm default minimal install did not install skills.");
-            ExpectTempFile(installRoot, ".specs/README.md", "npm default minimal install did not install .specs.");
+            ExpectTempFile(installRoot, ".claude/skills/idd-intent-new-document/SKILL.md", "npm default minimal install did not install skills.");
+            ExpectTempFile(installRoot, ".idd/intent/README.md", "npm default minimal install did not install .idd/intent.");
+            ExpectTempFile(installRoot, ".idd/intent/INDEX.md", "npm default minimal install did not install .idd/intent index.");
+            ExpectTempMissing(installRoot, LegacySpecsDirectory, "npm default minimal install created legacy specs directory.");
         });
 
         WithNpmInstall("install --coding-agent claude", installRoot =>
         {
             ExpectTempFile(installRoot, "CLAUDE.md", "npm install --coding-agent did not create CLAUDE.md.");
-            ExpectTempFile(installRoot, ".claude/skills/spec-new-document/SKILL.md", "npm install --coding-agent did not install skills.");
+            ExpectTempFile(installRoot, ".claude/skills/idd-intent-new-document/SKILL.md", "npm install --coding-agent did not install skills.");
         });
     }
 
@@ -87,10 +89,14 @@ internal sealed partial class SmokeTestSuite
     {
         WithNpmInstall("install --target claude", installRoot =>
         {
-            if (File.Exists(Path.Combine(installRoot, ".claude/skills/factory-create-work-plan/SKILL.md".Replace('/', Path.DirectorySeparatorChar))))
+            if (File.Exists(Path.Combine(installRoot, ".claude/skills/idd-factory-create-work-plan/SKILL.md".Replace('/', Path.DirectorySeparatorChar))))
             {
                 failures.Add("npm default install installed factory skills.");
             }
+
+            ExpectTempFile(installRoot, ".idd/intent/README.md", "npm default install did not install .idd/intent.");
+            ExpectTempFile(installRoot, ".idd/intent/INDEX.md", "npm default install did not install .idd/intent index.");
+            ExpectTempMissing(installRoot, LegacySpecsDirectory, "npm default install created legacy specs directory.");
         });
     }
 
@@ -99,9 +105,12 @@ internal sealed partial class SmokeTestSuite
         WithNpmInstall("install --target codex --pack factory", installRoot =>
         {
             ExpectTempFile(installRoot, "AGENTS.md", "npm factory install did not create AGENTS.md.");
-            ExpectTempFile(installRoot, ".agents/skills/spec-new-document/SKILL.md", "npm factory install did not install core skill.");
-            ExpectTempFile(installRoot, ".agents/skills/factory-create-work-plan/SKILL.md", "npm factory install did not install factory skill.");
+            ExpectTempFile(installRoot, ".agents/skills/idd-intent-new-document/SKILL.md", "npm factory install did not install core skill.");
+            ExpectTempFile(installRoot, ".agents/skills/idd-factory-create-work-plan/SKILL.md", "npm factory install did not install factory skill.");
+            ExpectTempFile(installRoot, ".idd/intent/README.md", "npm factory install did not install .idd/intent.");
+            ExpectTempFile(installRoot, ".idd/intent/INDEX.md", "npm factory install did not install .idd/intent index.");
             ExpectTempFile(installRoot, ".idd/factory/.gitignore", "npm factory install did not install factory .gitignore.");
+            ExpectTempMissing(installRoot, LegacySpecsDirectory, "npm factory install created legacy specs directory.");
 
             if (Directory.Exists(Path.Combine(installRoot, ".idd/factory/work".Replace('/', Path.DirectorySeparatorChar))))
             {
@@ -119,8 +128,10 @@ internal sealed partial class SmokeTestSuite
                 failures.Add("npm install with --entry none created CLAUDE.md.");
             }
 
-            ExpectTempFile(installRoot, ".claude/skills/spec-new-document/SKILL.md", "npm install with --entry none did not install skills.");
-            ExpectTempFile(installRoot, ".specs/README.md", "npm install with --entry none did not install .specs.");
+            ExpectTempFile(installRoot, ".claude/skills/idd-intent-new-document/SKILL.md", "npm install with --entry none did not install skills.");
+            ExpectTempFile(installRoot, ".idd/intent/README.md", "npm install with --entry none did not install .idd/intent.");
+            ExpectTempFile(installRoot, ".idd/intent/INDEX.md", "npm install with --entry none did not install .idd/intent index.");
+            ExpectTempMissing(installRoot, LegacySpecsDirectory, "npm install with --entry none created legacy specs directory.");
         });
     }
 
@@ -139,8 +150,10 @@ internal sealed partial class SmokeTestSuite
                 }
             }
 
-            ExpectTempFile(installRoot, ".claude/skills/spec-new-document/SKILL.md", "npm install with --entry full did not install skills.");
-            ExpectTempFile(installRoot, ".specs/README.md", "npm install with --entry full did not install .specs.");
+            ExpectTempFile(installRoot, ".claude/skills/idd-intent-new-document/SKILL.md", "npm install with --entry full did not install skills.");
+            ExpectTempFile(installRoot, ".idd/intent/README.md", "npm install with --entry full did not install .idd/intent.");
+            ExpectTempFile(installRoot, ".idd/intent/INDEX.md", "npm install with --entry full did not install .idd/intent index.");
+            ExpectTempMissing(installRoot, LegacySpecsDirectory, "npm install with --entry full created legacy specs directory.");
         });
     }
 

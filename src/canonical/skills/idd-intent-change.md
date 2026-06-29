@@ -1,15 +1,15 @@
-# spec-change
+# idd-intent-change
 
 Use this skill when the user describes a desired product behavior change, new
 capability, changed interaction rule, changed acceptance behavior, changed
 default, or changed product constraint.
 
-This skill updates `.specs/` before implementation.
+This skill updates `.idd/intent/` before implementation.
 
 Formula:
 
 ```text
-spec-change = user change request + affected specs + minimal product intent update
+idd-intent-change = user change request + affected specs + minimal product intent update
 ```
 
 ## Rules
@@ -51,7 +51,7 @@ existing-spec-update
 new-spec-required
 adr-required
 spike-required
-task-only-no-spec-change
+task-only-no-idd-intent-change
 unclear-product-intent
 ```
 
@@ -66,14 +66,14 @@ Use `adr-required` when the change is primarily a durable architecture decision.
 Use `spike-required` when the right product or architecture decision requires
 research.
 
-Use `task-only-no-spec-change` when the request is only a local refactor,
+Use `task-only-no-idd-intent-change` when the request is only a local refactor,
 cleanup, dependency update, or implementation detail that does not change
 durable product intent.
 
 ## Workflow
 
-1. Read `.specs/README.md`.
-2. Read `.specs/INDEX.md`.
+1. Read `.idd/intent/README.md`.
+2. Read `.idd/intent/INDEX.md`.
 3. Identify the product area and candidate current specs.
 4. Read only relevant current numbered specs.
 5. Classify the request.
@@ -105,7 +105,7 @@ is accepted only after the user explicitly selects it with keyboard or mouse.
 Expected behavior:
 
 - classify as `existing-spec-update`;
-- read `.specs/0018.spec-command-history-completion.md`;
+- read `.idd/intent/0018.spec-command-history-completion.md`;
 - update visible-panel command completion behavior;
 - update acceptance criteria and manual verification;
 - do not create a new spec.

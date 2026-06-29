@@ -23,7 +23,7 @@ Detailed IDD workflows live in skills:
 .github/skills/*
 ```
 
-Project product intent lives in `.specs/`.
+Project product intent lives in `.idd/intent/`.
 
 Optional factory execution state lives under `.idd/factory/work/` when the
 factory pack is installed and used. Factory artifacts are temporary work files,
@@ -78,7 +78,7 @@ The `generated/` directory is intentionally ignored by git. It is reproducible o
 
 `src/canonical/` is the source of truth for Intent-Driven Development.
 
-Canonical files define the method, project `.specs/` files, reusable skills, and instruction packs. CodingAgent-specific adapters may change paths, entry point names, front matter, and supported features, but they must not change the meaning of canonical content.
+Canonical files define the method, project `.idd/intent/` files, reusable skills, and instruction packs. CodingAgent-specific adapters may change paths, entry point names, front matter, and supported features, but they must not change the meaning of canonical content.
 
 Generated files are delivery formats for specific CodingAgents. They are not product knowledge, and they should not be edited directly.
 
@@ -96,12 +96,12 @@ Do not put Claude-specific frontmatter directly into canonical skill markdown.
 
 Pack membership is defined in `src/canonical/packs/pack-manifest.json`.
 
-`core` is the default pack. It owns `.specs/` project files and the `spec-*`
-skills.
+`core` is the default pack. It owns `.idd/intent/` project files and the
+`idd-intent-*` and `idd-code-*` skills.
 
 `factory` is optional. It depends on core and installs factory skills, role
 prompt references, and `.idd/factory/.gitignore`. It must not place work plans,
-task briefs, review notes, or logs in `.specs/`.
+task briefs, review notes, or logs in `.idd/intent/`.
 
 Generated bundles may contain all skill-capable CodingAgent files, but installers
 copy only the skills and project files selected by packs. Core-only entry
@@ -140,13 +140,13 @@ The default selected item should mean no completion.
 Correct routing:
 
 ```text
-spec-change:
-  update .specs/0018.spec-command-history-completion.md
+idd-intent-change:
+  update .idd/intent/0018.spec-command-history-completion.md
 
-spec-implement:
+idd-code-implement:
   update command completion behavior and tests
 
-spec-check-implementation:
+idd-code-check-implementation:
   verify implementation against 0018
 ```
 
