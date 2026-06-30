@@ -64,18 +64,23 @@
     "description": "Update `.idd/intent/` product intent from confirmed implementation behavior."
   },
   "idd-factory-create-work-plan": {
-    "description": "Create a temporary Factory Work Plan from current `.idd/intent/` product intent, the user request, and relevant repository evidence without writing code or product intent."
+    "description": "Manual-only factory command. Create a temporary Factory Work Plan only when invoked directly by the user.",
+    "invocation": "manual"
   },
   "idd-factory-execute-work-plan": {
-    "description": "Execute an explicit temporary Factory Work Plan with bounded task briefs, task reviews, final review, and cleanup."
+    "description": "Manual-only factory command. Execute an explicit temporary Factory Work Plan only when invoked directly by the user.",
+    "invocation": "manual"
   },
   "idd-factory-review-task": {
-    "description": "Review one completed factory task against its task brief, relevant `.idd/intent/` documents, code quality, and verification evidence."
+    "description": "Manual-only factory command. Review one completed factory task only when invoked directly by the user.",
+    "invocation": "manual"
   },
   "idd-factory-review-work-result": {
-    "description": "Review the whole result of a Factory Work Plan for task completion, IDD intent compliance, verification evidence, and cleanup readiness."
+    "description": "Manual-only factory command. Review the complete result of a Factory Work Plan only when invoked directly by the user.",
+    "invocation": "manual"
   },
   "idd-factory-finish-work": {
-    "description": "Finish a factory run by reporting results and cleaning the current temporary `.idd/factory/work/` artifacts when safe."
+    "description": "Manual-only factory command. Finish the current factory run and clean temporary artifacts only when invoked directly by the user.",
+    "invocation": "manual"
   }
 }

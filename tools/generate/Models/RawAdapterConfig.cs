@@ -4,4 +4,5 @@ internal sealed record RawAdapterConfig(
     string EntryPoint,
     string? SkillsRoot,
     bool SupportsSkills,
-    bool SupportsFrontMatter);
+    bool SupportsFrontMatter,
+    bool SupportsManualOnlySkills);

@@ -19,6 +19,7 @@ internal sealed class Generator(RepositoryLayout layout)
         var supportedCodingAgents = adapterDefinitions
             .Select(definition => definition.Config.CodingAgent)
             .ToHashSet(StringComparer.Ordinal);
+        var skillDescriptions = new SkillDescriptionReader().Read(layout.SkillDescriptionsPath, supportedCodingAgents);
         var packManifest = new PackManifestReader(layout).Read();
         new PackManifestValidator(layout).Validate(packManifest);
 
@@ -36,7 +37,7 @@ internal sealed class Generator(RepositoryLayout layout)
             GeneratedOutputWriter.Write(outputRoot, expectedFiles);
         }
 
-        var manifest = ManifestBuilder.Build(adapterDefinitions, packManifest, manifestVersion);
+        var manifest = ManifestBuilder.Build(adapterDefinitions, packManifest, skillDescriptions, manifestVersion);
         if (checkOnly)
         {
             errors.AddRange(GeneratedOutputChecker.CheckSingleFile(layout.ManifestPath, manifest));

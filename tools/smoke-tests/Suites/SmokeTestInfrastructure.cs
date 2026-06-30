@@ -75,7 +75,7 @@ internal sealed partial class SmokeTestSuite
         return RunProcessResult(fileName, arguments, workingDirectory).ExitCode;
     }
 
-    ProcessResult RunProcessResult(string fileName, string arguments, string? workingDirectory = null)
+    ProcessResult RunProcessResult(string fileName, string arguments, string? workingDirectory = null, bool echoOutput = true)
     {
         using var process = Process.Start(new ProcessStartInfo(fileName, arguments)
         {
@@ -95,12 +95,12 @@ internal sealed partial class SmokeTestSuite
         var standardError = process.StandardError.ReadToEnd();
         process.WaitForExit();
 
-        if (!string.IsNullOrWhiteSpace(standardOutput))
+        if (echoOutput && !string.IsNullOrWhiteSpace(standardOutput))
         {
             Console.Write(standardOutput);
         }
 
-        if (!string.IsNullOrWhiteSpace(standardError))
+        if (echoOutput && !string.IsNullOrWhiteSpace(standardError))
         {
             Console.Error.Write(standardError);
         }

@@ -107,6 +107,76 @@ internal sealed partial class SmokeTestSuite
                 failures.Add("Claude idd-intent-change skill unexpectedly has context: fork.");
             }
         }
+
+        var factoryPath = Path.Combine(repoRoot, "generated/claude/.claude/skills/idd-factory-create-work-plan/SKILL.md".Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(factoryPath))
+        {
+            failures.Add("Missing Claude factory skill for manual-only frontmatter check.");
+        }
+        else
+        {
+            var content = File.ReadAllText(factoryPath);
+            foreach (var text in new[]
+            {
+                "description: Manual-only factory command. Create a temporary Factory Work Plan only when invoked directly by the user.",
+                "disable-model-invocation: true",
+                "user-invocable: true"
+            })
+            {
+                if (!content.Contains(text, StringComparison.Ordinal))
+                {
+                    failures.Add($"Claude factory skill is missing manual-only frontmatter '{text}'.");
+                }
+            }
+        }
+    }
+
+    void ExpectSkillInvocationMetadata()
+    {
+        var descriptionPath = Path.Combine(repoRoot, "src", "canonical", "skills", "skill-descriptions.json");
+        var original = File.ReadAllText(descriptionPath);
+
+        using (var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(repoRoot, "manifest.json"))))
+        {
+            var skills = manifest.RootElement.GetProperty("skills");
+            if (!StringComparer.Ordinal.Equals(skills.GetProperty("idd-intent-change").GetProperty("invocation").GetString(), "auto"))
+            {
+                failures.Add("Missing invocation did not default to auto in manifest.json.");
+            }
+
+            if (!StringComparer.Ordinal.Equals(skills.GetProperty("idd-factory-create-work-plan").GetProperty("invocation").GetString(), "manual"))
+            {
+                failures.Add("Factory skill invocation is not manual in manifest.json.");
+            }
+        }
+
+        try
+        {
+            var descriptions = System.Text.Json.Nodes.JsonNode.Parse(original)!.AsObject();
+            descriptions["idd-intent-brainstorm"]!.AsObject()["invocation"] = "auto";
+            File.WriteAllText(descriptionPath, descriptions.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            if (RunProcess("dotnet", $"exec \"{generatorDll}\" --check") != 0)
+            {
+                failures.Add("Explicit invocation: auto was not accepted.");
+            }
+
+            descriptions["idd-intent-brainstorm"]!.AsObject()["invocation"] = "sometimes";
+            File.WriteAllText(descriptionPath, descriptions.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            var result = RunProcessResult("dotnet", $"exec \"{generatorDll}\" --check", echoOutput: false);
+            if (result.ExitCode == 0)
+            {
+                failures.Add("Invalid invocation value was accepted.");
+            }
+
+            if (!result.StandardError.Contains("Unsupported invocation value for skill 'idd-intent-brainstorm': 'sometimes'. Allowed values: auto, manual.", StringComparison.Ordinal))
+            {
+                failures.Add("Invalid invocation value did not report a clear error.");
+            }
+        }
+        finally
+        {
+            File.WriteAllText(descriptionPath, original);
+        }
     }
 
     void ExpectGeneratorCheckPasses()
@@ -166,6 +236,12 @@ internal sealed partial class SmokeTestSuite
             {
                 failures.Add("default install installed factory skills.");
             }
+
+            var entryPath = Path.Combine(installRoot, "CLAUDE.md");
+            if (File.Exists(entryPath) && File.ReadAllText(entryPath).Contains("Factory", StringComparison.Ordinal))
+            {
+                failures.Add("default install entry mentioned factory.");
+            }
         });
 
         WithToolInstall("install --coding-agent claude", installRoot =>
@@ -177,7 +253,7 @@ internal sealed partial class SmokeTestSuite
 
     void ExpectFactoryInstall()
     {
-        foreach (var target in new[] { "claude", "codex" })
+        foreach (var target in new[] { "claude" })
         {
             WithToolInstall($"install --target {target} --pack factory", installRoot =>
             {
@@ -195,6 +271,16 @@ internal sealed partial class SmokeTestSuite
                 {
                     failures.Add($"factory install for {target} created work directory.");
                 }
+
+                var entryPath = Path.Combine(installRoot, entry);
+                if (File.Exists(entryPath))
+                {
+                    var entryContent = File.ReadAllText(entryPath);
+                    ExpectContains(entryContent, "Factory commands are installed as manual user-invoked workflows.", entry, "factory entry");
+                    ExpectContains(entryContent, "Do not invoke factory workflows automatically.", entry, "factory entry");
+                    ExpectDoesNotContain(entryContent, "Use IDD factory skills only for planned implementation orchestration", entry, "factory entry");
+                    ExpectDoesNotContain(entryContent, "multi-step execution, task slicing, or factory role based work", entry, "factory entry");
+                }
             });
         }
     }
@@ -206,15 +292,47 @@ internal sealed partial class SmokeTestSuite
 
         try
         {
-            var result = RunProcessResult("dotnet", $"exec \"{toolDll}\" install --target gemini --pack factory", tempRoot);
+            var result = RunProcessResult("dotnet", $"exec \"{toolDll}\" install --target gemini --pack factory", tempRoot, echoOutput: false);
             if (result.ExitCode == 0)
             {
                 failures.Add("Factory install for Gemini succeeded unexpectedly.");
             }
 
-            if (!result.StandardError.Contains("Factory pack requires generated skills", StringComparison.Ordinal))
+            if (!result.StandardError.Contains("manual-only skills", StringComparison.Ordinal) ||
+                !result.StandardError.Contains("CodingAgent 'gemini'", StringComparison.Ordinal))
             {
-                failures.Add("Factory install for Gemini did not report unsupported generated skills.");
+                failures.Add("Factory install for Gemini did not report unsupported manual-only skills.");
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+
+        tempRoot = Path.Combine(Path.GetTempPath(), "idd-smoke-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            var result = RunProcessResult("dotnet", $"exec \"{toolDll}\" install --target codex --pack factory", tempRoot, echoOutput: false);
+            if (result.ExitCode == 0)
+            {
+                failures.Add("Factory install for Codex succeeded unexpectedly.");
+            }
+
+            if (!result.StandardError.Contains("manual-only skills", StringComparison.Ordinal) ||
+                !result.StandardError.Contains("CodingAgent 'codex'", StringComparison.Ordinal))
+            {
+                failures.Add("Factory install for Codex did not report unsupported manual-only skills.");
+            }
+
+            if (File.Exists(Path.Combine(tempRoot, "AGENTS.md")) ||
+                Directory.Exists(Path.Combine(tempRoot, ".agents")))
+            {
+                failures.Add("Factory install for Codex copied files before failing manual-only validation.");
             }
         }
         finally
@@ -296,7 +414,7 @@ internal sealed partial class SmokeTestSuite
 
         try
         {
-            var result = RunProcessResult("dotnet", $"exec \"{toolDll}\" install --target gemini --entry none", tempRoot);
+            var result = RunProcessResult("dotnet", $"exec \"{toolDll}\" install --target gemini --entry none", tempRoot, echoOutput: false);
             if (result.ExitCode == 0)
             {
                 failures.Add("Gemini install with --entry none succeeded unexpectedly.");

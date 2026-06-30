@@ -29,13 +29,14 @@ internal sealed class SkillDescriptionReader
         {
             var description = value.GetString();
             SkillDescriptionValidator.GuardDescription(path, skillName, description);
-            return new SkillDescription(description!, Adapters: null);
+            return new SkillDescription(description!, SkillInvocation.Auto, Adapters: null);
         }
 
         SkillDescriptionValidator.GuardDescriptionObject(path, skillName, value);
 
         var objectDescription = value.GetProperty("description").GetString();
         SkillDescriptionValidator.GuardDescription(path, skillName, objectDescription);
+        var invocation = ReadInvocation(skillName, value);
 
         IReadOnlyDictionary<string, AdapterSkillMetadata>? adapters = null;
         if (value.TryGetProperty("adapters", out var adaptersElement))
@@ -54,7 +55,30 @@ internal sealed class SkillDescriptionReader
             adapters = adapterMetadata;
         }
 
-        return new SkillDescription(objectDescription!, adapters);
+        return new SkillDescription(objectDescription!, invocation, adapters);
+    }
+
+    private static SkillInvocation ReadInvocation(string skillName, JsonElement value)
+    {
+        if (!value.TryGetProperty("invocation", out var invocationElement) ||
+            invocationElement.ValueKind == JsonValueKind.Null)
+        {
+            return SkillInvocation.Auto;
+        }
+
+        if (invocationElement.ValueKind != JsonValueKind.String)
+        {
+            throw new InvalidOperationException(
+                $"Unsupported invocation value for skill '{skillName}': '{invocationElement.GetRawText()}'. Allowed values: auto, manual.");
+        }
+
+        return invocationElement.GetString() switch
+        {
+            "auto" => SkillInvocation.Auto,
+            "manual" => SkillInvocation.Manual,
+            var unsupported => throw new InvalidOperationException(
+                $"Unsupported invocation value for skill '{skillName}': '{unsupported}'. Allowed values: auto, manual.")
+        };
     }
 
     private static AdapterSkillMetadata ReadAdapterSkillMetadata(

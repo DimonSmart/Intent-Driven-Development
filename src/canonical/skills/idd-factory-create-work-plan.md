@@ -16,6 +16,14 @@ In future versions, Factory Work Plan tasks may be backed by an external Work
 Item Provider. The current implementation uses temporary local markdown files
 only.
 
+## Invocation
+
+This is a manual-only factory command.
+
+Do not use this workflow automatically based on task size, complexity, uncertainty,
+or similarity to the user request. Use it only when the current user explicitly
+invokes this command or names this factory workflow directly.
+
 ## Rules
 
 - Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and only relevant current specs.
@@ -37,8 +45,8 @@ only.
 
 ## Workflow
 
-1. Identify whether the user is asking for planned implementation orchestration,
-   task slicing, multi-step execution, or factory-style work.
+1. Confirm the current user explicitly invoked this factory command or named
+   this factory workflow directly.
 2. Read `.idd/intent/README.md` and `.idd/intent/INDEX.md`.
 3. Read only the relevant current specs, ADRs, and active spikes needed to
    understand the requested implementation task.

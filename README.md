@@ -26,7 +26,7 @@ IDD treats specifications and ADRs as durable product memory. They describe what
 
 Temporary work belongs elsewhere: tasks, pull requests, chats, generated plans, and local implementation notes can guide the current change, but they do not define the product.
 
-Core IDD is the default install. It creates the durable intent layer in `.idd/intent/`. Optional execution orchestration, such as the factory pack, is for temporary work and must not become the canonical specification.
+Core IDD is the default install. It creates the durable intent layer in `.idd/intent/`. Optional execution orchestration, such as the factory pack, is for temporary work and must not become the canonical specification. Factory workflows are manual-only commands; installing factory does not authorize automatic factory routing.
 
 ## Why It Is Different
 

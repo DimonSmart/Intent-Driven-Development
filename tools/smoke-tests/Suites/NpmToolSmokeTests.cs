@@ -97,16 +97,22 @@ internal sealed partial class SmokeTestSuite
             ExpectTempFile(installRoot, ".idd/intent/README.md", "npm default install did not install .idd/intent.");
             ExpectTempFile(installRoot, ".idd/intent/INDEX.md", "npm default install did not install .idd/intent index.");
             ExpectTempMissing(installRoot, LegacySpecsDirectory, "npm default install created legacy specs directory.");
+
+            var entryPath = Path.Combine(installRoot, "CLAUDE.md");
+            if (File.Exists(entryPath) && File.ReadAllText(entryPath).Contains("Factory", StringComparison.Ordinal))
+            {
+                failures.Add("npm default install entry mentioned factory.");
+            }
         });
     }
 
     void ExpectNpmInstallFactory()
     {
-        WithNpmInstall("install --target codex --pack factory", installRoot =>
+        WithNpmInstall("install --target claude --pack factory", installRoot =>
         {
-            ExpectTempFile(installRoot, "AGENTS.md", "npm factory install did not create AGENTS.md.");
-            ExpectTempFile(installRoot, ".agents/skills/idd-intent-new-document/SKILL.md", "npm factory install did not install core skill.");
-            ExpectTempFile(installRoot, ".agents/skills/idd-factory-create-work-plan/SKILL.md", "npm factory install did not install factory skill.");
+            ExpectTempFile(installRoot, "CLAUDE.md", "npm factory install did not create CLAUDE.md.");
+            ExpectTempFile(installRoot, ".claude/skills/idd-intent-new-document/SKILL.md", "npm factory install did not install core skill.");
+            ExpectTempFile(installRoot, ".claude/skills/idd-factory-create-work-plan/SKILL.md", "npm factory install did not install factory skill.");
             ExpectTempFile(installRoot, ".idd/intent/README.md", "npm factory install did not install .idd/intent.");
             ExpectTempFile(installRoot, ".idd/intent/INDEX.md", "npm factory install did not install .idd/intent index.");
             ExpectTempFile(installRoot, ".idd/factory/.gitignore", "npm factory install did not install factory .gitignore.");
@@ -115,6 +121,16 @@ internal sealed partial class SmokeTestSuite
             if (Directory.Exists(Path.Combine(installRoot, ".idd/factory/work".Replace('/', Path.DirectorySeparatorChar))))
             {
                 failures.Add("npm factory install created work directory.");
+            }
+
+            var entryPath = Path.Combine(installRoot, "CLAUDE.md");
+            if (File.Exists(entryPath))
+            {
+                var entryContent = File.ReadAllText(entryPath);
+                ExpectContains(entryContent, "Factory commands are installed as manual user-invoked workflows.", "CLAUDE.md", "npm factory entry");
+                ExpectContains(entryContent, "Do not invoke factory workflows automatically.", "CLAUDE.md", "npm factory entry");
+                ExpectDoesNotContain(entryContent, "Use IDD factory skills only for planned implementation orchestration", "CLAUDE.md", "npm factory entry");
+                ExpectDoesNotContain(entryContent, "multi-step execution, task slicing, or factory role based work", "CLAUDE.md", "npm factory entry");
             }
         });
     }
@@ -167,7 +183,7 @@ internal sealed partial class SmokeTestSuite
 
             try
             {
-                var result = RunProcessResult("node", $"\"{script}\" install --target gemini --entry none", installRoot);
+                var result = RunProcessResult("node", $"\"{script}\" install --target gemini --entry none", installRoot, echoOutput: false);
                 if (result.ExitCode == 0)
                 {
                     failures.Add("npm Gemini install with --entry none succeeded unexpectedly.");
@@ -198,15 +214,16 @@ internal sealed partial class SmokeTestSuite
 
             try
             {
-                var result = RunProcessResult("node", $"\"{script}\" install --target gemini --pack factory", installRoot);
+                var result = RunProcessResult("node", $"\"{script}\" install --target gemini --pack factory", installRoot, echoOutput: false);
                 if (result.ExitCode == 0)
                 {
                     failures.Add("npm factory install for Gemini succeeded unexpectedly.");
                 }
 
-                if (!result.StandardError.Contains("Factory pack requires generated skills", StringComparison.Ordinal))
+                if (!result.StandardError.Contains("manual-only skills", StringComparison.Ordinal) ||
+                    !result.StandardError.Contains("CodingAgent 'gemini'", StringComparison.Ordinal))
                 {
-                    failures.Add("npm factory install for Gemini did not report unsupported generated skills.");
+                    failures.Add("npm factory install for Gemini did not report unsupported manual-only skills.");
                 }
             }
             finally
@@ -214,6 +231,70 @@ internal sealed partial class SmokeTestSuite
                 if (Directory.Exists(installRoot))
                 {
                     Directory.Delete(installRoot, recursive: true);
+                }
+            }
+        });
+    }
+
+    void ExpectNpmManualSkillValidationIsGeneric()
+    {
+        WithNpmFixture(fixtureRoot =>
+        {
+            var manifestPath = Path.Combine(fixtureRoot, "package-content", "manifest.json");
+            var manifest = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(manifestPath))!.AsObject();
+            manifest["skills"]!.AsObject()["fake-manual-command"] = new System.Text.Json.Nodes.JsonObject
+            {
+                ["description"] = "Manual test command.",
+                ["invocation"] = "manual"
+            };
+            manifest["packs"]!.AsObject()["fake"] = new System.Text.Json.Nodes.JsonObject
+            {
+                ["description"] = "Fake manual pack.",
+                ["default"] = false,
+                ["requires"] = new System.Text.Json.Nodes.JsonArray(),
+                ["skills"] = new System.Text.Json.Nodes.JsonArray("fake-manual-command"),
+                ["rolePrompts"] = new System.Text.Json.Nodes.JsonArray(),
+                ["skillRoleReferences"] = new System.Text.Json.Nodes.JsonObject(),
+                ["projectFiles"] = new System.Text.Json.Nodes.JsonArray()
+            };
+            File.WriteAllText(manifestPath, manifest.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+
+            var script = Path.Combine(fixtureRoot, "bin", "intent-driven-development.js");
+            var unsupportedRoot = Path.Combine(Path.GetTempPath(), "idd-smoke-npm-install-" + Guid.NewGuid().ToString("N"));
+            var supportedRoot = Path.Combine(Path.GetTempPath(), "idd-smoke-npm-install-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(unsupportedRoot);
+            Directory.CreateDirectory(supportedRoot);
+
+            try
+            {
+                var unsupported = RunProcessResult("node", $"\"{script}\" install --target codex --pack fake", unsupportedRoot, echoOutput: false);
+                if (unsupported.ExitCode == 0)
+                {
+                    failures.Add("npm generic manual-only pack for Codex succeeded unexpectedly.");
+                }
+
+                if (!unsupported.StandardError.Contains("manual-only skills", StringComparison.Ordinal) ||
+                    !unsupported.StandardError.Contains("CodingAgent 'codex'", StringComparison.Ordinal))
+                {
+                    failures.Add("npm generic manual-only pack did not report unsupported Codex manual-only skills.");
+                }
+
+                var supported = RunProcessResult("node", $"\"{script}\" install --target claude --pack fake", supportedRoot);
+                if (supported.ExitCode != 0)
+                {
+                    failures.Add("npm generic manual-only pack for Claude failed unexpectedly.");
+                }
+            }
+            finally
+            {
+                if (Directory.Exists(unsupportedRoot))
+                {
+                    Directory.Delete(unsupportedRoot, recursive: true);
+                }
+
+                if (Directory.Exists(supportedRoot))
+                {
+                    Directory.Delete(supportedRoot, recursive: true);
                 }
             }
         });
@@ -229,7 +310,7 @@ internal sealed partial class SmokeTestSuite
 
             try
             {
-                var result = RunProcessResult("node", $"\"{script}\" install --target claude --pack bogus", installRoot);
+                var result = RunProcessResult("node", $"\"{script}\" install --target claude --pack bogus", installRoot, echoOutput: false);
                 if (result.ExitCode == 0)
                 {
                     failures.Add("npm install with unknown pack succeeded unexpectedly.");
@@ -260,7 +341,7 @@ internal sealed partial class SmokeTestSuite
 
             try
             {
-                var result = RunProcessResult("node", $"\"{script}\" install --target claude --entry compact", installRoot);
+                var result = RunProcessResult("node", $"\"{script}\" install --target claude --entry compact", installRoot, echoOutput: false);
                 if (result.ExitCode == 0)
                 {
                     failures.Add("npm install with unknown entry mode succeeded unexpectedly.");

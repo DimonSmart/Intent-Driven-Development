@@ -2,8 +2,16 @@ using System.Text.Json;
 
 internal static class YamlFrontMatterWriter
 {
-    public static string BuildSkillFrontMatter(string skillName, SkillDescription skillDescription, string adapterName)
+    public static string BuildSkillFrontMatter(string skillName, SkillDescription skillDescription, AdapterConfig adapter)
     {
+        var generatedManualFields = adapter.SupportsManualOnlySkills &&
+            skillDescription.Invocation == SkillInvocation.Manual
+                ? new Dictionary<string, bool>(StringComparer.Ordinal)
+                {
+                    ["disable-model-invocation"] = true,
+                    ["user-invocable"] = true
+                }
+                : null;
         var lines = new List<string>
         {
             "---",
@@ -11,12 +19,33 @@ internal static class YamlFrontMatterWriter
             $"description: {ToYamlString(skillDescription.Description)}"
         };
 
-        if (skillDescription.Adapters?.TryGetValue(adapterName, out var adapterMetadata) == true &&
+        if (skillDescription.Adapters?.TryGetValue(adapter.CodingAgent, out var adapterMetadata) == true &&
             adapterMetadata.Frontmatter is not null)
         {
             foreach (var field in adapterMetadata.Frontmatter)
             {
+                if (generatedManualFields is not null &&
+                    generatedManualFields.TryGetValue(field.Key, out var expectedValue))
+                {
+                    if (field.Value.ValueKind is not JsonValueKind.True and not JsonValueKind.False ||
+                        field.Value.GetBoolean() != expectedValue)
+                    {
+                        throw new InvalidOperationException(
+                            $"Skill '{skillName}' frontmatter field '{field.Key}' conflicts with manual invocation policy for adapter '{adapter.CodingAgent}'.");
+                    }
+
+                    continue;
+                }
+
                 lines.Add($"{field.Key}: {ToYamlValue(field.Value)}");
+            }
+        }
+
+        if (generatedManualFields is not null)
+        {
+            foreach (var field in generatedManualFields)
+            {
+                lines.Add($"{field.Key}: true");
             }
         }
 

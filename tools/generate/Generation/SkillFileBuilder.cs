@@ -35,7 +35,7 @@ internal sealed class SkillFileBuilder(RepositoryLayout layout)
             if (adapter.SupportsFrontMatter)
             {
                 content = ContentNormalizer.JoinBlocks(
-                    YamlFrontMatterWriter.BuildSkillFrontMatter(skillName, skillDescription, adapter.CodingAgent),
+                    YamlFrontMatterWriter.BuildSkillFrontMatter(skillName, skillDescription, adapter),
                     content);
             }
 

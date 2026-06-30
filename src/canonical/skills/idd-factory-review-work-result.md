@@ -8,6 +8,14 @@ This skill is the final review workflow contract. The local final-reviewer role
 prompt is an optional reference for review focus; it does not own product
 intent.
 
+## Invocation
+
+This is a manual-only factory command.
+
+Do not use this workflow automatically based on task size, complexity, uncertainty,
+or similarity to the user request. Use it only when the current user explicitly
+invokes this command or names this factory workflow directly.
+
 ## Rules
 
 - Review the whole branch/result, not only the last task.

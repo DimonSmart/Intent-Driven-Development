@@ -4,7 +4,8 @@ const { ensureNoUnknownArgs, valueAfter, valuesAfter } = require("./fs-utils");
 const { resolvePacks, isDefaultPackSelection } = require("./pack-resolver");
 const { collectCodingAgentFiles } = require("./install-planner");
 const { copyPlannedFiles } = require("./file-installer");
-const { supportsGeneratedSkills } = require("./entry-builder");
+const { supportsGeneratedSkills, supportsManualOnlySkills } = require("./entry-builder");
+const { selectedSkills } = require("./pack-resolver");
 
 function install(args) {
   ensureNoUnknownArgs(args, ["--target", "--coding-agent", "--all", "--entry", "--force", "--pack"]);
@@ -84,13 +85,24 @@ Use --entry minimal or --entry full for this CodingAgent.`);
 }
 
 function validatePackCodingAgentCapabilities(manifest, selectedCodingAgents, selectedPacks) {
-  if (!selectedPacks.includes("factory")) {
+  const skills = selectedSkills(manifest, selectedPacks);
+  if (skills.size === 0) {
     return;
   }
 
-  const incompatible = selectedCodingAgents.filter((codingAgent) => !supportsGeneratedSkills(manifest, codingAgent));
-  if (incompatible.length > 0) {
-    fail(`Factory pack requires generated skills. Unsupported CodingAgents: ${incompatible.join(", ")}.`);
+  const containsManualOnlySkills = Array.from(skills).some((skill) => manifest.skills && manifest.skills[skill]?.invocation === "manual");
+  if (!containsManualOnlySkills) {
+    return;
+  }
+
+  const manualIncompatible = selectedCodingAgents.filter((codingAgent) => !supportsManualOnlySkills(manifest, codingAgent));
+  if (manualIncompatible.length > 0) {
+    const packText = selectedPacks.length === 1
+      ? `Pack '${selectedPacks[0]}' contains`
+      : `Selected packs '${selectedPacks.join(", ")}' contain`;
+    fail(`${packText} manual-only skills, but CodingAgent '${manualIncompatible[0]}' does not support manual-only skill invocation.
+Manual-only skills must not be installed as auto-selectable skills.
+Use a CodingAgent that supports manual-only skills or install core without the factory pack.`);
   }
 }
 

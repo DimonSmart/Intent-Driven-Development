@@ -106,6 +106,7 @@ internal sealed partial class SmokeTestSuite
         ExpectJsonProperty(root, "codingAgentCapabilities", manifestPath);
         ExpectJsonProperty(root, "targetCapabilities", manifestPath);
         ExpectJsonProperty(root, "entryPoints", manifestPath);
+        ExpectJsonProperty(root, "skills", manifestPath);
         ExpectJsonProperty(root, "packs", manifestPath);
 
         var codingAgents = JsonStringArray(root, "codingAgents");

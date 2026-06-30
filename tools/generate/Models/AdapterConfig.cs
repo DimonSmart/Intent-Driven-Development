@@ -3,4 +3,5 @@ internal sealed record AdapterConfig(
     string EntryPoint,
     string? SkillsRoot,
     bool SupportsSkills,
-    bool SupportsFrontMatter);
+    bool SupportsFrontMatter,
+    bool SupportsManualOnlySkills);

@@ -84,7 +84,13 @@ Generated files are delivery formats for specific CodingAgents. They are not pro
 
 ## Skill Metadata
 
-`src/canonical/skills/skill-descriptions.json` stores skill descriptions and optional adapter-specific metadata.
+`src/canonical/skills/skill-descriptions.json` stores skill descriptions,
+invocation policy, and optional adapter-specific metadata.
+
+Missing `invocation` means `auto`: a normal skill the CodingAgent may select
+when relevant. `invocation: "manual"` means the workflow is a user-invoked
+command only. Manual workflows must not be installed for adapters that cannot
+guarantee manual-only invocation.
 
 Canonical skill body remains CodingAgent-neutral.
 
@@ -103,10 +109,16 @@ Pack membership is defined in `src/canonical/packs/pack-manifest.json`.
 prompt references, and `.idd/factory/.gitignore`. It must not place work plans,
 task briefs, review notes, or logs in `.idd/intent/`.
 
+Factory workflows are installed as manual-only commands. They are available to
+the user after installing the factory pack, but the CodingAgent must not select
+them automatically. Use them through explicit slash-command invocation, for
+example `/idd-factory-create-work-plan` or `/idd-factory-execute-work-plan`.
+Installing factory does not authorize automatic factory routing.
+
 Generated bundles may contain all skill-capable CodingAgent files, but installers
 copy only the skills and project files selected by packs. Core-only entry
-routing must not mention factory skills. Factory-enabled entry routing may
-mention factory only as temporary execution orchestration.
+routing must not mention factory skills. Factory-enabled entry text may mention
+factory only as manual commands.
 
 ## Workflow
 

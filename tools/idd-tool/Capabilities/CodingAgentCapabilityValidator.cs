@@ -46,13 +46,29 @@ internal sealed class CodingAgentCapabilityValidator
             return;
         }
 
-        var incompatible = codingAgents
-            .Where(codingAgent => !SupportsGeneratedSkills(manifest, codingAgent))
+        var containsManualOnlySkills = selectedSkills.Any(skill =>
+            manifest.Skills.TryGetValue(skill, out var metadata) &&
+            StringComparer.Ordinal.Equals(metadata.Invocation, "manual"));
+        if (!containsManualOnlySkills)
+        {
+            return;
+        }
+
+        var manualIncompatible = codingAgents
+            .Where(codingAgent => !SupportsManualOnlySkills(manifest, codingAgent))
             .ToArray();
 
-        if (incompatible.Length > 0 && selectedPacks.Contains("factory", StringComparer.Ordinal))
+        if (manualIncompatible.Length > 0)
         {
-            throw new ToolException($"Factory pack requires generated skills. Unsupported CodingAgents: {string.Join(", ", incompatible)}.");
+            var packText = selectedPacks.Count == 1
+                ? $"Pack '{selectedPacks[0]}' contains"
+                : $"Selected packs '{string.Join(", ", selectedPacks)}' contain";
+            throw new ToolException(
+                $"{packText} manual-only skills, but CodingAgent '{manualIncompatible[0]}' does not support manual-only skill invocation." +
+                Environment.NewLine +
+                "Manual-only skills must not be installed as auto-selectable skills." +
+                Environment.NewLine +
+                "Use a CodingAgent that supports manual-only skills or install core without the factory pack.");
         }
     }
 
@@ -65,5 +81,16 @@ internal sealed class CodingAgentCapabilityValidator
         }
 
         return capabilities.SupportsSkills;
+    }
+
+    private static bool SupportsManualOnlySkills(Manifest manifest, string codingAgent)
+    {
+        if (manifest.CodingAgentCapabilities is null ||
+            !manifest.CodingAgentCapabilities.TryGetValue(codingAgent, out var capabilities))
+        {
+            throw new ToolException($"Bundled manifest does not define codingAgentCapabilities for CodingAgent: {codingAgent}");
+        }
+
+        return capabilities.SupportsSkills && capabilities.SupportsManualOnlySkills;
     }
 }

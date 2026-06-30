@@ -7,6 +7,7 @@ internal sealed class Manifest
     public required string CanonicalSource { get; init; }
     public required string GeneratedRoot { get; init; }
     public required Dictionary<string, string> EntryPoints { get; init; }
+    public Dictionary<string, SkillMetadata> Skills { get; init; } = new(StringComparer.Ordinal);
     public required Dictionary<string, PackDefinition> Packs { get; init; }
 
     [JsonPropertyName("codingAgents")]

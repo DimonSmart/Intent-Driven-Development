@@ -3,5 +3,6 @@
   "entryPoint": "CLAUDE.md",
   "skillsRoot": ".claude/skills",
   "supportsSkills": true,
-  "supportsFrontMatter": true
+  "supportsFrontMatter": true,
+  "supportsManualOnlySkills": true
 }

@@ -1,1 +1,1 @@
-internal sealed record CodingAgentCapabilities(bool SupportsSkills);
+internal sealed record CodingAgentCapabilities(bool SupportsSkills, bool SupportsManualOnlySkills);

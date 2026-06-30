@@ -37,6 +37,7 @@ internal sealed partial class SmokeTestSuite
         ExpectEntryPointLineLimits();
         ExpectAllSkillsGenerated();
         ExpectClaudeSkillMetadata();
+        ExpectSkillInvocationMetadata();
         ExpectPackManifestShape();
         ExpectNoLegacyPublicNames();
         ExpectFactoryGeneratedShape();
@@ -59,6 +60,7 @@ internal sealed partial class SmokeTestSuite
         ExpectNpmInstallEntryFull();
         ExpectNpmRejectsGeminiEntryNone();
         ExpectNpmRejectsFactoryForGemini();
+        ExpectNpmManualSkillValidationIsGeneric();
         ExpectNpmRejectsUnknownPack();
         ExpectNpmRejectsUnknownEntryMode();
         ExpectGeneratorCheckPasses();

@@ -39,7 +39,11 @@ function buildSkillGuidance(manifest, codingAgent, selectedPacks) {
 read only the documents needed for the current task.`;
   }
 
-  const skills = Array.from(selectedSkills(manifest, selectedPacks)).sort().map((skill) => `- \`${skill}\``).join("\n");
+  const skills = Array.from(selectedSkills(manifest, selectedPacks))
+    .filter((skill) => (manifest.skills && manifest.skills[skill]?.invocation) !== "manual")
+    .sort()
+    .map((skill) => `- \`${skill}\``)
+    .join("\n");
   const blocks = [
     `Use installed IDD skills for specific workflows:\n${skills}`,
     `## IDD Workflow Routing
@@ -56,16 +60,19 @@ updating the existing owning spec.`
   ];
 
   if (selectedPacks.includes("factory")) {
-    blocks.push(`## IDD Factory Routing
+    blocks.push(`## IDD Factory Commands
 
-Use IDD factory skills only for planned implementation orchestration,
-multi-step execution, task slicing, or factory role based work.
+Factory commands are installed as manual user-invoked workflows.
+Do not invoke factory workflows automatically.
+Do not choose factory because a task is large, complex, risky, multi-step, or implementation-heavy.
+Use factory only when the current user explicitly invokes a factory command, such as \`/idd-factory-create-work-plan\` or \`/idd-factory-execute-work-plan\`.
+For ordinary requests, use the regular IDD workflow.
 
-- Use \`idd-factory-create-work-plan\` to create a temporary Factory Work Plan.
-- Use \`idd-factory-execute-work-plan\` to execute an explicit Factory Work Plan.
-- Use \`idd-factory-review-task\` after each bounded task.
-- Use \`idd-factory-review-work-result\` after all tasks are complete.
-- Use \`idd-factory-finish-work\` to summarize and clean temporary factory artifacts.
+- \`/idd-factory-create-work-plan\` creates a temporary Factory Work Plan.
+- \`/idd-factory-execute-work-plan\` executes an explicit Factory Work Plan.
+- \`/idd-factory-review-task\` reviews one completed factory task.
+- \`/idd-factory-review-work-result\` reviews the complete Factory Work Plan result.
+- \`/idd-factory-finish-work\` summarizes and cleans temporary factory artifacts.
 
 Factory work plans are temporary execution state.
 They are not specs and must not be stored in \`.idd/intent/\`.
@@ -105,7 +112,17 @@ function supportsGeneratedSkills(manifest, codingAgent) {
   return capabilities.supportsSkills === true;
 }
 
+function supportsManualOnlySkills(manifest, codingAgent) {
+  const capabilities = codingAgentCapabilities(manifest) && codingAgentCapabilities(manifest)[codingAgent];
+  if (!capabilities) {
+    fail(`Bundled manifest does not define codingAgentCapabilities for CodingAgent: ${codingAgent}`);
+  }
+
+  return capabilities.supportsSkills === true && capabilities.supportsManualOnlySkills === true;
+}
+
 module.exports = {
   buildEntry,
-  supportsGeneratedSkills
+  supportsGeneratedSkills,
+  supportsManualOnlySkills
 };

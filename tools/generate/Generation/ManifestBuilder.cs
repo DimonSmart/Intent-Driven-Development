@@ -6,6 +6,7 @@ internal static class ManifestBuilder
     public static string Build(
         IReadOnlyList<AdapterDefinition> adapterDefinitions,
         PackManifest packManifest,
+        IReadOnlyDictionary<string, SkillDescription> skillDescriptions,
         string manifestVersion)
     {
         var orderedAdapters = adapterDefinitions
@@ -23,11 +24,13 @@ internal static class ManifestBuilder
             entryPoints.Add(adapter.CodingAgent, adapter.EntryPoint);
             codingAgentCapabilities.Add(adapter.CodingAgent, new JsonObject
             {
-                ["supportsSkills"] = adapter.SupportsSkills
+                ["supportsSkills"] = adapter.SupportsSkills,
+                ["supportsManualOnlySkills"] = adapter.SupportsManualOnlySkills
             });
             targetCapabilities.Add(adapter.CodingAgent, new JsonObject
             {
-                ["supportsSkills"] = adapter.SupportsSkills
+                ["supportsSkills"] = adapter.SupportsSkills,
+                ["supportsManualOnlySkills"] = adapter.SupportsManualOnlySkills
             });
         }
 
@@ -42,10 +45,26 @@ internal static class ManifestBuilder
             ["targets"] = targetAliases,
             ["entryPoints"] = entryPoints,
             ["targetCapabilities"] = targetCapabilities,
+            ["skills"] = BuildSkillsNode(skillDescriptions),
             ["packs"] = BuildPacksNode(packManifest)
         };
 
         return manifest.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n";
+    }
+
+    private static JsonObject BuildSkillsNode(IReadOnlyDictionary<string, SkillDescription> skillDescriptions)
+    {
+        var skills = new JsonObject();
+        foreach (var (skillName, skillDescription) in skillDescriptions.OrderBy(item => item.Key, StringComparer.Ordinal))
+        {
+            skills.Add(skillName, new JsonObject
+            {
+                ["description"] = skillDescription.Description,
+                ["invocation"] = skillDescription.Invocation == SkillInvocation.Manual ? "manual" : "auto"
+            });
+        }
+
+        return skills;
     }
 
     private static JsonObject BuildPacksNode(PackManifest packManifest)
