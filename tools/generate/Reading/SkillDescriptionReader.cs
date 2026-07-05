@@ -11,6 +11,7 @@ internal sealed class SkillDescriptionReader
         var descriptions = new Dictionary<string, SkillDescription>(StringComparer.Ordinal);
         foreach (var skillProperty in document.RootElement.EnumerateObject())
         {
+            SkillDescriptionValidator.GuardPublicSkillName(path, skillProperty.Name);
             descriptions.Add(
                 skillProperty.Name,
                 ReadSkillDescription(path, skillProperty.Name, skillProperty.Value, knownAdapterNames));

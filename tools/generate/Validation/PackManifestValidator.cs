@@ -12,6 +12,10 @@ internal sealed class PackManifestValidator(RepositoryLayout layout)
             .Select(path => Path.GetFileNameWithoutExtension(path)!)
             .ToHashSet(StringComparer.Ordinal);
         var skillOwners = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var skill in canonicalSkills)
+        {
+            SkillDescriptionValidator.GuardPublicSkillName(layout.SkillsRoot, skill);
+        }
 
         foreach (var (packName, pack) in manifest.Packs)
         {

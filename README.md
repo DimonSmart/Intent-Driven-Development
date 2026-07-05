@@ -28,6 +28,9 @@ Temporary work belongs elsewhere: tasks, pull requests, chats, generated plans, 
 
 Core IDD is the default install. It creates the durable intent layer in `.idd/intent/`. Optional execution orchestration, such as the factory pack, is for temporary work and must not become the canonical specification. Factory workflows are manual-only commands; installing factory does not authorize automatic factory routing.
 
+All public IDD commands use the `idd-` prefix and the format `idd-<area>-<action>`.
+This keeps IDD commands grouped in autocomplete and avoids collisions with project, plugin, or tool commands.
+
 ## Why It Is Different
 
 | Ordinary spec-driven workflow | Intent-Driven Development |

@@ -1,6 +1,7 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
-internal static class SkillDescriptionValidator
+internal static partial class SkillDescriptionValidator
 {
     public static void GuardRootObject(string path, JsonElement root)
     {
@@ -21,6 +22,15 @@ internal static class SkillDescriptionValidator
             descriptionElement.ValueKind != JsonValueKind.String)
         {
             throw new InvalidOperationException($"Invalid skill description for {skillName} in {path}: description is required.");
+        }
+    }
+
+    public static void GuardPublicSkillName(string path, string skillName)
+    {
+        if (!PublicSkillNamePattern().IsMatch(skillName))
+        {
+            throw new InvalidOperationException(
+                $"Invalid public skill name '{skillName}' in {path}: expected idd-<area>-<action> with area intent, code, or factory.");
         }
     }
 
@@ -105,4 +115,7 @@ internal static class SkillDescriptionValidator
         throw new InvalidOperationException(
             $"Invalid frontmatter for {skillName}/{adapterName} in {path}: '{fieldName}' must be a string, bool, number, or string array.");
     }
+
+    [GeneratedRegex("^idd-(intent|code|factory)-[a-z0-9]+(?:-[a-z0-9]+)*$", RegexOptions.CultureInvariant)]
+    private static partial Regex PublicSkillNamePattern();
 }

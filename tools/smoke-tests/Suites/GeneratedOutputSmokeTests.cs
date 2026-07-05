@@ -12,6 +12,14 @@ internal sealed partial class SmokeTestSuite
         }
     }
 
+    void ExpectNoFile(string relativePath)
+    {
+        if (File.Exists(Path.Combine(repoRoot, relativePath)))
+        {
+            failures.Add($"Unexpected file: {relativePath}");
+        }
+    }
+
     void ExpectNoDirectory(string relativePath)
     {
         if (Directory.Exists(Path.Combine(repoRoot, relativePath)))
@@ -113,5 +121,35 @@ internal sealed partial class SmokeTestSuite
             }
         }
     }
+
+    void ExpectPrefixedClaudeSkillOutput()
+    {
+        foreach (var skillName in ExpectedPrefixedClaudeSkills())
+        {
+            ExpectFile($"generated/claude/.claude/skills/{skillName}/SKILL.md");
+        }
+
+        foreach (var skillName in ForbiddenClaudeSkillDirectories())
+        {
+            ExpectNoFile($"generated/claude/.claude/skills/{skillName}/SKILL.md");
+            ExpectNoDirectory($"generated/claude/.claude/skills/{skillName}");
+        }
+    }
+
+    static string[] ExpectedPrefixedClaudeSkills() =>
+    [
+        "idd-intent-brainstorm",
+        "idd-intent-change",
+        "idd-code-implement",
+        "idd-factory-create-work-plan"
+    ];
+
+    static string[] ForbiddenClaudeSkillDirectories() =>
+    [
+        "brain" + "storm",
+        "cha" + "nge",
+        "imple" + "ment",
+        "factory" + "-create-work-plan"
+    ];
 
 }

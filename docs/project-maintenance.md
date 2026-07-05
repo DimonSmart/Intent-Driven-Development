@@ -109,6 +109,10 @@ Pack membership is defined in `src/canonical/packs/pack-manifest.json`.
 prompt references, and `.idd/factory/.gitignore`. It must not place work plans,
 task briefs, review notes, or logs in `.idd/intent/`.
 
+All public IDD commands use the `idd-` prefix and the format
+`idd-<area>-<action>`. This keeps IDD commands grouped in autocomplete and
+avoids collisions with project, plugin, or tool commands.
+
 Factory workflows are installed as manual-only commands. They are available to
 the user after installing the factory pack, but the CodingAgent must not select
 them automatically. Use them through explicit slash-command invocation, for

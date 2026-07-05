@@ -37,7 +37,8 @@ internal sealed partial class SmokeTestSuite
         "npm",
         "tools/idd-tool",
         "tools/generate",
-        "tools/smoke-tests"
+        "tools/smoke-tests",
+        "generated"
     ];
 
     private static readonly string[] LegacyPublicNameTextExtensions =
@@ -79,6 +80,25 @@ internal sealed partial class SmokeTestSuite
         }
     }
 
+    void ExpectNoUnprefixedPublicCommandNames()
+    {
+        foreach (var path in LegacyPublicNameFiles())
+        {
+            var text = File.ReadAllText(path);
+            foreach (var name in ForbiddenUnprefixedPublicNames())
+            {
+                foreach (var pattern in ForbiddenUnprefixedCommandPatterns(name))
+                {
+                    var match = Regex.Match(text, pattern, RegexOptions.CultureInvariant);
+                    if (match.Success)
+                    {
+                        failures.Add($"Unprefixed public command name '{name}' found in {Relative(path)}:{LineNumber(text, match.Index)}.");
+                    }
+                }
+            }
+        }
+    }
+
     IEnumerable<string> LegacyPublicNameFiles()
     {
         foreach (var root in LegacyPublicNameRoots)
@@ -112,4 +132,61 @@ internal sealed partial class SmokeTestSuite
 
     static int LineNumber(string text, int index) =>
         text.Take(index).Count(character => character == '\n') + 1;
+
+    static string[] ForbiddenUnprefixedPublicNames() =>
+    [
+        "brain" + "storm",
+        "cha" + "nge",
+        "au" + "dit",
+        "im" + "port",
+        "li" + "nt",
+        "new" + "-document",
+        "normalize" + "-current",
+        "imple" + "ment",
+        "check" + "-implementation",
+        "update" + "-intent",
+        "create" + "-work-plan",
+        "execute" + "-work-plan",
+        "review" + "-task",
+        "review" + "-work-result",
+        "finish" + "-work",
+        "factory" + "-create-work-plan",
+        "factory" + "-execute-work-plan",
+        "factory" + "-review-task",
+        "factory" + "-review-work-result",
+        "factory" + "-finish-work"
+    ];
+
+    static string[] ForbiddenUnprefixedCommandPatterns(string name)
+    {
+        var escapedName = Regex.Escape(name);
+        var pathPatterns = new[]
+        {
+            SkillPathPattern(".claude/skills/", escapedName),
+            SkillPathPattern(".agents/skills/", escapedName),
+            SkillPathPattern(".github/skills/", escapedName),
+            SkillPathPattern("generated/claude/.claude/skills/", escapedName),
+            SkillPathPattern("generated/codex/.agents/skills/", escapedName),
+            SkillPathPattern("generated/copilot/.github/skills/", escapedName)
+        };
+
+        return name.Contains('-', StringComparison.Ordinal)
+            ?
+            [
+                SlashCommandPattern(escapedName),
+                "`" + escapedName + "`",
+                .. pathPatterns
+            ]
+            :
+            [
+                SlashCommandPattern(escapedName),
+                .. pathPatterns
+            ];
+    }
+
+    static string SlashCommandPattern(string escapedName) =>
+        $@"(?<![A-Za-z0-9_.-])/{escapedName}(?![A-Za-z0-9_-])";
+
+    static string SkillPathPattern(string prefix, string escapedName) =>
+        Regex.Escape(prefix) + escapedName + @"(?:[/\\]|$)";
 }

@@ -32,6 +32,10 @@ Use `--entry none` to install only skills for CodingAgents that support them. Us
 Core IDD is installed by default. It installs the durable `.idd/intent/` intent layer
 and the `idd-intent-*` and `idd-code-*` skills.
 
+All public IDD commands use the `idd-` prefix and the format
+`idd-<area>-<action>`. This keeps IDD commands grouped in autocomplete and
+avoids collisions with project, plugin, or tool commands.
+
 ## Optional Factory Pack
 
 The factory pack adds temporary execution orchestration workflows for

@@ -36,10 +36,12 @@ internal sealed partial class SmokeTestSuite
         ExpectNoEntryIncludes("generated/gemini/GEMINI.md", "AGENTS.md");
         ExpectEntryPointLineLimits();
         ExpectAllSkillsGenerated();
+        ExpectPrefixedClaudeSkillOutput();
         ExpectClaudeSkillMetadata();
         ExpectSkillInvocationMetadata();
         ExpectPackManifestShape();
         ExpectNoLegacyPublicNames();
+        ExpectNoUnprefixedPublicCommandNames();
         ExpectFactoryGeneratedShape();
         ExpectFactoryRolePromptReferences();
         ExpectListPacks();

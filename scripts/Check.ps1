@@ -7,16 +7,30 @@ if ($LASTEXITCODE -ne 0) {
 
 Set-Location $repoRoot
 
-dotnet build tools/generate/Generate.csproj --nologo
-dotnet build tools/idd-tool/IntentDrivenDevelopment.Tool.csproj --nologo
-dotnet build tools/smoke-tests/SmokeTests.csproj --nologo
+function Invoke-CheckedNative {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $FilePath,
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]] $Arguments
+    )
 
-dotnet exec tools/generate/bin/Debug/net10.0/Generate.dll
+    & $FilePath @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Command failed with exit code ${LASTEXITCODE}: $FilePath $($Arguments -join ' ')"
+    }
+}
+
+Invoke-CheckedNative dotnet build tools/generate/Generate.csproj --nologo
+Invoke-CheckedNative dotnet build tools/idd-tool/IntentDrivenDevelopment.Tool.csproj --nologo
+Invoke-CheckedNative dotnet build tools/smoke-tests/SmokeTests.csproj --nologo
+
+Invoke-CheckedNative dotnet exec tools/generate/bin/Debug/net10.0/Generate.dll
 if (-not (Test-Path -LiteralPath (Join-Path $repoRoot "manifest.json"))) {
     throw "Generator did not create manifest.json."
 }
 
-dotnet exec tools/generate/bin/Debug/net10.0/Generate.dll --check
-dotnet exec tools/smoke-tests/bin/Debug/net10.0/SmokeTests.dll
+Invoke-CheckedNative dotnet exec tools/generate/bin/Debug/net10.0/Generate.dll --check
+Invoke-CheckedNative dotnet exec tools/smoke-tests/bin/Debug/net10.0/SmokeTests.dll
 
 Write-Host "Check completed."
