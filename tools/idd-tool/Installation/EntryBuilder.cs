@@ -37,7 +37,9 @@ internal sealed class EntryBuilder(ContentLayout layout)
         {
             return """
                 This CodingAgent does not use generated IDD skills. Keep IDD work focused and
-                read only the documents needed for the current task.
+                read only the documents needed for the current task. Skip IDD only when the
+                user explicitly requests it for the current request; never select skip
+                automatically.
                 """;
         }
 
@@ -53,6 +55,8 @@ internal sealed class EntryBuilder(ContentLayout layout)
             ## IDD Workflow Routing
 
             Use `idd-intent-brainstorm` when product intent is unclear.
+            Use `idd-skip` only when the user explicitly invokes it for the current
+            request. Never select `idd-skip` automatically.
             Use `idd-intent-change` when durable product behavior must change.
             Use `idd-code-implement` for one focused behavior already covered by
             `.idd/intent/`, then use `idd-code-check-implementation`.
@@ -61,6 +65,7 @@ internal sealed class EntryBuilder(ContentLayout layout)
 
             Do not create a new spec merely because the user described a new task. Prefer
             updating the existing owning spec.
+
             """
         };
 
@@ -69,10 +74,10 @@ internal sealed class EntryBuilder(ContentLayout layout)
             blocks.Add("""
                 ## IDD Factory Commands
 
-                Factory commands are installed as manual user-invoked workflows.
-                Do not invoke factory workflows automatically.
-                Do not choose factory because a task is large, complex, risky, multi-step, or implementation-heavy.
-                Use factory only when the current user explicitly invokes a factory command, such as `/idd-factory-create-work-plan` or `/idd-factory-execute-work-plan`.
+                Factory workflows are temporary execution orchestration and may be
+                selected automatically when the request requires multi-task planning,
+                sequencing, task reviews, or final review. Do not choose Factory when
+                one focused `idd-code-implement` operation is sufficient.
                 For ordinary requests, use the regular IDD workflow.
 
                 - `/idd-factory-create-work-plan` creates a temporary Factory Work Plan.
@@ -83,6 +88,9 @@ internal sealed class EntryBuilder(ContentLayout layout)
 
                 Factory work plans are temporary execution state.
                 They are not specs and must not be stored in `.idd/intent/`.
+                Factory must not invent missing product intent. Stop with
+                `INTENT_REQUIRED`, route to an intent skill, reread current intent,
+                and refresh the Work Plan before continuing.
                 Do not read old factory work plans unless the user explicitly provides the exact path.
                 """);
         }

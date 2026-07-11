@@ -41,10 +41,11 @@ avoids collisions with project, plugin, or tool commands.
 The factory pack adds temporary execution orchestration workflows for
 implementing current `.idd/intent/` intent.
 
-Factory workflows are installed as manual-only commands. They are available to
-the user after installing the factory pack, but the CodingAgent must not select
-them automatically. Use them through explicit slash-command invocation, for
-example `/idd-factory-create-work-plan`.
+Factory workflows may be selected automatically for temporary multi-task
+orchestration, sequencing, task reviews, or final review. Use
+`idd-code-implement` for one focused change. `idd-skip` is manual-only and
+applies only when explicitly invoked for the current request; never select it
+automatically.
 
 Install:
 
@@ -55,8 +56,8 @@ intent-driven-development install --target claude --pack factory
 The factory pack automatically includes core. It creates local support files
 under `.idd/factory/`; temporary work artifacts are created under
 `.idd/factory/work/` only when a factory work plan is created.
-Factory remains optional, and installing factory does not authorize automatic
-factory routing for large, complex, multi-step, or implementation-heavy tasks.
+Factory remains optional. It never replaces intent workflows and must stop when
+current intent is missing or insufficient.
 
 `.idd/factory/work/` is ignored by git by default. Factory work plans are not
 product specifications and must not be reused automatically for unrelated later

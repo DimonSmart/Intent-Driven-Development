@@ -86,6 +86,11 @@ Use --entry minimal or --entry full for this CodingAgent.`);
 
 function validatePackCodingAgentCapabilities(manifest, selectedCodingAgents, selectedPacks) {
   const skills = selectedSkills(manifest, selectedPacks);
+  for (const skill of [...skills]) {
+    if (skill === "idd-skip" && manifest.skills && manifest.skills[skill]?.invocation === "manual") {
+      skills.delete(skill);
+    }
+  }
   if (skills.size === 0) {
     return;
   }

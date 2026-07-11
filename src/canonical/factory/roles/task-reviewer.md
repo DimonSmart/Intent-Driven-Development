@@ -13,6 +13,9 @@ This role does not review the whole factory run.
 
 - Compare task result to task brief and specs.
 - Review code quality and test evidence.
+- Check that no new behavior or durable contract was invented without intent,
+  and that execution did not continue after `INTENT_REQUIRED` without intent
+  being refreshed.
 - Classify findings by severity.
 - Return approved, needs-fix, or blocked.
 - Do not update code or `.idd/intent/`.

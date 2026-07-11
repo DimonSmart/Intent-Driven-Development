@@ -134,6 +134,17 @@ internal sealed partial class SmokeTestSuite
             failures.Add("manifest.json is missing packs.core.");
         }
 
+        var coreSkills = packs.GetProperty("core").GetProperty("skills").EnumerateArray().Select(item => item.GetString() ?? "").ToArray();
+        if (!coreSkills.Contains("idd-skip", StringComparer.Ordinal))
+        {
+            failures.Add("idd-skip is missing from the core pack.");
+        }
+        if (packs.TryGetProperty("factory", out var manifestFactory) &&
+            manifestFactory.GetProperty("skills").EnumerateArray().Any(item => StringComparer.Ordinal.Equals(item.GetString(), "idd-skip")))
+        {
+            failures.Add("idd-skip must not be listed in the factory pack.");
+        }
+
         if (!packs.TryGetProperty("factory", out var factoryPack))
         {
             failures.Add("manifest.json is missing packs.factory.");

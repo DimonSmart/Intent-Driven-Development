@@ -8,9 +8,10 @@ This skill is the finish workflow contract. The local coordinator role prompt
 is an optional reference for cleanup and reporting focus; it does not own
 product intent.
 
-## Invocation
+## Routing
 
-This is a manual-only factory command.
+Use this workflow only to finish the current active Factory run. Do not select
+it outside that run or as a general cleanup workflow.
 
 Do not use this workflow automatically based on task size, complexity, uncertainty,
 or similarity to the user request. Use it only when the current user explicitly

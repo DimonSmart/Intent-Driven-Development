@@ -64,8 +64,10 @@ Do not use this skill when:
 
 `idd-intent-brainstorm` never edits files.
 
-If the user confirms a product direction and asks to persist it, stop and hand
-off to `idd-intent-change`.
+If the user confirms a product direction and asks to persist it, route to
+`idd-intent-change` when an existing current document owns the area. Route to
+`idd-intent-new-document` when the result is a new durable product area, ADR, or
+spike.
 
 It must not:
 
@@ -113,7 +115,7 @@ clear enough to write or update specs.
 Use `idd-intent-change` when the user has confirmed a desired product behavior change
 and `.idd/intent/` should be updated.
 
-Use `idd-intent-new-document` only when a new durable product area, ADR, or spike is
+Use `idd-intent-new-document` when a new durable product area, ADR, or spike is
 needed and no existing current document owns the area.
 
 Use `idd-code-implement` when current specs already describe the behavior to build.
@@ -355,7 +357,8 @@ Upgrade path:
 
 ## Next Step
 
-If the user confirms the direction, use `idd-intent-change`.
+If the user confirms the direction, use `idd-intent-change` for an existing owner
+or `idd-intent-new-document` for a new owner, ADR, or spike.
 ```
 
 ### Specification-ready intent
@@ -419,8 +422,8 @@ Use when the intent is clear enough to become a spec change.
 
 ## Next Step
 
-Use `idd-intent-change` to update the owning current spec or create the correct IDD
-document if no current document owns the area.
+Use `idd-intent-change` to update the owning current spec, or
+`idd-intent-new-document` if no current document owns the area.
 ```
 
 ## Rules

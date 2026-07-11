@@ -40,6 +40,7 @@ internal sealed partial class SmokeTestSuite
         ExpectDurableIntentPolicy();
         ExpectClaudeSkillMetadata();
         ExpectSkillInvocationMetadata();
+        ExpectPublicSkillNameValidation();
         ExpectPackManifestShape();
         ExpectNoLegacyPublicNames();
         ExpectNoUnprefixedPublicCommandNames();

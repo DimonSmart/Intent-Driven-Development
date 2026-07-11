@@ -15,6 +15,11 @@ Use the requested type when it matches the change. If the type is not
 specified, infer it from the change. If the requested type conflicts with IDD
 rules, state the mismatch and use the correct document type.
 
+This skill accepts a semantic handoff from `idd-intent-change`,
+`idd-intent-brainstorm`, or Factory. The handoff includes document type,
+product or decision area, durable intent, why current documents are not valid
+owners, related documents, acceptance or decision context, and open questions.
+
 ## Rules
 
 - Do not use this skill for changing behavior already covered by an existing
@@ -29,8 +34,8 @@ rules, state the mismatch and use the correct document type.
 - Create a spike for research before a decision.
 - Do not create replacement specs only to preserve old wording.
 - If the product area is the same, update the existing spec.
-- If the product area identity changes, delete the old spec and create a new
-  owning spec.
+- If the product area identity changes, create the new owning spec only after
+  this skill's ownership check confirms that no current document owns it.
 - Git history preserves the deleted document.
 - If the requested type does not match the change, do not follow it blindly.
   State the mismatch and use the correct IDD document type.

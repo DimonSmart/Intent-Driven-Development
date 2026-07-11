@@ -7,10 +7,16 @@ internal sealed class InstallPlanner(ContentLayout layout)
         IReadOnlyList<string> selectedPacks)
     {
         var byRelativePath = new Dictionary<string, PlannedFile>(StringComparer.Ordinal);
-        var selectedSkills = ManifestSkillSelector.SelectedSkills(manifest, selectedPacks);
-
         foreach (var codingAgent in codingAgents)
         {
+            var selectedSkills = ManifestSkillSelector.SelectedSkills(manifest, selectedPacks);
+            if (!SupportsManualOnlySkills(manifest, codingAgent))
+            {
+                selectedSkills.RemoveWhere(skill =>
+                    StringComparer.Ordinal.Equals(skill, "idd-skip") &&
+                    manifest.Skills.TryGetValue(skill, out var metadata) &&
+                    StringComparer.Ordinal.Equals(metadata.Invocation, "manual"));
+            }
             var sourceRoot = Path.Combine(layout.GeneratedRoot, codingAgent);
             if (!Directory.Exists(sourceRoot))
             {
@@ -58,6 +64,11 @@ internal sealed class InstallPlanner(ContentLayout layout)
 
         return byRelativePath.Values.ToArray();
     }
+
+    private static bool SupportsManualOnlySkills(Manifest manifest, string codingAgent) =>
+        manifest.CodingAgentCapabilities is not null &&
+        manifest.CodingAgentCapabilities.TryGetValue(codingAgent, out var capabilities) &&
+        capabilities.SupportsSkills && capabilities.SupportsManualOnlySkills;
 
     private static bool TryGetGeneratedSkillName(string relativePath, out string skillName)
     {

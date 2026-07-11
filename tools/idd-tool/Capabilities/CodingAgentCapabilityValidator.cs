@@ -41,6 +41,10 @@ internal sealed class CodingAgentCapabilityValidator
     public void ValidatePackCodingAgentCapabilities(Manifest manifest, IReadOnlyList<string> codingAgents, IReadOnlyList<string> selectedPacks)
     {
         var selectedSkills = ManifestSkillSelector.SelectedSkills(manifest, selectedPacks);
+        selectedSkills.RemoveWhere(skill =>
+            StringComparer.Ordinal.Equals(skill, "idd-skip") &&
+            manifest.Skills.TryGetValue(skill, out var metadata) &&
+            StringComparer.Ordinal.Equals(metadata.Invocation, "manual"));
         if (selectedSkills.Count == 0)
         {
             return;

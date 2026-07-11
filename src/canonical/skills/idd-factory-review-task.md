@@ -8,9 +8,10 @@ code quality, and verification evidence.
 This skill is the review workflow contract. The local task-reviewer role prompt
 is an optional reference for review focus; it does not own product intent.
 
-## Invocation
+## Routing
 
-This is a manual-only factory command.
+Use this workflow only when an active Factory Work Plan requires review of one
+bounded task. Do not select it as a replacement for a general code review.
 
 Do not use this workflow automatically based on task size, complexity, uncertainty,
 or similarity to the user request. Use it only when the current user explicitly

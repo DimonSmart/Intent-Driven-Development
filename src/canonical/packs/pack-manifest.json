@@ -5,6 +5,7 @@
       "default": true,
       "requires": [],
       "skills": [
+        "idd-skip",
         "idd-intent-audit",
         "idd-intent-brainstorm",
         "idd-intent-change",

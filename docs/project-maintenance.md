@@ -113,16 +113,16 @@ All public IDD commands use the `idd-` prefix and the format
 `idd-<area>-<action>`. This keeps IDD commands grouped in autocomplete and
 avoids collisions with project, plugin, or tool commands.
 
-Factory workflows are installed as manual-only commands. They are available to
-the user after installing the factory pack, but the CodingAgent must not select
-them automatically. Use them through explicit slash-command invocation, for
-example `/idd-factory-create-work-plan` or `/idd-factory-execute-work-plan`.
-Installing factory does not authorize automatic factory routing.
+Factory workflows may be selected automatically for temporary multi-task
+orchestration, sequencing, review gates, and coordinated implementation. They
+must stop when current intent is missing or insufficient and route to intent
+skills instead. `idd-skip` is manual-only because automatic selection would
+defeat its purpose; it applies only to the current explicitly opted-out request.
 
 Generated bundles may contain all skill-capable CodingAgent files, but installers
 copy only the skills and project files selected by packs. Core-only entry
 routing must not mention factory skills. Factory-enabled entry text may mention
-factory only as manual commands.
+factory as temporary orchestration and must describe its intent-gap boundary.
 
 ## Workflow
 

@@ -9,9 +9,12 @@ const { buildEntry } = require("./entry-builder");
 
 function collectCodingAgentFiles(manifest, selectedCodingAgents, entryMode, selectedPacks) {
   const byRelativePath = new Map();
-  const skills = selectedSkills(manifest, selectedPacks);
-
   for (const codingAgent of selectedCodingAgents) {
+    const skills = selectedSkills(manifest, selectedPacks);
+    const capabilities = manifest.codingAgentCapabilities?.[codingAgent] || manifest.targetCapabilities?.[codingAgent];
+    if (!capabilities?.supportsManualOnlySkills) {
+      skills.delete("idd-skip");
+    }
     const sourceRoot = path.join(contentRoot, "generated", codingAgent);
     if (!fs.existsSync(sourceRoot)) {
       fail(`Bundled generated CodingAgent not found: ${codingAgent}`);

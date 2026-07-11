@@ -49,3 +49,14 @@ It should not dump unrelated specification analysis into the main conversation.
 Run verification commands that match the repository and the affected behavior.
 If generated CodingAgent files exist, regenerate them instead of editing them
 manually.
+
+Use IDD skills when a request involves durable product intent, implementation
+based on current intent, conformance checking, or Factory orchestration. Use
+`idd-code-implement` for one focused implementation change. Use Factory when a
+temporary multi-task plan, sequencing, review gates, or coordinated execution
+is required; Factory may be selected automatically and never becomes product
+intent.
+
+Use `idd-skip` only when the user explicitly invokes it for the current request.
+Never select `idd-skip` automatically; it is not a project or future-request
+setting.

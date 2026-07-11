@@ -127,8 +127,9 @@ internal sealed partial class SmokeTestSuite
             if (File.Exists(entryPath))
             {
                 var entryContent = File.ReadAllText(entryPath);
-                ExpectContains(entryContent, "Factory commands are installed as manual user-invoked workflows.", "CLAUDE.md", "npm factory entry");
-                ExpectContains(entryContent, "Do not invoke factory workflows automatically.", "CLAUDE.md", "npm factory entry");
+                ExpectContains(entryContent, "Factory workflows are temporary execution orchestration", "CLAUDE.md", "npm factory entry");
+                ExpectContains(entryContent, "may be selected", "CLAUDE.md", "npm factory entry");
+                ExpectContains(entryContent, "Factory must not invent missing product intent", "CLAUDE.md", "npm factory entry");
                 ExpectDoesNotContain(entryContent, "Use IDD factory skills only for planned implementation orchestration", "CLAUDE.md", "npm factory entry");
                 ExpectDoesNotContain(entryContent, "multi-step execution, task slicing, or factory role based work", "CLAUDE.md", "npm factory entry");
             }
@@ -215,15 +216,9 @@ internal sealed partial class SmokeTestSuite
             try
             {
                 var result = RunProcessResult("node", $"\"{script}\" install --target gemini --pack factory", installRoot, echoOutput: false);
-                if (result.ExitCode == 0)
-                {
-                    failures.Add("npm factory install for Gemini succeeded unexpectedly.");
-                }
-
-                if (!result.StandardError.Contains("manual-only skills", StringComparison.Ordinal) ||
-                    !result.StandardError.Contains("CodingAgent 'gemini'", StringComparison.Ordinal))
-                {
-                    failures.Add("npm factory install for Gemini did not report unsupported manual-only skills.");
+            if (result.ExitCode != 0)
+            {
+                failures.Add("npm factory install for Gemini failed despite omitting unsupported manual-only skills.");
                 }
             }
             finally

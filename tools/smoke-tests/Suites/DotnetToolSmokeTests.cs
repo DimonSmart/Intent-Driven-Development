@@ -111,21 +111,19 @@ internal sealed partial class SmokeTestSuite
         var factoryPath = Path.Combine(repoRoot, "generated/claude/.claude/skills/idd-factory-create-work-plan/SKILL.md".Replace('/', Path.DirectorySeparatorChar));
         if (!File.Exists(factoryPath))
         {
-            failures.Add("Missing Claude factory skill for manual-only frontmatter check.");
+            failures.Add("Missing Claude factory skill for generated frontmatter check.");
         }
         else
         {
             var content = File.ReadAllText(factoryPath);
             foreach (var text in new[]
             {
-                "description: Manual-only factory command. Create a temporary Factory Work Plan only when invoked directly by the user.",
-                "disable-model-invocation: true",
-                "user-invocable: true"
+                "description: Create a temporary Factory Work Plan from current durable intent and relevant repository evidence."
             })
             {
                 if (!content.Contains(text, StringComparison.Ordinal))
                 {
-                    failures.Add($"Claude factory skill is missing manual-only frontmatter '{text}'.");
+                    failures.Add($"Claude factory skill is missing generated frontmatter '{text}'.");
                 }
             }
         }
@@ -144,9 +142,14 @@ internal sealed partial class SmokeTestSuite
                 failures.Add("Missing invocation did not default to auto in manifest.json.");
             }
 
-            if (!StringComparer.Ordinal.Equals(skills.GetProperty("idd-factory-create-work-plan").GetProperty("invocation").GetString(), "manual"))
+            if (!StringComparer.Ordinal.Equals(skills.GetProperty("idd-skip").GetProperty("invocation").GetString(), "manual"))
             {
-                failures.Add("Factory skill invocation is not manual in manifest.json.");
+                failures.Add("idd-skip is not manual in manifest.json.");
+            }
+
+            if (!StringComparer.Ordinal.Equals(skills.GetProperty("idd-factory-create-work-plan").GetProperty("invocation").GetString(), "auto"))
+            {
+                failures.Add("Factory skill invocation is not auto in manifest.json.");
             }
         }
 
@@ -171,6 +174,34 @@ internal sealed partial class SmokeTestSuite
             if (!result.StandardError.Contains("Unsupported invocation value for skill 'idd-intent-brainstorm': 'sometimes'. Allowed values: auto, manual.", StringComparison.Ordinal))
             {
                 failures.Add("Invalid invocation value did not report a clear error.");
+            }
+        }
+        finally
+        {
+            File.WriteAllText(descriptionPath, original);
+        }
+    }
+
+    void ExpectPublicSkillNameValidation()
+    {
+        var descriptionPath = Path.Combine(repoRoot, "src", "canonical", "skills", "skill-descriptions.json");
+        var original = File.ReadAllText(descriptionPath);
+        try
+        {
+            var descriptions = System.Text.Json.Nodes.JsonNode.Parse(original)!.AsObject();
+            foreach (var invalidName in new[] { "idd-skip-anything", "idd-foo-bar", "idd" })
+            {
+                descriptions[invalidName] = new System.Text.Json.Nodes.JsonObject
+                {
+                    ["description"] = "invalid test skill"
+                };
+                File.WriteAllText(descriptionPath, descriptions.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+                var result = RunProcessResult("dotnet", $"exec \"{generatorDll}\" --check", echoOutput: false);
+                if (result.ExitCode == 0 || !result.StandardError.Contains("expected idd-skip or idd-<area>-<action>", StringComparison.Ordinal))
+                {
+                    failures.Add($"Invalid public skill name '{invalidName}' was accepted or reported unclearly.");
+                }
+                descriptions.Remove(invalidName);
             }
         }
         finally
@@ -276,8 +307,9 @@ internal sealed partial class SmokeTestSuite
                 if (File.Exists(entryPath))
                 {
                     var entryContent = File.ReadAllText(entryPath);
-                    ExpectContains(entryContent, "Factory commands are installed as manual user-invoked workflows.", entry, "factory entry");
-                    ExpectContains(entryContent, "Do not invoke factory workflows automatically.", entry, "factory entry");
+                    ExpectContains(entryContent, "Factory workflows are temporary execution orchestration", entry, "factory entry");
+                    ExpectContains(entryContent, "selected automatically", entry, "factory entry");
+                    ExpectContains(entryContent, "Factory must not invent missing product intent", entry, "factory entry");
                     ExpectDoesNotContain(entryContent, "Use IDD factory skills only for planned implementation orchestration", entry, "factory entry");
                     ExpectDoesNotContain(entryContent, "multi-step execution, task slicing, or factory role based work", entry, "factory entry");
                 }
@@ -293,15 +325,14 @@ internal sealed partial class SmokeTestSuite
         try
         {
             var result = RunProcessResult("dotnet", $"exec \"{toolDll}\" install --target gemini --pack factory", tempRoot, echoOutput: false);
-            if (result.ExitCode == 0)
+            if (result.ExitCode != 0)
             {
-                failures.Add("Factory install for Gemini succeeded unexpectedly.");
+                failures.Add("Factory install for Gemini failed despite omitting unsupported manual-only skills.");
             }
-
-            if (!result.StandardError.Contains("manual-only skills", StringComparison.Ordinal) ||
-                !result.StandardError.Contains("CodingAgent 'gemini'", StringComparison.Ordinal))
+            if (File.Exists(Path.Combine(tempRoot, "GEMINI.md")) &&
+                File.ReadAllText(Path.Combine(tempRoot, "GEMINI.md")).Contains("idd-skip/SKILL.md", StringComparison.Ordinal))
             {
-                failures.Add("Factory install for Gemini did not report unsupported manual-only skills.");
+                failures.Add("Gemini install exposed unsupported idd-skip skill.");
             }
         }
         finally
@@ -318,21 +349,14 @@ internal sealed partial class SmokeTestSuite
         try
         {
             var result = RunProcessResult("dotnet", $"exec \"{toolDll}\" install --target codex --pack factory", tempRoot, echoOutput: false);
-            if (result.ExitCode == 0)
+            if (result.ExitCode != 0)
             {
-                failures.Add("Factory install for Codex succeeded unexpectedly.");
+                failures.Add("Factory install for Codex failed despite omitting unsupported manual-only skills.");
             }
 
-            if (!result.StandardError.Contains("manual-only skills", StringComparison.Ordinal) ||
-                !result.StandardError.Contains("CodingAgent 'codex'", StringComparison.Ordinal))
+            if (File.Exists(Path.Combine(tempRoot, ".agents/skills/idd-skip/SKILL.md".Replace('/', Path.DirectorySeparatorChar))))
             {
-                failures.Add("Factory install for Codex did not report unsupported manual-only skills.");
-            }
-
-            if (File.Exists(Path.Combine(tempRoot, "AGENTS.md")) ||
-                Directory.Exists(Path.Combine(tempRoot, ".agents")))
-            {
-                failures.Add("Factory install for Codex copied files before failing manual-only validation.");
+                failures.Add("Codex install exposed unsupported idd-skip skill.");
             }
         }
         finally

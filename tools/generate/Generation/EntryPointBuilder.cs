@@ -15,6 +15,7 @@ internal sealed class EntryPointBuilder(RepositoryLayout layout)
         var skillGuidance = adapter.SupportsSkills
             ? """
               Use installed IDD skills for specific workflows:
+              - `idd-skip` (manual-only; never select automatically; current request only)
               - `idd-intent-audit`
               - `idd-intent-brainstorm`
               - `idd-intent-change`
@@ -30,6 +31,9 @@ internal sealed class EntryPointBuilder(RepositoryLayout layout)
 
               Use `idd-intent-brainstorm` when product intent is unclear.
 
+              Use `idd-skip` only when the user explicitly invokes it for the current
+              request. Never select `idd-skip` automatically.
+
               Use `idd-intent-change` when durable product behavior must change.
 
               Use `idd-code-implement` for one focused behavior already covered by
@@ -40,10 +44,13 @@ internal sealed class EntryPointBuilder(RepositoryLayout layout)
 
               Do not create a new spec merely because the user described a new
               task. Prefer updating the existing owning spec.
+
               """
             : """
               This CodingAgent does not use generated IDD skills. Keep IDD work focused and
-              read only the documents needed for the current task.
+              read only the documents needed for the current task. Skip IDD only when the
+              user explicitly requests it for the current request; never select skip
+              automatically.
               """;
         var workflowGuidance = adapter.SupportsSkills
             ? "This file and installed IDD skills are workflow guidance.\nThey are not product specifications."

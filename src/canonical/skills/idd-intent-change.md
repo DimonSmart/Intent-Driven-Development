@@ -17,8 +17,9 @@ idd-intent-change = user change request + affected specs + minimal product inten
 - Treat the user request as proposed product intent.
 - First find whether the behavior belongs to an existing current spec.
 - Prefer updating an existing current spec when the product area already exists.
-- Create a new spec only when the change defines a distinct durable product
-  area.
+- Do not create a new document locally. When the change defines a distinct
+  durable product area, ADR, or spike, prepare a semantic handoff to
+  `idd-intent-new-document`.
 - Do not create a new spec for a local implementation task.
 - Do not create a new spec for a small behavior change inside an existing
   feature area.
@@ -34,8 +35,8 @@ idd-intent-change = user change request + affected specs + minimal product inten
   the next implementation skill rather than recording it as intent.
 - Do not archive old specs.
 - If behavior changes inside the same product area, edit the existing spec.
-- If product area identity changes, delete the old spec and create a new owning
-  spec.
+- If product area identity changes, delegate creation of the new owning spec to
+  `idd-intent-new-document`; do not duplicate document-creation logic here.
 - If a document becomes obsolete, duplicated, task-like, process-only, or
   incorrect, delete it.
 - Git history preserves previous versions.
@@ -67,12 +68,14 @@ Use `existing-spec-update` when an existing current spec already owns the produc
 area.
 
 Use `new-spec-required` only when no existing current spec owns the product area
-and the change describes durable product behavior.
+and the change describes durable product behavior. This classification must be
+delegated to `idd-intent-new-document`.
 
-Use `adr-required` when the change is primarily a durable architecture decision.
+Use `adr-required` when the change is primarily a durable architecture decision;
+delegate creation to `idd-intent-new-document`.
 
 Use `spike-required` when the right product or architecture decision requires
-research.
+research; delegate creation to `idd-intent-new-document`.
 
 Use `task-only-no-idd-intent-change` when the request is only a local refactor,
 cleanup, dependency update, or implementation detail that does not change
@@ -87,8 +90,9 @@ durable product intent.
 5. Classify the request.
 6. If an existing spec owns the area, update that spec instead of creating a
    duplicate.
-7. If a new spec is required, create it from the appropriate template and update
-   `INDEX.md`.
+7. If `new-spec-required`, `adr-required`, or `spike-required`, prepare a
+   semantic handoff and invoke `idd-intent-new-document`; do not create the
+   document locally.
 8. If the change affects behavior, update acceptance criteria.
 9. If the change affects testable behavior, update verification.
 10. Report:
@@ -98,6 +102,10 @@ durable product intent.
     - whether a new spec was created;
     - summary of semantic changes;
     - recommended implementation focus.
+
+`existing-spec-update` means this skill updates the current owning document.
+The three new-document classifications always hand off creation to
+`idd-intent-new-document`, which repeats the ownership check before writing.
 
 ## Example
 

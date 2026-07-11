@@ -16,13 +16,13 @@ In future versions, Factory Work Plan tasks may be backed by an external Work
 Item Provider. The current implementation uses temporary local markdown files
 only.
 
-## Invocation
+## Routing
 
-This is a manual-only factory command.
-
-Do not use this workflow automatically based on task size, complexity, uncertainty,
-or similarity to the user request. Use it only when the current user explicitly
-invokes this command or names this factory workflow directly.
+Use this workflow when the request requires coordinated multi-task
+implementation, temporary planning, sequencing, task-level reviews, or final
+review. Do not use Factory when one focused `idd-code-implement` operation is
+sufficient, when the user only asks to change intent, or while intent is not
+ready.
 
 ## Rules
 
@@ -31,8 +31,9 @@ invokes this command or names this factory workflow directly.
 - Do not write or modify code.
 - Do not write into `.idd/intent/`.
 - Do not treat implementation as product intent.
-- If requested durable behavior is missing from specs, stop and route to
-  `idd-intent-change` or `idd-intent-brainstorm`.
+- If requested durable behavior is missing from specs, do not create a
+  speculative work plan. Route to `idd-intent-brainstorm`,
+  `idd-intent-change`, or `idd-intent-new-document` as appropriate.
 - If intent is unclear, route to `idd-intent-brainstorm`.
 - If an architecture decision is missing, route to `idd-intent-new-document` for an
   ADR or spike when appropriate.
@@ -45,14 +46,12 @@ invokes this command or names this factory workflow directly.
 
 ## Workflow
 
-1. Confirm the current user explicitly invoked this factory command or named
-   this factory workflow directly.
-2. Read `.idd/intent/README.md` and `.idd/intent/INDEX.md`.
+1. Read `.idd/intent/README.md` and `.idd/intent/INDEX.md`.
 3. Read only the relevant current specs, ADRs, and active spikes needed to
    understand the requested implementation task.
 4. Inspect repository evidence needed to identify likely code and test areas.
-5. Stop and route to the appropriate spec skill if durable product intent is
-   missing, unclear, or wrong.
+5. Stop and route to the appropriate intent skill if durable product intent is
+   missing, unclear, or wrong. Factory must not invent missing product intent.
 6. Use local `references/roles/` role prompts only when they are present and
    relevant to this workflow.
 7. Create one work directory using this shape:

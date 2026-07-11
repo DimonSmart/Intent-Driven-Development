@@ -16,13 +16,12 @@ In future versions, Factory Work Plan tasks may be backed by an external Work
 Item Provider. The current implementation uses temporary local markdown files
 only.
 
-## Invocation
+## Routing
 
-This is a manual-only factory command.
-
-Do not use this workflow automatically based on task size, complexity, uncertainty,
-or similarity to the user request. Use it only when the current user explicitly
-invokes this command or names this factory workflow directly.
+Use this workflow when the user provides an explicit Work Plan, the current
+context unambiguously contains an active Work Plan, or plan creation has just
+completed in the current workflow. Do not search for old plans in other
+sessions or directories.
 
 ## Rules
 
@@ -30,6 +29,11 @@ invokes this command or names this factory workflow directly.
 - Do not search for old work plans automatically.
 - Do not infer the current plan from previous factory files.
 - Execute only the tasks in the work plan.
+- Before the first task and before each task, verify that referenced current
+  intent exists, is current, and defines the required behavior.
+- Factory must not invent missing product intent. On an intent gap, stop with
+  `INTENT_REQUIRED` and route to `idd-intent-brainstorm`,
+  `idd-intent-change`, or `idd-intent-new-document`.
 - For each task, create a bounded task brief in the same work directory when
   useful.
 - Factory execution delegates bounded implementation semantics to
@@ -42,9 +46,12 @@ invokes this command or names this factory workflow directly.
 - Finish with `idd-factory-finish-work`.
 - Do not modify specs unless the work plan explicitly says the current user
   request includes a spec update flow.
-- If implementation reveals missing or wrong product intent, stop and route to
-  `idd-intent-change` or `idd-code-update-intent` only after explicit user
-  confirmation.
+- If implementation reveals missing or wrong product intent, stop with a
+  structured intent-gap report. After the intent workflow completes, reread
+  `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and affected documents;
+  refresh the Work Plan, task briefs, scope, and verification plan before
+  continuing. Use `idd-code-update-intent` only after explicit confirmation
+  that existing implementation represents product intent.
 
 ## Workflow
 
@@ -66,6 +73,7 @@ invokes this command or names this factory workflow directly.
 - `DONE_WITH_CONCERNS`
 - `NEEDS_CONTEXT`
 - `BLOCKED`
+- `INTENT_REQUIRED`
 
 ## Output Format
 

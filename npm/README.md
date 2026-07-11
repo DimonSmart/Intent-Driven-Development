@@ -32,10 +32,10 @@ core:
 npx intent-driven-development install --target claude --pack factory
 ```
 
-Factory workflows are installed as manual-only commands. They are available to
-the user after installing the factory pack, but the CodingAgent must not select
-them automatically. Use them through explicit slash-command invocation, for
-example `/idd-factory-create-work-plan`.
+Factory workflows may be selected automatically for temporary multi-task
+orchestration, sequencing, and review gates. `idd-skip` is manual-only and
+applies only when explicitly invoked for the current request; never select it
+automatically.
 
 Factory work artifacts live under `.idd/factory/work/`, are ignored by git by
 default, and are not product specifications. They should not be reused

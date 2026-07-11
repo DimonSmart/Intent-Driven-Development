@@ -3,6 +3,20 @@
 Intent-Driven Development is an AI-assisted development method where a living
 specification guides implementation without replacing engineering judgment.
 
+## CodingAgent Routing
+
+Use IDD skills when a request involves durable product intent, implementation
+based on current intent, conformance checking, or Factory orchestration. Missing
+`invocation` means automatic routing; `invocation: "manual"` means user-invoked
+only. `idd-skip` is manual-only because automatic selection would defeat its
+purpose, and it applies only to the current explicitly opted-out request.
+
+Use `idd-code-implement` for one focused implementation change covered by
+current intent. Use Factory workflows for temporary multi-task planning,
+sequencing, review gates, or coordinated execution across bounded tasks. Factory
+may be selected automatically for those conditions, but it never becomes
+product intent and must stop when current intent is missing or insufficient.
+
 Guiding rule:
 
 > Specifications should be complete enough to rebuild the product from scratch,

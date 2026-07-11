@@ -12,6 +12,10 @@
       }
     }
   },
+  "idd-skip": {
+    "description": "Manual-only command. Perform the current request without applying Intent-Driven Development routing or updating durable intent.",
+    "invocation": "manual"
+  },
   "idd-intent-brainstorm": {
     "description": "Clarify real product intent before changing `.idd/intent/`, using focused customer-development questions and simplification options without editing product intent, planning implementation, or writing code."
   },
@@ -64,23 +68,18 @@
     "description": "Update `.idd/intent/` product intent from confirmed implementation behavior."
   },
   "idd-factory-create-work-plan": {
-    "description": "Manual-only factory command. Create a temporary Factory Work Plan only when invoked directly by the user.",
-    "invocation": "manual"
+    "description": "Create a temporary Factory Work Plan from current durable intent and relevant repository evidence."
   },
   "idd-factory-execute-work-plan": {
-    "description": "Manual-only factory command. Execute an explicit temporary Factory Work Plan only when invoked directly by the user.",
-    "invocation": "manual"
+    "description": "Execute an explicit temporary Factory Work Plan while preserving `.idd/intent/` as the normative product source."
   },
   "idd-factory-review-task": {
-    "description": "Manual-only factory command. Review one completed factory task only when invoked directly by the user.",
-    "invocation": "manual"
+    "description": "Review one completed factory task against its task brief, current intent, code quality, and verification evidence."
   },
   "idd-factory-review-work-result": {
-    "description": "Manual-only factory command. Review the complete result of a Factory Work Plan only when invoked directly by the user.",
-    "invocation": "manual"
+    "description": "Review the complete result of a Factory Work Plan against current intent and integration requirements."
   },
   "idd-factory-finish-work": {
-    "description": "Manual-only factory command. Finish the current factory run and clean temporary artifacts only when invoked directly by the user.",
-    "invocation": "manual"
+    "description": "Finish the current factory run, report results, and clean temporary factory artifacts."
   }
 }
