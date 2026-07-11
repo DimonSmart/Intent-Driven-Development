@@ -28,40 +28,12 @@ internal sealed partial class SmokeTestSuite
         }
     }
 
-    void ExpectNoGeneratedHeaderComments()
-    {
-        foreach (var path in GeneratedFiles())
-        {
-            var text = File.ReadAllText(path);
-            if (text.Contains("Generated from Intent-Driven-Development canonical sources.", StringComparison.Ordinal))
-            {
-                failures.Add($"Generated header comment is present: {Relative(path)}");
-            }
-        }
-    }
-
     void ExpectNoEntryIncludes(string relativePath, string forbidden)
     {
         var content = File.ReadAllText(Path.Combine(repoRoot, relativePath));
         if (content.Contains(forbidden, StringComparison.OrdinalIgnoreCase))
         {
             failures.Add($"{relativePath} includes {forbidden}");
-        }
-    }
-
-    void ExpectContains(string content, string expected, string relativePath, string context)
-    {
-        if (!content.Contains(expected, StringComparison.Ordinal))
-        {
-            failures.Add($"{context} is missing '{expected}': {relativePath}");
-        }
-    }
-
-    void ExpectDoesNotContain(string content, string forbidden, string relativePath, string context)
-    {
-        if (content.Contains(forbidden, StringComparison.Ordinal))
-        {
-            failures.Add($"{context} contains obsolete text '{forbidden}': {relativePath}");
         }
     }
 

@@ -4,7 +4,7 @@ using System.Text.Json;
 
 internal sealed partial class SmokeTestSuite
 {
-    static string LegacySpecsDirectory => ".sp" + "ecs";
+    static string SpecsDirectory => ".specs";
 
     void ExpectTempFile(string root, string relativePath, string failure)
     {

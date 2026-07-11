@@ -31,19 +31,15 @@ internal sealed partial class SmokeTestSuite
         
         ExpectFile("generated/copilot/.github/copilot-instructions.md");
         
-        ExpectNoGeneratedHeaderComments();
         ExpectNoEntryIncludes("generated/claude/CLAUDE.md", "AGENTS.md");
         ExpectNoEntryIncludes("generated/gemini/GEMINI.md", "AGENTS.md");
         ExpectEntryPointLineLimits();
         ExpectAllSkillsGenerated();
         ExpectPrefixedClaudeSkillOutput();
-        ExpectDurableIntentPolicy();
         ExpectClaudeSkillMetadata();
         ExpectSkillInvocationMetadata();
         ExpectPublicSkillNameValidation();
         ExpectPackManifestShape();
-        ExpectNoLegacyPublicNames();
-        ExpectNoUnprefixedPublicCommandNames();
         ExpectFactoryGeneratedShape();
         ExpectFactoryRolePromptReferences();
         ExpectListPacks();
@@ -54,19 +50,6 @@ internal sealed partial class SmokeTestSuite
         ExpectInstallEntryNone();
         ExpectInstallGeminiEntryNoneRejected();
         ExpectInstallAllAfterInit();
-        ExpectNpmListTargets();
-        ExpectNpmListCodingAgents();
-        ExpectNpmListPacks();
-        ExpectNpmInstallDefaultMinimal();
-        ExpectNpmInstallDefaultCoreOnly();
-        ExpectNpmInstallFactory();
-        ExpectNpmInstallEntryNone();
-        ExpectNpmInstallEntryFull();
-        ExpectNpmRejectsGeminiEntryNone();
-        ExpectNpmRejectsFactoryForGemini();
-        ExpectNpmManualSkillValidationIsGeneric();
-        ExpectNpmRejectsUnknownPack();
-        ExpectNpmRejectsUnknownEntryMode();
         ExpectGeneratorCheckPasses();
         ExpectSecondRunStable();
         

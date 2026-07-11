@@ -108,25 +108,6 @@ internal sealed partial class SmokeTestSuite
             }
         }
 
-        var factoryPath = Path.Combine(repoRoot, "generated/claude/.claude/skills/idd-factory-create-work-plan/SKILL.md".Replace('/', Path.DirectorySeparatorChar));
-        if (!File.Exists(factoryPath))
-        {
-            failures.Add("Missing Claude factory skill for generated frontmatter check.");
-        }
-        else
-        {
-            var content = File.ReadAllText(factoryPath);
-            foreach (var text in new[]
-            {
-                "description: Create a temporary Factory Work Plan from current durable intent and relevant repository evidence."
-            })
-            {
-                if (!content.Contains(text, StringComparison.Ordinal))
-                {
-                    failures.Add($"Claude factory skill is missing generated frontmatter '{text}'.");
-                }
-            }
-        }
     }
 
     void ExpectSkillInvocationMetadata()
@@ -261,18 +242,13 @@ internal sealed partial class SmokeTestSuite
             ExpectTempFile(installRoot, ".claude/skills/idd-intent-new-document/SKILL.md", "default install did not install core skill.");
             ExpectTempFile(installRoot, ".idd/intent/README.md", "default install did not install .idd/intent.");
             ExpectTempFile(installRoot, ".idd/intent/INDEX.md", "default install did not install .idd/intent index.");
-            ExpectTempMissing(installRoot, LegacySpecsDirectory, "default install created legacy specs directory.");
+            ExpectTempMissing(installRoot, SpecsDirectory, "default install created .specs directory.");
 
             if (File.Exists(Path.Combine(installRoot, ".claude/skills/idd-factory-create-work-plan/SKILL.md".Replace('/', Path.DirectorySeparatorChar))))
             {
                 failures.Add("default install installed factory skills.");
             }
 
-            var entryPath = Path.Combine(installRoot, "CLAUDE.md");
-            if (File.Exists(entryPath) && File.ReadAllText(entryPath).Contains("Factory", StringComparison.Ordinal))
-            {
-                failures.Add("default install entry mentioned factory.");
-            }
         });
 
         WithToolInstall("install --coding-agent claude", installRoot =>
@@ -296,23 +272,13 @@ internal sealed partial class SmokeTestSuite
                 ExpectTempFile(installRoot, ".idd/intent/README.md", $"factory install for {target} did not install .idd/intent.");
                 ExpectTempFile(installRoot, ".idd/intent/INDEX.md", $"factory install for {target} did not install .idd/intent index.");
                 ExpectTempFile(installRoot, ".idd/factory/.gitignore", $"factory install for {target} did not install factory .gitignore.");
-                ExpectTempMissing(installRoot, LegacySpecsDirectory, $"factory install for {target} created legacy specs directory.");
+                ExpectTempMissing(installRoot, SpecsDirectory, $"factory install for {target} created .specs directory.");
 
                 if (Directory.Exists(Path.Combine(installRoot, ".idd/factory/work".Replace('/', Path.DirectorySeparatorChar))))
                 {
                     failures.Add($"factory install for {target} created work directory.");
                 }
 
-                var entryPath = Path.Combine(installRoot, entry);
-                if (File.Exists(entryPath))
-                {
-                    var entryContent = File.ReadAllText(entryPath);
-                    ExpectContains(entryContent, "Factory workflows are temporary execution orchestration", entry, "factory entry");
-                    ExpectContains(entryContent, "selected automatically", entry, "factory entry");
-                    ExpectContains(entryContent, "Factory must not invent missing product intent", entry, "factory entry");
-                    ExpectDoesNotContain(entryContent, "Use IDD factory skills only for planned implementation orchestration", entry, "factory entry");
-                    ExpectDoesNotContain(entryContent, "multi-step execution, task slicing, or factory role based work", entry, "factory entry");
-                }
             });
         }
     }

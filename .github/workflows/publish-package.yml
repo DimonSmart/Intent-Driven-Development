@@ -10,9 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    env:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,12 +18,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22.x
-          registry-url: https://registry.npmjs.org
 
       - name: Run check
         run: pwsh ./scripts/Check.ps1
@@ -45,7 +36,6 @@ jobs:
             ./artifacts/intent-driven-development-v${{ steps.extract_version.outputs.VERSION }}.zip
             ./artifacts/checksums.txt
             ./artifacts/DimonSmart.IntentDrivenDevelopment.Tool.${{ steps.extract_version.outputs.VERSION }}.nupkg
-            ./artifacts/*.tgz
           draft: false
           prerelease: false
           generate_release_notes: true
@@ -58,13 +48,3 @@ jobs:
             --api-key ${{ secrets.NUGET_API_KEY }} \
             --source https://api.nuget.org/v3/index.json \
             --skip-duplicate
-
-      - name: Publish to npm
-        if: ${{ env.NPM_TOKEN != '' }}
-        run: npm publish ./artifacts/intent-driven-development-${{ steps.extract_version.outputs.VERSION }}.tgz
-        env:
-          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
-
-      - name: Skip npm publish
-        if: ${{ env.NPM_TOKEN == '' }}
-        run: echo "NPM_TOKEN is not configured; npm publish skipped. The npm package archive is attached to the GitHub Release."

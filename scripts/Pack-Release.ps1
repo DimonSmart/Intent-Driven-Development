@@ -17,7 +17,6 @@ Set-Location $repoRoot
 
 $artifactsRoot = Join-Path $repoRoot "artifacts"
 $releaseContentRoot = Join-Path $artifactsRoot "release-content"
-$npmStagingRoot = Join-Path $artifactsRoot "npm-package"
 $releaseZipPath = Join-Path $artifactsRoot "intent-driven-development-v$Version.zip"
 $artifactChecksumsPath = Join-Path $artifactsRoot "checksums.txt"
 $manifestPath = Join-Path $repoRoot "manifest.json"
@@ -68,26 +67,6 @@ function Write-Checksums([string]$Root, [string]$OutputPath) {
     Set-Content -LiteralPath $OutputPath -Value $lines -Encoding utf8NoBOM
 }
 
-function Copy-NpmSource {
-    New-Item -ItemType Directory -Force -Path $npmStagingRoot | Out-Null
-    Copy-Item -LiteralPath (Join-Path $repoRoot "npm/package.json") -Destination $npmStagingRoot -Force
-    Copy-Item -LiteralPath (Join-Path $repoRoot "npm/README.md") -Destination $npmStagingRoot -Force
-    Copy-Item -LiteralPath (Join-Path $repoRoot "npm/bin") -Destination (Join-Path $npmStagingRoot "bin") -Recurse -Force
-
-    $packageJsonPath = Join-Path $npmStagingRoot "package.json"
-    $packageJson = Get-Content -LiteralPath $packageJsonPath -Raw | ConvertFrom-Json
-    $packageJson.version = $Version
-    $packageJson | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $packageJsonPath -Encoding utf8NoBOM
-
-    $packageContentRoot = Join-Path $npmStagingRoot "package-content"
-    New-Item -ItemType Directory -Force -Path $packageContentRoot | Out-Null
-    Copy-Item -LiteralPath (Join-Path $repoRoot "manifest.json") -Destination $packageContentRoot -Force
-    Copy-Item -LiteralPath (Join-Path $repoRoot "generated") -Destination (Join-Path $packageContentRoot "generated") -Recurse -Force
-    Copy-Item -LiteralPath (Join-Path $repoRoot "src") -Destination (Join-Path $packageContentRoot "src") -Recurse -Force
-    Copy-Item -LiteralPath (Join-Path $repoRoot "README.md") -Destination $packageContentRoot -Force
-    Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE") -Destination $packageContentRoot -Force
-}
-
 function Invoke-RequiredCommand {
     param(
         [Parameter(Mandatory = $true)]
@@ -105,11 +84,9 @@ function Invoke-RequiredCommand {
 
 New-Item -ItemType Directory -Force -Path $artifactsRoot | Out-Null
 Remove-DirectoryIfExists $releaseContentRoot
-Remove-DirectoryIfExists $npmStagingRoot
 Remove-FileIfExists $artifactChecksumsPath
 Get-ChildItem -LiteralPath $artifactsRoot -Filter "intent-driven-development-v*.zip" -File | Remove-Item -Force
 Get-ChildItem -LiteralPath $artifactsRoot -Filter "*.nupkg" -File | Remove-Item -Force
-Get-ChildItem -LiteralPath $artifactsRoot -Filter "*.tgz" -File | Remove-Item -Force
 
 if (-not $SkipCheck) {
     & (Join-Path $repoRoot "scripts/Check.ps1")
@@ -145,9 +122,6 @@ Invoke-RequiredCommand -Description ".NET tool package pack" -Command {
         -p:Version=$Version
 }
 
-Copy-NpmSource
-Invoke-RequiredCommand -Description "npm package pack" -Command { npm pack $npmStagingRoot --pack-destination $artifactsRoot }
-
 $toolPackagePath = Join-Path $artifactsRoot "DimonSmart.IntentDrivenDevelopment.Tool.$Version.nupkg"
 if (-not (Test-Path -LiteralPath $toolPackagePath)) {
     throw "Expected .NET tool package not found: $toolPackagePath"
@@ -155,7 +129,6 @@ if (-not (Test-Path -LiteralPath $toolPackagePath)) {
 
 $artifactFiles = @(
     $releaseZipPath
-    (Get-ChildItem -LiteralPath $artifactsRoot -Filter "*.tgz" -File | Select-Object -First 1).FullName
     $toolPackagePath
 )
 

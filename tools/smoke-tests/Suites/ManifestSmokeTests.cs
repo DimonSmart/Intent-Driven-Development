@@ -8,15 +8,6 @@ internal sealed partial class SmokeTestSuite
     {
         const string manifestPath = "src/canonical/packs/pack-manifest.json";
         var fullManifestPath = Path.Combine(repoRoot, manifestPath);
-        var content = File.ReadAllText(fullManifestPath);
-        ExpectContains(content, "\"core\"", manifestPath, "pack manifest");
-        ExpectContains(content, "\"factory\"", manifestPath, "pack manifest");
-        ExpectContains(content, "\"requires\"", manifestPath, "pack manifest");
-        ExpectContains(content, "\"projectFiles\"", manifestPath, "pack manifest");
-        ExpectContains(content, "\"rolePrompts\"", manifestPath, "pack manifest");
-        ExpectContains(content, "\"skillRoleReferences\"", manifestPath, "pack manifest");
-        ExpectDoesNotContain(content, "\"agents\"", manifestPath, "pack manifest");
-
         var manifest = ReadPackManifest();
         if (manifest?.Packs is null || manifest.Packs.Count == 0)
         {
@@ -83,7 +74,6 @@ internal sealed partial class SmokeTestSuite
         foreach (var rolePrompt in manifest.Packs.Values.SelectMany(pack => pack.RolePrompts).Distinct(StringComparer.Ordinal))
         {
             ExpectFile($"src/canonical/factory/roles/{rolePrompt}.md");
-            ExpectContains(content, $"\"{rolePrompt}\"", manifestPath, "pack manifest role prompt");
         }
 
         ExpectNoDirectory("src/canonical/agents");

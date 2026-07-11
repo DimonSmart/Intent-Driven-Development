@@ -57,7 +57,6 @@ src/canonical/methodology/ full methodology for skills and project docs
 src/canonical/skills/ task-specific workflows
 src/adapters/        CodingAgent-specific entry points and adapter capabilities
 generated/           generated files for each CodingAgent
-npm/                 universal CLI delivery wrapper
 tools/generate/      C# generator
 tools/idd-tool/      .NET global tool CLI installer
 tools/smoke-tests/   smoke tests for generated output
@@ -174,26 +173,11 @@ Intent-Driven Development is release-first.
 
 The canonical versioned artifact is the GitHub Release archive. It contains the canonical source, adapters, generated CodingAgent files, manifest, license, README, and checksums for the released content.
 
-Recommended distribution:
+Current distribution:
 
 ```text
-- GitHub Releases for versioned artifacts
-- npm/npx for universal CLI installation
-- .NET tool for .NET-friendly CLI installation
-```
-
-The npm package is a universal CLI delivery wrapper. Bundled methodology and generated files are copied from the versioned GitHub Release content during packaging.
-
-Use npm/npx when you want to install generated CodingAgent files into any project without requiring the .NET SDK:
-
-```bash
-npx intent-driven-development list-targets
-npx intent-driven-development list-coding-agents
-npx intent-driven-development list-packs
-npx intent-driven-development install --target claude
-npx intent-driven-development install --target codex
-npx intent-driven-development install --target copilot
-npx intent-driven-development install --target gemini
+- GitHub Releases for canonical versioned ZIP artifacts
+- .NET tool for CLI installation
 ```
 
 Use the .NET global tool when you want a .NET-native installer command:
@@ -222,7 +206,9 @@ Release publication follows the tag-based flow:
 
 The script runs the local check, creates the next `vMAJOR.MINOR.PATCH` tag, and pushes it.
 
-Then `.github/workflows/publish-package.yml` packs the release archive, checksums, `DimonSmart.IntentDrivenDevelopment.Tool`, and the npm package archive. It creates a GitHub Release, publishes the .NET tool package to NuGet, and publishes npm only when `NPM_TOKEN` is configured.
+Then `.github/workflows/publish-package.yml` packs the release archive, checksums, and `DimonSmart.IntentDrivenDevelopment.Tool`. It creates a GitHub Release and publishes the .NET tool package to NuGet.
+
+The project is still evolving. The .NET installer is the supported CLI path, while the GitHub Release ZIP remains the runtime-neutral, versioned artifact. The removed npm distribution may be reconsidered as a separate future design; any future installer should avoid duplicating installation business logic in another language without a strong reason.
 
 Local release packaging uses the same script as CI:
 
