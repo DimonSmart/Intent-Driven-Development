@@ -140,7 +140,16 @@ This is not a fixed enum. Prefer areas that match the actual product.
    - task/progress/status notes;
    - implementation-only cleanup/refactor notes;
    - obsolete source-specific wrapper text.
-4. Do not import task/progress/status material as current specs.
+4. Classify every implementation-adjacent fragment as one of:
+   - durable-verification-property;
+   - verification-command;
+   - durable-architecture-boundary;
+   - implementation-structure;
+   - public-contract;
+   - private-code-detail;
+   - migration-step;
+   - source-scan-instruction.
+5. Do not import task/progress/status material as current specs.
 5. Do not preserve source file boundaries automatically.
 6. Build the normalized target structure before writing.
 7. Create a new spec only for a distinct durable product area.
@@ -154,6 +163,13 @@ This is not a fixed enum. Prefer areas that match the actual product.
 15. Run or simulate `idd-intent-lint` and fix mechanical errors before finishing.
 16. Keep a short source reference only when it helps traceability; do not turn a
     spec into an imported journal.
+
+Do not import shell commands, build/test command blocks, private class or method
+names, file lists, implementation order, dependency-injection wiring steps,
+temporary allowlists, migration steps, or source-scan instructions as intent.
+Generalize an implementation-specific fragment only when its meaning can be
+preserved without adding a new product decision. If generalization needs a
+product decision, retain a finding for human review.
 
 ## Source Triage
 
@@ -225,6 +241,14 @@ user-visible-behavior
 domain-contract
 product-defining-technical-constraint
 implementation-note
+durable-verification-property
+verification-command
+durable-architecture-boundary
+implementation-structure
+public-contract
+private-code-detail
+migration-step
+source-scan-instruction
 temporary-status
 task-step
 backlog-item
@@ -340,6 +364,35 @@ Create current spec documents only for durable current product intent. Create
 adr documents only for durable decision records. Create spike documents only for
 active unresolved research.
 
+For example, import this source:
+
+````md
+Run:
+
+```bash
+dotnet build
+dotnet test
+```
+
+UiCompositionHost must be created in Bootstrap and passed to every dialog
+constructor.
+````
+
+as the durable outcome only:
+
+```md
+## Durable Architecture And Constraints
+
+Application-owned UI surfaces and overlays share one composition lifecycle.
+
+## Verification
+
+Automated coverage verifies composition behavior for nested overlays and
+viewport changes.
+```
+
+Do not import the commands or constructor wiring.
+
 Imported current documents must use current IDD document shapes. Do not preserve
 legacy section layout when the document becomes current normative intent.
 
@@ -361,10 +414,16 @@ intent.
 
 Describe observable behavior and domain contracts.
 
-## Architecture And Patterns
+## Durable Architecture And Constraints
 
-Describe product-defining architecture, implementation patterns, and library or
-framework choices.
+Describe only architecture boundaries and technical constraints that future
+implementations must preserve. Include implementation patterns, frameworks, or
+libraries only when changing them would change product behavior, compatibility,
+public contracts, security, operability, or an accepted architecture decision.
+
+Do not include private class names, private methods, file names, constructor
+signatures, dependency-wiring steps, temporary workarounds, migration steps, or
+current code structure.
 
 ## Non-goals
 
@@ -376,7 +435,12 @@ List conditions that must hold for the specification to be satisfied.
 
 ## Verification
 
-List checks that verify the implementation.
+Describe durable verification properties and evidence required to establish
+correctness. State what must be verified, not the local command used to run
+verification.
+
+Do not include build commands, test-runner commands, CI commands, test class
+names, temporary source scans, or step-by-step execution instructions.
 ```
 
 Minimum shape for `adr` documents:

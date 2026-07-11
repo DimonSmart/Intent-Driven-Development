@@ -5,9 +5,15 @@
 `spec` describes what the system should be. It is not a task list.
 
 Use `spec` when the change affects product behavior, domain contracts,
-architectural shape, durable implementation patterns, compatibility
+durable architecture boundaries, durable technical constraints, compatibility
 expectations, non-goals, acceptance criteria, verification rules, or shared
 behavior.
+
+A spec document has no lifecycle status. Its presence in the current intent
+directory means that it is current. Do not mark a spec as `Current`,
+`Completed`, `Deprecated`, `Retired`, or `Superseded`. Edit the owning spec in
+place when its product area remains current; migrate remaining current intent
+and delete it when obsolete. Git history is the only history of spec revisions.
 
 Shared specification is a normal `spec`. Common rendering, input, validation,
 or dialog behavior should be a separate specification when multiple product
@@ -29,6 +35,8 @@ ADR status values are:
 ```text
 Proposed | Accepted | Superseded | Rejected
 ```
+
+ADR status is part of the decision record lifecycle and does not apply to specs.
 
 ADRs are decision records, not current behavior specs. Do not archive ADRs. The
 replacing ADR should reference the superseded ADR.

@@ -24,6 +24,14 @@ idd-intent-change = user change request + affected specs + minimal product inten
   feature area.
 - Do not put implementation steps, temporary notes, generated plans, or chat
   history into specs.
+- Do not add build or test commands, implementation plans, private classes or
+  methods from a proposed solution, source-file lists, dependency-injection
+  wiring, migration checklists, or progress status to a spec.
+- Keep Verification at the level of required evidence, scenario, and property;
+  do not name a test runner, CI command, test class, or test method.
+- When a request combines an intent change with implementation work, keep the
+  spec implementation-independent and pass the concrete implementation focus to
+  the next implementation skill rather than recording it as intent.
 - Do not archive old specs.
 - If behavior changes inside the same product area, edit the existing spec.
 - If product area identity changes, delete the old spec and create a new owning
@@ -92,6 +100,19 @@ durable product intent.
     - recommended implementation focus.
 
 ## Example
+
+Bad request wording:
+
+```text
+Add ModalDialogHost to SearchDialog constructor and run dotnet test.
+```
+
+Good specification wording:
+
+```text
+Search dialogs participate in the shared modal composition lifecycle and retain
+their state across viewport changes.
+```
 
 User request:
 

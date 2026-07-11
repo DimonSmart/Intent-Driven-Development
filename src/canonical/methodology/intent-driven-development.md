@@ -44,13 +44,14 @@ Specifications include:
 
 - product behavior;
 - domain contracts;
-- architectural shape;
-- important implementation patterns;
-- important library/framework choices when they define the product;
+- durable architecture boundaries and important technical constraints;
+- architecture decisions that define product properties;
+- framework or library choices only when they define compatibility, public
+  contracts, security, operability, or an accepted architecture decision;
 - compatibility expectations;
 - non-goals;
 - acceptance criteria;
-- verification rules;
+- verification rules that state the required evidence, scenario, and property;
 - shared behavior.
 
 Specifications do not include:
@@ -62,6 +63,64 @@ Specifications do not include:
 - small refactoring;
 - generated CodingAgent output;
 - current implementation gaps.
+
+Specifications also do not include private type or method names, source files,
+constructor signatures, dependency-injection wiring, implementation order,
+migration mechanics, temporary workarounds, build or test commands, one-off
+source scans, test locations, or progress status.
+
+## Durable Constraint vs Implementation Detail
+
+Ask: **Would a different correct implementation still be allowed?** If yes, the
+specific detail is probably not intent.
+
+Durable technical constraints, durable architecture boundaries, and verification
+rules describe what future implementations must preserve. Current code structure
+and local execution mechanics do not.
+
+Durable constraint:
+
+```text
+The comparison engine must process large files with bounded memory use.
+```
+
+Implementation detail:
+
+```text
+The engine must allocate a 64 KB byte array in CompareAsync().
+```
+
+Durable architecture boundary:
+
+```text
+Application-owned UI rendering must be coordinated through one composition
+lifecycle so overlays and underlying surfaces redraw consistently.
+```
+
+Implementation detail:
+
+```text
+UiCompositionHost must be instantiated in Bootstrap.cs and passed through a
+ModalDialogHost constructor.
+```
+
+Durable verification rule:
+
+```text
+Automated tests must cover both viewport growth and shrink while nested modals
+are visible.
+```
+
+Process command:
+
+```text
+Run dotnet test.
+```
+
+Build and test commands belong in developer documentation, CI, task
+instructions, or PR workflow; they are not product intent. Test names and test
+locations may change without changing intent. A Verification section states the
+evidence category, scenario, and required property.
 
 ## Decision Flow
 
@@ -127,3 +186,16 @@ outcome into a spec or ADR and delete the spike, or keep the spike only if it
 is still useful as active research.
 
 Deleted documents remain available through Git history.
+
+### Spec Lifecycle
+
+A spec document has no lifecycle status. Its presence in the current intent
+directory means that it is current. Do not mark a spec as Current, Completed,
+Deprecated, Retired, or Superseded.
+
+When intent changes within the same product area, edit the owning spec in place.
+When a spec becomes obsolete or is absorbed by another document, migrate any
+remaining current intent and delete the obsolete spec. Git history is the only history of spec revisions.
+
+ADR status is part of the decision record lifecycle and does not apply to specs.
+A spike remains only while the question is active.

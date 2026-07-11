@@ -16,8 +16,16 @@ implementation.
 ## Rules
 
 - Do not treat incidental implementation details as requirements.
-- Do not copy code structure, private helper names, temporary workarounds, or
-  framework defaults into product intent unless they define the product.
+- Do not copy code structure, private helper names, test method names, source
+  file names, internal naming, constructor signatures, current dependency
+  injection graph, temporary fallbacks, migration state, command lines, or
+  framework defaults into product intent unless they define a public or durable
+  architecture contract.
+- Do not copy a package version unless that version is itself a compatibility
+  contract.
+- Before transferring behavior from implementation, express it without internal
+  type names. If that is impossible, determine whether the type is a public or
+  durable architecture contract before updating intent.
 - Do not update a specification from implementation merely because the
   implementation exists.
 - Require explicit user confirmation before making semantic changes.
@@ -50,7 +58,8 @@ implementation.
 2. Inspect the implementation and verification evidence.
 3. Identify observable behavior and durable architecture that may represent
    current product intent.
-4. Exclude incidental implementation details and temporary state.
+4. Express candidate behavior without internal type names, then exclude
+   incidental implementation details and temporary state.
 5. Summarize the proposed semantic specification changes for user confirmation.
 6. After confirmation, update the smallest set of current specification files.
 7. Update `INDEX.md` only when document structure or document roles changed.

@@ -53,6 +53,9 @@ Check that:
 - ADR files use ADR-like structure;
 - spike files are marked as non-normative research or unresolved
   investigation.
+- normative spec sections do not contain fenced build/test shell commands,
+  explicit task/progress sections, implementation checklists, migration status,
+  or a spec lifecycle status.
 
 `idd-intent-lint` must fail if:
 
@@ -68,6 +71,26 @@ Check that:
 - any skill contains an archive import action;
 - any skill recommends moving specs to archive;
 - docs describe archive as a normal lifecycle.
+- an ordinary spec contains `Status: Current`, `Status: Superseded`,
+  `Superseded by`, or another explicit lifecycle status;
+- `INDEX.md` models ordinary specs as `Current`, `Completed`, `Superseded`, or
+  another lifecycle status;
+- a normative spec section contains a fenced shell block with a build or test
+  command such as `dotnet build`, `dotnet test`, `npm test`, `mvn test`,
+  `gradle test`, `cargo test`, or `pytest`;
+- a normative spec contains an explicit task/progress section, implementation
+  checklist, or migration status.
+
+Warn, without failing automatically, when a normative spec contains source file
+names such as `.cs`, `.java`, `.ts`, or `.py`; private-style identifiers;
+method-call notation; constructor names; dependency-injection registration
+instructions; test method names; CLI commands; or terms such as `remaining`,
+`finish`, `complete migration`, or `follow-up implementation`. Public APIs and
+durable architecture types may legitimately match these patterns.
+
+Do not apply implementation-leakage checks to clearly non-normative sections
+named `Source history`, `Migration source`, `Provenance`, `Imported from`, or
+`Historical note`; those sections must not state current requirements.
 
 Mechanical lint may flag suspicious wording. It must not claim to have completed
 semantic review.

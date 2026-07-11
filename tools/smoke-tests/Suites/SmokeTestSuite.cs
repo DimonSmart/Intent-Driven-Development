@@ -37,6 +37,7 @@ internal sealed partial class SmokeTestSuite
         ExpectEntryPointLineLimits();
         ExpectAllSkillsGenerated();
         ExpectPrefixedClaudeSkillOutput();
+        ExpectDurableIntentPolicy();
         ExpectClaudeSkillMetadata();
         ExpectSkillInvocationMetadata();
         ExpectPackManifestShape();

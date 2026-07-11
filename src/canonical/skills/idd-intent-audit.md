@@ -39,7 +39,8 @@ rules.
 
 Current specs must not contain local tasks, temporary implementation notes,
 progress logs, chat history, one-off cleanup notes, plans that do not define
-product behavior, or source-specific wrapper text from imported methodologies.
+product behavior, source-specific wrapper text from imported methodologies, or
+private code contracts and verification commands.
 
 ## Required Behavior
 
@@ -71,6 +72,14 @@ product behavior, or source-specific wrapper text from imported methodologies.
    - specs that should be spike;
    - missing shared specs;
    - missing references between related specs.
+   - implementation leakage: build/test command blocks, source files in
+     normative sections, private-style identifiers, method-call syntax, test
+     class or method names, constructor wiring, or dependency registration;
+   - task-like headings, implementation sequences, migration history, and
+     phrases such as `complete migration`, `finish migration`, `remaining work`,
+     `update all usages`, or `remove legacy call sites`;
+   - over-specified architecture that restricts a correct implementation without
+     defining a durable product property.
 7. Do not edit files.
 8. Produce a report with recommendations.
 
@@ -103,14 +112,15 @@ Short list of the most important structural problems.
 
 ### Finding: <short title>
 
-- Type: oversized | undersized | mixed-scope | duplicate | scattered-model | conflict | task-like | stale-reference | missing-shared-spec | adr-candidate | spike-candidate | archive-concept | delete-candidate | obsolete-current-doc | resolved-spike | superseded-adr-status-missing
+- Type: oversized | undersized | mixed-scope | duplicate | scattered-model | conflict | task-like-spec | stale-reference | missing-shared-spec | adr-candidate | spike-candidate | archive-concept | delete-candidate | obsolete-current-doc | resolved-spike | superseded-adr-status-missing | implementation-leakage | verification-command | migration-history | private-code-contract | over-specified-architecture
 - Specs:
 - Problem:
 - Recommended action:
 - Safety:
-  - safe-auto-change
-  - requires-product-decision
-  - requires-human-review
+  - safe to generalize
+  - likely durable architecture
+  - requires human review
+  - delete candidate
 
 ## Proposed Reorganization Plan
 
