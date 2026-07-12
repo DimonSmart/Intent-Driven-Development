@@ -1,6 +1,7 @@
 param(
     [string] $Remote = "origin",
-    [string] $Branch = "main"
+    [string] $Branch = "main",
+    [string] $FirstVersion = "1.0.0"
 )
 
 $ErrorActionPreference = "Stop"
@@ -33,17 +34,41 @@ Invoke-Git -Arguments @("fetch", "--prune", "--tags", $Remote)
 Invoke-Git -Arguments @("switch", $Branch)
 Invoke-Git -Arguments @("pull", "--ff-only", $Remote, $Branch)
 
-$version = (Get-Content -Raw VERSION).Trim()
-if ($version -notmatch '^\d+\.\d+\.\d+$') {
-    throw "VERSION '$version' must use MAJOR.MINOR.PATCH format."
+$firstVersionMatch = [regex]::Match($FirstVersion, '^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$')
+if (-not $firstVersionMatch.Success) {
+    throw "First version '$FirstVersion' must use MAJOR.MINOR.PATCH format."
 }
 
+$latestTag = Invoke-Git -Arguments @("tag", "--list", "v*") |
+    ForEach-Object {
+        $tag = $_.Trim()
+        $match = [regex]::Match($tag, '^v(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$')
+        if ($match.Success) {
+            [pscustomobject]@{
+                Tag = $tag
+                Major = [int] $match.Groups["major"].Value
+                Minor = [int] $match.Groups["minor"].Value
+                Patch = [int] $match.Groups["patch"].Value
+            }
+        }
+    } |
+    Sort-Object Major, Minor, Patch |
+    Select-Object -Last 1
+
+if ($latestTag) {
+    $version = "$($latestTag.Major).$($latestTag.Minor).$($latestTag.Patch + 1)"
+}
+else {
+    $version = "$($firstVersionMatch.Groups["major"].Value).$($firstVersionMatch.Groups["minor"].Value).$($firstVersionMatch.Groups["patch"].Value)"
+}
+
+Set-Content -LiteralPath VERSION -Value $version -NoNewline
 $tag = "v$version"
-if (Invoke-Git -Arguments @("tag", "--list", $tag)) {
-    throw "Tag '$tag' already exists. Update VERSION before publishing."
-}
 
+Invoke-Git -Arguments @("add", "VERSION")
+Invoke-Git -Arguments @("commit", "-m", "Release $version")
 Invoke-Git -Arguments @("tag", "-a", $tag, "-m", "Release $version")
-Invoke-Git -Arguments @("push", $Remote, $Branch, $tag)
+Invoke-Git -Arguments @("push", $Remote, $Branch)
+Invoke-Git -Arguments @("push", $Remote, $tag)
 
 Write-Host "Published '$tag' from '$Branch' to '$Remote'."
