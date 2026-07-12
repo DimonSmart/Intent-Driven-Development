@@ -1,0 +1,10 @@
+{
+  "name": "idd-factory",
+  "description": "Temporary implementation orchestration for IDD.",
+  "version": "2.0.1",
+  "author": {
+    "name": "DimonSmart"
+  },
+  "repository": "https://github.com/DimonSmart/Intent-Driven-Development",
+  "license": "MIT"
+}

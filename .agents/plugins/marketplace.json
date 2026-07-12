@@ -1,0 +1,32 @@
+{
+  "name": "intent-driven-development",
+  "interface": {
+    "displayName": "Intent-Driven Development"
+  },
+  "plugins": [
+    {
+      "name": "idd-core",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex/idd-core"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "idd-factory",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex/idd-factory"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

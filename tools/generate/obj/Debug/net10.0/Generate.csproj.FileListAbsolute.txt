@@ -1,0 +1,15 @@
+/home/runner/work/Intent-Driven-Development/Intent-Driven-Development/tools/generate/bin/Debug/net10.0/Generate
+/home/runner/work/Intent-Driven-Development/Intent-Driven-Development/tools/generate/bin/Debug/net10.0/Generate.deps.json
+/home/runner/work/Intent-Driven-Development/Intent-Driven-Development/tools/generate/bin/Debug/net10.0/Generate.runtimeconfig.json
+/home/runner/work/Intent-Driven-Development/Intent-Driven-Development/tools/generate/bin/Debug/net10.0/Generate.dll
+/home/runner/work/Intent-Driven-Development/Intent-Driven-Development/tools/generate/bin/Debug/net10.0/Generate.pdb
+/home/runner/work/Intent-Driven-Development/Intent-Driven-Development/tools/generate/obj/Debug/net10.0/Generate.GeneratedMSBuildEditorConfig.editorconfig
+/home/runner/work/Intent-Driven-Development/Intent-Driven-Development/tools/generate/obj/Debug/net10.0/Generate.AssemblyInfoInputs.cache
+/home/runner/work/Intent-Driven-Development/Intent-Driven-Development/tools/generate/obj/Debug/net10.0/Generate.AssemblyInfo.cs
+/home/runner/work/Intent-Driven-Development/Intent-Driven-Development/tools/generate/obj/Debug/net10.0/Generate.csproj.CoreCompileInputs.cache
+/home/runner/work/Intent-Driven-Development/Intent-Driven-Development/tools/generate/obj/Debug/net10.0/Generate.sourcelink.json
+/home/runner/work/Intent-Driven-Development/Intent-Driven-Development/tools/generate/obj/Debug/net10.0/Generate.dll
+/home/runner/work/Intent-Driven-Development/Intent-Driven-Development/tools/generate/obj/Debug/net10.0/refint/Generate.dll
+/home/runner/work/Intent-Driven-Development/Intent-Driven-Development/tools/generate/obj/Debug/net10.0/Generate.pdb
+/home/runner/work/Intent-Driven-Development/Intent-Driven-Development/tools/generate/obj/Debug/net10.0/Generate.genruntimeconfig.cache
+/home/runner/work/Intent-Driven-Development/Intent-Driven-Development/tools/generate/obj/Debug/net10.0/ref/Generate.dll
