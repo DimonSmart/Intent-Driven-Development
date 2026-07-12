@@ -1,100 +1,78 @@
 # Getting Started
 
-Intent-Driven Development can be installed into another repository with the .NET tool or obtained as a versioned GitHub Release ZIP.
+Intent-Driven Development is installed through native Coding Agent plugins.
 
-This repository ships canonical methodology and generated CodingAgent-specific delivery files. The installed CodingAgent files are generated from the canonical source, not edited as the source of truth.
+Supported platforms:
 
-Use the .NET global tool for CLI installation:
-
-```powershell
-dotnet tool install --global DimonSmart.IntentDrivenDevelopment.Tool
-intent-driven-development list-coding-agents
-intent-driven-development list-packs
-intent-driven-development init
-intent-driven-development install --target codex
+```text
+Claude
+Codex
 ```
 
-The tool requires the .NET runtime/SDK supported by its tool package. The installed methodology and generated files remain CodingAgent-neutral.
+## Install
 
-Core IDD is installed by default. It installs the durable `.idd/intent/` intent layer
-and the `idd-intent-*` and `idd-code-*` skills.
+Connect the IDD marketplace for your Coding Agent, then install:
 
-All public IDD commands use the `idd-` prefix and the format
-`idd-<area>-<action>`. This keeps IDD commands grouped in autocomplete and
-avoids collisions with project, plugin, or tool commands.
-
-## Optional Factory Pack
-
-The factory pack adds temporary execution orchestration workflows for
-implementing current `.idd/intent/` intent.
-
-Factory workflows may be selected automatically for temporary multi-task
-orchestration, sequencing, task reviews, or final review. Use
-`idd-code-implement` for one focused change. `idd-skip` is manual-only and
-applies only when explicitly invoked for the current request; never select it
-automatically.
-
-Install:
-
-```bash
-intent-driven-development install --target claude --pack factory
+```text
+idd-core
 ```
 
-The factory pack automatically includes core. It creates local support files
-under `.idd/factory/`; temporary work artifacts are created under
-`.idd/factory/work/` only when a factory work plan is created.
-Factory remains optional. It never replaces intent workflows and must stop when
-current intent is missing or insufficient.
+Install this only when you want temporary multi-step execution orchestration:
 
-`.idd/factory/work/` is ignored by git by default. Factory work plans are not
-product specifications and must not be reused automatically for unrelated later
-tasks. Durable product intent belongs in `.idd/intent/`.
-
-Future task-system integration may use an external Work Item Provider or Task
-Backend. The current implementation uses temporary local markdown files only.
-
-Use the .NET global tool when you want a .NET-native installer command:
-
-```powershell
-dotnet tool install --global DimonSmart.IntentDrivenDevelopment.Tool
-intent-driven-development list-targets
-intent-driven-development list-coding-agents
-intent-driven-development list-packs
-intent-driven-development install --target codex
+```text
+idd-factory
 ```
 
-## Starting a Project
+`idd-factory` depends on `idd-core`.
 
-In a target repository, initialize IDD and install the CodingAgent format you use:
+## Initialize A Project
 
-```powershell
-intent-driven-development init
-intent-driven-development install --target codex
+In the target repository, invoke:
+
+```text
+idd-project-init
 ```
 
-For multiple CodingAgents, install each CodingAgent explicitly or use `--all`:
+This creates the durable project-owned IDD state:
 
-```powershell
-intent-driven-development install --all
+```text
+.idd/
+.idd/intent/
+.idd/plugins.json
 ```
 
-Project product intent lives in `.idd/intent/`. Keep durable product decisions there. Keep tasks, temporary plans, pull request notes, chat summaries, and implementation status outside specifications.
+It also creates minimal bootstrap intent documents under `.idd/intent/`.
 
-## Updating
+## What Is Not Created
 
-If you use the .NET tool, update it first:
+IDD plugins do not copy skills into the project. Skills remain in the native plugin cache of the Coding Agent.
 
-```powershell
-dotnet tool update --global DimonSmart.IntentDrivenDevelopment.Tool
-intent-driven-development install --target codex
+## Product Intent
+
+Project product intent lives in:
+
+```text
+.idd/intent/
 ```
+
+Keep durable product behavior, accepted architecture decisions, constraints, and verification rules there. Keep temporary plans, tasks, implementation status, PR notes, and chat summaries elsewhere.
+
+## Factory
+
+Factory workflows are temporary orchestration. When enabled, temporary Factory state belongs under:
+
+```text
+.idd/factory/
+```
+
+Factory never creates or owns Product Intent. If current intent is missing or insufficient, route to an intent workflow before implementation.
 
 ## Local Repository Checks
 
-When changing this repository itself, run the local check:
+When changing this repository itself, run:
 
 ```powershell
 .\scripts\Check.ps1
 ```
 
-The check regenerates CodingAgent output, verifies that generated files are reproducible, and runs smoke tests.
+The check builds the generator, generates Claude and Codex marketplaces, validates plugin shape, and verifies reproducibility.

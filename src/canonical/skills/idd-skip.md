@@ -16,7 +16,7 @@ Skip IDD routing for the current user request only.
 - Do not update `.idd/intent/`.
 - Do not require missing product behavior to be specified before implementation.
 - Do not disable IDD for the project or future requests.
-- Do not modify installed packs, project configuration, or CodingAgent entry files.
+- Do not modify installed plugins, project configuration, or Coding Agent entry files.
 - Perform the requested task using the repository's normal engineering conventions.
 - If the request explicitly asks to inspect or modify IDD files, perform that work;
   skip only the automatic IDD workflow requirement.

@@ -1,7 +1,0 @@
-{
-  "codingAgent": "copilot",
-  "entryPoint": ".github/copilot-instructions.md",
-  "skillsRoot": ".github/skills",
-  "supportsSkills": true,
-  "supportsFrontMatter": true
-}

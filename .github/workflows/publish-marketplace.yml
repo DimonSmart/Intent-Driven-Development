@@ -1,0 +1,56 @@
+name: Publish IDD Marketplace
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Extract version from tag
+        id: extract_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build generator
+        run: dotnet build tools/generate/Generate.csproj --nologo
+
+      - name: Generate native marketplaces
+        run: dotnet exec tools/generate/bin/Debug/net10.0/Generate.dll --version ${{ steps.extract_version.outputs.VERSION }}
+
+      - name: Validate native marketplaces
+        run: pwsh ./scripts/Check.ps1
+
+      - name: Publish marketplace branch
+        run: |
+          mkdir -p /tmp/idd-marketplace
+          cp -R artifacts/marketplace/. /tmp/idd-marketplace/
+          git fetch origin marketplace || true
+          git switch --orphan marketplace
+          git rm -rf .
+          cp -R /tmp/idd-marketplace/. .
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Publish IDD marketplace ${{ steps.extract_version.outputs.VERSION }}"
+          git push --force origin marketplace
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

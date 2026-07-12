@@ -20,13 +20,14 @@ internal sealed class Generator(RepositoryLayout layout)
             .Select(definition => definition.Config.CodingAgent)
             .ToHashSet(StringComparer.Ordinal);
         var skillDescriptions = new SkillDescriptionReader().Read(layout.SkillDescriptionsPath, supportedCodingAgents);
-        var packManifest = new PackManifestReader(layout).Read();
-        new PackManifestValidator(layout).Validate(packManifest);
+        var pluginManifest = new PluginManifestReader(layout).Read();
+        new PluginManifestValidator(layout).Validate(pluginManifest);
 
         foreach (var adapterDefinition in adapterDefinitions)
         {
-            var expectedFiles = new AdapterFilePlanner(layout).BuildFiles(adapterDefinition, supportedCodingAgents, packManifest);
-            var outputRoot = Path.Combine(layout.GeneratedRoot, adapterDefinition.Config.CodingAgent);
+            var platformAdapter = PlatformAdapterFactory.Create(adapterDefinition.Config.CodingAgent);
+            var expectedFiles = BuildMarketplaceFiles(platformAdapter, adapterDefinition, pluginManifest, skillDescriptions, manifestVersion);
+            var outputRoot = Path.Combine(layout.MarketplaceRoot, adapterDefinition.Config.CodingAgent);
 
             if (checkOnly)
             {
@@ -37,16 +38,29 @@ internal sealed class Generator(RepositoryLayout layout)
             GeneratedOutputWriter.Write(outputRoot, expectedFiles);
         }
 
-        var manifest = ManifestBuilder.Build(adapterDefinitions, packManifest, skillDescriptions, manifestVersion);
-        if (checkOnly)
+        return errors;
+    }
+
+    private static IReadOnlyList<GeneratedFile> BuildMarketplaceFiles(
+        IPlatformAdapter platformAdapter,
+        AdapterDefinition adapterDefinition,
+        PluginManifest pluginManifest,
+        IReadOnlyDictionary<string, SkillDescription> skillDescriptions,
+        string version)
+    {
+        var files = new List<GeneratedFile>
         {
-            errors.AddRange(GeneratedOutputChecker.CheckSingleFile(layout.ManifestPath, manifest));
-        }
-        else
+            new("marketplace.json", MarketplaceBuilder.Build(platformAdapter.Platform, pluginManifest))
+        };
+
+        foreach (var (pluginName, plugin) in pluginManifest.Plugins.OrderBy(item => item.Key, StringComparer.Ordinal))
         {
-            File.WriteAllText(layout.ManifestPath, manifest, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            foreach (var file in platformAdapter.BuildPluginFiles(adapterDefinition, pluginManifest, pluginName, plugin, skillDescriptions, version))
+            {
+                files.Add(new GeneratedFile(Path.Combine("plugins", pluginName, file.RelativePath), file.Content));
+            }
         }
 
-        return errors;
+        return files;
     }
 }

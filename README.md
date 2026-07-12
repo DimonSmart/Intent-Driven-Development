@@ -4,54 +4,76 @@
   <img src="docs/assets/idd-hero.png" alt="Intent-Driven Development hero image: durable product intent above temporary work artifacts" />
 </p>
 
-> Run a thought experiment.
->
-> Delete the implementation.  
-> Keep only the intent.  
-> Can a CodingAgent rebuild the product?
+> Delete the implementation. Keep only the intent. Can a CodingAgent rebuild the product?
 
-Intent-Driven Development is a methodology for keeping durable product intent in the repository while keeping temporary work artifacts disposable.
+Intent-Driven Development is a plugin marketplace source for Claude Code and Codex. It keeps durable product intent in `.idd/intent/` and delivers the workflows as native agent plugins.
 
-Product intent is product memory. Tasks, TODOs, generated plans, PR notes, chat summaries, and temporary implementation notes are not product truth.
-
-## The Problem
-
-AI coding tools generate code, plans, checklists, summaries, and instruction files quickly. Over time, those artifacts can start pretending to be the source of truth.
-
-IDD exists to prevent that. The implementation can change. The tools can change. The CodingAgent can change. The durable product intent should remain stable.
+The repository is the canonical source for methodology, skills, plugin metadata, adapters, and marketplace publication.
 
 ## What IDD Is
 
-IDD treats specifications and ADRs as durable product memory. They describe what the product is supposed to become and what future implementations must preserve.
+IDD treats specifications and ADRs as durable product memory. Tasks, plans, PR notes, chat summaries, and local implementation notes are temporary work, not product truth.
 
-Temporary work belongs elsewhere: tasks, pull requests, chats, generated plans, and local implementation notes can guide the current change, but they do not define the product.
+The plugin model is:
 
-Core IDD is the default install. It creates the durable intent layer in `.idd/intent/`. Optional execution orchestration, such as the factory pack, is temporary work and must not become the canonical specification. Factory may be selected automatically for multi-task orchestration; `idd-skip` is the manual-only opt-out for the current request and is never selected automatically.
+```text
+Canonical methodology
+        |
+        v
+Canonical skills
+        |
+        v
+Canonical plugin model
+        |
+        v
+IPlatformAdapter
+        |
+        +-- Claude native plugin
+        +-- Codex native plugin
+```
 
-All public IDD commands use the `idd-` prefix and the format `idd-<area>-<action>`.
-This keeps IDD commands grouped in autocomplete and avoids collisions with project, plugin, or tool commands.
+There are two logical plugins:
 
-## Why It Is Different
+```text
+idd-core
+idd-factory
+```
 
-| Ordinary spec-driven workflow | Intent-Driven Development |
-| --- | --- |
-| Specs often mix with plans, tasks, and status notes | Product intent stays separate from temporary work |
-| Generated artifacts can look authoritative | Generated artifacts stay disposable |
-| Tool-specific files can drift into product memory | CodingAgent files are delivery/adaptation formats |
-| A workflow may depend on one CodingAgent | The source of truth remains tool-independent |
+`idd-core` owns durable intent workflows and the `idd-project-init` entry point. `idd-factory` depends on `idd-core` and provides temporary execution orchestration. Factory work never becomes product intent.
 
-IDD is not just another spec-driven workflow. It is stricter about separating product memory from task history.
+## User Workflow
 
-## Who It Is For
+Users connect the IDD marketplace for their Coding Agent, install `idd-core`, optionally install `idd-factory`, then run:
 
-IDD is useful for long-lived projects, multiple CodingAgents, repeated implementation sessions, architectural rules that should survive resets, and product knowledge that should not live only in chat history.
+```text
+idd-project-init
+```
 
-It is less useful for throwaway experiments where the code and the decisions will both be discarded.
+The project receives only durable IDD state:
+
+```text
+.idd/intent/
+.idd/plugins.json
+```
+
+Skills remain inside the agent plugin cache. They are not copied into user repositories.
+
+## Repository Shape
+
+```text
+src/canonical/              canonical methodology, skills, assets, and plugins
+src/canonical/plugins/      canonical plugin model
+src/adapters/claude/        Claude adapter input
+src/adapters/codex/         Codex adapter input
+tools/generate/             marketplace generator
+tools/smoke-tests/          marketplace validation
+artifacts/marketplace/      local generated output, ignored by git
+```
 
 ## Start Here
 
-- [Getting Started](docs/getting-started.md) - install IDD, choose a CodingAgent target, and initialize a project.
-- [Methodology](docs/methodology.md) - understand durable product intent, temporary work artifacts, and how IDD differs from spec-driven workflows.
-- [Project Maintenance](docs/project-maintenance.md) - maintain this repository, generated CodingAgent files, packs, checks, and releases.
+- [Getting Started](docs/getting-started.md) - connect a marketplace, install plugins, and initialize project intent.
+- [Methodology](docs/methodology.md) - understand durable product intent and temporary work.
+- [Project Maintenance](docs/project-maintenance.md) - maintain canonical source, adapters, generation, and marketplace publication.
 
-The engineer still owns the result. IDD keeps the product memory clear enough for humans and CodingAgents to use it.
+The engineer still owns the result. IDD keeps the product memory clear enough for humans and Coding Agents to use it.

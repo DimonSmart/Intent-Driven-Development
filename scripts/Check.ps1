@@ -22,12 +22,14 @@ function Invoke-CheckedNative {
 }
 
 Invoke-CheckedNative dotnet build tools/generate/Generate.csproj --nologo
-Invoke-CheckedNative dotnet build tools/idd-tool/IntentDrivenDevelopment.Tool.csproj --nologo
 Invoke-CheckedNative dotnet build tools/smoke-tests/SmokeTests.csproj --nologo
 
 Invoke-CheckedNative dotnet exec tools/generate/bin/Debug/net10.0/Generate.dll
-if (-not (Test-Path -LiteralPath (Join-Path $repoRoot "manifest.json"))) {
-    throw "Generator did not create manifest.json."
+if (-not (Test-Path -LiteralPath (Join-Path $repoRoot "artifacts/marketplace/codex/marketplace.json"))) {
+    throw "Generator did not create Codex marketplace."
+}
+if (-not (Test-Path -LiteralPath (Join-Path $repoRoot "artifacts/marketplace/claude/marketplace.json"))) {
+    throw "Generator did not create Claude marketplace."
 }
 
 Invoke-CheckedNative dotnet exec tools/generate/bin/Debug/net10.0/Generate.dll --check

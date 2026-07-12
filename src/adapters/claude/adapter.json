@@ -1,7 +1,7 @@
 {
   "codingAgent": "claude",
   "entryPoint": "CLAUDE.md",
-  "skillsRoot": ".claude/skills",
+  "skillsRoot": "skills",
   "supportsSkills": true,
   "supportsFrontMatter": true,
   "supportsManualOnlySkills": true

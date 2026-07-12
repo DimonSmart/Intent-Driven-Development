@@ -1,4 +1,7 @@
 {
+  "idd-project-init": {
+    "description": "Initialize `.idd/intent` and IDD plugin declarations without copying skills or installing agent-specific files."
+  },
   "idd-intent-audit": {
     "description": "Diagnose `.idd/intent/` product intent structure and recommend reorganizations without editing files.",
     "adapters": {
