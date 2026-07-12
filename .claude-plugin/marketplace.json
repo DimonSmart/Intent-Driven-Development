@@ -4,13 +4,13 @@
     "name": "DimonSmart"
   },
   "description": "Intent-Driven Development plugins for Claude Code.",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "plugins": [
     {
       "name": "idd-core",
       "source": "./plugins/claude/idd-core",
       "description": "Core Intent-Driven Development workflows.",
-      "version": "2.0.4",
+      "version": "2.0.5",
       "author": {
         "name": "DimonSmart"
       }
@@ -19,7 +19,7 @@
       "name": "idd-factory",
       "source": "./plugins/claude/idd-factory",
       "description": "Temporary implementation orchestration for IDD.",
-      "version": "2.0.4",
+      "version": "2.0.5",
       "author": {
         "name": "DimonSmart"
       }
