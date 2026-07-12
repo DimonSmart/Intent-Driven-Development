@@ -132,7 +132,7 @@ The release tag is the only release version source. The tag must use
 
 ```powershell
 pwsh ./scripts/Check.ps1
-./publish-current-version.bat
+./publish-next-version.bat
 ```
 
 The workflow runs:
