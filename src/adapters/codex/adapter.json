@@ -2,6 +2,5 @@
   "codingAgent": "codex",
   "entryPoint": "AGENTS.md",
   "skillsRoot": "skills",
-  "supportsSkills": true,
-  "supportsFrontMatter": true
+  "supportsSkills": true
 }

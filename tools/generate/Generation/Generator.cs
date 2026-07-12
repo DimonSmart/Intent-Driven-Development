@@ -23,21 +23,20 @@ internal sealed class Generator(RepositoryLayout layout)
         var pluginManifest = new PluginManifestReader(layout).Read();
         new PluginManifestValidator(layout).Validate(pluginManifest);
 
+        var expectedFiles = new List<GeneratedFile>();
         foreach (var adapterDefinition in adapterDefinitions)
         {
             var platformAdapter = PlatformAdapterFactory.Create(adapterDefinition.Config.CodingAgent);
-            var expectedFiles = BuildMarketplaceFiles(platformAdapter, adapterDefinition, pluginManifest, skillDescriptions, manifestVersion);
-            var outputRoot = Path.Combine(layout.MarketplaceRoot, adapterDefinition.Config.CodingAgent);
-
-            if (checkOnly)
-            {
-                errors.AddRange(GeneratedOutputChecker.CheckFiles(outputRoot, expectedFiles));
-                continue;
-            }
-
-            GeneratedOutputWriter.Write(outputRoot, expectedFiles);
+            expectedFiles.AddRange(BuildMarketplaceFiles(platformAdapter, adapterDefinition, pluginManifest, skillDescriptions, manifestVersion));
         }
 
+        if (checkOnly)
+        {
+            errors.AddRange(GeneratedOutputChecker.CheckFiles(layout.MarketplaceRoot, expectedFiles));
+            return errors;
+        }
+
+        GeneratedOutputWriter.Write(layout.MarketplaceRoot, expectedFiles);
         return errors;
     }
 
@@ -48,16 +47,13 @@ internal sealed class Generator(RepositoryLayout layout)
         IReadOnlyDictionary<string, SkillDescription> skillDescriptions,
         string version)
     {
-        var files = new List<GeneratedFile>
-        {
-            new("marketplace.json", MarketplaceBuilder.Build(platformAdapter.Platform, pluginManifest))
-        };
+        var files = new List<GeneratedFile> { platformAdapter.BuildMarketplaceFile(pluginManifest, version) };
 
         foreach (var (pluginName, plugin) in pluginManifest.Plugins.OrderBy(item => item.Key, StringComparer.Ordinal))
         {
             foreach (var file in platformAdapter.BuildPluginFiles(adapterDefinition, pluginManifest, pluginName, plugin, skillDescriptions, version))
             {
-                files.Add(new GeneratedFile(Path.Combine("plugins", pluginName, file.RelativePath), file.Content));
+                files.Add(new GeneratedFile(Path.Combine("plugins", platformAdapter.Platform, pluginName, file.RelativePath), file.Content));
             }
         }
 

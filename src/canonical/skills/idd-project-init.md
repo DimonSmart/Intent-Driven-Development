@@ -13,6 +13,17 @@ artifacts.
 
 ## Behavior
 
+Read bootstrap assets from this skill package:
+
+```text
+assets/bootstrap/.idd/intent/
+```
+
+When the runtime exposes a skill directory or resource URI, resolve the path
+relative to this `SKILL.md`. If the runtime only exposes packaged resources by
+reference, use the equivalent resource reference for
+`assets/bootstrap/.idd/intent/`.
+
 Create only the project-owned IDD state:
 
 ```text
@@ -56,9 +67,14 @@ workflows:
 
 ## Rules
 
+- Copy bootstrap files from `assets/bootstrap/.idd/intent/` without semantic
+  rewriting.
+- Never replace an existing file without explicit user approval.
 - Do not create agent-specific skill directories in the user project.
 - Do not copy plugin skills into the user project.
 - Do not create external distribution artifacts or generated delivery files.
+- Do not say that `.idd/plugins.json` installs plugins. It is a project-level
+  IDD declaration for people and IDD workflows.
 - Do not create `.idd/factory` unless Factory is explicitly enabled.
 - Product intent lives only under `.idd/intent`.
 - Factory working data, when enabled, is temporary and belongs under

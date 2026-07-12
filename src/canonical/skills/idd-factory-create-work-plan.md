@@ -39,6 +39,10 @@ ready.
   ADR or spike when appropriate.
 - Create a work plan only for behavior already covered by current specs or
   explicitly confirmed as task-only implementation work.
+- Do not create a work plan before validating current intent for the requested
+  work.
+- If `.idd/factory/.gitignore` is missing, create it from the packaged factory
+  asset before writing factory work files.
 - The work plan is temporary execution state.
 - The work plan must include cleanup instructions.
 - Do not read old factory work plans unless the user explicitly provides an
@@ -52,11 +56,13 @@ ready.
 4. Inspect repository evidence needed to identify likely code and test areas.
 5. Stop and route to the appropriate intent skill if durable product intent is
    missing, unclear, or wrong. Factory must not invent missing product intent.
-6. Use local `references/roles/` role prompts only when they are present and
+6. Ensure `.idd/factory/.gitignore` exists, creating it from the packaged
+   template if needed.
+7. Use local `references/roles/` role prompts only when they are present and
    relevant to this workflow.
-7. Create one work directory using this shape:
+8. Create one work directory using this shape:
    `.idd/factory/work/<yyyyMMdd-HHmmss>-<slug>/`.
-8. Write the work plan to:
+9. Write the work plan to:
    `.idd/factory/work/<yyyyMMdd-HHmmss>-<slug>/work-plan.md`.
 
 ## Output Format

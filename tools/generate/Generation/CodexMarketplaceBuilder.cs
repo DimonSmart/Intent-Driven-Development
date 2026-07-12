@@ -1,12 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-internal static class MarketplaceBuilder
+internal static class CodexMarketplaceBuilder
 {
-    public static string Build(string platform, PluginManifest manifest)
+    public static GeneratedFile Build(PluginManifest manifest)
     {
         var plugins = new JsonArray();
-        foreach (var pluginName in manifest.Plugins.Keys.OrderBy(name => name, StringComparer.Ordinal))
+        foreach (var (pluginName, _) in MarketplacePluginOrdering.OrderedPlugins(manifest))
         {
             plugins.Add(new JsonObject
             {
@@ -14,7 +14,7 @@ internal static class MarketplaceBuilder
                 ["source"] = new JsonObject
                 {
                     ["source"] = "local",
-                    ["path"] = $"./plugins/{pluginName}"
+                    ["path"] = $"./plugins/codex/{pluginName}"
                 },
                 ["policy"] = new JsonObject
                 {
@@ -27,22 +27,16 @@ internal static class MarketplaceBuilder
 
         var marketplace = new JsonObject
         {
-            ["name"] = $"idd-{platform}",
+            ["name"] = "intent-driven-development",
             ["interface"] = new JsonObject
             {
-                ["displayName"] = $"Intent-Driven Development {DisplayPlatform(platform)}"
+                ["displayName"] = "Intent-Driven Development"
             },
             ["plugins"] = plugins
         };
 
-        return marketplace.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n";
+        return new GeneratedFile(
+            Path.Combine(".agents", "plugins", "marketplace.json"),
+            marketplace.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n");
     }
-
-    private static string DisplayPlatform(string platform) =>
-        platform switch
-        {
-            "claude" => "Claude",
-            "codex" => "Codex",
-            _ => platform
-        };
 }

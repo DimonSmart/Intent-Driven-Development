@@ -2,7 +2,7 @@ using System.Text.Json;
 
 internal static class YamlFrontMatterWriter
 {
-    public static string BuildSkillFrontMatter(string skillName, SkillDescription skillDescription, AdapterConfig adapter)
+    public static string BuildClaudeSkillFrontMatter(string skillName, SkillDescription skillDescription, AdapterConfig adapter)
     {
         var generatedManualFields = adapter.SupportsManualOnlySkills &&
             skillDescription.Invocation == SkillInvocation.Manual
@@ -50,6 +50,19 @@ internal static class YamlFrontMatterWriter
         }
 
         lines.Add("---");
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    public static string BuildCodexSkillFrontMatter(string skillName, SkillDescription skillDescription)
+    {
+        var lines = new List<string>
+        {
+            "---",
+            $"name: {ToYamlString(skillName)}",
+            $"description: {ToYamlString(skillDescription.Description)}",
+            "---"
+        };
+
         return string.Join(Environment.NewLine, lines);
     }
 

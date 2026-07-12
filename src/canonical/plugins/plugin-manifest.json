@@ -1,7 +1,7 @@
 {
   "plugins": {
     "idd-core": {
-      "description": "Core Intent-Driven Development intent workflows.",
+      "description": "Core Intent-Driven Development workflows.",
       "dependencies": [],
       "skills": [
         "idd-project-init",
@@ -30,7 +30,7 @@
       }
     },
     "idd-factory": {
-      "description": "Temporary execution orchestration workflows for implementing current IDD intent.",
+      "description": "Temporary implementation orchestration for IDD.",
       "dependencies": [
         "idd-core"
       ],
@@ -72,7 +72,7 @@
       "assets": [
         {
           "source": "src/canonical/project-files/factory",
-          "destination": "."
+          "destination": ".idd/factory"
         }
       ],
       "metadata": {

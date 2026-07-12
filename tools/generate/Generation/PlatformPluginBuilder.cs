@@ -6,6 +6,10 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
     public abstract string Platform { get; }
     protected abstract string ManifestDirectory { get; }
     protected abstract string ManifestFileName { get; }
+    protected const string RepositoryUrl = "https://github.com/DimonSmart/Intent-Driven-Development";
+    protected const string AuthorName = "DimonSmart";
+
+    public abstract GeneratedFile BuildMarketplaceFile(PluginManifest manifest, string version);
 
     public IReadOnlyList<GeneratedFile> BuildPluginFiles(
         AdapterDefinition adapterDefinition,
@@ -22,12 +26,6 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
             new("idd-plugin.json", BuildIddPluginMetadata(adapter, plugin, version))
         };
 
-        if (plugin.Metadata?.TryGetValue("entryPoint", out var entryPointValue) == true &&
-            entryPointValue is JsonElement { ValueKind: JsonValueKind.True })
-        {
-            files.Add(new GeneratedFile(adapter.EntryPoint, BuildEntryPoint(adapterDefinition.Directory, adapter)));
-        }
-
         foreach (var skillName in plugin.Skills.OrderBy(name => name, StringComparer.Ordinal))
         {
             files.AddRange(BuildSkillFiles(adapter, plugin, skillName, skillDescriptions));
@@ -41,41 +39,11 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         return files;
     }
 
-    private string BuildPluginManifest(
+    protected abstract string BuildPluginManifest(
         AdapterConfig adapter,
         string pluginName,
         PluginDefinition plugin,
-        string version)
-    {
-        var pluginJson = new JsonObject
-        {
-            ["name"] = pluginName,
-            ["version"] = version,
-            ["description"] = plugin.Description,
-            ["author"] = new JsonObject
-            {
-                ["name"] = "Intent-Driven Development"
-            },
-            ["license"] = "MIT",
-            ["keywords"] = new JsonArray("intent-driven-development", "idd", adapter.CodingAgent),
-            ["skills"] = "./skills/",
-            ["interface"] = new JsonObject
-            {
-                ["displayName"] = DisplayName(pluginName),
-                ["shortDescription"] = plugin.Description,
-                ["longDescription"] = plugin.Description,
-                ["developerName"] = "Intent-Driven Development",
-                ["category"] = "Productivity",
-                ["capabilities"] = new JsonArray("Skills", "Workflow"),
-                ["defaultPrompt"] = new JsonArray(
-                    "Initialize IDD in this project.",
-                    "Update product intent for this change.",
-                    "Check implementation against intent.")
-            }
-        };
-
-        return pluginJson.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n";
-    }
+        string version);
 
     private static string BuildIddPluginMetadata(AdapterConfig adapter, PluginDefinition plugin, string version)
     {
@@ -92,7 +60,7 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         return metadata.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n";
     }
 
-    private IReadOnlyList<GeneratedFile> BuildSkillFiles(
+    protected virtual IReadOnlyList<GeneratedFile> BuildSkillFiles(
         AdapterConfig adapter,
         PluginDefinition plugin,
         string skillName,
@@ -105,12 +73,9 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
 
         var sourcePath = Path.Combine("src", "canonical", "skills", skillName + ".md");
         var content = RequiredFileReader.Read(sourcePath);
-        if (adapter.SupportsFrontMatter)
-        {
-            content = ContentNormalizer.JoinBlocks(
-                YamlFrontMatterWriter.BuildSkillFrontMatter(skillName, skillDescription, adapter),
-                content);
-        }
+        content = ContentNormalizer.JoinBlocks(
+            BuildSkillFrontMatter(skillName, skillDescription, adapter),
+            content);
 
         var files = new List<GeneratedFile>
         {
@@ -128,22 +93,21 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
             }
         }
 
+        if (StringComparer.Ordinal.Equals(skillName, "idd-project-init"))
+        {
+            foreach (var asset in plugin.Assets.Where(asset => StringComparer.Ordinal.Equals(asset.Destination, ".idd/intent")))
+            {
+                files.AddRange(BuildSkillAssetFiles(skillName, asset));
+            }
+        }
+
         return files;
     }
 
-    private static string BuildEntryPoint(string adapterDir, AdapterConfig adapter)
-    {
-        var entry = RequiredFileReader.Read(Path.Combine(adapterDir, "entry.md"));
-        var guidance = """
-                       IDD is installed as native plugins. Do not copy plugin skills into the user project.
-
-                       Use `idd-project-init` as the only project initialization workflow. It creates `.idd/intent`
-                       and minimal plugin declarations. Product intent remains in `.idd/intent`.
-                       """;
-        var entryPoint = ContentNormalizer.NormalizeContent(ContentNormalizer.JoinBlocks(entry, guidance));
-        EntryPointSizeGuard.Guard(adapter.EntryPoint, entryPoint);
-        return entryPoint;
-    }
+    protected abstract string BuildSkillFrontMatter(
+        string skillName,
+        SkillDescription skillDescription,
+        AdapterConfig adapter);
 
     private static JsonArray JsonStringArray(IEnumerable<string> values)
     {
@@ -171,7 +135,7 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         return assets;
     }
 
-    private static string DisplayName(string pluginName) =>
+    protected static string DisplayName(string pluginName) =>
         pluginName switch
         {
             "idd-core" => "IDD Core",
@@ -179,7 +143,7 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
             _ => pluginName
         };
 
-    private static IReadOnlyList<GeneratedFile> BuildAssetFiles(AssetDefinition asset)
+    protected virtual IReadOnlyList<GeneratedFile> BuildAssetFiles(AssetDefinition asset)
     {
         var source = asset.Source.Replace('/', Path.DirectorySeparatorChar);
         if (File.Exists(source))
@@ -193,12 +157,49 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
             .ToArray();
     }
 
+    private static IReadOnlyList<GeneratedFile> BuildSkillAssetFiles(string skillName, AssetDefinition asset)
+    {
+        var source = asset.Source.Replace('/', Path.DirectorySeparatorChar);
+        if (File.Exists(source))
+        {
+            return [BuildSkillAssetFile(skillName, source, Path.GetFileName(source), asset.Destination)];
+        }
+
+        return Directory.GetFiles(source, "*", SearchOption.AllDirectories)
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .Select(path => BuildSkillAssetFile(skillName, path, Path.GetRelativePath(source, path), asset.Destination))
+            .ToArray();
+    }
+
+    private static GeneratedFile BuildSkillAssetFile(
+        string skillName,
+        string sourceFile,
+        string relativeSourceFile,
+        string destination)
+    {
+        var normalizedDestination = destination.Replace('\\', '/').Trim('/');
+        var relativePath = Path.Combine(
+            "skills",
+            skillName,
+            "assets",
+            "bootstrap",
+            normalizedDestination,
+            relativeSourceFile);
+        return new GeneratedFile(relativePath, ContentNormalizer.NormalizeContent(File.ReadAllText(sourceFile)));
+    }
+
     private static GeneratedFile BuildAssetFile(string sourceFile, string relativeSourceFile, string destination)
     {
         var normalizedDestination = destination is "." or ""
             ? ""
             : destination.Replace('\\', '/').Trim('/');
+        relativeSourceFile = NormalizeAssetFileName(relativeSourceFile);
         var relativePath = Path.Combine("assets", "bootstrap", normalizedDestination, relativeSourceFile);
         return new GeneratedFile(relativePath, ContentNormalizer.NormalizeContent(File.ReadAllText(sourceFile)));
     }
+
+    private static string NormalizeAssetFileName(string relativeSourceFile) =>
+        StringComparer.Ordinal.Equals(relativeSourceFile, "gitignore.template")
+            ? ".gitignore"
+            : relativeSourceFile;
 }

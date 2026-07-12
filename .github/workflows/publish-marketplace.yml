@@ -11,40 +11,90 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout
+      - name: Checkout tag commit
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
 
-      - name: Extract version from tag
-        id: extract_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Build generator
-        run: dotnet build tools/generate/Generate.csproj --nologo
-
-      - name: Generate native marketplaces
-        run: dotnet exec tools/generate/bin/Debug/net10.0/Generate.dll --version ${{ steps.extract_version.outputs.VERSION }}
-
-      - name: Validate native marketplaces
-        run: pwsh ./scripts/Check.ps1
-
-      - name: Publish marketplace branch
+      - name: Extract and validate version
+        id: version
+        shell: pwsh
         run: |
+          $tag = "${env:GITHUB_REF_NAME}"
+          $version = (Get-Content -Raw VERSION).Trim()
+          if ($tag -ne "v$version") {
+            throw "Release tag '$tag' must equal 'v' + VERSION ('v$version')."
+          }
+          "VERSION=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Run full check
+        shell: pwsh
+        run: pwsh ./scripts/Check.ps1 -Version "${{ steps.version.outputs.VERSION }}"
+
+      - name: Validate Claude native plugin layout
+        shell: pwsh
+        run: |
+          if (Get-Command claude -ErrorAction SilentlyContinue) {
+            claude plugin validate artifacts/marketplace
+            claude plugin validate artifacts/marketplace/plugins/claude/idd-core
+            claude plugin validate artifacts/marketplace/plugins/claude/idd-factory
+          } else {
+            Write-Host "Claude CLI is not available in CI; structural smoke tests already ran. Run documented Claude validation before release."
+          }
+
+      - name: Validate required publish paths
+        shell: pwsh
+        run: |
+          $required = @(
+            "artifacts/marketplace/.claude-plugin/marketplace.json",
+            "artifacts/marketplace/.agents/plugins/marketplace.json",
+            "artifacts/marketplace/plugins/claude/idd-core",
+            "artifacts/marketplace/plugins/claude/idd-factory",
+            "artifacts/marketplace/plugins/codex/idd-core",
+            "artifacts/marketplace/plugins/codex/idd-factory"
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path)) {
+              throw "Missing required publish path: $path"
+            }
+          }
+
+      - name: Build publish root
+        shell: bash
+        run: |
+          rm -rf /tmp/idd-marketplace
           mkdir -p /tmp/idd-marketplace
           cp -R artifacts/marketplace/. /tmp/idd-marketplace/
-          git fetch origin marketplace || true
-          git switch --orphan marketplace
-          git rm -rf .
-          cp -R /tmp/idd-marketplace/. .
+          cp README.md /tmp/idd-marketplace/README.md
+          cp VERSION /tmp/idd-marketplace/VERSION
+
+      - name: Publish marketplace branch
+        shell: bash
+        run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin marketplace || true
+          if git show-ref --verify --quiet refs/remotes/origin/marketplace; then
+            git switch -C marketplace origin/marketplace
+            find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          else
+            git switch --orphan marketplace
+            git rm -rf . || true
+          fi
+          cp -R /tmp/idd-marketplace/. .
           git add .
-          git commit -m "Publish IDD marketplace ${{ steps.extract_version.outputs.VERSION }}"
-          git push --force origin marketplace
+          if git diff --cached --quiet; then
+            echo "Marketplace branch already contains this version."
+          else
+            git commit -m "Publish IDD marketplace ${{ steps.version.outputs.VERSION }}"
+            git push origin marketplace
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

@@ -1,3 +1,7 @@
+param(
+    [string] $Version
+)
+
 $ErrorActionPreference = "Stop"
 
 $repoRoot = & git rev-parse --show-toplevel
@@ -6,6 +10,10 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Set-Location $repoRoot
+
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $Version = (Get-Content -Raw -LiteralPath (Join-Path $repoRoot "VERSION")).Trim()
+}
 
 function Invoke-CheckedNative {
     param(
@@ -24,15 +32,15 @@ function Invoke-CheckedNative {
 Invoke-CheckedNative dotnet build tools/generate/Generate.csproj --nologo
 Invoke-CheckedNative dotnet build tools/smoke-tests/SmokeTests.csproj --nologo
 
-Invoke-CheckedNative dotnet exec tools/generate/bin/Debug/net10.0/Generate.dll
-if (-not (Test-Path -LiteralPath (Join-Path $repoRoot "artifacts/marketplace/codex/marketplace.json"))) {
+Invoke-CheckedNative dotnet exec tools/generate/bin/Debug/net10.0/Generate.dll --version $Version
+if (-not (Test-Path -LiteralPath (Join-Path $repoRoot "artifacts/marketplace/.agents/plugins/marketplace.json"))) {
     throw "Generator did not create Codex marketplace."
 }
-if (-not (Test-Path -LiteralPath (Join-Path $repoRoot "artifacts/marketplace/claude/marketplace.json"))) {
+if (-not (Test-Path -LiteralPath (Join-Path $repoRoot "artifacts/marketplace/.claude-plugin/marketplace.json"))) {
     throw "Generator did not create Claude marketplace."
 }
 
-Invoke-CheckedNative dotnet exec tools/generate/bin/Debug/net10.0/Generate.dll --check
-Invoke-CheckedNative dotnet exec tools/smoke-tests/bin/Debug/net10.0/SmokeTests.dll
+Invoke-CheckedNative dotnet exec tools/generate/bin/Debug/net10.0/Generate.dll --check --version $Version
+Invoke-CheckedNative dotnet exec tools/smoke-tests/bin/Debug/net10.0/SmokeTests.dll --version $Version
 
 Write-Host "Check completed."

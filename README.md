@@ -6,74 +6,90 @@
 
 > Delete the implementation. Keep only the intent. Can a CodingAgent rebuild the product?
 
-Intent-Driven Development is a plugin marketplace source for Claude Code and Codex. It keeps durable product intent in `.idd/intent/` and delivers the workflows as native agent plugins.
+Intent-Driven Development is published as a native plugin marketplace for Claude Code and Codex. Durable product intent lives in `.idd/intent/`; plugin skills stay in the agent plugin cache and are not copied into projects.
 
-The repository is the canonical source for methodology, skills, plugin metadata, adapters, and marketplace publication.
+## Plugins
 
-## What IDD Is
+`idd-core` provides the durable intent workflows and `idd-project-init`.
 
-IDD treats specifications and ADRs as durable product memory. Tasks, plans, PR notes, chat summaries, and local implementation notes are temporary work, not product truth.
+`idd-factory` provides temporary implementation orchestration. Install `idd-core` first; the dependency is recorded in canonical IDD metadata and in the documentation because the Claude plugin manifest does not add unsupported dependency fields.
 
-The plugin model is:
+## Install in Claude Code
 
-```text
-Canonical methodology
-        |
-        v
-Canonical skills
-        |
-        v
-Canonical plugin model
-        |
-        v
-IPlatformAdapter
-        |
-        +-- Claude native plugin
-        +-- Codex native plugin
+```bash
+git clone --branch marketplace --single-branch https://github.com/DimonSmart/Intent-Driven-Development.git idd-marketplace
+claude plugin marketplace add ./idd-marketplace --scope user
+claude plugin list --available --json
+claude plugin install idd-core@intent-driven-development
+claude plugin install idd-factory@intent-driven-development
 ```
 
-There are two logical plugins:
+## Install in Codex
 
-```text
-idd-core
-idd-factory
+```bash
+codex plugin marketplace add DimonSmart/Intent-Driven-Development --ref marketplace
+codex plugin list --available --json
+codex plugin add idd-core@intent-driven-development
+codex plugin add idd-factory@intent-driven-development
 ```
 
-`idd-core` owns durable intent workflows and the `idd-project-init` entry point. `idd-factory` depends on `idd-core` and provides temporary execution orchestration. Factory work never becomes product intent.
+## Initialize a Project
 
-## User Workflow
-
-Users connect the IDD marketplace for their Coding Agent, install `idd-core`, optionally install `idd-factory`, then run:
+In the target repository, invoke the installed skill:
 
 ```text
 idd-project-init
 ```
 
-The project receives only durable IDD state:
+It creates only project-owned IDD files:
 
 ```text
 .idd/intent/
 .idd/plugins.json
 ```
 
-Skills remain inside the agent plugin cache. They are not copied into user repositories.
+`.idd/plugins.json` is a declaration for people and IDD workflows. It does not install plugins.
 
-## Repository Shape
+## Publish a Release
 
-```text
-src/canonical/              canonical methodology, skills, assets, and plugins
-src/canonical/plugins/      canonical plugin model
-src/adapters/claude/        Claude adapter input
-src/adapters/codex/         Codex adapter input
-tools/generate/             marketplace generator
-tools/smoke-tests/          marketplace validation
-artifacts/marketplace/      local generated output, ignored by git
+`VERSION` is the only release version source. A release tag must equal `v` + `VERSION`.
+
+```powershell
+pwsh ./scripts/Check.ps1
+git tag v$(Get-Content VERSION)
+git push origin v$(Get-Content VERSION)
 ```
 
-## Start Here
+The publish workflow validates the tag, generates `artifacts/marketplace`, checks Claude and Codex structure, and publishes the `marketplace` branch with:
 
-- [Getting Started](docs/getting-started.md) - connect a marketplace, install plugins, and initialize project intent.
-- [Methodology](docs/methodology.md) - understand durable product intent and temporary work.
-- [Project Maintenance](docs/project-maintenance.md) - maintain canonical source, adapters, generation, and marketplace publication.
+```text
+.claude-plugin/marketplace.json
+.agents/plugins/marketplace.json
+plugins/claude/idd-core
+plugins/claude/idd-factory
+plugins/codex/idd-core
+plugins/codex/idd-factory
+README.md
+VERSION
+```
 
-The engineer still owns the result. IDD keeps the product memory clear enough for humans and Coding Agents to use it.
+## Verify Installation
+
+```bash
+claude plugin validate artifacts/marketplace
+claude plugin validate artifacts/marketplace/plugins/claude/idd-core
+claude plugin validate artifacts/marketplace/plugins/claude/idd-factory
+codex plugin list --available --json
+```
+
+For repository changes, run:
+
+```powershell
+pwsh ./scripts/Check.ps1
+```
+
+## Documentation
+
+- [Getting Started](https://github.com/DimonSmart/Intent-Driven-Development/blob/main/docs/getting-started.md)
+- [Methodology](https://github.com/DimonSmart/Intent-Driven-Development/blob/main/docs/methodology.md)
+- [Project Maintenance](https://github.com/DimonSmart/Intent-Driven-Development/blob/main/docs/project-maintenance.md)

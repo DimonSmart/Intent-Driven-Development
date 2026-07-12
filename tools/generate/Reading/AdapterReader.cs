@@ -21,7 +21,6 @@ internal sealed class AdapterReader
             rawConfig.EntryPoint,
             rawConfig.SkillsRoot,
             rawConfig.SupportsSkills,
-            rawConfig.SupportsFrontMatter,
             rawConfig.SupportsSkills && rawConfig.SupportsManualOnlySkills);
     }
 }

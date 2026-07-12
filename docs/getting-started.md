@@ -1,31 +1,55 @@
 # Getting Started
 
-Intent-Driven Development is installed through native Coding Agent plugins.
+Intent-Driven Development is installed through native Claude Code or Codex plugins.
 
-Supported platforms:
+## Install in Claude Code
 
-```text
-Claude
-Codex
+Add the marketplace branch as a Git marketplace root:
+
+```bash
+git clone --branch marketplace --single-branch https://github.com/DimonSmart/Intent-Driven-Development.git idd-marketplace
+claude plugin marketplace add ./idd-marketplace --scope user
 ```
 
-## Install
+Verify that the marketplace exposes `idd-core` and `idd-factory`:
 
-Connect the IDD marketplace for your Coding Agent, then install:
-
-```text
-idd-core
+```bash
+claude plugin list --available --json
 ```
 
-Install this only when you want temporary multi-step execution orchestration:
+Install the plugins:
 
-```text
-idd-factory
+```bash
+claude plugin install idd-core@intent-driven-development
+claude plugin install idd-factory@intent-driven-development
 ```
 
-`idd-factory` depends on `idd-core`.
+Install `idd-factory` only when you want temporary multi-step implementation orchestration.
 
-## Initialize A Project
+## Install in Codex
+
+Add the marketplace branch:
+
+```bash
+codex plugin marketplace add DimonSmart/Intent-Driven-Development --ref marketplace
+```
+
+Verify available plugins:
+
+```bash
+codex plugin list --available --json
+```
+
+Install the plugins:
+
+```bash
+codex plugin add idd-core@intent-driven-development
+codex plugin add idd-factory@intent-driven-development
+```
+
+Install `idd-core` before `idd-factory`.
+
+## Initialize a Project
 
 In the target repository, invoke:
 
@@ -33,46 +57,112 @@ In the target repository, invoke:
 idd-project-init
 ```
 
-This creates the durable project-owned IDD state:
+The skill reads packaged bootstrap files from its own `assets/bootstrap/.idd/intent/` resources and creates missing project-owned files:
 
 ```text
-.idd/
 .idd/intent/
 .idd/plugins.json
 ```
 
-It also creates minimal bootstrap intent documents under `.idd/intent/`.
+It never replaces existing files without explicit approval, never copies skills into the project, and never creates `.claude/skills` or `.agents/skills`.
 
-## What Is Not Created
+`.idd/plugins.json` is a project-level IDD declaration for people and IDD workflows. It does not install plugins.
 
-IDD plugins do not copy skills into the project. Skills remain in the native plugin cache of the Coding Agent.
+## Verify Installation
 
-## Product Intent
+Claude:
 
-Project product intent lives in:
-
-```text
-.idd/intent/
+```bash
+claude plugin list --json
+claude plugin validate artifacts/marketplace
+claude plugin validate artifacts/marketplace/plugins/claude/idd-core
+claude plugin validate artifacts/marketplace/plugins/claude/idd-factory
 ```
 
-Keep durable product behavior, accepted architecture decisions, constraints, and verification rules there. Keep temporary plans, tasks, implementation status, PR notes, and chat summaries elsewhere.
+Codex:
 
-## Factory
-
-Factory workflows are temporary orchestration. When enabled, temporary Factory state belongs under:
-
-```text
-.idd/factory/
+```bash
+codex plugin marketplace list
+codex plugin list --available --json
+codex plugin list --json
 ```
 
-Factory never creates or owns Product Intent. If current intent is missing or insufficient, route to an intent workflow before implementation.
+## Update Plugins
 
-## Local Repository Checks
+Claude:
 
-When changing this repository itself, run:
+```bash
+claude plugin marketplace update intent-driven-development
+claude plugin update idd-core
+claude plugin update idd-factory
+```
+
+Codex:
+
+```bash
+codex plugin marketplace upgrade
+codex plugin remove idd-core
+codex plugin remove idd-factory
+codex plugin add idd-core@intent-driven-development
+codex plugin add idd-factory@intent-driven-development
+```
+
+## Remove Marketplace
+
+Claude:
+
+```bash
+claude plugin uninstall idd-factory
+claude plugin uninstall idd-core
+claude plugin marketplace remove intent-driven-development
+```
+
+Codex:
+
+```bash
+codex plugin remove idd-factory
+codex plugin remove idd-core
+codex plugin marketplace remove intent-driven-development
+```
+
+## Publish a Release
+
+`VERSION` is the only release version source. The pushed release tag must match `v` + `VERSION` exactly.
 
 ```powershell
-.\scripts\Check.ps1
+pwsh ./scripts/Check.ps1
+$version = (Get-Content -Raw VERSION).Trim()
+git tag "v$version"
+git push origin "v$version"
 ```
 
-The check builds the generator, generates Claude and Codex marketplaces, validates plugin shape, and verifies reproducibility.
+The workflow runs:
+
+```powershell
+pwsh ./scripts/Check.ps1 -Version <tag-version>
+```
+
+It publishes the `marketplace` branch only after required native entry paths exist and validators pass or the documented manual Claude validation gate is used.
+
+## Troubleshooting
+
+If Claude cannot find the marketplace, run:
+
+```bash
+claude plugin marketplace list
+claude plugin marketplace update intent-driven-development
+```
+
+If Codex cannot find plugins, run:
+
+```bash
+codex plugin marketplace list
+codex plugin marketplace upgrade
+codex plugin list --available --json
+```
+
+If validation fails locally, regenerate and check:
+
+```powershell
+pwsh ./scripts/Check.ps1
+```
