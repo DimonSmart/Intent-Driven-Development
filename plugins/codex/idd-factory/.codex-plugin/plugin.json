@@ -1,6 +1,6 @@
 {
   "name": "idd-factory",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "Temporary implementation orchestration for IDD.",
   "skills": "./skills/",
   "author": {

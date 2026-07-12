@@ -52,11 +52,11 @@ It creates only project-owned IDD files:
 
 ## Publish a Release
 
-The release tag is the only release version source. `publish-current-version.bat`
+The release tag is the only release version source. `publish-next-version.bat`
 increments the latest `vMAJOR.MINOR.PATCH` tag and publishes the next patch tag.
 
 ```bat
-publish-current-version.bat
+publish-next-version.bat
 ```
 
 The publish workflow validates the tag, generates `artifacts/marketplace`, checks Claude and Codex structure, and publishes the `marketplace` branch with:
