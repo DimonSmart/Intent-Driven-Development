@@ -52,12 +52,11 @@ It creates only project-owned IDD files:
 
 ## Publish a Release
 
-`VERSION` is the only release version source. A release tag must equal `v` + `VERSION`.
+The release tag is the only release version source. `publish-current-version.bat`
+increments the latest `vMAJOR.MINOR.PATCH` tag and publishes the next patch tag.
 
-```powershell
-pwsh ./scripts/Check.ps1
-git tag v$(Get-Content VERSION)
-git push origin v$(Get-Content VERSION)
+```bat
+publish-current-version.bat
 ```
 
 The publish workflow validates the tag, generates `artifacts/marketplace`, checks Claude and Codex structure, and publishes the `marketplace` branch with:
@@ -70,7 +69,6 @@ plugins/claude/idd-factory
 plugins/codex/idd-core
 plugins/codex/idd-factory
 README.md
-VERSION
 ```
 
 ## Verify Installation

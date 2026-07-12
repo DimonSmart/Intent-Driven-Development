@@ -23,7 +23,7 @@ idd-factory
 ## Repository Layout
 
 ```text
-VERSION                   shared marketplace plugin version
+release tag               shared marketplace plugin version
 src/canonical/            canonical methodology, project intent assets, skills, and plugins
 src/canonical/plugins/    canonical plugin model
 src/canonical/skills/     platform-neutral skill bodies and metadata

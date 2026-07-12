@@ -127,13 +127,12 @@ codex plugin marketplace remove intent-driven-development
 
 ## Publish a Release
 
-`VERSION` is the only release version source. The pushed release tag must match `v` + `VERSION` exactly.
+The release tag is the only release version source. The tag must use
+`vMAJOR.MINOR.PATCH` format.
 
 ```powershell
 pwsh ./scripts/Check.ps1
-$version = (Get-Content -Raw VERSION).Trim()
-git tag "v$version"
-git push origin "v$version"
+./publish-current-version.bat
 ```
 
 The workflow runs:

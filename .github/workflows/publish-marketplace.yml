@@ -21,15 +21,15 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Extract and validate version
+      - name: Extract version from tag
         id: version
         shell: pwsh
         run: |
           $tag = "${env:GITHUB_REF_NAME}"
-          $version = (Get-Content -Raw VERSION).Trim()
-          if ($tag -ne "v$version") {
-            throw "Release tag '$tag' must equal 'v' + VERSION ('v$version')."
+          if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
+            throw "Release tag '$tag' must use vMAJOR.MINOR.PATCH format."
           }
+          $version = $Matches.version
           "VERSION=$version" >> $env:GITHUB_OUTPUT
 
       - name: Run full check
@@ -71,7 +71,6 @@ jobs:
           mkdir -p /tmp/idd-marketplace
           cp -R artifacts/marketplace/. /tmp/idd-marketplace/
           cp README.md /tmp/idd-marketplace/README.md
-          cp VERSION /tmp/idd-marketplace/VERSION
 
       - name: Publish marketplace branch
         shell: bash

@@ -463,7 +463,7 @@ static string FindRepoRoot()
 static string ParseVersion(string[] args)
 {
     var repoRoot = FindRepoRoot();
-    var version = File.ReadAllText(Path.Combine(repoRoot, "VERSION")).Trim();
+    string? version = null;
     for (var index = 0; index < args.Length; index++)
     {
         if (!StringComparer.Ordinal.Equals(args[index], "--version"))
@@ -477,6 +477,11 @@ static string ParseVersion(string[] args)
         }
 
         version = args[++index];
+    }
+
+    if (string.IsNullOrWhiteSpace(version))
+    {
+        throw new InvalidOperationException("Missing required --version MAJOR.MINOR.PATCH option.");
     }
 
     return version;

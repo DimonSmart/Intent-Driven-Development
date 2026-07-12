@@ -12,7 +12,12 @@ if ($LASTEXITCODE -ne 0) {
 Set-Location $repoRoot
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
-    $Version = (Get-Content -Raw -LiteralPath (Join-Path $repoRoot "VERSION")).Trim()
+    $tag = (& git describe --tags --abbrev=0).Trim()
+    if ($LASTEXITCODE -ne 0 -or $tag -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
+        throw "Pass -Version MAJOR.MINOR.PATCH or create a vMAJOR.MINOR.PATCH tag."
+    }
+
+    $Version = $Matches.version
 }
 
 function Invoke-CheckedNative {

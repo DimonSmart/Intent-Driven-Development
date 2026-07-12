@@ -3,9 +3,7 @@ internal static class GeneratorOptionsParser
     public static GeneratorOptions Parse(string[] args)
     {
         var checkOnly = false;
-        var manifestVersion = File.Exists("VERSION")
-            ? File.ReadAllText("VERSION").Trim()
-            : "0.0.0-local";
+        string? manifestVersion = null;
 
         for (var index = 0; index < args.Length; index++)
         {
@@ -22,7 +20,7 @@ internal static class GeneratorOptionsParser
                 {
                     Console.Error.WriteLine("Missing value for --version.");
                     Environment.ExitCode = 1;
-                    return new GeneratorOptions(checkOnly, manifestVersion);
+                    return new GeneratorOptions(checkOnly, "");
                 }
 
                 manifestVersion = args[++index];
@@ -31,7 +29,14 @@ internal static class GeneratorOptionsParser
 
             Console.Error.WriteLine($"Unknown option: {arg}");
             Environment.ExitCode = 1;
-            return new GeneratorOptions(checkOnly, manifestVersion);
+            return new GeneratorOptions(checkOnly, "");
+        }
+
+        if (string.IsNullOrWhiteSpace(manifestVersion))
+        {
+            Console.Error.WriteLine("Missing required --version MAJOR.MINOR.PATCH option.");
+            Environment.ExitCode = 1;
+            return new GeneratorOptions(checkOnly, "");
         }
 
         return new GeneratorOptions(checkOnly, manifestVersion);

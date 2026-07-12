@@ -62,13 +62,9 @@ else {
     $version = "$($firstVersionMatch.Groups["major"].Value).$($firstVersionMatch.Groups["minor"].Value).$($firstVersionMatch.Groups["patch"].Value)"
 }
 
-Set-Content -LiteralPath VERSION -Value $version -NoNewline
 $tag = "v$version"
 
-Invoke-Git -Arguments @("add", "VERSION")
-Invoke-Git -Arguments @("commit", "-m", "Release $version")
 Invoke-Git -Arguments @("tag", "-a", $tag, "-m", "Release $version")
-Invoke-Git -Arguments @("push", $Remote, $Branch)
 Invoke-Git -Arguments @("push", $Remote, $tag)
 
 Write-Host "Published '$tag' from '$Branch' to '$Remote'."
