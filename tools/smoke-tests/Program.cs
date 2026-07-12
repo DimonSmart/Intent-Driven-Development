@@ -240,7 +240,7 @@ void PublishedLayoutSmokeTests()
 
 void NativeValidatorSmokeTests()
 {
-    if (RunProcess("claude", "--version") != 0)
+    if (!IsCommandAvailable("claude"))
     {
         Console.WriteLine("Claude CLI not available; skipping native validator smoke tests.");
         return;
@@ -406,6 +406,19 @@ string ReadFrontMatter(string path)
 
 bool ContainsYamlKey(string frontMatter, string key) =>
     frontMatter.Split('\n').Any(line => line.TrimStart().StartsWith($"{key}:", StringComparison.Ordinal));
+
+bool IsCommandAvailable(string command)
+{
+    var path = Environment.GetEnvironmentVariable("PATH") ?? "";
+    var extensions = OperatingSystem.IsWindows()
+        ? (Environment.GetEnvironmentVariable("PATHEXT") ?? ".EXE;.CMD;.BAT")
+            .Split(';', StringSplitOptions.RemoveEmptyEntries)
+        : [""];
+
+    return path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+        .SelectMany(directory => extensions.Select(extension => Path.Combine(directory, command + extension)))
+        .Any(File.Exists);
+}
 
 int RunProcess(string fileName, string arguments)
 {
