@@ -28,8 +28,13 @@ internal static class ClaudeMarketplaceBuilder
             {
                 ["name"] = "DimonSmart"
             },
-            ["description"] = "Intent-Driven Development plugins for Claude Code.",
+            ["description"] = "Intent-Driven Development for Claude Code.",
             ["version"] = version,
+            ["renames"] = new JsonObject
+            {
+                ["idd-core"] = "idd",
+                ["idd-factory"] = "idd"
+            },
             ["plugins"] = plugins
         };
 
