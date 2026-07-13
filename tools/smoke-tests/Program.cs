@@ -54,26 +54,28 @@ void ClaudeMarketplaceSmokeTests()
     ExpectString(marketplace.RootElement, "name", "intent-driven-development", "Claude marketplace name");
     ExpectString(marketplace.RootElement.GetProperty("owner"), "name", "DimonSmart", "Claude marketplace owner.name");
     ExpectString(marketplace.RootElement, "version", version, "Claude marketplace version");
+    var renames = marketplace.RootElement.GetProperty("renames");
+    ExpectString(renames, "idd-core", "idd", "Claude marketplace idd-core migration");
+    ExpectString(renames, "idd-factory", "idd", "Claude marketplace idd-factory migration");
 
     var plugins = marketplace.RootElement.GetProperty("plugins").EnumerateArray().ToArray();
     ExpectPluginCount(plugins, "Claude marketplace");
-    foreach (var plugin in plugins)
+    var plugin = plugins.Single();
+    if (plugin.TryGetProperty("policy", out _))
     {
-        var pluginName = plugin.GetProperty("name").GetString() ?? "";
-        if (plugin.TryGetProperty("policy", out _))
-        {
-            failures.Add($"Claude marketplace plugin {pluginName} contains Codex-only policy.");
-        }
-
-        if (plugin.GetProperty("source").ValueKind != JsonValueKind.String)
-        {
-            failures.Add($"Claude marketplace plugin {pluginName} source is not a local string path.");
-            continue;
-        }
-
-        ExpectString(plugin, "version", version, $"Claude marketplace {pluginName} version");
-        ExpectExistingMarketplacePath(plugin.GetProperty("source").GetString(), $"Claude marketplace {pluginName} source");
+        failures.Add("Claude marketplace plugin contains Codex-only policy.");
     }
+
+    if (plugin.GetProperty("source").ValueKind != JsonValueKind.String)
+    {
+        failures.Add("Claude marketplace plugin source is not a local string path.");
+    }
+    else
+    {
+        ExpectExistingMarketplacePath(plugin.GetProperty("source").GetString(), "Claude marketplace plugin source");
+    }
+
+    ExpectString(plugin, "version", version, "Claude marketplace plugin version");
 }
 
 void CodexMarketplaceSmokeTests()
@@ -81,68 +83,105 @@ void CodexMarketplaceSmokeTests()
     var marketplacePath = Path.Combine(marketplaceRoot, ".agents", "plugins", "marketplace.json");
     ExpectFile(marketplacePath);
     using var marketplace = ReadJson(marketplacePath);
-    ExpectString(marketplace.RootElement.GetProperty("interface"), "displayName", "Intent-Driven Development", "Codex marketplace interface.displayName");
+    ExpectString(
+        marketplace.RootElement.GetProperty("interface"),
+        "displayName",
+        "Intent-Driven Development",
+        "Codex marketplace interface.displayName");
 
     var plugins = marketplace.RootElement.GetProperty("plugins").EnumerateArray().ToArray();
     ExpectPluginCount(plugins, "Codex marketplace");
-    foreach (var plugin in plugins)
+    var plugin = plugins.Single();
+    var source = plugin.GetProperty("source");
+    ExpectString(source, "source", "local", "Codex marketplace plugin source.source");
+
+    var sourcePath = source.GetProperty("path").GetString() ?? "";
+    if (!sourcePath.StartsWith("./", StringComparison.Ordinal))
     {
-        var pluginName = plugin.GetProperty("name").GetString() ?? "";
-        var source = plugin.GetProperty("source");
-        ExpectString(source, "source", "local", $"Codex marketplace {pluginName} source.source");
-        var sourcePath = source.GetProperty("path").GetString() ?? "";
-        if (!sourcePath.StartsWith("./", StringComparison.Ordinal))
-        {
-            failures.Add($"Codex marketplace {pluginName} source.path does not start with ./.");
-        }
-
-        ExpectExistingMarketplacePath(sourcePath, $"Codex marketplace {pluginName} source.path");
-        if (!plugin.TryGetProperty("policy", out var policy))
-        {
-            failures.Add($"Codex marketplace plugin {pluginName} is missing policy.");
-            continue;
-        }
-
-        ExpectString(policy, "installation", "AVAILABLE", $"Codex marketplace {pluginName} policy.installation");
-        ExpectString(policy, "authentication", "ON_INSTALL", $"Codex marketplace {pluginName} policy.authentication");
+        failures.Add("Codex marketplace plugin source.path does not start with ./.");
     }
+
+    ExpectExistingMarketplacePath(sourcePath, "Codex marketplace plugin source.path");
+
+    if (!plugin.TryGetProperty("policy", out var policy))
+    {
+        failures.Add("Codex marketplace plugin is missing policy.");
+        return;
+    }
+
+    ExpectString(policy, "installation", "AVAILABLE", "Codex marketplace plugin policy.installation");
+    ExpectString(policy, "authentication", "ON_INSTALL", "Codex marketplace plugin policy.authentication");
 }
 
 void ClaudePluginSmokeTests()
 {
-    foreach (var pluginName in new[] { "idd-core", "idd-factory" })
+    var root = Path.Combine(marketplaceRoot, "plugins", "claude", "idd");
+    ExpectDirectory(root);
+    var manifestPath = Path.Combine(root, ".claude-plugin", "plugin.json");
+    ExpectFile(manifestPath);
+    using var manifest = ReadJson(manifestPath);
+    ExpectString(manifest.RootElement, "name", "idd", "Claude plugin manifest name");
+    ExpectString(manifest.RootElement, "version", version, "Claude plugin manifest version");
+    ExpectMissing(Path.Combine(root, "CLAUDE.md"));
+
+    foreach (var field in new[] { "skills", "interface", "capabilities", "defaultPrompt" })
     {
-        var root = Path.Combine(marketplaceRoot, "plugins", "claude", pluginName);
-        ExpectDirectory(root);
-        var manifestPath = Path.Combine(root, ".claude-plugin", "plugin.json");
-        ExpectFile(manifestPath);
-        using var manifest = ReadJson(manifestPath);
-        ExpectString(manifest.RootElement, "name", pluginName, $"Claude {pluginName} manifest name");
-        ExpectString(manifest.RootElement, "version", version, $"Claude {pluginName} manifest version");
-        ExpectMissing(Path.Combine(root, "CLAUDE.md"));
-        foreach (var field in new[] { "skills", "interface", "capabilities", "defaultPrompt" })
+        if (manifest.RootElement.TryGetProperty(field, out _))
         {
-            if (manifest.RootElement.TryGetProperty(field, out _))
-            {
-                failures.Add($"Claude {pluginName} manifest contains unsupported field {field}.");
-            }
+            failures.Add($"Claude plugin manifest contains unsupported field {field}.");
         }
     }
+
+    ExpectIntentAndFactorySkills(root, "Claude");
 }
 
 void CodexPluginSmokeTests()
 {
-    foreach (var pluginName in new[] { "idd-core", "idd-factory" })
+    var root = Path.Combine(marketplaceRoot, "plugins", "codex", "idd");
+    ExpectDirectory(root);
+    var manifestPath = Path.Combine(root, ".codex-plugin", "plugin.json");
+    ExpectFile(manifestPath);
+    using var manifest = ReadJson(manifestPath);
+    ExpectString(manifest.RootElement, "name", "idd", "Codex plugin manifest name");
+    ExpectString(manifest.RootElement, "version", version, "Codex plugin manifest version");
+    ExpectString(manifest.RootElement, "skills", "./skills/", "Codex plugin skills path");
+    ExpectString(
+        manifest.RootElement.GetProperty("interface"),
+        "displayName",
+        "Intent-Driven Development",
+        "Codex plugin interface.displayName");
+    ExpectMissing(Path.Combine(root, "AGENTS.md"));
+
+    ExpectIntentAndFactorySkills(root, "Codex");
+}
+
+void ExpectIntentAndFactorySkills(string pluginRoot, string platform)
+{
+    foreach (var skillName in new[]
     {
-        var root = Path.Combine(marketplaceRoot, "plugins", "codex", pluginName);
-        ExpectDirectory(root);
-        var manifestPath = Path.Combine(root, ".codex-plugin", "plugin.json");
-        ExpectFile(manifestPath);
-        using var manifest = ReadJson(manifestPath);
-        ExpectString(manifest.RootElement, "name", pluginName, $"Codex {pluginName} manifest name");
-        ExpectString(manifest.RootElement, "version", version, $"Codex {pluginName} manifest version");
-        ExpectString(manifest.RootElement, "skills", "./skills/", $"Codex {pluginName} skills path");
-        ExpectMissing(Path.Combine(root, "AGENTS.md"));
+        "idd-project-init",
+        "idd-intent-change",
+        "idd-code-implement",
+        "idd-factory-create-work-plan",
+        "idd-factory-execute-work-plan",
+        "idd-factory-finish-work"
+    })
+    {
+        ExpectFile(Path.Combine(pluginRoot, "skills", skillName, "SKILL.md"));
+    }
+
+    var roleReference = Path.Combine(
+        pluginRoot,
+        "skills",
+        "idd-factory-execute-work-plan",
+        "references",
+        "roles",
+        "implementer.md");
+    ExpectFile(roleReference);
+
+    if (!File.Exists(roleReference))
+    {
+        failures.Add($"{platform} plugin does not package Factory role references.");
     }
 }
 
@@ -150,16 +189,38 @@ void SkillPolicySmokeTests()
 {
     foreach (var skillName in new[] { "idd-skip", "idd-project-init" })
     {
-        var claudeSkill = Path.Combine(marketplaceRoot, "plugins", "claude", "idd-core", "skills", skillName, "SKILL.md");
+        var claudeSkill = Path.Combine(
+            marketplaceRoot,
+            "plugins",
+            "claude",
+            "idd",
+            "skills",
+            skillName,
+            "SKILL.md");
         ExpectFile(claudeSkill);
         var claudeText = File.Exists(claudeSkill) ? File.ReadAllText(claudeSkill) : "";
         ExpectContains(claudeText, "disable-model-invocation: true", $"Claude {skillName} manual policy");
         ExpectContains(claudeText, "user-invocable: true", $"Claude {skillName} user invocable policy");
 
-        var codexSkill = Path.Combine(marketplaceRoot, "plugins", "codex", "idd-core", "skills", skillName, "SKILL.md");
+        var codexSkill = Path.Combine(
+            marketplaceRoot,
+            "plugins",
+            "codex",
+            "idd",
+            "skills",
+            skillName,
+            "SKILL.md");
         ExpectFile(codexSkill);
         var codexText = File.Exists(codexSkill) ? ReadFrontMatter(codexSkill) : "";
-        foreach (var field in new[] { "disable-model-invocation", "user-invocable", "context", "agent", "allowed-tools", "argument-hint" })
+        foreach (var field in new[]
+        {
+            "disable-model-invocation",
+            "user-invocable",
+            "context",
+            "agent",
+            "allowed-tools",
+            "argument-hint"
+        })
         {
             if (ContainsYamlKey(codexText, field))
             {
@@ -167,15 +228,37 @@ void SkillPolicySmokeTests()
             }
         }
 
-        var codexPolicy = Path.Combine(marketplaceRoot, "plugins", "codex", "idd-core", "skills", skillName, "agents", "openai.yaml");
+        var codexPolicy = Path.Combine(
+            marketplaceRoot,
+            "plugins",
+            "codex",
+            "idd",
+            "skills",
+            skillName,
+            "agents",
+            "openai.yaml");
         ExpectFile(codexPolicy);
-        ExpectContains(File.Exists(codexPolicy) ? File.ReadAllText(codexPolicy) : "", "allow_implicit_invocation: false", $"Codex {skillName} manual policy");
+        ExpectContains(
+            File.Exists(codexPolicy) ? File.ReadAllText(codexPolicy) : "",
+            "allow_implicit_invocation: false",
+            $"Codex {skillName} manual policy");
     }
 
-    foreach (var skillPath in Directory.GetFiles(Path.Combine(marketplaceRoot, "plugins", "codex"), "SKILL.md", SearchOption.AllDirectories))
+    foreach (var skillPath in Directory.GetFiles(
+                 Path.Combine(marketplaceRoot, "plugins", "codex"),
+                 "SKILL.md",
+                 SearchOption.AllDirectories))
     {
         var text = ReadFrontMatter(skillPath);
-        foreach (var field in new[] { "disable-model-invocation", "user-invocable", "context", "agent", "allowed-tools", "argument-hint" })
+        foreach (var field in new[]
+        {
+            "disable-model-invocation",
+            "user-invocable",
+            "context",
+            "agent",
+            "allowed-tools",
+            "argument-hint"
+        })
         {
             if (ContainsYamlKey(text, field))
             {
@@ -188,7 +271,7 @@ void SkillPolicySmokeTests()
         marketplaceRoot,
         "plugins",
         "codex",
-        "idd-core",
+        "idd",
         "skills",
         "idd-project-init",
         "assets",
@@ -217,10 +300,8 @@ void PublishedLayoutSmokeTests()
     {
         ".claude-plugin/marketplace.json",
         ".agents/plugins/marketplace.json",
-        "plugins/claude/idd-core",
-        "plugins/claude/idd-factory",
-        "plugins/codex/idd-core",
-        "plugins/codex/idd-factory"
+        "plugins/claude/idd",
+        "plugins/codex/idd"
     })
     {
         var fullPath = Path.Combine(marketplaceRoot, path.Replace('/', Path.DirectorySeparatorChar));
@@ -232,6 +313,17 @@ void PublishedLayoutSmokeTests()
         {
             ExpectDirectory(fullPath);
         }
+    }
+
+    foreach (var legacyPath in new[]
+    {
+        "plugins/claude/idd-core",
+        "plugins/claude/idd-factory",
+        "plugins/codex/idd-core",
+        "plugins/codex/idd-factory"
+    })
+    {
+        ExpectMissing(Path.Combine(marketplaceRoot, legacyPath.Replace('/', Path.DirectorySeparatorChar)));
     }
 
     ExpectMissing(Path.Combine(marketplaceRoot, "claude", "marketplace.json"));
@@ -249,8 +341,7 @@ void NativeValidatorSmokeTests()
     foreach (var path in new[]
     {
         marketplaceRoot,
-        Path.Combine(marketplaceRoot, "plugins", "claude", "idd-core"),
-        Path.Combine(marketplaceRoot, "plugins", "claude", "idd-factory")
+        Path.Combine(marketplaceRoot, "plugins", "claude", "idd")
     })
     {
         if (RunProcess("claude", $"plugin validate \"{path}\"") != 0)
@@ -282,11 +373,21 @@ void ExpectSecondRunStable()
 void ExpectNoText(params string[] forbidden)
 {
     var files = Directory.GetFiles(repoRoot, "*", SearchOption.AllDirectories)
-        .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}.git{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-        .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-        .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-        .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}artifacts{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-        .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}tools{Path.DirectorySeparatorChar}smoke-tests{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+        .Where(path => !path.Contains(
+            $"{Path.DirectorySeparatorChar}.git{Path.DirectorySeparatorChar}",
+            StringComparison.Ordinal))
+        .Where(path => !path.Contains(
+            $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
+            StringComparison.Ordinal))
+        .Where(path => !path.Contains(
+            $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
+            StringComparison.Ordinal))
+        .Where(path => !path.Contains(
+            $"{Path.DirectorySeparatorChar}artifacts{Path.DirectorySeparatorChar}",
+            StringComparison.Ordinal))
+        .Where(path => !path.Contains(
+            $"{Path.DirectorySeparatorChar}tools{Path.DirectorySeparatorChar}smoke-tests{Path.DirectorySeparatorChar}",
+            StringComparison.Ordinal))
         .Where(path => Path.GetExtension(path) is ".md" or ".json" or ".yml" or ".ps1" or ".cs" or ".csproj")
         .ToArray();
 
@@ -312,9 +413,9 @@ string[] SnapshotMarketplace() =>
 void ExpectPluginCount(JsonElement[] plugins, string context)
 {
     var names = plugins.Select(plugin => plugin.GetProperty("name").GetString()).ToArray();
-    if (!names.SequenceEqual(["idd-core", "idd-factory"]))
+    if (!names.SequenceEqual(["idd"]))
     {
-        failures.Add($"{context} plugins are not exactly idd-core and idd-factory.");
+        failures.Add($"{context} plugins are not exactly idd.");
     }
 }
 
@@ -326,7 +427,8 @@ void ExpectExistingMarketplacePath(string? relativePath, string context)
         return;
     }
 
-    var fullPath = Path.GetFullPath(Path.Combine(marketplaceRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+    var fullPath = Path.GetFullPath(
+        Path.Combine(marketplaceRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
     if (!fullPath.StartsWith(Path.GetFullPath(marketplaceRoot), StringComparison.OrdinalIgnoreCase))
     {
         failures.Add($"{context} resolves outside marketplace root.");
@@ -462,7 +564,6 @@ static string FindRepoRoot()
 
 static string ParseVersion(string[] args)
 {
-    var repoRoot = FindRepoRoot();
     string? version = null;
     for (var index = 0; index < args.Length; index++)
     {
