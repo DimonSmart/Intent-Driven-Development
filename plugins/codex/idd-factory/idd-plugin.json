@@ -1,7 +1,9 @@
 {
-  "version": "2.0.6",
+  "version": "2.0.7",
   "platform": "codex",
-  "dependencies": [],
+  "dependencies": [
+    "idd-intent"
+  ],
   "roles": [
     "factory-coordinator",
     "implementation-planner",
@@ -10,10 +12,6 @@
     "final-reviewer"
   ],
   "assets": [
-    {
-      "source": "src/canonical/project-files/intent",
-      "destination": ".idd/intent"
-    },
     {
       "source": "src/canonical/project-files/factory",
       "destination": ".idd/factory"

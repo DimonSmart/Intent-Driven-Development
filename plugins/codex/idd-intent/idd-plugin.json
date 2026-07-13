@@ -1,0 +1,13 @@
+{
+  "version": "2.0.7",
+  "platform": "codex",
+  "dependencies": [],
+  "roles": [],
+  "assets": [
+    {
+      "source": "src/canonical/project-files/intent",
+      "destination": ".idd/intent"
+    }
+  ],
+  "canonicalSource": "src/canonical"
+}

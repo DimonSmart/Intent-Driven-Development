@@ -1,8 +1,6 @@
 ---
 name: idd-project-init
 description: Initialize `.idd/intent` and the IDD plugin declaration without copying skills or installing agent-specific files.
-disable-model-invocation: true
-user-invocable: true
 ---
 
 # idd-project-init
@@ -11,7 +9,7 @@ Use this skill as the only official project initialization workflow for Intent-D
 
 ## Purpose
 
-Initialize durable product intent storage for a repository that already has the `idd` plugin installed in the user's Coding Agent.
+Initialize durable product intent storage for a repository that already has the `idd-intent` plugin installed in the user's Coding Agent.
 
 This skill does not copy plugins, copy skills, or create Coding Agent delivery artifacts.
 
@@ -43,17 +41,17 @@ Create minimal bootstrap intent documents when they are missing:
 .idd/intent/_templates/spike.md
 ```
 
-Write `.idd/plugins.json` as a declaration of the required IDD plugin, not as a copy of its implementation:
+Write `.idd/plugins.json` as a declaration of the required product-memory plugin, not as a copy of its implementation:
 
 ```json
 {
   "plugins": [
-    "idd"
+    "idd-intent"
   ]
 }
 ```
 
-Factory workflows are included in the same `idd` plugin. Do not create `.idd/factory` during initialization unless the user explicitly asks to begin Factory work.
+`idd-factory` is a separate optional plugin. Do not add it to `.idd/plugins.json` and do not create `.idd/factory` unless the user explicitly enables Factory workflows.
 
 ## Rules
 
@@ -71,23 +69,30 @@ Factory workflows are included in the same `idd` plugin. Do not create `.idd/fac
 
 When `.idd/intent` already exists, preserve existing documents. Add only missing bootstrap files.
 
-Normalize legacy plugin declarations when found:
+Normalize legacy declarations as follows:
+
+- replace `idd` with `idd-intent`;
+- replace `idd-core` with `idd-intent`;
+- preserve `idd-factory` only when it is already declared or the user explicitly enables it;
+- remove duplicate plugin names.
+
+A project using only durable product memory should contain:
 
 ```json
 {
   "plugins": [
-    "idd-core",
-    "idd-factory"
+    "idd-intent"
   ]
 }
 ```
 
-Replace the legacy declarations with the unified plugin declaration:
+A project that explicitly uses Factory may contain:
 
 ```json
 {
   "plugins": [
-    "idd"
+    "idd-intent",
+    "idd-factory"
   ]
 }
 ```

@@ -1,0 +1,15 @@
+{
+  "name": "idd-intent",
+  "version": "2.0.7",
+  "description": "Durable product memory for Intent-Driven Development.",
+  "skills": "./skills/",
+  "author": {
+    "name": "DimonSmart"
+  },
+  "repository": "https://github.com/DimonSmart/Intent-Driven-Development",
+  "license": "MIT",
+  "interface": {
+    "displayName": "IDD Intent",
+    "shortDescription": "Durable product memory for Intent-Driven Development."
+  }
+}

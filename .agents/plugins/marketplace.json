@@ -5,10 +5,22 @@
   },
   "plugins": [
     {
-      "name": "idd",
+      "name": "idd-intent",
       "source": {
         "source": "local",
-        "path": "./plugins/codex/idd"
+        "path": "./plugins/codex/idd-intent"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "idd-factory",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex/idd-factory"
       },
       "policy": {
         "installation": "AVAILABLE",

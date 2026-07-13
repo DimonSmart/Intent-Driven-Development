@@ -1,0 +1,15 @@
+{
+  "name": "idd-factory",
+  "version": "2.0.7",
+  "description": "Temporary implementation organization for Intent-Driven Development.",
+  "skills": "./skills/",
+  "author": {
+    "name": "DimonSmart"
+  },
+  "repository": "https://github.com/DimonSmart/Intent-Driven-Development",
+  "license": "MIT",
+  "interface": {
+    "displayName": "IDD Factory",
+    "shortDescription": "Temporary implementation organization for Intent-Driven Development."
+  }
+}
