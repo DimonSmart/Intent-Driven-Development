@@ -20,6 +20,17 @@ IDD organizes product knowledge so the answer can move closer to **yes**.
 
 The goal is not to make specifications executable or eliminate engineering judgment. The goal is to preserve enough durable product truth that the implementation can be replaced without losing what the product is supposed to be.
 
+## Two Explicit Plugins
+
+```text
+idd-intent    durable product memory
+idd-factory   temporary implementation organization
+```
+
+`idd-intent` is the standalone core of the methodology. It initializes `.idd/intent/`, maintains current product truth, implements from intent, and verifies implementation against intent.
+
+`idd-factory` is optional. It adds temporary planning, role orchestration, task review, and final review under `.idd/factory/`. Factory consumes intent but must not create product truth. Install `idd-intent` first.
+
 ## Why IDD?
 
 **Keep product truth, not project debris.**  
@@ -34,28 +45,32 @@ Plans, tasks, statuses, reviews, and failed implementation attempts do not becom
 **Let Git own history.**  
 IDD documents describe what is true now. Git records what used to be true.
 
-## How It Works
-
-1. Capture durable product behavior, constraints, decisions, and acceptance criteria.
-2. Let the Coding Agent plan, implement, and review against that intent.
-3. Update intent when the product changes; discard temporary work when it ends.
-
-Product intent lives in `.idd/intent/`. IDD workflows are installed once as a native plugin and are shared across projects.
-
 ## Install
 
 ### Claude Code
 
 ```bash
 claude plugin marketplace add DimonSmart/Intent-Driven-Development@marketplace
-claude plugin install idd@intent-driven-development
+claude plugin install idd-intent@intent-driven-development
+```
+
+Optional Factory:
+
+```bash
+claude plugin install idd-factory@intent-driven-development
 ```
 
 ### Codex
 
 ```bash
 codex plugin marketplace add DimonSmart/Intent-Driven-Development --ref marketplace
-codex plugin add idd@intent-driven-development
+codex plugin add idd-intent@intent-driven-development
+```
+
+Optional Factory:
+
+```bash
+codex plugin add idd-factory@intent-driven-development
 ```
 
 ## Start
@@ -67,6 +82,8 @@ idd-project-init
 ```
 
 Then ask IDD to import an existing product, describe a new one, change current product intent, implement from intent, or verify that the implementation still matches it.
+
+Factory is deliberately absent from the default installation. Add it only when the implementation needs explicit multi-step planning and review orchestration.
 
 ## Learn More
 
