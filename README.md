@@ -1,7 +1,7 @@
 # Intent-Driven Development
 
 <p align="center">
-  <img src="docs/assets/idd-hero.svg" alt="Intent-Driven Development thought experiment: delete the implementation, keep only the intent, and rebuild the product" />
+  <img src="docs/assets/idd-hero.png" alt="Intent-Driven Development thought experiment: delete the implementation, keep only the intent, and rebuild the product" />
 </p>
 
 <p align="center">
