@@ -1,0 +1,15 @@
+{
+  "name": "idd",
+  "version": "2.0.6",
+  "description": "Durable product intent and temporary implementation workflows for Claude Code and Codex.",
+  "skills": "./skills/",
+  "author": {
+    "name": "DimonSmart"
+  },
+  "repository": "https://github.com/DimonSmart/Intent-Driven-Development",
+  "license": "MIT",
+  "interface": {
+    "displayName": "Intent-Driven Development",
+    "shortDescription": "Durable product intent and temporary implementation workflows for Claude Code and Codex."
+  }
+}

@@ -3,23 +3,18 @@
   "owner": {
     "name": "DimonSmart"
   },
-  "description": "Intent-Driven Development plugins for Claude Code.",
-  "version": "2.0.5",
+  "description": "Intent-Driven Development for Claude Code.",
+  "version": "2.0.6",
+  "renames": {
+    "idd-core": "idd",
+    "idd-factory": "idd"
+  },
   "plugins": [
     {
-      "name": "idd-core",
-      "source": "./plugins/claude/idd-core",
-      "description": "Core Intent-Driven Development workflows.",
-      "version": "2.0.5",
-      "author": {
-        "name": "DimonSmart"
-      }
-    },
-    {
-      "name": "idd-factory",
-      "source": "./plugins/claude/idd-factory",
-      "description": "Temporary implementation orchestration for IDD.",
-      "version": "2.0.5",
+      "name": "idd",
+      "source": "./plugins/claude/idd",
+      "description": "Durable product intent and temporary implementation workflows for Claude Code and Codex.",
+      "version": "2.0.6",
       "author": {
         "name": "DimonSmart"
       }
