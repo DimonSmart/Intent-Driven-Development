@@ -1,6 +1,6 @@
 {
   "idd-project-init": {
-    "description": "Initialize `.idd/intent` and IDD plugin declarations without copying skills or installing agent-specific files.",
+    "description": "Initialize `.idd/intent` and the IDD plugin declaration without copying skills or installing agent-specific files.",
     "invocation": "manual"
   },
   "idd-intent-audit": {
