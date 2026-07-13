@@ -16,6 +16,10 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
         PluginDefinition plugin,
         string version)
     {
+        var displayName = StringComparer.Ordinal.Equals(pluginName, "idd")
+            ? "Intent-Driven Development"
+            : DisplayName(pluginName);
+
         var pluginJson = new JsonObject
         {
             ["name"] = pluginName,
@@ -30,7 +34,7 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
             ["license"] = "MIT",
             ["interface"] = new JsonObject
             {
-                ["displayName"] = DisplayName(pluginName),
+                ["displayName"] = displayName,
                 ["shortDescription"] = plugin.Description
             }
         };
