@@ -41,8 +41,7 @@ jobs:
         run: |
           if (Get-Command claude -ErrorAction SilentlyContinue) {
             claude plugin validate artifacts/marketplace
-            claude plugin validate artifacts/marketplace/plugins/claude/idd-core
-            claude plugin validate artifacts/marketplace/plugins/claude/idd-factory
+            claude plugin validate artifacts/marketplace/plugins/claude/idd
           } else {
             Write-Host "Claude CLI is not available in CI; structural smoke tests already ran. Run documented Claude validation before release."
           }
@@ -53,10 +52,8 @@ jobs:
           $required = @(
             "artifacts/marketplace/.claude-plugin/marketplace.json",
             "artifacts/marketplace/.agents/plugins/marketplace.json",
-            "artifacts/marketplace/plugins/claude/idd-core",
-            "artifacts/marketplace/plugins/claude/idd-factory",
-            "artifacts/marketplace/plugins/codex/idd-core",
-            "artifacts/marketplace/plugins/codex/idd-factory"
+            "artifacts/marketplace/plugins/claude/idd",
+            "artifacts/marketplace/plugins/codex/idd"
           )
           foreach ($path in $required) {
             if (-not (Test-Path -LiteralPath $path)) {
