@@ -16,9 +16,12 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
         PluginDefinition plugin,
         string version)
     {
-        var displayName = StringComparer.Ordinal.Equals(pluginName, "idd")
-            ? "Intent-Driven Development"
-            : DisplayName(pluginName);
+        var displayName = pluginName switch
+        {
+            "idd-intent" => "IDD Intent",
+            "idd-factory" => "IDD Factory",
+            _ => DisplayName(pluginName)
+        };
 
         var pluginJson = new JsonObject
         {

@@ -5,7 +5,14 @@ Intent-Driven Development separates two kinds of work:
 - durable product intent that must survive implementation changes;
 - temporary work used to produce or verify one implementation.
 
-The `idd` plugin provides workflows for both while keeping the boundary explicit.
+The plugin boundary mirrors that lifecycle:
+
+```text
+idd-intent    durable product memory
+idd-factory   temporary implementation organization
+```
+
+Install `idd-intent` for the normal IDD workflow. Install `idd-factory` only when a change needs explicit multi-step orchestration.
 
 ## Start a New Product Area
 
@@ -95,7 +102,7 @@ idd-intent-normalize-current
 
 ## Use Factory for Larger Work
 
-Factory coordinates temporary planning, implementation, and review:
+First install the optional `idd-factory` plugin. It depends on `idd-intent` and coordinates temporary planning, implementation, and review:
 
 ```text
 idd-factory-create-work-plan
@@ -106,7 +113,9 @@ idd-factory-finish-work
 
 Use Factory when the implementation requires an explicit multi-step plan or multiple review stages. Factory may consume product intent, but it must not invent or silently modify it.
 
-When Factory discovers missing or contradictory intent, it should stop and route the work back to an intent workflow.
+When Factory discovers missing or contradictory intent, it must stop and route the work back to an `idd-intent` workflow.
+
+Factory state belongs under `.idd/factory/` and should be removed when the work is finished. It is not product memory.
 
 ## Skip IDD Deliberately
 
@@ -116,7 +125,7 @@ For a request that must be performed without IDD routing or durable intent chang
 idd-skip
 ```
 
-This is an explicit escape hatch, not the default workflow.
+This escape hatch is provided by `idd-intent`. It is explicit, not the default workflow.
 
 ## What Belongs in Intent
 

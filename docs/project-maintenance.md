@@ -6,18 +6,16 @@ This page is for contributors and release maintainers. User-facing installation 
 
 IDD publishes native plugin marketplaces for Claude Code and Codex.
 
-The public product is one plugin:
+The public product has two explicit plugins:
 
 ```text
-idd
+idd-intent    durable product memory
+idd-factory   temporary implementation organization
 ```
 
-The plugin packages two methodological groups of workflows:
+`idd-intent` is standalone and is the default installation. `idd-factory` depends on `idd-intent` and is installed only when temporary multi-step orchestration is needed.
 
-- durable intent workflows;
-- temporary Factory orchestration workflows.
-
-The groups remain separated in canonical source and behavior, but they are distributed as one product so users do not manage internal implementation modules.
+The split is part of the product contract, not an internal packaging detail. Durable product truth and temporary execution state must remain independently installable and independently owned.
 
 ## Repository Layout
 
@@ -38,17 +36,25 @@ scripts/Check.ps1         local validation entry point
 
 ## Canonical Model
 
-`src/canonical/plugins/plugin-manifest.json` defines the public `idd` plugin and owns:
+`src/canonical/plugins/plugin-manifest.json` defines both public plugins and owns:
 
 ```text
 skills
 roles
+dependencies
 role references
 bootstrap assets
 metadata
 ```
 
 Canonical skills must remain platform-neutral. Adapter-specific behavior belongs in adapter configuration or skill metadata under the relevant adapter key.
+
+Ownership rules:
+
+- `idd-intent` owns initialization, intent workflows, code-to-intent workflows, and `.idd/intent` bootstrap assets;
+- `idd-factory` owns Factory workflows, Factory roles, role references, and `.idd/factory` assets;
+- Factory depends on Intent;
+- Intent must not depend on Factory.
 
 ## Adapters
 
@@ -65,11 +71,13 @@ The generated marketplace layout is:
 ```text
 .claude-plugin/marketplace.json
 .agents/plugins/marketplace.json
-plugins/claude/idd
-plugins/codex/idd
+plugins/claude/idd-intent
+plugins/claude/idd-factory
+plugins/codex/idd-intent
+plugins/codex/idd-factory
 ```
 
-Claude marketplace rename metadata maps the legacy `idd-core` and `idd-factory` plugin names to `idd`.
+Claude marketplace rename metadata maps the legacy `idd-core` and unified `idd` names to `idd-intent`. `idd-factory` keeps its existing public name.
 
 ## Local Validation
 
@@ -93,7 +101,8 @@ When Claude CLI is available, also validate:
 
 ```bash
 claude plugin validate artifacts/marketplace
-claude plugin validate artifacts/marketplace/plugins/claude/idd
+claude plugin validate artifacts/marketplace/plugins/claude/idd-intent
+claude plugin validate artifacts/marketplace/plugins/claude/idd-factory
 ```
 
 ## Publication
@@ -114,8 +123,8 @@ The workflow:
 ```text
 Checkout
 Build Generator
-Generate Claude Plugin
-Generate Codex Plugin
+Generate Claude Plugins
+Generate Codex Plugins
 Validate Claude
 Validate Codex
 Run Smoke Tests
@@ -127,8 +136,9 @@ The `marketplace` branch contains only ready-to-consume marketplace output and t
 
 ## Rules
 
-- Publish one user-facing plugin named `idd`.
-- Keep intent and Factory responsibilities separate inside the canonical model.
+- Publish exactly `idd-intent` and `idd-factory`.
+- Keep `idd-intent` usable without Factory.
+- Keep Factory dependent on Intent, never the reverse.
 - Do not add a supported platform without a new adapter and an explicit canonical model update.
 - Do not put generated marketplace output in `main`.
 - Do not copy skills into user projects.

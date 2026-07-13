@@ -20,4 +20,18 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Run check
-        run: pwsh ./scripts/Check.ps1 -Version 0.0.0
+        id: check
+        shell: pwsh
+        run: |
+          & pwsh ./scripts/Check.ps1 -Version 0.0.0 *> check.log
+          $exitCode = $LASTEXITCODE
+          Get-Content check.log
+          exit $exitCode
+
+      - name: Upload failed check log
+        if: failure() && steps.check.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-check-log
+          path: check.log
+          if-no-files-found: error
