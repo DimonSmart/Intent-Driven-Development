@@ -87,18 +87,25 @@ ADRs are the exception because they record durable decisions. When a decision ch
 
 Resolved spikes should be removed after their durable outcome is captured in a specification or ADR, unless the research itself remains active.
 
-## One Product Plugin, Two Kinds of Workflow
+## Two Plugins, One Boundary
 
-IDD is distributed as one native plugin named `idd`.
+IDD is distributed as two explicit native plugins:
 
-The plugin contains:
+```text
+idd-intent    durable product memory
+idd-factory   temporary implementation organization
+```
 
-- intent workflows that create and maintain durable product memory;
-- Factory workflows that coordinate temporary planning, implementation, and review.
+`idd-intent` owns the durable side of the methodology. It initializes and maintains `.idd/intent/`, imports or changes current product truth, implements from intent, and checks implementation against intent.
 
-This is an internal methodological boundary, not two products the user must install separately.
+`idd-factory` owns temporary execution orchestration. It creates plans, coordinates roles, tracks implementation work, performs task and final reviews, and cleans up temporary Factory state under `.idd/factory/`.
 
-Factory may consume intent, but it must not create product truth. When Factory discovers missing, contradictory, or insufficient intent, it must stop and route the work to an intent workflow.
+The separation is visible to the user because the responsibilities have different lifecycles:
+
+- `idd-intent` is the normal standalone installation;
+- `idd-factory` is optional and depends on `idd-intent`;
+- Factory may read intent but must not create or silently modify product truth;
+- when Factory discovers missing, contradictory, or insufficient intent, it must stop and route the work to an `idd-intent` workflow.
 
 ## How IDD Differs from Broad Spec-Driven Workflows
 
@@ -116,4 +123,4 @@ IDD does not attempt to preserve every step that led to the product. It preserve
 
 ## Summary
 
-The specification is product memory. The implementation is replaceable. Plans and statuses are temporary. Git owns history. Coding Agents may change, but durable product intent remains the stable source of truth.
+`idd-intent` preserves product memory. `idd-factory` organizes temporary implementation work. The implementation is replaceable, plans and statuses are temporary, and Git owns history.
