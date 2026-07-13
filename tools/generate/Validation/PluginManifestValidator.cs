@@ -16,10 +16,9 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
 
         foreach (var (pluginName, plugin) in manifest.Plugins)
         {
-            if (!StringComparer.Ordinal.Equals(pluginName, "idd") &&
-                !pluginName.StartsWith("idd-", StringComparison.Ordinal))
+            if (!pluginName.StartsWith("idd-", StringComparison.Ordinal))
             {
-                throw new InvalidOperationException($"Plugin '{pluginName}' must be named 'idd' or use the idd-* naming scheme.");
+                throw new InvalidOperationException($"Plugin '{pluginName}' must use the idd-* naming scheme.");
             }
 
             foreach (var dependency in plugin.Dependencies)
