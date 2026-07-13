@@ -1,7 +1,7 @@
 {
   "plugins": {
-    "idd-core": {
-      "description": "Core Intent-Driven Development workflows.",
+    "idd": {
+      "description": "Durable product intent and temporary implementation workflows for Claude Code and Codex.",
       "dependencies": [],
       "skills": [
         "idd-project-init",
@@ -15,26 +15,7 @@
         "idd-intent-new-document",
         "idd-intent-normalize-current",
         "idd-code-check-implementation",
-        "idd-code-update-intent"
-      ],
-      "roles": [],
-      "skillRoleReferences": {},
-      "assets": [
-        {
-          "source": "src/canonical/project-files/intent",
-          "destination": ".idd/intent"
-        }
-      ],
-      "metadata": {
-        "entryPoint": true
-      }
-    },
-    "idd-factory": {
-      "description": "Temporary implementation orchestration for IDD.",
-      "dependencies": [
-        "idd-core"
-      ],
-      "skills": [
+        "idd-code-update-intent",
         "idd-factory-create-work-plan",
         "idd-factory-execute-work-plan",
         "idd-factory-review-task",
@@ -71,12 +52,16 @@
       },
       "assets": [
         {
+          "source": "src/canonical/project-files/intent",
+          "destination": ".idd/intent"
+        },
+        {
           "source": "src/canonical/project-files/factory",
           "destination": ".idd/factory"
         }
       ],
       "metadata": {
-        "entryPoint": false,
+        "entryPoint": true,
         "temporaryWorkspace": ".idd/factory"
       }
     }

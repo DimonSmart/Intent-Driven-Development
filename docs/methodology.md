@@ -1,37 +1,55 @@
-# Methodology
+# Intent-Driven Development Methodology
 
 Intent-Driven Development keeps product memory separate from temporary work.
 
-The specification is not executable magic. It does not replace architecture, code review, testing, or human responsibility. It is a stable description of what the product should become.
+It is a lightweight, opinionated response to a common failure mode of spec-driven workflows: specifications gradually accumulate plans, statuses, implementation notes, obsolete alternatives, and historical debris until the current product truth is difficult to find.
 
-## Intent
+IDD draws a stricter boundary.
 
-Intent means stable product truth that future implementations must preserve.
-
-A task says what to do next. Intent says what must remain true after the task is done.
-
-Ask:
+## The Thought Experiment
 
 ```text
-If we delete the implementation, can we rebuild the product from these files?
+Delete the implementation.
+Keep only the intent.
+Can a Coding Agent rebuild the product?
 ```
 
-If yes, the specification is useful. If no, it is probably a task list, local note, or chat summary.
+This is a test of the repository's product memory, not a claim that specifications can replace engineering.
 
-## Mental Model
+A useful body of intent should make reconstruction possible in principle while still leaving implementation choices, architecture work, testing, review, and human responsibility to the engineering process.
+
+## Intent Is Current Product Truth
+
+Intent is stable product knowledge that future implementations must preserve.
+
+A task says what to do next. Intent says what must remain true after the task is finished.
+
+Good intent answers questions such as:
+
+- What behavior does the user rely on?
+- What domain rules must hold?
+- Which constraints and non-goals are deliberate?
+- Which architecture decisions are durable?
+- How can the behavior be accepted or verified?
+
+Intent does not need to prescribe every class, command, library, or implementation step.
+
+## Durable and Temporary Knowledge
 
 ```text
 product intent       durable product knowledge
-plugin skills        reusable workflow knowledge
-implementation       code, tests, scripts, and concrete changes
+plugin workflows     reusable methodology knowledge
+implementation       replaceable code, tests, and architecture
 temporary work       plans, tasks, status, reviews, and chat
 ```
 
-Product intent should survive tool changes, agent changes, and implementation attempts.
+Product intent should survive tool changes, agent changes, refactoring, failed implementation attempts, and complete rewrites.
 
-## What Goes Into Intent
+Temporary work exists to complete one change. It should be removable when that work is finished.
 
-Good specification content:
+## What Belongs in Intent
+
+Keep:
 
 ```text
 product behavior
@@ -44,7 +62,7 @@ acceptance criteria
 verification rules
 ```
 
-Temporary content belongs elsewhere:
+Keep elsewhere or discard:
 
 ```text
 tasks
@@ -54,37 +72,48 @@ review notes
 chat summaries
 local scratch files
 agent delivery files
+commands tied only to the current toolchain
 ```
 
-## Document Lifecycle
+## Current Truth, Not Historical Archive
 
-`.idd/intent/` stores current product intent, active ADRs, and active spikes.
+IDD documents describe what is true now.
 
-When product intent evolves inside the same area, update the existing owning document. When an area is replaced, remove the obsolete document and create a new owner.
+When behavior evolves inside an existing product area, update the current owning document. When an area is replaced, remove the obsolete specification and create the new owner when necessary.
 
-ADRs are decision records. If a durable decision changes, mark the old ADR as superseded and create the replacing ADR.
+Git owns history. The intent tree should not reproduce Git through status fields, changelogs inside specifications, or retained obsolete documents.
 
-Resolved spikes should be removed after their outcome is captured in a spec or ADR, unless they remain active research.
+ADRs are the exception because they record durable decisions. When a decision changes, mark the old ADR as superseded and create the replacing ADR.
 
-## Plugin Delivery
+Resolved spikes should be removed after their durable outcome is captured in a specification or ADR, unless the research itself remains active.
 
-IDD workflows are distributed as native plugins. Skills are knowledge artifacts installed in the Coding Agent's plugin cache.
+## One Product Plugin, Two Kinds of Workflow
 
-User projects keep only their product memory and plugin declarations:
+IDD is distributed as one native plugin named `idd`.
 
-```text
-.idd/intent/
-.idd/plugins.json
-```
+The plugin contains:
 
-Agent-specific plugin files are delivery artifacts, not product knowledge.
+- intent workflows that create and maintain durable product memory;
+- Factory workflows that coordinate temporary planning, implementation, and review.
 
-## Factory
+This is an internal methodological boundary, not two products the user must install separately.
 
-Factory is temporary execution orchestration. It may coordinate planning, implementation, review, and finish workflows, but it must not create Product Intent.
+Factory may consume intent, but it must not create product truth. When Factory discovers missing, contradictory, or insufficient intent, it must stop and route the work to an intent workflow.
 
-When Factory discovers missing or insufficient intent, it must stop and route to an intent workflow.
+## How IDD Differs from Broad Spec-Driven Workflows
+
+IDD is still specification-driven in the ordinary sense: implementation follows an explicit product description.
+
+Its distinction is narrower and stricter:
+
+- specifications describe the current product, not the current project;
+- implementation work is disposable by default;
+- Git owns specification history;
+- one current document should own one durable product area;
+- the methodology is tested by the possibility of rebuilding from intent.
+
+IDD does not attempt to preserve every step that led to the product. It preserves what the product must continue to be.
 
 ## Summary
 
-The specification is product memory. Plugins distribute workflow knowledge. Adapters translate canonical workflow knowledge into native agent formats. Temporary work stays disposable.
+The specification is product memory. The implementation is replaceable. Plans and statuses are temporary. Git owns history. Coding Agents may change, but durable product intent remains the stable source of truth.

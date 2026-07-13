@@ -1,53 +1,34 @@
 # Getting Started
 
-Intent-Driven Development is installed through native Claude Code or Codex plugins.
+Intent-Driven Development is distributed as one native plugin named `idd` for Claude Code and Codex.
 
 ## Install in Claude Code
 
-Add the marketplace branch as a Git marketplace root:
+Add the marketplace:
 
 ```bash
-git clone --branch marketplace --single-branch https://github.com/DimonSmart/Intent-Driven-Development.git idd-marketplace
-claude plugin marketplace add ./idd-marketplace --scope user
+claude plugin marketplace add DimonSmart/Intent-Driven-Development@marketplace
 ```
 
-Verify that the marketplace exposes `idd-core` and `idd-factory`:
+Install IDD:
 
 ```bash
-claude plugin list --available --json
+claude plugin install idd@intent-driven-development
 ```
-
-Install the plugins:
-
-```bash
-claude plugin install idd-core@intent-driven-development
-claude plugin install idd-factory@intent-driven-development
-```
-
-Install `idd-factory` only when you want temporary multi-step implementation orchestration.
 
 ## Install in Codex
 
-Add the marketplace branch:
+Add the marketplace:
 
 ```bash
 codex plugin marketplace add DimonSmart/Intent-Driven-Development --ref marketplace
 ```
 
-Verify available plugins:
+Install IDD:
 
 ```bash
-codex plugin list --available --json
+codex plugin add idd@intent-driven-development
 ```
-
-Install the plugins:
-
-```bash
-codex plugin add idd-core@intent-driven-development
-codex plugin add idd-factory@intent-driven-development
-```
-
-Install `idd-core` before `idd-factory`.
 
 ## Initialize a Project
 
@@ -57,102 +38,153 @@ In the target repository, invoke:
 idd-project-init
 ```
 
-The skill reads packaged bootstrap files from its own `assets/bootstrap/.idd/intent/` resources and creates missing project-owned files:
+The skill creates only project-owned IDD state:
 
 ```text
+.idd/
 .idd/intent/
 .idd/plugins.json
 ```
 
-It never replaces existing files without explicit approval, never copies skills into the project, and never creates `.claude/skills` or `.agents/skills`.
+It adds minimal bootstrap intent documents when they are missing. It does not copy plugin skills into the repository and does not create agent-specific skill directories.
 
-`.idd/plugins.json` is a project-level IDD declaration for people and IDD workflows. It does not install plugins.
+`.idd/plugins.json` declares that the project uses the `idd` plugin. It is project metadata for people and IDD workflows; it does not install the plugin.
+
+## Choose a First Workflow
+
+For an existing product:
+
+```text
+idd-intent-import
+```
+
+For a new product area or an unclear request:
+
+```text
+idd-intent-brainstorm
+```
+
+For a requested product change:
+
+```text
+idd-intent-change
+```
+
+To implement current intent:
+
+```text
+idd-code-implement
+```
+
+To check implementation against intent:
+
+```text
+idd-code-check-implementation
+```
+
+For explicit temporary multi-step orchestration:
+
+```text
+idd-factory-create-work-plan
+idd-factory-execute-work-plan
+idd-factory-review-work-result
+idd-factory-finish-work
+```
+
+Factory workflows are included in the same `idd` plugin. Their plans, tasks, reviews, and status are temporary and must not become product intent.
+
+See [Using IDD](using-idd.md) for common workflows and example prompts.
 
 ## Verify Installation
 
-Claude:
+Claude Code:
 
 ```bash
 claude plugin list --json
-claude plugin validate artifacts/marketplace
-claude plugin validate artifacts/marketplace/plugins/claude/idd-core
-claude plugin validate artifacts/marketplace/plugins/claude/idd-factory
 ```
 
 Codex:
 
 ```bash
 codex plugin marketplace list
-codex plugin list --available --json
 codex plugin list --json
 ```
 
-## Update Plugins
+The installed plugin should be named `idd` and come from the `intent-driven-development` marketplace.
 
-Claude:
+## Update
+
+Claude Code:
 
 ```bash
 claude plugin marketplace update intent-driven-development
-claude plugin update idd-core
-claude plugin update idd-factory
+claude plugin update idd
 ```
 
 Codex:
 
 ```bash
 codex plugin marketplace upgrade
-codex plugin remove idd-core
-codex plugin remove idd-factory
-codex plugin add idd-core@intent-driven-development
-codex plugin add idd-factory@intent-driven-development
+codex plugin remove idd
+codex plugin add idd@intent-driven-development
 ```
 
-## Remove Marketplace
+## Migrate from the Split Plugins
 
-Claude:
+Older releases exposed `idd-core` and `idd-factory` separately. The marketplace now publishes one plugin named `idd`.
+
+Claude Code marketplace rename metadata maps both old plugin names to `idd`. When a manual migration is needed, remove the old plugins and install `idd`:
 
 ```bash
 claude plugin uninstall idd-factory
 claude plugin uninstall idd-core
+claude plugin install idd@intent-driven-development
+```
+
+Codex:
+
+```bash
+codex plugin remove idd-factory
+codex plugin remove idd-core
+codex plugin add idd@intent-driven-development
+```
+
+Update project declarations so `.idd/plugins.json` contains:
+
+```json
+{
+  "plugins": [
+    "idd"
+  ]
+}
+```
+
+## Remove
+
+Claude Code:
+
+```bash
+claude plugin uninstall idd
 claude plugin marketplace remove intent-driven-development
 ```
 
 Codex:
 
 ```bash
-codex plugin remove idd-factory
-codex plugin remove idd-core
+codex plugin remove idd
 codex plugin marketplace remove intent-driven-development
 ```
 
-## Publish a Release
-
-The release tag is the only release version source. The tag must use
-`vMAJOR.MINOR.PATCH` format.
-
-```powershell
-pwsh ./scripts/Check.ps1
-./publish-next-version.bat
-```
-
-The workflow runs:
-
-```powershell
-pwsh ./scripts/Check.ps1 -Version <tag-version>
-```
-
-It publishes the `marketplace` branch only after required native entry paths exist and validators pass or the documented manual Claude validation gate is used.
-
 ## Troubleshooting
 
-If Claude cannot find the marketplace, run:
+If Claude Code cannot find IDD:
 
 ```bash
 claude plugin marketplace list
 claude plugin marketplace update intent-driven-development
 ```
 
-If Codex cannot find plugins, run:
+If Codex cannot find IDD:
 
 ```bash
 codex plugin marketplace list
@@ -160,8 +192,4 @@ codex plugin marketplace upgrade
 codex plugin list --available --json
 ```
 
-If validation fails locally, regenerate and check:
-
-```powershell
-pwsh ./scripts/Check.ps1
-```
+For methodology questions, see [Methodology](methodology.md). Repository generation, validation, and release instructions belong in [Project Maintenance](project-maintenance.md).
