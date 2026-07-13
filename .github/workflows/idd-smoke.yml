@@ -20,4 +20,4 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Run check
-        run: pwsh ./scripts/Check.ps1
+        run: pwsh ./scripts/Check.ps1 -Version 0.0.0
