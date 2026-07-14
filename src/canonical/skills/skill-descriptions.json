@@ -34,10 +34,10 @@
     "description": "Clarify real product intent before changing `.idd/intent/`, using focused customer-development questions and simplification options without editing product intent, planning implementation, or writing code."
   },
   "idd-intent-change": {
-    "description": "Update current `.idd/intent/` product intent from a user-requested behavior change, preferring existing specs over new specs."
+    "description": "Update current `.idd/intent/` product intent for add, modify, and remove product operations, preferring existing specs over new specs."
   },
   "idd-code-implement": {
-    "description": "Implement behavior from current `.idd/intent/` product intent and verify the code against the relevant specification."
+    "description": "Implement current product intent or perform a behavior-preserving implementation change, then verify the result against relevant `.idd/intent/` specifications."
   },
   "idd-intent-new-document": {
     "description": "Create a new owning IDD spec, ADR, or spike only when no existing current document owns the area or decision."

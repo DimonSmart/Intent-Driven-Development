@@ -52,24 +52,24 @@ observable behavior change.
 
 ## Workflow
 
-1. Identify the relevant spec and acceptance criteria.
-2. Locate the implementation area.
-3. Locate existing tests for the behavior.
-4. Implement the smallest change that satisfies the spec.
-5. Add or update tests.
-6. Run relevant verification.
-7. Run or recommend focused `idd-code-check-implementation`.
-8. Report:
+1. Classify mode:
 
-   - specs used as intent;
-   - code areas changed;
-   - tests added or updated;
-   - verification result;
-   - remaining risks or missing coverage.
+   - `satisfy-current-intent`;
+   - `preserve-current-intent`.
+
+2. Read relevant current intent.
+3. For preserve mode, establish or accept the preservation boundary.
+4. Locate implementation and verification areas.
+5. Apply the smallest safe implementation change.
+6. Add or update verification.
+7. Run relevant verification.
+8. Run focused `idd-code-check-implementation`.
+9. Report the required implementation result fields.
 
 ## Missing Spec Rule
 
-If the requested behavior is not covered by current specs:
+In `satisfy-current-intent`, if the requested durable behavior is not covered by
+current specs:
 
 ```text
 Stop before implementation and use idd-intent-change.
@@ -77,6 +77,34 @@ Stop before implementation and use idd-intent-change.
 
 Do not silently implement new durable behavior without updating product intent
 first.
+
+In `preserve-current-intent`, a missing specification for private
+implementation structure is not an error. Preserve mode may proceed when current
+intent sufficiently defines the observable behavior and durable contracts that
+must remain unchanged.
+
+If the preservation boundary cannot be determined from the request and current
+intent, stop and route to `idd-code-check-implementation`,
+`idd-intent-brainstorm`, or an intent change workflow instead of making code
+changes.
+
+## Report
+
+Use these fields:
+
+```text
+Mode:
+Specs used as intent:
+Behavior changed:
+Behavior preserved:
+Public contracts preserved:
+Compatibility/data constraints:
+Code areas changed:
+Tests changed:
+Verification result:
+Conformance-check result:
+Remaining risks:
+```
 
 ## Removal Implementation
 

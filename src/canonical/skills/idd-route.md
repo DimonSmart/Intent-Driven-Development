@@ -6,6 +6,19 @@ end-to-end workflow.
 This skill is read-only. It does not change intent, implementation, Factory
 state, or project files.
 
+## Required Reference
+
+Before classifying the request, read:
+
+`references/common-workflows.md`
+
+Treat that document as the canonical source for workflow families, product
+operations, execution-depth selection, preservation boundaries, and completion
+rules.
+
+If the reference is unavailable, report that the installed plugin is incomplete
+and do not reconstruct the full routing model from memory.
+
 ## Inputs
 
 Accept natural-language user requests. The request may include a product area,
@@ -14,7 +27,7 @@ JSON or a special parameter structure.
 
 ## Context Reading Rules
 
-First classify the request from its wording.
+First classify the request from its wording and the required reference.
 
 Read project context only when needed to determine whether a current owner
 exists, product truth changes, the problem is structural, implementation and
@@ -30,7 +43,7 @@ When project context is needed:
 6. Do not perform broad code review.
 7. Do not change files.
 
-## Classification
+## Classification Fields
 
 Return these semantic fields:
 
@@ -49,137 +62,48 @@ Classification:
 - unclear
 ```
 
-For `product-change`, set:
+For `product-change`, set `Operation` to `add`, `modify`, or `remove` according
+to the required reference. For every other classification, set
+`Operation: not-applicable`.
 
-```text
-Operation:
-- add
-- modify
-- remove
-```
+Set `Clarity` to `clear`, `ambiguous`, or `research-required`.
 
-For all other classifications, set:
+Set `Execution depth` to `focused`, `orchestrated`, or `not-applicable`
+according to the required reference.
 
-```text
-Operation: not-applicable
-```
+## First Skill
 
-Set clarity as:
+Use the required reference to select the first skill. This compact table is only
+a handoff index:
 
-```text
-Clarity:
-- clear
-- ambiguous
-- research-required
-```
+| Classification | Recommended first skill |
+| --- | --- |
+| `project-initialization` | `idd-project-init` |
+| `intent-import` | `idd-intent-import` |
+| `product-change` | `idd-intent-change` |
+| `implementation-change` | `idd-code-implement` or Factory |
+| `intent-normalization` | `idd-intent-normalize-current` |
+| `intent-audit` | `idd-intent-audit` |
+| `intent-lint` | `idd-intent-lint` |
+| `implementation-intent-check` | `idd-code-check-implementation` |
+| `implementation-to-intent` | `idd-code-update-intent` |
+| `explicit-skip` | `idd-skip` |
+| `unclear` | `idd-intent-brainstorm` or a spike handoff |
 
-Set execution depth as:
+Never select `idd-skip` automatically. Use it only when the user explicitly
+refuses IDD for the request.
 
-```text
-Execution depth:
-- focused
-- orchestrated
-- not-applicable
-```
+## Handoff Rules
 
-## Execution Depth
+After routing a real request to a write-oriented workflow, continue with the
+recommended skill in the same user request when the Coding Agent can do so.
+Do not require a second user message only to confirm the route.
 
-Choose `focused` when the change has one main product owner, localized
-implementation, no complex migration, no dependent phases, no multiple review
-gates, and can be handled safely by one focused implementation workflow.
+Pass through the original request, classification fields, relevant context, and
+any temporary preservation boundary identified from the required reference.
 
-Choose `orchestrated` when the request involves multiple subsystems, multiple
-independent implementation tasks, data or settings migration, compatibility
-transition, public contract changes, high regression risk, ordered stages,
-multiple roles or review gates, major capability removal, or architecture work
-that cannot be safely executed as one focused change.
-
-Diff size alone is not a sufficient reason to choose Factory.
-
-## Product Change Routing
-
-Treat adding, modifying, and removing behavior as variants of one
-`product-change` workflow:
-
-```text
-idd-intent-change(operation: add|modify|remove)
--> idd-code-implement or Factory
--> idd-code-check-implementation
-```
-
-Do not decide document ownership from the operation alone. `idd-intent-change`
-separately determines whether the outcome is an existing-spec update, new spec,
-ADR, spike, owning spec deletion, or unclear intent.
-
-## Implementation Change Routing
-
-For refactoring, dependency replacement, internal cleanup, private type
-movement, algorithm replacement, performance work, or migration with no
-observable behavior change:
-
-```text
-read relevant intent
--> idd-code-implement(mode: preserve-current-intent) or Factory
--> idd-code-check-implementation
-```
-
-If the request requires product behavior to change, route to
-`idd-intent-change` instead of implementation-only work.
-
-## Intent Maintenance Routing
-
-Use `idd-intent-audit` for broad or unclear structural problems.
-
-Use `idd-intent-normalize-current` for focused normalization that does not
-change product meaning, followed by `idd-intent-lint`.
-
-Use `idd-intent-lint` for mechanical consistency checks.
-
-## Additional Routes
-
-- Project initialization: `idd-project-init`.
-- Import existing product knowledge: `idd-intent-import`.
-- Unclear desired product behavior: `idd-intent-brainstorm`.
-- Possible implementation/spec mismatch: `idd-code-check-implementation`.
-- Confirmed implementation behavior should become intent:
-  `idd-code-update-intent`.
-- Explicit refusal of IDD for this request: `idd-skip`.
-
-Never select `idd-skip` automatically.
-
-## Bug Routing
-
-Route bug reports by implementation relationship to current intent:
-
-- Clear intent and violating implementation: start with
-  `idd-code-check-implementation`.
-- Implementation matches current intent but the user wants different behavior:
-  route to `idd-intent-change(operation: modify)`.
-- Correct intent is unclear: start with `idd-code-check-implementation`, then
-  route to `idd-intent-brainstorm` or a spike.
-
-Bug is not a separate top-level workflow.
-
-## Preservation Boundary
-
-Identify a temporary preservation boundary:
-
-```text
-Behavior expected to change:
-Behavior expected to remain unchanged:
-Public contracts to preserve:
-Compatibility or data constraints:
-Unresolved preservation questions:
-```
-
-Do not invent product truth. If the boundary cannot be determined from current
-intent or the user request, mark it unresolved and choose
-`idd-intent-brainstorm`, `idd-code-check-implementation`, or a spike instead of
-direct implementation.
-
-Do not save the preservation boundary as a standalone `.idd/intent/` document.
-Durable preserved contracts belong in ordinary acceptance criteria,
-constraints, behavior, verification, or non-goals of the owning current spec.
+The route classification is temporary workflow evidence. Do not create route
+files, preservation records, Factory Work Plans, specs, or code from this skill.
 
 ## Output Format
 
@@ -204,18 +128,9 @@ Preservation boundary:
 - Unresolved preservation questions:
 
 Why:
-- Short routing rationale.
+- Short routing rationale grounded in `references/common-workflows.md`.
 
 Handoff:
 - Invoke the recommended first skill with the original request and the
   preservation boundary.
 ```
-
-## Handoff Rules
-
-After routing a real request to a write-oriented workflow, continue with the
-recommended skill in the same user request when the Coding Agent can do so.
-Do not require a second user message only to confirm the route.
-
-The route classification is temporary workflow evidence. Do not create route
-files, preservation records, Factory Work Plans, specs, or code from this skill.

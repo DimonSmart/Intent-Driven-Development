@@ -4,6 +4,9 @@ internal sealed record PluginDefinition(
     string[] Skills,
     string[] Roles,
     Dictionary<string, string[]> SkillRoleReferences,
-    SkillReferenceDefinition[] SkillReferences,
+    SkillReferenceDefinition[]? SkillReferences,
     AssetDefinition[] Assets,
-    Dictionary<string, object>? Metadata);
+    Dictionary<string, object>? Metadata)
+{
+    public IReadOnlyList<SkillReferenceDefinition> SkillReferencesOrEmpty => SkillReferences ?? [];
+}

@@ -15,6 +15,8 @@ CheckPlatformPlugins("claude", ".claude-plugin");
 CheckPlatformPlugins("codex", ".codex-plugin");
 CheckRouteSkill("claude");
 CheckRouteSkill("codex");
+CheckCanonicalManifest();
+CheckCanonicalSkillSemantics();
 CheckManualSkillPolicies();
 CheckPublishedLayout();
 CheckGeneratorCheckMode();
@@ -222,6 +224,10 @@ void CheckIddMetadata(
 
     var root = document.RootElement;
     ExpectString(root, "version", version, $"{platform} {pluginName} metadata version");
+    if (root.TryGetProperty("skillReferences", out _))
+    {
+        failures.Add($"{platform} {pluginName} metadata exposes skillReferences.");
+    }
 
     var dependencies = root.GetProperty("dependencies")
         .EnumerateArray()
@@ -355,6 +361,8 @@ void CheckRouteSkill(string platform)
     if (File.Exists(routeSkill))
     {
         var routeSkillText = File.ReadAllText(routeSkill);
+        ExpectContains(routeSkillText, "references/common-workflows.md", $"{platform} idd-route reference path");
+        ExpectContains(routeSkillText, "canonical source", $"{platform} idd-route canonical reference declaration");
         if (platform == "claude")
         {
             if (routeSkillText.Contains("disable-model-invocation: true", StringComparison.Ordinal))
@@ -379,6 +387,65 @@ void CheckRouteSkill(string platform)
         {
             failures.Add("Codex idd-route disables implicit invocation.");
         }
+    }
+}
+
+void CheckCanonicalManifest()
+{
+    var path = Path.Combine(repoRoot, "src", "canonical", "plugins", "plugin-manifest.json");
+    using var document = ReadJson(path);
+    if (document is null)
+    {
+        return;
+    }
+
+    var factory = document.RootElement
+        .GetProperty("plugins")
+        .GetProperty("idd-factory");
+    if (factory.TryGetProperty("skillReferences", out _))
+    {
+        failures.Add("Canonical idd-factory manifest still declares skillReferences.");
+    }
+}
+
+void CheckCanonicalSkillSemantics()
+{
+    ExpectCanonicalContains(
+        Path.Combine("src", "canonical", "skills", "idd-intent-change.md"),
+        [
+            "not-applicable",
+            "task-only-no-idd-intent-change"
+        ],
+        "canonical idd-intent-change");
+
+    ExpectCanonicalContains(
+        Path.Combine("src", "canonical", "skills", "idd-code-check-implementation.md"),
+        ["current-requirement"],
+        "canonical idd-code-check-implementation");
+
+    ExpectCanonicalContains(
+        Path.Combine("src", "canonical", "skills", "idd-code-implement.md"),
+        [
+            "satisfy-current-intent",
+            "preserve-current-intent",
+            "Mode:"
+        ],
+        "canonical idd-code-implement");
+}
+
+void ExpectCanonicalContains(string relativePath, string[] expectedValues, string context)
+{
+    var path = Path.Combine(repoRoot, relativePath);
+    ExpectFile(path);
+    if (!File.Exists(path))
+    {
+        return;
+    }
+
+    var text = File.ReadAllText(path);
+    foreach (var expected in expectedValues)
+    {
+        ExpectContains(text, expected, $"{context} {expected}");
     }
 }
 

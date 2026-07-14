@@ -1,5 +1,11 @@
+using System.Text;
+
 internal sealed class PluginManifestValidator(RepositoryLayout layout)
 {
+    private static readonly Encoding StrictUtf8 = new UTF8Encoding(
+        encoderShouldEmitUTF8Identifier: false,
+        throwOnInvalidBytes: true);
+
     public void Validate(PluginManifest manifest)
     {
         if (manifest.Plugins.Count == 0)
@@ -78,7 +84,7 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
     {
         var destinationsBySkill = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
 
-        foreach (var reference in plugin.SkillReferences)
+        foreach (var reference in plugin.SkillReferencesOrEmpty)
         {
             if (!plugin.Skills.Contains(reference.Skill, StringComparer.Ordinal))
             {
@@ -99,6 +105,8 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
                     $"Plugin '{pluginName}' references missing skill reference source '{reference.Source}'.");
             }
 
+            ValidateUtf8ReferenceSource(pluginName, reference, source);
+
             var destination = NormalizeSkillReferenceDestination(pluginName, reference);
             if (!destinationsBySkill.TryGetValue(reference.Skill, out var destinations))
             {
@@ -116,6 +124,11 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
 
     private string ResolveRepositoryPath(string source)
     {
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            throw new InvalidOperationException("Skill reference source is empty.");
+        }
+
         var fullPath = Path.GetFullPath(Path.Combine(
             layout.RepoRoot,
             source.Replace('/', Path.DirectorySeparatorChar)));
@@ -123,15 +136,35 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
         var repoRootWithSeparator = repoRoot.EndsWith(Path.DirectorySeparatorChar)
             ? repoRoot
             : repoRoot + Path.DirectorySeparatorChar;
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
 
-        if (!fullPath.StartsWith(repoRootWithSeparator, StringComparison.OrdinalIgnoreCase) &&
-            !StringComparer.OrdinalIgnoreCase.Equals(fullPath, repoRoot))
+        if (!fullPath.StartsWith(repoRootWithSeparator, comparison) &&
+            !string.Equals(fullPath, repoRoot, comparison))
         {
             throw new InvalidOperationException(
                 $"Skill reference source '{source}' resolves outside the repository root.");
         }
 
         return fullPath;
+    }
+
+    private static void ValidateUtf8ReferenceSource(
+        string pluginName,
+        SkillReferenceDefinition reference,
+        string source)
+    {
+        try
+        {
+            _ = File.ReadAllText(source, StrictUtf8);
+        }
+        catch (DecoderFallbackException exception)
+        {
+            throw new InvalidOperationException(
+                $"Plugin '{pluginName}' skill '{reference.Skill}' reference source '{reference.Source}' is not valid UTF-8 text.",
+                exception);
+        }
     }
 
     private static string NormalizeSkillReferenceDestination(
@@ -144,15 +177,15 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
                 $"Plugin '{pluginName}' has an empty skill reference destination for skill '{reference.Skill}'.");
         }
 
-        if (Path.IsPathRooted(reference.Destination))
+        var normalized = reference.Destination.Replace('\\', '/');
+
+        if (IsAbsoluteReferenceDestination(normalized))
         {
             throw new InvalidOperationException(
                 $"Plugin '{pluginName}' has absolute skill reference destination '{reference.Destination}'.");
         }
 
-        var segments = reference.Destination
-            .Replace('\\', '/')
-            .Split('/', StringSplitOptions.None);
+        var segments = normalized.Split('/', StringSplitOptions.None);
 
         if (segments.Any(string.IsNullOrWhiteSpace))
         {
@@ -174,4 +207,20 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
 
         return string.Join('/', segments);
     }
+
+    private static bool IsAbsoluteReferenceDestination(string destination)
+    {
+        if (destination.StartsWith("/", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return destination.Length >= 3 &&
+            IsAsciiLetter(destination[0]) &&
+            destination[1] == ':' &&
+            destination[2] == '/';
+    }
+
+    private static bool IsAsciiLetter(char value) =>
+        value is >= 'A' and <= 'Z' or >= 'a' and <= 'z';
 }

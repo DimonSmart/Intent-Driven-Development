@@ -71,11 +71,17 @@ Classify the requested product operation as one of:
 add
 modify
 remove
+not-applicable
 ```
 
 This operation is separate from document ownership. Adding behavior can update
 an existing spec. Removing behavior can update part of a spec or delete the
 whole owning spec only when that document has no remaining current intent.
+
+Use `not-applicable` only when the ownership outcome is
+`task-only-no-idd-intent-change`. Do not assign a fake `add`, `modify`, or
+`remove` operation to a local implementation task that does not change product
+truth.
 
 ## Classification
 
@@ -111,6 +117,15 @@ Use `task-only-no-idd-intent-change` when the request is only a local refactor,
 cleanup, dependency update, or implementation detail that does not change
 durable product intent.
 
+For `task-only-no-idd-intent-change`:
+
+1. Do not change `.idd/intent`.
+2. Report that the request is not a product change.
+3. Recommend `idd-code-implement(mode: preserve-current-intent)` for focused
+   work.
+4. Recommend Factory for orchestrated work.
+5. Do not force the request into `add`, `modify`, or `remove`.
+
 ## Removal Rules
 
 For `operation: remove`:
@@ -136,14 +151,16 @@ For `operation: remove`:
 4. Read only relevant current numbered specs.
 5. Classify the operation.
 6. Classify the ownership outcome.
-7. If an existing spec owns the area, update that spec instead of creating a
+7. If the ownership outcome is `task-only-no-idd-intent-change`, stop without
+   editing `.idd/intent` and report the implementation-work recommendation.
+8. If an existing spec owns the area, update that spec instead of creating a
    duplicate.
-8. If `new-spec-required`, `adr-required`, or `spike-required`, prepare a
+9. If `new-spec-required`, `adr-required`, or `spike-required`, prepare a
    semantic handoff and invoke `idd-intent-new-document`; do not create the
    document locally.
-9. If the change affects behavior, update acceptance criteria.
-10. If the change affects testable behavior, update verification.
-11. Report:
+10. If the change affects behavior, update acceptance criteria.
+11. If the change affects testable behavior, update verification.
+12. Report:
 
     - operation;
     - ownership outcome;

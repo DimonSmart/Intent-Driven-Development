@@ -128,10 +128,14 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
 
    Also assign an evidence scope:
 
+   - `current-requirement`;
    - `changed-requirement`;
    - `preserved-requirement`;
    - `removed-behavior`;
    - `compatibility-boundary`.
+
+   Use `current-requirement` for ordinary checks against current intent when no
+   specific change context is provided.
 
 7. For each mismatch, cite the relevant spec section or explain that no current
    spec covers the behavior.
@@ -172,7 +176,7 @@ Current specs and sections used as normative intent.
 
 Classification: `implementation-mismatch | missing-verification | missing-spec | unclear-intent | possible-intent-change | matches-spec | non-goal-or-out-of-scope`
 
-Scope: `changed-requirement | preserved-requirement | removed-behavior | compatibility-boundary`
+Scope: `current-requirement | changed-requirement | preserved-requirement | removed-behavior | compatibility-boundary`
 
 Evidence:
 - Spec evidence:
@@ -192,6 +196,26 @@ Recommended next step:
 ```
 
 ## Classification Rules
+
+## Evidence Scope Rules
+
+Use `current-requirement` for an ordinary check of current intent that is not
+tied to a specific change.
+
+Use `changed-requirement` for a requirement changed by the current work.
+
+Use `preserved-requirement` for a requirement from a preservation boundary.
+
+Use `removed-behavior` to verify behavior that should no longer exist.
+
+Use `compatibility-boundary` for migration, legacy data, or compatibility
+contracts.
+
+When no change context is provided, use:
+
+```text
+Scope: current-requirement
+```
 
 ### `matches-spec`
 

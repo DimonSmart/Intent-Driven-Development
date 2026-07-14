@@ -69,7 +69,7 @@ Diff size alone is not enough to choose Factory.
 - Current numbered documents directly under `.idd/intent/` are normative
   product intent.
 - Git stores history.
-- Add, modify, and remove are product truth changes.
+- Add, modify, and remove apply only to product truth changes.
 - Implementation-only refactoring does not change product truth.
 - Intent normalization does not change product meaning.
 - Implementation evidence is not product intent by itself.
@@ -198,5 +198,10 @@ intent. Product changes complete after intent is updated, implementation is
 performed when requested, and `idd-code-check-implementation` verifies changed,
 removed, and preserved behavior. Implementation-only work completes after
 verification proves current intent was preserved. Normalization completes after
-semantic movement is checked and `idd-intent-lint` passes or reports remaining
-issues.
+semantic movement is checked and `idd-intent-lint` passes.
+
+If `idd-intent-lint` reports errors, the normalization workflow is not complete.
+Fix the errors or report them explicitly as unresolved blockers. Do not present
+normalization as completed while mechanical consistency errors remain. Warnings
+may remain only when they do not indicate mechanical inconsistency and are
+explicitly reflected in the report.

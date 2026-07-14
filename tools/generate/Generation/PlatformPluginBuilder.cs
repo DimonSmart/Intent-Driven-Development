@@ -54,7 +54,6 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
             ["dependencies"] = JsonStringArray(plugin.Dependencies),
             ["roles"] = JsonStringArray(plugin.Roles),
             ["assets"] = BuildAssets(plugin),
-            ["skillReferences"] = BuildSkillReferences(plugin),
             ["canonicalSource"] = "src/canonical"
         };
 
@@ -94,7 +93,7 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
             }
         }
 
-        foreach (var reference in plugin.SkillReferences
+        foreach (var reference in plugin.SkillReferencesOrEmpty
             .Where(reference => StringComparer.Ordinal.Equals(reference.Skill, skillName))
             .OrderBy(reference => NormalizeReferenceDestination(reference.Destination), StringComparer.Ordinal))
         {
@@ -148,22 +147,6 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         }
 
         return assets;
-    }
-
-    private static JsonArray BuildSkillReferences(PluginDefinition plugin)
-    {
-        var references = new JsonArray();
-        foreach (var reference in plugin.SkillReferences)
-        {
-            references.Add(new JsonObject
-            {
-                ["skill"] = reference.Skill,
-                ["source"] = reference.Source,
-                ["destination"] = reference.Destination
-            });
-        }
-
-        return references;
     }
 
     protected static string DisplayName(string pluginName) =>

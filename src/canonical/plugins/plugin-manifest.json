@@ -83,7 +83,6 @@
           "destination": ".idd/factory"
         }
       ],
-      "skillReferences": [],
       "metadata": {
         "entryPoint": false,
         "temporaryWorkspace": ".idd/factory"
