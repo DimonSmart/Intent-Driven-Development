@@ -171,56 +171,14 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
         string pluginName,
         SkillReferenceDefinition reference)
     {
-        if (string.IsNullOrWhiteSpace(reference.Destination))
+        try
+        {
+            return SkillReferencePathValidator.NormalizeDestination(reference.Destination);
+        }
+        catch (ArgumentException exception)
         {
             throw new InvalidOperationException(
-                $"Plugin '{pluginName}' has an empty skill reference destination for skill '{reference.Skill}'.");
+                $"Plugin '{pluginName}' has invalid skill reference destination '{reference.Destination}' for skill '{reference.Skill}': {exception.Message}");
         }
-
-        var normalized = reference.Destination.Replace('\\', '/');
-
-        if (IsAbsoluteReferenceDestination(normalized))
-        {
-            throw new InvalidOperationException(
-                $"Plugin '{pluginName}' has absolute skill reference destination '{reference.Destination}'.");
-        }
-
-        var segments = normalized.Split('/', StringSplitOptions.None);
-
-        if (segments.Any(string.IsNullOrWhiteSpace))
-        {
-            throw new InvalidOperationException(
-                $"Plugin '{pluginName}' has invalid skill reference destination '{reference.Destination}'.");
-        }
-
-        if (segments.Any(segment => segment is "." or ".."))
-        {
-            throw new InvalidOperationException(
-                $"Plugin '{pluginName}' has unsafe skill reference destination '{reference.Destination}'.");
-        }
-
-        if (StringComparer.Ordinal.Equals(segments[0], "roles"))
-        {
-            throw new InvalidOperationException(
-                $"Plugin '{pluginName}' has skill reference destination '{reference.Destination}' inside reserved 'roles/' references.");
-        }
-
-        return string.Join('/', segments);
     }
-
-    private static bool IsAbsoluteReferenceDestination(string destination)
-    {
-        if (destination.StartsWith("/", StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        return destination.Length >= 3 &&
-            IsAsciiLetter(destination[0]) &&
-            destination[1] == ':' &&
-            destination[2] == '/';
-    }
-
-    private static bool IsAsciiLetter(char value) =>
-        value is >= 'A' and <= 'Z' or >= 'a' and <= 'z';
 }

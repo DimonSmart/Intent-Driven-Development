@@ -133,9 +133,10 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
    - `preserved-requirement`;
    - `removed-behavior`;
    - `compatibility-boundary`.
+   - `unowned-behavior`.
 
-   Use `current-requirement` for ordinary checks against current intent when no
-   specific change context is provided.
+   Use `current-requirement` for ordinary checks against an existing current
+   requirement when no specific change context is provided.
 
 7. For each mismatch, cite the relevant spec section or explain that no current
    spec covers the behavior.
@@ -176,7 +177,7 @@ Current specs and sections used as normative intent.
 
 Classification: `implementation-mismatch | missing-verification | missing-spec | unclear-intent | possible-intent-change | matches-spec | non-goal-or-out-of-scope`
 
-Scope: `current-requirement | changed-requirement | preserved-requirement | removed-behavior | compatibility-boundary`
+Scope: `current-requirement | changed-requirement | preserved-requirement | removed-behavior | compatibility-boundary | unowned-behavior`
 
 Evidence:
 - Spec evidence:
@@ -211,7 +212,12 @@ Use `removed-behavior` to verify behavior that should no longer exist.
 Use `compatibility-boundary` for migration, legacy data, or compatibility
 contracts.
 
-When no change context is provided, use:
+Use `unowned-behavior` when implementation contains observable durable behavior
+for which no current owning intent exists.
+
+Do not use `current-requirement` for `missing-spec` when no current requirement exists.
+
+When no change context is provided and a current requirement exists, use:
 
 ```text
 Scope: current-requirement
@@ -269,11 +275,20 @@ Add or update verification.
 Use when implementation contains durable product behavior that is not described
 by current specs.
 
+Use this classification with:
+
+```text
+Scope: unowned-behavior
+```
+
 Example:
 
 ```text
-Password reset exists in implementation, but no current spec describes password
-reset behavior.
+Password reset is implemented, but no current specification owns or describes
+password-reset behavior.
+
+Classification: missing-spec
+Scope: unowned-behavior
 ```
 
 Recommended next step:
@@ -281,7 +296,8 @@ Recommended next step:
 ```text
 Ask whether this behavior is intended product intent. If the user describes a
 desired behavior, use idd-intent-change. If the user confirms existing implementation
-as intent, use idd-code-update-intent.
+as intent, use idd-code-update-intent. If the decision is unclear, use brainstorm
+or create a spike.
 ```
 
 ### `unclear-intent`

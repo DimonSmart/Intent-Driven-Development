@@ -9,6 +9,7 @@ var version = ParseVersion(args);
 var failures = new List<string>();
 
 RunGenerator();
+CheckSkillReferenceDestinationValidation();
 CheckClaudeMarketplace();
 CheckCodexMarketplace();
 CheckPlatformPlugins("claude", ".claude-plugin");
@@ -370,6 +371,9 @@ void CheckRouteSkill(string platform)
                 failures.Add("Claude idd-route disables implicit invocation.");
             }
 
+            ExpectContains(routeSkillText, "context: fork", "Claude idd-route forked context");
+            ExpectContains(routeSkillText, "agent: Explore", "Claude idd-route Explore agent");
+            ExpectContains(routeSkillText, "argument-hint: \"[request or workflow question]\"", "Claude idd-route argument hint");
             ExpectContains(routeSkillText, "allowed-tools: Read Glob Grep", "Claude idd-route read-only tool policy");
         }
     }
@@ -420,7 +424,7 @@ void CheckCanonicalSkillSemantics()
 
     ExpectCanonicalContains(
         Path.Combine("src", "canonical", "skills", "idd-code-check-implementation.md"),
-        ["current-requirement"],
+        ["current-requirement", "unowned-behavior", "Do not use `current-requirement` for `missing-spec` when no current requirement exists."],
         "canonical idd-code-check-implementation");
 
     ExpectCanonicalContains(
@@ -431,6 +435,45 @@ void CheckCanonicalSkillSemantics()
             "Mode:"
         ],
         "canonical idd-code-implement");
+}
+
+void CheckSkillReferenceDestinationValidation()
+{
+    foreach (var destination in new[] { "common-workflows.md", "docs/common-workflows.md" })
+    {
+        try
+        {
+            _ = SkillReferencePathValidator.NormalizeDestination(destination);
+        }
+        catch (ArgumentException exception)
+        {
+            failures.Add($"Valid skill reference destination '{destination}' was rejected: {exception.Message}");
+        }
+    }
+
+    foreach (var destination in new[]
+    {
+        "C:",
+        "C:file.md",
+        "C:/file.md",
+        "C:\\file.md",
+        "/file.md",
+        "\\file.md",
+        "//server/share/file.md",
+        "\\\\server\\share\\file.md",
+        "../file.md",
+        "roles/file.md"
+    })
+    {
+        try
+        {
+            _ = SkillReferencePathValidator.NormalizeDestination(destination);
+            failures.Add($"Invalid skill reference destination '{destination}' was accepted.");
+        }
+        catch (ArgumentException)
+        {
+        }
+    }
 }
 
 void ExpectCanonicalContains(string relativePath, string[] expectedValues, string context)

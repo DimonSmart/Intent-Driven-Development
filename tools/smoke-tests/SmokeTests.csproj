@@ -5,4 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\generate\Validation\SkillReferencePathValidator.cs" Link="Validation\SkillReferencePathValidator.cs" />
+  </ItemGroup>
 </Project>
