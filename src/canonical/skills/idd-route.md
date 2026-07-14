@@ -13,8 +13,8 @@ Before classifying the request, read:
 `references/common-workflows.md`
 
 Treat that document as the canonical source for workflow families, product
-operations, execution-depth selection, preservation boundaries, and completion
-rules.
+operations, requested scope, execution-depth selection, preservation
+boundaries, and completion rules.
 
 If the reference is unavailable, report that the installed plugin is incomplete
 and do not reconstruct the full routing model from memory.
@@ -22,8 +22,9 @@ and do not reconstruct the full routing model from memory.
 ## Inputs
 
 Accept natural-language user requests. The request may include a product area,
-specification, code area, observed mismatch, or required result. Do not require
-JSON or a special parameter structure.
+specification, code area, observed mismatch, required result, or an explicit
+limit such as "classify only", "update intent only", or "do not change specs".
+Do not require JSON or a special parameter structure.
 
 ## Context Reading Rules
 
@@ -71,6 +72,35 @@ Set `Clarity` to `clear`, `ambiguous`, or `research-required`.
 Set `Execution depth` to `focused`, `orchestrated`, or `not-applicable`
 according to the required reference.
 
+Set `Requested scope` to one of:
+
+```text
+route-only
+intent-only
+implementation-only
+end-to-end
+```
+
+Use the narrowest scope that satisfies the user's explicit request. Explicit
+limits such as "only", "do not change files", "do not implement", and "do not
+change specs" take precedence over the complete workflow normally associated
+with the classification.
+
+- `route-only`: describe the route and stop. Do not invoke another skill or
+  change files.
+- `intent-only`: perform only intent-side work, including initialization,
+  import, brainstorm, audit, lint, change, new-document, or normalization as
+  applicable. Do not implement product code or create a Factory Work Plan.
+- `implementation-only`: perform implementation or implementation checking from
+  current intent. Do not change product intent. If current intent is missing,
+  unclear, or wrong, stop and report the required intent workflow instead of
+  expanding scope.
+- `end-to-end`: continue through all requested intent, implementation, and
+  conformance stages, subject to clarity gates and execution-depth selection.
+
+Do not assign route fields when another explicitly named skill or `idd-skip`
+bypasses routing. Those cases are direct skill invocation, not route results.
+
 ## First Skill
 
 Use the required reference to select the first skill. This compact table is only
@@ -95,12 +125,34 @@ refuses IDD for the request.
 
 ## Handoff Rules
 
-After routing a real request to a write-oriented workflow, continue with the
-recommended skill in the same user request when the Coding Agent can do so.
-Do not require a second user message only to confirm the route.
+Distinguish the complete workflow from the current handoff:
 
-Pass through the original request, classification fields, relevant context, and
-any temporary preservation boundary identified from the required reference.
+- `Expected complete workflow` describes the normal lifecycle needed to finish
+  the product change safely.
+- `Current handoff` describes what may start in this user request.
+- `Stop after` defines the requested-scope boundary or clarity gate.
+
+The complete workflow is informative. It is not permission to execute stages
+outside `Requested scope`.
+
+Apply these rules:
+
+- For `route-only`, set `Current handoff: none` and stop after returning the
+  route.
+- For `intent-only`, hand off only to the applicable intent-side skill and stop
+  before implementation or Factory execution.
+- For `implementation-only`, hand off only to the applicable code or check skill
+  and do not modify intent.
+- For `end-to-end`, continue with the recommended skill in the same user request
+  when the Coding Agent can do so. Do not require a second user message only to
+  confirm the route.
+- When clarity is `ambiguous` or `research-required`, stop at the corresponding
+  brainstorm, check, ADR, or spike gate even when the requested scope is
+  `end-to-end`. Continue only after the missing decision or evidence exists.
+
+Pass through the original request, classification fields, requested scope,
+relevant context, and any temporary preservation boundary identified from the
+required reference.
 
 The route classification is temporary workflow evidence. Do not create route
 files, preservation records, Factory Work Plans, specs, or code from this skill.
@@ -116,9 +168,12 @@ Classification: `product-change`
 Operation: `modify`
 Clarity: `clear`
 Execution depth: `focused`
+Requested scope: `end-to-end`
 
 Recommended first skill: `idd-intent-change`
-Expected workflow: `idd-intent-change -> idd-code-implement -> idd-code-check-implementation`
+Expected complete workflow: `idd-intent-change -> idd-code-implement -> idd-code-check-implementation`
+Current handoff: `idd-intent-change`
+Stop after: `the requested end-to-end workflow completes, or an intent or verification gate blocks progress`
 
 Preservation boundary:
 - Behavior expected to change:
@@ -131,6 +186,6 @@ Why:
 - Short routing rationale grounded in `references/common-workflows.md`.
 
 Handoff:
-- Invoke the recommended first skill with the original request and the
-  preservation boundary.
+- Invoke the current handoff skill with the original request, route fields, and
+  preservation boundary, or state that no handoff is allowed for `route-only`.
 ```

@@ -3,6 +3,7 @@ cases:
     mode: explicit-router
     request: "idd-route: classify this request only. Add a per-project default language setting; do not change files."
     repository_fixture: null
+    expected_router_invoked: true
     expected_classification: product-change
     expected_operation: add
     expected_clarity: clear
@@ -15,15 +16,33 @@ cases:
       - implementation-handoff
     semantic_review_notes: "The rationale should distinguish a requested behavior change from implementation work and identify the setting's existing owner if context is needed."
 
-  - id: implicit-focused-product-modification
+  - id: implicit-intent-only-product-modification
     mode: implicit-routing
-    request: "Change the existing search results page so pressing Enter opens the selected result instead of submitting a new search. Implement the change."
+    request: "Update the current search intent so pressing Enter opens the selected result instead of submitting a new search. Update the specification only; do not change code."
     repository_fixture: search-product
+    expected_router_invoked: true
     expected_classification: product-change
     expected_operation: modify
     expected_clarity: clear
     expected_execution_depth: focused
-    expected_requested_scope: intent-and-implementation
+    expected_requested_scope: intent-only
+    expected_first_skill: idd-intent-change
+    forbidden_actions:
+      - modify-code
+      - create-factory-work-plan
+      - implementation-handoff
+    semantic_review_notes: "The route should allow the intent update, preserve search submission when no result is selected, and stop before implementation."
+
+  - id: implicit-focused-product-modification
+    mode: implicit-routing
+    request: "Change the existing search results page so pressing Enter opens the selected result instead of submitting a new search. Implement the change."
+    repository_fixture: search-product
+    expected_router_invoked: true
+    expected_classification: product-change
+    expected_operation: modify
+    expected_clarity: clear
+    expected_execution_depth: focused
+    expected_requested_scope: end-to-end
     expected_first_skill: idd-intent-change
     forbidden_actions:
       - create-factory-work-plan
@@ -33,6 +52,7 @@ cases:
     mode: implicit-routing
     request: "Refactor the search query parser to remove duplicated branches. Keep all current behavior unchanged and run the relevant tests."
     repository_fixture: search-product
+    expected_router_invoked: true
     expected_classification: implementation-change
     expected_operation: not-applicable
     expected_clarity: clear
@@ -48,11 +68,12 @@ cases:
     mode: implicit-routing
     request: "Remove password login across web, mobile, API clients, account recovery, and documentation. Preserve existing passkey users and coordinate the migration."
     repository_fixture: authentication-product
+    expected_router_invoked: true
     expected_classification: product-change
     expected_operation: remove
     expected_clarity: clear
     expected_execution_depth: orchestrated
-    expected_requested_scope: intent-and-implementation
+    expected_requested_scope: end-to-end
     expected_first_skill: idd-intent-change
     forbidden_actions:
       - immediate-code-only-handoff
@@ -62,46 +83,39 @@ cases:
     mode: implicit-routing
     request: "Use idd-intent-change to add an export CSV action to reports."
     repository_fixture: null
-    expected_classification: explicit-skill
-    expected_operation: not-applicable
-    expected_clarity: clear
-    expected_execution_depth: not-applicable
-    expected_requested_scope: intent-only
+    expected_router_invoked: false
     expected_first_skill: idd-intent-change
     forbidden_actions:
       - invoke-idd-route
       - implementation-handoff
       - create-factory-work-plan
-    semantic_review_notes: "The explicitly named skill takes precedence; do not emit a separate route result."
+    semantic_review_notes: "The explicitly named skill takes precedence; route fields and a separate route result should be absent."
 
   - id: explicit-skip-bypasses-router
     mode: implicit-routing
     request: "Use idd-skip and add a temporary debug endpoint."
     repository_fixture: null
-    expected_classification: explicit-skip
-    expected_operation: not-applicable
-    expected_clarity: clear
-    expected_execution_depth: not-applicable
-    expected_requested_scope: requested-skill-only
+    expected_router_invoked: false
     expected_first_skill: idd-skip
     forbidden_actions:
       - invoke-idd-route
       - invoke-idd-intent-change
       - create-factory-work-plan
-    semantic_review_notes: "The user explicitly declined IDD routing; no alternative IDD workflow should be selected."
+    semantic_review_notes: "The user explicitly declined IDD routing; route fields and alternative IDD workflows should be absent."
 
   - id: implicit-ambiguous-product-request
     mode: implicit-routing
     request: "Make the checkout experience better for international customers."
     repository_fixture: checkout-product
+    expected_router_invoked: true
     expected_classification: unclear
     expected_operation: not-applicable
     expected_clarity: ambiguous
     expected_execution_depth: not-applicable
-    expected_requested_scope: intent-only
+    expected_requested_scope: end-to-end
     expected_first_skill: idd-intent-brainstorm
     forbidden_actions:
       - modify-files
       - implementation-handoff
       - create-factory-work-plan
-    semantic_review_notes: "The response should identify the missing product decision instead of choosing a localization, currency, or payment change."
+    semantic_review_notes: "The user appears to want a delivered product improvement, but the current handoff must stop at the smallest missing product decision instead of choosing a localization, currency, or payment change."

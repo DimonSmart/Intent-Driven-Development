@@ -49,9 +49,34 @@ Classify clarity as:
 - `research-required`: the correct decision depends on investigation that
   should be represented as a spike or focused check.
 
+### Requested Scope
+
+Classify how much of the workflow the user authorizes in the current request:
+
+- `route-only`: classify and describe the workflow without invoking another
+  skill or changing files.
+- `intent-only`: perform only intent-side work. Do not implement product code or
+  create a Factory Work Plan.
+- `implementation-only`: implement or check against current intent without
+  changing product intent.
+- `end-to-end`: continue through all requested intent, implementation, and
+  conformance stages.
+
+Requested scope is independent from what changes and from execution depth. Use
+the narrowest scope that satisfies the explicit request. Explicit limits such
+as "only", "do not change files", "do not implement", and "do not change
+specs" take precedence over the normal complete lifecycle.
+
+The complete lifecycle describes what is eventually needed for safe delivery.
+It does not grant permission to execute stages outside the requested scope.
+
+Do not assign requested scope when an explicitly named skill or `idd-skip`
+bypasses routing.
+
 ### Execution Depth
 
-Classify execution depth independently from the product operation:
+Classify execution depth independently from the product operation and requested
+scope:
 
 - `focused`: one primary product owner, localized implementation, no complex
   migration, no staged rollout, and no multiple review gates.
@@ -62,7 +87,9 @@ Classify execution depth independently from the product operation:
 - `not-applicable`: routing, audits, lint checks, brainstorms, and pure intent
   reads that do not execute implementation.
 
-Diff size alone is not enough to choose Factory.
+Diff size alone is not enough to choose Factory. Execution depth may describe a
+later implementation stage even when the current requested scope stops at
+routing or intent work.
 
 ## Shared Invariants
 
@@ -78,7 +105,10 @@ Diff size alone is not enough to choose Factory.
   temporary workflow evidence.
 - Obsolete ordinary specs are deleted, not archived.
 - A new spec is created only when no current owner exists.
-- Every workflow completes by checking the result against current intent.
+- Every executed workflow stage is checked against current intent where
+  applicable.
+- An expected complete workflow must never be interpreted as permission to
+  exceed the current requested scope.
 
 ## Workflow Family: Product Change
 
@@ -124,6 +154,10 @@ public APIs, data formats, saved settings, migration or deprecation
 requirements, remaining intent in the owning document, and whether a durable
 non-goal is needed.
 
+For `intent-only`, stop after the intent-side stage and report the remaining
+complete lifecycle without starting implementation. For `route-only`, do not
+start the product-change workflow at all.
+
 ## Workflow Family: Implementation Change
 
 ### Refactor While Preserving Behavior
@@ -137,7 +171,8 @@ read relevant intent
 ```
 
 If implementation work reveals that product behavior must change, stop the
-implementation workflow and route to `idd-intent-change`.
+implementation workflow and route to `idd-intent-change`. Do not silently
+expand an `implementation-only` request into an intent change.
 
 ## Workflow Family: Intent Maintenance
 
@@ -177,6 +212,10 @@ intent. Use Factory only for coordinated multi-task implementation, sequencing,
 temporary planning, review gates, or high-risk preservation boundaries. Factory
 remains optional and must not become a dependency of `idd-intent`.
 
+Do not create or execute Factory work when requested scope is `route-only` or
+`intent-only`. For `implementation-only`, Factory may be used only when current
+intent is already sufficient and execution is orchestrated.
+
 ## Preservation Boundary
 
 Each workflow should identify temporary preservation evidence:
@@ -191,14 +230,32 @@ The boundary is not saved as a standalone `.idd/intent/` document. Durable
 preserved behavior belongs in ordinary behavior, acceptance criteria,
 constraints, verification, or non-goals of the owning current spec.
 
+## Complete Workflow and Current Handoff
+
+Routing must distinguish:
+
+- the `Expected complete workflow`, which describes the safe lifecycle;
+- the `Current handoff`, which is allowed in the current request;
+- the `Stop after` boundary, which follows requested scope and clarity gates.
+
+For `route-only`, the current handoff is none. For `intent-only`, stop before
+implementation. For `implementation-only`, do not modify intent. For
+`end-to-end`, continue through the complete workflow unless ambiguity, required
+research, missing intent, verification failure, or another safety gate blocks
+progress.
+
 ## Workflow Completion Rules
 
-Complete a workflow only after the changed result is checked against current
-intent. Product changes complete after intent is updated, implementation is
-performed when requested, and `idd-code-check-implementation` verifies changed,
-removed, and preserved behavior. Implementation-only work completes after
-verification proves current intent was preserved. Normalization completes after
-semantic movement is checked and `idd-intent-lint` passes.
+Complete the current request when all stages inside its requested scope have
+finished and their applicable checks pass. Do not claim that the complete
+product lifecycle has finished when the request intentionally stopped at
+routing or intent work.
+
+For `end-to-end`, product changes complete after intent is updated,
+implementation is performed, and `idd-code-check-implementation` verifies
+changed, removed, and preserved behavior. Implementation-only work completes
+after verification proves current intent was preserved. Normalization completes
+after semantic movement is checked and `idd-intent-lint` passes.
 
 If `idd-intent-lint` reports errors, the normalization workflow is not complete.
 Fix the errors or report them explicitly as unresolved blockers. Do not present

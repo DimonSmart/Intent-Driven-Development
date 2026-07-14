@@ -29,6 +29,21 @@ The route separates what changes from how deep execution needs to be:
 - focused execution uses one implementation workflow;
 - orchestrated execution can use optional Factory for multi-step work.
 
+The route also records the requested scope for the current user request:
+
+- `route-only` — describe the route and stop;
+- `intent-only` — perform only intent-side work and do not implement product
+  code;
+- `implementation-only` — implement or check from current intent without
+  changing intent;
+- `end-to-end` — continue through all requested intent, implementation, and
+  conformance stages.
+
+The expected complete workflow describes the safe lifecycle, not permission to
+perform every stage immediately. For example, "update the specification only"
+must stop before implementation even when the eventual lifecycle also requires
+code and conformance checking.
+
 An explicitly named skill bypasses Router. `idd-skip` is never selected
 automatically.
 
@@ -147,26 +162,3 @@ idd-skip
 ```
 
 This escape hatch is provided by `idd-intent`. It is explicit, not the default workflow.
-
-## What Belongs in Intent
-
-Keep:
-
-- product behavior;
-- user scenarios;
-- domain contracts;
-- accepted architecture decisions;
-- important constraints and non-goals;
-- acceptance criteria and verification rules.
-
-Do not keep:
-
-- task lists;
-- implementation plans;
-- progress and status notes;
-- review notes;
-- chat summaries;
-- one-off delivery files;
-- commands that merely describe the current toolchain.
-
-For the underlying principles, see [Methodology](methodology.md).
