@@ -83,6 +83,14 @@ idd-project-init
 
 Then ask IDD to import an existing product, describe a new one, change current product intent, implement from intent, or verify that the implementation still matches it.
 
+Describe the requested change naturally. IDD routes it through the smallest safe workflow.
+
+To inspect the selected route explicitly:
+
+```text
+idd-route
+```
+
 Factory is deliberately absent from the default installation. Add it only when the implementation needs explicit multi-step planning and review orchestration.
 
 ## Learn More

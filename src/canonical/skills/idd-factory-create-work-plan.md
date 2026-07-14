@@ -24,6 +24,10 @@ review. Do not use Factory when one focused `idd-code-implement` operation is
 sufficient, when the user only asks to change intent, or while intent is not
 ready.
 
+The workflow may receive a temporary route classification and preservation
+boundary from `idd-route`. Use them as execution constraints, not as product
+intent.
+
 ## Rules
 
 - Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and only relevant current specs.
@@ -44,6 +48,9 @@ ready.
 - If `.idd/factory/.gitignore` is missing, create it from the packaged factory
   asset before writing factory work files.
 - The work plan is temporary execution state.
+- Include any route classification and preservation boundary as temporary
+  execution evidence.
+- Do not convert preservation boundary text into new product intent.
 - The work plan must include cleanup instructions.
 - Do not read old factory work plans unless the user explicitly provides an
   exact path.
@@ -51,18 +58,18 @@ ready.
 ## Workflow
 
 1. Read `.idd/intent/README.md` and `.idd/intent/INDEX.md`.
-3. Read only the relevant current specs, ADRs, and active spikes needed to
+2. Read only the relevant current specs, ADRs, and active spikes needed to
    understand the requested implementation task.
-4. Inspect repository evidence needed to identify likely code and test areas.
-5. Stop and route to the appropriate intent skill if durable product intent is
+3. Inspect repository evidence needed to identify likely code and test areas.
+4. Stop and route to the appropriate intent skill if durable product intent is
    missing, unclear, or wrong. Factory must not invent missing product intent.
-6. Ensure `.idd/factory/.gitignore` exists, creating it from the packaged
+5. Ensure `.idd/factory/.gitignore` exists, creating it from the packaged
    template if needed.
-7. Use local `references/roles/` role prompts only when they are present and
+6. Use local `references/roles/` role prompts only when they are present and
    relevant to this workflow.
-8. Create one work directory using this shape:
+7. Create one work directory using this shape:
    `.idd/factory/work/<yyyyMMdd-HHmmss>-<slug>/`.
-9. Write the work plan to:
+8. Write the work plan to:
    `.idd/factory/work/<yyyyMMdd-HHmmss>-<slug>/work-plan.md`.
 
 ## Output Format
@@ -94,6 +101,21 @@ It must not be reused automatically for unrelated future work.
 
 - In scope:
 - Out of scope:
+
+## Route Classification
+
+- Classification:
+- Operation:
+- Execution depth:
+- Source:
+
+## Preservation Boundary
+
+- Behavior expected to change:
+- Behavior expected to remain unchanged:
+- Public contracts to preserve:
+- Compatibility or data constraints:
+- Unresolved preservation questions:
 
 ## Repository Map
 

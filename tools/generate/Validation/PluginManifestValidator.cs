@@ -61,6 +61,8 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
                 }
             }
 
+            ValidateSkillReferences(pluginName, plugin);
+
             foreach (var asset in plugin.Assets)
             {
                 var source = Path.Combine(layout.RepoRoot, asset.Source.Replace('/', Path.DirectorySeparatorChar));
@@ -70,5 +72,106 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
                 }
             }
         }
+    }
+
+    private void ValidateSkillReferences(string pluginName, PluginDefinition plugin)
+    {
+        var destinationsBySkill = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+
+        foreach (var reference in plugin.SkillReferences)
+        {
+            if (!plugin.Skills.Contains(reference.Skill, StringComparer.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Plugin '{pluginName}' has document reference for unowned skill '{reference.Skill}'.");
+            }
+
+            var source = ResolveRepositoryPath(reference.Source);
+            if (!File.Exists(source))
+            {
+                if (Directory.Exists(source))
+                {
+                    throw new InvalidOperationException(
+                        $"Plugin '{pluginName}' skill reference source '{reference.Source}' is a directory.");
+                }
+
+                throw new InvalidOperationException(
+                    $"Plugin '{pluginName}' references missing skill reference source '{reference.Source}'.");
+            }
+
+            var destination = NormalizeSkillReferenceDestination(pluginName, reference);
+            if (!destinationsBySkill.TryGetValue(reference.Skill, out var destinations))
+            {
+                destinations = new HashSet<string>(StringComparer.Ordinal);
+                destinationsBySkill.Add(reference.Skill, destinations);
+            }
+
+            if (!destinations.Add(destination))
+            {
+                throw new InvalidOperationException(
+                    $"Plugin '{pluginName}' has duplicate skill reference destination '{destination}' for skill '{reference.Skill}'.");
+            }
+        }
+    }
+
+    private string ResolveRepositoryPath(string source)
+    {
+        var fullPath = Path.GetFullPath(Path.Combine(
+            layout.RepoRoot,
+            source.Replace('/', Path.DirectorySeparatorChar)));
+        var repoRoot = Path.GetFullPath(layout.RepoRoot);
+        var repoRootWithSeparator = repoRoot.EndsWith(Path.DirectorySeparatorChar)
+            ? repoRoot
+            : repoRoot + Path.DirectorySeparatorChar;
+
+        if (!fullPath.StartsWith(repoRootWithSeparator, StringComparison.OrdinalIgnoreCase) &&
+            !StringComparer.OrdinalIgnoreCase.Equals(fullPath, repoRoot))
+        {
+            throw new InvalidOperationException(
+                $"Skill reference source '{source}' resolves outside the repository root.");
+        }
+
+        return fullPath;
+    }
+
+    private static string NormalizeSkillReferenceDestination(
+        string pluginName,
+        SkillReferenceDefinition reference)
+    {
+        if (string.IsNullOrWhiteSpace(reference.Destination))
+        {
+            throw new InvalidOperationException(
+                $"Plugin '{pluginName}' has an empty skill reference destination for skill '{reference.Skill}'.");
+        }
+
+        if (Path.IsPathRooted(reference.Destination))
+        {
+            throw new InvalidOperationException(
+                $"Plugin '{pluginName}' has absolute skill reference destination '{reference.Destination}'.");
+        }
+
+        var segments = reference.Destination
+            .Replace('\\', '/')
+            .Split('/', StringSplitOptions.None);
+
+        if (segments.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new InvalidOperationException(
+                $"Plugin '{pluginName}' has invalid skill reference destination '{reference.Destination}'.");
+        }
+
+        if (segments.Any(segment => segment is "." or ".."))
+        {
+            throw new InvalidOperationException(
+                $"Plugin '{pluginName}' has unsafe skill reference destination '{reference.Destination}'.");
+        }
+
+        if (StringComparer.Ordinal.Equals(segments[0], "roles"))
+        {
+            throw new InvalidOperationException(
+                $"Plugin '{pluginName}' has skill reference destination '{reference.Destination}' inside reserved 'roles/' references.");
+        }
+
+        return string.Join('/', segments);
     }
 }

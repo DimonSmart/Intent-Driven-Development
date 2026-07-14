@@ -30,7 +30,7 @@ internal static partial class SkillDescriptionValidator
         if (!PublicSkillNamePattern().IsMatch(skillName))
         {
             throw new InvalidOperationException(
-                $"Invalid public skill name '{skillName}' in {path}: expected idd-skip, idd-project-init, or idd-<area>-<action> with area intent, code, or factory.");
+                $"Invalid public skill name '{skillName}' in {path}: expected idd-skip, idd-route, idd-project-init, or idd-<area>-<action> with area intent, code, or factory.");
         }
     }
 
@@ -116,6 +116,6 @@ internal static partial class SkillDescriptionValidator
             $"Invalid frontmatter for {skillName}/{adapterName} in {path}: '{fieldName}' must be a string, bool, number, or string array.");
     }
 
-    [GeneratedRegex("^(?:idd-skip|idd-project-init|idd-(intent|code|factory)-[a-z0-9]+(?:-[a-z0-9]+)*)$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^(?:idd-skip|idd-route|idd-project-init|idd-(intent|code|factory)-[a-z0-9]+(?:-[a-z0-9]+)*)$", RegexOptions.CultureInvariant)]
     private static partial Regex PublicSkillNamePattern();
 }

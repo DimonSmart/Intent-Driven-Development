@@ -57,6 +57,19 @@ temporary multi-task plan, sequencing, review gates, or coordinated execution
 is required; Factory may be selected automatically and never becomes product
 intent.
 
+When a request concerns IDD but does not explicitly name a skill, classify it
+through the `idd-route` routing model before selecting an intent,
+implementation, audit, normalization, import, check, or Factory workflow.
+
+An explicitly named skill bypasses routing. `idd-route` is read-only and selects
+the smallest safe workflow. It classifies what changes separately from
+execution depth, so Factory selection is independent of whether the product
+operation is add, modify, or remove.
+
+When the routed request asks for an actual change, continue from routing into
+the recommended next skill in the same user request when possible. Do not ask
+for a second message only to confirm the selected route.
+
 Use `idd-skip` only when the user explicitly invokes it for the current request.
 Never select `idd-skip` automatically; it is not a project or future-request
 setting.

@@ -14,6 +14,27 @@ idd-factory   temporary implementation organization
 
 Install `idd-intent` for the normal IDD workflow. Install `idd-factory` only when a change needs explicit multi-step orchestration.
 
+## Route an IDD Request
+
+You can describe an IDD request in natural language. When no skill is named
+explicitly, IDD uses `idd-route` to classify the request and choose the smallest
+safe workflow.
+
+The route separates what changes from how deep execution needs to be:
+
+- product changes use `add`, `modify`, or `remove`, then update intent before
+  implementation;
+- implementation-only work preserves current intent;
+- intent normalization changes structure without changing product meaning;
+- focused execution uses one implementation workflow;
+- orchestrated execution can use optional Factory for multi-step work.
+
+An explicitly named skill bypasses Router. `idd-skip` is never selected
+automatically.
+
+For the canonical workflow reference, see
+[`src/canonical/methodology/common-workflows.md`](../src/canonical/methodology/common-workflows.md).
+
 ## Start a New Product Area
 
 Begin by clarifying what the product must do:

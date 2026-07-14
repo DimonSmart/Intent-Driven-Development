@@ -1,4 +1,14 @@
 {
+  "idd-route": {
+    "description": "Classify an IDD-related request and select the smallest safe read-only workflow before handing off to the right IDD skill.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "allowed-tools": "Read Glob Grep"
+        }
+      }
+    }
+  },
   "idd-project-init": {
     "description": "Initialize `.idd/intent` and the IDD plugin declaration without copying skills or installing agent-specific files.",
     "invocation": "manual"

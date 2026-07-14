@@ -9,7 +9,11 @@ This skill updates `.idd/intent/` before implementation.
 Formula:
 
 ```text
-idd-intent-change = user change request + affected specs + minimal product intent update
+idd-intent-change =
+    requested product operation
+    + owning intent
+    + minimal current-truth update
+    + preservation boundary
 ```
 
 ## Rules
@@ -39,6 +43,8 @@ idd-intent-change = user change request + affected specs + minimal product inten
   `idd-intent-new-document`; do not duplicate document-creation logic here.
 - If a document becomes obsolete, duplicated, task-like, process-only, or
   incorrect, delete it.
+- For `operation: remove`, delete an owning spec only when no current product
+  intent remains in that document.
 - Git history preserves previous versions.
 - Update Behavior, Acceptance Criteria and Verification together when the change
   affects them.
@@ -50,16 +56,37 @@ idd-intent-change = user change request + affected specs + minimal product inten
 - Keep the change normative: describe observable product behavior, not patch
   mechanics.
 - Do not treat current implementation as product intent by itself.
+- Before editing, identify what changes, what must be preserved, affected
+  public contracts, compatibility constraints, and adjacent areas that remain
+  out of scope.
+- Do not add a mandatory `Preservation Boundary` section to every spec.
+  Durable preserved contracts belong in normal Behavior, Acceptance Criteria,
+  Constraints, Verification, or Non-Goals sections.
+
+## Operation
+
+Classify the requested product operation as one of:
+
+```text
+add
+modify
+remove
+```
+
+This operation is separate from document ownership. Adding behavior can update
+an existing spec. Removing behavior can update part of a spec or delete the
+whole owning spec only when that document has no remaining current intent.
 
 ## Classification
 
-Classify the request as one of:
+Classify the ownership outcome as one of:
 
 ```text
 existing-spec-update
 new-spec-required
 adr-required
 spike-required
+delete-owning-spec
 task-only-no-idd-intent-change
 unclear-product-intent
 ```
@@ -77,9 +104,29 @@ delegate creation to `idd-intent-new-document`.
 Use `spike-required` when the right product or architecture decision requires
 research; delegate creation to `idd-intent-new-document`.
 
+Use `delete-owning-spec` for `operation: remove` only when the removed document
+does not own any remaining current product intent.
+
 Use `task-only-no-idd-intent-change` when the request is only a local refactor,
 cleanup, dependency update, or implementation detail that does not change
 durable product intent.
+
+## Removal Rules
+
+For `operation: remove`:
+
+1. Find the current owner.
+2. Find dependent specifications and cross-references.
+3. Determine whether the product needs immediate removal, deprecation,
+   compatibility transition, or replacement.
+4. Remove obsolete behavior from current intent.
+5. Preserve remaining compatibility requirements.
+6. Preserve a durable non-goal only when the removed behavior defines an
+   intentional product boundary.
+7. Delete the whole owning spec only if no current intent remains in it.
+8. Do not archive removed specs.
+9. Update `INDEX.md` when the document set changes.
+10. Recommend `idd-intent-lint` when the document set changes.
 
 ## Workflow
 
@@ -87,21 +134,26 @@ durable product intent.
 2. Read `.idd/intent/INDEX.md`.
 3. Identify the product area and candidate current specs.
 4. Read only relevant current numbered specs.
-5. Classify the request.
-6. If an existing spec owns the area, update that spec instead of creating a
+5. Classify the operation.
+6. Classify the ownership outcome.
+7. If an existing spec owns the area, update that spec instead of creating a
    duplicate.
-7. If `new-spec-required`, `adr-required`, or `spike-required`, prepare a
+8. If `new-spec-required`, `adr-required`, or `spike-required`, prepare a
    semantic handoff and invoke `idd-intent-new-document`; do not create the
    document locally.
-8. If the change affects behavior, update acceptance criteria.
-9. If the change affects testable behavior, update verification.
-10. Report:
+9. If the change affects behavior, update acceptance criteria.
+10. If the change affects testable behavior, update verification.
+11. Report:
 
-    - classification;
-    - affected specs;
-    - whether a new spec was created;
-    - summary of semantic changes;
-    - recommended implementation focus.
+    - operation;
+    - ownership outcome;
+    - primary owner;
+    - affected specifications;
+    - changed behavior;
+    - preservation boundary;
+    - document changes;
+    - recommended implementation depth;
+    - recommended next skill.
 
 `existing-spec-update` means this skill updates the current owning document.
 The three new-document classifications always hand off creation to

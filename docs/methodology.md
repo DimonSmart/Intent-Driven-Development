@@ -107,6 +107,25 @@ The separation is visible to the user because the responsibilities have differen
 - Factory may read intent but must not create or silently modify product truth;
 - when Factory discovers missing, contradictory, or insufficient intent, it must stop and route the work to an `idd-intent` workflow.
 
+## Routing Model
+
+IDD routes natural-language requests across two dimensions:
+
+```text
+what changes x execution depth
+```
+
+What changes determines the workflow family: product truth, implementation
+only, intent structure, implementation versus intent, raw imported knowledge,
+project initialization, or unknown. Product truth changes are further classified
+as `add`, `modify`, or `remove`.
+
+Execution depth is independent: a change can be focused or orchestrated
+regardless of the product operation. Focused work uses the smallest direct
+workflow. Orchestrated work may use optional Factory when implementation needs
+sequencing, temporary planning, review gates, migration, compatibility
+transition, or multiple independent tasks.
+
 ## How IDD Differs from Broad Spec-Driven Workflows
 
 IDD is still specification-driven in the ordinary sense: implementation follows an explicit product description.

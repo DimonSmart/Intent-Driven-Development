@@ -29,6 +29,10 @@ sessions or directories.
 - Do not search for old work plans automatically.
 - Do not infer the current plan from previous factory files.
 - Execute only the tasks in the work plan.
+- Preserve any route classification and preservation boundary from the Work
+  Plan as temporary execution constraints.
+- Task briefs may quote the local preservation boundary, but must not convert it
+  into product intent.
 - Before the first task and before each task, verify that referenced current
   intent exists, is current, and defines the required behavior.
 - Factory must not invent missing product intent. On an intent gap, stop with
@@ -52,6 +56,9 @@ sessions or directories.
   refresh the Work Plan, task briefs, scope, and verification plan before
   continuing. Use `idd-code-update-intent` only after explicit confirmation
   that existing implementation represents product intent.
+- If current intent is missing or contradicts the preservation boundary, stop
+  and return to an `idd-intent` workflow instead of continuing Factory
+  execution.
 
 ## Workflow
 
@@ -62,9 +69,10 @@ sessions or directories.
 3. Use the local `references/roles/` role prompts when dispatching or
    simulating planner, implementer, reviewer, and coordinator work.
 4. Execute tasks in plan order.
-5. Stop on `BLOCKED` or missing context. Do not silently continue through a
+5. Check each task against its local preservation boundary before review.
+6. Stop on `BLOCKED` or missing context. Do not silently continue through a
    blocked task.
-6. Keep temporary execution artifacts under `.idd/factory/work/`; never write
+7. Keep temporary execution artifacts under `.idd/factory/work/`; never write
    them into `.idd/intent/`.
 
 ## Statuses

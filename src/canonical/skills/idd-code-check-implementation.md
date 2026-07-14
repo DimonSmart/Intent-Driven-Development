@@ -89,6 +89,9 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
 
 - If specification and implementation disagree, report the mismatch and propose
   the smallest safe next step.
+- If a preservation boundary is provided, check changed behavior, removed
+  behavior, preserved behavior, public contracts, compatibility or data
+  constraints, and verification evidence.
 - If intent is unclear, ask for confirmation or recommend a spike.
 - If the implementation appears correct but verification is missing, recommend
   adding or updating tests.
@@ -122,6 +125,13 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
    - `unclear-intent`;
    - `possible-intent-change`;
    - `non-goal-or-out-of-scope`.
+
+   Also assign an evidence scope:
+
+   - `changed-requirement`;
+   - `preserved-requirement`;
+   - `removed-behavior`;
+   - `compatibility-boundary`.
 
 7. For each mismatch, cite the relevant spec section or explain that no current
    spec covers the behavior.
@@ -162,6 +172,8 @@ Current specs and sections used as normative intent.
 
 Classification: `implementation-mismatch | missing-verification | missing-spec | unclear-intent | possible-intent-change | matches-spec | non-goal-or-out-of-scope`
 
+Scope: `changed-requirement | preserved-requirement | removed-behavior | compatibility-boundary`
+
 Evidence:
 - Spec evidence:
 - Implementation evidence:
@@ -195,6 +207,7 @@ sessions after 30 days.
 ### `implementation-mismatch`
 
 Use when current spec is clear and implementation violates it.
+Also use this classification when preserved behavior regresses during a change.
 
 Example:
 

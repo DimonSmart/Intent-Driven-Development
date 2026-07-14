@@ -4,6 +4,7 @@
       "description": "Durable product memory for Intent-Driven Development.",
       "dependencies": [],
       "skills": [
+        "idd-route",
         "idd-project-init",
         "idd-skip",
         "idd-intent-audit",
@@ -19,6 +20,13 @@
       ],
       "roles": [],
       "skillRoleReferences": {},
+      "skillReferences": [
+        {
+          "skill": "idd-route",
+          "source": "src/canonical/methodology/common-workflows.md",
+          "destination": "common-workflows.md"
+        }
+      ],
       "assets": [
         {
           "source": "src/canonical/project-files/intent",
@@ -75,6 +83,7 @@
           "destination": ".idd/factory"
         }
       ],
+      "skillReferences": [],
       "metadata": {
         "entryPoint": false,
         "temporaryWorkspace": ".idd/factory"

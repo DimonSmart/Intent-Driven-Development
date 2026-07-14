@@ -1,13 +1,29 @@
 # idd-code-implement
 
 Use this skill when the user asks to implement behavior that is already
-specified, or when `idd-intent-change` has just updated the relevant spec.
+specified, when `idd-intent-change` has just updated the relevant spec, or when
+the user asks for implementation-only work that must preserve current intent.
 
 Formula:
 
 ```text
-idd-code-implement = current spec intent + code change + verification
+idd-code-implement = current spec intent + mode + code change + verification
 ```
+
+## Modes
+
+```text
+satisfy-current-intent
+preserve-current-intent
+```
+
+Use `satisfy-current-intent` after a product change or when implementation must
+be brought into conformance with existing current intent.
+
+Use `preserve-current-intent` for refactoring, dependency replacement, internal
+architecture cleanup, private type split or merge, implementation algorithm
+replacement, internal performance work, or implementation migration without
+observable behavior change.
 
 ## Rules
 
@@ -20,6 +36,15 @@ idd-code-implement = current spec intent + code change + verification
 - Do not copy implementation plans or temporary notes into specs.
 - Prefer the smallest code change that satisfies the relevant acceptance
   criteria.
+- In `preserve-current-intent` mode, do not edit intent.
+- In `preserve-current-intent` mode, read relevant current intent before
+  changing code and treat the preservation boundary as a temporary
+  implementation constraint.
+- Add or update verification when existing checks are not enough to prove the
+  preserved behavior.
+- If implementation requires a product behavior change, stop
+  `preserve-current-intent` and use `idd-intent-change`.
+- Do not update intent after the fact to justify an accidental behavior change.
 - Add or update tests when the behavior can be tested.
 - Run relevant verification.
 - After implementation, perform a focused implementation/spec check using
@@ -52,6 +77,18 @@ Stop before implementation and use idd-intent-change.
 
 Do not silently implement new durable behavior without updating product intent
 first.
+
+## Removal Implementation
+
+When implementing behavior removal, verify that:
+
+- the removed entry point is no longer available;
+- dependent scenarios still work;
+- old data and saved settings are handled according to current intent;
+- public contracts are removed or changed according to current intent;
+- tests for removed behavior are removed or changed instead of remaining as
+  false requirements;
+- negative verification exists when absence of behavior is a product contract.
 
 ## Relationship to Factory
 

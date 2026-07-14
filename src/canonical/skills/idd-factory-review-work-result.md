@@ -23,6 +23,7 @@ invokes this command or names this factory workflow directly.
 - Verify that all tasks in the work plan are either complete or explicitly
   deferred.
 - Verify that implementation still matches current specs.
+- Verify the complete preservation boundary across all tasks.
 - Verify that tests and commands provide reasonable evidence.
 - Verify that temporary factory artifacts are not accidentally becoming product
   documentation.
@@ -34,10 +35,15 @@ invokes this command or names this factory workflow directly.
 1. Read the explicit work plan and per-task review outputs for the current work
    directory.
 2. Review the full diff/result against relevant current specs.
-3. Use the local `references/roles/` final-reviewer prompt when present.
-4. Check that `.idd/factory/work/` artifacts remain temporary and are not placed
+3. Verify changed behavior, removed behavior, preserved behavior, public
+   contracts, and compatibility or data constraints from the Work Plan
+   preservation boundary.
+4. Stop and return to an intent workflow if required product intent is missing
+   or contradictory.
+5. Use the local `references/roles/` final-reviewer prompt when present.
+6. Check that `.idd/factory/work/` artifacts remain temporary and are not placed
    under `.idd/intent/`.
-5. Write `final-review.md` in the same work directory when a file artifact is
+7. Write `final-review.md` in the same work directory when a file artifact is
    useful.
 
 ## Output Format
@@ -61,6 +67,10 @@ invokes this command or names this factory workflow directly.
 - Evidence:
 
 ## Spec Compliance
+
+- Finding:
+
+## Preservation Boundary
 
 - Finding:
 

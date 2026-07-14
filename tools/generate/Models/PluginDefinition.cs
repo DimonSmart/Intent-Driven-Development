@@ -4,5 +4,6 @@ internal sealed record PluginDefinition(
     string[] Skills,
     string[] Roles,
     Dictionary<string, string[]> SkillRoleReferences,
+    SkillReferenceDefinition[] SkillReferences,
     AssetDefinition[] Assets,
     Dictionary<string, object>? Metadata);

@@ -54,6 +54,7 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
             ["dependencies"] = JsonStringArray(plugin.Dependencies),
             ["roles"] = JsonStringArray(plugin.Roles),
             ["assets"] = BuildAssets(plugin),
+            ["skillReferences"] = BuildSkillReferences(plugin),
             ["canonicalSource"] = "src/canonical"
         };
 
@@ -91,6 +92,20 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
                     Path.Combine("skills", skillName, "references", "roles", rolePrompt + ".md"),
                     ContentNormalizer.NormalizeContent(roleContent)));
             }
+        }
+
+        foreach (var reference in plugin.SkillReferences
+            .Where(reference => StringComparer.Ordinal.Equals(reference.Skill, skillName))
+            .OrderBy(reference => NormalizeReferenceDestination(reference.Destination), StringComparer.Ordinal))
+        {
+            var referenceContent = RequiredFileReader.Read(reference.Source);
+            files.Add(new GeneratedFile(
+                Path.Combine(
+                    "skills",
+                    skillName,
+                    "references",
+                    NormalizeReferenceDestination(reference.Destination).Replace('/', Path.DirectorySeparatorChar)),
+                ContentNormalizer.NormalizeContent(referenceContent)));
         }
 
         if (StringComparer.Ordinal.Equals(skillName, "idd-project-init"))
@@ -133,6 +148,22 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         }
 
         return assets;
+    }
+
+    private static JsonArray BuildSkillReferences(PluginDefinition plugin)
+    {
+        var references = new JsonArray();
+        foreach (var reference in plugin.SkillReferences)
+        {
+            references.Add(new JsonObject
+            {
+                ["skill"] = reference.Skill,
+                ["source"] = reference.Source,
+                ["destination"] = reference.Destination
+            });
+        }
+
+        return references;
     }
 
     protected static string DisplayName(string pluginName) =>
@@ -202,4 +233,7 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         StringComparer.Ordinal.Equals(relativeSourceFile, "gitignore.template")
             ? ".gitignore"
             : relativeSourceFile;
+
+    private static string NormalizeReferenceDestination(string destination) =>
+        string.Join('/', destination.Replace('\\', '/').Split('/'));
 }

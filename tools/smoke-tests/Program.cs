@@ -13,6 +13,8 @@ CheckClaudeMarketplace();
 CheckCodexMarketplace();
 CheckPlatformPlugins("claude", ".claude-plugin");
 CheckPlatformPlugins("codex", ".codex-plugin");
+CheckRouteSkill("claude");
+CheckRouteSkill("codex");
 CheckManualSkillPolicies();
 CheckPublishedLayout();
 CheckGeneratorCheckMode();
@@ -277,6 +279,109 @@ void CheckManualSkillPolicies()
     }
 }
 
+void CheckRouteSkill(string platform)
+{
+    var intentRoot = Path.Combine(marketplaceRoot, "plugins", platform, "idd-intent");
+    var factoryRoot = Path.Combine(marketplaceRoot, "plugins", platform, "idd-factory");
+    var routeSkill = Path.Combine(intentRoot, "skills", "idd-route", "SKILL.md");
+    var reference = Path.Combine(intentRoot, "skills", "idd-route", "references", "common-workflows.md");
+    var canonicalReference = Path.Combine(repoRoot, "src", "canonical", "methodology", "common-workflows.md");
+    var canonicalRoute = Path.Combine(repoRoot, "src", "canonical", "skills", "idd-route.md");
+
+    ExpectFile(routeSkill);
+    ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-route"));
+    ExpectFile(reference);
+    ExpectMissing(Path.Combine(intentRoot, "assets", "bootstrap", "common-workflows.md"));
+    ExpectMissing(Path.Combine(
+        intentRoot,
+        "skills",
+        "idd-route",
+        "assets",
+        "bootstrap",
+        "common-workflows.md"));
+    ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-route", "references", "common-workflows.md"));
+
+    if (File.Exists(reference) && File.Exists(canonicalReference))
+    {
+        var generated = NormalizeText(File.ReadAllText(reference));
+        var canonical = NormalizeText(File.ReadAllText(canonicalReference));
+        if (!StringComparer.Ordinal.Equals(generated, canonical))
+        {
+            failures.Add($"{platform} idd-route common-workflows reference does not match canonical content.");
+        }
+    }
+
+    if (File.Exists(canonicalReference))
+    {
+        var text = File.ReadAllText(canonicalReference);
+        foreach (var expected in new[]
+        {
+            "Add Behavior",
+            "Modify Behavior",
+            "Remove Behavior",
+            "Refactor While Preserving Behavior",
+            "Normalize Current Intent",
+            "idd-intent-change",
+            "idd-code-implement",
+            "idd-code-check-implementation",
+            "idd-intent-audit",
+            "idd-intent-normalize-current",
+            "idd-intent-lint"
+        })
+        {
+            ExpectContains(text, expected, $"canonical common workflows {expected}");
+        }
+    }
+
+    if (File.Exists(canonicalRoute))
+    {
+        var routeText = File.ReadAllText(canonicalRoute);
+        foreach (var expected in new[]
+        {
+            "read-only",
+            "product-change",
+            "add",
+            "modify",
+            "remove",
+            "focused",
+            "orchestrated",
+            "preservation boundary"
+        })
+        {
+            ExpectContains(routeText, expected, $"canonical idd-route content {expected}");
+        }
+    }
+
+    if (File.Exists(routeSkill))
+    {
+        var routeSkillText = File.ReadAllText(routeSkill);
+        if (platform == "claude")
+        {
+            if (routeSkillText.Contains("disable-model-invocation: true", StringComparison.Ordinal))
+            {
+                failures.Add("Claude idd-route disables implicit invocation.");
+            }
+
+            ExpectContains(routeSkillText, "allowed-tools: Read Glob Grep", "Claude idd-route read-only tool policy");
+        }
+    }
+
+    if (StringComparer.Ordinal.Equals(platform, "codex"))
+    {
+        var codexPolicy = Path.Combine(
+            intentRoot,
+            "skills",
+            "idd-route",
+            "agents",
+            "openai.yaml");
+        if (File.Exists(codexPolicy) &&
+            File.ReadAllText(codexPolicy).Contains("allow_implicit_invocation: false", StringComparison.Ordinal))
+        {
+            failures.Add("Codex idd-route disables implicit invocation.");
+        }
+    }
+}
+
 void CheckPublishedLayout()
 {
     foreach (var path in new[]
@@ -432,6 +537,8 @@ string[] SnapshotMarketplace() => Directory.Exists(marketplaceRoot)
     : [];
 
 string Relative(string path) => Path.GetRelativePath(repoRoot, path).Replace('\\', '/');
+
+static string NormalizeText(string text) => text.ReplaceLineEndings("\n").TrimEnd() + "\n";
 
 int RunProcess(string fileName, string arguments)
 {
