@@ -28,7 +28,7 @@ internal static class SkillReferencePathValidator
             throw new ArgumentException("Skill reference destination contains an unsafe segment.", nameof(destination));
         }
 
-        if (StringComparer.Ordinal.Equals(segments[0], "roles"))
+        if (StringComparer.OrdinalIgnoreCase.Equals(segments[0], "roles"))
         {
             throw new ArgumentException(
                 "Skill reference destination is inside reserved 'roles/' references.",

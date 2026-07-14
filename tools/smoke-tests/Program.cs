@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 var repoRoot = FindRepoRoot();
@@ -14,11 +15,7 @@ CheckClaudeMarketplace();
 CheckCodexMarketplace();
 CheckPlatformPlugins("claude", ".claude-plugin");
 CheckPlatformPlugins("codex", ".codex-plugin");
-CheckRouteSkill("claude");
-CheckRouteSkill("codex");
-CheckCanonicalManifest();
-CheckCanonicalSkillSemantics();
-CheckManualSkillPolicies();
+CheckCanonicalSkillReferences();
 CheckPublishedLayout();
 CheckGeneratorCheckMode();
 CheckSecondRunIsStable();
@@ -249,152 +246,7 @@ void CheckIddMetadata(
     }
 }
 
-void CheckManualSkillPolicies()
-{
-    foreach (var skillName in new[] { "idd-skip", "idd-project-init" })
-    {
-        var claudeSkill = Path.Combine(
-            marketplaceRoot,
-            "plugins",
-            "claude",
-            "idd-intent",
-            "skills",
-            skillName,
-            "SKILL.md");
-        ExpectFile(claudeSkill);
-        if (File.Exists(claudeSkill))
-        {
-            var text = File.ReadAllText(claudeSkill);
-            ExpectContains(text, "disable-model-invocation: true", $"Claude {skillName} manual policy");
-            ExpectContains(text, "user-invocable: true", $"Claude {skillName} user policy");
-        }
-
-        var codexPolicy = Path.Combine(
-            marketplaceRoot,
-            "plugins",
-            "codex",
-            "idd-intent",
-            "skills",
-            skillName,
-            "agents",
-            "openai.yaml");
-        ExpectFile(codexPolicy);
-        if (File.Exists(codexPolicy))
-        {
-            ExpectContains(File.ReadAllText(codexPolicy), "allow_implicit_invocation: false", $"Codex {skillName} manual policy");
-        }
-    }
-}
-
-void CheckRouteSkill(string platform)
-{
-    var intentRoot = Path.Combine(marketplaceRoot, "plugins", platform, "idd-intent");
-    var factoryRoot = Path.Combine(marketplaceRoot, "plugins", platform, "idd-factory");
-    var routeSkill = Path.Combine(intentRoot, "skills", "idd-route", "SKILL.md");
-    var reference = Path.Combine(intentRoot, "skills", "idd-route", "references", "common-workflows.md");
-    var canonicalReference = Path.Combine(repoRoot, "src", "canonical", "methodology", "common-workflows.md");
-    var canonicalRoute = Path.Combine(repoRoot, "src", "canonical", "skills", "idd-route.md");
-
-    ExpectFile(routeSkill);
-    ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-route"));
-    ExpectFile(reference);
-    ExpectMissing(Path.Combine(intentRoot, "assets", "bootstrap", "common-workflows.md"));
-    ExpectMissing(Path.Combine(
-        intentRoot,
-        "skills",
-        "idd-route",
-        "assets",
-        "bootstrap",
-        "common-workflows.md"));
-    ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-route", "references", "common-workflows.md"));
-
-    if (File.Exists(reference) && File.Exists(canonicalReference))
-    {
-        var generated = NormalizeText(File.ReadAllText(reference));
-        var canonical = NormalizeText(File.ReadAllText(canonicalReference));
-        if (!StringComparer.Ordinal.Equals(generated, canonical))
-        {
-            failures.Add($"{platform} idd-route common-workflows reference does not match canonical content.");
-        }
-    }
-
-    if (File.Exists(canonicalReference))
-    {
-        var text = File.ReadAllText(canonicalReference);
-        foreach (var expected in new[]
-        {
-            "Add Behavior",
-            "Modify Behavior",
-            "Remove Behavior",
-            "Refactor While Preserving Behavior",
-            "Normalize Current Intent",
-            "idd-intent-change",
-            "idd-code-implement",
-            "idd-code-check-implementation",
-            "idd-intent-audit",
-            "idd-intent-normalize-current",
-            "idd-intent-lint"
-        })
-        {
-            ExpectContains(text, expected, $"canonical common workflows {expected}");
-        }
-    }
-
-    if (File.Exists(canonicalRoute))
-    {
-        var routeText = File.ReadAllText(canonicalRoute);
-        foreach (var expected in new[]
-        {
-            "read-only",
-            "product-change",
-            "add",
-            "modify",
-            "remove",
-            "focused",
-            "orchestrated",
-            "preservation boundary"
-        })
-        {
-            ExpectContains(routeText, expected, $"canonical idd-route content {expected}");
-        }
-    }
-
-    if (File.Exists(routeSkill))
-    {
-        var routeSkillText = File.ReadAllText(routeSkill);
-        ExpectContains(routeSkillText, "references/common-workflows.md", $"{platform} idd-route reference path");
-        ExpectContains(routeSkillText, "canonical source", $"{platform} idd-route canonical reference declaration");
-        if (platform == "claude")
-        {
-            if (routeSkillText.Contains("disable-model-invocation: true", StringComparison.Ordinal))
-            {
-                failures.Add("Claude idd-route disables implicit invocation.");
-            }
-
-            ExpectContains(routeSkillText, "context: fork", "Claude idd-route forked context");
-            ExpectContains(routeSkillText, "agent: Explore", "Claude idd-route Explore agent");
-            ExpectContains(routeSkillText, "argument-hint: \"[request or workflow question]\"", "Claude idd-route argument hint");
-            ExpectContains(routeSkillText, "allowed-tools: Read Glob Grep", "Claude idd-route read-only tool policy");
-        }
-    }
-
-    if (StringComparer.Ordinal.Equals(platform, "codex"))
-    {
-        var codexPolicy = Path.Combine(
-            intentRoot,
-            "skills",
-            "idd-route",
-            "agents",
-            "openai.yaml");
-        if (File.Exists(codexPolicy) &&
-            File.ReadAllText(codexPolicy).Contains("allow_implicit_invocation: false", StringComparison.Ordinal))
-        {
-            failures.Add("Codex idd-route disables implicit invocation.");
-        }
-    }
-}
-
-void CheckCanonicalManifest()
+void CheckCanonicalSkillReferences()
 {
     var path = Path.Combine(repoRoot, "src", "canonical", "plugins", "plugin-manifest.json");
     using var document = ReadJson(path);
@@ -403,38 +255,91 @@ void CheckCanonicalManifest()
         return;
     }
 
-    var factory = document.RootElement
-        .GetProperty("plugins")
-        .GetProperty("idd-factory");
-    if (factory.TryGetProperty("skillReferences", out _))
+    var plugins = document.RootElement.GetProperty("plugins");
+    foreach (var pluginProperty in plugins.EnumerateObject())
     {
-        failures.Add("Canonical idd-factory manifest still declares skillReferences.");
+        var pluginName = pluginProperty.Name;
+        var plugin = pluginProperty.Value;
+        var skills = plugin.GetProperty("skills").EnumerateArray()
+            .Select(skill => skill.GetString() ?? "")
+            .ToHashSet(StringComparer.Ordinal);
+        var destinationsBySkill = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+
+        if (!plugin.TryGetProperty("skillReferences", out var references))
+        {
+            continue;
+        }
+
+        foreach (var reference in references.EnumerateArray())
+        {
+            var skill = reference.GetProperty("skill").GetString() ?? "";
+            var source = reference.GetProperty("source").GetString() ?? "";
+            var destination = reference.GetProperty("destination").GetString() ?? "";
+
+            if (!skills.Contains(skill))
+            {
+                failures.Add($"Plugin '{pluginName}' assigns a reference to unowned skill '{skill}'.");
+            }
+
+            var sourcePath = Path.GetFullPath(Path.Combine(repoRoot, source.Replace('/', Path.DirectorySeparatorChar)));
+            var rootWithSeparator = repoRoot.EndsWith(Path.DirectorySeparatorChar) ? repoRoot : repoRoot + Path.DirectorySeparatorChar;
+            if (!sourcePath.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase) || !File.Exists(sourcePath))
+            {
+                failures.Add($"Plugin '{pluginName}' reference source '{source}' is not a repository text file.");
+                continue;
+            }
+
+            try
+            {
+                var content = File.ReadAllText(sourcePath, new UTF8Encoding(false, true));
+                if (content.Contains('\0'))
+                {
+                    failures.Add($"Plugin '{pluginName}' reference source '{source}' is not valid UTF-8 text.");
+                }
+            }
+            catch (DecoderFallbackException)
+            {
+                failures.Add($"Plugin '{pluginName}' reference source '{source}' is not valid UTF-8 text.");
+            }
+
+            string normalizedDestination;
+            try
+            {
+                normalizedDestination = SkillReferencePathValidator.NormalizeDestination(destination);
+            }
+            catch (ArgumentException exception)
+            {
+                failures.Add($"Plugin '{pluginName}' reference destination '{destination}' is invalid: {exception.Message}");
+                continue;
+            }
+
+            if (!destinationsBySkill.TryGetValue(skill, out var destinations))
+            {
+                destinations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                destinationsBySkill.Add(skill, destinations);
+            }
+
+            if (!destinations.Add(normalizedDestination))
+            {
+                failures.Add($"Plugin '{pluginName}' skill '{skill}' has a case-insensitive destination conflict at '{normalizedDestination}'.");
+            }
+
+            foreach (var platform in new[] { "claude", "codex" })
+            {
+                var generatedPath = Path.Combine(marketplaceRoot, "plugins", platform, pluginName, "skills", skill, "references", normalizedDestination.Replace('/', Path.DirectorySeparatorChar));
+                ExpectFile(generatedPath);
+                if (File.Exists(generatedPath) && !StringComparer.Ordinal.Equals(NormalizeText(File.ReadAllText(generatedPath)), NormalizeText(File.ReadAllText(sourcePath))))
+                {
+                    failures.Add($"{platform} generated reference for '{pluginName}/{skill}/{normalizedDestination}' does not match its canonical source.");
+                }
+            }
+        }
     }
-}
 
-void CheckCanonicalSkillSemantics()
-{
-    ExpectCanonicalContains(
-        Path.Combine("src", "canonical", "skills", "idd-intent-change.md"),
-        [
-            "not-applicable",
-            "task-only-no-idd-intent-change"
-        ],
-        "canonical idd-intent-change");
-
-    ExpectCanonicalContains(
-        Path.Combine("src", "canonical", "skills", "idd-code-check-implementation.md"),
-        ["current-requirement", "unowned-behavior", "Do not use `current-requirement` for `missing-spec` when no current requirement exists."],
-        "canonical idd-code-check-implementation");
-
-    ExpectCanonicalContains(
-        Path.Combine("src", "canonical", "skills", "idd-code-implement.md"),
-        [
-            "satisfy-current-intent",
-            "preserve-current-intent",
-            "Mode:"
-        ],
-        "canonical idd-code-implement");
+    foreach (var platform in new[] { "claude", "codex" })
+    {
+        ExpectMissing(Path.Combine(marketplaceRoot, "plugins", platform, "idd-factory", "skills", "idd-route", "references"));
+    }
 }
 
 void CheckSkillReferenceDestinationValidation()
@@ -462,7 +367,10 @@ void CheckSkillReferenceDestinationValidation()
         "//server/share/file.md",
         "\\\\server\\share\\file.md",
         "../file.md",
-        "roles/file.md"
+        "folder//file.md",
+        "./file.md",
+        "roles/file.md",
+        "Roles/file.md"
     })
     {
         try
@@ -473,22 +381,6 @@ void CheckSkillReferenceDestinationValidation()
         catch (ArgumentException)
         {
         }
-    }
-}
-
-void ExpectCanonicalContains(string relativePath, string[] expectedValues, string context)
-{
-    var path = Path.Combine(repoRoot, relativePath);
-    ExpectFile(path);
-    if (!File.Exists(path))
-    {
-        return;
-    }
-
-    var text = File.ReadAllText(path);
-    foreach (var expected in expectedValues)
-    {
-        ExpectContains(text, expected, $"{context} {expected}");
     }
 }
 

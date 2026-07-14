@@ -110,7 +110,7 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
             var destination = NormalizeSkillReferenceDestination(pluginName, reference);
             if (!destinationsBySkill.TryGetValue(reference.Skill, out var destinations))
             {
-                destinations = new HashSet<string>(StringComparer.Ordinal);
+                destinations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 destinationsBySkill.Add(reference.Skill, destinations);
             }
 
@@ -157,9 +157,19 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
     {
         try
         {
-            _ = File.ReadAllText(source, StrictUtf8);
+            var content = File.ReadAllText(source, StrictUtf8);
+            if (content.Contains('\0'))
+            {
+                throw new InvalidOperationException("contains a NUL character");
+            }
         }
         catch (DecoderFallbackException exception)
+        {
+            throw new InvalidOperationException(
+                $"Plugin '{pluginName}' skill '{reference.Skill}' reference source '{reference.Source}' is not valid UTF-8 text.",
+                exception);
+        }
+        catch (InvalidOperationException exception)
         {
             throw new InvalidOperationException(
                 $"Plugin '{pluginName}' skill '{reference.Skill}' reference source '{reference.Source}' is not valid UTF-8 text.",
