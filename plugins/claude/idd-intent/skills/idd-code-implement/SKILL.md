@@ -1,18 +1,34 @@
 ---
 name: idd-code-implement
-description: Implement behavior from current `.idd/intent/` product intent and verify the code against the relevant specification.
+description: Implement current product intent or perform a behavior-preserving implementation change, then verify the result against relevant `.idd/intent/` specifications.
 ---
 
 # idd-code-implement
 
 Use this skill when the user asks to implement behavior that is already
-specified, or when `idd-intent-change` has just updated the relevant spec.
+specified, when `idd-intent-change` has just updated the relevant spec, or when
+the user asks for implementation-only work that must preserve current intent.
 
 Formula:
 
 ```text
-idd-code-implement = current spec intent + code change + verification
+idd-code-implement = current spec intent + mode + code change + verification
 ```
+
+## Modes
+
+```text
+satisfy-current-intent
+preserve-current-intent
+```
+
+Use `satisfy-current-intent` after a product change or when implementation must
+be brought into conformance with existing current intent.
+
+Use `preserve-current-intent` for refactoring, dependency replacement, internal
+architecture cleanup, private type split or merge, implementation algorithm
+replacement, internal performance work, or implementation migration without
+observable behavior change.
 
 ## Rules
 
@@ -25,31 +41,46 @@ idd-code-implement = current spec intent + code change + verification
 - Do not copy implementation plans or temporary notes into specs.
 - Prefer the smallest code change that satisfies the relevant acceptance
   criteria.
-- Add or update tests when the behavior can be tested.
+- In `preserve-current-intent` mode, do not edit intent.
+- In `preserve-current-intent` mode, read relevant current intent before
+  changing code and treat the preservation boundary as a temporary
+  implementation constraint.
+- Add or update only the minimal high-value verification needed when existing
+  checks are not enough to protect meaningful preserved behavior or regression
+  risk.
+- If implementation requires a product behavior change, stop
+  `preserve-current-intent` and use `idd-intent-change`.
+- Do not update intent after the fact to justify an accidental behavior change.
+- Before adding a test, check whether the behavior is already covered, whether an
+  existing scenario can be extended, whether the logic or risk is non-trivial, and
+  whether omitting the test would materially reduce regression detection.
+- Prefer a higher-level automated scenario that covers several lower-level details
+  over separate tests for each method or specification sentence.
 - Run relevant verification.
 - After implementation, perform a focused implementation/spec check using
   `idd-code-check-implementation`.
 
 ## Workflow
 
-1. Identify the relevant spec and acceptance criteria.
-2. Locate the implementation area.
-3. Locate existing tests for the behavior.
-4. Implement the smallest change that satisfies the spec.
-5. Add or update tests.
-6. Run relevant verification.
-7. Run or recommend focused `idd-code-check-implementation`.
-8. Report:
+1. Classify mode:
 
-   - specs used as intent;
-   - code areas changed;
-   - tests added or updated;
-   - verification result;
-   - remaining risks or missing coverage.
+   - `satisfy-current-intent`;
+   - `preserve-current-intent`.
+
+2. Read relevant current intent.
+3. For preserve mode, establish or accept the preservation boundary.
+4. Locate implementation and verification areas.
+5. Apply the smallest safe implementation change.
+6. Add or update only the minimal high-value verification needed for meaningful
+   behavior or regression risk.
+7. Run relevant verification.
+8. Run focused `idd-code-check-implementation`.
+9. Report the required implementation result fields.
 
 ## Missing Spec Rule
 
-If the requested behavior is not covered by current specs:
+In `satisfy-current-intent`, if the requested durable behavior is not covered by
+current specs:
 
 ```text
 Stop before implementation and use idd-intent-change.
@@ -57,6 +88,46 @@ Stop before implementation and use idd-intent-change.
 
 Do not silently implement new durable behavior without updating product intent
 first.
+
+In `preserve-current-intent`, a missing specification for private
+implementation structure is not an error. Preserve mode may proceed when current
+intent sufficiently defines the observable behavior and durable contracts that
+must remain unchanged.
+
+If the preservation boundary cannot be determined from the request and current
+intent, stop and route to `idd-code-check-implementation`,
+`idd-intent-brainstorm`, or an intent change workflow instead of making code
+changes.
+
+## Report
+
+Use these fields:
+
+```text
+Mode:
+Specs used as intent:
+Behavior changed:
+Behavior preserved:
+Public contracts preserved:
+Compatibility/data constraints:
+Code areas changed:
+Tests changed:
+Verification result:
+Conformance-check result:
+Remaining risks:
+```
+
+## Removal Implementation
+
+When implementing behavior removal, verify that:
+
+- the removed entry point is no longer available;
+- dependent scenarios still work;
+- old data and saved settings are handled according to current intent;
+- public contracts are removed or changed according to current intent;
+- tests for removed behavior are removed or changed instead of remaining as
+  false requirements;
+- negative verification exists when absence of behavior is a product contract.
 
 ## Relationship to Factory
 
@@ -78,5 +149,6 @@ workflow.
 ## Example
 
 If `.idd/intent/0018.spec-command-history-completion.md` says command completion must
-have a neutral default selection, implement that behavior in command completion
-code and tests, then verify the implementation against spec 0018.
+have a neutral default selection, implement that behavior and add only the
+high-value verification needed to protect it, then verify the implementation
+against spec 0018.

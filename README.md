@@ -1,7 +1,7 @@
 # Intent-Driven Development
 
 <p align="center">
-  <img src="docs/assets/idd-hero.svg" alt="Intent-Driven Development thought experiment: delete the implementation, keep only the intent, and rebuild the product" />
+  <img src="docs/assets/idd-hero.png" alt="Intent-Driven Development thought experiment: delete the implementation, keep only the intent, and rebuild the product" />
 </p>
 
 <p align="center">
@@ -82,6 +82,14 @@ idd-project-init
 ```
 
 Then ask IDD to import an existing product, describe a new one, change current product intent, implement from intent, or verify that the implementation still matches it.
+
+Describe the requested change naturally. IDD routes it through the smallest safe workflow.
+
+To inspect the selected route explicitly:
+
+```text
+idd-route
+```
 
 Factory is deliberately absent from the default installation. Add it only when the implementation needs explicit multi-step planning and review orchestration.
 

@@ -1,6 +1,6 @@
 {
   "name": "idd-intent",
-  "version": "2.0.7",
+  "version": "2.0.8",
   "description": "Durable product memory for Intent-Driven Development.",
   "skills": "./skills/",
   "author": {

@@ -446,6 +446,11 @@ verification.
 
 Do not include build commands, test-runner commands, CI commands, test class
 names, temporary source scans, or step-by-step execution instructions.
+
+Do not turn Verification into a catalog of test methods, internal classes,
+private implementation shape, or one automated test per specification
+sentence. Prefer important user scenarios, critical invariants, meaningful
+boundary cases, and justified manual checks.
 ```
 
 Minimum shape for `adr` documents:
@@ -596,7 +601,7 @@ Rules:
    - reject task/refactor/cleanup notes as current specs.
 9. Propose or infer target files.
 10. Write normalized current specs, ADRs, or active spikes according to mode and
-   safety.
+    safety.
 11. Keep conflicts visible and unresolved.
 12. Run post-import cleanup.
 13. Return the import report in the assistant response, or write it outside

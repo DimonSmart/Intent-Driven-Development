@@ -26,6 +26,8 @@ invokes this command or names this factory workflow directly.
 
 - Review one task only.
 - Use the task brief and relevant specs as the review scope.
+- Review the task against any route classification and preservation boundary
+  copied into the Work Plan or task brief.
 - Do not broaden into unrelated code review.
 - Do not treat old factory plans as context.
 - Classify findings clearly.
@@ -38,8 +40,12 @@ invokes this command or names this factory workflow directly.
    Work Plan.
 2. Read only the relevant current specs needed for the task scope.
 3. Review the implementation evidence and verification output for that task.
-4. Use the local `references/roles/` task-reviewer prompt when present.
-5. Write a task review in the same `.idd/factory/work/<current-work-dir>/`
+4. Verify local changed, removed, preserved, public contract, and compatibility
+   constraints from the task preservation boundary.
+5. Stop and return to an intent workflow if required product intent is missing
+   or contradictory.
+6. Use the local `references/roles/` task-reviewer prompt when present.
+7. Write a task review in the same `.idd/factory/work/<current-work-dir>/`
    directory when a file artifact is useful.
 
 ## Output Format
@@ -58,6 +64,11 @@ invokes this command or names this factory workflow directly.
 `approved | needs-fix | blocked | out-of-scope`
 
 ## Spec Compliance
+
+- Result:
+- Evidence:
+
+## Preservation Boundary
 
 - Result:
 - Evidence:

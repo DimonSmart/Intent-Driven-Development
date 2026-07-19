@@ -8,6 +8,9 @@ intent, ADRs, or active spikes.
 
 Git history is the source for deleted or previous document versions.
 
+## Current documents
+
+No numbered current documents have been created yet.
+
 | Document | Role | Area | Notes | Replaces |
 | --- | --- | --- | --- | --- |
-| Add numbered current documents here | spec / adr / spike | Product area | Short navigation note | Optional replaced document |

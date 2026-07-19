@@ -94,9 +94,12 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
 
 - If specification and implementation disagree, report the mismatch and propose
   the smallest safe next step.
+- If a preservation boundary is provided, check changed behavior, removed
+  behavior, preserved behavior, public contracts, compatibility or data
+  constraints, and verification evidence.
 - If intent is unclear, ask for confirmation or recommend a spike.
-- If the implementation appears correct but verification is missing, recommend
-  adding or updating tests.
+- If meaningful behavior or regression risk lacks adequate verification,
+  recommend only the minimal high-value tests or checks needed to protect it.
 - If the specification is current and implementation violates it, classify the
   issue as an implementation mismatch.
 - If implementation behavior may be desired but is not specified, classify it as
@@ -128,12 +131,24 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
    - `possible-intent-change`;
    - `non-goal-or-out-of-scope`.
 
+   Also assign an evidence scope:
+
+   - `current-requirement`;
+   - `changed-requirement`;
+   - `preserved-requirement`;
+   - `removed-behavior`;
+   - `compatibility-boundary`.
+   - `unowned-behavior`.
+
+   Use `current-requirement` for ordinary checks against an existing current
+   requirement when no specific change context is provided.
+
 7. For each mismatch, cite the relevant spec section or explain that no current
    spec covers the behavior.
 8. Recommend the smallest next step:
 
    - fix implementation;
-   - add or update tests;
+   - add or update minimal high-value verification;
    - ask for product intent confirmation;
    - update product intent using `idd-intent-change`;
    - create a new spec, ADR, or spike using `idd-intent-new-document` only when no
@@ -167,6 +182,8 @@ Current specs and sections used as normative intent.
 
 Classification: `implementation-mismatch | missing-verification | missing-spec | unclear-intent | possible-intent-change | matches-spec | non-goal-or-out-of-scope`
 
+Scope: `current-requirement | changed-requirement | preserved-requirement | removed-behavior | compatibility-boundary | unowned-behavior`
+
 Evidence:
 - Spec evidence:
 - Implementation evidence:
@@ -186,6 +203,31 @@ Recommended next step:
 
 ## Classification Rules
 
+## Evidence Scope Rules
+
+Use `current-requirement` for an ordinary check of current intent that is not
+tied to a specific change.
+
+Use `changed-requirement` for a requirement changed by the current work.
+
+Use `preserved-requirement` for a requirement from a preservation boundary.
+
+Use `removed-behavior` to verify behavior that should no longer exist.
+
+Use `compatibility-boundary` for migration, legacy data, or compatibility
+contracts.
+
+Use `unowned-behavior` when implementation contains observable durable behavior
+for which no current owning intent exists.
+
+Do not use `current-requirement` for `missing-spec` when no current requirement exists.
+
+When no change context is provided and a current requirement exists, use:
+
+```text
+Scope: current-requirement
+```
+
 ### `matches-spec`
 
 Use when implementation behavior satisfies current spec.
@@ -200,6 +242,7 @@ sessions after 30 days.
 ### `implementation-mismatch`
 
 Use when current spec is clear and implementation violates it.
+Also use this classification when preserved behavior regresses during a change.
 
 Example:
 
@@ -217,8 +260,13 @@ implementation is the intended behavior.
 
 ### `missing-verification`
 
-Use when implementation appears to satisfy spec, but there is no test or check
-that proves it.
+Use when implementation appears to satisfy spec, but an important user scenario,
+critical invariant, meaningful boundary case, or real regression risk lacks
+adequate evidence.
+
+Do not classify `missing-verification` merely because a method or specification
+sentence lacks a dedicated test, when the behavior is trivial, or when a
+higher-level automated scenario already covers the risk.
 
 Example:
 
@@ -229,7 +277,8 @@ The code appears to support OTP, but no test covers OTP failure retry behavior.
 Recommended next step:
 
 ```text
-Add or update verification.
+Add or update only verification that proves meaningful behavior or regression
+risk not already covered by a higher-level automated check.
 ```
 
 ### `missing-spec`
@@ -237,11 +286,20 @@ Add or update verification.
 Use when implementation contains durable product behavior that is not described
 by current specs.
 
+Use this classification with:
+
+```text
+Scope: unowned-behavior
+```
+
 Example:
 
 ```text
-Password reset exists in implementation, but no current spec describes password
-reset behavior.
+Password reset is implemented, but no current specification owns or describes
+password-reset behavior.
+
+Classification: missing-spec
+Scope: unowned-behavior
 ```
 
 Recommended next step:
@@ -249,7 +307,8 @@ Recommended next step:
 ```text
 Ask whether this behavior is intended product intent. If the user describes a
 desired behavior, use idd-intent-change. If the user confirms existing implementation
-as intent, use idd-code-update-intent.
+as intent, use idd-code-update-intent. If the decision is unclear, use brainstorm
+or create a spike.
 ```
 
 ### `unclear-intent`
