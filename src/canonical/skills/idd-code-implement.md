@@ -40,12 +40,17 @@ observable behavior change.
 - In `preserve-current-intent` mode, read relevant current intent before
   changing code and treat the preservation boundary as a temporary
   implementation constraint.
-- Add or update verification when existing checks are not enough to prove the
-  preserved behavior.
+- Add or update only the minimal high-value verification needed when existing
+  checks are not enough to protect meaningful preserved behavior or regression
+  risk.
 - If implementation requires a product behavior change, stop
   `preserve-current-intent` and use `idd-intent-change`.
 - Do not update intent after the fact to justify an accidental behavior change.
-- Add or update tests when the behavior can be tested.
+- Before adding a test, check whether the behavior is already covered, whether an
+  existing scenario can be extended, whether the logic or risk is non-trivial, and
+  whether omitting the test would materially reduce regression detection.
+- Prefer a higher-level automated scenario that covers several lower-level details
+  over separate tests for each method or specification sentence.
 - Run relevant verification.
 - After implementation, perform a focused implementation/spec check using
   `idd-code-check-implementation`.
@@ -61,7 +66,8 @@ observable behavior change.
 3. For preserve mode, establish or accept the preservation boundary.
 4. Locate implementation and verification areas.
 5. Apply the smallest safe implementation change.
-6. Add or update verification.
+6. Add or update only the minimal high-value verification needed for meaningful
+   behavior or regression risk.
 7. Run relevant verification.
 8. Run focused `idd-code-check-implementation`.
 9. Report the required implementation result fields.
@@ -138,5 +144,6 @@ workflow.
 ## Example
 
 If `.idd/intent/0018.spec-command-history-completion.md` says command completion must
-have a neutral default selection, implement that behavior in command completion
-code and tests, then verify the implementation against spec 0018.
+have a neutral default selection, implement that behavior and add only the
+high-value verification needed to protect it, then verify the implementation
+against spec 0018.

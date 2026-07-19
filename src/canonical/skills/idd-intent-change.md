@@ -32,8 +32,10 @@ idd-intent-change =
 - Do not add build or test commands, implementation plans, private classes or
   methods from a proposed solution, source-file lists, dependency-injection
   wiring, migration checklists, or progress status to a spec.
-- Keep Verification at the level of required evidence, scenario, and property;
-  do not name a test runner, CI command, test class, or test method.
+- Verification describes important user scenarios, critical invariants,
+  meaningful boundary cases, and justified manual checks. It must not become a
+  catalog of test methods, internal classes, private implementation shape, or one
+  automated test per specification sentence.
 - When a request combines an intent change with implementation work, keep the
   spec implementation-independent and pass the concrete implementation focus to
   the next implementation skill rather than recording it as intent.

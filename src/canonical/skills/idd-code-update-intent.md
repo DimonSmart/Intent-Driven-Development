@@ -31,6 +31,10 @@ implementation.
 - Require explicit user confirmation before making semantic changes.
 - Preserve the distinction between observable behavior, domain contracts,
   architecture, verification rules, and local implementation mechanics.
+- When updating Verification, describe important user scenarios, critical
+  invariants, meaningful boundary cases, and justified manual checks. Do not
+  turn it into a list of test methods, internal classes, private implementation
+  shape, or one automated test per specification sentence.
 - If implementation and specification differ but intent is unclear, report the
   difference and ask for confirmation instead of editing the specification.
 - Update existing current specifications before creating new documents.

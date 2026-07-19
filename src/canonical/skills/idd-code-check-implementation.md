@@ -93,8 +93,8 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
   behavior, preserved behavior, public contracts, compatibility or data
   constraints, and verification evidence.
 - If intent is unclear, ask for confirmation or recommend a spike.
-- If the implementation appears correct but verification is missing, recommend
-  adding or updating tests.
+- If meaningful behavior or regression risk lacks adequate verification,
+  recommend only the minimal high-value tests or checks needed to protect it.
 - If the specification is current and implementation violates it, classify the
   issue as an implementation mismatch.
 - If implementation behavior may be desired but is not specified, classify it as
@@ -143,7 +143,7 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
 8. Recommend the smallest next step:
 
    - fix implementation;
-   - add or update tests;
+   - add or update minimal high-value verification;
    - ask for product intent confirmation;
    - update product intent using `idd-intent-change`;
    - create a new spec, ADR, or spike using `idd-intent-new-document` only when no
@@ -255,8 +255,13 @@ implementation is the intended behavior.
 
 ### `missing-verification`
 
-Use when implementation appears to satisfy spec, but there is no test or check
-that proves it.
+Use when implementation appears to satisfy spec, but an important user scenario,
+critical invariant, meaningful boundary case, or real regression risk lacks
+adequate evidence.
+
+Do not classify `missing-verification` merely because a method or specification
+sentence lacks a dedicated test, when the behavior is trivial, or when a
+higher-level automated scenario already covers the risk.
 
 Example:
 
@@ -267,7 +272,8 @@ The code appears to support OTP, but no test covers OTP failure retry behavior.
 Recommended next step:
 
 ```text
-Add or update verification.
+Add or update only verification that proves meaningful behavior or regression
+risk not already covered by a higher-level automated check.
 ```
 
 ### `missing-spec`

@@ -39,6 +39,10 @@ owners, related documents, acceptance or decision context, and open questions.
 - Git history preserves the deleted document.
 - If the requested type does not match the change, do not follow it blindly.
   State the mismatch and use the correct IDD document type.
+- Verification sections describe important user scenarios, critical invariants,
+  meaningful boundary cases, and justified manual checks. They must not list
+  individual test methods, internal classes, private implementation shape, or
+  require one automated test per specification sentence.
 
 ## Document Type
 
