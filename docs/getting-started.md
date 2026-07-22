@@ -57,7 +57,9 @@ With `idd-intent` installed, invoke in the target repository:
 idd-project-init
 ```
 
-The skill creates only project-owned durable state:
+The workflow is performed directly by the Coding Agent. No generator, CLI helper, installation hook, or application runtime writes project agent instructions.
+
+The skill creates the project-owned durable state:
 
 ```text
 .idd/
@@ -65,7 +67,18 @@ The skill creates only project-owned durable state:
 .idd/plugins.json
 ```
 
-It adds minimal bootstrap intent documents when they are missing. It does not copy plugin skills into the repository and does not create agent-specific skill directories.
+It also creates or updates exactly one repository-root Coding Agent instruction file:
+
+```text
+Codex        AGENTS.md
+Claude Code  CLAUDE.md
+```
+
+The file receives one minimal managed IDD section stating that the project uses Intent-Driven Development, that `.idd/intent/` is the current product truth, and that installed IDD skills should be used for intent, implementation, and verification workflows.
+
+Existing unrelated instructions are preserved. If the file already contains a managed IDD block or clearly IDD-specific instructions, `idd-project-init` updates and consolidates them instead of appending a second section. Re-running initialization is idempotent.
+
+The skill adds minimal bootstrap intent documents when they are missing. It does not copy plugin skills into the repository and does not create agent-specific skill directories.
 
 The default `.idd/plugins.json` declaration is:
 
