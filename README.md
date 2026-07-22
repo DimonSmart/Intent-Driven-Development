@@ -73,15 +73,25 @@ Optional Factory:
 codex plugin add idd-factory@intent-driven-development
 ```
 
-## Start
-
-Open the target repository and invoke:
+After installing `idd-intent`, open each target repository and perform the initial project setup:
 
 ```text
 idd-project-init
 ```
 
-Then ask IDD to import an existing product, describe a new one, change current product intent, implement from intent, or verify that the implementation still matches it.
+For an existing project that already has documentation, specifications, requirements, ADRs, or other attempts to record product behavior, import that material after initialization:
+
+```text
+idd-intent-import
+```
+
+## Start
+
+`idd-project-init` creates the missing `.idd/intent/` bootstrap state and creates or updates one minimal managed IDD section in the repository-root `AGENTS.md` for Codex or `CLAUDE.md` for Claude Code. Existing unrelated agent instructions are preserved, and existing IDD instructions are consolidated instead of duplicated.
+
+For an existing product, use `idd-intent-import` to turn relevant existing documentation, source behavior, tests, and confirmed requirements into proposed current product intent. Review the import result rather than treating every historical document or implementation detail as current truth.
+
+Then ask IDD to describe a new product area, change current product intent, implement from intent, or verify that the implementation still matches it.
 
 Describe the requested change naturally. IDD routes it through the smallest safe workflow.
 
