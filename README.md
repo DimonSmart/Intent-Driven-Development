@@ -81,6 +81,8 @@ Open the target repository and invoke:
 idd-project-init
 ```
 
+The agent creates the missing `.idd/intent/` bootstrap state and creates or updates one minimal managed IDD section in the repository-root `AGENTS.md` for Codex or `CLAUDE.md` for Claude Code. Existing unrelated agent instructions are preserved, and existing IDD instructions are consolidated instead of duplicated.
+
 Then ask IDD to import an existing product, describe a new one, change current product intent, implement from intent, or verify that the implementation still matches it.
 
 Describe the requested change naturally. IDD routes it through the smallest safe workflow.
