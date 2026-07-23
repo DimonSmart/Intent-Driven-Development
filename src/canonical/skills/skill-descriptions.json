@@ -13,8 +13,18 @@
     }
   },
   "idd-project-init": {
-    "description": "Initialize `.idd/intent` and the IDD plugin declaration without copying skills or installing agent-specific files.",
+    "description": "Initialize `.idd/intent` and the IDD plugin declaration, then optionally offer interactive bootstrap for an existing implementation without current intent.",
     "invocation": "manual"
+  },
+  "idd-intent-bootstrap": {
+    "description": "Interactively discover, classify, confirm, and write initial current product intent for an existing implemented project that lacks reliable IDD intent.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "argument-hint": "[whole repository or selected product roots and exclusions]"
+        }
+      }
+    }
   },
   "idd-intent-audit": {
     "description": "Diagnose `.idd/intent/` product intent structure and recommend reorganizations without editing files.",

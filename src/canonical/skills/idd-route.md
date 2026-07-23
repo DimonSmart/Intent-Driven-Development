@@ -22,8 +22,10 @@ and do not reconstruct the full routing model from memory.
 ## Inputs
 
 Accept natural-language user requests. The request may include a product area,
-specification, code area, observed mismatch, required result, or an explicit
-limit such as "classify only", "update intent only", or "do not change specs".
+specification, code area, observed mismatch, required result, repository
+bootstrap request, or an explicit limit such as "classify only", "update intent
+only", or "do not change specs".
+
 Do not require JSON or a special parameter structure.
 
 ## Context Reading Rules
@@ -32,7 +34,7 @@ First classify the request from its wording and the required reference.
 
 Read project context only when needed to determine whether a current owner
 exists, product truth changes, the problem is structural, implementation and
-intent may diverge, or Factory is probably required.
+intent may diverge, initial intent is missing, or Factory is probably required.
 
 When project context is needed:
 
@@ -44,6 +46,11 @@ When project context is needed:
 6. Do not perform broad code review.
 7. Do not change files.
 
+For possible `intent-bootstrap`, perform only the cheap check needed to
+distinguish an existing implementation without adequate current intent from an
+empty new project or an already documented product. The bootstrap skill owns
+broad discovery.
+
 ## Classification Fields
 
 Return these semantic fields:
@@ -51,6 +58,7 @@ Return these semantic fields:
 ```text
 Classification:
 - project-initialization
+- intent-bootstrap
 - intent-import
 - product-change
 - implementation-change
@@ -63,14 +71,31 @@ Classification:
 - unclear
 ```
 
+Use `intent-bootstrap` when the repository already contains implementation but
+lacks an adequate current IDD product model and the user asks to discover,
+reconstruct, or create initial intent from codebase evidence with owner
+confirmation.
+
+Use `intent-import` when existing documents or other source material already
+express product knowledge that needs normalization into IDD. Do not route
+codebase reverse discovery to import merely because code is a source.
+
 For `product-change`, set `Operation` to `add`, `modify`, or `remove` according
 to the required reference. For every other classification, set
 `Operation: not-applicable`.
 
 Set `Clarity` to `clear`, `ambiguous`, or `research-required`.
 
+A bootstrap request may have `Clarity: clear` even though the product meaning is
+not yet known: the requested workflow is clear, and
+`idd-intent-bootstrap` contains its own semantic confirmation gates.
+
 Set `Execution depth` to `focused`, `orchestrated`, or `not-applicable`
 according to the required reference.
+
+Use `not-applicable` for `intent-bootstrap`. Repository discovery may be broad,
+but it is intent-side investigation rather than implementation orchestration and
+must not start Factory.
 
 Set `Requested scope` to one of:
 
@@ -89,14 +114,19 @@ with the classification.
 - `route-only`: describe the route and stop. Do not invoke another skill or
   change files.
 - `intent-only`: perform only intent-side work, including initialization,
-  import, brainstorm, audit, lint, change, new-document, or normalization as
-  applicable. Do not implement product code or start Factory execution.
+  bootstrap, import, brainstorm, audit, lint, change, new-document, or
+  normalization as applicable. Do not implement product code or start Factory
+  execution.
 - `implementation-only`: perform implementation or implementation checking from
   current intent. Do not change product intent. If current intent is missing,
   unclear, or wrong, stop and report the required intent workflow instead of
   expanding scope.
 - `end-to-end`: continue through all requested intent, implementation, and
   conformance stages, subject to clarity gates and execution-depth selection.
+
+A request to understand an existing project and create its initial intent is
+normally `intent-only` unless it also explicitly asks for implementation
+changes after bootstrap.
 
 Do not assign route fields when another explicitly named skill or `idd-skip`
 bypasses routing. Those cases are direct skill invocation, not route results.
@@ -109,6 +139,7 @@ a handoff index:
 | Classification | Recommended first skill |
 | --- | --- |
 | `project-initialization` | `idd-project-init` |
+| `intent-bootstrap` | `idd-intent-bootstrap` |
 | `intent-import` | `idd-intent-import` |
 | `product-change` | `idd-intent-change` |
 | `implementation-change` | `idd-code-implement` or Factory |
@@ -128,7 +159,7 @@ refuses IDD for the request.
 Distinguish the complete workflow from the current handoff:
 
 - `Expected complete workflow` describes the normal lifecycle needed to finish
-  the product change safely.
+  the product change or initial intent establishment safely.
 - `Current handoff` describes what may start in this user request.
 - `Stop after` defines the requested-scope boundary or clarity gate.
 
@@ -149,13 +180,18 @@ Apply these rules:
 - When clarity is `ambiguous` or `research-required`, stop at the corresponding
   brainstorm, check, ADR, or spike gate even when the requested scope is
   `end-to-end`. Continue only after the missing decision or evidence exists.
+- For `intent-bootstrap`, hand off the original scope and any include, exclude,
+  temporary context, or known compatibility information. The bootstrap skill
+  must still obtain its own project-boundary and semantic proposal
+  confirmations before writing current intent.
 
 Pass through the original request, classification fields, requested scope,
-relevant context, and any temporary preservation boundary identified from the
-required reference.
+relevant context, and any temporary preservation or discovery boundary
+identified from the required reference.
 
 The route classification is temporary workflow evidence. Do not create route
-files, preservation records, Factory state, specs, or code from this skill.
+files, preservation records, discovery reports, Factory state, specs, or code
+from this skill.
 
 ## Output Format
 
@@ -187,5 +223,18 @@ Why:
 
 Handoff:
 - Invoke the current handoff skill with the original request, route fields, and
-  preservation boundary, or state that no handoff is allowed for `route-only`.
+  preservation or discovery boundary, or state that no handoff is allowed for
+  `route-only`.
+```
+
+For `intent-bootstrap`, use a discovery boundary instead of inventing a product
+preservation boundary:
+
+```md
+Discovery boundary:
+- Repository or product areas included:
+- Areas excluded or probably non-product:
+- User-provided temporary context:
+- Known public or compatibility contracts:
+- Unresolved scope questions:
 ```

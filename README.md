@@ -68,6 +68,8 @@ Open the target repository and initialize IDD:
 idd-project-init
 ```
 
+For an existing implementation without current intent documents, initialization can offer the interactive `idd-intent-bootstrap` workflow to analyze the project and propose its initial intent model.
+
 Then describe what you need naturally. For example:
 
 ```text
