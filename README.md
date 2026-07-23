@@ -20,7 +20,7 @@ IDD organizes product knowledge so the answer can move closer to **yes**.
 
 ## Why IDD?
 
-- **One current source of product truth.** Intent documents describe what the product must do now.
+- **One current source of product truth.** Intent documents describe what the product must do.
 - **Fewer permanent artifacts.** Plans, task states, and reviews do not accumulate in the repository.
 - **Lower context overhead.** Agents read relevant current intent instead of a growing history of workflow documents.
 - **Git owns history.** Specifications stay current; Git records how they and the implementation changed.
