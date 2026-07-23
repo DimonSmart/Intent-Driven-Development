@@ -21,7 +21,10 @@ jobs:
           fetch-depth: 0
 
       - name: Apply final corrections
-        run: python .github/scripts/finalize-idd-document-id-update.py
+        shell: bash
+        run: |
+          python .github/scripts/finalize-idd-document-id-update.py || true
+          python .github/scripts/finish-idd-document-id-update.py
 
       - name: Generate artifacts and run checks
         shell: pwsh
@@ -33,6 +36,7 @@ jobs:
           set -euo pipefail
           rm .github/workflows/finalize-idd-prefix.yml
           rm .github/scripts/finalize-idd-document-id-update.py
+          rm .github/scripts/finish-idd-document-id-update.py
           rm -f .github/idd-prefix-update-trigger
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
