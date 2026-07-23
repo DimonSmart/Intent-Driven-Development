@@ -1,8 +1,8 @@
 # CodingAgent Workflow
 
 Before changing behavior, contracts, architecture, or durable implementation
-patterns, inspect `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and the numbered
-current documents directly under `.idd/intent/`.
+patterns, inspect `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and the current
+`IDD-NNNN` documents directly under `.idd/intent/`.
 
 Use only current `IDD-NNNN` documents in `.idd/intent/` as normative product intent.
 There is no `.idd/intent` archive lifecycle. Do not inspect deleted Git history
