@@ -6,6 +6,7 @@
       "skills": [
         "idd-route",
         "idd-project-init",
+        "idd-intent-bootstrap",
         "idd-skip",
         "idd-intent-audit",
         "idd-intent-brainstorm",
