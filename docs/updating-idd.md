@@ -4,6 +4,8 @@ Intent-Driven Development is actively developed. New releases may add workflows,
 
 Update IDD periodically, especially when the documentation describes commands or behavior that are not available in the installed version.
 
+This page updates the installed plugin code. It does not automatically migrate project-owned intent documents. After updating, review [Updates and Breaking Changes](updates-and-breaking-changes.md) for any repository changes that must be applied separately.
+
 ## Claude Code
 
 Refresh the marketplace and update `idd-intent`:
@@ -36,8 +38,8 @@ codex plugin add idd-factory@intent-driven-development
 
 ## After Updating
 
-Check the installed versions using [Verify Installation](verify-installation.md).
-
-Start a new Claude Code or Codex session so the updated skills and instructions are loaded cleanly.
+1. Review [Updates and Breaking Changes](updates-and-breaking-changes.md) and apply any relevant project migrations.
+2. Check the installed versions using [Verify Installation](verify-installation.md).
+3. Start a new Claude Code or Codex session so the updated skills and instructions are loaded cleanly.
 
 Repositories that already use IDD do not need to run `idd-project-init` again. Project-owned intent remains in the repository, while the installed plugin provides the updated workflows.
