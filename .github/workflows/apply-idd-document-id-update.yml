@@ -1,0 +1,335 @@
+name: Apply IDD document ID update
+
+on:
+  push:
+    branches:
+      - idd-prefix-update
+    paths:
+      - .github/workflows/apply-idd-document-id-update.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout update branch
+        uses: actions/checkout@v4
+        with:
+          ref: idd-prefix-update
+          fetch-depth: 0
+
+      - name: Apply canonical IDD document IDs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('.')
+
+          def read(path: str) -> str:
+              return (root / path).read_text(encoding='utf-8')
+
+          def write(path: str, text: str) -> None:
+              (root / path).write_text(text, encoding='utf-8')
+
+          def replace_required(path: str, old: str, new: str, count: int = 0) -> None:
+              text = read(path)
+              if old not in text:
+                  raise RuntimeError(f"Expected text not found in {path}: {old!r}")
+              text = text.replace(old, new, count) if count else text.replace(old, new)
+              write(path, text)
+
+          # Update existing documentation examples before adding the breaking-change
+          # note, whose migration prompt intentionally mentions the old format.
+          for path in root.rglob('*.md'):
+              if '.git' in path.parts:
+                  continue
+              text = path.read_text(encoding='utf-8')
+              updated = re.sub(
+                  r'(?<!IDD-)\b(\d{4})\.(spec|adr|spike)-',
+                  r'IDD-\1.\2-',
+                  text,
+              )
+              updated = updated.replace('current numbered documents', 'current `IDD-NNNN` documents')
+              updated = updated.replace('current numbered specs', 'current `IDD-NNNN` specs')
+              updated = updated.replace('actual current numbered documents', 'actual current `IDD-NNNN` documents')
+              updated = updated.replace('Implement spec 0018.', 'Implement IDD-0018.')
+              updated = updated.replace('against spec 0018', 'against IDD-0018')
+              updated = re.sub(
+                  r'(?m)^(\s*(?:Related|Replaces|Supersedes|Depends on)\s*:\s*)(\d{4})\b',
+                  r'\1IDD-\2',
+                  updated,
+              )
+              if updated != text:
+                  path.write_text(updated, encoding='utf-8')
+
+          # Rename real current intent files used by evaluation fixtures.
+          candidates = sorted(
+              [p for p in root.rglob('*.md') if re.match(r'^\d{4}\.(spec|adr|spike)-', p.name)],
+              key=lambda p: len(p.parts),
+              reverse=True,
+          )
+          for path in candidates:
+              target = path.with_name(f'IDD-{path.name}')
+              if target.exists():
+                  raise RuntimeError(f'Cannot rename {path}: {target} already exists')
+              path.rename(target)
+
+          write('src/canonical/methodology/numbering.md', '''# Document IDs and Numbering
+
+## Why intent documents are numbered
+
+Projects evolve. At the beginning, the full product intent is rarely known.
+
+A namespaced document ID gives each piece of intent a stable and unambiguous
+identity while the system changes. Titles and filenames may change, documents
+may be deleted or replaced by a new owner, but references by ID remain stable.
+
+The sequence records document creation order without turning specifications
+into task logs.
+
+Use one increasing numeric sequence across current intent documents directly
+under `.idd/intent/`. Every document ID starts with the `IDD-` namespace:
+
+```text
+IDD-NNNN
+```
+
+The canonical filename is:
+
+```text
+.idd/intent/IDD-NNNN.type-short-title.md
+```
+
+Examples:
+
+```text
+.idd/intent/IDD-0001.spec-initial-product-model.md
+.idd/intent/IDD-0002.adr-rendering-architecture.md
+.idd/intent/IDD-0003.spike-input-layer-feasibility.md
+```
+
+Use `IDD-NNNN` in normative relations and prose references. A bare four-digit
+number such as `0019` is not an IDD document identifier.
+
+When finding the next number, scan current files directly under `.idd/intent/`
+whose names match the `IDD-NNNN.type-short-title.md` convention, then use the
+maximum `NNNN` value plus one. Do not scan or create an archive directory.
+Deleted document numbers are not reused. Do not include lifecycle markers such
+as `active` or `retired` in filenames.
+''')
+
+          # Templates and initialized project files.
+          for template in ('spec.md', 'adr.md', 'spike.md'):
+              path = f'src/canonical/project-files/intent/_templates/{template}'
+              text = read(path)
+              text = re.sub(r'^# NNNN\.', '# IDD-NNNN.', text, count=1, flags=re.MULTILINE)
+              write(path, text)
+
+          replace_required(
+              'src/canonical/project-files/intent/_templates/adr.md',
+              'Reference the superseded ADR when this ADR replaces an earlier decision.',
+              'Reference the superseded ADR by its `IDD-NNNN` identifier when this ADR replaces an earlier decision.',
+          )
+
+          project_readme = read('src/canonical/project-files/intent/README.md')
+          project_readme = project_readme.replace(
+              'Read `INDEX.md` first, then read the current `IDD-NNNN` documents directly under\nthis directory that apply to the change.\n',
+              'Read `INDEX.md` first, then read the current `IDD-NNNN` documents directly under\nthis directory that apply to the change.\n\nEvery intent document uses a stable `IDD-NNNN` identifier and a canonical\n`IDD-NNNN.type-short-title.md` filename. Bare numeric document identifiers are\nnot valid.\n',
+          )
+          write('src/canonical/project-files/intent/README.md', project_readme)
+
+          project_index = read('src/canonical/project-files/intent/INDEX.md')
+          project_index = project_index.replace(
+              'No current numbered documents have been created yet.',
+              'No current `IDD-NNNN` documents have been created yet.',
+          )
+          write('src/canonical/project-files/intent/INDEX.md', project_index)
+
+          # Creation workflow: the prefix is mandatory and the old format is invalid.
+          new_doc = read('src/canonical/skills/idd-intent-new-document.md')
+          new_doc = new_doc.replace(
+              '- Git history preserves the deleted document.\n',
+              '- Every new document uses a stable `IDD-NNNN` identifier and the canonical\n'
+              '  `IDD-NNNN.type-short-title.md` filename.\n'
+              '- Never create a bare `NNNN.type-short-title.md` filename.\n'
+              '- Git history preserves the deleted document.\n',
+          )
+          new_doc = new_doc.replace(
+              '6. Find the next number by scanning current numbered documents directly under\n'
+              '   `.idd/intent/`. Do not scan or create an archive directory. Deleted document\n'
+              '   numbers are not reused.\n'
+              '7. Create the document from the matching template.\n'
+              '8. Update `INDEX.md` when a numbered document is added.\n',
+              '6. Find the next number by scanning current filenames matching\n'
+              '   `IDD-NNNN.type-short-title.md` directly under `.idd/intent/`. Use the maximum\n'
+              '   `NNNN` value plus one. Do not scan or create an archive directory. Deleted\n'
+              '   document numbers are not reused.\n'
+              '7. Create the document from the matching template, using the same `IDD-NNNN`\n'
+              '   identifier in the filename and heading.\n'
+              '8. Update `INDEX.md` when an `IDD-NNNN` document is added.\n',
+          )
+          write('src/canonical/skills/idd-intent-new-document.md', new_doc)
+
+          # Lint rejects the old format rather than supporting it.
+          lint = read('src/canonical/skills/idd-intent-lint.md')
+          lint = lint.replace(
+              '- every current `IDD-NNNN` document under `.idd/intent/` is listed in `INDEX.md`;\n',
+              '- every current `IDD-NNNN` document under `.idd/intent/` is listed in `INDEX.md`;\n'
+              '- every current intent filename matches\n'
+              '  `^IDD-\\d{4}\\.(spec|adr|spike)-[a-z0-9][a-z0-9-]*\\.md$`;\n'
+              '- no current intent document uses the legacy bare numeric filename format\n'
+              '  `^\\d{4}\\.(spec|adr|spike)-`;\n'
+              '- the `IDD-NNNN` identifier in the document heading matches its filename;\n',
+          )
+          lint = lint.replace(
+              '- numeric `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar\n'
+              '  references point to existing current documents;\n',
+              '- `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar normative\n'
+              '  relation references use `IDD-NNNN` identifiers and point to existing current\n'
+              '  documents;\n'
+              '- normative relations do not use bare four-digit document numbers;\n',
+          )
+          lint = lint.replace(
+              '`idd-intent-lint` must fail if:\n\n',
+              '`idd-intent-lint` must fail if:\n\n'
+              '- a current intent filename does not use the canonical\n'
+              '  `IDD-NNNN.type-short-title.md` format;\n'
+              '- a current intent filename uses the legacy bare numeric format;\n'
+              '- a document heading uses a missing, malformed, or filename-mismatched\n'
+              '  `IDD-NNNN` identifier;\n',
+          )
+          lint = lint.replace(
+              '- any numeric `Related`, `Replaces`, `Supersedes`, `Depends on`, or similar\n'
+              '  relation points to a missing current document;\n',
+              '- any `Related`, `Replaces`, `Supersedes`, `Depends on`, or similar normative\n'
+              '  relation uses a bare four-digit ID or points to a missing current document;\n',
+          )
+          lint = lint.replace(
+              '- check `INDEX.md`, links, required sections, and stale `.worklog` references;\n',
+              '- check `INDEX.md`, filenames, document IDs, links, required sections, and stale\n'
+              '  `.worklog` references;\n',
+          )
+          write('src/canonical/skills/idd-intent-lint.md', lint)
+
+          # Import and normalization use the namespaced ID in parameters and relations.
+          import_path = 'src/canonical/skills/idd-intent-import.md'
+          imported = read(import_path)
+          imported = imported.replace('all numeric `Related`', 'all `IDD-NNNN` `Related`')
+          imported = imported.replace('A numeric relation may be written only', 'An `IDD-NNNN` relation may be written only')
+          imported = imported.replace('normative numeric references', 'normative `IDD-NNNN` references')
+          imported = imported.replace('for numeric\nreferences.', 'for `IDD-NNNN`\nreferences.')
+          imported = imported.replace('when `0026` does not exist.', 'when `IDD-0026` does not exist.')
+          imported = imported.replace('Validate and rewrite numeric relations', 'Validate and rewrite `IDD-NNNN` relations')
+          imported = imported.replace('- numeric relations point only', '- `IDD-NNNN` relations point only')
+          marker = ('Imported current documents must use current IDD document shapes. Do not preserve\n'
+                    'legacy section layout when the document becomes current normative intent.\n')
+          if marker not in imported:
+              raise RuntimeError('Import naming marker not found')
+          imported = imported.replace(
+              marker,
+              marker + '\nEvery target document must use the canonical `IDD-NNNN.type-short-title.md`\n'
+              'filename and the same `IDD-NNNN` identifier in its heading. Bare `NNNN`\n'
+              'filenames and normative references are invalid.\n',
+              1,
+          )
+          write(import_path, imported)
+
+          normalize_path = 'src/canonical/skills/idd-intent-normalize-current.md'
+          normalized = read(normalize_path)
+          normalized = normalized.replace('specs: [0019, 0054]', 'specs: [IDD-0019, IDD-0054]')
+          normalized = normalized.replace('--specs 0033,0046,0014,0048', '--specs IDD-0033,IDD-0046,IDD-0014,IDD-0048')
+          normalized = normalized.replace('--specs 0019,0054', '--specs IDD-0019,IDD-0054')
+          normalized = normalized.replace(
+              '- Numeric `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar\n'
+              '  relation references must point to existing current `IDD-NNNN` documents.',
+              '- `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar relations must\n'
+              '  use `IDD-NNNN` identifiers and point to existing current documents.',
+          )
+          write(normalize_path, normalized)
+
+          # Add the user-facing breaking-change note after all broad replacements so
+          # its old-format examples remain intact.
+          readme_path = 'README.md'
+          readme = read(readme_path)
+          if '## Updates and Breaking Changes' in readme:
+              raise RuntimeError('README already contains Updates and Breaking Changes')
+          breaking = '''## Updates and Breaking Changes
+
+### 2026-07-23 — Intent document filename namespace
+
+Intent document identifiers and filenames now use the `IDD-` prefix: `IDD-0001.spec-example.md` instead of `0001.spec-example.md`. The namespace makes document IDs unambiguous in prose, search results, links, logs, and automated repository scans.
+
+This is a breaking change. IDD does not provide an automatic migration or compatibility with the old bare numeric format. Update an existing `.idd/intent/` directory by running the prompt below with a Coding Agent.
+
+<details>
+<summary>Prompt: update intent document numbering and internal links</summary>
+
+```text
+Update this repository's `.idd/intent/` document identifiers to the current IDD naming convention.
+
+Required result:
+- Rename every current intent document from `NNNN.type-short-title.md` to `IDD-NNNN.type-short-title.md`.
+- Preserve each existing four-digit number, document type, slug, content, and product meaning.
+- Update each renamed document heading so its identifier starts with the same `IDD-NNNN` value.
+- Update `.idd/intent/INDEX.md` to use the new filenames and identifiers.
+- Update all internal references, including Related, Replaces, Supersedes, Depends on, prose references, and Markdown links, from bare `NNNN` identifiers or old filenames to `IDD-NNNN` identifiers or the corresponding new filenames.
+- Treat `IDD-NNNN` as the stable document ID. Do not renumber documents.
+- Do not add aliases, redirect files, fallback parsing, migration code, or compatibility with the old naming convention.
+- Do not modify unrelated numbers such as versions, dates, issue numbers, task sequence numbers, ports, or quantities.
+- Verify that no current intent filename uses the old `NNNN.type-short-title.md` format and no normative internal relation uses a bare four-digit document number.
+- Run or simulate `idd-intent-lint` and fix all mechanical errors caused by the rename.
+
+Report the renamed files, rewritten references, and verification result.
+```
+
+</details>
+'''
+          readme = readme.replace('## Documentation\n', breaking + '\n## Documentation\n', 1)
+          write(readme_path, readme)
+
+          # Focused verification before generation.
+          old_files = [str(p) for p in root.rglob('*.md') if re.match(r'^\d{4}\.(spec|adr|spike)-', p.name)]
+          if old_files:
+              raise RuntimeError(f'Legacy intent filenames remain: {old_files}')
+
+          legacy_literals = []
+          pattern = re.compile(r'(?<!IDD-)\b\d{4}\.(?:spec|adr|spike)-')
+          for path in root.rglob('*.md'):
+              if path == Path('README.md') or '.git' in path.parts:
+                  continue
+              if pattern.search(path.read_text(encoding='utf-8')):
+                  legacy_literals.append(str(path))
+          if legacy_literals:
+              raise RuntimeError(f'Legacy intent filename references remain: {legacy_literals}')
+
+          for path in (
+              'src/canonical/methodology/numbering.md',
+              'src/canonical/skills/idd-intent-new-document.md',
+              'src/canonical/skills/idd-intent-lint.md',
+              'src/canonical/skills/idd-intent-import.md',
+              'src/canonical/skills/idd-intent-normalize-current.md',
+          ):
+              if 'IDD-NNNN' not in read(path):
+                  raise RuntimeError(f'Missing canonical ID rule in {path}')
+          PY
+
+      - name: Generate artifacts and run checks
+        shell: pwsh
+        run: pwsh ./scripts/Check.ps1 -Version 0.0.0
+
+      - name: Commit clean result to update branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/apply-idd-document-id-update.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Namespace intent document IDs"
+          git push origin HEAD:idd-prefix-update
