@@ -10,7 +10,7 @@
 
 Intent-Driven Development (IDD) is a lightweight alternative to heavyweight Spec-Driven Development workflows for AI-assisted software development.
 
-IDD keeps the current truth about the product and deliberately leaves temporary plans, task lists, statuses, reviews, and implementation attempts out of permanent product documentation. Coding Agents work from the relevant current intent, Git preserves history, and the repository stays easier to understand.
+IDD preserves the current truth about the product. Temporary plans, task lists, statuses, reviews, and implementation attempts stay temporary. Coding Agents work from the relevant intent, while Git preserves history.
 
 ## The Thought Experiment
 
@@ -20,21 +20,12 @@ IDD organizes product knowledge so the answer can move closer to **yes**.
 
 ## Why IDD?
 
-**Keep one current source of product truth.**  
-Intent documents describe what the product must do now, not every intermediate plan that led there.
+- **One current source of product truth.** Intent documents describe what the product must do now.
+- **Fewer permanent artifacts.** Plans, task states, and reviews do not accumulate in the repository.
+- **Lower context overhead.** Agents read relevant current intent instead of a growing history of workflow documents.
+- **Git owns history.** Specifications stay current; Git records how they and the implementation changed.
 
-**Create fewer permanent artifacts.**  
-Plans, task lists, review notes, and execution state remain temporary unless they contain durable product truth.
-
-**Reduce context and token overhead.**  
-IDD workflows read the relevant current intent instead of repeatedly loading a growing history of project-management artifacts.
-
-**Let Git own history.**  
-Specifications stay current. Git records previous versions, implementation changes, and the path taken to reach them.
-
-Many Spec-Driven workflows preserve specifications, plans, tasks, checklists, reviews, and execution history as repository artifacts. IDD takes a narrower approach: preserve durable product intent, keep implementation work temporary, and use the smallest safe workflow for the current request.
-
-## Try It in a Few Minutes
+## Quick Start
 
 ### Claude Code
 
@@ -56,90 +47,39 @@ Open the target repository and initialize IDD:
 idd-project-init
 ```
 
-Then describe what you need in natural language. For example:
+Then describe what you need naturally. For example:
 
 ```text
 Use idd-intent-brainstorm to help me clarify a feature that lets users compare two local folders without modifying either side.
 ```
 
-Or, when current product intent is already clear:
+[Installation, initialization, and verification](docs/getting-started.md)
 
-```text
-Use idd-code-implement for the folder comparison behavior.
-```
+## Choose the Right Workflow
 
-That is enough to start. IDD creates only the minimal project-owned intent structure and uses installed skills for clarification, implementation, and verification.
+The README stays intentionally small. Continue with the guide that matches the current situation:
 
-## Choose Your Starting Point
+- [Existing project](docs/existing-project.md) — import confirmed product knowledge into current intent.
+- [New project or idea](docs/new-project.md) — clarify the product and implement the first useful slice.
+- [Common use cases](docs/using-idd.md) — find what to do for changes, implementation, audits, verification, updates, and other routine work.
+- [Large implementation task](docs/factory-workflow.md) — use optional Factory orchestration and independent review.
 
-### I already have a project
-
-Import existing documentation, confirmed behavior, requirements, and architectural decisions into a clean current-intent structure.
-
-[Start using IDD in an existing project](docs/existing-project.md)
-
-### I am starting from an idea
-
-Turn an informal product vision into current intent, establish the first product boundaries, and begin implementation without creating a large specification bureaucracy.
-
-[Start a new project with IDD](docs/new-project.md)
-
-### I want practical examples
-
-See common workflows for product changes, implementation-only work, audits, normalization, and verification.
-
-[Browse IDD use cases](docs/using-idd.md)
-
-## Larger Implementation Work
-
-For larger, higher-risk, or naturally multi-stage implementation tasks, install the optional Factory plugin.
-
-Claude Code:
-
-```bash
-claude plugin install idd-factory@intent-driven-development
-```
-
-Codex:
-
-```bash
-codex plugin add idd-factory@intent-driven-development
-```
-
-Then give Factory the task once:
-
-```text
-Use idd-factory-run to implement the task described in ./ui-audit.md.
-```
-
-Factory carries the requested work through to completion. It may decompose the task when useful, verify intermediate results, review the integrated result, and prepare a concise commit-message handoff.
-
-If execution is unexpectedly interrupted, the current Factory run can be continued without starting again:
-
-```text
-Continue the current IDD Factory work.
-```
-
-[Learn how Factory works](docs/factory-workflow.md)
-
-## Two Small, Explicit Plugins
+## Two Explicit Plugins
 
 ```text
 idd-intent    durable product memory
 idd-factory   optional temporary implementation orchestration
 ```
 
-`idd-intent` is the standalone core. `idd-factory` is installed only when a task benefits from explicit multi-step execution and independent review.
+`idd-intent` is the standalone core. Install `idd-factory` only when a task benefits from explicit multi-step execution and independent review.
 
-## Learn More
+## Documentation
 
 - [Getting Started](docs/getting-started.md)
-- [Existing Project Guide](docs/existing-project.md)
-- [New Project Guide](docs/new-project.md)
-- [Using IDD](docs/using-idd.md)
+- [IDD Use Cases](docs/using-idd.md)
+- [Methodology](docs/methodology.md)
 - [Factory Workflow](docs/factory-workflow.md)
 - [Factory Skills Reference](docs/factory-skills.md)
-- [Methodology](docs/methodology.md)
 
 ## License
 
