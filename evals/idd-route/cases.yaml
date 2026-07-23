@@ -119,3 +119,20 @@ cases:
       - implementation-handoff
       - create-factory-work-plan
     semantic_review_notes: "The user appears to want a delivered product improvement, but the current handoff must stop at the smallest missing product decision instead of choosing a localization, currency, or payment change."
+
+  - id: implicit-existing-codebase-bootstrap
+    mode: implicit-routing
+    request: "Analyze this existing undocumented codebase and create its initial IDD intent documentation. Do not change the implementation."
+    repository_fixture: null
+    expected_router_invoked: true
+    expected_classification: intent-bootstrap
+    expected_operation: not-applicable
+    expected_clarity: clear
+    expected_execution_depth: not-applicable
+    expected_requested_scope: intent-only
+    expected_first_skill: idd-intent-bootstrap
+    forbidden_actions:
+      - modify-code
+      - create-factory-work-plan
+      - treat-implementation-as-confirmed-intent-without-user-approval
+    semantic_review_notes: "The route should distinguish interactive codebase discovery from importing existing product documents and hand off only to bootstrap."
