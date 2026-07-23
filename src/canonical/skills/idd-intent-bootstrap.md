@@ -88,29 +88,42 @@ inventory, or temporary notes.
 Every decision that blocks discovery scope or normative intent writing must be an
 actual user-input request, not a suggestion placed in a completion report.
 
-### When `request_user_input` is available
+Use the structured user-question tool exposed by the current host:
+
+- Codex: `request_user_input`;
+- Claude Code: `AskUserQuestion`.
+
+Do not reproduce, approximate, or document either tool's JSON schema in this
+skill. The runtime defines the tool contract. This skill defines only the
+semantic question, stable workflow values, available choices, and the action to
+take after each answer.
+
+### When a structured user-question tool is available
 
 For every blocking decision:
 
-1. MUST call `request_user_input`.
-2. Prefer one question per call and never exceed three questions.
-3. Provide two or three meaningful, mutually exclusive options.
-4. Put the recommended option first and mark it as recommended when the client
+1. MUST invoke the host's structured question tool.
+2. Prefer one question per call and do not exceed the host's supported limit.
+3. Ask a single-choice question unless the workflow explicitly requires multiple
+   selections.
+4. Provide two or three meaningful, mutually exclusive options.
+5. Put the recommended option first and mark it as recommended when the host
    convention supports that label.
-5. Omit `autoResolutionMs`; blocking semantic decisions require an explicit
-   answer and must not resolve automatically.
-6. Stop and wait immediately after the tool call.
-7. Do not emit a final response, continue discovery, or write current intent
+6. In Codex, omit `autoResolutionMs`; blocking semantic decisions require an
+   explicit answer and must not resolve automatically.
+7. Stop and wait immediately after the tool call.
+8. Do not emit a final response, continue discovery, or write current intent
    while the answer is pending.
-8. Do not convert an unanswered decision into an assumption.
-9. Do not add an `Other` option when the client supplies one automatically.
+9. Do not convert an unanswered decision into an assumption.
 
-Use short stable question IDs and short UI headers. Keep each option description
-to one sentence explaining the effect of that choice.
+Use short stable decision keys and short UI headers. Keep each option description
+to one sentence explaining the effect of that choice. Stable option values belong
+to the workflow description even when a host does not expose those values as
+literal tool fields.
 
-### When `request_user_input` is unavailable
+### When no structured user-question tool is available
 
-For every blocking decision:
+If neither `request_user_input` nor `AskUserQuestion` is available:
 
 1. Ask one concise plain-text question.
 2. End the turn immediately after the question.
@@ -199,21 +212,24 @@ toolkit, and extension mechanism.
 Because structured input should use only two or three options, classify a
 technical choice in at most two stages.
 
-First ask:
+First ask one single-choice question:
 
-```text
-1. Durable requirement or decision
-2. Replaceable or incidental implementation detail
-3. Unresolved
-```
+- decision key: `technical_choice_level`;
+- question: `How should this technical choice constrain future implementations?`;
+- options:
+  - `durable` — **Durable requirement or decision**;
+  - `replaceable` — **Replaceable or incidental implementation detail**;
+  - `unresolved` — **Unresolved**.
 
-If the user selects the durable option and the distinction matters, ask:
+If the user selects `durable` and the distinction matters, ask a second
+single-choice question:
 
-```text
-1. Product or compatibility contract
-2. Accepted architecture decision
-3. Return to unresolved
-```
+- decision key: `technical_choice_kind`;
+- question: `What kind of durable constraint is this technical choice?`;
+- options:
+  - `product_contract` — **Product or compatibility contract**;
+  - `architecture_decision` — **Accepted architecture decision**;
+  - `unresolved` — **Return to unresolved**.
 
 Map results as follows:
 
@@ -259,15 +275,14 @@ asks for historical investigation.
 
 ### 1. Establish scope
 
-If scope is not already explicit, use the Structured User Input Protocol with:
+If scope is not already explicit, use the Structured User Input Protocol:
 
-```text
-Question: Which scope should initial intent discovery cover?
-Options:
-- Whole repository (Recommended)
-- Select product areas
-- Cancel bootstrap
-```
+- decision key: `bootstrap_scope`;
+- question: `Which scope should initial intent discovery cover?`;
+- options:
+  - `whole_repository` — **Whole repository (Recommended)**;
+  - `select_areas` — **Select product areas**;
+  - `cancel` — **Cancel bootstrap**.
 
 For selected scope, obtain include roots, exclude roots, or a semantic description
 of target product areas through another blocking request. Also allow temporary
@@ -286,15 +301,14 @@ Perform the initial repository map and present:
 - excluded generated or non-product areas;
 - uncertainties in classification.
 
-Then use the Structured User Input Protocol with:
+Then use the Structured User Input Protocol:
 
-```text
-Question: Is this the correct product boundary for intent discovery?
-Options:
-- Confirm map (Recommended)
-- Revise map
-- Cancel bootstrap
-```
+- decision key: `project_map_confirmation`;
+- question: `Is this the correct product boundary for intent discovery?`;
+- options:
+  - `confirm` — **Confirm map (Recommended)**;
+  - `revise` — **Revise map**;
+  - `cancel` — **Cancel bootstrap**.
 
 If revision is selected, request corrections and repeat confirmation. Do not
 create current intent before the boundary is accepted.
@@ -377,15 +391,14 @@ Prefer a small document set. Product areas, shared contracts, durable decisions,
 and active research questions determine document boundaries. Folders and project
 files do not.
 
-Use the Structured User Input Protocol with:
+Use the Structured User Input Protocol:
 
-```text
-Question: What should happen with the proposed initial intent model?
-Options:
-- Apply proposal (Recommended)
-- Review or edit
-- Cancel without writing
-```
+- decision key: `initial_intent_proposal`;
+- question: `What should happen with the proposed initial intent model?`;
+- options:
+  - `apply` — **Apply proposal (Recommended)**;
+  - `review` — **Review or edit**;
+  - `cancel` — **Cancel without writing**.
 
 If review or edit is selected, obtain corrections, update the proposal, and ask
 for approval again. Do not create or modify current `IDD-NNNN` documents before
@@ -476,8 +489,10 @@ Before completion, verify:
 
 - the repository contained meaningful existing implementation;
 - scope and product boundaries were explicitly confirmed;
-- every blocking decision used `request_user_input` when available, otherwise a
-  plain-text question followed by an immediate stop;
+- every blocking decision used `request_user_input` in Codex or
+  `AskUserQuestion` in Claude Code when available, otherwise a plain-text
+  question followed by an immediate stop;
+- no tool-call JSON schema was embedded in the skill's question descriptions;
 - no final response was emitted while a blocking decision was pending;
 - implementation evidence was not treated as product intent automatically;
 - user-supplied context was not copied as workflow history;
