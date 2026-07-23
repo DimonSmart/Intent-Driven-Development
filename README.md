@@ -53,16 +53,19 @@ Then describe what you need naturally. For example:
 Use idd-intent-brainstorm to help me clarify a feature that lets users compare two local folders without modifying either side.
 ```
 
-[Installation, initialization, and verification](docs/getting-started.md)
+## Use Cases
 
-## Choose the Right Workflow
+Open [IDD Use Cases](docs/using-idd.md) when you need to decide what to do next. It covers existing and new projects, product changes, implementation-only work, audits, verification, Factory, and deliberate IDD bypass.
 
-The README stays intentionally small. Continue with the guide that matches the current situation:
+## Verify Installation
 
-- [Existing project](docs/existing-project.md) — import confirmed product knowledge into current intent.
-- [New project or idea](docs/new-project.md) — clarify the product and implement the first useful slice.
-- [Common use cases](docs/using-idd.md) — find what to do for changes, implementation, audits, verification, updates, and other routine work.
-- [Large implementation task](docs/factory-workflow.md) — use optional Factory orchestration and independent review.
+After setup, [verify the marketplace, installed plugins, and repository initialization](docs/verify-installation.md).
+
+## Updating IDD
+
+IDD is actively developed, and new versions are released periodically. Refresh the marketplace and update the installed plugins to receive the latest workflows, fixes, and documentation.
+
+[Update IDD to the latest version](docs/updating-idd.md)
 
 ## Two Explicit Plugins
 
@@ -75,8 +78,11 @@ idd-factory   optional temporary implementation orchestration
 
 ## Documentation
 
-- [Getting Started](docs/getting-started.md)
 - [IDD Use Cases](docs/using-idd.md)
+- [Verify Installation](docs/verify-installation.md)
+- [Updating IDD](docs/updating-idd.md)
+- [Existing Project Guide](docs/existing-project.md)
+- [New Project Guide](docs/new-project.md)
 - [Methodology](docs/methodology.md)
 - [Factory Workflow](docs/factory-workflow.md)
 - [Factory Skills Reference](docs/factory-skills.md)

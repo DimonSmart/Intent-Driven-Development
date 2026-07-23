@@ -1,6 +1,6 @@
 # Project Maintenance
 
-This page is for contributors and release maintainers. User-facing installation and product guidance belong in the root README, [Getting Started](getting-started.md), and [Using IDD](using-idd.md).
+This page is for contributors and release maintainers. User-facing installation and product guidance belong in the root README, [IDD Use Cases](using-idd.md), [Verify Installation](verify-installation.md), and [Updating IDD](updating-idd.md).
 
 ## Distribution Model
 

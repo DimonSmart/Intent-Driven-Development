@@ -17,7 +17,7 @@ Use `idd-intent` for the normal workflow. Add optional `idd-factory` only when i
 | Existing behavior has been confirmed as product truth but is missing from intent | Use `idd-code-update-intent`. |
 | Intent documents need review or cleanup | Use `idd-intent-audit`, `idd-intent-lint`, or `idd-intent-normalize-current`. |
 | The implementation task is large or naturally multi-stage | Install `idd-factory` and use `idd-factory-run`. |
-| A new IDD release is available | Refresh the marketplace, update or reinstall the installed IDD plugins, and start a new session. |
+| A new IDD release is available | Follow [Updating IDD](updating-idd.md), then start a new session. |
 | The request must deliberately bypass IDD | Use `idd-skip`. |
 
 ## Initialize a Repository
@@ -30,7 +30,7 @@ idd-project-init
 
 The workflow creates the minimal project-owned IDD structure and records the integration in the active agent instructions. It does not copy plugin skills into the project.
 
-For a complete installation and initialization guide, see [Getting Started](getting-started.md).
+Installation and initialization commands are in the [README Quick Start](../README.md#quick-start). To confirm setup, see [Verify Installation](verify-installation.md).
 
 ## Import an Existing Product
 
@@ -143,53 +143,9 @@ Continue the current IDD Factory work.
 [Read the Factory workflow guide](factory-workflow.md)  
 [See the Factory skills reference](factory-skills.md)
 
-## Update IDD to a New Version
+## Update IDD
 
-IDD plugins are installed from the `intent-driven-development` marketplace. Updating requires refreshing the marketplace first so the client can see the newest published plugin versions.
-
-### Claude Code
-
-Refresh the marketplace and update the installed plugins:
-
-```bash
-claude plugin marketplace update intent-driven-development
-claude plugin update idd-intent@intent-driven-development
-```
-
-When Factory is installed, update it as well:
-
-```bash
-claude plugin update idd-factory@intent-driven-development
-```
-
-Verify the installed versions:
-
-```bash
-claude plugin list --json
-```
-
-### Codex
-
-Refresh the marketplace snapshot and reinstall the installed plugins from it:
-
-```bash
-codex plugin marketplace upgrade intent-driven-development
-codex plugin add idd-intent@intent-driven-development
-```
-
-When Factory is installed, reinstall it as well:
-
-```bash
-codex plugin add idd-factory@intent-driven-development
-```
-
-Verify the installed versions:
-
-```bash
-codex plugin list --json
-```
-
-Start a new Claude Code or Codex session after updating so the new skills and instructions are loaded cleanly. Updating the plugin does not require running `idd-project-init` again in repositories that are already initialized.
+IDD changes regularly. Follow [Updating IDD](updating-idd.md) to refresh the marketplace, update the installed plugins, verify the versions, and load the update in a new session.
 
 ## Inspect Routing
 
