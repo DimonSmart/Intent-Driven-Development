@@ -13,11 +13,11 @@
     }
   },
   "idd-project-init": {
-    "description": "Initialize `.idd/intent` and the IDD plugin declaration, then optionally offer interactive bootstrap for an existing implementation without current intent.",
+    "description": "Initialize `.idd/intent` and the IDD plugin declaration, then pause for a blocking bootstrap decision when an existing implementation has no current intent.",
     "invocation": "manual"
   },
   "idd-intent-bootstrap": {
-    "description": "Interactively discover, classify, confirm, and write initial current product intent for an existing implemented project that lacks reliable IDD intent.",
+    "description": "Interactively discover, classify, confirm, and write initial current product intent using blocking user decisions for an existing implemented project without reliable IDD intent.",
     "adapters": {
       "claude": {
         "frontmatter": {
