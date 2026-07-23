@@ -36,6 +36,9 @@ owners, related documents, acceptance or decision context, and open questions.
 - If the product area is the same, update the existing spec.
 - If the product area identity changes, create the new owning spec only after
   this skill's ownership check confirms that no current document owns it.
+- Every new document uses a stable `IDD-NNNN` identifier and the canonical
+  `IDD-NNNN.type-short-title.md` filename.
+- Never create a bare `NNNN.type-short-title.md` filename.
 - Git history preserves the deleted document.
 - If the requested type does not match the change, do not follow it blindly.
   State the mismatch and use the correct IDD document type.
@@ -63,7 +66,7 @@ owners, related documents, acceptance or decision context, and open questions.
 4. If an owner exists, stop and use `idd-intent-change`.
 5. If current intent already exists, update the existing current document
    instead of creating a duplicate.
-6. Find the next number by scanning current numbered documents directly under
+6. Find the next number by scanning current `IDD-NNNN` documents directly under
    `.idd/intent/`. Do not scan or create an archive directory. Deleted document
    numbers are not reused.
 7. Create the document from the matching template.

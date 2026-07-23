@@ -1,3 +1,3 @@
 # Intent Index
 
-- `0001.spec-checkout.md` — Checkout completion.
+- `IDD-0001.spec-checkout.md` — Checkout completion.

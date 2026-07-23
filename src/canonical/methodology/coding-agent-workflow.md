@@ -4,7 +4,7 @@ Before changing behavior, contracts, architecture, or durable implementation
 patterns, inspect `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and the numbered
 current documents directly under `.idd/intent/`.
 
-Use only current numbered documents in `.idd/intent/` as normative product intent.
+Use only current `IDD-NNNN` documents in `.idd/intent/` as normative product intent.
 There is no `.idd/intent` archive lifecycle. Do not inspect deleted Git history
 unless the user explicitly asks for historical investigation.
 
@@ -24,7 +24,7 @@ Prefer focused specification reads:
 
 - read `.idd/intent/README.md`;
 - read `.idd/intent/INDEX.md`;
-- read only relevant current numbered documents;
+- read only relevant current `IDD-NNNN` documents;
 - avoid importing large unrelated context into the main conversation.
 
 Large maintenance operations should produce compact summaries instead of

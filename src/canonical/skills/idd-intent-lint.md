@@ -59,6 +59,11 @@ Check that:
 
 `idd-intent-lint` must fail if:
 
+- a current intent filename does not use the canonical
+  `IDD-NNNN.type-short-title.md` format;
+- a current intent filename uses the legacy bare numeric format;
+- a document heading uses a missing, malformed, or filename-mismatched
+  `IDD-NNNN` identifier;
 - an archive directory exists under `.idd/intent`;
 - `.idd/intent/import-report.md` exists;
 - generated, import, task, progress, or process reports exist under `.idd/intent`;

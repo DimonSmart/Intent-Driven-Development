@@ -30,7 +30,7 @@ The request must provide at least one concrete check focus:
 
    Examples:
 
-   - `0003.spec-authentication.md`
+   - `IDD-0003.spec-authentication.md`
    - the console controls specification
    - session expiration behavior
    - validation error behavior
@@ -67,7 +67,7 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
 
 ## Rules
 
-- Use only current numbered documents directly under `.idd/intent/` as normative
+- Use only current `IDD-NNNN` documents directly under `.idd/intent/` as normative
   product intent.
 - There is no `.idd/intent` archive lifecycle.
 - Do not inspect deleted Git history unless the user explicitly asks for
@@ -366,7 +366,7 @@ Good request:
 
 ```text
 Use idd-code-check-implementation to check the authentication implementation against
-0003.spec-authentication.md.
+IDD-0003.spec-authentication.md.
 ```
 
 Good request:
