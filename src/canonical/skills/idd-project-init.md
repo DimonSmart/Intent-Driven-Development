@@ -115,29 +115,87 @@ workspace or solution files, executable or library projects, package manifests,
 entry points, tests, or equivalent project markers. Do not perform broad
 codebase analysis inside `idd-project-init`.
 
-When the conditions hold, ask:
+Information supplied with the initialization request, such as a product summary,
+technology stack, known project structure, or exclusions, is temporary bootstrap
+context. It does not by itself authorize repository discovery or creation of
+current `IDD-NNNN` documents. Preserve it for a possible handoff, but still obtain
+the blocking bootstrap decision unless the user explicitly requested both
+initialization and intent reconstruction.
 
-```text
-IDD initialization is complete.
+#### Blocking bootstrap decision
 
-This repository contains an existing implementation, but no current numbered
-intent documents were found.
+When the conditions hold, the bootstrap offer is a blocking user decision. It is
+not a recommendation to mention only in the completion report.
 
-Would you like to analyze the project and propose initial intent documentation?
+If `request_user_input` is available in the current tool set:
 
-1. Analyze the whole repository
-2. Analyze selected product areas or project roots
-3. Skip for now
+1. MUST call `request_user_input` immediately after structural initialization.
+2. MUST present the choices through that tool, not as an ordinary assistant
+   message or Markdown menu.
+3. MUST omit `autoResolutionMs`; explicit input is required and the decision must
+   not resolve automatically.
+4. MUST stop and wait after the tool call.
+5. MUST NOT emit the final initialization completion response while the decision
+   is unanswered.
+6. MUST NOT invoke `idd-intent-bootstrap`, inspect the codebase broadly, or create
+   current `IDD-NNNN` documents before an affirmative answer.
+
+Use one question equivalent to:
+
+```json
+{
+  "questions": [
+    {
+      "id": "initial_intent_bootstrap",
+      "header": "Bootstrap",
+      "question": "Analyze this existing project and propose its initial IDD intent documentation?",
+      "options": [
+        {
+          "label": "Whole repository (Recommended)",
+          "description": "Analyze all detected current product areas."
+        },
+        {
+          "label": "Select areas",
+          "description": "Choose product roots and exclusions before analysis."
+        },
+        {
+          "label": "Skip for now",
+          "description": "Finish initialization without reconstructing product intent."
+        }
+      ]
+    }
+  ]
+}
 ```
+
+Do not add an `Other` option when the client adds it automatically.
 
 Handle the answer as follows:
 
-- `1`: invoke `idd-intent-bootstrap` in the same request with whole-repository
-  scope.
-- `2`: ask for the selected product areas, include roots, exclude roots, or
-  temporary project context, then invoke `idd-intent-bootstrap` with that scope.
-- `3`: finish initialization without semantic intent changes and mention that
-  `idd-intent-bootstrap` can be run manually later.
+- `Whole repository`: invoke `idd-intent-bootstrap` in the same request with
+  whole-repository scope and pass all temporary context from the initialization
+  request.
+- `Select areas`: obtain include roots, exclude roots, semantic product areas,
+  and optional temporary context through another blocking input request when the
+  available interaction tool supports free-form input; otherwise ask one concise
+  plain-text question and end the turn. Then invoke `idd-intent-bootstrap` with
+  the selected scope.
+- `Skip for now`: finish initialization without semantic intent changes and
+  mention that `idd-intent-bootstrap` can be run manually later.
+
+If `request_user_input` is not available:
+
+1. State only that structural IDD initialization is complete.
+2. Ask one concise blocking plain-text question:
+   `Should I now analyze the existing implementation and reconstruct its initial product intent?`
+3. End the turn immediately after the question.
+4. Do not print a textual multiple-choice menu.
+5. Do not reduce the question to a generic "next step" recommendation.
+6. Do not claim the complete initialization workflow has finished while the
+   bootstrap decision is still pending.
+7. After an affirmative answer, ask for whole-repository versus selected-area
+   scope only when the scope is not already clear, then hand off to
+   `idd-intent-bootstrap`.
 
 The question is an offer, not permission to infer or write product intent.
 `idd-project-init` itself must not create, update, or delete current
