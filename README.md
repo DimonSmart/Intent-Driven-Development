@@ -55,17 +55,7 @@ Use idd-intent-brainstorm to help me clarify a feature that lets users compare t
 
 ## Use Cases
 
-Open [IDD Use Cases](docs/using-idd.md) when you need to decide what to do next. It covers existing and new projects, product changes, implementation-only work, audits, verification, Factory, and deliberate IDD bypass.
-
-## Verify Installation
-
-After setup, [verify the marketplace, installed plugins, and repository initialization](docs/verify-installation.md).
-
-## Updating IDD
-
-IDD is actively developed, and new versions are released periodically. Refresh the marketplace and update the installed plugins to receive the latest workflows, fixes, and documentation.
-
-[Update IDD to the latest version](docs/updating-idd.md)
+Open [IDD Use Cases](docs/using-idd.md) when you need to decide what to do next. It covers existing and new projects, product changes, implementation-only work, audits, verification, Factory, installation checks, updates, and deliberate IDD bypass.
 
 ## Two Explicit Plugins
 

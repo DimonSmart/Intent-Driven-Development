@@ -9,6 +9,7 @@ Use `idd-intent` for the normal workflow. Add optional `idd-factory` only when i
 | Situation | What to do |
 | --- | --- |
 | An existing repository does not use IDD yet | Run `idd-project-init`, then import confirmed product knowledge with `idd-intent-import`. |
+| You need to confirm that IDD is installed and initialized correctly | Follow [Verify Installation](verify-installation.md). |
 | You are starting from an idea | Run `idd-project-init`, then clarify the first product behavior with `idd-intent-brainstorm`. |
 | The requested feature is still unclear | Use `idd-intent-brainstorm` before changing intent or code. |
 | Product behavior must be added, changed, or removed | Use `idd-intent-change`, then implement the updated intent. |
@@ -30,7 +31,11 @@ idd-project-init
 
 The workflow creates the minimal project-owned IDD structure and records the integration in the active agent instructions. It does not copy plugin skills into the project.
 
-Installation and initialization commands are in the [README Quick Start](../README.md#quick-start). To confirm setup, see [Verify Installation](verify-installation.md).
+Installation and initialization commands are in the [README Quick Start](../README.md#quick-start).
+
+## Verify Installation
+
+After setup, or when IDD commands are unavailable in a new session, follow [Verify Installation](verify-installation.md) to confirm the marketplace, installed plugins, and repository initialization.
 
 ## Import an Existing Product
 
@@ -145,7 +150,7 @@ Continue the current IDD Factory work.
 
 ## Update IDD
 
-IDD changes regularly. Follow [Updating IDD](updating-idd.md) to refresh the marketplace, update the installed plugins, verify the versions, and load the update in a new session.
+IDD is actively developed, and new versions are released periodically. Follow [Updating IDD](updating-idd.md) to refresh the marketplace, update or reinstall the installed plugins, verify the versions, and load the update in a new session.
 
 ## Inspect Routing
 
