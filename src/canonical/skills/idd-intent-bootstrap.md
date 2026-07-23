@@ -3,19 +3,17 @@
 Use this skill to establish initial current product intent for an existing
 implemented project when reliable IDD intent documents do not yet exist.
 
-Formula:
-
 ```text
 idd-intent-bootstrap =
     adaptive codebase discovery
     + evidence classification
-    + interactive semantic confirmation
+    + blocking semantic confirmation
     + normalized initial intent
     + lint gate
 ```
 
-This skill is manually invocable. `idd-project-init` may hand off to it only
-after the user explicitly agrees to analyze an existing implementation.
+The skill is directly invocable. `idd-project-init` may hand off to it only after
+the user explicitly agrees to analyze an existing implementation.
 
 ## Purpose
 
@@ -23,33 +21,31 @@ Recover a small, current, owner-confirmed product intent model from an existing
 codebase, available documentation, tests, public contracts, observed behavior,
 and temporary information supplied by the user.
 
-The implementation is evidence. It is not product intent by itself.
+Implementation is evidence. It is not product intent by itself.
 
 The skill must distinguish:
 
-- what the product observably does;
-- what the product is intended to continue doing;
-- which public contracts and compatibility constraints are durable;
-- which architecture decisions are intentional and durable;
-- which technical choices are replaceable implementation preferences;
-- which details are incidental;
-- which conclusions remain uncertain or conflicting.
+- observable product behavior from accidental behavior;
+- public contracts and compatibility constraints from internal formats;
+- intentional durable architecture from replaceable implementation choices;
+- current product areas from obsolete, experimental, migration, or internal-tool
+  areas;
+- confirmed product truth from unresolved or conflicting interpretations.
 
-The result belongs under `.idd/intent/` only after the user reviews and confirms
+Nothing becomes a current `IDD-NNNN` document until the user reviews and approves
 the proposed semantic model.
 
 ## When To Use
 
 Use this skill when:
 
-- the repository already contains meaningful implementation;
+- meaningful implementation already exists;
 - `.idd/intent/` has no adequate current `IDD-NNNN` product model;
-- existing documentation is absent, incomplete, stale, or insufficient to
-  establish current intent safely;
-- the user asks to understand an existing project and create its initial IDD
-  intent;
-- `idd-project-init` detects an existing implementation without current numbered
-  intent and the user accepts the bootstrap offer.
+- documentation is absent, incomplete, stale, or insufficient;
+- the user asks to understand an existing project and reconstruct its initial
+  current intent;
+- `idd-project-init` detects an existing implementation without current intent
+  and the user accepts the bootstrap offer.
 
 The request may limit discovery to selected roots, projects, modules, products,
 or applications. Respect explicit include and exclude boundaries.
@@ -58,39 +54,80 @@ or applications. Respect explicit include and exclude boundaries.
 
 Do not use this skill when:
 
-- the repository is a new or effectively empty project;
-- reliable source specifications already express the current product truth and
-  only need migration into IDD; use `idd-intent-import`;
-- current IDD intent already owns the relevant product areas and needs a normal
-  product change; use `idd-intent-change`;
+- the repository is new or effectively empty;
+- reliable source specifications already express current product truth and only
+  need normalization into IDD; use `idd-intent-import`;
+- current IDD intent already owns the area and needs a normal product change; use
+  `idd-intent-change`;
 - one confirmed implementation behavior is missing from otherwise adequate
   current intent; use `idd-code-update-intent`;
 - the request is only to document implementation patterns for Coding Agents;
-- the user asks for a broad code quality, security, architecture, or
-  implementation review;
+- the user asks for a broad code-quality, security, or architecture review;
 - the user has not authorized creation or modification of current intent.
 
-Do not use bootstrap as a reason to rewrite an established `.idd/intent/` tree
-from the implementation.
+Do not use bootstrap to replace an established intent tree from implementation.
 
 ## Inputs
 
-Accept natural-language input. Useful optional input includes:
+Accept natural-language input. Useful optional context includes:
 
-- product or repository roots to include;
-- directories, projects, generated sources, prototypes, migrations, or legacy
-  areas to exclude;
-- a short description of the project's purpose;
-- known users, actors, or operational environments;
-- links or paths to external documentation;
-- public contracts that must remain compatible;
+- roots or product areas to include;
+- generated sources, prototypes, migrations, legacy areas, or tools to exclude;
+- a short description of product purpose and users;
+- external documentation or related repositories;
+- public contracts and compatibility expectations;
 - known obsolete or experimental areas;
-- technical choices that the user already knows are mandatory, replaceable, or
-  undecided.
+- technical choices already known to be mandatory, replaceable, or undecided.
 
-Treat user-supplied information as evidence for the current run. Persist only
-the durable confirmed meaning, not the conversation, scan instructions, source
+Treat this information as temporary evidence for the current run. Persist only
+confirmed durable meaning, not the conversation, scan instructions, source
 inventory, or temporary notes.
+
+## Structured User Input Protocol
+
+Every decision that blocks discovery scope or normative intent writing must be an
+actual user-input request, not a suggestion placed in a completion report.
+
+### When `request_user_input` is available
+
+For every blocking decision:
+
+1. MUST call `request_user_input`.
+2. Prefer one question per call and never exceed three questions.
+3. Provide two or three meaningful, mutually exclusive options.
+4. Put the recommended option first and mark it as recommended when the client
+   convention supports that label.
+5. Omit `autoResolutionMs`; blocking semantic decisions require an explicit
+   answer and must not resolve automatically.
+6. Stop and wait immediately after the tool call.
+7. Do not emit a final response, continue discovery, or write current intent
+   while the answer is pending.
+8. Do not convert an unanswered decision into an assumption.
+9. Do not add an `Other` option when the client supplies one automatically.
+
+Use short stable question IDs and short UI headers. Keep each option description
+to one sentence explaining the effect of that choice.
+
+### When `request_user_input` is unavailable
+
+For every blocking decision:
+
+1. Ask one concise plain-text question.
+2. End the turn immediately after the question.
+3. Do not print a textual numbered or bulleted multiple-choice menu.
+4. Do not reduce the decision to a generic next-step recommendation.
+5. Do not continue with a guessed answer.
+
+### Decisions covered by this protocol
+
+The protocol applies to:
+
+- whole-repository versus selected-area scope;
+- whether to bootstrap uncovered areas when partial current intent exists;
+- confirmation or correction of the detected product map;
+- classification of material technical choices;
+- resolution of semantic conflicts;
+- approval, revision, or cancellation of the proposed initial intent model.
 
 ## Existing Intent Guard
 
@@ -98,22 +135,15 @@ Before discovery:
 
 1. Read `.idd/intent/README.md` and `.idd/intent/INDEX.md`.
 2. Inspect current `IDD-NNNN` documents directly under `.idd/intent/`.
-3. If an adequate current product model already exists, stop and recommend the
-   narrower applicable workflow.
+3. If an adequate current model exists, stop and recommend the narrower workflow.
 4. If only bootstrap support files exist, continue.
-5. If a partial current model exists, ask whether the user wants to bootstrap
-   only uncovered product areas. Never replace confirmed current intent merely
-   because the implementation differs.
+5. If a partial current model exists, use the Structured User Input Protocol to
+   ask whether only uncovered areas should be bootstrapped. Never replace
+   confirmed current intent merely because implementation differs.
 
 ## Core Safety Model
 
-### Evidence Is Not Authority
-
-A code path, dependency, test, directory, framework, or deployment file may
-prove that something exists. It does not prove that it must remain part of the
-product.
-
-Never infer requirements using this transformation:
+Never perform this transformation:
 
 ```text
 current implementation detail
@@ -126,13 +156,11 @@ Use this transformation:
 observed implementation or source evidence
     -> candidate meaning
     -> classification
-    -> user confirmation when semantic
+    -> explicit semantic confirmation
     -> spec, ADR, spike, or omission
 ```
 
-### Evidence Classes
-
-Classify findings before proposing documents:
+Classify material findings as one of:
 
 ```text
 observable-product-behavior
@@ -149,176 +177,150 @@ semantic-conflict
 
 Examples:
 
-- a user-visible export operation may be `observable-product-behavior`;
-- a file schema consumed by other systems may be `public-contract`;
-- local offline operation may be a `compatibility-constraint`;
-- SQLite may be a `durable-architecture-candidate`,
-  `current-implementation-preference`, or incidental detail depending on user
-  confirmation;
-- a private helper name is an `incidental-implementation-detail`;
-- contradictory README and runtime behavior is a `semantic-conflict`.
+- user-visible export behavior may be observable product behavior;
+- an externally consumed file schema may be a public contract;
+- offline operation may be a compatibility constraint;
+- SQLite may be an accepted architecture decision, a replaceable preference, or
+  incidental depending on confirmation;
+- a private helper name is incidental;
+- contradictory README and runtime behavior is a semantic conflict.
 
-### Technical Detail Classification
-
-When a technical choice may constrain future implementations, ask the user to
-classify its durable meaning using the smallest useful choice set:
-
-```text
-1. Durable product or compatibility contract
-2. Accepted architecture decision
-3. Replaceable implementation preference
-4. Incidental current detail
-5. Unresolved
-```
-
-Adapt the wording to the actual finding.
+## Technical Detail Classification
 
 Do not ask about every dependency. Ask only when the answer changes future
 implementation freedom, public compatibility, supported environments,
 operability, security, or an intentional architecture boundary.
 
-Typical candidates include:
+Typical candidates include language/runtime, framework, persistence provider,
+deployment model, operating-system support, network protocol, public file
+format, offline behavior, module boundaries, required external service, UI
+toolkit, and extension mechanism.
 
-- language or runtime;
-- framework;
-- persistence engine or provider;
-- deployment model;
-- operating-system support;
-- network protocol;
-- public data or file format;
-- offline or local-first behavior;
-- module boundaries;
-- required external service;
-- UI toolkit;
-- extension or plugin mechanism.
+Because structured input should use only two or three options, classify a
+technical choice in at most two stages.
 
-Package presence alone is insufficient evidence that the package belongs in
+First ask:
+
+```text
+1. Durable requirement or decision
+2. Replaceable or incidental implementation detail
+3. Unresolved
+```
+
+If the user selects the durable option and the distinction matters, ask:
+
+```text
+1. Product or compatibility contract
+2. Accepted architecture decision
+3. Return to unresolved
+```
+
+Map results as follows:
+
+- product or compatibility contract -> spec;
+- accepted architecture decision -> ADR;
+- replaceable or incidental detail -> omit from current intent;
+- unresolved -> active spike only when focused research materially affects the
+  product or architecture, otherwise omit and report.
+
+Package presence alone is insufficient evidence that a package belongs in
 intent.
 
 ## Discovery Strategy
 
 Use adaptive breadth-first discovery followed by focused deep reading.
 
-### Initial Repository Map
+### Initial repository map
 
 Inspect enough repository structure to identify:
 
-- repository roots and workspace or solution files;
-- monolith, monorepo, multi-part, or multi-application structure;
-- executable entry points;
-- public libraries and exposed APIs;
+- workspace, solution, package, and project roots;
+- monolith, monorepo, multipart, or multi-application structure;
+- executable entry points and public libraries;
 - CLI commands, UI routes, endpoints, jobs, services, or background processes;
 - domain modules and major data flows;
 - tests, examples, fixtures, and sample applications;
-- persisted or exchanged formats;
-- configuration boundaries;
+- persisted or exchanged formats and configuration boundaries;
 - integrations and deployment targets;
-- existing README files, docs, ADRs, schemas, and API descriptions;
+- README files, docs, ADRs, schemas, and API descriptions;
 - generated, vendored, experimental, legacy, migration, or test-only areas.
 
-Exclude normal dependency, build-output, generated-output, and cache
-directories unless they define a public generated contract.
+Exclude normal dependencies, build outputs, generated outputs, and caches unless
+they define a public generated contract.
 
 Do not begin by reading every source file. Build the map first, then inspect the
-smallest representative set of files needed to understand product behavior and
-durable boundaries.
+smallest representative set needed to understand product behavior and durable
+boundaries.
 
-### Project Boundary Confirmation
-
-Present the detected product parts and ask the user to confirm or correct them
-before semantic writing.
-
-The user may:
-
-- confirm the detected parts;
-- rename or regroup them by product meaning;
-- exclude obsolete, experimental, generated, migration, or internal-tool areas;
-- provide additional repository or directory roots;
-- provide temporary project context;
-- identify a primary product when the repository contains several;
-- request whole-repository or selected-area discovery.
-
-Directory boundaries are evidence, not automatic intent-document boundaries.
-
-### Focused Product Discovery
-
-For each confirmed product part, investigate:
-
-- likely purpose and intended users;
-- primary user or system scenarios;
-- externally observable behavior;
-- public entry points and contracts;
-- durable domain concepts and invariants;
-- compatibility and data-preservation expectations;
-- failure and recovery behavior where product-defining;
-- external integrations;
-- security, privacy, or operational constraints where observable or confirmed;
-- architecture boundaries that may be intentionally durable;
-- tests or examples that provide behavioral evidence.
-
-Prefer converging evidence from multiple sources. For example, a public API,
-integration tests, runtime wiring, and user confirmation together provide
-stronger evidence than one private class.
-
-Do not inspect Git history unless the user explicitly provides it as a source
-or asks for historical investigation.
+Do not inspect Git history unless the user explicitly supplies it as evidence or
+asks for historical investigation.
 
 ## Interactive Workflow
 
-### 1. Establish Scope
+### 1. Establish scope
 
-If the request does not already define scope, ask whether to analyze:
+If scope is not already explicit, use the Structured User Input Protocol with:
 
 ```text
-1. The whole repository
-2. Selected product areas or project roots
-3. Cancel without creating initial intent
+Question: Which scope should initial intent discovery cover?
+Options:
+- Whole repository (Recommended)
+- Select product areas
+- Cancel bootstrap
 ```
 
-For selected scope, ask for include and exclude roots or a semantic description
-of the target product parts.
+For selected scope, obtain include roots, exclude roots, or a semantic description
+of target product areas through another blocking request. Also allow temporary
+context, external documents, known obsolete areas, and compatibility constraints.
+Do not force additional information when none exists; retain explicit
+uncertainty.
 
-Ask whether the user has temporary context, external documents, known obsolete
-areas, or compatibility requirements that the code cannot reveal.
+### 2. Discover and confirm the project map
 
-Do not force the user to provide additional information. Continue with explicit
-uncertainty when none is available.
-
-### 2. Discover And Confirm The Project Map
-
-Perform the initial repository map.
-
-Present:
+Perform the initial repository map and present:
 
 - detected product or application parts;
 - likely responsibilities;
 - public entry points;
 - important source areas;
 - excluded generated or non-product areas;
-- uncertainties in the classification.
+- uncertainties in classification.
 
-Ask the user to confirm or correct the map. Do not create current intent before
-this boundary is accepted.
-
-### 3. Build Candidate Product Intent
-
-Create a temporary candidate model containing:
+Then use the Structured User Input Protocol with:
 
 ```text
-product purpose
-actors and users
-major capabilities
-public contracts
-domain concepts and invariants
-compatibility expectations
-external integrations
-durable architecture candidates
-replaceable implementation choices
-possible obsolete areas
-unknowns and conflicts
+Question: Is this the correct product boundary for intent discovery?
+Options:
+- Confirm map (Recommended)
+- Revise map
+- Cancel bootstrap
 ```
 
-For each material candidate track:
+If revision is selected, request corrections and repeat confirmation. Do not
+create current intent before the boundary is accepted.
+
+Directory boundaries are evidence, not automatic intent-document boundaries.
+
+### 3. Build candidate product intent
+
+For each confirmed product part, investigate:
+
+- purpose and intended users;
+- primary user or system scenarios;
+- externally observable behavior;
+- public entry points and contracts;
+- durable domain concepts and invariants;
+- compatibility and data-preservation expectations;
+- product-defining failure and recovery behavior;
+- external integrations;
+- observable or confirmed security, privacy, and operational constraints;
+- architecture boundaries that may be intentionally durable;
+- tests and examples providing behavioral evidence.
+
+Prefer converging evidence. A public API, integration tests, runtime wiring, and
+user confirmation together are stronger than one private class.
+
+Track material candidates temporarily using:
 
 ```text
 candidate statement
@@ -329,61 +331,37 @@ confirmation status
 proposed target: spec | adr | spike | omit
 ```
 
-Confidence helps review. It does not replace confirmation.
+Confidence helps review. It never replaces confirmation. Do not write this
+inventory under `.idd/intent/`.
 
-Do not write this inventory under `.idd/intent/`.
+### 4. Ask targeted semantic questions
 
-### 4. Ask Targeted Semantic Questions
+Ask only high-leverage questions affecting durable meaning. Group related
+questions and use the technical classification protocol above.
 
-Ask only high-leverage questions that affect durable meaning.
+Examples include:
 
-Group related questions instead of asking one question per file or dependency.
-Examples:
+- whether local/offline operation is required or merely current architecture;
+- whether an exported JSON shape is a public contract or internal format;
+- whether an unreferenced migration utility is current product, temporary work,
+  or obsolete;
+- whether C#, .NET, Agent Framework, a database, or a UI toolkit is part of the
+  durable contract, an ADR, or replaceable implementation.
 
-```text
-The application persists all state locally and contains no server dependency.
-Is local/offline operation a product requirement, an accepted architecture
-decision, or only the current implementation?
-```
+### 5. Handle conflicts
 
-```text
-The exported JSON shape is covered by compatibility tests and consumed by a
-sample client. Is this a public compatibility contract or a replaceable internal
-format?
-```
+A conflict exists when plausible current sources imply different behavior,
+contracts, supported environments, defaults, or durable boundaries.
 
-```text
-The repository contains a migration utility that is not referenced by the main
-application. Is it part of the current product, a temporary migration tool, or
-obsolete?
-```
+Do not choose silently. State the competing interpretations and strongest
+evidence, then request a blocking product decision. Create only non-conflicting
+intent while the conflict remains unresolved. Use a spike only when focused
+research is genuinely required.
 
-When the user cannot decide, classify the item as unresolved. Create a spike
-only when the unresolved question is active and materially affects the product
-or architecture. Otherwise omit it from current intent and report it.
+### 6. Propose the initial intent model
 
-### 5. Handle Conflicts
-
-A conflict exists when plausible current sources imply different product
-behavior, contracts, supported environments, defaults, or durable boundaries.
-
-Do not choose silently.
-
-For each material conflict:
-
-- state both interpretations;
-- show the strongest evidence for each;
-- ask for a product decision when the conflict blocks coherent intent;
-- create only non-conflicting current intent;
-- use a spike when focused research is genuinely required;
-- stop before writing the conflicting normative statement when no decision is
-  available.
-
-### 6. Propose The Initial Intent Model
-
-Before writing numbered documents, present a compact proposal.
-
-For each proposed document include:
+Before writing current documents, present a compact proposal. For each proposed
+document include:
 
 ```text
 candidate ID and filename
@@ -395,23 +373,25 @@ implementation details intentionally excluded
 open questions
 ```
 
-Prefer a small document set. Product areas, shared contracts, durable
-architecture decisions, and active research questions determine document
-boundaries. Repository folders and project files do not.
+Prefer a small document set. Product areas, shared contracts, durable decisions,
+and active research questions determine document boundaries. Folders and project
+files do not.
 
-Offer these outcomes:
+Use the Structured User Input Protocol with:
 
 ```text
-Apply the proposal
-Edit the proposal
-Review ambiguous candidates
-Cancel without writing current intent
+Question: What should happen with the proposed initial intent model?
+Options:
+- Apply proposal (Recommended)
+- Review or edit
+- Cancel without writing
 ```
 
-Do not create or modify current numbered documents until the user explicitly
-approves the semantic proposal.
+If review or edit is selected, obtain corrections, update the proposal, and ask
+for approval again. Do not create or modify current `IDD-NNNN` documents before
+explicit approval.
 
-### 7. Write Confirmed Current Intent
+### 7. Write confirmed current intent
 
 After approval:
 
@@ -421,38 +401,34 @@ After approval:
    documented project.
 3. Create the minimum required specs, ADRs, and active spikes using current
    templates and `IDD-NNNN` numbering rules.
-4. Write observable behavior and durable contracts without private type, method,
-   source-file, or dependency-wiring names.
-5. Include technical technologies or libraries only when confirmed as a product
-   contract, compatibility constraint, or accepted architecture decision.
+4. Express observable behavior and durable contracts without private type,
+   method, source-file, or dependency-wiring names.
+5. Include technologies and libraries only when confirmed as a product contract,
+   compatibility constraint, or accepted architecture decision.
 6. Keep replaceable preferences and incidental details out of current intent.
 7. Update `.idd/intent/INDEX.md`.
-8. Run or simulate `idd-intent-lint`.
-9. Fix every mechanical error before completing.
+8. Run or simulate `idd-intent-lint` and fix every mechanical error.
 
 Do not create a discovery report, source inventory, confirmation transcript, or
-scan-state file under `.idd/intent/`.
-
-If persistent discovery output is explicitly requested, place it outside
-`.idd/intent/` and mark it non-normative.
+scan-state file under `.idd/intent/`. If persistent discovery output is
+explicitly requested, place it elsewhere and mark it non-normative.
 
 ## Document Selection
 
 Use:
 
-- `spec` for durable product behavior, actors, scenarios, domain contracts,
-  public contracts, compatibility constraints, acceptance criteria, and
-  verification properties;
+- `spec` for durable behavior, actors, scenarios, domain contracts, public
+  contracts, compatibility constraints, acceptance criteria, and verification;
 - `adr` for a confirmed durable architecture decision whose rationale,
   alternatives, and consequences matter;
-- `spike` for an active unresolved question that requires research before a
-  product or architecture decision.
+- `spike` for an active unresolved question requiring research before a product
+  or architecture decision.
 
 Do not create:
 
 - one spec per project, namespace, directory, class, endpoint, or test;
 - specs for ordinary dependencies, coding style, private architecture shape, or
-  current DI wiring;
+  DI wiring;
 - ADRs solely because a framework or library is present;
 - spikes for every low-confidence observation;
 - task, migration, implementation, or cleanup documents under `.idd/intent/`.
@@ -462,31 +438,28 @@ Do not create:
 Use `idd-project-init` first when the repository has not been initialized.
 
 Use `idd-intent-import` when source documents already express product knowledge
-that can be normalized without reconstructing meaning primarily from the
-implementation.
+that can be normalized without reconstructing meaning primarily from code.
 
-Use `idd-intent-brainstorm` when the owner wants to define a future product
-direction rather than recover the current product.
+Use `idd-intent-brainstorm` to define future direction rather than recover the
+current product.
 
 Use `idd-intent-new-document` for a normal focused new owner after bootstrap.
-Bootstrap may perform equivalent document creation internally only after its
-whole initial proposal is approved.
+Bootstrap may create its approved initial document set directly.
 
-Use `idd-code-update-intent` for later, narrow transfer of explicitly confirmed
-implementation behavior into an established intent model.
+Use `idd-code-update-intent` for later narrow transfer of explicitly confirmed
+implementation behavior into an established model.
 
-Use `idd-code-check-implementation` after bootstrap when the user wants a
-separate conformance review of the complete implementation against the newly
-confirmed intent.
+Use `idd-code-check-implementation` after bootstrap for a separate conformance
+review against the newly confirmed intent.
 
 ## Output
 
-Before approval, return a discovery and proposal summary in the conversation.
+Before approval, return discovery and proposal summaries in the conversation,
+then request the applicable blocking decision.
 
 After apply, report:
 
-- scope inspected;
-- product parts confirmed;
+- scope inspected and product parts confirmed;
 - documents created or updated;
 - material technical details classified as durable, replaceable, incidental, or
   unresolved;
@@ -502,19 +475,19 @@ The report is temporary workflow output and is not normative product intent.
 Before completion, verify:
 
 - the repository contained meaningful existing implementation;
-- scope and product-part boundaries were confirmed;
+- scope and product boundaries were explicitly confirmed;
+- every blocking decision used `request_user_input` when available, otherwise a
+  plain-text question followed by an immediate stop;
+- no final response was emitted while a blocking decision was pending;
 - implementation evidence was not treated as product intent automatically;
-- user-supplied temporary context was not copied as workflow history;
-- public behavior and contracts are expressed without private implementation
-  names;
+- user-supplied context was not copied as workflow history;
 - technical choices were included only at their confirmed durable level;
 - accidental patterns, ordinary dependencies, source paths, and coding style
   were excluded;
-- conflicts remain visible and were not resolved silently;
-- no numbered current document was written before proposal approval;
+- conflicts remained visible and were not resolved silently;
+- no current `IDD-NNNN` document was written before proposal approval;
 - document boundaries follow durable product areas rather than repository
   structure;
-- the initial intent model is small enough to remain useful;
 - `.idd/intent/INDEX.md` matches actual current documents;
 - all `IDD-NNNN` references are mechanically valid;
 - `idd-intent-lint` reports no errors.
@@ -525,8 +498,7 @@ This skill does not:
 
 - prove that the current implementation is correct;
 - perform a broad quality or architecture review;
-- generate implementation documentation;
-- create a full repository inventory as durable project memory;
+- generate implementation documentation or a durable repository inventory;
 - preserve every existing behavior;
 - automatically lock the current technology stack;
 - resolve product conflicts without the owner;
