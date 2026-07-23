@@ -8,11 +8,13 @@
   <strong>Durable product intent for disposable implementations.</strong>
 </p>
 
-Intent-Driven Development (IDD) is a lightweight alternative to heavyweight Spec-Driven Development workflows for AI-assisted software development.
+## What Is Intent-Driven Development?
 
-IDD preserves the current truth about the product. Temporary plans, task lists, statuses, reviews, and implementation attempts stay temporary. Coding Agents work from the relevant intent, while Git preserves history.
+Intent-Driven Development (IDD) is a lightweight methodology and plugin toolkit for AI-assisted software development.
 
-## The Thought Experiment
+IDD turns product specifications into durable working memory for Coding Agents. Instead of accumulating plans, task states, review notes, and obsolete implementation details, it keeps a compact and up-to-date description of what the product must do.
+
+Agents get the context they need to understand, implement, and verify changes. Temporary implementation work remains temporary, while Git preserves history.
 
 > **Delete the implementation. Keep only the intent. Can a Coding Agent rebuild the product?**
 
@@ -20,12 +22,31 @@ IDD organizes product knowledge so the answer can move closer to **yes**.
 
 ## Why IDD?
 
-- **One current source of product truth.** Intent documents describe what the product must do.
-- **Fewer permanent artifacts.** Plans, task states, and reviews do not accumulate in the repository.
-- **Lower context overhead.** Agents read relevant current intent instead of a growing history of workflow documents.
+- **One current source of product truth.** Intent documents describe what the product must continue to do.
+- **Less workflow debris.** Plans, task states, reviews, and implementation attempts do not accumulate in the repository.
+- **Lower context overhead.** Agents read relevant current intent instead of a growing archive of workflow documents.
+- **Replaceable implementations.** Product knowledge survives refactoring, tool changes, agent changes, and rewrites.
 - **Git owns history.** Specifications stay current; Git records how they and the implementation changed.
 
+## Core Intent Plugin and Optional Factory
+
+### `idd-intent` — durable product memory
+
+`idd-intent` is the core IDD plugin. It helps Coding Agents create, maintain, use, and verify the current product intent.
+
+It is a complete standalone plugin and is sufficient for normal IDD workflows. Start here.
+
+### `idd-factory` — lightweight implementation orchestration
+
+`idd-factory` is an optional plugin for larger tasks that benefit from decomposition, resumable execution, and independent review.
+
+Factory is actively developed with a strong focus on token efficiency. Its primary optimization target is to make structured Factory-driven implementation cost close to equivalent direct Coding Agent commands in token usage — adding control and reliability without turning orchestration into a token multiplier.
+
+The direction is maximum economy: compact state, minimal handoffs, and only as much orchestration as the task actually needs. Install Factory when that additional structure is useful; keep using `idd-intent` alone when a direct workflow is enough.
+
 ## Quick Start
+
+Start with the standalone `idd-intent` plugin.
 
 ### Claude Code
 
@@ -53,18 +74,23 @@ Then describe what you need naturally. For example:
 Use idd-intent-brainstorm to help me clarify a feature that lets users compare two local folders without modifying either side.
 ```
 
+For a complex implementation task, add the optional Factory plugin later:
+
+### Claude Code
+
+```bash
+claude plugin install idd-factory@intent-driven-development
+```
+
+### Codex
+
+```bash
+codex plugin add idd-factory@intent-driven-development
+```
+
 ## Use Cases
 
 Open [IDD Use Cases](docs/using-idd.md) when you need to decide what to do next. It covers existing and new projects, product changes, implementation-only work, audits, verification, Factory, installation checks, updates, and deliberate IDD bypass.
-
-## Two Explicit Plugins
-
-```text
-idd-intent    durable product memory
-idd-factory   optional temporary implementation orchestration
-```
-
-`idd-intent` is the standalone core. Install `idd-factory` only when a task benefits from explicit multi-step execution and independent review.
 
 ## Documentation
 
