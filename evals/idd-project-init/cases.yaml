@@ -1,0 +1,165 @@
+cases:
+  - id: init-existing-project-uses-codex-structured-input
+    skill: idd-project-init
+    host: codex
+    interaction_mode: structured-input-available
+    setup: existing implementation, no current IDD-NNNN documents
+    request: "Initialize IDD. This is a C# learning project using Microsoft Agent Framework."
+    expected_actions:
+      - create-or-normalize-bootstrap-structure
+      - call-request-user-input
+      - decision-key-initial-intent-bootstrap
+      - recommended-whole-repository-option-first
+      - omit-auto-resolution
+      - wait-for-user-answer
+    forbidden_actions:
+      - embed-tool-call-json-schema
+      - textual-multiple-choice-menu
+      - final-workflow-completion-before-answer
+      - invoke-bootstrap-before-answer
+      - broad-codebase-discovery-before-answer
+      - create-current-intent-before-answer
+    semantic_review_notes: "The supplied product and stack description is temporary context, not implicit consent to reconstruct intent."
+
+  - id: init-existing-project-uses-claude-structured-input
+    skill: idd-project-init
+    host: claude
+    interaction_mode: structured-input-available
+    setup: existing implementation, no current IDD-NNNN documents
+    request: "Initialize IDD for this existing project."
+    expected_actions:
+      - create-or-normalize-bootstrap-structure
+      - call-ask-user-question
+      - decision-key-initial-intent-bootstrap
+      - ask-single-choice-question
+      - recommended-whole-repository-option-first
+      - wait-for-user-answer
+    forbidden_actions:
+      - call-request-user-input
+      - embed-tool-call-json-schema
+      - context-fork
+      - textual-multiple-choice-menu
+      - invoke-bootstrap-before-answer
+      - create-current-intent-before-answer
+
+  - id: init-whole-repository-selection-hands-off
+    skill: idd-project-init
+    interaction_mode: structured-input-available
+    setup: pending initial_intent_bootstrap question
+    user_answer: "Whole repository"
+    expected_actions:
+      - invoke-idd-intent-bootstrap
+      - pass-whole-repository-scope
+      - pass-temporary-initialization-context
+    forbidden_actions:
+      - ask-for-scope-again
+      - summarize-implementation-as-confirmed-intent
+
+  - id: init-selected-area-selection-asks-scope
+    skill: idd-project-init
+    interaction_mode: structured-input-available
+    setup: pending initial_intent_bootstrap question
+    user_answer: "Select areas"
+    expected_actions:
+      - request-selected-roots-or-product-areas
+      - wait-for-scope-answer
+    forbidden_actions:
+      - invoke-bootstrap-with-guessed-scope
+      - broad-codebase-discovery-before-scope-answer
+      - create-current-intent
+
+  - id: init-skip-finishes-without-bootstrap
+    skill: idd-project-init
+    interaction_mode: structured-input-available
+    setup: pending initial_intent_bootstrap question
+    user_answer: "Skip for now"
+    expected_actions:
+      - finish-structural-initialization
+      - mention-manual-bootstrap-availability
+    forbidden_actions:
+      - invoke-idd-intent-bootstrap
+      - create-current-intent
+
+  - id: init-fallback-asks-real-blocking-question
+    skill: idd-project-init
+    interaction_mode: structured-input-unavailable
+    setup: existing implementation, no current IDD-NNNN documents
+    request: "Initialize IDD for this existing project."
+    expected_actions:
+      - create-or-normalize-bootstrap-structure
+      - ask-one-direct-bootstrap-question
+      - end-turn-after-question
+    forbidden_actions:
+      - textual-numbered-menu
+      - generic-next-step-only
+      - claim-complete-workflow-finished
+      - continue-with-assumed-consent
+      - invoke-bootstrap-before-answer
+
+  - id: bootstrap-project-map-confirmation-is-blocking-in-codex
+    skill: idd-intent-bootstrap
+    host: codex
+    interaction_mode: structured-input-available
+    setup: repository map has been discovered but not confirmed
+    expected_actions:
+      - present-detected-product-map
+      - call-request-user-input
+      - decision-key-project-map-confirmation
+      - offer-confirm-revise-cancel
+      - omit-auto-resolution
+      - wait-for-user-answer
+    forbidden_actions:
+      - embed-tool-call-json-schema
+      - build-normative-documents-before-map-confirmation
+      - assume-directory-layout-is-product-boundary
+      - final-response-before-answer
+
+  - id: bootstrap-project-map-confirmation-is-blocking-in-claude
+    skill: idd-intent-bootstrap
+    host: claude
+    interaction_mode: structured-input-available
+    setup: repository map has been discovered but not confirmed
+    expected_actions:
+      - present-detected-product-map
+      - call-ask-user-question
+      - decision-key-project-map-confirmation
+      - offer-confirm-revise-cancel
+      - wait-for-user-answer
+    forbidden_actions:
+      - call-request-user-input
+      - embed-tool-call-json-schema
+      - context-fork
+      - build-normative-documents-before-map-confirmation
+      - final-response-before-answer
+
+  - id: bootstrap-technical-choice-uses-staged-classification
+    skill: idd-intent-bootstrap
+    interaction_mode: structured-input-available
+    setup: material technical choice could constrain future implementations
+    expected_actions:
+      - ask-durable-versus-implementation-versus-unresolved
+      - use-two-or-three-options
+      - use-stable-workflow-values
+      - wait-for-answer
+      - ask-contract-versus-adr-only-if-needed
+    forbidden_actions:
+      - embed-tool-call-json-schema
+      - five-option-single-question
+      - infer-library-is-mandatory-from-presence
+      - write-technical-choice-before-confirmation
+
+  - id: bootstrap-proposal-approval-is-blocking
+    skill: idd-intent-bootstrap
+    interaction_mode: structured-input-available
+    setup: initial intent proposal is ready, no current IDD-NNNN documents written
+    expected_actions:
+      - present-compact-proposal
+      - call-current-host-structured-question-tool
+      - decision-key-initial-intent-proposal
+      - offer-apply-review-cancel
+      - wait-for-user-answer
+    forbidden_actions:
+      - embed-tool-call-json-schema
+      - create-current-intent-before-apply-answer
+      - assume-proposal-approval
+      - final-completion-before-answer
