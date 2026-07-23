@@ -3,10 +3,15 @@
 This directory contains the current working model of product intent and current
 decision/research records.
 
-Read `INDEX.md` first, then read the numbered current documents directly under
+Read `INDEX.md` first, then read the current `IDD-NNNN` documents directly under
 this directory that apply to the change.
 
-Numbered documents may be specs, ADRs, or active spikes.
+Every intent document uses a stable `IDD-NNNN` identifier and the canonical
+`IDD-NNNN.type-short-title.md` filename. Its first Markdown heading starts with
+the same identifier and document type. Bare numeric document identifiers are not
+valid.
+
+Current documents may be specs, ADRs, or active spikes.
 
 Do not treat templates, support files, generated reports, or deleted Git history
 as current product intent.

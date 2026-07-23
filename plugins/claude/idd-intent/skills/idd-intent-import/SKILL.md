@@ -29,10 +29,11 @@ For successful apply-safe import, the expected final state is:
 
 - no `.idd/intent/archive`;
 - no process-only import reports under `.idd/intent`;
-- all current numbered documents are listed in `.idd/intent/INDEX.md`;
+- all current `IDD-NNNN` documents are listed in `.idd/intent/INDEX.md`;
 - all current documents listed in `.idd/intent/INDEX.md` exist;
-- all numeric `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar
-  references point to existing current documents;
+- all `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar
+  normative relations use `IDD-NNNN` identifiers and point to existing
+  current documents;
 - imported current specs, ADRs, and active spikes follow the current document
   shape;
 - `idd-intent-lint` would return no errors.
@@ -165,7 +166,7 @@ This is not a fixed enum. Prefer areas that match the actual product.
 11. Extract repeated common models into shared specs.
 12. Keep semantic conflicts visible and do not resolve them automatically.
 13. Build and apply a source-to-target remap before writing final relations.
-14. Regenerate `.idd/intent/INDEX.md` from actual current numbered documents.
+14. Regenerate `.idd/intent/INDEX.md` from actual current `IDD-NNNN` documents.
 15. Run or simulate `idd-intent-lint` and fix mechanical errors before finishing.
 16. Keep a short source reference only when it helps traceability; do not turn a
     spec into an imported journal.
@@ -313,13 +314,13 @@ needs-review
 
 Rules:
 
-- A numeric relation may be written only if the referenced target document
+- An `IDD-NNNN` relation may be written only if the referenced target document
   exists in current `.idd/intent`.
 - If source document A was absorbed by target document B, references to A must
   be rewritten to B when the relation is still meaningful.
 - If source document A was skipped as process-only, duplicate, obsolete,
   generated, or historical-only, references to A must be removed or rewritten as
-  source history, not kept as normative numeric references.
+  source history, not kept as normative `IDD-NNNN` references.
 - If the correct remap cannot be inferred safely, do not leave a broken
   reference. Report the unresolved mapping as a blocking import issue.
 
@@ -401,6 +402,10 @@ Do not import the commands or constructor wiring.
 
 Imported current documents must use current IDD document shapes. Do not preserve
 legacy section layout when the document becomes current normative intent.
+
+Every target document must use the canonical `IDD-NNNN.type-short-title.md`
+filename and the same `IDD-NNNN` identifier in its heading. Bare `NNNN`
+filenames and normative references are invalid.
 
 Minimum shape for `spec` documents:
 
@@ -523,7 +528,7 @@ research, import must choose one of these outcomes:
 
 ## Relation Normalization
 
-After writing documents, scan all current specs, ADRs, and spikes for numeric
+After writing documents, scan all current specs, ADRs, and spikes for `IDD-NNNN`
 references.
 
 For each reference:
@@ -538,15 +543,15 @@ For each reference:
 Do not finish with a relation such as:
 
 ```text
-Related: 0026
+Related: IDD-0026
 ```
 
-when `0026` does not exist.
+when `IDD-0026` does not exist.
 
 It is valid to rewrite the relation when the source remap proves the target:
 
 ```text
-Related: 0027
+Related: IDD-0027
 ```
 
 It is also valid to preserve traceability as non-normative history:
@@ -559,7 +564,7 @@ Source history is not a normative relation.
 
 ## Index Regeneration
 
-Regenerate `.idd/intent/INDEX.md` from actual current numbered documents after
+Regenerate `.idd/intent/INDEX.md` from actual current `IDD-NNNN` documents after
 import. Never leave placeholder index content. Never rely on the source index as
 the final target index.
 
@@ -570,14 +575,14 @@ Minimum structure:
 
 | Document | Role | Area | Notes | Replaces |
 | --- | --- | --- | --- | --- |
-| 0001.spec-product-overview.md | spec | Product overview | ... | |
-| 0002.adr-rendering-architecture.md | adr | Rendering | ... | |
-| 0003.spike-input-layer-feasibility.md | spike | Input layer | ... | |
+| IDD-0001.spec-product-overview.md | spec | Product overview | ... | |
+| IDD-0002.adr-rendering-architecture.md | adr | Rendering | ... | |
+| IDD-0003.spike-input-layer-feasibility.md | spike | Input layer | ... | |
 ```
 
 Rules:
 
-- every current numbered document under `.idd/intent/` must be listed;
+- every current `IDD-NNNN` document under `.idd/intent/` must be listed;
 - every listed document must exist;
 - process reports, templates, README files, and support docs must not be listed
   as current specs;
@@ -616,7 +621,7 @@ Before finishing:
 1. Delete `.idd/intent/archive` if it exists.
 2. Remove import/process reports from `.idd/intent`.
 3. Regenerate `.idd/intent/INDEX.md`.
-4. Validate and rewrite numeric relations through the source-to-target map.
+4. Validate and rewrite `IDD-NNNN` relations through the source-to-target map.
 5. Normalize current specs, ADRs, and spikes to current section shapes.
 6. Reclassify resolved spikes.
 7. Remove or merge task-like, process-only, duplicate, and historical-only docs.
@@ -672,8 +677,8 @@ Before finishing, check:
 - Existing specs were updated when appropriate.
 - Conflicts are visible and unresolved.
 - ADR-worthy decisions and spike-worthy research are separated.
-- `.idd/intent/INDEX.md` is regenerated from actual current numbered documents.
-- numeric relations point only to existing current documents.
+- `.idd/intent/INDEX.md` is regenerated from actual current `IDD-NNNN` documents.
+- `IDD-NNNN` relations point only to existing current documents.
 - no process/import report remains under `.idd/intent`.
 - no `.idd/intent/archive` directory exists.
 - imported specs, ADRs, and active spikes use current document shapes.

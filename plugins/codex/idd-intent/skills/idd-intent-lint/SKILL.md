@@ -29,8 +29,15 @@ Check that:
 
 - `.idd/intent/README.md` exists;
 - `.idd/intent/INDEX.md` exists;
-- every current spec listed in `INDEX.md` exists;
-- every current numbered spec under `.idd/intent/` is listed in `INDEX.md`;
+- every current document listed in `INDEX.md` exists;
+- every current `IDD-NNNN` document under `.idd/intent/` is listed in
+  `INDEX.md`;
+- every current intent filename matches
+  `^IDD-\d{4}\.(spec|adr|spike)-[a-z0-9][a-z0-9-]*\.md$`;
+- no current intent document uses the legacy bare numeric filename format
+  `^\d{4}\.(spec|adr|spike)-`;
+- the `IDD-NNNN` identifier and document type in the first Markdown heading
+  match the filename;
 - `.idd/intent` has no archive directory;
 - `.idd/intent/import-report.md` does not exist;
 - generated, import, task, progress, or process reports are not stored under
@@ -45,8 +52,9 @@ Check that:
   preservation candidates;
 - templates/support docs are not listed as current specs;
 - required sections exist, or missing sections are reported;
-- `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar numeric
-  relation references point to existing current numbered docs;
+- `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar normative
+  relations use `IDD-NNNN` identifiers and point to existing current documents;
+- normative relations do not use bare four-digit document numbers;
 - Related Specifications links point to existing files or valid external
   references;
 - specs do not contain obvious stale `.worklog` references except in
@@ -57,32 +65,38 @@ Check that:
   Scope and "not implemented" in Non-goals for the same feature;
 - ADR files use ADR-like structure;
 - spike files are marked as non-normative research or unresolved
-  investigation.
+  investigation;
 - normative spec sections do not contain fenced build/test shell commands,
   explicit task/progress sections, implementation checklists, migration status,
   or a spec lifecycle status.
 
 `idd-intent-lint` must fail if:
 
+- a current intent filename does not use the canonical
+  `IDD-NNNN.type-short-title.md` format;
+- a current intent filename uses the legacy bare numeric format;
+- a document heading uses a missing, malformed, or filename-mismatched
+  `IDD-NNNN` identifier;
 - an archive directory exists under `.idd/intent`;
 - `.idd/intent/import-report.md` exists;
 - generated, import, task, progress, or process reports exist under `.idd/intent`;
 - `INDEX.md` contains an `Archived` section;
 - `INDEX.md` links to deleted document storage;
 - any file under `.idd/intent` references `.idd/intent/archive/...`;
-- any numeric `Related`, `Replaces`, `Supersedes`, `Depends on`, or similar
-  relation points to a missing current numbered doc;
+- any `Related`, `Replaces`, `Supersedes`, `Depends on`, or similar normative
+  relation uses a bare four-digit document number or points to a missing current
+  document;
 - any skill contains an archive-enabling flag;
 - any skill contains an archive import action;
 - any skill recommends moving specs to archive;
-- docs describe archive as a normal lifecycle.
+- docs describe archive as a normal lifecycle;
 - an ordinary spec contains `Status: Current`, `Status: Superseded`,
   `Superseded by`, or another explicit lifecycle status;
 - `INDEX.md` models ordinary specs as `Current`, `Completed`, `Superseded`, or
   another lifecycle status;
 - a normative spec section contains a fenced shell block with a build or test
   command such as `dotnet build`, `dotnet test`, `cargo test`, `mvn test`,
-  `gradle test`, `cargo test`, or `pytest`;
+  `gradle test`, or `pytest`;
 - a normative spec contains an explicit task/progress section, implementation
   checklist, or migration status.
 
@@ -133,8 +147,8 @@ Check whether `.idd/intent` is mechanically consistent.
 Expected behavior:
 
 - use `idd-intent-lint`;
-- check `INDEX.md`, files, links, required sections, and stale `.worklog`
-  references;
+- check `INDEX.md`, filenames, document headings, links, required sections,
+  relation identifiers, and stale `.worklog` references;
 - report pass/fail and warnings;
 - do not edit files.
 

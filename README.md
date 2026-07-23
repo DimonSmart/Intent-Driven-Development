@@ -8,56 +8,51 @@
   <strong>Durable product intent for disposable implementations.</strong>
 </p>
 
-Intent-Driven Development (IDD) is a lightweight, opinionated alternative to heavyweight spec-driven workflows for AI-assisted software development.
+## What Is Intent-Driven Development?
 
-IDD keeps the current truth about the product separate from plans, tasks, statuses, reviews, and implementation details. Change the Coding Agent. Replace the architecture. Rebuild from scratch. The product intent remains.
+Intent-Driven Development (IDD) is a lightweight methodology and plugin toolkit for AI-assisted software development.
 
-## The Thought Experiment
+IDD turns product specifications into durable working memory for Coding Agents. Instead of accumulating plans, task states, review notes, and obsolete implementation details, it keeps a compact and up-to-date description of what the product must do.
+
+Agents get the context they need to understand, implement, and verify changes. Temporary implementation work remains temporary, while Git preserves history.
 
 > **Delete the implementation. Keep only the intent. Can a Coding Agent rebuild the product?**
 
 IDD organizes product knowledge so the answer can move closer to **yes**.
 
-The goal is not to make specifications executable or eliminate engineering judgment. The goal is to preserve enough durable product truth that the implementation can be replaced without losing what the product is supposed to be.
-
-## Two Explicit Plugins
-
-```text
-idd-intent    durable product memory
-idd-factory   temporary implementation organization
-```
-
-`idd-intent` is the standalone core of the methodology. It initializes `.idd/intent/`, maintains current product truth, implements from intent, and verifies implementation against intent.
-
-`idd-factory` is optional. Its `idd-factory-run` entry point coordinates one resumable, file-backed run under `.idd/factory/`, with independent task and final reviews and a commit-message handoff. Factory consumes intent but must not create product truth. Install `idd-intent` first.
-
 ## Why IDD?
 
-**Keep product truth, not project debris.**  
-Specifications describe the current product—not the history of how it was built.
+- **One current source of product truth.** Intent documents describe what the product must continue to do.
+- **Less workflow debris.** Plans, task states, reviews, and implementation attempts do not accumulate in the repository.
+- **Lower context overhead.** Agents read relevant current intent instead of a growing archive of workflow documents.
+- **Replaceable implementations.** Product knowledge survives refactoring, tool changes, agent changes, and rewrites.
+- **Git owns history.** Specifications stay current; Git records how they and the implementation changed.
 
-**Treat implementation as replaceable.**  
-Code, libraries, architecture, and even the Coding Agent may change.
+## Core Intent Plugin and Optional Factory
 
-**Keep temporary work temporary.**  
-Plans, tasks, statuses, reviews, and failed implementation attempts do not become permanent product documentation.
+### `idd-intent` — durable product memory
 
-**Let Git own history.**  
-IDD documents describe what is true now. Git records what used to be true.
+`idd-intent` is the core IDD plugin. It helps Coding Agents create, maintain, use, and verify the current product intent.
 
-## Install
+It is a complete standalone plugin and is sufficient for normal IDD workflows. Start here.
+
+### `idd-factory` — lightweight implementation orchestration
+
+`idd-factory` is an optional plugin for larger tasks that benefit from decomposition, resumable execution, and independent review.
+
+Factory is actively developed with a strong focus on token efficiency. Its primary optimization target is to make structured Factory-driven implementation cost close to equivalent direct Coding Agent commands in token usage — adding control and reliability without turning orchestration into a token multiplier.
+
+The direction is maximum economy: compact state, minimal handoffs, and only as much orchestration as the task actually needs. Install Factory when that additional structure is useful; keep using `idd-intent` alone when a direct workflow is enough.
+
+## Quick Start
+
+Start with the standalone `idd-intent` plugin.
 
 ### Claude Code
 
 ```bash
 claude plugin marketplace add DimonSmart/Intent-Driven-Development@marketplace
 claude plugin install idd-intent@intent-driven-development
-```
-
-Optional Factory:
-
-```bash
-claude plugin install idd-factory@intent-driven-development
 ```
 
 ### Codex
@@ -67,50 +62,79 @@ codex plugin marketplace add DimonSmart/Intent-Driven-Development --ref marketpl
 codex plugin add idd-intent@intent-driven-development
 ```
 
-Optional Factory:
-
-```bash
-codex plugin add idd-factory@intent-driven-development
-```
-
-After installing `idd-intent`, open each target repository and perform the initial project setup:
+Open the target repository and initialize IDD:
 
 ```text
 idd-project-init
 ```
 
-For an existing project that already has documentation, specifications, requirements, ADRs, or other attempts to record product behavior, import that material after initialization:
+For an existing implementation without current intent documents, initialization can offer the interactive `idd-intent-bootstrap` workflow to analyze the project and propose its initial intent model.
+
+Then describe what you need naturally. For example:
 
 ```text
-idd-intent-import
+Use idd-intent-brainstorm to help me clarify a feature that lets users compare two local folders without modifying either side.
 ```
 
-## Start
+For a complex implementation task, add the optional Factory plugin later:
 
-`idd-project-init` creates the missing `.idd/intent/` bootstrap state and creates or updates one minimal managed IDD section in the repository-root `AGENTS.md` for Codex or `CLAUDE.md` for Claude Code. Existing unrelated agent instructions are preserved, and existing IDD instructions are consolidated instead of duplicated.
+### Claude Code
 
-For an existing product, use `idd-intent-import` to turn relevant existing documentation, source behavior, tests, and confirmed requirements into proposed current product intent. Review the import result rather than treating every historical document or implementation detail as current truth.
+```bash
+claude plugin install idd-factory@intent-driven-development
+```
 
-Then ask IDD to describe a new product area, change current product intent, implement from intent, or verify that the implementation still matches it.
+### Codex
 
-Describe the requested change naturally. IDD routes it through the smallest safe workflow.
+```bash
+codex plugin add idd-factory@intent-driven-development
+```
 
-To inspect the selected route explicitly:
+## Use Cases
+
+Open [IDD Use Cases](docs/using-idd.md) when you need to decide what to do next. It covers existing and new projects, product changes, implementation-only work, audits, verification, Factory, installation checks, updates, and deliberate IDD bypass.
+
+## Updates and Breaking Changes
+
+### 2026-07-23 — Intent document filename namespace
+
+Intent document identifiers and filenames now use the `IDD-` prefix: `IDD-0001.spec-example.md` instead of `0001.spec-example.md`. The namespace makes document IDs unambiguous in prose, search results, links, logs, and automated repository scans.
+
+This is a breaking change. IDD does not provide an automatic migration or compatibility with the old bare numeric format. Update an existing `.idd/intent/` directory by running the prompt below with a Coding Agent.
+
+<details>
+<summary>Prompt: update intent document numbering and internal links</summary>
 
 ```text
-idd-route
+Update this repository's `.idd/intent/` document identifiers to the current IDD naming convention.
+
+Required result:
+- Rename every current intent document from `NNNN.type-short-title.md` to `IDD-NNNN.type-short-title.md`.
+- Preserve each existing four-digit number, document type, slug, content, and product meaning.
+- Update each renamed document heading so its identifier starts with the same `IDD-NNNN` value.
+- Update `.idd/intent/INDEX.md` to use the new filenames and identifiers.
+- Update all internal references, including Related, Replaces, Supersedes, Depends on, prose references, and Markdown links, from bare `NNNN` identifiers or old filenames to `IDD-NNNN` identifiers or the corresponding new filenames.
+- Treat `IDD-NNNN` as the stable document ID. Do not renumber documents.
+- Do not add aliases, redirect files, fallback parsing, migration code, or compatibility with the old naming convention.
+- Do not modify unrelated numbers such as versions, dates, issue numbers, task sequence numbers, ports, or quantities.
+- Verify that no current intent filename uses the old `NNNN.type-short-title.md` format and no normative internal relation uses a bare four-digit document number.
+- Run or simulate `idd-intent-lint` and fix all mechanical errors caused by the rename.
+
+Report the renamed files, rewritten references, and verification result.
 ```
 
-Factory is deliberately absent from the default installation. Add it only when the implementation needs explicit multi-step planning and review orchestration. Start it with a request such as `Use idd-factory-run to implement the task described in ./ui-audit.md.` and resume later with `Continue the current IDD Factory work.`
+</details>
 
-Factory keeps one active workspace in `.idd/factory/current/`. Tasks are a flat numbered list, and the filename suffix is their only status. After successful final review, Factory writes `.idd/factory/results/<work-slug>/commit-message.md` and clears `current/`. Both `current/` and `results/` are local temporary state ignored by default, not product intent.
+## Documentation
 
-## Learn More
-
-- [Getting Started](docs/getting-started.md)
-- [Using IDD](docs/using-idd.md)
+- [IDD Use Cases](docs/using-idd.md)
+- [Verify Installation](docs/verify-installation.md)
+- [Updating IDD](docs/updating-idd.md)
+- [Existing Project Guide](docs/existing-project.md)
+- [New Project Guide](docs/new-project.md)
 - [Methodology](docs/methodology.md)
-- [Project Maintenance](docs/project-maintenance.md)
+- [Factory Workflow](docs/factory-workflow.md)
+- [Factory Skills Reference](docs/factory-skills.md)
 
 ## License
 

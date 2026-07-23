@@ -1,6 +1,6 @@
 ---
 name: idd-project-init
-description: Initialize `.idd/intent` and the IDD plugin declaration without copying skills or installing agent-specific files.
+description: Initialize `.idd/intent` and the IDD plugin declaration, then optionally offer interactive bootstrap for an existing implementation without current intent.
 disable-model-invocation: true
 user-invocable: true
 ---
@@ -23,6 +23,10 @@ Claude Code  CLAUDE.md
 The agent performing this workflow must edit that file directly. Do not implement this behavior through generator code, a CLI helper, an installation hook, or runtime application code.
 
 This skill does not copy plugins or copy skills into the repository.
+
+For an existing implemented project without current numbered intent, initialization
+also offers an optional interactive handoff to `idd-intent-bootstrap`. The
+handoff begins only after explicit user consent.
 
 ## Behavior
 
@@ -101,6 +105,65 @@ Apply these rules:
 - Do not add detailed workflow documentation, skill catalogs, Factory instructions, implementation plans, or duplicated methodology text to the instruction file.
 - Re-running `idd-project-init` must leave the instruction file semantically unchanged and must never create a second IDD section.
 
+### 4. Offer initial intent bootstrap for existing implementations
+
+After structural initialization, determine whether all of these conditions hold:
+
+- the repository contains meaningful existing implementation rather than only an
+  empty scaffold or new-product placeholder;
+- no current `IDD-NNNN` documents exist directly under `.idd/intent/`;
+- the user did not explicitly request initialization only or forbid project
+  analysis;
+- the current request has not already supplied a different initial-intent
+  workflow.
+
+Use a cheap repository check only. Detect implementation from source roots,
+workspace or solution files, executable or library projects, package manifests,
+entry points, tests, or equivalent project markers. Do not perform broad
+codebase analysis inside `idd-project-init`.
+
+When the conditions hold, ask:
+
+```text
+IDD initialization is complete.
+
+This repository contains an existing implementation, but no current numbered
+intent documents were found.
+
+Would you like to analyze the project and propose initial intent documentation?
+
+1. Analyze the whole repository
+2. Analyze selected product areas or project roots
+3. Skip for now
+```
+
+Handle the answer as follows:
+
+- `1`: invoke `idd-intent-bootstrap` in the same request with whole-repository
+  scope.
+- `2`: ask for the selected product areas, include roots, exclude roots, or
+  temporary project context, then invoke `idd-intent-bootstrap` with that scope.
+- `3`: finish initialization without semantic intent changes and mention that
+  `idd-intent-bootstrap` can be run manually later.
+
+The question is an offer, not permission to infer or write product intent.
+`idd-project-init` itself must not create, update, or delete current
+`IDD-NNNN` documents.
+
+Do not offer bootstrap when:
+
+- the repository is empty or represents a new product;
+- current numbered intent already exists;
+- the user explicitly requested initialization only;
+- the user already chose `idd-intent-import`, `idd-intent-brainstorm`, or another
+  explicit initial-intent workflow;
+- bootstrap was already offered and declined during the current initialization.
+
+If the user accepts, pass the original request, detected repository scope, user
+guidance, and explicit include or exclude boundaries to
+`idd-intent-bootstrap`. Do not summarize implementation findings as established
+product truth during the handoff.
+
 ## Rules
 
 - Copy bootstrap files from `assets/bootstrap/.idd/intent/` without semantic rewriting.
@@ -113,6 +176,10 @@ Apply these rules:
 - Do not create `.idd/factory` unless Factory work is explicitly requested.
 - Product intent lives only under `.idd/intent`.
 - Factory working data, when used, is temporary and belongs under `.idd/factory`.
+- Optional bootstrap discovery remains a separate skill with a separate semantic
+  confirmation gate.
+- Declining bootstrap is a successful initialization result.
+- Re-running initialization must not trigger semantic rewrites of existing intent.
 
 ## Existing Projects
 

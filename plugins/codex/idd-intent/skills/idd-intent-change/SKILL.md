@@ -155,7 +155,7 @@ For `operation: remove`:
 1. Read `.idd/intent/README.md`.
 2. Read `.idd/intent/INDEX.md`.
 3. Identify the product area and candidate current specs.
-4. Read only relevant current numbered specs.
+4. Read only relevant current `IDD-NNNN` specs.
 5. Classify the operation.
 6. Classify the ownership outcome.
 7. If the ownership outcome is `task-only-no-idd-intent-change`, stop without
@@ -210,7 +210,7 @@ is accepted only after the user explicitly selects it with keyboard or mouse.
 Expected behavior:
 
 - classify as `existing-spec-update`;
-- read `.idd/intent/0018.spec-command-history-completion.md`;
+- read `.idd/intent/IDD-0018.spec-command-history-completion.md`;
 - update visible-panel command completion behavior;
 - update acceptance criteria and manual verification;
 - do not create a new spec.

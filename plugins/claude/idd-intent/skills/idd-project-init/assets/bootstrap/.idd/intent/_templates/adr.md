@@ -1,4 +1,4 @@
-# NNNN.adr-short-title
+# IDD-NNNN.adr-short-title
 
 ## Status
 
@@ -22,4 +22,4 @@ Describe accepted tradeoffs and follow-up constraints.
 
 ## Supersedes
 
-Reference the superseded ADR when this ADR replaces an earlier decision.
+Reference the superseded ADR by its `IDD-NNNN` identifier when this ADR replaces an earlier decision.

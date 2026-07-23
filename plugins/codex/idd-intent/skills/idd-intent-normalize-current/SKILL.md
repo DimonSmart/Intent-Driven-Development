@@ -28,9 +28,9 @@ Describe the operation with parameters like:
 
 ```yaml
 scope:
-  specs: [0019, 0054]
+  specs: [IDD-0019, IDD-0054]
   topic: "Paranoid copy retry"
-  target: "0019.spec-paranoid-copy-resume.md"
+  target: "IDD-0019.spec-paranoid-copy-resume.md"
 
 mode: propose | apply
 allowNewSpec: true | false
@@ -55,7 +55,7 @@ Examples:
 
 ```text
 Use idd-intent-normalize-current with:
---specs 0033,0046,0014,0048
+--specs IDD-0033,IDD-0046,IDD-0014,IDD-0048
 --topic "text encoding / BOM / EOL"
 --target new
 --mode propose
@@ -63,9 +63,9 @@ Use idd-intent-normalize-current with:
 
 ```text
 Use idd-intent-normalize-current with:
---specs 0019,0054
+--specs IDD-0019,IDD-0054
 --topic "Paranoid copy retry"
---target 0019.spec-paranoid-copy-resume.md
+--target IDD-0019.spec-paranoid-copy-resume.md
 --mode apply
 ```
 
@@ -170,7 +170,7 @@ Support these scenarios:
 - delete task-like, process-only, obsolete, duplicated, or incorrect documents;
 - delete `.idd/intent/archive`;
 - remove import/process reports from `.idd/intent`;
-- regenerate `INDEX.md` from actual current numbered documents;
+- regenerate `INDEX.md` from actual current `IDD-NNNN` documents;
 - fix broken relation references where the remap is obvious;
 - normalize current document shapes;
 - replace moved fragments with references;
@@ -198,11 +198,11 @@ Support these scenarios:
 - Git history is the only history mechanism.
 - Remove process-only import reports from `.idd/intent`; if a persistent report is
   explicitly needed, move it outside `.idd/intent`.
-- Numeric `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar
-  relation references must point to existing current numbered documents.
+- `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar relations must
+  use `IDD-NNNN` identifiers and point to existing current documents.
 - Remove historical-only relations or rewrite them when the current target is
   obvious from the existing document set.
-- Regenerate `INDEX.md` from actual current numbered documents when the index is
+- Regenerate `INDEX.md` from actual current `IDD-NNNN` documents when the index is
   stale.
 - If deleting a document would lose current product intent, stop and report the
   conflict.
@@ -252,8 +252,8 @@ reorganization.
 Example:
 
 ```text
-0004.spec-table-view.md says mouse wheel scrolls the table.
-0009.spec-selection.md says mouse wheel changes current selection.
+IDD-0004.spec-table-view.md says mouse wheel scrolls the table.
+IDD-0009.spec-selection.md says mouse wheel changes current selection.
 ```
 
 Response:
@@ -290,12 +290,12 @@ User request:
 
 ```text
 Use idd-intent-normalize-current to extract the Controls section from
-0003.spec-console-ui.md into a dedicated console controls specification.
+IDD-0003.spec-console-ui.md into a dedicated console controls specification.
 ```
 
 Expected behavior:
 
-- read `0003.spec-console-ui.md` and closely related specs;
+- read `IDD-0003.spec-console-ui.md` and closely related specs;
 - create or update the target controls spec if allowed;
 - leave non-control console behavior in the source spec;
 - replace the extracted section with a reference;
