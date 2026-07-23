@@ -18,7 +18,6 @@
   },
   "idd-intent-bootstrap": {
     "description": "Interactively discover, classify, confirm, and write initial current product intent for an existing implemented project that lacks reliable IDD intent.",
-    "invocation": "manual",
     "adapters": {
       "claude": {
         "frontmatter": {
