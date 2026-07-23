@@ -127,63 +127,56 @@ initialization and intent reconstruction.
 When the conditions hold, the bootstrap offer is a blocking user decision. It is
 not a recommendation to mention only in the completion report.
 
-If `request_user_input` is available in the current tool set:
+Use the structured user-question tool exposed by the current host:
 
-1. MUST call `request_user_input` immediately after structural initialization.
-2. MUST present the choices through that tool, not as an ordinary assistant
+- Codex: `request_user_input`;
+- Claude Code: `AskUserQuestion`.
+
+When either structured tool is available:
+
+1. MUST invoke that tool immediately after structural initialization.
+2. MUST present the decision through the tool, not as an ordinary assistant
    message or Markdown menu.
-3. MUST omit `autoResolutionMs`; explicit input is required and the decision must
-   not resolve automatically.
-4. MUST stop and wait after the tool call.
-5. MUST NOT emit the final initialization completion response while the decision
+3. MUST ask one single-choice question.
+4. In Codex, omit `autoResolutionMs`; explicit input is required and the decision
+   must not resolve automatically.
+5. MUST stop and wait after the tool call.
+6. MUST NOT emit the final initialization completion response while the decision
    is unanswered.
-6. MUST NOT invoke `idd-intent-bootstrap`, inspect the codebase broadly, or create
+7. MUST NOT invoke `idd-intent-bootstrap`, inspect the codebase broadly, or create
    current `IDD-NNNN` documents before an affirmative answer.
 
-Use one question equivalent to:
+Describe the question semantically. Do not reproduce or invent the host tool's
+JSON schema in this skill; the runtime supplies that schema and the model forms
+the actual tool call.
 
-```json
-{
-  "questions": [
-    {
-      "id": "initial_intent_bootstrap",
-      "header": "Bootstrap",
-      "question": "Analyze this existing project and propose its initial IDD intent documentation?",
-      "options": [
-        {
-          "label": "Whole repository (Recommended)",
-          "description": "Analyze all detected current product areas."
-        },
-        {
-          "label": "Select areas",
-          "description": "Choose product roots and exclusions before analysis."
-        },
-        {
-          "label": "Skip for now",
-          "description": "Finish initialization without reconstructing product intent."
-        }
-      ]
-    }
-  ]
-}
-```
+Use this decision definition:
 
-Do not add an `Other` option when the client adds it automatically.
+- decision key: `initial_intent_bootstrap`;
+- short header: `Bootstrap`;
+- question: `Analyze this existing project and propose its initial IDD intent documentation?`;
+- single-choice options:
+  - `whole_repository` — **Whole repository (Recommended)**: analyze all detected
+    current product areas;
+  - `select_areas` — **Select areas**: choose product roots and exclusions before
+    analysis;
+  - `skip` — **Skip for now**: finish initialization without reconstructing
+    product intent.
 
-Handle the answer as follows:
+Handle the selected value as follows:
 
-- `Whole repository`: invoke `idd-intent-bootstrap` in the same request with
+- `whole_repository`: invoke `idd-intent-bootstrap` in the same request with
   whole-repository scope and pass all temporary context from the initialization
   request.
-- `Select areas`: obtain include roots, exclude roots, semantic product areas,
+- `select_areas`: obtain include roots, exclude roots, semantic product areas,
   and optional temporary context through another blocking input request when the
   available interaction tool supports free-form input; otherwise ask one concise
   plain-text question and end the turn. Then invoke `idd-intent-bootstrap` with
   the selected scope.
-- `Skip for now`: finish initialization without semantic intent changes and
-  mention that `idd-intent-bootstrap` can be run manually later.
+- `skip`: finish initialization without semantic intent changes and mention that
+  `idd-intent-bootstrap` can be run manually later.
 
-If `request_user_input` is not available:
+If neither `request_user_input` nor `AskUserQuestion` is available:
 
 1. State only that structural IDD initialization is complete.
 2. Ask one concise blocking plain-text question:
