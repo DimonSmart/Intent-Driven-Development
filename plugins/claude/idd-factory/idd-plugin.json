@@ -1,12 +1,12 @@
 {
-  "version": "2.0.9",
+  "version": "2.0.10",
   "platform": "claude",
   "dependencies": [
     "idd-intent"
   ],
   "roles": [
     "factory-coordinator",
-    "implementation-planner",
+    "work-decomposer",
     "implementer",
     "task-reviewer",
     "final-reviewer"

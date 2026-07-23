@@ -29,7 +29,7 @@ idd-factory   temporary implementation organization
 
 `idd-intent` is the standalone core of the methodology. It initializes `.idd/intent/`, maintains current product truth, implements from intent, and verifies implementation against intent.
 
-`idd-factory` is optional. It adds temporary planning, role orchestration, task review, and final review under `.idd/factory/`. Factory consumes intent but must not create product truth. Install `idd-intent` first.
+`idd-factory` is optional. Its `idd-factory-run` entry point coordinates one resumable, file-backed run under `.idd/factory/`, with independent task and final reviews and a commit-message handoff. Factory consumes intent but must not create product truth. Install `idd-intent` first.
 
 ## Why IDD?
 
@@ -101,7 +101,9 @@ To inspect the selected route explicitly:
 idd-route
 ```
 
-Factory is deliberately absent from the default installation. Add it only when the implementation needs explicit multi-step planning and review orchestration.
+Factory is deliberately absent from the default installation. Add it only when the implementation needs explicit multi-step planning and review orchestration. Start it with a request such as `Use idd-factory-run to implement the task described in ./ui-audit.md.` and resume later with `Continue the current IDD Factory work.`
+
+Factory keeps one active workspace in `.idd/factory/current/`. Tasks are a flat numbered list, and the filename suffix is their only status. After successful final review, Factory writes `.idd/factory/results/<work-slug>/commit-message.md` and clears `current/`. Both `current/` and `results/` are local temporary state ignored by default, not product intent.
 
 ## Learn More
 

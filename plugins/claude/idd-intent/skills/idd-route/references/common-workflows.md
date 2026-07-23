@@ -56,7 +56,7 @@ Classify how much of the workflow the user authorizes in the current request:
 - `route-only`: classify and describe the workflow without invoking another
   skill or changing files.
 - `intent-only`: perform only intent-side work. Do not implement product code or
-  create a Factory Work Plan.
+  start Factory execution.
 - `implementation-only`: implement or check against current intent without
   changing product intent.
 - `end-to-end`: continue through all requested intent, implementation, and
@@ -208,11 +208,19 @@ A bug is not a separate top-level workflow family.
 ## Focused and Orchestrated Execution
 
 Use focused execution when one implementation pass can safely satisfy current
-intent. Use Factory only for coordinated multi-task implementation, sequencing,
-temporary planning, review gates, or high-risk preservation boundaries. Factory
-remains optional and must not become a dependency of `idd-intent`.
+intent. Use optional `idd-factory-run` only for coordinated multi-task
+implementation, sequencing, temporary planning, review gates, or high-risk
+preservation boundaries. Factory remains optional and must not become a
+dependency of `idd-intent`.
 
-Do not create or execute Factory work when requested scope is `route-only` or
+Factory stores one resumable run under `.idd/factory/current/`: `request.md`
+and a flat sequence of task files whose `ready`, `active`, `completed`, or
+`blocked` filename suffix is the only status source. It performs independent
+task reviews and a final integration review, then writes a compact commit-message
+handoff under `.idd/factory/results/` before clearing `current/`. Neither
+directory is product intent, and both are ignored by default.
+
+Do not start or resume Factory work when requested scope is `route-only` or
 `intent-only`. For `implementation-only`, Factory may be used only when current
 intent is already sufficient and execution is orchestrated.
 

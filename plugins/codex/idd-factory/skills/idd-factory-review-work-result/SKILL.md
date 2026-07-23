@@ -1,99 +1,45 @@
 ---
 name: idd-factory-review-work-result
-description: Review the complete result of a Factory Work Plan against current intent and integration requirements.
+description: Independently review the complete result of the current Factory run against its request, current intent, integration requirements, and verification evidence.
 ---
 
 # idd-factory-review-work-result
 
 ## Purpose
 
-Review the whole result after all Factory Work Plan tasks are complete.
+Independently review the complete result of the current Factory run. This
+worker is read-only.
 
-This skill is the final review workflow contract. The local final-reviewer role
-prompt is an optional reference for review focus; it does not own product
-intent.
+## Preconditions
 
-## Routing
+Run only when `current/` contains `request.md` and one or more valid tasks, all
+tasks are `.completed.md`, and no ready, active, or blocked task exists. If the
+state violates these conditions, return `blocked` without guessing.
 
-Use this workflow only for the complete result of the current active Factory
-run. Do not select it as a replacement for a general integration review.
+## Review
 
-Do not use this workflow automatically based on task size, complexity, uncertainty,
-or similarity to the user request. Use it only when the current user explicitly
-invokes this command or names this factory workflow directly.
+Read the request, all completed task goals and completion summaries, only
+relevant current intent, the full actual diff, and available verification.
+Check:
 
-## Rules
+- complete satisfaction of the original request and every task goal;
+- compliance with relevant intent and preservation boundaries;
+- integration and consistency across task results;
+- public contracts, maintainability, and sufficient verification;
+- absence of incomplete changes hidden by task-level reviews;
+- that Factory artifacts did not become product documentation.
 
-- Review the whole branch/result, not only the last task.
-- Verify that all tasks in the work plan are either complete or explicitly
-  deferred.
-- Verify that implementation still matches current specs.
-- Verify the complete preservation boundary across all tasks.
-- Verify that tests and commands provide reasonable evidence.
-- Verify that temporary factory artifacts are not accidentally becoming product
-  documentation.
-- Do not update specs or code during review.
-- Do not read unrelated previous work plans.
+Do not modify code, intent, Factory files, or task statuses. Do not reactivate
+completed tasks.
 
-## Workflow
+## Verdicts
 
-1. Read the explicit work plan and per-task review outputs for the current work
-   directory.
-2. Review the full diff/result against relevant current specs.
-3. Verify changed behavior, removed behavior, preserved behavior, public
-   contracts, and compatibility or data constraints from the Work Plan
-   preservation boundary.
-4. Stop and return to an intent workflow if required product intent is missing
-   or contradictory.
-5. Use the local `references/roles/` final-reviewer prompt when present.
-6. Check that `.idd/factory/work/` artifacts remain temporary and are not placed
-   under `.idd/intent/`.
-7. Write `final-review.md` in the same work directory when a file artifact is
-   useful.
+- `approved`: the result is ready for `idd-factory-finish-work`.
+- `needs-fix`: return a bounded corrective goal, scope, done conditions, and
+  verification suitable for the coordinator to create the next numbered ready
+  task.
+- `blocked`: identify the concrete blocking condition.
+- `intent-required`: identify missing or conflicting durable intent and the
+  applicable intent handoff.
 
-## Output Format
-
-```md
-# Factory Work Result Review
-
-## Scope
-
-- Work plan:
-- Tasks reviewed:
-- Specs used:
-
-## Verdict
-
-`approved | needs-fix | blocked`
-
-## Completed Work
-
-- Task:
-- Evidence:
-
-## Spec Compliance
-
-- Finding:
-
-## Preservation Boundary
-
-- Finding:
-
-## Integration Risks
-
-- Risk:
-
-## Verification Evidence
-
-- Command:
-- Result:
-
-## Required Fixes
-
-- Fix:
-
-## Cleanup Readiness
-
-- Factory artifacts can be deleted: yes/no
-- Reason:
-```
+Return the verdict first and only the current integration evidence or findings.

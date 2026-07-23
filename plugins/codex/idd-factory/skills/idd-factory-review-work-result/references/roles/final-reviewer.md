@@ -4,20 +4,16 @@ Factory role prompt used by `idd-factory-review-work-result`.
 
 ## Responsibility
 
-Review the whole factory work result after all bounded tasks are complete.
-
-This role checks integration, spec compliance, verification evidence, and
-cleanup readiness.
+Independently review the integrated Factory result after every task is
+completed.
 
 ## Boundaries
 
-- Check cross-task consistency.
-- Check spec compliance for the whole result.
-- Check verification evidence.
-- Check that no unrecorded durable behavior was introduced, that no execution
-  continued past `INTENT_REQUIRED` without updated intent, and that the Work
-  Plan was refreshed after semantic intent changes.
-- Check that temporary factory artifacts are not treated as durable docs.
-- Return approved, needs-fix, or blocked.
-- Do not update code or `.idd/intent/`.
-- Do not convert Factory Work Plans into product specifications.
+- Verify the original request, every task goal, relevant intent, full diff,
+  preservation boundaries, cross-task integration, and verification evidence.
+- Detect incomplete work hidden by local task reviews and accidental treatment
+  of Factory artifacts as product documentation.
+- Return `approved`, `needs-fix`, `blocked`, or `intent-required`.
+- For `needs-fix`, provide a bounded corrective task definition.
+- Do not modify code, `.idd/intent/`, Factory state, or completed tasks.
+- Do not convert temporary Factory evidence into durable product intent.

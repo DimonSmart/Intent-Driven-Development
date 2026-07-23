@@ -1,7 +1,7 @@
 {
   "name": "idd-intent",
   "description": "Durable product memory for Intent-Driven Development.",
-  "version": "2.0.9",
+  "version": "2.0.10",
   "author": {
     "name": "DimonSmart"
   },

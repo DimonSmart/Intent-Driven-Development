@@ -99,7 +99,7 @@ with the classification.
   change files.
 - `intent-only`: perform only intent-side work, including initialization,
   import, brainstorm, audit, lint, change, new-document, or normalization as
-  applicable. Do not implement product code or create a Factory Work Plan.
+  applicable. Do not implement product code or start Factory execution.
 - `implementation-only`: perform implementation or implementation checking from
   current intent. Do not change product intent. If current intent is missing,
   unclear, or wrong, stop and report the required intent workflow instead of
@@ -164,7 +164,7 @@ relevant context, and any temporary preservation boundary identified from the
 required reference.
 
 The route classification is temporary workflow evidence. Do not create route
-files, preservation records, Factory Work Plans, specs, or code from this skill.
+files, preservation records, Factory state, specs, or code from this skill.
 
 ## Output Format
 
