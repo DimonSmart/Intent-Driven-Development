@@ -43,29 +43,29 @@
         "idd-intent"
       ],
       "skills": [
-        "idd-factory-create-work-plan",
-        "idd-factory-execute-work-plan",
+        "idd-factory-run",
+        "idd-factory-decompose-work",
+        "idd-factory-execute-task",
         "idd-factory-review-task",
         "idd-factory-review-work-result",
         "idd-factory-finish-work"
       ],
       "roles": [
         "factory-coordinator",
-        "implementation-planner",
+        "work-decomposer",
         "implementer",
         "task-reviewer",
         "final-reviewer"
       ],
       "skillRoleReferences": {
-        "idd-factory-create-work-plan": [
-          "factory-coordinator",
-          "implementation-planner"
+        "idd-factory-run": [
+          "factory-coordinator"
         ],
-        "idd-factory-execute-work-plan": [
-          "factory-coordinator",
-          "implementer",
-          "task-reviewer",
-          "final-reviewer"
+        "idd-factory-decompose-work": [
+          "work-decomposer"
+        ],
+        "idd-factory-execute-task": [
+          "implementer"
         ],
         "idd-factory-review-task": [
           "task-reviewer"

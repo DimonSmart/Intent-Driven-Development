@@ -103,7 +103,8 @@ When Factory is explicitly enabled, the declaration may become:
 }
 ```
 
-Factory working data belongs under `.idd/factory/` and remains temporary.
+Factory working data belongs under `.idd/factory/` and remains temporary. Its
+`current/` and `results/` directories are ignored by default.
 
 ## Choose a First Intent Workflow
 
@@ -139,16 +140,19 @@ idd-code-check-implementation
 
 ## Use Factory Deliberately
 
-After installing `idd-factory`, use its temporary workflow when a change needs explicit planning and review stages:
+After installing `idd-factory`, use its public entry point when a change needs explicit planning and review stages:
 
 ```text
-idd-factory-create-work-plan
-idd-factory-execute-work-plan
-idd-factory-review-work-result
-idd-factory-finish-work
+Use idd-factory-run to implement the task described in ./ui-audit.md.
 ```
 
 Factory may consume intent, but it must not invent or silently modify product truth. Missing or contradictory intent must be resolved through `idd-intent` workflows.
+
+Factory keeps only one run in `.idd/factory/current/`. If work is interrupted,
+resume it with `Continue the current IDD Factory work.` A second request cannot
+replace an existing run; explicitly continue or cancel it first. Successful
+work leaves a compact commit-message handoff under `.idd/factory/results/` and
+clears `current/`.
 
 See [Using IDD](using-idd.md) for common workflows and example prompts.
 

@@ -128,7 +128,7 @@ When implementing behavior removal, verify that:
 
 `idd-code-implement` implements one focused behavior from current specs.
 
-It does not create or execute Factory Work Plans.
+It does not create or coordinate Factory runs.
 When used from factory execution, the factory task brief is only the local task
 scope.
 The normative product intent still comes from `.idd/intent/`.

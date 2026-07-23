@@ -84,19 +84,60 @@
   "idd-code-update-intent": {
     "description": "Update `.idd/intent/` product intent from confirmed implementation behavior."
   },
-  "idd-factory-create-work-plan": {
-    "description": "Create a temporary Factory Work Plan from current durable intent and relevant repository evidence."
+  "idd-factory-run": {
+    "description": "Run or resume one file-backed IDD Factory workflow through decomposition, sequential implementation, independent reviews, and commit-message handoff."
   },
-  "idd-factory-execute-work-plan": {
-    "description": "Execute an explicit temporary Factory Work Plan while preserving `.idd/intent/` as the normative product source."
+  "idd-factory-decompose-work": {
+    "description": "Analyze one supplied request against relevant intent and repository evidence, then return clarification, a focused handoff, or ordered bounded Factory tasks.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "argument-hint": "[request text or file contents]",
+          "allowed-tools": "Read Glob Grep"
+        }
+      }
+    }
+  },
+  "idd-factory-execute-task": {
+    "description": "Implement exactly one explicit active Factory task from the request snapshot and current intent, then return focused verification evidence.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "general-purpose",
+          "argument-hint": "[active task path]"
+        }
+      }
+    }
   },
   "idd-factory-review-task": {
-    "description": "Review one completed factory task against its task brief, current intent, code quality, and verification evidence."
+    "description": "Independently review one active Factory task against its request, relevant intent, actual diff, code quality, and verification evidence.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "argument-hint": "[active task path]",
+          "allowed-tools": "Read Glob Grep Bash"
+        }
+      }
+    }
   },
   "idd-factory-review-work-result": {
-    "description": "Review the complete result of a Factory Work Plan against current intent and integration requirements."
+    "description": "Independently review the complete result of the current Factory run against its request, current intent, integration requirements, and verification evidence.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "allowed-tools": "Read Glob Grep Bash"
+        }
+      }
+    }
   },
   "idd-factory-finish-work": {
-    "description": "Finish the current factory run, report results, and clean temporary factory artifacts."
+    "description": "Create a compact commit-message handoff for an approved Factory run, then safely clear its current temporary state."
   }
 }

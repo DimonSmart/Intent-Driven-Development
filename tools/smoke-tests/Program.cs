@@ -135,6 +135,7 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     }
 
     ExpectMissing(Path.Combine(intentRoot, "skills", "idd-factory-create-work-plan"));
+    ExpectMissing(Path.Combine(intentRoot, "skills", "idd-factory-execute-work-plan"));
     ExpectFile(Path.Combine(intentRoot, "assets", "bootstrap", ".idd", "intent", "README.md"));
     ExpectFile(Path.Combine(
         intentRoot,
@@ -159,8 +160,10 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
 
     foreach (var skill in new[]
     {
-        "idd-factory-create-work-plan",
-        "idd-factory-execute-work-plan",
+        "idd-factory-run",
+        "idd-factory-decompose-work",
+        "idd-factory-execute-task",
+        "idd-factory-review-task",
         "idd-factory-review-work-result",
         "idd-factory-finish-work"
     })
@@ -168,16 +171,68 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
         ExpectFile(Path.Combine(factoryRoot, "skills", skill, "SKILL.md"));
     }
 
+    ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-factory-create-work-plan"));
+    ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-factory-execute-work-plan"));
     ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-project-init"));
     ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-intent-change"));
     ExpectDirectory(Path.Combine(factoryRoot, "assets", "bootstrap", ".idd", "factory"));
-    ExpectFile(Path.Combine(
-        factoryRoot,
-        "skills",
-        "idd-factory-execute-work-plan",
-        "references",
-        "roles",
-        "implementer.md"));
+    ExpectFile(Path.Combine(factoryRoot, "assets", "bootstrap", ".idd", "factory", ".gitignore"));
+
+    foreach (var reference in new[]
+    {
+        (Skill: "idd-factory-run", Role: "factory-coordinator"),
+        (Skill: "idd-factory-decompose-work", Role: "work-decomposer"),
+        (Skill: "idd-factory-execute-task", Role: "implementer"),
+        (Skill: "idd-factory-review-task", Role: "task-reviewer"),
+        (Skill: "idd-factory-review-work-result", Role: "final-reviewer"),
+        (Skill: "idd-factory-finish-work", Role: "factory-coordinator")
+    })
+    {
+        ExpectFile(Path.Combine(
+            factoryRoot,
+            "skills",
+            reference.Skill,
+            "references",
+            "roles",
+            $"{reference.Role}.md"));
+    }
+
+    var runFrontMatter = ReadFrontMatter(ReadText(Path.Combine(factoryRoot, "skills", "idd-factory-run", "SKILL.md")));
+    var workerSkills = new[]
+    {
+        "idd-factory-decompose-work",
+        "idd-factory-execute-task",
+        "idd-factory-review-task",
+        "idd-factory-review-work-result"
+    };
+
+    if (platform == "claude")
+    {
+        if (runFrontMatter.Contains("context: fork", StringComparison.Ordinal))
+        {
+            failures.Add("Claude idd-factory-run must remain in the coordinator context.");
+        }
+
+        foreach (var skill in workerSkills)
+        {
+            var workerFrontMatter = ReadFrontMatter(ReadText(Path.Combine(factoryRoot, "skills", skill, "SKILL.md")));
+            ExpectContains(workerFrontMatter, "context: fork", $"Claude {skill} isolation metadata");
+        }
+    }
+    else
+    {
+        foreach (var skill in workerSkills.Prepend("idd-factory-run").Append("idd-factory-finish-work"))
+        {
+            var skillFrontMatter = ReadFrontMatter(ReadText(Path.Combine(factoryRoot, "skills", skill, "SKILL.md")));
+            foreach (var claudeField in new[] { "context:", "agent:", "allowed-tools:", "argument-hint:" })
+            {
+                if (skillFrontMatter.Contains(claudeField, StringComparison.Ordinal))
+                {
+                    failures.Add($"Codex {skill} contains Claude-specific frontmatter '{claudeField}'.");
+                }
+            }
+        }
+    }
 
     CheckIddMetadata(intentRoot, [], ".idd/intent", platform, "idd-intent");
     CheckIddMetadata(factoryRoot, ["idd-intent"], ".idd/factory", platform, "idd-factory");
@@ -505,6 +560,24 @@ void ExpectContains(string text, string expected, string context)
     {
         failures.Add($"{context} does not contain '{expected}'.");
     }
+}
+
+string ReadText(string path)
+{
+    ExpectFile(path);
+    return File.Exists(path) ? File.ReadAllText(path) : "";
+}
+
+static string ReadFrontMatter(string text)
+{
+    var lines = text.ReplaceLineEndings("\n").Split('\n');
+    if (lines.Length == 0 || !StringComparer.Ordinal.Equals(lines[0], "---"))
+    {
+        return "";
+    }
+
+    var end = Array.FindIndex(lines, 1, line => StringComparer.Ordinal.Equals(line, "---"));
+    return end < 0 ? "" : string.Join("\n", lines.Take(end + 1));
 }
 
 void ExpectFile(string path)

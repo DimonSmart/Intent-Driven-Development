@@ -52,10 +52,18 @@ manually.
 
 Use IDD skills when a request involves durable product intent, implementation
 based on current intent, conformance checking, or Factory orchestration. Use
-`idd-code-implement` for one focused implementation change. Use Factory when a
-temporary multi-task plan, sequencing, review gates, or coordinated execution
-is required; Factory may be selected automatically and never becomes product
-intent.
+`idd-code-implement` for one focused implementation change. Use the optional
+`idd-factory-run` entry point when temporary multi-task sequencing, review
+gates, or coordinated execution is required; Factory may be selected
+automatically and never becomes product intent.
+
+Factory keeps at most one resumable run in `.idd/factory/current/`. Its tasks
+are a flat numbered list and their filename suffix is the only status source.
+When a user asks to continue the current Factory work, validate and resume that
+state instead of reconstructing work from conversation history. A new request
+must not replace a nonempty current run. After independent task and final
+reviews, Factory writes `.idd/factory/results/<work-slug>/commit-message.md`
+before clearing `current/`.
 
 When a request concerns IDD but does not explicitly name a skill, classify it
 through the `idd-route` routing model before selecting an intent,

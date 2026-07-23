@@ -98,14 +98,32 @@ idd-factory   temporary implementation organization
 
 `idd-intent` owns the durable side of the methodology. It initializes and maintains `.idd/intent/`, imports or changes current product truth, implements from intent, and checks implementation against intent.
 
-`idd-factory` owns temporary execution orchestration. It creates plans, coordinates roles, tracks implementation work, performs task and final reviews, and cleans up temporary Factory state under `.idd/factory/`.
+`idd-factory` owns temporary execution orchestration. Its `idd-factory-run`
+entry point decomposes a request, coordinates sequential tasks, performs
+independent task and final reviews, supports session-independent resume, and
+prepares a commit-message handoff under `.idd/factory/`.
 
 The separation is visible to the user because the responsibilities have different lifecycles:
 
 - `idd-intent` is the normal standalone installation;
 - `idd-factory` is optional and depends on `idd-intent`;
 - Factory may read intent but must not create or silently modify product truth;
-- when Factory discovers missing, contradictory, or insufficient intent, it must stop and route the work to an `idd-intent` workflow.
+- when Factory discovers missing, contradictory, or insufficient intent, it must stop and route the work to an `idd-intent` workflow;
+- `.idd/factory/current/` holds at most one active run and
+  `.idd/factory/results/` holds compact commit-message handoffs;
+- both directories are ignored by default and are never durable product intent.
+
+The current workspace contains `request.md` and a flat, gap-free sequence of
+task files. A task filename is `<sequence>-<slug>.<status>.md`; its suffix is the
+only status source. The supported states are `ready`, `active`, `completed`,
+and `blocked`, with at most one active or blocked task. This filesystem state,
+not conversation history, lets a later session validate and resume safely.
+
+Each completed task passes an independent review. Final review findings create
+a new corrective task instead of reopening completed history. Only after final
+approval does Factory create
+`.idd/factory/results/<work-slug>/commit-message.md`; it then clears the
+contents of `current/` and leaves prior results intact.
 
 ## Routing Model
 
@@ -142,4 +160,4 @@ IDD does not attempt to preserve every step that led to the product. It preserve
 
 ## Summary
 
-`idd-intent` preserves product memory. `idd-factory` organizes temporary implementation work. The implementation is replaceable, plans and statuses are temporary, and Git owns history.
+`idd-intent` preserves product memory. `idd-factory` organizes resumable temporary implementation work. Requests, task statuses, reviews, and commit-message handoffs remain temporary, and Git owns history.

@@ -138,20 +138,49 @@ idd-intent-normalize-current
 
 ## Use Factory for Larger Work
 
-First install the optional `idd-factory` plugin. It depends on `idd-intent` and coordinates temporary planning, implementation, and review:
+First install the optional `idd-factory` plugin. It depends on `idd-intent`.
+The public entry point coordinates decomposition, sequential implementation,
+independent task reviews, final review, and safe finalization:
 
 ```text
-idd-factory-create-work-plan
-idd-factory-execute-work-plan
-idd-factory-review-work-result
-idd-factory-finish-work
+Use idd-factory-run to implement the task described in ./ui-audit.md.
 ```
 
 Use Factory when the implementation requires an explicit multi-step plan or multiple review stages. Factory may consume product intent, but it must not invent or silently modify it.
 
 When Factory discovers missing or contradictory intent, it must stop and route the work back to an `idd-intent` workflow.
 
-Factory state belongs under `.idd/factory/` and should be removed when the work is finished. It is not product memory.
+Factory keeps one active workspace:
+
+```text
+.idd/factory/
+  .gitignore
+  current/
+    request.md
+    001-first-outcome.completed.md
+    002-next-outcome.active.md
+    003-final-outcome.ready.md
+  results/
+```
+
+Tasks are a flat, gap-free numbered sequence. Their `.ready.md`, `.active.md`,
+`.completed.md`, or `.blocked.md` suffix is the only status source. At most one
+task is active or blocked. A new request never replaces a nonempty `current/`;
+the user must explicitly continue or cancel the existing run.
+
+To resume after interruption:
+
+```text
+Continue the current IDD Factory work.
+```
+
+Factory validates the files and diff before continuing. It reviews each task
+in an independent context, performs a final integration review, and writes a
+compact Git-compatible handoff to
+`.idd/factory/results/<work-slug>/commit-message.md` before clearing
+`current/`. The `current/` and `results/` directories are ignored by default.
+They are temporary execution artifacts, not product intent, and Factory never
+commits or deletes result handoffs automatically.
 
 ## Skip IDD Deliberately
 

@@ -2,66 +2,67 @@
 
 ## Purpose
 
-Finish a factory run by reporting results and cleaning temporary artifacts.
+Create a compact Git commit-message handoff for an approved Factory run, then
+clear its temporary current state. This workflow does not run Git commands.
 
-This skill is the finish workflow contract. The local coordinator role prompt
-is an optional reference for cleanup and reporting focus; it does not own
-product intent.
+## Preconditions
 
-## Routing
+- The final review verdict is `approved` for the current actual diff.
+- `current/` passes the state invariants from `idd-factory-run`.
+- It contains one `request.md`, one or more tasks, and every task is completed.
 
-Use this workflow only to finish the current active Factory run. Do not select
-it outside that run or as a general cleanup workflow.
+Stop without cleanup if any precondition fails.
 
-Do not use this workflow automatically based on task size, complexity, uncertainty,
-or similarity to the user request. Use it only when the current user explicitly
-invokes this command or names this factory workflow directly.
+## Result Directory
 
-## Rules
+Choose a short lowercase kebab-case work slug that describes the overall
+implemented result without a date, status, or agent name. Write:
 
-- Summarize what was implemented.
-- List specs used as intent.
-- List tests and verification commands.
-- List remaining risks.
-- Delete `.idd/factory/work/<current-work-dir>/` unless the user explicitly
-  asked to keep or commit factory artifacts.
-- If deletion is unsafe because artifacts were explicitly requested as
-  evidence, do not delete silently.
-- Never delete `.idd/intent/`.
-- Never delete code, tests, or durable documentation as part of factory cleanup.
-- Do not read unrelated previous work plans.
-- Factory artifacts are temporary execution state, not product intent and not a
-  specification.
-
-## Workflow
-
-1. Read the explicit current work plan and final review result.
-2. Report implementation, specs used, verification, review result, and risks.
-3. Use the local `references/roles/` coordinator prompt when present.
-4. Delete only the current `.idd/factory/work/<current-work-dir>/` directory when
-   cleanup is allowed.
-5. Leave `.idd/factory/.gitignore` and `.idd/factory/README.md` in place.
-
-## Output Format
-
-```md
-# Factory Work Finished
-
-## Summary
-
-## Specs Used
-
-## Code Areas Changed
-
-## Tests and Verification
-
-## Review Result
-
-## Remaining Risks
-
-## Temporary Artifact Cleanup
-
-- Work directory:
-- Action: `deleted | kept | committed | not-created`
-- Reason:
+```text
+.idd/factory/results/<work-slug>/commit-message.md
 ```
+
+Never overwrite a result directory. If the slug exists, try `<work-slug>-2`,
+then `-3`, and so on.
+
+The result directory contains only `commit-message.md`. Do not copy the request,
+tasks, reviews, or other execution state into `results/`.
+
+## Commit Message
+
+Derive the message from `request.md`, completed task goals, the actual diff,
+and final review. The diff takes precedence over planning assumptions.
+
+```text
+<Imperative subject, at most 72 characters, no final period>
+
+Performed by: IDD Factory
+
+Why:
+<at most three short sentences>
+
+Result:
+- <confirmed principal result>
+- <confirmed principal result>
+```
+
+Use the repository's established commit language, or English when it cannot be
+determined. Include two to six result bullets and preferably stay under 1200
+characters.
+
+Do not include full file lists, test logs, attempts, task statuses, resolved
+findings, tokens, model or timing data, internal prompts, the full request, or
+claims not supported by the diff.
+
+## Safe Finish
+
+1. Create the collision-safe result directory.
+2. Write and verify `commit-message.md` completely.
+3. Only after the result exists and is readable, clear the contents of
+   `.idd/factory/current/`.
+4. Leave the empty `current/`, all of `results/`, and `.idd/factory/.gitignore`
+   in place.
+5. Report the exact commit-message path and that current state was cleared.
+
+If result creation fails, leave `current/` unchanged so the run can resume.
+Factory never commits, pushes, creates a pull request, or deletes results.
