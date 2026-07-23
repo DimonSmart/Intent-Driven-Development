@@ -12,12 +12,17 @@ Run it manually after changes to:
 
 ## Evaluation modes
 
-Evaluate relevant cases in both environments when supported:
+Evaluate relevant cases in both supported hosts:
 
-- `structured-input-available`: `request_user_input` is present in the current
-  tool set and should render a client-native selection UI;
-- `structured-input-unavailable`: the tool is absent and the skill must fall
-  back to one blocking plain-text question.
+- Codex structured input: `request_user_input` is present in the current tool set
+  and should render a client-native selection UI;
+- Claude Code structured input: `AskUserQuestion` is present in the main
+  interactive session and should render a client-native selection UI;
+- structured input unavailable: neither host tool is available and the skill must
+  fall back to one blocking plain-text question.
+
+Interactive Claude skills must remain inline. Do not evaluate `AskUserQuestion`
+from `context: fork`, because that tool is unavailable in a subagent context.
 
 Use an existing implemented fixture with no current `IDD-NNNN` documents unless a
 case says otherwise.
@@ -26,10 +31,15 @@ case says otherwise.
 
 For structured input, assert:
 
-- `request_user_input` is actually called rather than described in prose;
-- the request contains one short question with two or three meaningful options;
+- the current host's question tool is actually called rather than described in
+  prose;
+- the skill describes the decision semantically and does not embed a tool-call
+  JSON schema;
+- the request contains one short single-choice question with two or three
+  meaningful options;
+- stable workflow values are sufficient to route the answer;
 - the recommended option appears first;
-- `autoResolutionMs` is absent for blocking decisions;
+- Codex omits `autoResolutionMs` for blocking decisions;
 - the turn waits for the answer;
 - no final completion response is emitted while the answer is pending;
 - no broad discovery or current intent writing occurs before consent.
@@ -50,5 +60,6 @@ wording when the semantic interaction and safety boundary are correct.
   the workflow waits, and no intent is written before explicit approval.
 - **Needs review** — interaction occurs but choices are unclear, overly broad, or
   a non-blocking timeout is used.
-- **Fail** — the agent only mentions a next step, prints an inert menu, continues
-  without an answer, assumes consent, or writes current intent before approval.
+- **Fail** — the agent only mentions a next step, prints an inert menu, embeds a
+  tool-call JSON schema, continues without an answer, assumes consent, or writes
+  current intent before approval.
