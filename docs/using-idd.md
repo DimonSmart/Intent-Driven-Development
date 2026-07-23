@@ -1,36 +1,74 @@
-# Using IDD
+# IDD Use Cases
 
 Intent-Driven Development separates durable product intent from temporary implementation work.
 
-Use `idd-intent` for the normal workflow. Add optional `idd-factory` only when implementation benefits from explicit multi-step orchestration.
+Use `idd-intent` for the normal workflow. Add optional `idd-factory` only when implementation benefits from explicit multi-step orchestration and independent review.
 
-## Choose a Starting Path
+## Find the Right Action
 
-- [Existing project](existing-project.md): import current product knowledge from documentation, tests, public behavior, and confirmed requirements.
-- [New project](new-project.md): turn an informal idea into the first current intent and implement the smallest useful slice.
-- [Large implementation task](factory-workflow.md): let Factory complete a coordinated multi-stage task with independent review.
+| Situation | What to do |
+| --- | --- |
+| An existing repository does not use IDD yet | Run `idd-project-init`, then import confirmed product knowledge with `idd-intent-import`. |
+| You are starting from an idea | Run `idd-project-init`, then clarify the first product behavior with `idd-intent-brainstorm`. |
+| The requested feature is still unclear | Use `idd-intent-brainstorm` before changing intent or code. |
+| Product behavior must be added, changed, or removed | Use `idd-intent-change`, then implement the updated intent. |
+| Current intent is already correct and only code must change | Use `idd-code-implement`. |
+| You need to check whether code still matches intent | Use `idd-code-check-implementation`. |
+| Existing behavior has been confirmed as product truth but is missing from intent | Use `idd-code-update-intent`. |
+| Intent documents need review or cleanup | Use `idd-intent-audit`, `idd-intent-lint`, or `idd-intent-normalize-current`. |
+| The implementation task is large or naturally multi-stage | Install `idd-factory` and use `idd-factory-run`. |
+| A new IDD release is available | Refresh the marketplace, update or reinstall the installed IDD plugins, and start a new session. |
+| The request must deliberately bypass IDD | Use `idd-skip`. |
 
-## Describe Requests Naturally
+## Initialize a Repository
 
-You do not need JSON or a formal command structure. Name a skill when you want a specific workflow, or describe the request naturally and let IDD choose the smallest safe path.
-
-To inspect routing without changing files:
+Open the target repository and run:
 
 ```text
-idd-route
+idd-project-init
 ```
+
+The workflow creates the minimal project-owned IDD structure and records the integration in the active agent instructions. It does not copy plugin skills into the project.
+
+For a complete installation and initialization guide, see [Getting Started](getting-started.md).
+
+## Import an Existing Product
+
+Use existing documentation, relevant tests, the public API, and confirmed behavior as evidence:
+
+```text
+Use idd-intent-import to propose current product intent from ./docs, relevant tests, the public API, and confirmed application behavior.
+```
+
+Import extracts durable behavior and constraints. It does not treat every old document or implementation detail as current product truth.
+
+[Read the existing-project guide](existing-project.md)
+
+## Start a New Product
+
+Clarify the product before creating unnecessary structure:
+
+```text
+Use idd-intent-brainstorm to clarify the first useful product behavior.
+```
+
+After the intent is clear, record it and implement the smallest useful slice.
+
+[Read the new-project guide](new-project.md)
 
 ## Clarify Product Intent
 
-Use when the product behavior or boundaries are not yet clear:
+Use when product behavior, boundaries, constraints, or expected outcomes are not yet clear:
 
 ```text
 Use idd-intent-brainstorm to clarify this feature before changing product intent.
 ```
 
-The result should clarify product meaning, users, outcomes, boundaries, constraints, and unresolved decisions. It should not become an implementation plan.
+The result should clarify product meaning rather than produce an implementation plan.
 
 ## Add, Change, or Remove Product Behavior
+
+Describe the product change rather than expected code edits:
 
 ```text
 Use idd-intent-change. Users must be able to compare two local folders without modifying either side.
@@ -38,19 +76,9 @@ Use idd-intent-change. Users must be able to compare two local folders without m
 
 The workflow updates the current owning intent document. It creates a new document only when no current document owns the product area.
 
-## Import an Existing Product
-
-```text
-Use idd-intent-import to propose current product intent from ./docs, relevant tests, the public API, and confirmed application behavior.
-```
-
-Import extracts durable behavior and constraints. It does not treat every old document or implementation detail as current truth.
-
-[Read the existing-project guide](existing-project.md)
-
 ## Implement from Current Intent
 
-For focused implementation:
+For focused implementation when current intent is already correct:
 
 ```text
 Use idd-code-implement for the folder comparison behavior.
@@ -60,15 +88,15 @@ The workflow reads relevant intent, inspects the affected code, implements the c
 
 ## Verify an Existing Implementation
 
+Use after refactoring, agent-generated changes, migrations, or whenever implementation and intent may have diverged:
+
 ```text
 Use idd-code-check-implementation for the comparison workflow.
 ```
 
-Use this after refactoring, agent-generated changes, migrations, or when implementation and intent may have diverged.
-
 ## Update Intent from Confirmed Behavior
 
-When the implementation contains behavior that has been explicitly confirmed as product truth:
+When existing implementation behavior has been explicitly confirmed as product truth:
 
 ```text
 Use idd-code-update-intent for the confirmed retry behavior.
@@ -114,6 +142,62 @@ Continue the current IDD Factory work.
 
 [Read the Factory workflow guide](factory-workflow.md)  
 [See the Factory skills reference](factory-skills.md)
+
+## Update IDD to a New Version
+
+IDD plugins are installed from the `intent-driven-development` marketplace. Updating requires refreshing the marketplace first so the client can see the newest published plugin versions.
+
+### Claude Code
+
+Refresh the marketplace and update the installed plugins:
+
+```bash
+claude plugin marketplace update intent-driven-development
+claude plugin update idd-intent@intent-driven-development
+```
+
+When Factory is installed, update it as well:
+
+```bash
+claude plugin update idd-factory@intent-driven-development
+```
+
+Verify the installed versions:
+
+```bash
+claude plugin list --json
+```
+
+### Codex
+
+Refresh the marketplace snapshot and reinstall the installed plugins from it:
+
+```bash
+codex plugin marketplace upgrade intent-driven-development
+codex plugin add idd-intent@intent-driven-development
+```
+
+When Factory is installed, reinstall it as well:
+
+```bash
+codex plugin add idd-factory@intent-driven-development
+```
+
+Verify the installed versions:
+
+```bash
+codex plugin list --json
+```
+
+Start a new Claude Code or Codex session after updating so the new skills and instructions are loaded cleanly. Updating the plugin does not require running `idd-project-init` again in repositories that are already initialized.
+
+## Inspect Routing
+
+You can describe requests naturally and let IDD choose the smallest safe workflow. To inspect the selected route without changing files:
+
+```text
+idd-route
+```
 
 ## Skip IDD Deliberately
 
