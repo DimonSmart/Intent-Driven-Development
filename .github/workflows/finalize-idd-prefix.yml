@@ -24,7 +24,7 @@ jobs:
         shell: bash
         run: |
           python .github/scripts/finalize-idd-document-id-update.py || true
-          python .github/scripts/finish-idd-document-id-update.py
+          python .github/scripts/finish-idd-document-id-update.py || true
 
       - name: Generate artifacts and run checks
         shell: pwsh
