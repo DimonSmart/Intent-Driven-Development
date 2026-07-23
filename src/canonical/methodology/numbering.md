@@ -11,8 +11,8 @@ may be deleted or replaced by a new owner, but references by ID remain stable.
 The sequence records document creation order without turning specifications
 into task logs.
 
-Use one increasing numeric sequence across current intent documents directly
-under `.idd/intent/`. Every document ID starts with the `IDD-` namespace:
+Use one increasing numeric sequence across intent documents directly under
+`.idd/intent/`. Every document ID starts with the `IDD-` namespace:
 
 ```text
 IDD-NNNN
@@ -32,11 +32,18 @@ Examples:
 .idd/intent/IDD-0003.spike-input-layer-feasibility.md
 ```
 
+The first Markdown heading must start with the same identifier and document type
+as the filename, for example:
+
+```md
+# IDD-0001.spec-initial-product-model
+```
+
 Use `IDD-NNNN` in normative relations and prose references. A bare four-digit
 number such as `0019` is not an IDD document identifier.
 
-When finding the next number, scan current files directly under `.idd/intent/`
-whose names match the `IDD-NNNN.type-short-title.md` convention, then use the
-maximum `NNNN` value plus one. Do not scan or create an archive directory.
-Deleted document numbers are not reused. Do not include lifecycle markers such
+When finding the next number, inspect current `IDD-NNNN.type-short-title.md`
+files and previously assigned `IDD-NNNN` identifiers in Git history, then use
+the maximum `NNNN` value plus one. Do not scan or create an archive directory.
+Deleted document numbers are never reused. Do not include lifecycle markers such
 as `active` or `retired` in filenames.

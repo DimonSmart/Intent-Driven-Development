@@ -25,8 +25,9 @@ For successful apply-safe import, the expected final state is:
 - no process-only import reports under `.idd/intent`;
 - all current `IDD-NNNN` documents are listed in `.idd/intent/INDEX.md`;
 - all current documents listed in `.idd/intent/INDEX.md` exist;
-- all `IDD-NNNN` `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar
-  references point to existing current documents;
+- all `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar
+  normative relations use `IDD-NNNN` identifiers and point to existing
+  current documents;
 - imported current specs, ADRs, and active spikes follow the current document
   shape;
 - `idd-intent-lint` would return no errors.
@@ -575,7 +576,7 @@ Minimum structure:
 
 Rules:
 
-- every current numbered document under `.idd/intent/` must be listed;
+- every current `IDD-NNNN` document under `.idd/intent/` must be listed;
 - every listed document must exist;
 - process reports, templates, README files, and support docs must not be listed
   as current specs;
