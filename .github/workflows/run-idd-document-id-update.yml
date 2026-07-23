@@ -1,0 +1,62 @@
+name: Run IDD document ID update
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.head_ref == 'idd-prefix-update'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout update branch
+        uses: actions/checkout@v4
+        with:
+          ref: idd-prefix-update
+          fetch-depth: 0
+
+      - name: Extract and run update script
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path('.github/workflows/apply-idd-document-id-update.yml')
+          lines = source.read_text(encoding='utf-8').splitlines()
+          start_marker = "          python - <<'PY'"
+          end_marker = "          PY"
+          start = lines.index(start_marker) + 1
+          end = lines.index(end_marker, start)
+          body = []
+          for line in lines[start:end]:
+              if line.startswith('          '):
+                  line = line[10:]
+              body.append(line)
+          Path('/tmp/apply-idd-document-id-update.py').write_text(
+              '\n'.join(body) + '\n',
+              encoding='utf-8',
+          )
+          PY
+          python /tmp/apply-idd-document-id-update.py
+
+      - name: Generate artifacts and run checks
+        shell: pwsh
+        run: pwsh ./scripts/Check.ps1 -Version 0.0.0
+
+      - name: Commit clean result to update branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/apply-idd-document-id-update.yml
+          rm .github/workflows/run-idd-document-id-update.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Namespace intent document IDs"
+          git push origin HEAD:idd-prefix-update
