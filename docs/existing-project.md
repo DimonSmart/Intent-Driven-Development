@@ -42,8 +42,15 @@ It also adds one small managed IDD section to `AGENTS.md` for Codex or
 `CLAUDE.md` for Claude Code while preserving unrelated project instructions.
 
 When implementation already exists but no current `IDD-NNNN` documents exist,
-initialization offers to analyze the whole repository, analyze selected product
-areas, or skip bootstrap for now.
+initialization pauses for an explicit bootstrap decision. When the Coding Agent
+provides structured user input, this appears as a client-native choice between
+analyzing the whole repository, selecting product areas, or skipping bootstrap.
+When structured input is unavailable, initialization asks one direct question
+and ends the turn instead of merely mentioning analysis as a possible next step.
+
+A project description supplied with `idd-project-init` is temporary bootstrap
+context. It is not implicit consent to analyze the codebase or create current
+intent documents.
 
 ## 3. Choose How To Establish Initial Intent
 
@@ -83,21 +90,26 @@ Exclude ./src/LegacyMigration and ./experiments.
 Bootstrap:
 
 1. maps the repository and detects product parts;
-2. asks you to confirm or correct the scope;
+2. pauses for you to confirm or correct the product boundary;
 3. discovers candidate users, scenarios, behavior, contracts, domain concepts,
    integrations, and architecture boundaries;
 4. separates durable product meaning from replaceable or incidental
    implementation details;
-5. asks targeted questions only where a technical choice changes future
+5. asks blocking targeted questions only where a technical choice changes future
    implementation freedom;
 6. presents a proposed initial set of specs, ADRs, and active spikes;
-7. writes current intent only after explicit approval;
+7. pauses for explicit approval before writing current intent;
 8. runs `idd-intent-lint`.
 
-For example, the workflow may ask whether SQLite is a required compatibility
-choice, an accepted architecture decision, a replaceable persistence
-implementation, or still unresolved. Package presence alone does not make a
-technology part of product intent.
+Blocking decisions use the client's structured input UI when available and do
+not auto-resolve. Without structured input, the workflow asks one direct question
+and stops until the user responds.
+
+For example, the workflow may ask first whether SQLite is durable, replaceable,
+or unresolved. Only when it is durable and the distinction matters does it ask
+whether SQLite is a product/compatibility contract or an accepted architecture
+decision. Package presence alone does not make a technology part of product
+intent.
 
 ### Code and partial documentation both exist
 
