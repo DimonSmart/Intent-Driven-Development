@@ -485,7 +485,7 @@ Expected behavior:
 User request:
 
 ```text
-Implement spec 0018.
+Implement IDD-0018.
 ```
 
 Expected behavior:

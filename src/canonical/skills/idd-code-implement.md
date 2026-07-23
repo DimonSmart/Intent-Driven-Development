@@ -143,7 +143,7 @@ workflow.
 
 ## Example
 
-If `.idd/intent/0018.spec-command-history-completion.md` says command completion must
+If `.idd/intent/IDD-0018.spec-command-history-completion.md` says command completion must
 have a neutral default selection, implement that behavior and add only the
 high-value verification needed to protect it, then verify the implementation
-against spec 0018.
+against IDD-0018.

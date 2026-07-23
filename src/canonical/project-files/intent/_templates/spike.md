@@ -1,4 +1,4 @@
-# NNNN.spike-short-title
+# IDD-NNNN.spike-short-title
 
 A spike is active research only while the question is unresolved. When resolved,
 move durable product behavior into a spec, move durable architecture decisions

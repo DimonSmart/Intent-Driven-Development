@@ -38,7 +38,7 @@ When project context is needed:
 
 1. Read `.idd/intent/README.md`.
 2. Read `.idd/intent/INDEX.md`.
-3. Read only relevant current numbered documents.
+3. Read only relevant current `IDD-NNNN` documents.
 4. Do not load the whole intent tree.
 5. Do not inspect Git history.
 6. Do not perform broad code review.

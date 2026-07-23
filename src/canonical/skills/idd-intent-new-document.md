@@ -36,6 +36,12 @@ owners, related documents, acceptance or decision context, and open questions.
 - If the product area is the same, update the existing spec.
 - If the product area identity changes, create the new owning spec only after
   this skill's ownership check confirms that no current document owns it.
+- Every new document uses a stable `IDD-NNNN` identifier and the canonical
+  `IDD-NNNN.type-short-title.md` filename.
+- The first Markdown heading starts with the same `IDD-NNNN` identifier and
+  document type as the filename.
+- Never create a bare `NNNN.type-short-title.md` filename or a bare numeric
+  normative relation.
 - Git history preserves the deleted document.
 - If the requested type does not match the change, do not follow it blindly.
   State the mismatch and use the correct IDD document type.
@@ -55,17 +61,19 @@ owners, related documents, acceptance or decision context, and open questions.
 
 ## Workflow
 
-1. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and relevant current numbered
-   documents directly under `.idd/intent/`.
+1. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and relevant current
+   `IDD-NNNN` documents directly under `.idd/intent/`.
 2. Determine the document type from the explicit input or from the change.
 3. Before creating a new document, search `INDEX.md` and relevant current specs
    for an existing owner of the product area.
 4. If an owner exists, stop and use `idd-intent-change`.
 5. If current intent already exists, update the existing current document
    instead of creating a duplicate.
-6. Find the next number by scanning current numbered documents directly under
-   `.idd/intent/`. Do not scan or create an archive directory. Deleted document
-   numbers are not reused.
-7. Create the document from the matching template.
-8. Update `INDEX.md` when a numbered document is added.
+6. Find the next number by inspecting current filenames matching
+   `IDD-NNNN.type-short-title.md` and previously assigned `IDD-NNNN` identifiers
+   in Git history. Use the maximum `NNNN` value plus one. Do not scan or create an
+   archive directory. Deleted document numbers are not reused.
+7. Create the document from the matching template. Use the same `IDD-NNNN`
+   identifier and document type in the filename and first Markdown heading.
+8. Update `INDEX.md` when an `IDD-NNNN` document is added.
 9. Keep the document normative. Do not add local task notes.
