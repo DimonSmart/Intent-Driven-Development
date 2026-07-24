@@ -62,6 +62,12 @@ codex plugin marketplace add DimonSmart/Intent-Driven-Development --ref marketpl
 codex plugin add idd-intent@intent-driven-development
 ```
 
+Questions about IDD itself can be addressed at any time by manually invoking `idd-help`. Use it to ask how the methodology works, why a workflow is chosen, what a skill does, or how a particular IDD rule should be interpreted.
+
+```text
+idd-help Why does this change need an intent update?
+```
+
 Open the target repository and initialize IDD:
 
 ```text
