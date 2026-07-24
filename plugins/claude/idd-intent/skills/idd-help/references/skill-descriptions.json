@@ -1,0 +1,167 @@
+{
+  "idd-help": {
+    "description": "Manual-only, read-only help for questions about Intent-Driven Development methodology, concepts, workflows, skills, and expected Coding Agent behavior.",
+    "invocation": "manual",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "argument-hint": "[question about IDD]",
+          "allowed-tools": "Read Glob Grep"
+        }
+      }
+    }
+  },
+  "idd-route": {
+    "description": "Use a read-only routing step to classify an IDD-related request and select the smallest safe end-to-end workflow before handing off to the appropriate IDD skill.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "argument-hint": "[request or workflow question]",
+          "allowed-tools": "Read Glob Grep"
+        }
+      }
+    }
+  },
+  "idd-project-init": {
+    "description": "Initialize `.idd/intent` and the IDD plugin declaration, then pause for a blocking bootstrap decision when an existing implementation has no current intent.",
+    "invocation": "manual"
+  },
+  "idd-intent-bootstrap": {
+    "description": "Interactively discover, classify, confirm, and write initial current product intent using blocking user decisions for an existing implemented project without reliable IDD intent.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "argument-hint": "[whole repository or selected product roots and exclusions]"
+        }
+      }
+    }
+  },
+  "idd-intent-audit": {
+    "description": "Diagnose `.idd/intent/` product intent structure and recommend reorganizations without editing files.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "argument-hint": "[scope or audit focus]",
+          "allowed-tools": "Read Glob Grep"
+        }
+      }
+    }
+  },
+  "idd-skip": {
+    "description": "Manual-only command. Perform the current request without applying Intent-Driven Development routing or updating durable intent.",
+    "invocation": "manual"
+  },
+  "idd-intent-brainstorm": {
+    "description": "Clarify real product intent before changing `.idd/intent/`, using focused customer-development questions and simplification options without editing product intent, planning implementation, or writing code."
+  },
+  "idd-intent-change": {
+    "description": "Update current `.idd/intent/` product intent for add, modify, and remove product operations, preferring existing specs over new specs."
+  },
+  "idd-code-implement": {
+    "description": "Implement current product intent or perform a behavior-preserving implementation change, then verify the result against relevant `.idd/intent/` specifications."
+  },
+  "idd-intent-new-document": {
+    "description": "Create a new owning IDD spec, ADR, or spike only when no existing current document owns the area or decision."
+  },
+  "idd-code-check-implementation": {
+    "description": "Check whether implementation behavior matches durable product intent in `.idd/intent/`."
+  },
+  "idd-intent-import": {
+    "description": "Import raw source material into structurally normalized IDD intent under `.idd/intent/`.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "argument-hint": "[source roots] [--mode propose|apply-safe]"
+        }
+      }
+    }
+  },
+  "idd-intent-lint": {
+    "description": "Run mechanical `.idd/intent/` consistency checks without editing files.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "argument-hint": "[optional spec path or scope]",
+          "allowed-tools": "Read Glob Grep Bash"
+        }
+      }
+    }
+  },
+  "idd-intent-normalize-current": {
+    "description": "Perform focused structural normalization of existing `.idd/intent/` product intent without changing product meaning.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "argument-hint": "--documents <ids> --topic <topic> --target <file|new> --mode propose|apply"
+        }
+      }
+    }
+  },
+  "idd-code-update-intent": {
+    "description": "Update `.idd/intent/` product intent from confirmed implementation behavior."
+  },
+  "idd-factory-run": {
+    "description": "Run or resume one file-backed IDD Factory workflow through decomposition, sequential implementation, independent reviews, and commit-message handoff."
+  },
+  "idd-factory-decompose-work": {
+    "description": "Analyze one supplied request against relevant intent and repository evidence, then return clarification, a focused handoff, or ordered bounded Factory tasks.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "argument-hint": "[request text or file contents]",
+          "allowed-tools": "Read Glob Grep"
+        }
+      }
+    }
+  },
+  "idd-factory-execute-task": {
+    "description": "Implement exactly one explicit active Factory task from the request snapshot and current intent, then return focused verification evidence.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "general-purpose",
+          "argument-hint": "[active task path]"
+        }
+      }
+    }
+  },
+  "idd-factory-review-task": {
+    "description": "Independently review one active Factory task against its request, relevant intent, actual diff, code quality, and verification evidence.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "argument-hint": "[active task path]",
+          "allowed-tools": "Read Glob Grep Bash"
+        }
+      }
+    }
+  },
+  "idd-factory-review-work-result": {
+    "description": "Independently review the complete result of the current Factory run against its request, current intent, integration requirements, and verification evidence.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "allowed-tools": "Read Glob Grep Bash"
+        }
+      }
+    }
+  },
+  "idd-factory-finish-work": {
+    "description": "Create a compact commit-message handoff for an approved Factory run, then safely clear its current temporary state."
+  }
+}
