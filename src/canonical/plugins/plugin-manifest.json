@@ -30,7 +30,7 @@
         },
         {
           "skill": "idd-help",
-          "source": "docs/methodology.md",
+          "source": "src/canonical/methodology/intent-driven-development.md",
           "destination": "methodology.md"
         },
         {
