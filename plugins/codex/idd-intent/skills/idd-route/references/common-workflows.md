@@ -352,20 +352,35 @@ exceptions, acceptance criteria, compatibility contracts, or non-goals.
 
 ## Bug and Mismatch Entry Points
 
-Bug reports route by the relationship between implementation and current
-intent:
+A concrete bug-fix request does not automatically require an intent or
+conformance pass before implementation. When the user reports an observed
+failure and asks to fix it, first determine whether the expected behavior is
+already clear from the request and focused implementation context.
 
-- Clear intent and violating implementation: `idd-code-check-implementation`,
-  then `idd-code-implement`, then `idd-code-check-implementation`.
-- Implementation matches current intent but the user wants different behavior:
-  `idd-intent-change(operation: modify)`, then implementation, then check.
-- Correct intent is unclear: `idd-code-check-implementation`, then
-  `idd-intent-brainstorm` or a spike.
-- No adequate current intent exists for an implemented product area:
-  `idd-intent-bootstrap` when broad initial discovery is needed, or
-  `idd-code-update-intent` only for a narrow behavior the user already confirms.
+- If expected behavior is clear, the defect is localized, and there is no sign
+  that the fix changes product truth, a public contract, compatibility, or a
+  durable architecture boundary: investigate the implementation directly,
+  apply `idd-code-implement` or an equivalent focused code fix, and run relevant
+  verification. Do not run `idd-code-check-implementation` first merely because
+  the request is a bug report.
+- Use `idd-code-check-implementation` before implementation when current intent
+  is actually needed to determine what correct behavior is, when expected
+  behavior is unclear, when the implementation may represent a deliberate
+  product change, when the fix touches a public or durable contract, or when the
+  user explicitly asks for conformance checking.
+- If implementation matches current intent but the user wants different
+  behavior: `idd-intent-change(operation: modify)`, then implementation, then
+  check.
+- If no adequate current intent exists and the requested work would establish or
+  change durable product behavior: use `idd-intent-bootstrap` when broad initial
+  discovery is needed, or `idd-code-update-intent` only for a narrow behavior
+  the user already confirms. A narrow implementation bug whose expected behavior
+  is explicitly supplied by the user does not require bootstrap solely because
+  numbered intent is absent.
 
-A bug is not a separate top-level workflow family.
+A bug is not a separate top-level workflow family. Route through intent or
+conformance workflows only when they are needed to decide or protect durable
+product meaning; otherwise prefer the smallest focused implementation workflow.
 
 ## Focused and Orchestrated Execution
 
