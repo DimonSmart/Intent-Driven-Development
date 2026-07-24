@@ -4,6 +4,7 @@
       "description": "Durable product memory for Intent-Driven Development.",
       "dependencies": [],
       "skills": [
+        "idd-help",
         "idd-route",
         "idd-project-init",
         "idd-intent-bootstrap",
@@ -22,6 +23,21 @@
       "roles": [],
       "skillRoleReferences": {},
       "skillReferences": [
+        {
+          "skill": "idd-help",
+          "source": "src/canonical/methodology/common-workflows.md",
+          "destination": "common-workflows.md"
+        },
+        {
+          "skill": "idd-help",
+          "source": "docs/methodology.md",
+          "destination": "methodology.md"
+        },
+        {
+          "skill": "idd-help",
+          "source": "src/canonical/skills/skill-descriptions.json",
+          "destination": "skill-descriptions.json"
+        },
         {
           "skill": "idd-route",
           "source": "src/canonical/methodology/common-workflows.md",
