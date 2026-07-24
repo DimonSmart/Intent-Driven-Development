@@ -1,4 +1,18 @@
 {
+  "idd-help": {
+    "description": "Manual-only, read-only help for questions about Intent-Driven Development methodology, concepts, workflows, skills, and expected Coding Agent behavior.",
+    "invocation": "manual",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "argument-hint": "[question about IDD]",
+          "allowed-tools": "Read Glob Grep"
+        }
+      }
+    }
+  },
   "idd-route": {
     "description": "Use a read-only routing step to classify an IDD-related request and select the smallest safe end-to-end workflow before handing off to the appropriate IDD skill.",
     "adapters": {
