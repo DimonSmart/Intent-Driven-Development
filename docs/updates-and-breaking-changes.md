@@ -20,12 +20,13 @@ Required result:
 - Rename every current intent document from `NNNN.type-short-title.md` to `IDD-NNNN.type-short-title.md`.
 - Preserve each existing four-digit number, document type, slug, content, and product meaning.
 - Update each renamed document heading so its identifier starts with the same `IDD-NNNN` value.
-- Update `.idd/intent/INDEX.md` to use the new filenames and identifiers.
-- Update all internal references, including Related, Replaces, Supersedes, Depends on, prose references, and Markdown links, from bare `NNNN` identifiers or old filenames to `IDD-NNNN` identifiers or the corresponding new filenames.
+- Update `.idd/intent/INDEX.md` document identifiers from `NNNN` to `IDD-NNNN` while preserving the ID-only index representation. The `Document` column must contain only the stable `IDD-NNNN` identifier, not filenames, paths, or Markdown links.
+- Rewrite normative relations and prose document references from bare `NNNN` identifiers to stable `IDD-NNNN` identifiers.
+- When an existing Markdown link actually targets an intent file, update only its link target from the old filename to the corresponding `IDD-NNNN.type-short-title.md` filename. Do not introduce a new filename-based Markdown link where the source used a document identifier.
 - Treat `IDD-NNNN` as the stable document ID. Do not renumber documents.
 - Do not add aliases, redirect files, fallback parsing, migration code, or compatibility with the old naming convention.
 - Do not modify unrelated numbers such as versions, dates, issue numbers, task sequence numbers, ports, or quantities.
-- Verify that no current intent filename uses the old `NNNN.type-short-title.md` format and no normative internal relation uses a bare four-digit document number.
+- Verify that no current intent filename uses the old `NNNN.type-short-title.md` format, no normative internal relation uses a bare four-digit document number, and every `INDEX.md` Document entry is exactly an `IDD-NNNN` identifier.
 - Run or simulate `idd-intent-lint` and fix all mechanical errors caused by the rename.
 
 Report the renamed files, rewritten references, and verification result.
