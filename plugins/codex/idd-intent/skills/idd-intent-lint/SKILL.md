@@ -29,9 +29,14 @@ Check that:
 
 - `.idd/intent/README.md` exists;
 - `.idd/intent/INDEX.md` exists;
-- every current document listed in `INDEX.md` exists;
-- every current `IDD-NNNN` document under `.idd/intent/` is listed in
-  `INDEX.md`;
+- every `Document` entry in `INDEX.md` is exactly a plain `IDD-NNNN` identifier
+  matching `^IDD-\d{4}$`, not a filename, path, inline-code filename, or Markdown
+  link;
+- every `Document` identifier appears exactly once in `INDEX.md`;
+- every `Document` identifier in `INDEX.md` resolves to exactly one current file
+  matching `.idd/intent/IDD-NNNN.*.md`;
+- every current `IDD-NNNN` document under `.idd/intent/` is listed exactly once in
+  `INDEX.md` by its stable identifier;
 - every current intent filename matches
   `^IDD-\d{4}\.(spec|adr|spike)-[a-z0-9][a-z0-9-]*\.md$`;
 - no current intent document uses the legacy bare numeric filename format
@@ -72,6 +77,13 @@ Check that:
 
 `idd-intent-lint` must fail if:
 
+- a `Document` entry in `INDEX.md` is not exactly a plain `IDD-NNNN` identifier,
+  including when it contains a canonical filename, a path, or a Markdown link;
+- the same `Document` identifier appears more than once in `INDEX.md`;
+- an `INDEX.md` document identifier resolves to zero or multiple current
+  `.idd/intent/IDD-NNNN.*.md` files;
+- a current `IDD-NNNN` document is missing from `INDEX.md` or is represented there
+  by something other than its stable identifier;
 - a current intent filename does not use the canonical
   `IDD-NNNN.type-short-title.md` format;
 - a current intent filename uses the legacy bare numeric format;
@@ -147,8 +159,8 @@ Check whether `.idd/intent` is mechanically consistent.
 Expected behavior:
 
 - use `idd-intent-lint`;
-- check `INDEX.md`, filenames, document headings, links, required sections,
-  relation identifiers, and stale `.worklog` references;
+- check `INDEX.md` ID-only document entries, filenames, document headings, links,
+  required sections, relation identifiers, and stale `.worklog` references;
 - report pass/fail and warnings;
 - do not edit files.
 

@@ -12,5 +12,10 @@ Git history is the source for deleted or previous document versions.
 
 No current `IDD-NNNN` documents have been created yet.
 
+The `Document` column contains stable `IDD-NNNN` identifiers only. Do not put
+filenames, file paths, or Markdown links in this column. Resolve an identifier to
+the unique current `.idd/intent/IDD-NNNN.*.md` file when the document must be
+opened.
+
 | Document | Role | Area | Notes | Replaces |
 | --- | --- | --- | --- | --- |
