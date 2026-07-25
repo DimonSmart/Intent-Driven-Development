@@ -1,3 +1,3 @@
 # Intent Index
 
-- `IDD-0001.spec-authentication.md` — Authentication methods.
+- IDD-0001 — Authentication methods.
