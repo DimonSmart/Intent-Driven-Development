@@ -24,6 +24,7 @@ For successful apply-safe import, the expected final state is:
 - no `.idd/intent/archive`;
 - no process-only import reports under `.idd/intent`;
 - all current `IDD-NNNN` documents are listed in `.idd/intent/INDEX.md`;
+- every `INDEX.md` `Document` entry uses only the stable `IDD-NNNN` identifier;
 - all current documents listed in `.idd/intent/INDEX.md` exist;
 - all `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar
   normative relations use `IDD-NNNN` identifiers and point to existing
@@ -160,7 +161,8 @@ This is not a fixed enum. Prefer areas that match the actual product.
 11. Extract repeated common models into shared specs.
 12. Keep semantic conflicts visible and do not resolve them automatically.
 13. Build and apply a source-to-target remap before writing final relations.
-14. Regenerate `.idd/intent/INDEX.md` from actual current `IDD-NNNN` documents.
+14. Regenerate `.idd/intent/INDEX.md` from actual current `IDD-NNNN` documents
+    using the canonical ID-only `Document` representation.
 15. Run or simulate `idd-intent-lint` and fix mechanical errors before finishing.
 16. Keep a short source reference only when it helps traceability; do not turn a
     spec into an imported journal.
@@ -404,7 +406,7 @@ filenames and normative references are invalid.
 Minimum shape for `spec` documents:
 
 ```md
-# NNNN.spec-short-title
+# IDD-NNNN.spec-short-title
 
 ## Intent
 
@@ -456,7 +458,7 @@ boundary cases, and justified manual checks.
 Minimum shape for `adr` documents:
 
 ```md
-# NNNN.adr-short-title
+# IDD-NNNN.adr-short-title
 
 ## Status
 
@@ -486,7 +488,7 @@ Reference the superseded ADR when this ADR replaces an earlier decision.
 Minimum shape for `spike` documents:
 
 ```md
-# NNNN.spike-short-title
+# IDD-NNNN.spike-short-title
 
 A spike is active research only while the question is unresolved. When resolved,
 move durable product behavior into a spec, move durable architecture decisions
@@ -562,6 +564,11 @@ Regenerate `.idd/intent/INDEX.md` from actual current `IDD-NNNN` documents after
 import. Never leave placeholder index content. Never rely on the source index as
 the final target index.
 
+The index references document identity, not storage filenames. Its `Document`
+column must contain only stable `IDD-NNNN` identifiers as plain text. Resolve an
+identifier to the unique current `.idd/intent/IDD-NNNN.*.md` file when opening
+the document.
+
 Minimum structure:
 
 ```md
@@ -569,15 +576,20 @@ Minimum structure:
 
 | Document | Role | Area | Notes | Replaces |
 | --- | --- | --- | --- | --- |
-| IDD-0001.spec-product-overview.md | spec | Product overview | ... | |
-| IDD-0002.adr-rendering-architecture.md | adr | Rendering | ... | |
-| IDD-0003.spike-input-layer-feasibility.md | spike | Input layer | ... | |
+| IDD-0001 | Spec | Product overview | ... | — |
+| IDD-0002 | ADR | Rendering | ... | — |
+| IDD-0003 | Spike | Input layer | ... | — |
 ```
 
 Rules:
 
-- every current `IDD-NNNN` document under `.idd/intent/` must be listed;
-- every listed document must exist;
+- every `Document` entry must match exactly `IDD-NNNN`;
+- filenames, paths, inline-code filenames, and Markdown links must not be used in
+  the `Document` column;
+- every current `IDD-NNNN` document under `.idd/intent/` must be listed exactly
+  once by its stable identifier;
+- every listed identifier must resolve to exactly one current
+  `.idd/intent/IDD-NNNN.*.md` file;
 - process reports, templates, README files, and support docs must not be listed
   as current specs;
 - there must be no Archived section.
@@ -614,7 +626,8 @@ Before finishing:
 
 1. Delete `.idd/intent/archive` if it exists.
 2. Remove import/process reports from `.idd/intent`.
-3. Regenerate `.idd/intent/INDEX.md`.
+3. Regenerate `.idd/intent/INDEX.md` using the canonical ID-only `Document`
+   representation.
 4. Validate and rewrite `IDD-NNNN` relations through the source-to-target map.
 5. Normalize current specs, ADRs, and spikes to current section shapes.
 6. Reclassify resolved spikes.
@@ -671,7 +684,8 @@ Before finishing, check:
 - Existing specs were updated when appropriate.
 - Conflicts are visible and unresolved.
 - ADR-worthy decisions and spike-worthy research are separated.
-- `.idd/intent/INDEX.md` is regenerated from actual current `IDD-NNNN` documents.
+- `.idd/intent/INDEX.md` is regenerated from actual current `IDD-NNNN` documents
+  using ID-only `Document` entries.
 - `IDD-NNNN` relations point only to existing current documents.
 - no process/import report remains under `.idd/intent`.
 - no `.idd/intent/archive` directory exists.
