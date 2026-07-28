@@ -11,6 +11,7 @@ Use `idd-intent` for the normal workflow. Add optional `idd-factory` only when i
 | An existing repository does not use IDD yet | Run `idd-project-init`. It can offer interactive bootstrap when implementation exists without current intent. |
 | Existing implementation has little or unreliable product documentation | Use `idd-intent-bootstrap` to discover and confirm the initial current intent model. |
 | Existing documents already express current product knowledge | Use `idd-intent-import` to normalize that knowledge into IDD. |
+| Project terminology is genuinely ambiguous or project-specific | Explicitly run `idd-glossary-build` to create or update the optional glossary. |
 | You need to confirm that IDD is installed and initialized correctly | Follow [Verify Installation](verify-installation.md). |
 | You are starting from an idea | Run `idd-project-init`, then clarify the first product behavior with `idd-intent-brainstorm`. |
 | The requested feature is still unclear | Use `idd-intent-brainstorm` before changing intent or code. |
@@ -31,7 +32,7 @@ Open the target repository and run:
 idd-project-init
 ```
 
-The workflow creates the minimal project-owned IDD structure and records the integration in the active agent instructions. It does not copy plugin skills into the project.
+The workflow creates the minimal project-owned IDD structure and records the integration in the active agent instructions. It does not copy plugin skills into the project and does not create an empty glossary.
 
 When the repository contains meaningful implementation but no current `IDD-NNNN` documents, initialization asks whether to analyze the whole repository, analyze selected product areas, or skip bootstrap.
 
@@ -62,6 +63,8 @@ Current implementation is evidence, not product intent by itself. The workflow d
 
 Technical details are included only when confirmed as a durable product or compatibility contract or as an accepted architecture decision. Replaceable preferences and incidental implementation details stay out of `.idd/intent/`.
 
+When bootstrap finds a small set of terminology candidates whose incorrect interpretation could change the understanding of intent, it may show those candidates and ask whether to hand them to `idd-glossary-build`. It does not create the glossary itself, and it does not offer one when no material ambiguity exists.
+
 [Read the existing-project guide](existing-project.md)
 
 ## Import Existing Product Knowledge
@@ -74,7 +77,34 @@ Use idd-intent-import to propose current product intent from ./docs, relevant te
 
 Import extracts durable behavior and constraints. It does not treat every old document or implementation detail as current product truth, and it is not the reverse-discovery workflow for an undocumented codebase.
 
+Like bootstrap, import may identify genuinely ambiguous terminology. For an apply workflow it asks for explicit consent before handing approved candidates to `idd-glossary-build`. Proposal-only import reports candidates as an optional follow-up without creating files.
+
 [Read the existing-project guide](existing-project.md)
+
+## Build an Optional Project Glossary
+
+Use the glossary only when terminology itself creates a material interpretation risk:
+
+```text
+idd-glossary-build
+```
+
+Or provide a focused scope:
+
+```text
+Use idd-glossary-build for the Topic, Aspect, Ticket, and Question Core terms.
+Include the Russian names used in project discussions as aliases.
+```
+
+The governing rule is:
+
+> The glossary contains not all project terms, but only terms whose incorrect interpretation could change the understanding of product intent.
+
+The skill excludes ordinary technical terms, ordinary domain terms, private code identifiers, and task-local wording. It proposes a small entry set and waits for explicit approval before creating or changing `.idd/intent/GLOSSARY.md`.
+
+Each entry contains only a canonical term, a short definition, and optionally `Aliases`. Aliases may include synonyms, old names, abbreviations, spelling variants, transliterations, and names in other languages.
+
+The glossary defines vocabulary, not behavior. Behavioral rules remain in numbered specs. The file is optional, unnumbered, and absent by default.
 
 ## Start a New Product
 
@@ -156,6 +186,8 @@ Focused structural cleanup without changing product meaning:
 idd-intent-normalize-current
 ```
 
+Audit and lint may inspect an existing glossary, but they do not build or maintain it. Use `idd-glossary-build` explicitly for glossary changes.
+
 ## Use Factory for Larger Work
 
 Install optional `idd-factory`, then provide the complete task once:
@@ -164,7 +196,7 @@ Install optional `idd-factory`, then provide the complete task once:
 Use idd-factory-run to implement the task described in ./ui-audit.md.
 ```
 
-Factory completes the requested implementation work, decomposing it when useful and applying independent review before finalization. Factory must not create or change product intent and is not used for bootstrap.
+Factory completes the requested implementation work, decomposing it when useful and applying independent review before finalization. Factory must not create or change product intent and is not used for bootstrap or glossary maintenance.
 
 A normal run continues automatically. Only after an unexpected interruption use:
 
@@ -189,6 +221,8 @@ idd-route
 
 Requests to reconstruct initial intent for an existing undocumented implementation route to `idd-intent-bootstrap`; existing source specifications that need normalization route to `idd-intent-import`.
 
+Glossary construction remains manual-only. Run `idd-glossary-build` explicitly or accept an explicit bootstrap/import offer.
+
 ## Skip IDD Deliberately
 
 When a request must be performed without IDD routing or durable intent changes:
@@ -201,7 +235,9 @@ This is an explicit escape hatch, not the default workflow.
 
 ## Core Rule
 
-Keep durable product truth in `.idd/intent/`.
+Keep durable product truth in numbered documents under `.idd/intent/`.
+
+Keep only deliberately selected ambiguous project vocabulary in the optional `GLOSSARY.md`.
 
 Keep discovery reports, source inventories, confidence notes, plans, task states, reviews, implementation attempts, and Factory execution data temporary.
 
