@@ -25,6 +25,8 @@ Use it when the user asks whether `.idd/intent` is mechanically consistent.
 - Do not reorganize specs.
 - Do not perform broad semantic review.
 - Do not resolve product conflicts.
+- Treat `GLOSSARY.md` as optional. Its absence is valid and produces no warning.
+- Do not create or update the glossary from lint.
 - Report errors, warnings, and suggested fixes only.
 
 ## Checks
@@ -59,7 +61,7 @@ Check that:
 - skills do not recommend archiving obsolete specs;
 - obsolete/task-like/process-only docs are reported as delete candidates, not
   preservation candidates;
-- templates/support docs are not listed as current specs;
+- templates and support files are not listed as current specs;
 - required sections exist, or missing sections are reported;
 - `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar normative
   relations use `IDD-NNNN` identifiers and point to existing current documents;
@@ -78,6 +80,20 @@ Check that:
 - normative spec sections do not contain fenced build/test shell commands,
   explicit task/progress sections, implementation checklists, migration status,
   or a spec lifecycle status.
+
+When `.idd/intent/GLOSSARY.md` exists, also check that:
+
+- the first heading is exactly `# Project Glossary`;
+- the file has no `IDD-NNNN` identifier and is not listed in `INDEX.md`;
+- every entry uses a unique non-empty `## <canonical term>` heading,
+  case-insensitively;
+- every entry contains a non-empty definition before the next entry;
+- the only entry metadata field is an optional single `- Aliases:` line;
+- an alias is not assigned to more than one canonical term,
+  case-insensitively;
+- the file does not contain acceptance criteria, verification sections, task or
+  progress sections, implementation checklists, or lifecycle status;
+- the file is not empty and contains at least one term entry.
 
 `idd-intent-lint` must fail if:
 
@@ -114,7 +130,11 @@ Check that:
   command such as `dotnet build`, `dotnet test`, `cargo test`, `mvn test`,
   `gradle test`, or `pytest`;
 - a normative spec contains an explicit task/progress section, implementation
-  checklist, or migration status.
+  checklist, or migration status;
+- `GLOSSARY.md` is listed as a current document in `INDEX.md`;
+- `GLOSSARY.md` has a malformed heading, duplicate canonical terms, duplicate
+  aliases assigned to different terms, an empty entry, unsupported entry
+  metadata, or no term entries.
 
 Warn, without failing automatically, when a normative spec contains source file
 names such as `.cs`, `.java`, `.ts`, or `.py`; private-style identifiers;
@@ -123,12 +143,23 @@ instructions; test method names; CLI commands; or terms such as `remaining`,
 `finish`, `complete migration`, or `follow-up implementation`. Public APIs and
 durable architecture types may legitimately match these patterns.
 
+When a glossary exists, warn without failing automatically when:
+
+- a definition is long enough to look like a specification section;
+- entries contain normative words such as `must`, `shall`, acceptance language,
+  or verification requirements;
+- a term appears to be an ordinary technical term used in its ordinary meaning;
+- an entry appears to document a private implementation identifier;
+- aliases look like distinct concepts rather than equivalent names.
+
 Do not apply implementation-leakage checks to clearly non-normative sections
 named `Source history`, `Migration source`, `Provenance`, `Imported from`, or
 `Historical note`; those sections must not state current requirements.
 
 Mechanical lint may flag suspicious wording. It must not claim to have completed
-semantic review.
+semantic review. Glossary inclusion quality is primarily reviewed by
+`idd-glossary-build`; lint only catches cheap structural problems and obvious
+scope leakage.
 
 ## Output Format
 
@@ -164,7 +195,8 @@ Expected behavior:
 
 - use `idd-intent-lint`;
 - check `INDEX.md` ID-only document entries, filenames, document headings, links,
-  required sections, relation identifiers, and stale `.worklog` references;
+  required sections, relation identifiers, stale `.worklog` references, and the
+  optional glossary when present;
 - report pass/fail and warnings;
 - do not edit files.
 
@@ -176,6 +208,8 @@ Do not use this skill to:
 - import source material;
 - reorganize product areas;
 - decide whether product behavior is correct;
+- build, expand, or prune the project glossary;
 - perform implementation conformance checks.
 
-Use `idd-intent-audit` for broad structural diagnostics.
+Use `idd-intent-audit` for broad structural diagnostics. Use
+`idd-glossary-build` for explicit glossary creation or maintenance.

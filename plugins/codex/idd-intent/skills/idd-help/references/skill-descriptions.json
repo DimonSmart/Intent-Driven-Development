@@ -40,6 +40,17 @@
       }
     }
   },
+  "idd-glossary-build": {
+    "description": "Manual-only workflow to create or deliberately update the optional project glossary with only terminology whose incorrect interpretation could change the understanding of product intent.",
+    "invocation": "manual",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "argument-hint": "[terms, product area, or terminology sources]"
+        }
+      }
+    }
+  },
   "idd-intent-audit": {
     "description": "Diagnose `.idd/intent/` product intent structure and recommend reorganizations without editing files.",
     "adapters": {

@@ -6,6 +6,9 @@ It is not the source of truth.
 Current `IDD-NNNN` documents directly under `.idd/intent/` contain normative
 product intent, ADRs, or active spikes.
 
+`GLOSSARY.md`, when present, is an optional unnumbered vocabulary support file
+and is not listed in this index.
+
 Git history is the source for deleted or previous document versions.
 
 ## Current documents
