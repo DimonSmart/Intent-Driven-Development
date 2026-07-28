@@ -8,6 +8,7 @@
         "idd-route",
         "idd-project-init",
         "idd-intent-bootstrap",
+        "idd-glossary-build",
         "idd-skip",
         "idd-intent-audit",
         "idd-intent-brainstorm",
@@ -42,6 +43,21 @@
           "skill": "idd-route",
           "source": "src/canonical/methodology/common-workflows.md",
           "destination": "common-workflows.md"
+        },
+        {
+          "skill": "idd-project-init",
+          "source": "src/canonical/methodology/glossary-integration.md",
+          "destination": "glossary-integration.md"
+        },
+        {
+          "skill": "idd-intent-bootstrap",
+          "source": "src/canonical/methodology/glossary-integration.md",
+          "destination": "glossary-integration.md"
+        },
+        {
+          "skill": "idd-intent-import",
+          "source": "src/canonical/methodology/glossary-integration.md",
+          "destination": "glossary-integration.md"
         }
       ],
       "assets": [
