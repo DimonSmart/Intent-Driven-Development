@@ -9,7 +9,9 @@ Use IDD skills when a request involves durable product intent, implementation
 based on current intent, conformance checking, or Factory orchestration. Missing
 `invocation` means automatic routing; `invocation: "manual"` means user-invoked
 only. `idd-skip` is manual-only because automatic selection would defeat its
-purpose, and it applies only to the current explicitly opted-out request.
+purpose, `idd-help` is manual-only because explanation must not become an
+automatic pre-step, and `idd-glossary-build` is manual-only because encountering
+terminology must not trigger glossary maintenance.
 
 Use `idd-code-implement` for one focused implementation change covered by
 current intent. Use Factory workflows for temporary multi-task planning,
@@ -83,6 +85,50 @@ constructor signatures, dependency-injection wiring, implementation order,
 migration mechanics, temporary workarounds, build or test commands, one-off
 source scans, test locations, or progress status.
 
+## Optional Project Glossary
+
+A project may optionally keep `.idd/intent/GLOSSARY.md` as a small shared
+vocabulary support file.
+
+> The glossary contains not all project terms, but only terms whose incorrect
+> interpretation could change the understanding of product intent.
+
+The glossary is appropriate when a familiar word has a project-specific meaning,
+several names denote the same concept, similar concepts must be distinguished,
+or translations and legacy terms create a material ambiguity risk. Ordinary
+technical and domain terms used in their ordinary meaning do not belong there.
+
+The file is absent by default. Its absence is valid and means that the project
+does not use a managed glossary. `idd-project-init` does not create an empty
+file. `idd-intent-bootstrap` and `idd-intent-import` may identify material
+candidates, but they must ask for explicit consent and hand off to
+`idd-glossary-build`; they do not write the glossary themselves.
+
+`GLOSSARY.md`:
+
+- is not an IDD document type;
+- has no `IDD-NNNN` identifier;
+- is not listed in `INDEX.md`;
+- is created or changed only by the manual-only `idd-glossary-build` workflow;
+- is read by other skills only when its terminology is relevant;
+- defines vocabulary, not product behavior.
+
+Each entry contains a canonical term, a short definition, and optionally
+`Aliases`. Aliases may include synonyms, legacy names, abbreviations, spelling
+variants, transliterations, and equivalent names in other languages. The entry
+heading remains the canonical project term, and every alias must denote the same
+concept.
+
+The ownership boundary is:
+
+```text
+What does Aspect mean?          -> GLOSSARY.md
+How must the system use Aspect? -> spec
+Why was this model chosen?      -> ADR when the decision is durable
+```
+
+Git history stores glossary revisions just as it stores specification revisions.
+
 ## Durable Constraint vs Implementation Detail
 
 Ask: **Would a different correct implementation still be allowed?** If yes, the
@@ -150,16 +196,20 @@ Before changing `.idd/intent/`, decide:
    implementation is the new intent.
 5. If intent is unclear, keep the uncertainty visible and create a spike or ask
    for confirmation.
+6. If the request is only to establish project-specific terminology, use the
+   explicit `idd-glossary-build` workflow rather than treating vocabulary as a
+   product change.
 
 ## Project Directory
 
 IDD projects use `.idd/intent/` for current product intent and current
-decision/research records:
+decision/research records, with an optional project glossary:
 
 ```text
 .idd/intent/
   README.md
   INDEX.md
+  GLOSSARY.md        optional, created only by idd-glossary-build
   _templates/
     spec.md
     adr.md
@@ -169,15 +219,16 @@ decision/research records:
 Use these meanings:
 
 ```text
-.idd/intent/              current product intent, ADRs, and active spikes
+.idd/intent/              current product intent, ADRs, active spikes,
+                          and optional glossary support
 ```
 
 Small product-neutral changes belong in commit messages, not in `.idd/intent/`.
 
 ## Document Lifecycle
 
-`.idd/intent/` contains only the current working model of product intent and current
-decision/research records.
+`.idd/intent/` contains only the current working model of product intent, current
+decision/research records, and the optional current glossary.
 
 Git is the only history mechanism. Do not preserve obsolete specs in an
 archive directory.
@@ -199,6 +250,9 @@ Spikes are research records. When a spike is resolved, either convert its
 outcome into a spec or ADR and delete the spike, or keep the spike only if it
 is still useful as active research.
 
+The glossary is edited in place only through explicit `idd-glossary-build` work.
+Delete it when an explicitly approved update removes its final entry.
+
 Deleted documents remain available through Git history.
 
 ### Spec Lifecycle
@@ -209,7 +263,8 @@ Deprecated, Retired, or Superseded.
 
 When intent changes within the same product area, edit the owning spec in place.
 When a spec becomes obsolete or is absorbed by another document, migrate any
-remaining current intent and delete the obsolete spec. Git history is the only history of spec revisions.
+remaining current intent and delete the obsolete spec. Git history is the only
+history of spec revisions.
 
 ADR status is part of the decision record lifecycle and does not apply to specs.
 A spike remains only while the question is active.

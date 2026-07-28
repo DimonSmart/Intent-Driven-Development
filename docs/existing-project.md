@@ -41,6 +41,9 @@ This creates the minimal project-owned IDD structure:
 It also adds one small managed IDD section to `AGENTS.md` for Codex or
 `CLAUDE.md` for Claude Code while preserving unrelated project instructions.
 
+Initialization does not create an empty `GLOSSARY.md`. The optional glossary is
+created only later through explicit `idd-glossary-build` work.
+
 When implementation already exists but no current `IDD-NNNN` documents exist,
 initialization pauses for an explicit bootstrap decision. When the Coding Agent
 provides structured user input, this appears as a client-native choice between
@@ -121,7 +124,75 @@ Use bootstrap when the product meaning still has to be reconstructed and
 confirmed. Use import when the meaning is already expressed and mainly needs
 normalization.
 
-## 4. Provide Temporary Project Context
+## 4. Optional Terminology Discovery
+
+Bootstrap and import may encounter project vocabulary while performing their
+primary work. They must not turn that into an automatic terminology inventory.
+
+The governing rule is:
+
+> The glossary contains not all project terms, but only terms whose incorrect
+> interpretation could change the understanding of product intent.
+
+A candidate is worth showing only when there is a concrete ambiguity risk: for
+example, multiple names denote the same concept, a familiar term has a special
+project meaning, two similar concepts must be distinguished, or translations
+and legacy names can lead to different interpretations.
+
+Ordinary technical terms, ordinary domain vocabulary, private identifiers, and
+frequently used words are not glossary candidates merely because they occur in
+the project.
+
+When material candidates exist, bootstrap or apply-mode import:
+
+1. shows a compact list with the proposed canonical term, short definition,
+   optional aliases, and the misunderstanding prevented;
+2. asks explicitly whether to build or update the glossary;
+3. treats `skip` as a successful outcome;
+4. hands approved candidates to `idd-glossary-build` rather than writing the file
+   directly.
+
+Proposal-only import may report candidates as an optional follow-up but does not
+start a glossary write that exceeds proposal scope.
+
+If no material candidates exist, the workflow should not mention or offer a
+glossary.
+
+## 5. Build the Glossary Only When Needed
+
+Run the manual-only skill explicitly:
+
+```text
+idd-glossary-build
+```
+
+Or use a focused request:
+
+```text
+Use idd-glossary-build for Topic, Aspect, Ticket, and Question Core.
+Treat the Russian terms used in discussions as aliases where they denote the
+same concept.
+```
+
+The skill reads only relevant intent and supplied terminology sources, proposes
+a minimal entry set, and waits for approval before creating or updating
+`.idd/intent/GLOSSARY.md`.
+
+Each entry contains:
+
+- a canonical term;
+- one short definition;
+- optionally `Aliases`.
+
+Aliases may include synonyms, old names, abbreviations, spelling variants,
+transliterations, and names in other languages. They must denote the same concept
+as the canonical heading.
+
+The glossary defines language, not product behavior. Behavioral rules remain in
+numbered specs. The glossary is not assigned an `IDD-NNNN` identifier and is not
+listed in `INDEX.md`.
+
+## 6. Provide Temporary Project Context
 
 During bootstrap you may provide:
 
@@ -139,7 +210,7 @@ This information guides the current discovery run. The workflow persists only
 confirmed durable meaning. It does not save the conversation, scan inventory,
 confidence notes, or temporary instructions as product intent.
 
-## 5. Review The Proposed Intent
+## 7. Review The Proposed Intent
 
 Check that the proposed documents capture:
 
@@ -164,7 +235,7 @@ When a product decision remains unclear, keep it visible. Use an active spike
 only when research is genuinely needed before a product or architecture
 decision.
 
-## 6. Verify The Structure
+## 8. Verify The Structure
 
 Run:
 
@@ -178,6 +249,10 @@ For a broader diagnostic review:
 idd-intent-audit
 ```
 
+Lint treats a missing glossary as valid. When a glossary exists, it checks its
+basic shape, duplicate terms and aliases, and obvious requirement or task
+leakage without attempting to maintain the file.
+
 After bootstrap, a separate conformance check can compare the implementation
 with the newly confirmed model:
 
@@ -187,7 +262,7 @@ Use idd-code-check-implementation for the bootstrapped product areas.
 
 This check does not automatically authorize implementation changes.
 
-## 7. Start Normal Development
+## 9. Start Normal Development
 
 For a focused implementation from current intent:
 
@@ -208,7 +283,8 @@ Use idd-factory-run to implement the task described in <file or request>.
 ```
 
 Factory requires the optional `idd-factory` plugin. Factory is not used for
-bootstrap because Factory must not create or change product intent.
+bootstrap or glossary work because Factory must not create or change product
+intent support artifacts.
 
 ## What Happens To Existing Documentation?
 
@@ -218,12 +294,13 @@ Use the following rule:
 
 - keep documents that still serve a clear audience or operational purpose;
 - move durable product truth into `.idd/intent/`;
+- keep only materially ambiguous shared vocabulary in the optional glossary;
 - avoid maintaining two competing sources of product truth;
 - remove or archive stale plans and obsolete specifications when it is safe;
 - let Git preserve historical versions.
 
 The target state is a small, current intent model—not a second copy of the
-repository's source tree or documentation history.
+repository's source tree, terminology, or documentation history.
 
 ## Next
 

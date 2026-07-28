@@ -52,3 +52,17 @@ recommended follow-up.
 A spike is active research only while the question is unresolved. When resolved,
 move durable product behavior into a spec, move durable architecture decisions
 into an ADR, and delete the spike unless it remains useful as active research.
+
+## Optional glossary support file
+
+`GLOSSARY.md` is not an IDD document type. It is an optional unnumbered support
+file for project-specific vocabulary.
+
+The glossary contains not all project terms, but only terms whose incorrect
+interpretation could change the understanding of product intent. It does not own
+behavior, constraints, decisions, acceptance criteria, or verification rules.
+
+Do not assign it an `IDD-NNNN` identifier and do not list it in `INDEX.md`. Its
+absence is valid and means that the project does not use a managed glossary.
+Create or change it only through the explicit manual-only
+`idd-glossary-build` workflow.
