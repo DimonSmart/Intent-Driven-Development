@@ -38,6 +38,7 @@ Intent does not need to prescribe every class, command, library, or implementati
 
 ```text
 product intent       durable product knowledge
+project glossary     optional shared vocabulary
 plugin workflows     reusable methodology knowledge
 implementation       replaceable code, tests, and architecture
 temporary work       plans, tasks, status, reviews, and chat
@@ -75,6 +76,28 @@ agent delivery files
 commands tied only to the current toolchain
 ```
 
+## Optional Project Glossary
+
+A project may optionally keep `.idd/intent/GLOSSARY.md` for a small amount of shared terminology.
+
+> The glossary contains not all project terms, but only terms whose incorrect interpretation could change the understanding of product intent.
+
+This means that ordinary technical or domain terms used in their ordinary meaning do not belong in the glossary. A term is useful there when the project gives it a special meaning, multiple names denote the same concept, two similar concepts must be distinguished, or translations and legacy names create a real ambiguity risk.
+
+The glossary is absent by default. Its absence is valid and does not make IDD initialization incomplete. It is created or changed only through the manual-only `idd-glossary-build` workflow. Bootstrap and import may detect material candidates, but they ask for explicit consent before handing them to that skill.
+
+Each glossary entry has a canonical term, a short definition, and optionally `Aliases`. Aliases may include synonyms, legacy names, abbreviations, spelling variants, transliterations, and names in other languages. They must all denote the same concept.
+
+The glossary defines vocabulary, not requirements:
+
+```text
+What does Aspect mean?          -> GLOSSARY.md
+How must the system use Aspect? -> specification
+Why was this model chosen?      -> ADR when the decision is durable
+```
+
+`GLOSSARY.md` has no `IDD-NNNN` identifier and is not listed in `INDEX.md`.
+
 ## Current Truth, Not Historical Archive
 
 IDD documents describe what is true now.
@@ -87,6 +110,8 @@ ADRs are the exception because they record durable decisions. When a decision ch
 
 Resolved spikes should be removed after their durable outcome is captured in a specification or ADR, unless the research itself remains active.
 
+An existing glossary is edited in place through explicit glossary work. If its final approved entry is removed, the file should be deleted rather than retained empty.
+
 ## Two Plugins, One Boundary
 
 IDD is distributed as two explicit native plugins:
@@ -96,7 +121,7 @@ idd-intent    durable product memory
 idd-factory   temporary implementation organization
 ```
 
-`idd-intent` owns the durable side of the methodology. It initializes and maintains `.idd/intent/`, imports or changes current product truth, implements from intent, and checks implementation against intent.
+`idd-intent` owns the durable side of the methodology. It initializes and maintains `.idd/intent/`, imports or changes current product truth, optionally builds the project glossary, implements from intent, and checks implementation against intent.
 
 `idd-factory` owns temporary execution orchestration. Its `idd-factory-run`
 entry point decomposes a request, coordinates sequential tasks, performs
@@ -144,6 +169,9 @@ workflow. Orchestrated work may use optional Factory when implementation needs
 sequencing, temporary planning, review gates, migration, compatibility
 transition, or multiple independent tasks.
 
+Glossary work is deliberately outside automatic routing. It starts only from an
+explicit glossary request or an explicitly accepted bootstrap/import offer.
+
 ## How IDD Differs from Broad Spec-Driven Workflows
 
 IDD is still specification-driven in the ordinary sense: implementation follows an explicit product description.
@@ -154,10 +182,11 @@ Its distinction is narrower and stricter:
 - implementation work is disposable by default;
 - Git owns specification history;
 - one current document should own one durable product area;
+- optional vocabulary support stays separate from behavioral requirements;
 - the methodology is tested by the possibility of rebuilding from intent.
 
 IDD does not attempt to preserve every step that led to the product. It preserves what the product must continue to be.
 
 ## Summary
 
-`idd-intent` preserves product memory. `idd-factory` organizes resumable temporary implementation work. Requests, task statuses, reviews, and commit-message handoffs remain temporary, and Git owns history.
+`idd-intent` preserves product memory and may optionally maintain a deliberately small project glossary. `idd-factory` organizes resumable temporary implementation work. Requests, task statuses, reviews, and commit-message handoffs remain temporary, and Git owns history.
