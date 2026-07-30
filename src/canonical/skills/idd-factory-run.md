@@ -143,16 +143,19 @@ history, or logs. Ordering already expresses dependencies.
 2. Run `idd-factory-execute-task` for that one task.
 3. Run `idd-factory-review-task` in a fresh isolated context.
 4. Apply the verdict:
-   - `approved`: remove `Review Findings`, append a compact `Completion`, then
-     rename the task to `.completed.md`.
-   - `needs-fix`: replace `Review Findings` with only the latest actionable
-     findings, keep the task active, and repeat implementation and review.
-   - `blocked`: record the current reason, rename the task to `.blocked.md`, and
-     stop before later tasks.
-   - `intent-required`: rename the task to `.blocked.md` and run the applicable
-     intent workflow. After confirmed intent changes, reread relevant intent,
-     update only remaining ready tasks when necessary, rename blocked back to
-     active, and continue.
+   - `approved`: remove `Review Findings` and `Blocker`, append a compact
+     `Completion`, then rename the task to `.completed.md`.
+   - `needs-fix`: remove `Blocker`, replace `Review Findings` with only the
+     latest actionable findings, keep the task active, and repeat implementation
+     and review.
+   - `blocked`: remove `Review Findings`, write the standard `Blocker` supplied
+     by the reviewer, rename the task to `.blocked.md`, and stop before later
+     tasks. Never append `Completion`.
+   - `intent-required`: remove `Review Findings`, write the standard `Blocker`
+     with the intent gap and handoff, rename the task to `.blocked.md`, and run
+     the applicable intent workflow. After confirmed intent changes, reread
+     relevant intent, update only remaining ready tasks when necessary, rename
+     blocked back to active, and continue.
 
 Use this completion shape without file lists or command logs:
 
@@ -169,6 +172,29 @@ Concerns:
 <none or one material remaining concern>
 ```
 
+Use this blocker shape without command logs, attempt history, timestamps, or
+speculative diagnosis:
+
+```md
+## Blocker
+
+Reason:
+<one concrete condition preventing safe continuation or approval>
+
+Verified:
+<only conclusive implementation or verification evidence already established>
+
+Not verified:
+<required work or evidence that remains incomplete>
+
+Resume when:
+<one concrete condition that makes continuation safe>
+```
+
+`Verified` may be `none`. `Not verified` must distinguish missing evidence from
+an implementation defect. `Review Findings` is reserved for `needs-fix` and is
+never used as the persisted blocker record.
+
 Use this temporary findings shape:
 
 ```md
@@ -177,6 +203,31 @@ Use this temporary findings shape:
 - <current actionable finding>
 ```
 
+## Assessment and Outcome Reporting
+
+Keep these concepts distinct:
+
+- implementation assessment: what the actual diff does and whether it has
+  material implementation findings;
+- verification assessment: which required checks have conclusive evidence and
+  which remain incomplete;
+- Factory outcome: the coordinator state such as `COMPLETED`, `BLOCKED`, or
+  `INTENT_REQUIRED`.
+
+Every user-facing stop or finish report must state all three explicitly:
+
+```text
+Factory outcome: <outcome>
+Implementation assessment: <compact assessment>
+Verification assessment: <compact assessment>
+```
+
+A favorable implementation assessment does not override incomplete required
+verification. When a task-review or final-review verdict is `blocked`, never
+describe the blocked task or run as approved, review passed, completed,
+accepted, or finished. Report the favorable and missing evidence separately and
+keep the Factory outcome `BLOCKED`.
+
 ## Resume
 
 After validating state:
@@ -184,8 +235,16 @@ After validating state:
 - `.active.md`: read the task and current diff first. If implementation appears
   complete, review it before invoking the implementer; otherwise continue the
   bounded implementation without duplicating finished work.
-- `.blocked.md`: show the blocker and do not continue until it is explicitly
-  resolved.
+- `.blocked.md`: show the persisted `Blocker` and do not continue until its
+  `Resume when` condition is explicitly resolved. Then rename the task to
+  `.active.md` before dispatching work.
+- When repository evidence confirms that the current implementation diff is
+  unchanged from the blocked review and the blocker contains no implementation
+  defect, invoke `idd-factory-execute-task` in verification-only resume mode.
+  Limit the worker to `Not verified`, preserve `Verified`, and do not repeat
+  implementation or already conclusive checks.
+- If the implementation changed, or unchanged state cannot be established,
+  perform a normal bounded resume and treat affected prior evidence as stale.
 - only completed and ready tasks: activate the lowest ready task.
 - all tasks completed: run final review.
 
@@ -200,8 +259,8 @@ exists and all tasks are completed.
 - `approved`: invoke `idd-factory-finish-work`.
 - `needs-fix`: create the next numbered corrective task, normally
   `<next>-address-final-review-findings.ready.md`, and resume the task loop.
-- `blocked` or `intent-required`: stop through the same blocker or intent gate
-  used for task review.
+- `blocked` or `intent-required`: stop through the same structured blocker gate
+  used for task review and report the separated assessments and Factory outcome.
 
 Never change a completed task back to active.
 

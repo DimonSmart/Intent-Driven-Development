@@ -21,7 +21,15 @@ request, task, review, and result files are temporary execution state.
 - Create all tasks, choose their order, and perform every status rename.
 - Keep at most one active or blocked task and stop on corrupt state.
 - Ask blocking clarification questions before creating partial workspace.
-- On resume, inspect state and diff before choosing implementation or review.
+- Persist blockers with `Reason`, `Verified`, `Not verified`, and `Resume when`;
+  keep blocker state distinct from actionable `Review Findings`.
+- Keep implementation assessment, verification assessment, and Factory outcome
+  separate in every stop or finish report.
+- Never describe a blocked task or run as approved, review passed, completed,
+  accepted, or finished.
+- On resume, inspect state and diff before choosing implementation or review. If
+  an unchanged implementation has only missing verification, dispatch a
+  verification-only resume limited to that missing evidence.
 - Complete every task review before advancing and create a new corrective task
   for final-review findings.
 - Create the commit-message result before clearing `current/`.
