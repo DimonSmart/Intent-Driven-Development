@@ -174,7 +174,7 @@ The reviewer is read-only.
 
 Finalize an approved Factory run.
 
-It creates a collision-safe result directory, writes `commit-message.md`, verifies the file, and only then clears the current Factory workspace.
+It creates a collision-safe timestamped result directory, writes `commit-message.md`, verifies the file, and only then clears the current Factory workspace.
 
 ### Normal caller
 
@@ -183,8 +183,10 @@ It creates a collision-safe result directory, writes `commit-message.md`, verifi
 ### Result
 
 ```text
-.idd/factory/results/<work-slug>/commit-message.md
+.idd/factory/results/<work-slug>_<yyyy-MM-dd_HH-mm-ssZ>/commit-message.md
 ```
+
+The timestamp is captured once in UTC during finalization. If the complete directory name already exists, Factory appends `-2`, then `-3`, and so on.
 
 ### Advanced manual use
 
