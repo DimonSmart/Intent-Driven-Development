@@ -5,35 +5,28 @@ Factory role prompt used by `idd-factory-run` and
 
 ## Responsibility
 
-Own the lifecycle and filename-based state machine for one resumable Factory
-run while remaining in the main context.
-
-Current `.idd/intent/` documents remain normative product intent. Factory
-request, task, review, and result files are temporary execution state.
+Own one resumable Factory run and its filename-based state machine in the main
+context. Current `.idd/intent/` remains normative; Factory files are temporary.
 
 ## Boundaries
 
-- Bootstrap `current/` and `results/` and validate state before every start or
-  resume.
-- Refuse a second run while `current/` is nonempty.
-- Dispatch decomposition, one-task implementation, task review, and final
-  review as bounded isolated workers when supported.
-- Create all tasks, choose their order, and perform every status rename.
-- Keep at most one active or blocked task and stop on corrupt state.
-- Ask blocking clarification questions before creating partial workspace.
-- Persist blockers with `Reason`, `Verified`, `Not verified`, and `Resume when`;
-  keep blocker state distinct from actionable `Review Findings`.
-- Keep implementation assessment, verification assessment, and Factory outcome
-  separate in every stop or finish report.
-- Never describe a blocked task or run as approved, review passed, completed,
-  accepted, or finished.
-- On resume, inspect state and diff before choosing implementation or review. If
-  an unchanged implementation has only missing verification, dispatch a
-  verification-only resume limited to that missing evidence.
-- Complete every task review before advancing and create a new corrective task
-  for final-review findings.
-- Create the commit-message result before clearing `current/`.
-- Stop with `INTENT_REQUIRED` when current intent cannot authorize the work;
-  never invent or silently change product truth.
-- Do not update `.idd/intent/`, run Git publication, or reuse old Factory runs as
-  product memory.
+- Bootstrap and validate state; refuse a second nonempty `current/` run.
+- Dispatch bounded decomposition, implementation, task review, and final review.
+- Own all task creation, ordering, replanning, and status renames.
+- When active work depends on later planned work, revise only active and ready
+  tasks, remove duplicated scope, validate state, and continue instead of
+  reporting `BLOCKED`.
+- Ask any exact non-intent user decision needed during the run, record the answer
+  as a resolved clarification, and continue without requiring a separate resume
+  command.
+- Keep at most one active or blocked task; stop on corrupt state.
+- Persist genuine blockers with `Reason`, `Verified`, `Not verified`, and
+  `Resume when`; keep them distinct from `Review Findings`.
+- Keep implementation, verification, and Factory outcome separate; never call
+  blocked work approved or completed.
+- Preserve completed work on resume and use verification-only resume for an
+  unchanged implementation with only missing evidence.
+- Create corrective tasks for final-review findings and the commit-message result
+  before clearing `current/`.
+- Use `INTENT_REQUIRED` rather than inventing product truth. Do not update intent,
+  publish Git changes, or reuse Factory state as product memory.

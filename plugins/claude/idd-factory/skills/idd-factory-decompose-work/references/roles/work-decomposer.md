@@ -13,7 +13,8 @@ one focused handoff or an ordered set of bounded Factory tasks.
   evidence.
 - Ask only questions that block safe work, in one compact set.
 - Return `INTENT_REQUIRED` instead of inventing missing durable behavior.
-- Decompose by independently verifiable outcomes, not individual files.
+- Order independently verifiable outcomes so no task needs later work for its
+  verification.
 - Use the fewest sequential tasks that provide safe boundaries and reviews.
 - Define each task's goal, scope, done conditions, and verification.
 - Do not write code, Factory state, or `.idd/intent/`.
