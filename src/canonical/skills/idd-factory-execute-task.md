@@ -2,53 +2,37 @@
 
 ## Purpose
 
-Implement exactly one explicit `.active.md` task in an isolated worker context.
+Implement one explicit `.active.md` task in an isolated worker context.
 
 ## Inputs
 
-Read the active task, including a resumed `Blocker`; `request.md`; only relevant
-current intent; and repository evidence needed for this task. Use project skills
-normally; Factory does not duplicate their catalog.
+Read the active task (including resumed `Blocker`), `request.md`, relevant intent,
+current diff, and focused repository evidence. Use project skills normally.
 
 ## Rules
 
-- Confirm that exactly the supplied task is active and intent is sufficient.
-- On resume, inspect the diff and evidence first and preserve completed work.
-- In explicit verification-only mode for a confirmed unchanged diff, preserve
-  code and `Verified` evidence and perform only `Not verified`. Leave this mode
-  only if the code changed or new evidence reveals an implementation defect.
-- Make the smallest coherent change satisfying the task and preservation
-  boundaries. Add tests only for affected behavior or mechanical contracts.
-- Run the task's focused verification.
-- Return `NEEDS_REPLAN` when completion or verification requires adjacent work
-  inside the Factory request but outside this task. Report the minimum
-  prerequisite; do not implement later tasks.
-- Return `INTENT_REQUIRED` for missing, unclear, or conflicting durable behavior.
-- Return `BLOCKED` only for an external condition or non-intent user decision
-  the worker cannot resolve safely.
-- Do not select tasks, rename Factory files, create tasks, run final review,
-  clean state, prepare a commit message, or update intent without its workflow.
+- Confirm the supplied task is the only active task and intent is sufficient.
+- Inspect diff and evidence first; preserve completed work on resume.
+- In explicit verification-only mode for an unchanged diff, preserve code and
+  `Verified`, perform only `Not verified`, and leave the mode only for changed
+  code or a newly revealed defect.
+- Make the smallest coherent change, preserve boundaries, add only affected
+  tests, and run focused verification.
+- Return `NEEDS_REPLAN` when completion or verification needs adjacent work
+  inside the request but outside this task. Name the minimum prerequisite; do
+  not perform later tasks.
+- Return `INTENT_REQUIRED` for unknown durable behavior and `BLOCKED` only for an
+  external condition or non-intent user decision.
+- Do not select or rename tasks, create Factory work, update intent, run final
+  review, clean state, or prepare a commit message.
 
 ## Output
 
-Return `DONE`, `NEEDS_REPLAN`, `BLOCKED`, or `INTENT_REQUIRED`, followed by:
+Return `DONE`, `NEEDS_REPLAN`, `BLOCKED`, or `INTENT_REQUIRED` with compact
+`Implementation`, `Verification`, and `Concerns` sections.
 
-```text
-Implementation:
-<implemented or preserved result>
-
-Verification:
-<conclusive and missing evidence>
-
-Concerns:
-<none or material concern>
-```
-
-For `NEEDS_REPLAN`, also append:
-
-```text
-Dependency:
-<minimum prerequisite outside the active task>
-```
+For `NEEDS_REPLAN`, append `Dependency`. For `BLOCKED` or `INTENT_REQUIRED`,
+append `Reason` and `Resume when`; when a user decision is needed, make
+`Resume when` the exact question.
 
 The coordinator owns task contents, status, `Completion`, and `Blocker`.
