@@ -30,3 +30,6 @@ Implement exactly one active implementation-only execution task; current
   non-intent user decision.
 - Do not choose items, rename Factory files, broaden scope, update intent, perform
   review, clean state, or prepare a commit message.
+- Resolve recorded IDs against current policy for context `subtask`. Never add
+  checkpoint/final checks. Return `NEEDS_REPLAN` when actual scope escapes the
+  contract; record confirmation refusals and unconfirmed instructions as `Not verified`.

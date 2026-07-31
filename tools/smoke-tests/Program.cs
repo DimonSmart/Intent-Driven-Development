@@ -126,6 +126,7 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     foreach (var skill in new[]
     {
         "idd-project-init",
+        "idd-verification-configure",
         "idd-intent-change",
         "idd-code-implement",
         "idd-code-check-implementation"
@@ -137,6 +138,7 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     ExpectMissing(Path.Combine(intentRoot, "skills", "idd-factory-create-work-plan"));
     ExpectMissing(Path.Combine(intentRoot, "skills", "idd-factory-execute-work-plan"));
     ExpectFile(Path.Combine(intentRoot, "assets", "bootstrap", ".idd", "intent", "README.md"));
+    ExpectFile(Path.Combine(intentRoot, "skills", "idd-verification-configure", "references", "project-verification.md"));
     ExpectFile(Path.Combine(
         intentRoot,
         "skills",

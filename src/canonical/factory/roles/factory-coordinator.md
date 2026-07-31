@@ -49,3 +49,6 @@ context. Current `.idd/intent/` remains normative; Factory files are temporary.
 - Use `INTENT_REQUIRED` rather than inventing product truth. Do not update intent
   inside an execution task, publish Git changes, or reuse Factory state as
   product memory.
+- Block preflight on a policy error needed by the run. During a policy change,
+  preserve completed work, resolve recorded IDs from current policy, and update
+  only active or ready contracts through replan.

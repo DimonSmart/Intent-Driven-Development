@@ -1,5 +1,12 @@
 # idd-factory-execute-task
 
+For an execution subtask, resolve its recorded IDs from the current
+`.idd/verification.md` using context `subtask`. Run no checkpoint or final
+checks. A missing/changed referenced ID blocks the item. Confirmation refusal,
+user instructions without confirmation, and unavailable checks are `Not
+verified`. If actual changes escape the contracted verification scope, return
+`NEEDS_REPLAN`; do not expand checks yourself.
+
 ## Purpose
 
 Implement one explicit active execution task in an isolated worker context.

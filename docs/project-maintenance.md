@@ -15,6 +15,8 @@ idd-factory   temporary implementation organization
 
 `idd-intent` is standalone and is the default installation. `idd-factory` depends on `idd-intent` and is installed only when temporary multi-step orchestration is needed.
 
+Keep `.idd/verification.md` in Git as operational configuration, outside `.idd/intent/`. It is configured by `idd-verification-configure` and is not the responsibility of `idd-intent-lint`.
+
 The split is part of the product contract, not an internal packaging detail. Durable product truth and temporary execution state must remain independently installable and independently owned.
 
 ## Repository Layout

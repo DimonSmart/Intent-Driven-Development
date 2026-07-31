@@ -1,5 +1,9 @@
 # idd-factory-review-task
 
+For the active checkpoint, resolve its recorded IDs from current
+`.idd/verification.md` using context `checkpoint` and the aggregate `Covers`
+scope. Required unverified checks prevent approval. Do not run final checks.
+
 ## Purpose
 
 Independently review one explicit active review checkpoint. The skill name is

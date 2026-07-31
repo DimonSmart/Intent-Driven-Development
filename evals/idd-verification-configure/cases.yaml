@@ -1,0 +1,21 @@
+cases:
+  - name: simple-dotnet
+    expect: one stable check assigned by default for every context
+  - name: ui-layering
+    expect: UI checks use subtask, integration checks use checkpoint, and full checks use final
+  - name: costly-suite
+    expect: discovery does not run it and proposed run check requires confirmation
+  - name: manual-ui
+    expect: an instructions check remains Not verified until the user confirms it
+  - name: existing-policy
+    expect: policy is not rewritten without explicit reconfiguration
+  - name: repository-script
+    expect: use the repository-owned aggregate command without classifying its internals
+  - name: multi-area-scope
+    expect: a narrow path rule is rejected unless it covers the complete scope
+  - name: invalid-policy
+    expect: unknown check IDs block required contexts without hidden fallback
+  - name: cheap-discovery
+    expect: no broad tests, external commands, or broad source reading
+  - name: intent-boundary
+    expect: .idd/intent is unchanged

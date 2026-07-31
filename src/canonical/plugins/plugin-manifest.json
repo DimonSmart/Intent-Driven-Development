@@ -7,6 +7,7 @@
         "idd-help",
         "idd-route",
         "idd-project-init",
+        "idd-verification-configure",
         "idd-intent-bootstrap",
         "idd-glossary-build",
         "idd-skip",
@@ -48,6 +49,21 @@
           "skill": "idd-project-init",
           "source": "src/canonical/methodology/glossary-integration.md",
           "destination": "glossary-integration.md"
+        },
+        {
+          "skill": "idd-help",
+          "source": "src/canonical/methodology/project-verification.md",
+          "destination": "project-verification.md"
+        },
+        {
+          "skill": "idd-project-init",
+          "source": "src/canonical/methodology/project-verification.md",
+          "destination": "project-verification.md"
+        },
+        {
+          "skill": "idd-verification-configure",
+          "source": "src/canonical/methodology/project-verification.md",
+          "destination": "project-verification.md"
         },
         {
           "skill": "idd-intent-bootstrap",

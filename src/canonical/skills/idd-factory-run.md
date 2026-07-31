@@ -1,5 +1,11 @@
 # idd-factory-run
 
+At preflight, require a valid `.idd/verification.md` when one exists; otherwise
+use repository/platform fallback. Preserve completed recorded IDs during a
+policy change, resolve their commands from the current policy, and replan only
+active or ready contracts. The final reviewer always uses the current `final`
+policy.
+
 ## Purpose
 
 Coordinate one resumable Factory run from a request or

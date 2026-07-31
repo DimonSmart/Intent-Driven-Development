@@ -29,4 +29,6 @@ completed execution tasks.
   implementation.
 - Return only current material findings and do not prolong loops for style.
 - Never describe blocked work as approved or completed.
+- Resolve checkpoint check IDs using context `checkpoint` and the aggregate
+  covered scope. Do not approve required `Not verified` checks or run final checks.
 - Do not modify code, intent, Factory state, covered tasks, or the checkpoint.

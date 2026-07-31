@@ -1,5 +1,9 @@
 # IDD Factory Skills Reference
 
+When present, `.idd/verification.md` assigns `subtask` checks to execution
+subtasks, `checkpoint` checks to reviews, and `final` checks to integrated
+review. An execution subtask never broadens its own checks.
+
 Most users should invoke only:
 
 ```text

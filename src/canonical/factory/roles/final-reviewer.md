@@ -29,3 +29,5 @@ review checkpoint is completed.
   accepted, or finished.
 - Do not modify code, `.idd/intent/`, Factory state, or completed items.
 - Do not convert temporary Factory evidence into durable product intent.
+- Resolve final checks from current project policy with context `final`; judge
+  sufficiency by that policy rather than demanding every available repository test.

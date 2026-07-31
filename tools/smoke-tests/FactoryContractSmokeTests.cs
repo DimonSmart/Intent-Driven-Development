@@ -68,7 +68,13 @@ internal static class FactoryContractSmokeTests
             (workDecomposer, "Separate execution boundaries from review boundaries", "role separates boundaries"),
             (implementer, "review checkpoints", "implementer checkpoint boundary"),
             (taskReviewer, "reviews checkpoints, not every execution task", "reviewer checkpoint responsibility"),
-            (finalReviewer, "review checkpoint is completed", "final reviewer checkpoint scope")
+            (finalReviewer, "review checkpoint is completed", "final reviewer checkpoint scope"),
+            (decompose, "`subtask` checks", "subtask verification context"),
+            (decompose, "`checkpoint` checks", "checkpoint verification context"),
+            (execute, "context `subtask`", "executor verification context"),
+            (review, "context `checkpoint`", "checkpoint reviewer verification context"),
+            (finalReview, "context `final`", "final verification context"),
+            (implementer, "NEEDS_REPLAN", "executor verification scope boundary")
         })
         {
             Check(check.Text, check.Expected, check.Name, failures);

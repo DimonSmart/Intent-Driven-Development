@@ -40,6 +40,8 @@ It is a complete standalone plugin and is sufficient for normal IDD workflows. S
 
 `idd-factory` is an optional plugin for larger tasks that benefit from decomposition, resumable execution, and independent review.
 
+Projects can optionally keep `.idd/verification.md` as their Git-owned operational verification policy. Use `idd-verification-configure` to propose it; the policy keeps repository commands separate from product intent.
+
 Factory is actively developed with a strong focus on token efficiency. Its primary optimization target is to make structured Factory-driven implementation cost close to equivalent direct Coding Agent commands in token usage — adding control and reliability without turning orchestration into a token multiplier.
 
 The direction is maximum economy: compact state, minimal handoffs, and only as much orchestration as the task actually needs. Install Factory when that additional structure is useful; keep using `idd-intent` alone when a direct workflow is enough.

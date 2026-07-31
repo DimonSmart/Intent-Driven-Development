@@ -36,6 +36,8 @@ codex plugin add idd-factory@intent-driven-development
 
 `idd-factory` depends on `idd-intent`.
 
+When present, `.idd/verification.md` assigns checks to execution `subtask`, review `checkpoint`, and integrated `final` contexts. Factory stores only check IDs in contracts and resolves their current commands at execution time.
+
 ## Run a Complete Factory Task
 
 Give Factory the complete task once:

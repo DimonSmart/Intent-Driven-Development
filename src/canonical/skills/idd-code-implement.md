@@ -51,7 +51,11 @@ observable behavior change.
   whether omitting the test would materially reduce regression detection.
 - Prefer a higher-level automated scenario that covers several lower-level details
   over separate tests for each method or specification sentence.
-- Run relevant verification.
+- Use `.idd/verification.md` context `direct` when it exists: resolve checks for
+  the actual changed paths, run assigned automatic checks, request required
+  confirmation, and record IDs, commands, and results. User instructions stay
+  `Not verified` until confirmed. Without the file, use and report the
+  repository/platform fallback.
 - After implementation, perform a focused implementation/spec check using
   `idd-code-check-implementation`.
 

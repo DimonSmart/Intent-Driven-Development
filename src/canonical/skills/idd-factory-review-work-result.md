@@ -1,5 +1,10 @@
 # idd-factory-review-work-result
 
+Resolve current final-policy checks with context `final` for the complete
+Factory diff. Final verification is sufficient only when its assigned checks
+have evidence; it does not imply every repository test. Record confirmation
+refusals, user instructions, and unavailable checks as `Not verified`.
+
 ## Purpose
 
 Independently review the complete result of the current Factory run. This worker

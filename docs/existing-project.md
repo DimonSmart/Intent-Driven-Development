@@ -1,5 +1,9 @@
 # Start Using IDD in an Existing Project
 
+Project initialization can offer verification configuration before intent
+bootstrap. Choosing defaults leaves no marker file; run
+`idd-verification-configure` later to create `.idd/verification.md`.
+
 Use this path when the repository already contains implementation,
 documentation, requirements, ADRs, tests, or other evidence about the product.
 
