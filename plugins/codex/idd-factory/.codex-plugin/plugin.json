@@ -1,6 +1,6 @@
 {
   "name": "idd-factory",
-  "version": "2.0.21",
+  "version": "2.0.22",
   "description": "Temporary implementation organization for Intent-Driven Development.",
   "skills": "./skills/",
   "author": {
