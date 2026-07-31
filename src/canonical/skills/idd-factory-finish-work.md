@@ -9,7 +9,8 @@ clear its temporary current state. This workflow does not run Git commands.
 
 - The final review verdict is `approved` for the current actual diff.
 - `current/` passes the state invariants from `idd-factory-run`.
-- It contains one `request.md`, one or more tasks, and every task is completed.
+- It contains one `request.md`, one or more work items, and every execution task
+  and review checkpoint is completed.
 
 Stop without cleanup if any precondition fails.
 
@@ -27,12 +28,13 @@ Never overwrite a result directory. If the complete timestamped name exists,
 append `-2`, then `-3`, and so on.
 
 The result directory contains only `commit-message.md`. Do not copy the request,
-tasks, reviews, or other execution state into `results/`.
+execution tasks, checkpoints, reviews, or other state into `results/`.
 
 ## Commit Message
 
-Derive the message from `request.md`, completed task goals, the actual diff,
-and final review. The diff takes precedence over planning assumptions.
+Derive the message from `request.md`, completed execution-task goals, checkpoint
+results, the actual diff, and final review. The diff takes precedence over
+planning assumptions.
 
 ```text
 <Imperative subject, at most 72 characters, no final period>
@@ -51,7 +53,7 @@ Use the repository's established commit language, or English when it cannot be
 determined. Include two to six result bullets and preferably stay under 1200
 characters.
 
-Do not include full file lists, test logs, attempts, task statuses, resolved
+Do not include full file lists, test logs, attempts, item statuses, resolved
 findings, tokens, model or timing data, internal prompts, the full request, or
 claims not supported by the diff.
 

@@ -6,7 +6,8 @@ Most users should invoke only:
 idd-factory-run
 ```
 
-The other Factory skills are bounded workers used by the coordinator. This page documents them for transparency, advanced inspection, and troubleshooting.
+The other Factory skills are bounded workers used by the coordinator. This page
+documents them for transparency, advanced inspection, and troubleshooting.
 
 ## Normal Workflow
 
@@ -16,17 +17,17 @@ idd-factory-run
   → when INTENT_REQUIRED:
       idd-intent workflow
       idd-factory-decompose-work again
-  → create implementation-only Factory tasks
-  → idd-factory-execute-task
-  → idd-factory-review-task
-  → repeat tasks when necessary
+  → create ordered execution tasks and review checkpoints
+  → idd-factory-execute-task for each execution item
+  → idd-factory-review-task only at checkpoints
+  → repeat corrections when necessary
   → idd-factory-review-work-result
   → idd-factory-finish-work
 ```
 
-The coordinator normally continues through this sequence automatically. Intent
-changes happen before task-state creation or as coordinator-owned orchestration,
-never as Factory tasks.
+Execution completion does not automatically invoke independent review.
+Checkpoints are explicit work items, and the final integrated review remains
+mandatory.
 
 ## `idd-factory-run`
 
@@ -34,9 +35,9 @@ never as Factory tasks.
 
 Public entry point for starting, continuing, or cancelling one Factory run.
 
-It owns intent preflight, workspace validation, clarification, implementation
-task sequencing, worker dispatch, status transitions, review loops, final review,
-and finalization.
+It owns intent preflight, workspace validation, clarification, execution-task
+sequencing, checkpoint dispatch, status transitions, correction insertion, final
+review, and finalization.
 
 ### Start a complete run
 
@@ -47,14 +48,13 @@ Use idd-factory-run to implement the task described in ./ui-audit.md.
 Or:
 
 ```text
-Use idd-factory-run to replace the legacy storage implementation, migrate existing callers, preserve compatibility, and verify the result.
+Use idd-factory-run to replace the legacy storage implementation, migrate
+existing callers, preserve compatibility, and verify the result.
 ```
 
-One invocation is expected to complete the workflow unless clarification, missing intent, an external blocker, or an unexpected interruption prevents progress.
-
-Before creating `.idd/factory/current/`, Factory resolves missing or conflicting
-durable intent and repeats decomposition. The saved task list contains only
-implementation work.
+Before state creation, Factory resolves missing durable intent and repeats
+decomposition. The saved sequence contains implementation-only execution tasks
+and optional review checkpoints.
 
 ### Continue an interrupted run
 
@@ -62,7 +62,8 @@ implementation work.
 Continue the current IDD Factory work.
 ```
 
-Use this only after an existing run was interrupted.
+Factory identifies whether the active item is an execution task or review
+checkpoint and resumes the corresponding worker.
 
 ### Cancel the current run
 
@@ -70,26 +71,25 @@ Use this only after an existing run was interrupted.
 Cancel the current IDD Factory work.
 ```
 
-Cancellation removes temporary Factory task state but does not revert code changes.
+Cancellation removes temporary current state but does not revert code changes.
 
 ## `idd-factory-decompose-work`
 
 ### Purpose
 
-Analyze one request and return the smallest safe ordered set of implementation tasks.
+Analyze one request and return the smallest safe ordered set of execution tasks
+and review checkpoints.
 
-It determines whether the request is ready, small enough for focused implementation, blocked by missing clarification, blocked by missing intent, or blocked by another condition.
+It determines whether the request is ready, small enough for focused
+implementation, blocked by missing clarification, blocked by missing intent, or
+blocked by another condition.
 
-Intent preflight is part of decomposition. When durable behavior is missing or
-conflicting, it returns `INTENT_REQUIRED` and no partial task plan. It never
-creates a task for updating, linting, auditing, or otherwise changing
-`.idd/intent/`.
+Execution tasks are small self-contained implementation contracts. Review
+checkpoints are separate boundaries that may cover several adjacent execution
+tasks.
 
-After intent is resolved, decomposition runs again against the complete original
-request and creates self-contained implementation task contracts. Task-specific
-requirements stay in the owning task. Substantial constraints shared by multiple
-tasks may be placed in a compact optional `run-context.md`. Neither tasks nor run
-context copy the complete original request.
+The decomposer uses the fewest checkpoints that protect dependent later work. It
+does not add a terminal checkpoint that only duplicates final review.
 
 ### Normal caller
 
@@ -97,10 +97,9 @@ context copy the complete original request.
 
 ### Advanced manual use
 
-Use it manually only to inspect a proposed decomposition without implementing anything:
-
 ```text
-Use idd-factory-decompose-work to show how ./migration-plan.md would be divided into implementation tasks. Do not execute them.
+Use idd-factory-decompose-work to show how ./migration-plan.md would be divided
+into execution tasks and review checkpoints. Do not execute them.
 ```
 
 The skill does not write Factory state, code, tests, or product intent.
@@ -109,16 +108,15 @@ The skill does not write Factory state, code, tests, or product intent.
 
 ### Purpose
 
-Implement exactly one active Factory task.
+Implement exactly one active execution task.
 
-It reads the active self-contained implementation task, optional shared
-`run-context.md`, relevant current intent, the current diff, and repository
-evidence required for that task. It does not read the original `request.md` or
-other task files.
+It reads the active self-contained task, optional shared `run-context.md`,
+relevant current intent, current diff, and focused repository evidence. It does
+not read the original request, checkpoints, or other execution tasks.
 
-If an invalid task asks to change intent, the executor returns `NEEDS_REPLAN`
-instead of performing that scope. `INTENT_REQUIRED` is reserved for missing or
-conflicting durable behavior discovered during implementation.
+A successful result returns compact `Implementation`, `Changes`,
+`Verification`, and `Concerns`. The coordinator completes the execution task
+without invoking `idd-factory-review-task`.
 
 ### Normal caller
 
@@ -126,34 +124,28 @@ conflicting durable behavior discovered during implementation.
 
 ### Advanced manual use
 
-Manual invocation is generally discouraged because the coordinator owns task order and status.
-
-For controlled troubleshooting of an already active task:
-
 ```text
-Use idd-factory-execute-task for .idd/factory/current/002-update-storage.active.md only. Do not advance the Factory workflow.
+Use idd-factory-execute-task for
+.idd/factory/current/002-update-storage.active.md only. Do not advance the
+Factory workflow.
 ```
 
-The skill does not select another task, rename task files, perform final review, create a commit message, or clean the workspace.
+The skill does not select another item, rename files, perform checkpoint or final
+review, create a commit message, or clean the workspace.
 
 ## `idd-factory-review-task`
 
 ### Purpose
 
-Independently review one active task after implementation.
+Independently review one active review checkpoint.
 
-It checks the implementation task contract, optional shared run context,
-relevant intent, public contracts, implementation quality, verification
-evidence, and safety for later tasks. It does not reread the original request or
-other task files.
+The skill name is retained for compatibility. It does not review every execution
+task.
 
-An intent-changing task contract receives `needs-replan`, not approval.
-`intent-required` is reserved for missing or conflicting durable behavior
-discovered while reviewing implementation.
-
-### Normal caller
-
-`idd-factory-run`.
+It reads the checkpoint, the completed execution tasks listed in `Covers`,
+optional shared run context, relevant current intent, and checkpoint-local diff
+and verification evidence. It does not read the original request, unrelated
+tasks, or later work.
 
 ### Verdicts
 
@@ -165,16 +157,18 @@ blocked
 intent-required
 ```
 
-For `needs-fix`, the coordinator keeps the task active, records the current actionable findings, and invokes implementation again.
+For `needs-fix`, the reviewer returns one complete self-contained corrective
+execution task. The coordinator inserts it immediately before the checkpoint,
+updates checkpoint coverage, and reviews the group again after correction.
 
-For `needs-replan`, the coordinator corrects insufficient task boundaries,
-intent-editing scope, missing contract information, or ordering without asking
-the worker to recover requirements from `request.md`.
+For `needs-replan`, the coordinator corrects coverage, checkpoint placement,
+contracts, or ordering.
 
 ### Advanced manual use
 
 ```text
-Use idd-factory-review-task to review the current active Factory task. Do not modify code or task files.
+Use idd-factory-review-task to review the current active review checkpoint. Do
+not modify code or Factory files.
 ```
 
 The reviewer is read-only.
@@ -183,17 +177,16 @@ The reviewer is read-only.
 
 ### Purpose
 
-Independently review the complete integrated result after all tasks are completed.
+Independently review the complete integrated result after all execution tasks and
+review checkpoints are completed.
 
-It checks the original request, optional run context, every completed
-implementation task contract, current product intent, the full diff, cross-task
-integration, preservation boundaries, public contracts, and verification
-sufficiency. This is the stage that verifies decomposition did not omit
-requirements from the original request.
+It checks the original request, optional run context, every execution-task
+contract and completion, every checkpoint result, current product intent, the
+full diff, cross-task integration, preservation boundaries, public contracts,
+and verification sufficiency.
 
-### Normal caller
-
-`idd-factory-run`.
+This stage verifies that decomposition did not omit requirements and that grouped
+checkpoint reviews did not hide incomplete integration.
 
 ### Verdicts
 
@@ -204,15 +197,15 @@ blocked
 intent-required
 ```
 
-When the verdict is `needs-fix`, the coordinator creates a new self-contained
-implementation-only corrective task rather than reopening completed task
-history. When the verdict is `intent-required`, the coordinator resolves intent
-outside the task list before creating any required implementation correction.
+When the verdict is `needs-fix`, the coordinator appends one self-contained
+corrective execution task. The next final review is its review gate; Factory does
+not add a redundant terminal checkpoint.
 
 ### Advanced manual use
 
 ```text
-Use idd-factory-review-work-result to review the completed current Factory run. Do not create the result handoff or clear current state.
+Use idd-factory-review-work-result to review the completed current Factory run.
+Do not create the result handoff or clear current state.
 ```
 
 The reviewer is read-only.
@@ -223,11 +216,9 @@ The reviewer is read-only.
 
 Finalize an approved Factory run.
 
-It creates a collision-safe timestamped result directory, writes `commit-message.md`, verifies the file, and only then clears the current Factory workspace.
-
-### Normal caller
-
-`idd-factory-run`.
+It creates a collision-safe timestamped result directory, writes
+`commit-message.md`, verifies the file, and only then clears the current Factory
+workspace.
 
 ### Result
 
@@ -235,19 +226,10 @@ It creates a collision-safe timestamped result directory, writes `commit-message
 .idd/factory/results/<work-slug>_<yyyy-MM-dd_HH-mm-ssZ>/commit-message.md
 ```
 
-The timestamp is captured once in UTC during finalization. If the complete directory name already exists, Factory appends `-2`, then `-3`, and so on.
+The timestamp is captured once in UTC. If the complete directory name already
+exists, Factory appends `-2`, then `-3`, and so on.
 
-### Advanced manual use
-
-Use it manually only when all tasks are completed, final review already approved the actual result, and the normal workflow was interrupted before finalization:
-
-```text
-Use idd-factory-finish-work to finish the approved current Factory run.
-```
-
-The skill stops without cleanup if it cannot confirm the preconditions.
-
-## Task Files and Statuses
+## Work Items and Statuses
 
 The current run is stored under:
 
@@ -255,26 +237,34 @@ The current run is stored under:
 .idd/factory/current/
 ```
 
-It contains `request.md`, optional `run-context.md`, and a flat numbered
-implementation task sequence:
+It contains `request.md`, optional `run-context.md`, and a flat numbered work
+sequence:
 
 ```text
 request.md
 run-context.md
-001-first-outcome.completed.md
-002-next-outcome.active.md
-003-final-outcome.ready.md
+001-create-foundation.completed.md
+002-migrate-consumer.completed.md
+003-review-foundation.active.md
+004-finish-migration.ready.md
 ```
 
-`request.md` preserves the complete original request. `run-context.md` is
-created only for compact context shared by multiple tasks. Each numbered task is
-a self-contained local implementation and review contract when read with the
-optional run context.
+The filename suffix is the only status source.
 
-Factory tasks never own edits to `.idd/intent/`, intent workflow invocation, or
-intent updates as completion conditions.
+Supported states:
 
-A task contains these required sections:
+```text
+ready
+active
+completed
+blocked
+```
+
+Factory allows at most one active or blocked item.
+
+### Execution task format
+
+An execution task contains:
 
 ```text
 Goal
@@ -286,41 +276,72 @@ Verification
 ```
 
 It may also contain concrete `Out of Scope`, `Preservation Boundaries`,
-`Dependencies`, and `Intent References` sections. Empty optional sections are
-omitted. Tasks must not rely on vague references back to `request.md`.
+`Dependencies`, and `Intent References`. It never owns intent changes.
 
-The filename suffix is the only task-status source.
-
-Supported states:
+Execution-task `Completion` contains:
 
 ```text
-ready
-active
-completed
-blocked
+Result
+Changes
+Verification
+Concerns
 ```
 
-Factory allows at most one active or blocked task. Completed tasks are not reopened; final-review corrections become new tasks.
+### Review checkpoint format
+
+A checkpoint contains:
+
+```text
+Review Checkpoint
+Covers
+Review Scope
+Verification
+```
+
+It may also contain `Intent References`. `Covers` names a contiguous group of
+preceding completed execution tasks since the previous checkpoint.
+
+Checkpoint `Completion` contains:
+
+```text
+Result
+Verification
+Concerns
+```
+
+A checkpoint never covers another checkpoint.
+
+On `needs-fix`, completed tasks remain immutable. Factory inserts a new
+corrective execution task before the checkpoint and adds it to `Covers`.
+
+## Choosing Checkpoints
+
+Use a checkpoint when later work should not proceed without independent review
+of a risky earlier result, such as:
+
+- a foundational abstraction;
+- a public contract;
+- persisted-data compatibility;
+- security or concurrency behavior;
+- a grouped migration with meaningful regression risk.
+
+Group adjacent mechanical changes under one checkpoint. Omit checkpoints where
+the mandatory final integrated review is sufficient. Never create a final
+checkpoint solely to duplicate final review.
 
 ## Choosing Factory or Focused Implementation
 
-Use `idd-code-implement` when one bounded pass is sufficient:
+Use `idd-code-implement` when one bounded pass is sufficient.
 
-```text
-Use idd-code-implement to remove the obsolete overload and update its callers.
-```
-
-Use Factory when sequencing or review boundaries make a single pass unsafe:
-
-```text
-Use idd-factory-run to migrate the storage subsystem, update all consumers, preserve saved-data compatibility, and independently review the integrated result.
-```
+Use Factory when sequencing, small execution contexts, explicit checkpoint
+boundaries, or integrated review make one pass unsafe.
 
 The number of changed files alone does not determine the choice.
 
 ## Product Intent Boundary
 
-Factory may read `.idd/intent/`, but it must not invent product behavior.
+Factory may read `.idd/intent/`, but it must not invent or change product
+behavior inside an execution task.
 
 When durable behavior is missing or contradictory, Factory returns:
 
@@ -328,9 +349,9 @@ When durable behavior is missing or contradictory, Factory returns:
 INTENT_REQUIRED
 ```
 
-Before state creation, resolve the product decision through an `idd-intent`
-workflow and repeat decomposition. During an existing run, the coordinator
-resolves it outside the task list and then updates only implementation
-contracts. Intent changes are never Factory task completions.
+Before state creation, resolve intent and repeat decomposition. During an
+existing run, the coordinator resolves intent outside the work-item list and
+updates only implementation contracts and checkpoints.
 
-Factory requests, run context, task files, statuses, review findings, and commit-message handoffs remain temporary execution artifacts.
+Factory requests, shared context, execution tasks, checkpoints, blockers,
+completions, and commit-message handoffs remain temporary execution artifacts.

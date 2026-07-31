@@ -21,7 +21,7 @@ internal static class FactoryContractSmokeTests
         foreach (var field in new[] { "Reason:", "Verified:", "Not verified:", "Resume when:" })
         {
             Check(run, field, $"run blocker {field}", failures);
-            Check(review, field, $"task-review blocker {field}", failures);
+            Check(review, field, $"checkpoint-review blocker {field}", failures);
             Check(finalReview, field, $"final-review blocker {field}", failures);
         }
 
@@ -30,77 +30,60 @@ internal static class FactoryContractSmokeTests
             (run, "Factory outcome:", "outcome label"),
             (run, "Implementation assessment:", "implementation label"),
             (run, "Verification assessment:", "verification label"),
-            (run, "Never describe the " + "blocked task or", "blocked run wording"),
-            (review, "Never describe a " + "blocked task as approved, completed, accepted, or finished.", "blocked task wording"),
-            (finalReview, "Do not describe a " + "blocked result as approved, review passed, completed,", "blocked final wording"),
-            (run, "in verification-only resume mode", "verification-only dispatch"),
+            (run, "verification-only resume", "verification-only dispatch"),
             (execute, "In explicit verification-only mode for an unchanged diff", "verification-only worker"),
             (execute, "perform only `Not verified`", "verification-only scope"),
-            (coordinator, "use verification-only resume for an", "coordinator resume boundary"),
-            (implementer, "perform only `Not verified`", "implementer resume boundary"),
+            (coordinator, "use verification-only resume", "coordinator resume boundary"),
+            (implementer, "perform only", "implementer resume boundary"),
             (decompose, "without implementation from later tasks", "forward-dependency guard"),
             (run, "`NEEDS_REPLAN` is internal, never a Factory outcome", "replanning contract"),
             (execute, "Return `NEEDS_REPLAN`", "implementer replanning result"),
-            (review, "Use `needs-replan`", "review replanning verdict"),
+            (review, "Use `needs-replan`", "checkpoint replanning verdict"),
             (run, "do not require a separate", "automatic resume after decision"),
             (run, "an optional `run-context.md`", "optional run context"),
-            (run, "Each task is a self-contained implementation contract", "self-contained task contract"),
-            (run, "Workers must not need `request.md`", "worker request boundary"),
-            (decompose, "Do not copy the complete request", "decomposition copy guard"),
-            (decompose, "all ordered self-contained task Markdown", "self-contained decomposition result"),
-            (execute, "Do not read `request.md` or other task files", "execute request boundary"),
-            (review, "Do not read `request.md` or other task files", "review request boundary"),
-            (finalReview, "Read the original request, optional run context", "final review request ownership"),
-            (coordinator, "Ensure implementation and task-review workers do not need `request.md`", "coordinator context boundary"),
-            (workDecomposer, "Do not make workers read `request.md`", "decomposer context boundary"),
-            (implementer, "Do not read `request.md` or other task files", "implementer context boundary"),
-            (taskReviewer, "Do not read `request.md` or other task files", "task reviewer context boundary"),
-            (finalReviewer, "Verify the original request, optional shared run context", "final reviewer request ownership"),
-            (run, "Run `idd-factory-decompose-work` with the complete request before creating", "intent preflight before state"),
-            (run, "create no Factory state and no task for the intent change", "no intent task on preflight"),
-            (run, "Factory tasks are implementation-only", "implementation-only task invariant"),
-            (run, "never turn the intent change", "mid-run intent orchestration boundary"),
-            (decompose, "Perform intent preflight before returning implementation tasks", "decomposer intent preflight"),
-            (decompose, "Never represent intent work as a Factory task", "decomposer no intent task"),
-            (decompose, "return no work slug, run context, or", "intent-required no partial plan"),
-            (execute, "If it asks to edit `.idd/intent/`", "executor rejects intent task"),
-            (execute, "return `NEEDS_REPLAN` and identify removal of that scope", "executor intent task verdict"),
-            (review, "If its contract owns an edit to", "review rejects intent task"),
-            (review, "return `needs-replan`; do not review intent work", "review intent task verdict"),
-            (coordinator, "Run intent preflight before creating Factory state", "coordinator intent preflight"),
-            (coordinator, "Handle mid-run `INTENT_REQUIRED` as coordinator-owned intent orchestration", "coordinator mid-run intent ownership"),
-            (workDecomposer, "Never represent intent work as a Factory task", "role no intent task"),
-            (implementer, "If the task asks to edit `.idd/intent/`", "implementer rejects intent task"),
-            (taskReviewer, "If the task owns an edit to `.idd/intent/`", "task reviewer rejects intent task"),
-            (finalReview, "absence of intent-changing work recorded as a completed Factory task", "final review intent-task guard"),
-            (finalReview, "Return no corrective task until the coordinator", "final review intent handoff boundary"),
-            (finalReviewer, "intent-changing work incorrectly recorded as a completed Factory task", "final reviewer intent-task guard"),
-            (finalReviewer, "do not define a corrective task until the coordinator resolves intent outside the task list", "final reviewer intent handoff boundary")
+            (run, "Each execution task is self-contained", "self-contained execution contract"),
+            (run, "Execution completion does not invoke", "no automatic task review"),
+            (run, "A review checkpoint contains", "checkpoint contract"),
+            (run, "active review-checkpoint -> ready", "checkpoint correction transition"),
+            (run, "immediately before the checkpoint", "checkpoint correction insertion"),
+            (run, "Do not add a terminal checkpoint", "terminal checkpoint guard"),
+            (run, "`Changes` is a compact list", "checkpoint evidence focus"),
+            (decompose, "Separate execution boundaries from review boundaries", "separate review boundaries"),
+            (decompose, "Use the fewest review checkpoints", "minimal checkpoints"),
+            (decompose, "do not add a terminal checkpoint", "decomposer terminal checkpoint guard"),
+            (decompose, "all ordered execution-task and review-checkpoint", "decomposition item result"),
+            (execute, "active execution task", "execution-only worker"),
+            (execute, "Do not read `request.md`, checkpoints, or other", "execute context boundary"),
+            (execute, "Changes:", "execution changes output"),
+            (execute, "Do not run broad checkpoint or final integrated verification", "verification layering"),
+            (review, "active review checkpoint", "checkpoint-only reviewer"),
+            (review, "does not review every execution task", "legacy name boundary"),
+            (review, "every completed execution task named by its `Covers`", "checkpoint coverage input"),
+            (review, "Do not read `request.md`, unrelated execution tasks", "checkpoint context boundary"),
+            (review, "Corrective execution task:", "checkpoint corrective output"),
+            (finalReview, "all completed review checkpoints", "final checkpoint ownership"),
+            (finalReview, "do not add a terminal", "final correction review gate"),
+            (coordinator, "execution tasks and review checkpoints", "coordinator item kinds"),
+            (coordinator, "Mark a successful execution task completed without invoking independent review", "coordinator no per-task review"),
+            (workDecomposer, "Separate execution boundaries from review boundaries", "role separates boundaries"),
+            (implementer, "review checkpoints", "implementer checkpoint boundary"),
+            (taskReviewer, "reviews checkpoints, not every execution task", "reviewer checkpoint responsibility"),
+            (finalReviewer, "review checkpoint is completed", "final reviewer checkpoint scope")
         })
         {
             Check(check.Text, check.Expected, check.Name, failures);
         }
 
-        CheckAbsent(
-            execute,
-            "Read the active task (including resumed `Blocker`), `request.md`",
-            "legacy execute request input",
-            failures);
-        CheckAbsent(
-            review,
-            "Read `request.md`, the active task",
-            "legacy review request input",
-            failures);
-        CheckAbsent(
-            run,
-            "INTENT_REQUIRED`: persist the intent blocker and use its workflow",
-            "legacy intent task-loop wording",
-            failures);
-        CheckAbsent(
-            decompose,
-            "task that updates intent",
-            "ambiguous intent task allowance",
-            failures);
+        foreach (var absent in new (string Text, string Unexpected, string Name)[]
+        {
+            (run, "`DONE`: run fresh `idd-factory-review-task`", "legacy per-task review dispatch"),
+            (review, "Independently review one explicit `.active.md` task", "legacy single-task reviewer"),
+            (review, "Do not read `request.md` or other task files; review the active task", "legacy task-only review context"),
+            (execute, "run final review", "executor final-review ownership")
+        })
+        {
+            CheckAbsent(absent.Text, absent.Unexpected, absent.Name, failures);
+        }
 
         if (failures.Count > 0)
             throw new InvalidOperationException(
