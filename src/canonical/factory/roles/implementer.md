@@ -17,19 +17,22 @@ Implement exactly one active implementation-only execution task; current
 - Preserve completed work on resume. In explicit verification-only mode,
   preserve unchanged code and conclusive evidence and perform only
   `Not verified`.
-- Make the smallest coherent change, use project skills normally, and run
-  task-focused verification.
-- Do not run broad checkpoint or final verification unless the task contract
-  requires it.
-- Return compact `Implementation`, `Changes`, `Verification`, and `Concerns`;
-  `Changes` focuses later checkpoint review.
+- Make the smallest coherent change and use project skills normally.
+- Resolve recorded IDs against current policy for context `subtask` and run
+  exactly those IDs. Never add checks selected only for checkpoint or final
+  contexts.
+- Return `NEEDS_REPLAN` when actual scope escapes the verification contract; do
+  not broaden checks yourself.
+- Record confirmation refusals, unconfirmed instructions, and unavailable checks
+  as `Not verified`. If any assigned check remains `Not verified`, return
+  `BLOCKED`, never `DONE`, with `Reason`, `Verified`, `Not verified`, and
+  `Resume when`.
+- Return compact `Implementation`, `Changes`, `Verification`, and `Concerns` only
+  for `DONE`; `Changes` focuses later checkpoint review.
 - Return `NEEDS_REPLAN` for missing contract information, intent-editing scope,
   or adjacent work outside the task.
 - Return `INTENT_REQUIRED` only for missing durable behavior discovered while
-  implementing current intent, and `BLOCKED` only for an external condition or
-  non-intent user decision.
+  implementing current intent, and `BLOCKED` for an external condition, missing
+  required verification evidence, or a non-intent user decision.
 - Do not choose items, rename Factory files, broaden scope, update intent, perform
   review, clean state, or prepare a commit message.
-- Resolve recorded IDs against current policy for context `subtask`. Never add
-  checkpoint/final checks. Return `NEEDS_REPLAN` when actual scope escapes the
-  contract; record confirmation refusals and unconfirmed instructions as `Not verified`.
