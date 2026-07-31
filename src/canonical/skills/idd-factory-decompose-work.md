@@ -2,47 +2,42 @@
 
 ## Purpose
 
-Analyze one supplied request and return a bounded, ordered decomposition for a
-Factory run. This is an isolated planning operation, not the coordinator.
+Produce the smallest safe ordered decomposition for one Factory request. This
+is an isolated planning operation, not the coordinator.
 
 ## Inputs
 
-- The complete source request or text-file contents.
-- Any user-confirmed clarifications.
+- The complete request and user-confirmed clarifications.
 - `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and only relevant current
-  numbered intent documents.
-- Only repository evidence needed to identify task boundaries and verification.
+  intent.
+- Only repository evidence needed to define task boundaries and verification.
 
 Do not read previous Factory runs or write Factory state.
 
 ## Rules
 
-- Decide whether one focused implementation or coordinated Factory execution
-  is appropriate.
-- Ask only questions that block safe decomposition or implementation, and
-  return them in one compact set.
-- Return `INTENT_REQUIRED` when required durable behavior is missing,
-  contradictory, or would require an invented product decision.
-- Split work by independently verifiable outcomes, not by individual files.
-- Keep tasks sequential. Do not create a dependency graph or parallel stages.
-- Use the fewest bounded tasks that preserve safe implementation and review.
-- Every task must be short, self-contained, and use the task format defined by
-  `idd-factory-run`.
-- Do not create `request.md`, task files, product specifications, code, or tests.
+- Choose focused implementation or coordinated Factory execution.
+- Ask all questions that block safe planning in one compact set.
+- Return `INTENT_REQUIRED` rather than inventing missing or conflicting durable
+  behavior.
+- Order independently verifiable outcomes, not files. Every task's verification
+  must run after that task and earlier tasks without implementation from later
+  tasks.
+- Use the fewest short, sequential, self-contained tasks that preserve safe
+  implementation and review; do not create dependency graphs or parallel stages.
+- Use the task format defined by `idd-factory-run`.
+- Do not create Factory files, product intent, code, or tests.
 
 ## Results
 
-- `READY`: return a concise work slug and the complete ordered task contents.
+- `READY`: return a work slug and all ordered task contents.
 - `NEEDS_CLARIFICATION`: return all blocking questions and no partial tasks.
-- `INTENT_REQUIRED`: identify the missing or conflicting intent and the
-  applicable intent handoff.
-- `FOCUSED_HANDOFF`: explain why one `idd-code-implement` operation is safer and
-  sufficient.
-- `BLOCKED`: identify another concrete condition that prevents safe planning.
+- `INTENT_REQUIRED`: identify the intent gap and applicable handoff.
+- `FOCUSED_HANDOFF`: explain why one `idd-code-implement` operation is safer.
+- `BLOCKED`: identify another concrete condition preventing safe planning.
 
 ## Output
 
-Return the result token first, followed only by evidence needed by the
-coordinator. For `READY`, include relevant intent, repository areas, work slug,
-and ordered task Markdown. Do not add statuses, timestamps, agents, attempt
-counts, or speculative requirements.
+Return the result token first and only evidence needed by the coordinator. For
+`READY`, include relevant intent, repository areas, work slug, and task Markdown.
+Do not add statuses, timestamps, agents, attempts, or speculative requirements.
