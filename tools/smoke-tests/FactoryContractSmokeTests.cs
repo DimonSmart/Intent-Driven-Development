@@ -21,6 +21,7 @@ internal static class FactoryContractSmokeTests
         foreach (var field in new[] { "Reason:", "Verified:", "Not verified:", "Resume when:" })
         {
             Check(run, field, $"run blocker {field}", failures);
+            Check(execute, field, $"execution blocker {field}", failures);
             Check(review, field, $"checkpoint-review blocker {field}", failures);
             Check(finalReview, field, $"final-review blocker {field}", failures);
         }
@@ -42,7 +43,7 @@ internal static class FactoryContractSmokeTests
             (run, "do not require a separate", "automatic resume after decision"),
             (run, "an optional `run-context.md`", "optional run context"),
             (run, "Each execution task is self-contained", "self-contained execution contract"),
-            (run, "Execution completion does not invoke", "no automatic task review"),
+            (run, "Execution completion does", "no automatic task review"),
             (run, "A review checkpoint contains", "checkpoint contract"),
             (run, "active review-checkpoint -> ready", "checkpoint correction transition"),
             (run, "immediately before the checkpoint", "checkpoint correction insertion"),
@@ -55,7 +56,8 @@ internal static class FactoryContractSmokeTests
             (execute, "active execution task", "execution-only worker"),
             (execute, "Do not read `request.md`, checkpoints, or other", "execute context boundary"),
             (execute, "Changes:", "execution changes output"),
-            (execute, "Do not run broad checkpoint or final integrated verification", "verification layering"),
+            (execute, "run exactly the check IDs assigned", "exact subtask verification set"),
+            (execute, "return `BLOCKED`, never `DONE`", "incomplete subtask verification blocks"),
             (review, "active review checkpoint", "checkpoint-only reviewer"),
             (review, "does not review every execution task", "legacy name boundary"),
             (review, "every completed execution task named by its `Covers`", "checkpoint coverage input"),
@@ -63,12 +65,16 @@ internal static class FactoryContractSmokeTests
             (review, "Corrective execution task:", "checkpoint corrective output"),
             (finalReview, "all completed review checkpoints", "final checkpoint ownership"),
             (finalReview, "do not add a terminal", "final correction review gate"),
+            (finalReview, "run every assigned automatic check", "final automatic check ownership"),
+            (finalReview, "Read-only review forbids code", "final read-only verification boundary"),
+            (finalReview, "requires `blocked`, never", "unverified final check blocks approval"),
             (coordinator, "execution tasks and review checkpoints", "coordinator item kinds"),
-            (coordinator, "Mark a successful execution task completed without invoking independent review", "coordinator no per-task review"),
+            (coordinator, "Accept execution-task `DONE` only", "coordinator verification completion guard"),
             (workDecomposer, "Separate execution boundaries from review boundaries", "role separates boundaries"),
-            (implementer, "review checkpoints", "implementer checkpoint boundary"),
+            (implementer, "Never add checks selected only for checkpoint or final", "implementer exact verification boundary"),
+            (implementer, "return\n  `BLOCKED`, never `DONE`", "implementer incomplete verification guard"),
             (taskReviewer, "reviews checkpoints, not every execution task", "reviewer checkpoint responsibility"),
-            (finalReviewer, "review checkpoint is completed", "final reviewer checkpoint scope"),
+            (finalReviewer, "run every assigned automatic final check", "final role verification ownership"),
             (decompose, "`subtask` checks", "subtask verification context"),
             (decompose, "`checkpoint` checks", "checkpoint verification context"),
             (execute, "context `subtask`", "executor verification context"),
@@ -85,7 +91,9 @@ internal static class FactoryContractSmokeTests
             (run, "`DONE`: run fresh `idd-factory-review-task`", "legacy per-task review dispatch"),
             (review, "Independently review one explicit `.active.md` task", "legacy single-task reviewer"),
             (review, "Do not read `request.md` or other task files; review the active task", "legacy task-only review context"),
-            (execute, "run final review", "executor final-review ownership")
+            (execute, "run final review", "executor final-review ownership"),
+            (execute, "unless the task contract explicitly requires it", "subtask broad-verification exception"),
+            (implementer, "unless the task contract requires it", "implementer broad-verification exception")
         })
         {
             CheckAbsent(absent.Text, absent.Unexpected, absent.Name, failures);
