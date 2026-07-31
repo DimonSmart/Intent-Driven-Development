@@ -56,6 +56,12 @@ state.
 - Use the execution-task, review-checkpoint, and run-context formats from
   `idd-factory-run`.
 - Do not create Factory state, product intent, code, or tests.
+- Read `.idd/verification.md` when present before producing items. Resolve
+  `subtask` checks for each execution subtask and `checkpoint` checks for each
+  review checkpoint from its complete scope; record stable check IDs only, never
+  commands, timeout, or instructions. Put shared costly checks at checkpoint or
+  final instead of every subtask. Policy errors required by the run block
+  planning before Factory state exists.
 
 ## Results
 

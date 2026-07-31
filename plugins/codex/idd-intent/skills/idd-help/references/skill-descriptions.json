@@ -30,6 +30,10 @@
     "description": "Initialize `.idd/intent` and the IDD plugin declaration, then pause for a blocking bootstrap decision when an existing implementation has no current intent.",
     "invocation": "manual"
   },
+  "idd-verification-configure": {
+    "description": "Create or deliberately update project-specific `.idd/verification.md` rules without changing product intent.",
+    "invocation": "manual"
+  },
   "idd-intent-bootstrap": {
     "description": "Interactively discover, classify, confirm, and write initial current product intent using blocking user decisions for an existing implemented project without reliable IDD intent.",
     "adapters": {

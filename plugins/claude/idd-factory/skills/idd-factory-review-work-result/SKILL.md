@@ -8,10 +8,20 @@ allowed-tools: Read Glob Grep Bash
 
 # idd-factory-review-work-result
 
+The final reviewer owns verification for context `final` over the complete
+Factory diff. Before producing a verdict, resolve the current final-policy
+checks, reuse only conclusive evidence that still applies to the current check
+definition and complete diff, and run every assigned automatic check that lacks
+such evidence. Ask before `confirmation: required`. Present `instructions`
+checks to the user and obtain the actual result. Read-only review forbids code,
+intent, and Factory-state changes; it does not prohibit verification commands.
+Any assigned final check that remains `Not verified` requires `blocked`, never
+`approved`.
+
 ## Purpose
 
 Independently review the complete result of the current Factory run. This worker
-is read-only.
+is read-only with respect to implementation, intent, and Factory state.
 
 ## Preconditions
 
@@ -19,6 +29,25 @@ Run only when `current/` contains `request.md`, optional `run-context.md`, and
 one or more valid work items, all work items are `.completed.md`, and no ready,
 active, or blocked item exists. If the state violates these conditions, return
 `blocked` without guessing.
+
+## Final Verification Procedure
+
+1. Resolve checks selected by the current `.idd/verification.md` for context
+   `final` and the complete Factory diff.
+2. Reuse existing evidence only when it is conclusive and still applies to the
+   current check definition and complete diff.
+3. Run every assigned automatic check that does not have reusable conclusive
+   evidence.
+4. Before a check with `confirmation: required`, ask the exact user decision and
+   wait for the answer.
+5. For a check with `instructions`, present the instructions and wait for the
+   user's actual result; do not infer success.
+6. Record confirmation refusal, unavailable execution, and unconfirmed user
+   instructions as `Not verified` with the precise reason and resumption
+   condition.
+7. Return `blocked` while any assigned final check remains `Not verified`.
+8. A conclusive failed check is evidence of a defect or blocker; classify the
+   resulting verdict according to whether bounded implementation work can fix it.
 
 ## Review
 
@@ -40,20 +69,24 @@ Check:
 
 Assess implementation and verification independently. A favorable integrated
 implementation assessment does not compensate for missing required verification.
+Final verification sufficiency is defined by the assigned `final` checks, not by
+an assumption that every repository test must run.
 
 Do not modify code, intent, Factory files, or work-item statuses. Do not reopen
-completed items.
+completed items. Running assigned verification commands is part of final review
+and is not a modification of implementation or Factory state.
 
 ## Verdicts
 
 - `approved`: the integrated implementation has no material findings and all
-  required verification has conclusive evidence; the result is ready for
+  assigned final verification has conclusive evidence; the result is ready for
   `idd-factory-finish-work`.
 - `needs-fix`: return a bounded self-contained implementation-only corrective
   execution task suitable for the coordinator to append after completed items.
   The mandatory next final review is the review gate; do not add a terminal
   checkpoint solely for this correction.
-- `blocked`: identify the concrete blocking condition.
+- `blocked`: identify the concrete blocking condition, including any assigned
+  final check that remains `Not verified`.
 - `intent-required`: identify missing or conflicting durable intent and the
   applicable intent handoff. Do not define a corrective task until intent is
   resolved outside the work-item list.

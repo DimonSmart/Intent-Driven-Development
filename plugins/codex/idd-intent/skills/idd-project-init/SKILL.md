@@ -87,7 +87,10 @@ The root Coding Agent instruction file must contain exactly one managed IDD bloc
 <!-- idd:project:start -->
 ## Intent-Driven Development
 
-This project uses Intent-Driven Development (IDD). Treat `.idd/intent/` as the current product truth and use the installed IDD skills when changing intent, implementing behavior, or verifying the implementation.
+This project uses Intent-Driven Development (IDD). Treat `.idd/intent/` as the
+current product truth. When `.idd/verification.md` exists, follow it as the
+project-owned verification policy. Use the installed IDD skills when changing
+intent, implementing behavior, or verifying implementation.
 <!-- idd:project:end -->
 ```
 
@@ -103,7 +106,18 @@ Apply these rules:
 - Do not add detailed workflow documentation, skill catalogs, Factory instructions, implementation plans, or duplicated methodology text to the instruction file.
 - Re-running `idd-project-init` must leave the instruction file semantically unchanged and must never create a second IDD section.
 
-### 4. Offer initial intent bootstrap for existing implementations
+### 4. Offer verification configuration
+
+After structural initialization, cheaply inspect only repository technology
+markers. If `.idd/verification.md` is absent and the user did not explicitly
+request structural initialization only, ask: `Configure project-specific
+verification rules?` Offer `configure` to hand off to
+`idd-verification-configure`, or `use-defaults` to continue with repository or
+platform fallback. The latter creates no marker file. Do not repeat this offer
+on idempotent initialization and never modify an existing policy without an
+explicit request. This decision precedes the optional initial-intent bootstrap.
+
+### 5. Offer initial intent bootstrap for existing implementations
 
 After structural initialization, determine whether all of these conditions hold:
 

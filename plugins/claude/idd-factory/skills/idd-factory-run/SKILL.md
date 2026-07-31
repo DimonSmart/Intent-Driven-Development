@@ -5,6 +5,13 @@ description: Run or resume one file-backed IDD Factory workflow through intent p
 
 # idd-factory-run
 
+At preflight, require a valid `.idd/verification.md` when one exists; otherwise
+use repository/platform fallback. Preserve completed recorded IDs during a
+policy change, resolve their commands from the current policy, and replan only
+active or ready contracts. The final reviewer always uses the current `final`
+policy. Accept execution-task `DONE` only when every assigned `subtask` check has
+conclusive evidence; any assigned `Not verified` keeps the item blocked.
+
 ## Purpose
 
 Coordinate one resumable Factory run from a request or
@@ -120,16 +127,20 @@ Activate the lowest ready work item.
 Run `idd-factory-execute-task` with the active execution task and optional
 `run-context.md`.
 
-- `DONE`: clear any resolved blocker, append `Completion`, and mark the execution
-  task completed. Execution completion does not invoke
-  `idd-factory-review-task`.
+- `DONE`: accept only when implementation is complete and every assigned
+  `subtask` check has conclusive evidence. Clear any resolved blocker, append
+  `Completion`, and mark the execution task completed. Execution completion does
+  not invoke `idd-factory-review-task`.
+- worker `DONE` with any assigned `Not verified`: treat as `BLOCKED`, persist
+  `Reason`, `Verified`, `Not verified`, and `Resume when`, and do not mark the
+  item completed.
 - `NEEDS_REPLAN`: replan.
 - `BLOCKED`: classify the blocker.
 - `INTENT_REQUIRED`: persist the intent blocker and resolve intent outside the
   task list.
 
-After `DONE`, activate the next ready item. Independent review happens only when
-a review checkpoint becomes active.
+After a valid `DONE`, activate the next ready item. Independent review happens
+only when a review checkpoint becomes active.
 
 ### Review Checkpoint
 
