@@ -16,14 +16,15 @@ Stop without cleanup if any precondition fails.
 ## Result Directory
 
 Choose a short lowercase kebab-case work slug that describes the overall
-implemented result without a date, status, or agent name. Write:
+implemented result without a date, status, or agent name. Capture the current
+UTC time once at finalization in `yyyy-MM-dd_HH-mm-ssZ` format and write:
 
 ```text
-.idd/factory/results/<work-slug>/commit-message.md
+.idd/factory/results/<work-slug>_<timestamp>/commit-message.md
 ```
 
-Never overwrite a result directory. If the slug exists, try `<work-slug>-2`,
-then `-3`, and so on.
+Never overwrite a result directory. If the complete timestamped name exists,
+append `-2`, then `-3`, and so on.
 
 The result directory contains only `commit-message.md`. Do not copy the request,
 tasks, reviews, or other execution state into `results/`.
