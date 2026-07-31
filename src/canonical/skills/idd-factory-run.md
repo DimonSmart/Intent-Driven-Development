@@ -61,7 +61,7 @@ Do not add status, dates, owners, attempts, dependencies, history, or logs.
    - `DONE`: run fresh `idd-factory-review-task`;
    - `NEEDS_REPLAN`: replan;
    - `BLOCKED`: classify the blocker;
-   - `INTENT_REQUIRED`: use the intent workflow.
+   - `INTENT_REQUIRED`: persist the intent blocker and use its workflow.
 3. Apply review:
    - `approved`: clear findings/blocker, append `Completion`, mark completed;
    - `needs-fix`: keep active with only current actionable findings and repeat;
@@ -69,6 +69,9 @@ Do not add status, dates, owners, attempts, dependencies, history, or logs.
    - `blocked`: classify the blocker;
    - `intent-required`: persist the intent blocker, run its workflow, revise
      active/ready tasks if needed, reactivate, and continue.
+
+After either `INTENT_REQUIRED`, reread relevant intent, revise only active and
+ready tasks when needed, reactivate the blocked task, and continue.
 
 ### Replanning
 
