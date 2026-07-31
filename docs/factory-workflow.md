@@ -95,10 +95,10 @@ Cancellation does not revert implementation changes and does not delete previous
 After successful completion, Factory writes:
 
 ```text
-.idd/factory/results/<work-slug>/commit-message.md
+.idd/factory/results/<work-slug>_<yyyy-MM-dd_HH-mm-ssZ>/commit-message.md
 ```
 
-The file contains a concise Git-compatible explanation of why the change was made and what was implemented. A commit or publication workflow can use it together with the actual Git diff.
+The UTC timestamp distinguishes repeated runs while the leading work slug keeps the result recognizable in directory listings. The file contains a concise Git-compatible explanation of why the change was made and what was implemented. A commit or publication workflow can use it together with the actual Git diff.
 
 Factory itself does not commit, push, or create a pull request.
 
