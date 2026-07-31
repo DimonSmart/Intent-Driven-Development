@@ -68,6 +68,11 @@ Analyze one request and return the smallest safe ordered set of implementation t
 
 It determines whether the request is ready, small enough for focused implementation, blocked by missing clarification, blocked by missing intent, or blocked by another condition.
 
+For a Factory run, it creates self-contained task contracts. Task-specific
+requirements stay in the owning task. Substantial constraints shared by multiple
+tasks may be placed in a compact optional `run-context.md`. Neither tasks nor
+run context copy the complete original request.
+
 ### Normal caller
 
 `idd-factory-run`.
@@ -88,7 +93,9 @@ The skill does not write Factory state, code, tests, or product intent.
 
 Implement exactly one active Factory task.
 
-It reads the active task, the original request, relevant current intent, the current diff, and repository evidence required for that task.
+It reads the active self-contained task, optional shared `run-context.md`,
+relevant current intent, the current diff, and repository evidence required for
+that task. It does not read the original `request.md` or other task files.
 
 ### Normal caller
 
@@ -112,7 +119,9 @@ The skill does not select another task, rename task files, perform final review,
 
 Independently review one active task after implementation.
 
-It checks the task goal, completion conditions, relevant intent, public contracts, implementation quality, verification evidence, and safety for later tasks.
+It checks the task contract, optional shared run context, relevant intent, public
+contracts, implementation quality, verification evidence, and safety for later
+tasks. It does not reread the original request or other task files.
 
 ### Normal caller
 
@@ -123,11 +132,16 @@ It checks the task goal, completion conditions, relevant intent, public contract
 ```text
 approved
 needs-fix
+needs-replan
 blocked
 intent-required
 ```
 
 For `needs-fix`, the coordinator keeps the task active, records the current actionable findings, and invokes implementation again.
+
+For `needs-replan`, the coordinator corrects insufficient task boundaries,
+missing contract information, or ordering without asking the worker to recover
+requirements from `request.md`.
 
 ### Advanced manual use
 
@@ -143,7 +157,11 @@ The reviewer is read-only.
 
 Independently review the complete integrated result after all tasks are completed.
 
-It checks the original request, every task goal, current product intent, the full diff, cross-task integration, preservation boundaries, public contracts, and verification sufficiency.
+It checks the original request, optional run context, every completed task
+contract, current product intent, the full diff, cross-task integration,
+preservation boundaries, public contracts, and verification sufficiency. This is
+the stage that verifies decomposition did not omit requirements from the
+original request.
 
 ### Normal caller
 
@@ -158,7 +176,7 @@ blocked
 intent-required
 ```
 
-When the verdict is `needs-fix`, the coordinator creates a new corrective task rather than reopening completed task history.
+When the verdict is `needs-fix`, the coordinator creates a new self-contained corrective task rather than reopening completed task history.
 
 ### Advanced manual use
 
@@ -206,13 +224,35 @@ The current run is stored under:
 .idd/factory/current/
 ```
 
-It contains `request.md` and a flat numbered task sequence:
+It contains `request.md`, optional `run-context.md`, and a flat numbered task sequence:
 
 ```text
+request.md
+run-context.md
 001-first-outcome.completed.md
 002-next-outcome.active.md
 003-final-outcome.ready.md
 ```
+
+`request.md` preserves the complete original request. `run-context.md` is
+created only for compact context shared by multiple tasks. Each numbered task is
+a self-contained local implementation and review contract when read with the
+optional run context.
+
+A task contains these required sections:
+
+```text
+Goal
+Context
+Scope
+Requirements
+Done When
+Verification
+```
+
+It may also contain concrete `Out of Scope`, `Preservation Boundaries`,
+`Dependencies`, and `Intent References` sections. Empty optional sections are
+omitted. Tasks must not rely on vague references back to `request.md`.
 
 The filename suffix is the only task-status source.
 
@@ -255,4 +295,4 @@ INTENT_REQUIRED
 
 Resolve the product decision through an `idd-intent` workflow before Factory continues.
 
-Factory requests, task files, statuses, review findings, and commit-message handoffs remain temporary execution artifacts.
+Factory requests, run context, task files, statuses, review findings, and commit-message handoffs remain temporary execution artifacts.

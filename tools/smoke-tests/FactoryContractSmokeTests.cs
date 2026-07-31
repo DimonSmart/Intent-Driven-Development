@@ -12,7 +12,10 @@ internal static class FactoryContractSmokeTests
         var review = Read(root, "src/canonical/skills/idd-factory-review-task.md");
         var finalReview = Read(root, "src/canonical/skills/idd-factory-review-work-result.md");
         var coordinator = Read(root, "src/canonical/factory/roles/factory-coordinator.md");
+        var workDecomposer = Read(root, "src/canonical/factory/roles/work-decomposer.md");
         var implementer = Read(root, "src/canonical/factory/roles/implementer.md");
+        var taskReviewer = Read(root, "src/canonical/factory/roles/task-reviewer.md");
+        var finalReviewer = Read(root, "src/canonical/factory/roles/final-reviewer.md");
         var failures = new List<string>();
 
         foreach (var field in new[] { "Reason:", "Verified:", "Not verified:", "Resume when:" })
@@ -39,11 +42,35 @@ internal static class FactoryContractSmokeTests
             (run, "`NEEDS_REPLAN` is internal, never a Factory outcome", "replanning contract"),
             (execute, "Return `NEEDS_REPLAN`", "implementer replanning result"),
             (review, "Use `needs-replan`", "review replanning verdict"),
-            (run, "do not require a separate", "automatic resume after decision")
+            (run, "do not require a separate", "automatic resume after decision"),
+            (run, "an optional `run-context.md`", "optional run context"),
+            (run, "Each task is a self-contained implementation contract", "self-contained task contract"),
+            (run, "Workers must not need `request.md`", "worker request boundary"),
+            (decompose, "Do not copy the complete request", "decomposition copy guard"),
+            (decompose, "all ordered self-contained task Markdown", "self-contained decomposition result"),
+            (execute, "Do not read `request.md` or other task files", "execute request boundary"),
+            (review, "Do not read `request.md` or other task files", "review request boundary"),
+            (finalReview, "Read the original request, optional run context", "final review request ownership"),
+            (coordinator, "Ensure implementation and task-review workers do not need `request.md`", "coordinator context boundary"),
+            (workDecomposer, "Do not make workers read `request.md`", "decomposer context boundary"),
+            (implementer, "Do not read `request.md` or other task files", "implementer context boundary"),
+            (taskReviewer, "Do not read `request.md` or other task files", "task reviewer context boundary"),
+            (finalReviewer, "Verify the original request, optional shared run context", "final reviewer request ownership")
         })
         {
             Check(check.Text, check.Expected, check.Name, failures);
         }
+
+        CheckAbsent(
+            execute,
+            "Read the active task (including resumed `Blocker`), `request.md`",
+            "legacy execute request input",
+            failures);
+        CheckAbsent(
+            review,
+            "Read `request.md`, the active task",
+            "legacy review request input",
+            failures);
 
         if (failures.Count > 0)
             throw new InvalidOperationException(
@@ -54,6 +81,16 @@ internal static class FactoryContractSmokeTests
     {
         if (!text.Contains(expected, StringComparison.Ordinal))
             failures.Add($"{name} does not contain '{expected}'.");
+    }
+
+    private static void CheckAbsent(
+        string text,
+        string unexpected,
+        string name,
+        ICollection<string> failures)
+    {
+        if (text.Contains(unexpected, StringComparison.Ordinal))
+            failures.Add($"{name} still contains '{unexpected}'.");
     }
 
     private static string Read(string root, string path) =>

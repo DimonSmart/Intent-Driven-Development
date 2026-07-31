@@ -7,30 +7,34 @@ and reviews neither later tasks nor the complete run.
 
 ## Inputs
 
-Read `request.md`, the active task with current `Review Findings` or resumed
-`Blocker`, only relevant intent, the actual diff, and available evidence.
+Read the active task with current `Review Findings` or resumed `Blocker`,
+optional `run-context.md`, only relevant intent, the actual diff, and available
+evidence. Do not read `request.md` or other task files; review the active task as
+the complete local contract supplied by the coordinator.
 
 ## Rules
 
-- Check the task goal, scope, done conditions, request, intent, preservation
-  boundaries, public contracts, code quality, and verification.
+- Check the task goal, context, scope, requirements, done conditions, shared run
+  context, intent, preservation boundaries, public contracts, code quality, and
+  verification.
 - Review only the task and its necessary integration surface.
 - Assess implementation and verification separately.
 - Return only current material findings; do not accumulate history or prolong
   loops for stylistic preferences.
 - Use `needs-fix` for findings resolvable inside the active task.
-- Use `needs-replan` when the task cannot be completed or verified without
-  adjacent work inside the Factory request but outside its scope. Name the
-  minimum prerequisite, not a future task owner.
+- Use `needs-replan` when the task contract or run context is insufficient,
+  contradictory, or cannot be completed or verified without adjacent work
+  outside its scope. Name the minimum prerequisite or contract correction.
 - Use `blocked` only for an external condition or exact non-intent user decision.
 - Use `intent-required` for missing or conflicting durable behavior.
-- Do not modify code, intent, request, task contents, or filenames.
+- Do not modify code, intent, request, run context, task contents, or filenames.
 
 ## Verdicts
 
 - `approved`: no material findings and all required verification is conclusive.
 - `needs-fix`: the implementer can resolve the findings inside the task.
-- `needs-replan`: the task boundary or order prevents safe completion or review.
+- `needs-replan`: the task boundary, order, or contract prevents safe completion
+  or review.
 - `blocked`: an external condition or user decision prevents continuation.
 - `intent-required`: current intent cannot authorize the work.
 
@@ -51,7 +55,7 @@ For `needs-fix`, append current actionable `Review findings`. For
 
 ```text
 Dependency:
-<minimum prerequisite outside the active task>
+<minimum prerequisite or contract correction outside the active task>
 ```
 
 For `blocked` or `intent-required`, append:

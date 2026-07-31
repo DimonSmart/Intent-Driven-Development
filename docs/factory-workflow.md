@@ -53,6 +53,22 @@ Factory examines the request and current intent, asks only questions that block 
 
 The user normally does not invoke the internal worker skills separately.
 
+## Self-Contained Task Contracts
+
+Factory preserves the complete original request in `request.md`, but task
+implementers and task reviewers do not reread it. Decomposition produces
+self-contained task contracts containing the context, requirements, boundaries,
+completion conditions, and verification needed for that task.
+
+When several tasks share substantial constraints or references, Factory may
+create a compact `run-context.md`. It contains only genuinely shared context.
+Factory does not copy the complete request into this file or repeat the entire
+request across every task.
+
+The original request remains available to the coordinator for clarification and
+replanning and to the final reviewer for checking that decomposition did not
+lose any requirement.
+
 ## Clarification and Intent Boundaries
 
 Factory may pause before implementation when:
@@ -65,6 +81,9 @@ Factory may pause before implementation when:
 Questions should be limited to information required for safe execution.
 
 When durable product behavior is missing or contradictory, Factory stops with `INTENT_REQUIRED`. Resolve the product decision through an `idd-intent` workflow, then continue Factory.
+
+After a clarification or intent change, Factory updates affected active and ready
+task contracts and shared run context before resuming workers.
 
 ## Continue an Interrupted Run
 
@@ -109,6 +128,9 @@ Factory keeps local temporary state under:
 ```text
 .idd/factory/
   current/
+    request.md
+    run-context.md        # optional
+    001-*.ready.md
   results/
 ```
 
