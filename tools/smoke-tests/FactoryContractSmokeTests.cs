@@ -5,114 +5,71 @@ internal static class FactoryContractSmokeTests
     [ModuleInitializer]
     internal static void ValidateFactoryContracts()
     {
-        var repoRoot = FindRepoRoot();
+        var root = FindRepoRoot();
+        var run = Read(root, "src/canonical/skills/idd-factory-run.md");
+        var decompose = Read(root, "src/canonical/skills/idd-factory-decompose-work.md");
+        var execute = Read(root, "src/canonical/skills/idd-factory-execute-task.md");
+        var review = Read(root, "src/canonical/skills/idd-factory-review-task.md");
+        var finalReview = Read(root, "src/canonical/skills/idd-factory-review-work-result.md");
+        var coordinator = Read(root, "src/canonical/factory/roles/factory-coordinator.md");
+        var implementer = Read(root, "src/canonical/factory/roles/implementer.md");
         var failures = new List<string>();
-
-        var run = Read(repoRoot, "src/canonical/skills/idd-factory-run.md");
-        var execute = Read(repoRoot, "src/canonical/skills/idd-factory-execute-task.md");
-        var taskReview = Read(repoRoot, "src/canonical/skills/idd-factory-review-task.md");
-        var finalReview = Read(repoRoot, "src/canonical/skills/idd-factory-review-work-result.md");
-        var coordinatorRole = Read(repoRoot, "src/canonical/factory/roles/factory-coordinator.md");
-        var implementerRole = Read(repoRoot, "src/canonical/factory/roles/implementer.md");
 
         foreach (var field in new[] { "Reason:", "Verified:", "Not verified:", "Resume when:" })
         {
-            ExpectContains(run, field, $"Factory run blocker field {field}", failures);
-            ExpectContains(taskReview, field, $"Task reviewer blocker field {field}", failures);
-            ExpectContains(finalReview, field, $"Final reviewer blocker field {field}", failures);
+            Check(run, field, $"run blocker {field}", failures);
+            Check(review, field, $"task-review blocker {field}", failures);
+            Check(finalReview, field, $"final-review blocker {field}", failures);
         }
 
-        foreach (var label in new[]
+        foreach (var check in new (string Text, string Expected, string Name)[]
         {
-            "Factory outcome:",
-            "Implementation assessment:",
-            "Verification assessment:"
+            (run, "Factory outcome:", "outcome label"),
+            (run, "Implementation assessment:", "implementation label"),
+            (run, "Verification assessment:", "verification label"),
+            (run, "Never describe the " + "blocked task or", "blocked run wording"),
+            (review, "Never describe a " + "blocked task as approved, completed, accepted, or finished.", "blocked task wording"),
+            (finalReview, "Do not describe a " + "blocked result as approved, review passed, completed,", "blocked final wording"),
+            (run, "in verification-only resume mode", "verification-only dispatch"),
+            (execute, "In explicit verification-only mode for an unchanged diff", "verification-only worker"),
+            (execute, "perform only `Not verified`", "verification-only scope"),
+            (coordinator, "use verification-only resume for an", "coordinator resume boundary"),
+            (implementer, "perform only `Not verified`", "implementer resume boundary"),
+            (decompose, "without implementation from later tasks", "forward-dependency guard"),
+            (run, "`NEEDS_REPLAN` is internal, never a Factory outcome", "replanning contract"),
+            (execute, "Return `NEEDS_REPLAN`", "implementer replanning result"),
+            (review, "Use `needs-replan`", "review replanning verdict"),
+            (run, "do not require a separate", "automatic resume after decision")
         })
         {
-            ExpectContains(run, label, $"Factory outcome report label {label}", failures);
+            Check(check.Text, check.Expected, check.Name, failures);
         }
-
-        ExpectContains(
-            run,
-            "describe the blocked task or run as approved, review passed, completed,",
-            "blocked Factory wording guard",
-            failures);
-        ExpectContains(
-            taskReview,
-            "Do not describe a blocked task as approved, review passed, completed, accepted,",
-            "blocked task-review wording guard",
-            failures);
-        ExpectContains(
-            finalReview,
-            "Do not describe a blocked result as approved, review passed, completed,",
-            "blocked final-review wording guard",
-            failures);
-
-        ExpectContains(
-            run,
-            "invoke `idd-factory-execute-task` in verification-only resume mode",
-            "coordinator verification-only resume dispatch",
-            failures);
-        ExpectContains(
-            execute,
-            "explicitly requests verification-only resume",
-            "implementer verification-only resume contract",
-            failures);
-        ExpectContains(
-            execute,
-            "Perform only the work listed under",
-            "implementer missing-verification scope",
-            failures);
-        ExpectContains(
-            coordinatorRole,
-            "verification-only resume limited to that missing evidence",
-            "coordinator role resume boundary",
-            failures);
-        ExpectContains(
-            implementerRole,
-            "perform only the task's",
-            "implementer role resume boundary",
-            failures);
 
         if (failures.Count > 0)
-        {
             throw new InvalidOperationException(
                 "Factory contract smoke checks failed:\n- " + string.Join("\n- ", failures));
-        }
     }
 
-    private static string Read(string repoRoot, string relativePath)
-    {
-        var path = Path.Combine(repoRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
-        return File.Exists(path) ? File.ReadAllText(path) : "";
-    }
-
-    private static void ExpectContains(
-        string text,
-        string expected,
-        string context,
-        ICollection<string> failures)
+    private static void Check(string text, string expected, string name, ICollection<string> failures)
     {
         if (!text.Contains(expected, StringComparison.Ordinal))
-        {
-            failures.Add($"{context} does not contain '{expected}'.");
-        }
+            failures.Add($"{name} does not contain '{expected}'.");
     }
+
+    private static string Read(string root, string path) =>
+        File.ReadAllText(Path.Combine(root, path.Replace('/', Path.DirectorySeparatorChar)));
 
     private static string FindRepoRoot()
     {
-        var current = new DirectoryInfo(Environment.CurrentDirectory);
-        while (current is not null)
+        for (var current = new DirectoryInfo(Environment.CurrentDirectory);
+             current is not null;
+             current = current.Parent)
         {
             if (Directory.Exists(Path.Combine(current.FullName, "src", "canonical")) &&
                 Directory.Exists(Path.Combine(current.FullName, "tools", "generate")))
-            {
                 return current.FullName;
-            }
-
-            current = current.Parent;
         }
 
-        throw new InvalidOperationException("Could not locate repository root for Factory contract checks.");
+        throw new InvalidOperationException("Could not locate repository root.");
     }
 }
