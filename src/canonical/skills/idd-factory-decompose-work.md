@@ -8,14 +8,25 @@ isolated planning context.
 ## Inputs
 
 Read the complete request, confirmed clarifications, relevant current intent,
-and only repository evidence needed for task boundaries and verification. Do
-not read previous Factory runs or write Factory state.
+and only repository evidence needed for intent preflight, task boundaries, and
+verification. Do not read previous Factory runs or write Factory state.
 
 ## Rules
 
 - Choose focused implementation or coordinated Factory execution.
 - Ask all questions that block safe planning together.
-- Return `INTENT_REQUIRED` instead of inventing durable behavior.
+- Perform intent preflight before returning implementation tasks.
+- Return `INTENT_REQUIRED` instead of inventing durable behavior or creating a
+  task that changes durable intent.
+- For `INTENT_REQUIRED`, identify the exact missing or conflicting durable
+  behavior and relevant owning intent; return no work slug, run context, or
+  partial tasks.
+- Never represent intent work as a Factory task. Tasks must not edit
+  `.idd/intent/`, invoke an intent-changing workflow, lint or audit intent as
+  their implementation outcome, or use an intent update as a dependency or
+  completion condition.
+- After the coordinator resolves intent, analyze the complete original request
+  again against the updated current intent and create only implementation tasks.
 - Order independently verifiable outcomes, not files. Verification must run
   without implementation from later tasks.
 - Use the fewest short sequential tasks preserving safe implementation and
@@ -37,7 +48,15 @@ not read previous Factory runs or write Factory state.
 ## Results
 
 Return `READY`, `NEEDS_CLARIFICATION`, `INTENT_REQUIRED`, `FOCUSED_HANDOFF`, or
-`BLOCKED`. For `READY`, include relevant intent, repository areas, a work slug,
+`BLOCKED`.
+
+`READY` means current intent is already sufficient and every returned task is
+implementation-only. Include relevant intent, repository areas, a work slug,
 optional `run-context.md` Markdown, and all ordered self-contained task Markdown.
-Return no partial tasks with clarification and no statuses, timestamps, agents,
-attempts, or speculative requirements.
+
+For `INTENT_REQUIRED`, return only the missing or conflicting durable behavior,
+the relevant owning intent or product area, and the intent workflow handoff
+needed before decomposition is attempted again.
+
+Return no partial tasks with clarification or intent-required results and no
+statuses, timestamps, agents, attempts, or speculative requirements.

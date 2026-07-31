@@ -25,6 +25,7 @@ available verification. Check:
 - integration and consistency across task results;
 - public contracts, maintainability, and sufficient verification;
 - absence of incomplete changes hidden by task-level reviews;
+- absence of intent-changing work recorded as a completed Factory task;
 - that Factory artifacts did not become product documentation.
 
 Assess implementation and verification independently. A favorable integrated
@@ -35,15 +36,16 @@ completed tasks.
 
 ## Verdicts
 
-- `approved`: the integrated implementation has no material findings and all
-  required verification has conclusive evidence; the result is ready for
-  `idd-factory-finish-work`.
-- `needs-fix`: return a bounded self-contained corrective goal, context, scope,
-  requirements, done conditions, and verification suitable for the coordinator
-  to create the next numbered ready task.
+- `approved`: the integrated implementation has no material findings, every
+  completed task is implementation-only, and all required verification has
+  conclusive evidence; the result is ready for `idd-factory-finish-work`.
+- `needs-fix`: return a bounded self-contained implementation-only corrective
+  goal, context, scope, requirements, done conditions, and verification suitable
+  for the coordinator to create the next numbered ready task.
 - `blocked`: identify the concrete blocking condition.
 - `intent-required`: identify missing or conflicting durable intent and the
-  applicable intent handoff.
+  applicable intent handoff. Return no corrective task until the coordinator
+  resolves intent outside the task list.
 
 ## Output
 
@@ -59,8 +61,9 @@ Verification assessment:
 <conclusive evidence and required evidence that remains incomplete>
 ```
 
-For `needs-fix`, append only the bounded corrective task definition. For
-`blocked` or `intent-required`, append only this structured blocker:
+For `needs-fix`, append only the bounded implementation-only corrective task
+definition. For `blocked` or `intent-required`, append only this structured
+blocker:
 
 ```text
 Blocker:

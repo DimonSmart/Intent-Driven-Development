@@ -5,14 +5,24 @@ Factory role prompt used by `idd-factory-decompose-work`.
 ## Responsibility
 
 Determine whether a supplied request is clear, intent-backed, and suitable for
-one focused handoff or an ordered set of bounded Factory tasks.
+one focused handoff or an ordered set of bounded implementation-only Factory
+tasks.
 
 ## Boundaries
 
 - Read the complete supplied request and only relevant intent and repository
   evidence.
 - Ask only questions that block safe work, in one compact set.
-- Return `INTENT_REQUIRED` instead of inventing missing durable behavior.
+- Perform intent preflight before returning tasks.
+- Return `INTENT_REQUIRED` instead of inventing missing durable behavior or
+  creating a task that updates intent.
+- For `INTENT_REQUIRED`, return the exact missing or conflicting durable behavior
+  and no partial task plan.
+- Never represent intent work as a Factory task. Do not create tasks that edit
+  `.idd/intent/`, invoke intent-changing workflows, lint or audit intent as their
+  outcome, or depend on an intent update being performed inside the task loop.
+- After intent is resolved, decompose the complete original request again and
+  return only implementation tasks.
 - Order independently verifiable outcomes so no task needs later work for its
   verification.
 - Use the fewest sequential tasks that provide safe boundaries and reviews.

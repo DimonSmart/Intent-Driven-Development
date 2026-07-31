@@ -49,16 +49,40 @@ Use idd-factory-run to migrate the storage subsystem, update all consumers, pres
 
 Under normal conditions, this single invocation carries the requested work through to completion.
 
-Factory examines the request and current intent, asks only questions that block safe work, decomposes the task when useful, implements the stages in order, reviews the results, and prepares a concise commit-message handoff.
+Factory first checks whether current intent is sufficient. If durable behavior is
+missing or conflicting, it resolves that through the appropriate `idd-intent`
+workflow before creating Factory state. It then decomposes only the remaining
+implementation work, implements the stages in order, reviews the results, and
+prepares a concise commit-message handoff.
 
 The user normally does not invoke the internal worker skills separately.
+
+## Intent Preflight
+
+Intent changes are not Factory tasks.
+
+Before writing `.idd/factory/current/`, Factory analyzes the complete request
+against current `.idd/intent/`. When durable behavior is missing or
+contradictory, decomposition returns `INTENT_REQUIRED` without a partial task
+plan. Factory runs the appropriate intent workflow, rereads current intent, and
+decomposes the original request again.
+
+Only after intent is sufficient does Factory create implementation tasks. A
+Factory task must not edit `.idd/intent/`, invoke an intent-changing workflow,
+or use an intent update as its goal, dependency, or completion condition.
+
+If missing intent is discovered during implementation or review, the coordinator
+handles the intent workflow outside the task list, updates affected
+implementation contracts, and resumes. The intent update is never recorded as a
+completed Factory task.
 
 ## Self-Contained Task Contracts
 
 Factory preserves the complete original request in `request.md`, but task
 implementers and task reviewers do not reread it. Decomposition produces
-self-contained task contracts containing the context, requirements, boundaries,
-completion conditions, and verification needed for that task.
+self-contained implementation task contracts containing the context,
+requirements, boundaries, completion conditions, and verification needed for
+that task.
 
 When several tasks share substantial constraints or references, Factory may
 create a compact `run-context.md`. It contains only genuinely shared context.
@@ -80,10 +104,12 @@ Factory may pause before implementation when:
 
 Questions should be limited to information required for safe execution.
 
-When durable product behavior is missing or contradictory, Factory stops with `INTENT_REQUIRED`. Resolve the product decision through an `idd-intent` workflow, then continue Factory.
+When durable product behavior is missing or contradictory, Factory stops with
+`INTENT_REQUIRED`. Resolve the product decision through an `idd-intent` workflow,
+then repeat decomposition before creating implementation tasks.
 
-After a clarification or intent change, Factory updates affected active and ready
-task contracts and shared run context before resuming workers.
+After a clarification or a mid-run intent change, Factory updates affected
+active and ready task contracts and shared run context before resuming workers.
 
 ## Continue an Interrupted Run
 
@@ -130,7 +156,7 @@ Factory keeps local temporary state under:
   current/
     request.md
     run-context.md        # optional
-    001-*.ready.md
+    001-*.ready.md        # implementation tasks only
   results/
 ```
 

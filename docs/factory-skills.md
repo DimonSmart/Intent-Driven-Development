@@ -12,7 +12,11 @@ The other Factory skills are bounded workers used by the coordinator. This page 
 
 ```text
 idd-factory-run
-  → idd-factory-decompose-work
+  → idd-factory-decompose-work (intent preflight)
+  → when INTENT_REQUIRED:
+      idd-intent workflow
+      idd-factory-decompose-work again
+  → create implementation-only Factory tasks
   → idd-factory-execute-task
   → idd-factory-review-task
   → repeat tasks when necessary
@@ -20,7 +24,9 @@ idd-factory-run
   → idd-factory-finish-work
 ```
 
-The coordinator normally continues through this sequence automatically.
+The coordinator normally continues through this sequence automatically. Intent
+changes happen before task-state creation or as coordinator-owned orchestration,
+never as Factory tasks.
 
 ## `idd-factory-run`
 
@@ -28,7 +34,9 @@ The coordinator normally continues through this sequence automatically.
 
 Public entry point for starting, continuing, or cancelling one Factory run.
 
-It owns workspace validation, clarification, task sequencing, worker dispatch, status transitions, review loops, final review, and finalization.
+It owns intent preflight, workspace validation, clarification, implementation
+task sequencing, worker dispatch, status transitions, review loops, final review,
+and finalization.
 
 ### Start a complete run
 
@@ -43,6 +51,10 @@ Use idd-factory-run to replace the legacy storage implementation, migrate existi
 ```
 
 One invocation is expected to complete the workflow unless clarification, missing intent, an external blocker, or an unexpected interruption prevents progress.
+
+Before creating `.idd/factory/current/`, Factory resolves missing or conflicting
+durable intent and repeats decomposition. The saved task list contains only
+implementation work.
 
 ### Continue an interrupted run
 
@@ -68,10 +80,16 @@ Analyze one request and return the smallest safe ordered set of implementation t
 
 It determines whether the request is ready, small enough for focused implementation, blocked by missing clarification, blocked by missing intent, or blocked by another condition.
 
-For a Factory run, it creates self-contained task contracts. Task-specific
+Intent preflight is part of decomposition. When durable behavior is missing or
+conflicting, it returns `INTENT_REQUIRED` and no partial task plan. It never
+creates a task for updating, linting, auditing, or otherwise changing
+`.idd/intent/`.
+
+After intent is resolved, decomposition runs again against the complete original
+request and creates self-contained implementation task contracts. Task-specific
 requirements stay in the owning task. Substantial constraints shared by multiple
-tasks may be placed in a compact optional `run-context.md`. Neither tasks nor
-run context copy the complete original request.
+tasks may be placed in a compact optional `run-context.md`. Neither tasks nor run
+context copy the complete original request.
 
 ### Normal caller
 
@@ -93,9 +111,14 @@ The skill does not write Factory state, code, tests, or product intent.
 
 Implement exactly one active Factory task.
 
-It reads the active self-contained task, optional shared `run-context.md`,
-relevant current intent, the current diff, and repository evidence required for
-that task. It does not read the original `request.md` or other task files.
+It reads the active self-contained implementation task, optional shared
+`run-context.md`, relevant current intent, the current diff, and repository
+evidence required for that task. It does not read the original `request.md` or
+other task files.
+
+If an invalid task asks to change intent, the executor returns `NEEDS_REPLAN`
+instead of performing that scope. `INTENT_REQUIRED` is reserved for missing or
+conflicting durable behavior discovered during implementation.
 
 ### Normal caller
 
@@ -119,9 +142,14 @@ The skill does not select another task, rename task files, perform final review,
 
 Independently review one active task after implementation.
 
-It checks the task contract, optional shared run context, relevant intent, public
-contracts, implementation quality, verification evidence, and safety for later
-tasks. It does not reread the original request or other task files.
+It checks the implementation task contract, optional shared run context,
+relevant intent, public contracts, implementation quality, verification
+evidence, and safety for later tasks. It does not reread the original request or
+other task files.
+
+An intent-changing task contract receives `needs-replan`, not approval.
+`intent-required` is reserved for missing or conflicting durable behavior
+discovered while reviewing implementation.
 
 ### Normal caller
 
@@ -140,8 +168,8 @@ intent-required
 For `needs-fix`, the coordinator keeps the task active, records the current actionable findings, and invokes implementation again.
 
 For `needs-replan`, the coordinator corrects insufficient task boundaries,
-missing contract information, or ordering without asking the worker to recover
-requirements from `request.md`.
+intent-editing scope, missing contract information, or ordering without asking
+the worker to recover requirements from `request.md`.
 
 ### Advanced manual use
 
@@ -157,11 +185,11 @@ The reviewer is read-only.
 
 Independently review the complete integrated result after all tasks are completed.
 
-It checks the original request, optional run context, every completed task
-contract, current product intent, the full diff, cross-task integration,
-preservation boundaries, public contracts, and verification sufficiency. This is
-the stage that verifies decomposition did not omit requirements from the
-original request.
+It checks the original request, optional run context, every completed
+implementation task contract, current product intent, the full diff, cross-task
+integration, preservation boundaries, public contracts, and verification
+sufficiency. This is the stage that verifies decomposition did not omit
+requirements from the original request.
 
 ### Normal caller
 
@@ -176,7 +204,10 @@ blocked
 intent-required
 ```
 
-When the verdict is `needs-fix`, the coordinator creates a new self-contained corrective task rather than reopening completed task history.
+When the verdict is `needs-fix`, the coordinator creates a new self-contained
+implementation-only corrective task rather than reopening completed task
+history. When the verdict is `intent-required`, the coordinator resolves intent
+outside the task list before creating any required implementation correction.
 
 ### Advanced manual use
 
@@ -224,7 +255,8 @@ The current run is stored under:
 .idd/factory/current/
 ```
 
-It contains `request.md`, optional `run-context.md`, and a flat numbered task sequence:
+It contains `request.md`, optional `run-context.md`, and a flat numbered
+implementation task sequence:
 
 ```text
 request.md
@@ -238,6 +270,9 @@ run-context.md
 created only for compact context shared by multiple tasks. Each numbered task is
 a self-contained local implementation and review contract when read with the
 optional run context.
+
+Factory tasks never own edits to `.idd/intent/`, intent workflow invocation, or
+intent updates as completion conditions.
 
 A task contains these required sections:
 
@@ -287,12 +322,15 @@ The number of changed files alone does not determine the choice.
 
 Factory may read `.idd/intent/`, but it must not invent product behavior.
 
-When durable behavior is missing or contradictory, Factory stops with:
+When durable behavior is missing or contradictory, Factory returns:
 
 ```text
 INTENT_REQUIRED
 ```
 
-Resolve the product decision through an `idd-intent` workflow before Factory continues.
+Before state creation, resolve the product decision through an `idd-intent`
+workflow and repeat decomposition. During an existing run, the coordinator
+resolves it outside the task list and then updates only implementation
+contracts. Intent changes are never Factory task completions.
 
 Factory requests, run context, task files, statuses, review findings, and commit-message handoffs remain temporary execution artifacts.

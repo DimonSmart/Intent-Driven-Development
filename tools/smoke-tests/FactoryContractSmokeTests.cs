@@ -55,7 +55,27 @@ internal static class FactoryContractSmokeTests
             (workDecomposer, "Do not make workers read `request.md`", "decomposer context boundary"),
             (implementer, "Do not read `request.md` or other task files", "implementer context boundary"),
             (taskReviewer, "Do not read `request.md` or other task files", "task reviewer context boundary"),
-            (finalReviewer, "Verify the original request, optional shared run context", "final reviewer request ownership")
+            (finalReviewer, "Verify the original request, optional shared run context", "final reviewer request ownership"),
+            (run, "Run `idd-factory-decompose-work` with the complete request before creating", "intent preflight before state"),
+            (run, "create no Factory state and no task for the intent change", "no intent task on preflight"),
+            (run, "Factory tasks are implementation-only", "implementation-only task invariant"),
+            (run, "never turn the intent change", "mid-run intent orchestration boundary"),
+            (decompose, "Perform intent preflight before returning implementation tasks", "decomposer intent preflight"),
+            (decompose, "Never represent intent work as a Factory task", "decomposer no intent task"),
+            (decompose, "return no work slug, run context, or", "intent-required no partial plan"),
+            (execute, "If it asks to edit `.idd/intent/`", "executor rejects intent task"),
+            (execute, "return `NEEDS_REPLAN` and identify removal of that scope", "executor intent task verdict"),
+            (review, "If its contract owns an edit to", "review rejects intent task"),
+            (review, "return `needs-replan`; do not review intent work", "review intent task verdict"),
+            (coordinator, "Run intent preflight before creating Factory state", "coordinator intent preflight"),
+            (coordinator, "Handle mid-run `INTENT_REQUIRED` as coordinator-owned intent orchestration", "coordinator mid-run intent ownership"),
+            (workDecomposer, "Never represent intent work as a Factory task", "role no intent task"),
+            (implementer, "If the task asks to edit `.idd/intent/`", "implementer rejects intent task"),
+            (taskReviewer, "If the task owns an edit to `.idd/intent/`", "task reviewer rejects intent task"),
+            (finalReview, "absence of intent-changing work recorded as a completed Factory task", "final review intent-task guard"),
+            (finalReview, "Return no corrective task until the coordinator", "final review intent handoff boundary"),
+            (finalReviewer, "intent-changing work incorrectly recorded as a completed Factory task", "final reviewer intent-task guard"),
+            (finalReviewer, "do not define a corrective task until the coordinator resolves intent outside the task list", "final reviewer intent handoff boundary")
         })
         {
             Check(check.Text, check.Expected, check.Name, failures);
@@ -70,6 +90,16 @@ internal static class FactoryContractSmokeTests
             review,
             "Read `request.md`, the active task",
             "legacy review request input",
+            failures);
+        CheckAbsent(
+            run,
+            "INTENT_REQUIRED`: persist the intent blocker and use its workflow",
+            "legacy intent task-loop wording",
+            failures);
+        CheckAbsent(
+            decompose,
+            "task that updates intent",
+            "ambiguous intent task allowance",
             failures);
 
         if (failures.Count > 0)
