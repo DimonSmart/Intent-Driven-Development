@@ -101,7 +101,15 @@ external or repository blocker and stop before later tasks.
 ## Records and Reporting
 
 `Completion` contains `Result`, `Verification`, and `Concerns`.
-`Blocker` contains `Reason`, `Verified`, `Not verified`, and `Resume when`.
+A persisted `Blocker` uses these literal fields:
+
+```text
+Reason:
+Verified:
+Not verified:
+Resume when:
+```
+
 `Review Findings` contains only current actionable findings and never coexists
 with `Blocker`. Blocked work never receives `Completion`.
 
@@ -113,7 +121,8 @@ Implementation assessment: <assessment>
 Verification assessment: <assessment>
 ```
 
-Missing verification never becomes approval.
+Missing verification never becomes approval. Never describe the blocked task or
+run as approved, review passed, completed, accepted, or finished.
 
 ## Resume and Finish
 
@@ -122,8 +131,9 @@ After validation:
 - active: inspect task and diff; review first if implementation appears complete;
 - blocked: when `Resume when` is satisfied, record any clarification, reactivate,
   and continue without a separate command;
-- unchanged implementation with only missing evidence: use verification-only
-  resume limited to `Not verified`;
+- unchanged implementation with only missing evidence: invoke
+  `idd-factory-execute-task` in verification-only resume mode, limited to
+  `Not verified`;
 - completed plus ready: activate the lowest ready task;
 - all completed: run `idd-factory-review-work-result`.
 
