@@ -2,67 +2,53 @@
 
 ## Purpose
 
-Implement exactly one explicit `.active.md` task from the current Factory run.
-This is an isolated worker operation, not a coordinator.
+Implement exactly one explicit `.active.md` task in an isolated worker context.
 
 ## Inputs
 
-Read:
-
-- the explicit active task, including a resumed `Blocker` when present;
-- `.idd/factory/current/request.md`;
-- `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and only relevant current
-  intent;
-- current diff and repository evidence needed for this task.
-
-Use applicable project skills and instructions through the Coding Agent's
-normal skill mechanism. Factory does not duplicate their catalog.
+Read the active task, including a resumed `Blocker`; `request.md`; only relevant
+current intent; and repository evidence needed for this task. Use project skills
+normally; Factory does not duplicate their catalog.
 
 ## Rules
 
-- Confirm that exactly the supplied task is active and that required intent is
-  sufficient.
-- On normal resume, inspect the current diff and verification evidence before
-  editing; do not duplicate already completed work.
-- When the coordinator explicitly requests verification-only resume because the
-  implementation diff is confirmed unchanged from the blocked review and the
-  blocker contains no implementation defect, preserve the code and all
-  conclusive `Verified` evidence. Perform only the work listed under
-  `Not verified` that is needed to satisfy `Resume when`; do not repeat
-  implementation or already conclusive checks.
-- If verification-only resume reveals an implementation defect, or the code is
-  no longer unchanged, leave verification-only mode, make the smallest coherent
-  fix, and rerun only evidence affected by that change.
-- Make the smallest coherent implementation that satisfies the task goal and
-  preservation boundaries.
-- Add or update tests only where they protect affected behavior or a mechanical
-  contract.
-- Run focused verification from the task.
-- Stop with `INTENT_REQUIRED` when implementation needs missing, unclear, or
-  contradictory durable behavior.
-- Return `BLOCKED` for another concrete condition the worker cannot safely
-  resolve.
-- Do not select another task, rename task files, create Factory tasks, perform
-  final review, clean the workspace, create a commit message, or change
-  `.idd/intent/` unless a separate intent workflow is explicitly invoked.
-- Do not broaden scope to adjacent work unless the active task cannot otherwise
-  satisfy current intent.
+- Confirm that exactly the supplied task is active and intent is sufficient.
+- On resume, inspect the diff and evidence first and preserve completed work.
+- In explicit verification-only mode for a confirmed unchanged diff, preserve
+  code and `Verified` evidence and perform only `Not verified`. Leave this mode
+  only if the code changed or new evidence reveals an implementation defect.
+- Make the smallest coherent change satisfying the task and preservation
+  boundaries. Add tests only for affected behavior or mechanical contracts.
+- Run the task's focused verification.
+- Return `NEEDS_REPLAN` when completion or verification requires adjacent work
+  inside the Factory request but outside this task. Report the minimum
+  prerequisite; do not implement later tasks.
+- Return `INTENT_REQUIRED` for missing, unclear, or conflicting durable behavior.
+- Return `BLOCKED` only for an external condition or non-intent user decision
+  the worker cannot resolve safely.
+- Do not select tasks, rename Factory files, create tasks, run final review,
+  clean state, prepare a commit message, or update intent without its workflow.
 
 ## Output
 
-Return `DONE`, `BLOCKED`, or `INTENT_REQUIRED`, followed by separate compact
-sections:
+Return `DONE`, `NEEDS_REPLAN`, `BLOCKED`, or `INTENT_REQUIRED`, followed by:
 
 ```text
 Implementation:
-<implemented result or preserved unchanged result>
+<implemented or preserved result>
 
 Verification:
-<new and preserved conclusive evidence, plus anything still missing>
+<conclusive and missing evidence>
 
 Concerns:
 <none or material concern>
 ```
 
-Do not write task status, `Completion`, or `Blocker` sections; the coordinator
-owns Factory state.
+For `NEEDS_REPLAN`, also append:
+
+```text
+Dependency:
+<minimum prerequisite outside the active task>
+```
+
+The coordinator owns task contents, status, `Completion`, and `Blocker`.
