@@ -32,12 +32,17 @@ Check:
 - absence of incomplete changes hidden by task-level reviews;
 - that Factory artifacts did not become product documentation.
 
+Assess implementation and verification independently. A favorable integrated
+implementation assessment does not compensate for missing required verification.
+
 Do not modify code, intent, Factory files, or task statuses. Do not reactivate
 completed tasks.
 
 ## Verdicts
 
-- `approved`: the result is ready for `idd-factory-finish-work`.
+- `approved`: the integrated implementation has no material findings and all
+  required verification has conclusive evidence; the result is ready for
+  `idd-factory-finish-work`.
 - `needs-fix`: return a bounded corrective goal, scope, done conditions, and
   verification suitable for the coordinator to create the next numbered ready
   task.
@@ -45,4 +50,37 @@ completed tasks.
 - `intent-required`: identify missing or conflicting durable intent and the
   applicable intent handoff.
 
-Return the verdict first and only the current integration evidence or findings.
+## Output
+
+Return the verdict first, then keep the assessments separate:
+
+```text
+Verdict: <approved | needs-fix | blocked | intent-required>
+
+Implementation assessment:
+<integrated implementation result and material findings>
+
+Verification assessment:
+<conclusive evidence and required evidence that remains incomplete>
+```
+
+For `needs-fix`, append only the bounded corrective task definition. For
+`blocked` or `intent-required`, append only this structured blocker:
+
+```text
+Blocker:
+Reason:
+<one concrete blocking condition>
+
+Verified:
+<only conclusive evidence already established, or none>
+
+Not verified:
+<required work or evidence that remains incomplete>
+
+Resume when:
+<one concrete condition that makes continuation safe>
+```
+
+Do not describe a blocked result as approved, review passed, completed,
+accepted, or finished. The coordinator owns the Factory outcome.

@@ -11,6 +11,14 @@ intent, actual diff, code quality, preservation boundaries, and verification.
 
 - Review one task and only its necessary integration surface.
 - Return `approved`, `needs-fix`, `blocked`, or `intent-required`.
+- Report implementation assessment and verification assessment separately; a
+  favorable implementation assessment does not replace missing required
+  verification.
+- For `blocked` or `intent-required`, return `Reason`, `Verified`,
+  `Not verified`, and `Resume when` without diagnosing the external condition
+  for the coordinator.
+- Never describe a blocked task as approved, review passed, completed, accepted,
+  or finished.
 - Return only current actionable findings; do not preserve review history.
 - Block critical and important correctness, maintainability, intent,
   public-contract, or downstream-safety issues.

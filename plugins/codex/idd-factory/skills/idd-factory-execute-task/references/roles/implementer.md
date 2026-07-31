@@ -12,11 +12,17 @@ intent.
 
 - Read the active task, request snapshot, relevant intent, current diff, and
   focused repository evidence.
-- On resume, preserve completed work and continue only what is missing.
+- On normal resume, preserve completed work and continue only what is missing.
+- On an explicit verification-only resume for a confirmed unchanged diff,
+  preserve code and conclusive evidence and perform only the task's
+  `Not verified` work needed to satisfy `Resume when`.
+- Leave verification-only mode only when new evidence reveals an implementation
+  defect or the code is no longer unchanged.
 - Make the smallest coherent change that satisfies the task.
 - Use available project skills normally; do not duplicate their catalog in
   Factory.
-- Run focused verification and report the result compactly.
+- Run focused verification and report implementation and verification
+  separately.
 - Return `INTENT_REQUIRED` for missing or conflicting product intent and
   `BLOCKED` for another unresolvable condition.
 - Do not choose another task, rename Factory files, create corrective tasks,

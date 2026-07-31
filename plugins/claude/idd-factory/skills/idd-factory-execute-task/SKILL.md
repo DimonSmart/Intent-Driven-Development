@@ -17,7 +17,7 @@ This is an isolated worker operation, not a coordinator.
 
 Read:
 
-- the explicit active task;
+- the explicit active task, including a resumed `Blocker` when present;
 - `.idd/factory/current/request.md`;
 - `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and only relevant current
   intent;
@@ -30,8 +30,17 @@ normal skill mechanism. Factory does not duplicate their catalog.
 
 - Confirm that exactly the supplied task is active and that required intent is
   sufficient.
-- On resume, inspect the current diff and verification evidence before editing;
-  do not duplicate already completed work.
+- On normal resume, inspect the current diff and verification evidence before
+  editing; do not duplicate already completed work.
+- When the coordinator explicitly requests verification-only resume because the
+  implementation diff is confirmed unchanged from the blocked review and the
+  blocker contains no implementation defect, preserve the code and all
+  conclusive `Verified` evidence. Perform only the work listed under
+  `Not verified` that is needed to satisfy `Resume when`; do not repeat
+  implementation or already conclusive checks.
+- If verification-only resume reveals an implementation defect, or the code is
+  no longer unchanged, leave verification-only mode, make the smallest coherent
+  fix, and rerun only evidence affected by that change.
 - Make the smallest coherent implementation that satisfies the task goal and
   preservation boundaries.
 - Add or update tests only where they protect affected behavior or a mechanical
@@ -49,6 +58,19 @@ normal skill mechanism. Factory does not duplicate their catalog.
 
 ## Output
 
-Return `DONE`, `BLOCKED`, or `INTENT_REQUIRED`, followed by a compact summary of
-the implemented result, focused verification, and material concerns. Do not
-write task status or completion sections; the coordinator owns Factory state.
+Return `DONE`, `BLOCKED`, or `INTENT_REQUIRED`, followed by separate compact
+sections:
+
+```text
+Implementation:
+<implemented result or preserved unchanged result>
+
+Verification:
+<new and preserved conclusive evidence, plus anything still missing>
+
+Concerns:
+<none or material concern>
+```
+
+Do not write task status, `Completion`, or `Blocker` sections; the coordinator
+owns Factory state.

@@ -14,6 +14,13 @@ completed.
 - Detect incomplete work hidden by local task reviews and accidental treatment
   of Factory artifacts as product documentation.
 - Return `approved`, `needs-fix`, `blocked`, or `intent-required`.
+- Report implementation assessment and verification assessment separately; a
+  favorable integrated implementation assessment does not replace missing
+  required verification.
+- For `blocked` or `intent-required`, return `Reason`, `Verified`,
+  `Not verified`, and `Resume when`.
+- Never describe a blocked result as approved, review passed, completed,
+  accepted, or finished.
 - For `needs-fix`, provide a bounded corrective task definition.
 - Do not modify code, `.idd/intent/`, Factory state, or completed tasks.
 - Do not convert temporary Factory evidence into durable product intent.
