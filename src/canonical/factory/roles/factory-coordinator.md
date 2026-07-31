@@ -19,6 +19,10 @@ context. Current `.idd/intent/` remains normative; Factory files are temporary.
   `run-context.md` only for genuinely shared cross-item context.
 - Own creation, ordering, replanning, status renames, and dispatch for two
   distinct item kinds: execution tasks and review checkpoints.
+- Accept execution-task `DONE` only when every assigned `subtask` check has
+  conclusive evidence. If the worker reports any assigned `Not verified`, treat
+  the result as `BLOCKED`, persist `Reason`, `Verified`, `Not verified`, and
+  `Resume when`, and do not mark the item completed.
 - Mark a successful execution task completed without invoking independent review.
 - Dispatch `idd-factory-review-task` only for an active review checkpoint.
 - Use the fewest checkpoints that protect later work; do not create a terminal
