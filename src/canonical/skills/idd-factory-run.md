@@ -2,72 +2,29 @@
 
 ## Purpose
 
-Coordinate one resumable Factory run from a user request or from the files in
-`.idd/factory/current/`.
+Coordinate one resumable Factory run from a request or
+`.idd/factory/current/`. Factory may read current intent but never invent
+product requirements or treat temporary tasks/results as product intent.
+Dispatch bounded workers in isolated contexts when supported.
 
-Factory is temporary execution orchestration. It may read current
-`.idd/intent/`, but it never creates product requirements, resolves unknown
-product decisions, or treats tasks and results as product intent.
+## Workspace and State
 
-This skill is the public Factory entry point and stays in the coordinator's
-main context. Run decomposers, implementers, and reviewers as isolated workers
-when the platform supports isolated execution.
+On first explicit use, require `.idd/intent/`, install the packaged Factory
+`.gitignore`, create `current/` and `results/`, and register `idd-factory` when
+needed. Do not copy skills or alter managed instructions without separate need.
 
-## Accepted Requests
+Only one run may exist. A new request requires empty `current/`; otherwise
+summarize it and require continue or cancel. Do not merge runs or migrate legacy
+`.idd/factory/work/*/work-plan.md` state.
 
-- A natural-language task.
-- Markdown supplied in the request.
-- A local text or Markdown file path. Copy its substantive contents into the
-  request snapshot; do not retain only a temporary path.
-- An explicit request to continue or cancel the current Factory run.
+`current/` contains one `request.md` and contiguous
+`<sequence>-<slug>.<status>.md` tasks. Valid statuses are `ready`, `active`,
+`completed`, and `blocked`; filenames are authoritative. Require valid flat
+files, at most one active or blocked task, never both, completed tasks before it,
+and ready tasks after it. Stop invalid state as `CORRUPT_FACTORY_STATE`; never
+guess repairs.
 
-## Workspace
-
-On first explicit Factory use:
-
-1. Require `.idd/intent/` and explicit use of the `idd-factory` plugin.
-2. Create `.idd/factory/.gitignore` from the packaged asset when absent.
-3. Create `.idd/factory/current/` and `.idd/factory/results/` when absent.
-4. Add `idd-factory` to `.idd/plugins.json` when necessary.
-5. Do not copy skills into the project or modify managed agent-instruction
-   blocks without a separate need.
-
-The packaged `.gitignore` keeps `current/` and `results/` local by default.
-Users may change that policy themselves; Factory does not commit its artifacts.
-
-Only one run may be active. For a new request, require `current/` to be empty.
-If it is not empty, do not change it: summarize the existing run and ask the
-user to explicitly continue or cancel it. Never merge or replace runs.
-
-Legacy `.idd/factory/work/*/work-plan.md` state is unsupported. Report it
-clearly and do not migrate or mix it with `current/`.
-
-## Current State Contract
-
-`current/` contains only:
-
-- exactly one `request.md` while a run exists; and
-- a flat ordered list named `<sequence>-<slug>.<status>.md`.
-
-Sequence numbers are three digits, start at `001`, and have no gaps. Slugs are
-stable lowercase kebab-case result names. Supported statuses are `ready`,
-`active`, `completed`, and `blocked`; the filename is the only status source.
-
-Before starting or resuming, validate all of these invariants:
-
-- no nested directories or unknown files exist;
-- every task filename is valid, numbers are unique and contiguous;
-- at most one task is active and at most one is blocked;
-- active and blocked tasks never coexist;
-- tasks before an active or blocked task are completed and tasks after it are
-  ready;
-- without active or blocked tasks, completed tasks precede ready tasks.
-
-On any violation, stop with `CORRUPT_FACTORY_STATE`. List the violations and
-files and offer safe manual repair options. Never guess or silently repair the
-state.
-
-Allowed task transitions are:
+Allowed transitions:
 
 ```text
 ready -> active
@@ -76,199 +33,103 @@ active -> blocked
 blocked -> active
 ```
 
-Only the coordinator renames task files. Never reactivate a completed task.
+Only the coordinator renames files. Completed tasks are immutable.
 
-## New Run
+## Start
 
-1. Bootstrap and validate the workspace; require an empty `current/`.
-2. Pass the complete source request to `idd-factory-decompose-work` in an
-   isolated context.
-3. Handle its result:
-   - `NEEDS_CLARIFICATION`: ask all blocking questions together and create no
-     workspace files. Repeat decomposition after the answer.
-   - `INTENT_REQUIRED`: stop and route to the applicable intent workflow. After
-     intent changes, reread relevant intent and decompose again.
-   - `FOCUSED_HANDOFF`: when Factory was selected implicitly, hand off to one
-     `idd-code-implement`; when the user explicitly requested Factory, one
-     bounded task is allowed.
-   - `BLOCKED`: report the concrete blocker and create no partial workspace.
-   - `READY`: create the complete workspace atomically enough that a failure
-     cannot be mistaken for a valid run.
-4. Write `request.md` as:
+Run `idd-factory-decompose-work` with the complete request.
 
-```md
-# Factory Request
+- `NEEDS_CLARIFICATION`: ask all questions together and decompose again after
+  the answer; create no partial state.
+- `INTENT_REQUIRED`: run the intent workflow, reread intent, and decompose again.
+- `FOCUSED_HANDOFF`: use one `idd-code-implement` when Factory was implicit; an
+  explicit Factory request may use one bounded task.
+- `BLOCKED`: report the planning blocker; create no state.
+- `READY`: write `request.md` and all ordered `.ready.md` tasks, then validate.
 
-<substantive original request>
+`request.md` preserves the original request and an optional
+`## Resolved Clarifications` section containing only confirmed user decisions.
+Append later confirmed decisions without rewriting the original request.
 
-## Resolved Clarifications
-
-<only decisions actually confirmed by the user>
-```
-
-   Omit `Resolved Clarifications` when no clarification occurred. Do not add
-   dates, status, planned statuses, or invented product interpretation.
-5. Write all ordered tasks as `.ready.md`, then validate the workspace and
-   report the compact task list.
-
-Each task uses this base shape:
-
-```md
-# <Task title>
-
-## Goal
-
-<one concrete result>
-
-## Scope
-
-- <bounded area>
-
-## Done When
-
-- <verifiable completion condition>
-
-## Verification
-
-- <focused check>
-```
-
-Do not add status, timestamps, owner, agent, model, attempts, dependencies,
-history, or logs. Ordering already expresses dependencies.
+Each task contains only title, `Goal`, `Scope`, `Done When`, and `Verification`.
+Do not add status, dates, owners, attempts, dependencies, history, or logs.
 
 ## Task Loop
 
-1. Select the lowest-numbered ready task and rename it to `.active.md` before
-   changing implementation.
-2. Run `idd-factory-execute-task` for that one task.
-3. Run `idd-factory-review-task` in a fresh isolated context.
-4. Apply the verdict:
-   - `approved`: remove `Review Findings` and `Blocker`, append a compact
-     `Completion`, then rename the task to `.completed.md`.
-   - `needs-fix`: remove `Blocker`, replace `Review Findings` with only the
-     latest actionable findings, keep the task active, and repeat implementation
-     and review.
-   - `blocked`: remove `Review Findings`, write the standard `Blocker` supplied
-     by the reviewer, rename the task to `.blocked.md`, and stop before later
-     tasks. Never append `Completion`.
-   - `intent-required`: remove `Review Findings`, write the standard `Blocker`
-     with the intent gap and handoff, rename the task to `.blocked.md`, and run
-     the applicable intent workflow. After confirmed intent changes, reread
-     relevant intent, update only remaining ready tasks when necessary, rename
-     blocked back to active, and continue.
+1. Activate the lowest ready task.
+2. Run `idd-factory-execute-task`:
+   - `DONE`: run fresh `idd-factory-review-task`;
+   - `NEEDS_REPLAN`: replan;
+   - `BLOCKED`: classify the blocker;
+   - `INTENT_REQUIRED`: use the intent workflow.
+3. Apply review:
+   - `approved`: clear findings/blocker, append `Completion`, mark completed;
+   - `needs-fix`: keep active with only current actionable findings and repeat;
+   - `needs-replan`: replan;
+   - `blocked`: classify the blocker;
+   - `intent-required`: persist the intent blocker, run its workflow, revise
+     active/ready tasks if needed, reactivate, and continue.
 
-Use this completion shape without file lists or command logs:
+### Replanning
 
-```md
-## Completion
+`NEEDS_REPLAN` is internal, never a Factory outcome. Confirm the prerequisite is
+inside the request and current active/ready work. Atomically revise only active
+and ready tasks by moving the minimum prerequisite forward or, when necessary,
+reordering, splitting, or merging them. Remove duplicate scope, preserve
+completed tasks and original request text, restore valid numbering/state, and
+continue.
 
-Result:
-<one to three sentences>
+When the prerequisite is not covered, classify it as a user clarification,
+`INTENT_REQUIRED`, or a genuine blocker.
 
-Verification:
-<compact result>
+### Blocker Classification
 
-Concerns:
-<none or one material remaining concern>
-```
+Treat worker `BLOCKED` as proposed. If remaining planned work resolves it,
+replan instead.
 
-Use this blocker shape without command logs, attempt history, timestamps, or
-speculative diagnosis:
+When an exact non-intent user decision resolves it, persist a `Blocker` whose
+`Resume when` contains the question, mark blocked, and ask. The answer is enough
+to append the clarification, reactivate, and continue; do not require a separate
+continue command.
 
-```md
-## Blocker
+Use `INTENT_REQUIRED` for unknown durable behavior. Otherwise persist the genuine
+external or repository blocker and stop before later tasks.
 
-Reason:
-<one concrete condition preventing safe continuation or approval>
+## Records and Reporting
 
-Verified:
-<only conclusive implementation or verification evidence already established>
+`Completion` contains `Result`, `Verification`, and `Concerns`.
+`Blocker` contains `Reason`, `Verified`, `Not verified`, and `Resume when`.
+`Review Findings` contains only current actionable findings and never coexists
+with `Blocker`. Blocked work never receives `Completion`.
 
-Not verified:
-<required work or evidence that remains incomplete>
-
-Resume when:
-<one concrete condition that makes continuation safe>
-```
-
-`Verified` may be `none`. `Not verified` must distinguish missing evidence from
-an implementation defect. `Review Findings` is reserved for `needs-fix` and is
-never used as the persisted blocker record.
-
-Use this temporary findings shape:
-
-```md
-## Review Findings
-
-- <current actionable finding>
-```
-
-## Assessment and Outcome Reporting
-
-Keep these concepts distinct:
-
-- implementation assessment: what the actual diff does and whether it has
-  material implementation findings;
-- verification assessment: which required checks have conclusive evidence and
-  which remain incomplete;
-- Factory outcome: the coordinator state such as `COMPLETED`, `BLOCKED`, or
-  `INTENT_REQUIRED`.
-
-Every user-facing stop or finish report must state all three explicitly:
+Every stop or finish reports separately:
 
 ```text
 Factory outcome: <outcome>
-Implementation assessment: <compact assessment>
-Verification assessment: <compact assessment>
+Implementation assessment: <assessment>
+Verification assessment: <assessment>
 ```
 
-A favorable implementation assessment does not override incomplete required
-verification. When a task-review or final-review verdict is `blocked`, never
-describe the blocked task or run as approved, review passed, completed,
-accepted, or finished. Report the favorable and missing evidence separately and
-keep the Factory outcome `BLOCKED`.
+Missing verification never becomes approval.
 
-## Resume
+## Resume and Finish
 
-After validating state:
+After validation:
 
-- `.active.md`: read the task and current diff first. If implementation appears
-  complete, review it before invoking the implementer; otherwise continue the
-  bounded implementation without duplicating finished work.
-- `.blocked.md`: show the persisted `Blocker` and do not continue until its
-  `Resume when` condition is explicitly resolved. Then rename the task to
-  `.active.md` before dispatching work.
-- When repository evidence confirms that the current implementation diff is
-  unchanged from the blocked review and the blocker contains no implementation
-  defect, invoke `idd-factory-execute-task` in verification-only resume mode.
-  Limit the worker to `Not verified`, preserve `Verified`, and do not repeat
-  implementation or already conclusive checks.
-- If the implementation changed, or unchanged state cannot be established,
-  perform a normal bounded resume and treat affected prior evidence as stale.
-- only completed and ready tasks: activate the lowest ready task.
-- all tasks completed: run final review.
+- active: inspect task and diff; review first if implementation appears complete;
+- blocked: when `Resume when` is satisfied, record any clarification, reactivate,
+  and continue without a separate command;
+- unchanged implementation with only missing evidence: use verification-only
+  resume limited to `Not verified`;
+- completed plus ready: activate the lowest ready task;
+- all completed: run `idd-factory-review-work-result`.
 
-If all tasks are completed but a result is absent after interruption, repeat
-final verification and finish safely.
+Final review `approved` invokes `idd-factory-finish-work`; `needs-fix` creates the
+next corrective ready task; `blocked` and `intent-required` use the same handling.
+Never reopen completed tasks.
 
-## Final Review and Finish
-
-Run `idd-factory-review-work-result` only when no ready, active, or blocked task
-exists and all tasks are completed.
-
-- `approved`: invoke `idd-factory-finish-work`.
-- `needs-fix`: create the next numbered corrective task, normally
-  `<next>-address-final-review-findings.ready.md`, and resume the task loop.
-- `blocked` or `intent-required`: stop through the same structured blocker gate
-  used for task review and report the separated assessments and Factory outcome.
-
-Never change a completed task back to active.
-
-## Cancellation
-
-Cancel only on an explicit user request. Warn when the worktree contains
-changes, clear only the contents of `current/`, leave `results/` untouched, do
-not revert code, and do not create a commit message.
+Cancel only explicitly: warn about worktree changes, clear only `current/`,
+preserve `results/`, and do not revert code or create a commit message.
 
 ## Outcomes
 
