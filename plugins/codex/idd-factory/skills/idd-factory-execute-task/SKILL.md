@@ -11,8 +11,10 @@ Implement one explicit `.active.md` task in an isolated worker context.
 
 ## Inputs
 
-Read the active task (including resumed `Blocker`), `request.md`, relevant intent,
-current diff, and focused repository evidence. Use project skills normally.
+Read the active task (including resumed `Blocker`), optional `run-context.md`,
+relevant intent, current diff, and focused repository evidence. Use project
+skills normally. Do not read `request.md` or other task files; the coordinator
+owns decomposition and must provide a sufficient active task contract.
 
 ## Rules
 
@@ -21,11 +23,12 @@ current diff, and focused repository evidence. Use project skills normally.
 - In explicit verification-only mode for an unchanged diff, preserve code and
   `Verified`, perform only `Not verified`, and leave the mode only for changed
   code or a newly revealed defect.
-- Make the smallest coherent change, preserve boundaries, add only affected
+- Make the smallest coherent change, preserve named boundaries, add only affected
   tests, and run focused verification.
-- Return `NEEDS_REPLAN` when completion or verification needs adjacent work
-  inside the request but outside this task. Name the minimum prerequisite; do
-  not perform later tasks.
+- Return `NEEDS_REPLAN` when the active task and run context are insufficient,
+  contradictory, or require adjacent work outside the task contract. Name the
+  minimum missing prerequisite or contract correction; do not inspect the
+  original request or perform later tasks.
 - Return `INTENT_REQUIRED` for unknown durable behavior and `BLOCKED` only for an
   external condition or non-intent user decision.
 - Do not select or rename tasks, create Factory work, update intent, run final

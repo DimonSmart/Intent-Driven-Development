@@ -22,12 +22,12 @@ Only one run may exist. A new request requires empty `current/`; otherwise
 summarize it and require continue or cancel. Do not merge runs or migrate legacy
 `.idd/factory/work/*/work-plan.md` state.
 
-`current/` contains one `request.md` and contiguous
-`<sequence>-<slug>.<status>.md` tasks. Valid statuses are `ready`, `active`,
-`completed`, and `blocked`; filenames are authoritative. Require valid flat
-files, at most one active or blocked task, never both, completed tasks before it,
-and ready tasks after it. Stop invalid state as `CORRUPT_FACTORY_STATE`; never
-guess repairs.
+`current/` contains one `request.md`, an optional `run-context.md`, and
+contiguous `<sequence>-<slug>.<status>.md` tasks. Valid statuses are `ready`,
+`active`, `completed`, and `blocked`; filenames are authoritative. Require valid
+flat files, at most one active or blocked task, never both, completed tasks
+before it, and ready tasks after it. Stop invalid state as
+`CORRUPT_FACTORY_STATE`; never guess repairs.
 
 Allowed transitions:
 
@@ -50,19 +50,40 @@ Run `idd-factory-decompose-work` with the complete request.
 - `FOCUSED_HANDOFF`: use one `idd-code-implement` when Factory was implicit; an
   explicit Factory request may use one bounded task.
 - `BLOCKED`: report the planning blocker; create no state.
-- `READY`: write `request.md` and all ordered `.ready.md` tasks, then validate.
+- `READY`: write `request.md`, optional `run-context.md`, and all ordered
+  `.ready.md` tasks, then validate.
 
 `request.md` preserves the original request and an optional
 `## Resolved Clarifications` section containing only confirmed user decisions.
 Append later confirmed decisions without rewriting the original request.
 
-Each task contains only title, `Goal`, `Scope`, `Done When`, and `Verification`.
-Do not add status, dates, owners, attempts, dependencies, history, or logs.
+`run-context.md` is optional. Create it only when several tasks share substantial
+context. Keep only compact cross-task constraints, shared assumptions, and
+references. Do not copy the complete request or place task-specific requirements
+there.
+
+Each task is a self-contained implementation contract when read with
+`run-context.md`, if present. It contains:
+
+- title;
+- `Goal`;
+- `Context`;
+- `Scope`;
+- `Requirements`;
+- `Done When`;
+- `Verification`;
+- optional `Out of Scope`, `Preservation Boundaries`, `Dependencies`, and
+  `Intent References` sections when they add concrete information.
+
+Omit empty optional sections. Do not add status, dates, owners, attempts,
+history, or logs. Workers must not need `request.md` or other task files to
+understand, implement, or review the active task.
 
 ## Task Loop
 
 1. Activate the lowest ready task.
-2. Run `idd-factory-execute-task`:
+2. Run `idd-factory-execute-task` with the active task and optional
+   `run-context.md`:
    - `DONE`: run fresh `idd-factory-review-task`;
    - `NEEDS_REPLAN`: replan;
    - `BLOCKED`: classify the blocker;
@@ -75,15 +96,17 @@ Do not add status, dates, owners, attempts, dependencies, history, or logs.
    - `intent-required`: persist the intent blocker, run its workflow, revise
      active/ready tasks if needed, reactivate, and continue.
 
-After either `INTENT_REQUIRED`, reread relevant intent, revise only active and
-ready tasks when needed, reactivate the blocked task, and continue.
+After either `INTENT_REQUIRED`, reread relevant intent, revise `run-context.md`
+and only active and ready task contracts when needed, reactivate the blocked
+task, and continue.
 
 ### Replanning
 
 `NEEDS_REPLAN` is internal, never a Factory outcome. Confirm the prerequisite is
-inside the request and current active/ready work. Atomically revise only active
-and ready tasks by moving the minimum prerequisite forward or, when necessary,
-reordering, splitting, or merging them. Remove duplicate scope, preserve
+inside the request and current active/ready work. Atomically revise
+`run-context.md` and only active and ready tasks by moving the minimum
+prerequisite forward or, when necessary, reordering, splitting, or merging them.
+Keep every revised task self-contained, remove duplicate scope, preserve
 completed tasks and original request text, restore valid numbering/state, and
 continue.
 
@@ -97,8 +120,9 @@ replan instead.
 
 When an exact non-intent user decision resolves it, persist a `Blocker` whose
 `Resume when` contains the question, mark blocked, and ask. The answer is enough
-to append the clarification, reactivate, and continue; do not require a separate
-continue command.
+to append the clarification, update `run-context.md` and affected active/ready
+task contracts, reactivate, and continue; do not require a separate continue
+command.
 
 Use `INTENT_REQUIRED` for unknown durable behavior. Otherwise persist the genuine
 external or repository blocker and stop before later tasks.
@@ -134,8 +158,9 @@ run as approved, review passed, completed, accepted, or finished.
 After validation:
 
 - active: inspect task and diff; review first if implementation appears complete;
-- blocked: when `Resume when` is satisfied, record any clarification, reactivate,
-  and continue without a separate command;
+- blocked: when `Resume when` is satisfied, record any clarification, update
+  affected active/ready contracts, reactivate, and continue without a separate
+  command;
 - unchanged implementation with only missing evidence: invoke
   `idd-factory-execute-task` in verification-only resume mode, limited to
   `Not verified`;
@@ -143,8 +168,8 @@ After validation:
 - all completed: run `idd-factory-review-work-result`.
 
 Final review `approved` invokes `idd-factory-finish-work`; `needs-fix` creates the
-next corrective ready task; `blocked` and `intent-required` use the same handling.
-Never reopen completed tasks.
+next self-contained corrective ready task; `blocked` and `intent-required` use
+the same handling. Never reopen completed tasks.
 
 Cancel only explicitly: warn about worktree changes, clear only `current/`,
 preserve `results/`, and do not revert code or create a commit message.

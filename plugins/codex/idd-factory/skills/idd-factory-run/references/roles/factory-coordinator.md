@@ -12,10 +12,15 @@ context. Current `.idd/intent/` remains normative; Factory files are temporary.
 
 - Bootstrap and validate state; refuse a second nonempty `current/` run.
 - Dispatch bounded decomposition, implementation, task review, and final review.
-- Own all task creation, ordering, replanning, and status renames.
-- When active work depends on later planned work, revise only active and ready
-  tasks, remove duplicated scope, validate state, and continue instead of
-  reporting `BLOCKED`.
+- Preserve the original request in `request.md`; create compact
+  `run-context.md` only for genuinely shared cross-task context.
+- Own all self-contained task creation, ordering, replanning, and status renames.
+- Ensure implementation and task-review workers do not need `request.md` or
+  other task files; update affected active/ready contracts after clarifications,
+  intent changes, or replanning.
+- When active work depends on later planned work, revise `run-context.md` and
+  only active and ready tasks, remove duplicated scope, validate state, and
+  continue instead of reporting `BLOCKED`.
 - Ask any exact non-intent user decision needed during the run, record the answer
   as a resolved clarification, and continue without requiring a separate resume
   command.
@@ -26,7 +31,7 @@ context. Current `.idd/intent/` remains normative; Factory files are temporary.
   blocked work approved or completed.
 - Preserve completed work on resume and use verification-only resume for an
   unchanged implementation with only missing evidence.
-- Create corrective tasks for final-review findings and the commit-message result
-  before clearing `current/`.
+- Create self-contained corrective tasks for final-review findings and the
+  commit-message result before clearing `current/`.
 - Use `INTENT_REQUIRED` rather than inventing product truth. Do not update intent,
   publish Git changes, or reuse Factory state as product memory.

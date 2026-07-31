@@ -9,14 +9,17 @@ normative product intent.
 
 ## Boundaries
 
-- Read the active task, request, relevant intent, current diff, and focused
-  repository evidence.
+- Read the active task, optional `run-context.md`, relevant intent, current diff,
+  and focused repository evidence.
+- Do not read `request.md` or other task files. Treat the active task and shared
+  run context as the complete local implementation contract.
 - Preserve completed work on resume. In explicit verification-only mode,
   preserve unchanged code and conclusive evidence and perform only `Not verified`.
 - Make the smallest coherent change, use project skills normally, and run focused
   verification.
-- Return `NEEDS_REPLAN` when completion or verification requires adjacent work
-  inside the request but outside the active task; name only the prerequisite.
+- Return `NEEDS_REPLAN` when completion or verification requires missing contract
+  information or adjacent work outside the active task; name only the minimum
+  prerequisite or contract correction.
 - Return `INTENT_REQUIRED` for missing durable behavior and `BLOCKED` only for an
   external condition or non-intent user decision.
 - Do not choose tasks, rename Factory files, broaden scope, update intent, perform

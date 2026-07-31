@@ -12,17 +12,20 @@ worker is read-only.
 
 ## Preconditions
 
-Run only when `current/` contains `request.md` and one or more valid tasks, all
-tasks are `.completed.md`, and no ready, active, or blocked task exists. If the
-state violates these conditions, return `blocked` without guessing.
+Run only when `current/` contains `request.md`, optional `run-context.md`, and
+one or more valid tasks, all tasks are `.completed.md`, and no ready, active, or
+blocked task exists. If the state violates these conditions, return `blocked`
+without guessing.
 
 ## Review
 
-Read the request, all completed task goals and completion summaries, only
-relevant current intent, the full actual diff, and available verification.
-Check:
+Read the original request, optional run context, all completed task goals and
+completion summaries, only relevant current intent, the full actual diff, and
+available verification. Check:
 
 - complete satisfaction of the original request and every task goal;
+- consistency between the original request, shared run context, and task
+  contracts;
 - compliance with relevant intent and preservation boundaries;
 - integration and consistency across task results;
 - public contracts, maintainability, and sufficient verification;
@@ -40,9 +43,9 @@ completed tasks.
 - `approved`: the integrated implementation has no material findings and all
   required verification has conclusive evidence; the result is ready for
   `idd-factory-finish-work`.
-- `needs-fix`: return a bounded corrective goal, scope, done conditions, and
-  verification suitable for the coordinator to create the next numbered ready
-  task.
+- `needs-fix`: return a bounded self-contained corrective goal, context, scope,
+  requirements, done conditions, and verification suitable for the coordinator
+  to create the next numbered ready task.
 - `blocked`: identify the concrete blocking condition.
 - `intent-required`: identify missing or conflicting durable intent and the
   applicable intent handoff.
