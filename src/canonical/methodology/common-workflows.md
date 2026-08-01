@@ -3,10 +3,10 @@
 ## Purpose
 
 This document defines platform-independent IDD workflow routing. It describes
-how natural-language requests move through initialization, initial intent
-bootstrap, import, product intent, implementation, checking, normalization, and
-optional Factory orchestration without making the route itself durable product
-intent.
+how natural-language requests move through initialization, verification
+configuration, initial intent bootstrap, import, product intent, implementation,
+checking, normalization, and optional Factory orchestration without making the
+route itself durable product intent.
 
 ## Routing Dimensions
 
@@ -28,6 +28,8 @@ Classify the request by the thing that changes:
 - `raw imported knowledge`: external or existing product knowledge already
   expressed in documents or other sources needs to be imported into IDD intent.
 - `project initialization`: the project needs an `.idd/intent/` structure.
+- `project verification configuration`: `.idd/verification.md` needs creation or
+  deliberate update.
 - `unknown`: the request does not provide enough information to choose safely.
 
 Initial product truth discovery and raw imported knowledge are different:
@@ -84,8 +86,7 @@ Classify how much of the workflow the user authorizes in the current request:
   start Factory execution.
 - `implementation-only`: implement or check against current intent without
   changing product intent.
-- `end-to-end`: continue through all requested intent, implementation, and
-  conformance stages.
+- `end-to-end`: continue through all requested workflow stages.
 
 Requested scope is independent from what changes and from execution depth. Use
 the narrowest scope that satisfies the explicit request. Explicit limits such
@@ -113,8 +114,9 @@ scope:
   migration, compatibility transition, public contract change, high regression
   risk, sequenced phases, multiple roles, review gates, or major capability
   removal.
-- `not-applicable`: routing, initialization, bootstrap, imports, audits, lint
-  checks, brainstorms, and pure intent reads that do not execute implementation.
+- `not-applicable`: routing, initialization, verification configuration,
+  bootstrap, imports, audits, lint checks, brainstorms, and pure intent reads
+  that do not execute implementation.
 
 A broad repository scan does not make bootstrap `orchestrated`. Factory
 orchestration is for implementation work and must not be used to create or
@@ -128,6 +130,8 @@ routing or intent work.
 
 - Current `IDD-NNNN` documents directly under `.idd/intent/` are normative
   product intent.
+- `.idd/verification.md` is project-owned operational configuration, not product
+  intent.
 - Git stores history.
 - Add, modify, and remove apply only to product truth changes.
 - Implementation-only refactoring does not change product truth.
@@ -169,6 +173,18 @@ initialization skill itself must not infer or write current numbered intent.
 
 Do not offer bootstrap for an empty new product, a project that already has
 current numbered intent, or an explicit initialization-only request.
+
+## Workflow Family: Verification Configuration
+
+Use this workflow to create or deliberately update project-owned verification
+rules:
+
+```text
+idd-verification-configure
+```
+
+Do not use it to run checks, fix failing tests, or define product acceptance
+criteria.
 
 ## Workflow Family: Initial Intent Bootstrap
 
@@ -451,6 +467,9 @@ Complete the current request when all stages inside its requested scope have
 finished and their applicable checks pass. Do not claim that the complete
 product lifecycle has finished when the request intentionally stopped at
 routing or intent work.
+
+Verification configuration completes after the confirmed policy is written, or
+a deliberate review concludes that no change is required.
 
 For `end-to-end`, product changes complete after intent is updated,
 implementation is performed, and `idd-code-check-implementation` verifies
