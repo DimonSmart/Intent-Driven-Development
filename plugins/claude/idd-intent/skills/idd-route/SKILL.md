@@ -67,6 +67,7 @@ Return these semantic fields:
 ```text
 Classification:
 - project-initialization
+- verification-configuration
 - intent-bootstrap
 - intent-import
 - product-change
@@ -79,6 +80,10 @@ Classification:
 - explicit-skip
 - unclear
 ```
+
+Use `verification-configuration` when the user asks to create or deliberately
+update project-owned `.idd/verification.md` rules. Do not use it for running
+checks, fixing tests, or changing product acceptance criteria.
 
 Use `intent-bootstrap` when the repository already contains implementation but
 lacks an adequate current IDD product model and the user asks to discover,
@@ -102,9 +107,9 @@ not yet known: the requested workflow is clear, and
 Set `Execution depth` to `focused`, `orchestrated`, or `not-applicable`
 according to the required reference.
 
-Use `not-applicable` for `intent-bootstrap`. Repository discovery may be broad,
-but it is intent-side investigation rather than implementation orchestration and
-must not start Factory.
+Use `not-applicable` for `intent-bootstrap` and `verification-configuration`.
+Repository discovery may be broad, but it is intent-side investigation rather
+than implementation orchestration and must not start Factory.
 
 Set `Requested scope` to one of:
 
@@ -130,12 +135,15 @@ with the classification.
   current intent. Do not change product intent. If current intent is missing,
   unclear, or wrong, stop and report the required intent workflow instead of
   expanding scope.
-- `end-to-end`: continue through all requested intent, implementation, and
-  conformance stages, subject to clarity gates and execution-depth selection.
+- `end-to-end`: continue through all requested workflow stages, subject to
+  clarity gates and execution-depth selection.
 
 A request to understand an existing project and create its initial intent is
 normally `intent-only` unless it also explicitly asks for implementation
 changes after bootstrap.
+
+For `verification-configuration`, use `route-only` only when the user asks for
+classification or advice without changing files; otherwise use `end-to-end`.
 
 Do not assign route fields when another explicitly named skill or `idd-skip`
 bypasses routing. Those cases are direct skill invocation, not route results.
@@ -148,6 +156,7 @@ a handoff index:
 | Classification | Recommended first skill |
 | --- | --- |
 | `project-initialization` | `idd-project-init` |
+| `verification-configuration` | `idd-verification-configure` |
 | `intent-bootstrap` | `idd-intent-bootstrap` |
 | `intent-import` | `idd-intent-import` |
 | `product-change` | `idd-intent-change` |
@@ -168,7 +177,7 @@ refuses IDD for the request.
 Distinguish the complete workflow from the current handoff:
 
 - `Expected complete workflow` describes the normal lifecycle needed to finish
-  the product change or initial intent establishment safely.
+  the request safely.
 - `Current handoff` describes what may start in this user request.
 - `Stop after` defines the requested-scope boundary or clarity gate.
 
