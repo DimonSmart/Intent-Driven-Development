@@ -66,8 +66,9 @@ The canonical Factory skill set is `idd-factory-run`,
 `task-decomposer`, `implementer`, `checkpoint-reviewer`, and `final-reviewer`.
 Do not reintroduce the obsolete single `work-plan.md` create/execute workflow.
 
-Claude adapter metadata forks the one-step coordinator as well as bounded
-decomposer, implementer, checkpoint reviewer, and final reviewer contexts.
+Claude adapter metadata forks the one-step coordinator synchronously, as well
+as bounded decomposer, implementer, checkpoint reviewer, and final reviewer
+contexts. Each Factory step has fresh context and relies on persisted state.
 `idd-factory-run` remains the public dispatcher in the main context. Codex
 output must remain free of Claude-specific front matter.
 

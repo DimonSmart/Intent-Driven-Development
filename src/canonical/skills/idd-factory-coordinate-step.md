@@ -5,11 +5,7 @@
 Process exactly one logical action of the current Factory run in a fresh,
 isolated coordinator context. `.idd/factory/current/` is the authoritative
 memory between steps; never rely on a caller transcript for previous results.
-This is an internal skill whose normal caller is `idd-factory-run`. When a
-platform cannot nest fresh workers to the required depth, preserve the same
-persisted one-step transition with the smallest platform-compatible dispatch;
-do not claim isolation that the platform did not provide and do not introduce a
-new Factory outcome.
+This is an internal skill whose normal caller is `idd-factory-run`.
 
 ## Fresh Context and Inputs
 
@@ -34,14 +30,11 @@ checkpoint and all completed work items only for final review.
   never guess repairs. Completed items are immutable.
 - Activate the lowest ready item and process it in the same step. Only this
   coordinator may rename work-item files or alter their sequence.
-- For an active Subtask, call `idd-factory-execute-subtask` in its existing
-  isolated worker context. Persist `DONE`, `NEEDS_REPLAN`, `BLOCKED`, or
-  `INTENT_REQUIRED` using the established Completion and Blocker contracts.
-- For a Review checkpoint, call `idd-factory-review-checkpoint` in an
-  independent reviewer context using only its `Covers` items and focused
-  evidence. On `needs-fix`, atomically insert its self-contained correction
-  before the checkpoint, update `Covers`, return the checkpoint to ready,
-  renumber only active/ready items, validate, and stop the step.
+- For implementation, checkpoint review, or final review, dispatch only the
+  corresponding specialized Factory skill and apply its result contract. Do
+  not duplicate that worker's detailed scope or perform it here.
+- A Subtask becomes completed only when its required verification is confirmed.
+  Otherwise persist its Blocker and return `BLOCKED`.
 - For `NEEDS_REPLAN` or `needs-replan`, verify the prerequisite belongs to the
   request and current intent, read only required active/ready contracts, make
   the minimum replan, preserve completed items, validate, persist, and stop.
@@ -53,13 +46,11 @@ checkpoint and all completed work items only for final review.
   when` and must not dispatch later work. With an applicable answer, append it
   under `## Resolved Clarifications` in `request.md`, update affected active or
   ready contracts, reactivate only that item, process it, then stop.
-- When all work items are completed, call `idd-factory-review-task` in a fresh
-  independent context. On `approved`, immediately call `idd-factory-finalize-run`,
-  verify `commit-message.md`, and return finished. On `needs-fix`, persist one
-  new ready corrective Subtask and stop. Handle `blocked` and `intent-required`
-  through their established boundaries.
-- If a worker ends before returning a result, leave the item active. A later
-  fresh step inspects diff and evidence and may use verification-only resume.
+- Apply the persisted transition required for checkpoint correction or final
+  review, then stop. Completed items remain unchanged.
+- If a required specialized worker cannot be dispatched or ends without a
+  result, preserve the current item and return `BLOCKED` with the actual reason.
+  Do not implement or review in this coordinator context.
 
 ## Persist Before Return
 

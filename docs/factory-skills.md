@@ -31,6 +31,10 @@ Execution completion does not automatically invoke independent review.
 Checkpoints are explicit work items, and the final integrated review remains
 mandatory.
 
+Each fresh coordinator step performs one action and uses persisted Factory
+state as its only memory. If it cannot dispatch the required specialized
+worker, it returns resumable `BLOCKED` without taking that worker's scope.
+
 ## `idd-factory-run`
 
 ### Purpose

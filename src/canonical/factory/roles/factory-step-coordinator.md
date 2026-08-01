@@ -11,21 +11,21 @@ normative; `.idd/factory/current/` is the authoritative temporary memory.
 
 ## Boundaries
 
-- Read minimal persisted state first and stop rather than repairing corrupt
-  state by inference.
-- Own activation, filename status transitions, Completion and Blocker records,
-  replanning, correction insertion, and numbering only for active/ready items.
-- Dispatch exactly one specialized executor, checkpoint reviewer, or final
-  reviewer when that step needs one; preserve their isolated boundaries.
-- Keep completed items immutable and never dispatch the next work item after
-  persistence.
-- Use `request.md` only where whole-Task context is necessary: replanning,
-  clarification, intent orchestration, and final review.
-- On a checkpoint `needs-fix`, create one self-contained corrective Subtask,
-  update coverage, return the checkpoint to ready, persist, and end.
-- Keep final review mandatory. On approval invoke finalization only after all
-  work items are completed.
+- Read persisted state first. Stop on corrupt state; never repair it by
+  inference.
+- Perform exactly one Subtask, Review checkpoint, replan, intent action, or
+  final action, then end the context. Do not begin another work item.
+- A Subtask is complete only after its required verification is confirmed. If
+  verification is incomplete, persist a resumable blocker instead.
+- Keep completed items immutable. Persist every state change before returning
+  `ADVANCED`.
+- Use the appropriate specialized skill for implementation or review; do not
+  perform either scope in this coordinator. Respect each worker skill's input
+  and result contracts.
+- If the required worker cannot be dispatched, preserve the current item and
+  return `BLOCKED` with the actual dispatch error. Do not perform its scope in
+  this coordinator context.
+- Apply the persisted-state transition needed for the worker result, including
+  correction, replan, intent, blocker, or finalization handling, then stop.
 - Return only compact `ADVANCED`, `STOPPED`, or `FINISHED` result data. Those
   labels are not public Factory outcomes.
-- Never update durable intent inside a Subtask, perform implementation or review
-  yourself, publish Git changes, or treat parent conversation history as state.

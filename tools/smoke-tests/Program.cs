@@ -227,6 +227,9 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
             var workerFrontMatter = ReadFrontMatter(ReadText(Path.Combine(factoryRoot, "skills", skill, "SKILL.md")));
             ExpectContains(workerFrontMatter, "context: fork", $"Claude {skill} isolation metadata");
         }
+
+        var coordinateStepFrontMatter = ReadFrontMatter(ReadText(Path.Combine(factoryRoot, "skills", "idd-factory-coordinate-step", "SKILL.md")));
+        ExpectContains(coordinateStepFrontMatter, "background: false", "Claude idd-factory-coordinate-step synchronous metadata");
     }
     else
     {

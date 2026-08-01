@@ -182,12 +182,16 @@ fails, continue the existing run with:
 Continue the current IDD Factory work.
 ```
 
-Factory validates saved state before a new one-step coordinator decides whether
+Each Factory step runs in a fresh coordinator context; persisted state is its
+only memory. Factory validates saved state before a new one-step coordinator decides whether
 to resume a Subtask, review an active checkpoint, activate the next item,
 perform final review, or finish the result. An interruption never requires the
 previous coordinator context: persisted state and repository evidence suffice.
 
 Do not start a different Factory request while unfinished work exists.
+
+If Factory cannot dispatch the required specialized worker, it preserves the
+current item and reports a resumable `BLOCKED` outcome.
 
 ## Cancel a Run
 

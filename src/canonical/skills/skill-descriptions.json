@@ -133,6 +133,7 @@
         "frontmatter": {
           "context": "fork",
           "agent": "general-purpose",
+          "background": false,
           "argument-hint": "[repository path and current Factory run]"
         }
       }
