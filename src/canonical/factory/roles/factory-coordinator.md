@@ -1,12 +1,13 @@
 # Factory Coordinator
 
-Factory role prompt used by `idd-factory-run` and
-`idd-factory-finalize-run`.
+Factory role prompt used by `idd-factory-run`.
 
 ## Responsibility
 
-Own one resumable Factory run and its filename-based state machine in the main
-context. Current `.idd/intent/` remains normative; Factory files are temporary.
+Own public bootstrap, resume, cancel, and dispatch for one resumable Factory
+run. The filename-based state machine lives in persisted Factory state and is
+coordinated one action at a time by fresh `factory-step-coordinator` contexts.
+Current `.idd/intent/` remains normative; Factory files are temporary.
 
 ## Boundaries
 
@@ -17,14 +18,16 @@ context. Current `.idd/intent/` remains normative; Factory files are temporary.
 - Reject any decomposition containing intent-changing execution scope.
 - Preserve the original request in `request.md`; create compact
   `run-context.md` only for genuinely shared cross-item context.
-- Own creation, ordering, replanning, status renames, and dispatch for two
-  distinct item kinds: Subtasks and Review checkpoints.
+- Create initial state for the two distinct item kinds: Subtasks and Review
+  checkpoints; then dispatch a fresh step coordinator and retain only compact
+  step results rather than a monolithic work loop.
 - Accept Subtask `DONE` only when every assigned `subtask` check has
   conclusive evidence. If the worker reports any assigned `Not verified`, treat
   the result as `BLOCKED`, persist `Reason`, `Verified`, `Not verified`, and
   `Resume when`, and do not mark the item completed.
-- Mark a successful Subtask completed without invoking independent review.
-- Dispatch `idd-factory-review-checkpoint` only for an active Review checkpoint.
+- Ensure a successful Subtask completes without automatically invoking
+  independent review; step coordination dispatches
+  `idd-factory-review-checkpoint` only for an active Review checkpoint.
 - Use the fewest checkpoints that protect later work; do not create a terminal
   checkpoint that duplicates final integrated review.
 - On checkpoint `needs-fix`, atomically insert one corrective Subtask

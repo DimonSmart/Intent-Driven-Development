@@ -1,220 +1,87 @@
 # idd-factory-run
 
-At preflight, require a valid `.idd/verification.md` when one exists; otherwise
-use repository/platform fallback. Preserve completed recorded IDs during a
-policy change, resolve their commands from the current policy, and replan only
-active or ready contracts. The final reviewer always uses the current `final`
-policy. Accept Subtask `DONE` only when every assigned `subtask` check has
-conclusive evidence; any assigned `Not verified` keeps the item blocked.
-
 ## Purpose
 
-Coordinate one resumable Factory run from a request or
-`.idd/factory/current/`. Factory may read current intent but never invent
-product requirements or treat temporary work items/results as product intent.
-Dispatch bounded workers in isolated contexts when supported.
+The sole public entry point for starting, resuming, or cancelling one Factory
+run. It bootstraps persisted state, then acts as a thin dispatcher of fresh
+`idd-factory-coordinate-step` contexts. The original user request defines the
+Factory Task. `.idd/factory/current/`, not the parent coordinator transcript,
+is the authoritative memory between steps.
 
 ## Workspace and State
 
 On first explicit use, require `.idd/intent/`, install the packaged Factory
 `.gitignore`, create `current/` and `results/`, and register `idd-factory` when
-needed. Do not copy skills or alter managed instructions without separate need.
+needed. Only one run may exist. A new request requires empty `current/`;
+otherwise summarize it and require continue or cancel.
 
-Only one run may exist. A new request requires empty `current/`; otherwise
-summarize it and require continue or cancel. Do not merge runs or migrate legacy
-`.idd/factory/work/*/work-plan.md` state.
+`current/` contains `request.md`, optional `run-context.md`, and contiguous
+`<sequence>-<slug>.<status>.md` work items. A work item is a Subtask, identified
+by a `## Goal` section, or a Review checkpoint, identified by a `## Review
+Checkpoint` section. Valid statuses are `ready`, `active`, `completed`, and
+`blocked`; filenames are authoritative. Require at most one active or blocked
+item, never both, completed items before it, and ready items after it. Stop
+invalid state as `CORRUPT_FACTORY_STATE`; never guess repairs. Completed items
+are immutable.
 
-`current/` contains one `request.md`, an optional `run-context.md`, and
-contiguous `<sequence>-<slug>.<status>.md` work items. Valid statuses are
-`ready`, `active`, `completed`, and `blocked`; filenames are authoritative.
-Require valid flat files, at most one active or blocked item, never both,
-completed items before it, and ready items after it. Stop invalid state as
-`CORRUPT_FACTORY_STATE`; never guess repairs.
+The coordinator-step contract preserves the allowed transition `active
+review-checkpoint -> ready` only when it atomically inserts a correction
+immediately before the checkpoint. Subtask completion does not automatically
+invoke independent review. A Subtask `Changes` is a compact list of focused
+checkpoint evidence.
 
-A work item is one of:
+## Bootstrap
 
-- a Subtask, identified by a `## Goal` section and no
-  `## Review Checkpoint` section;
-- a Review checkpoint, identified by a `## Review Checkpoint` section.
+Before state exists, run intent preflight and `idd-factory-decompose-task` with
+the complete request.
 
-Allowed transitions:
-
-```text
-ready -> active
-active -> completed
-active -> blocked
-blocked -> active
-active review-checkpoint -> ready
-```
-
-The last transition is allowed only as one atomic correction operation that
-inserts a new Subtask immediately before the checkpoint, updates its
-coverage, and renumbers only active/ready items. Only the coordinator renames
-files. Completed items are immutable.
-
-## Start
-
-The original user request defines the Factory Task and is stored unchanged in
-`request.md`.
-
-Run `idd-factory-decompose-task` with the complete request.
-
-- `NEEDS_CLARIFICATION`: ask all questions together and decompose again after
-  the answer; create no partial state.
-- `INTENT_REQUIRED`: create no state, run the intent workflow, reread intent, and
-  decompose the complete original request again.
+- `NEEDS_CLARIFICATION`: ask all questions together; create no partial state.
+- `INTENT_REQUIRED`: create no state, run the intent workflow, reread intent,
+  and decompose the complete original request again.
 - `FOCUSED_HANDOFF`: use one `idd-code-implement` when Factory was implicit; an
   explicit Factory request may use one bounded Subtask.
 - `BLOCKED`: report the planning blocker; create no state.
-- `READY`: reject any intent-changing Subtask, then write `request.md`,
-  optional `run-context.md`, and all ordered Subtasks and Review checkpoints as
-  `.ready.md` files.
+- `READY`: reject intent-changing execution scope; write unchanged `request.md`,
+  optional compact `run-context.md`, and all ordered Subtask and Review
+  checkpoint contracts as `.ready.md` files.
 
-`request.md` preserves the original request and an optional
-`## Resolved Clarifications` section containing only confirmed user decisions.
-Append later confirmed decisions without rewriting the original request.
+Append confirmed later decisions only to `## Resolved Clarifications` in
+`request.md`. Each Subtask is self-contained with optional `run-context.md`;
+workers do not need the original request. A Review checkpoint contains its
+contiguous `Covers`, review scope, and focused verification. Do not add a
+terminal checkpoint that duplicates final integrated review.
 
-`run-context.md` is optional. Create it only when several Subtasks or
-Review checkpoints share substantial context. Keep only compact cross-item
-constraints, shared assumptions, and references. Do not copy the complete
-request or place item-specific requirements there.
+## Dispatch
 
-### Subtask Contract
+After bootstrap or a valid resume, invoke `idd-factory-coordinate-step` in a
+new isolated coordinator context. Pass only the worktree path, resume request,
+and any confirmed answer to the current blocker. Do not pass detailed parent
+history, worker reports, or test logs.
 
-Each Subtask is self-contained when read with `run-context.md`, if
-present. It contains:
+- On `Step result: ADVANCED`, discard the completed step context and invoke a
+  new fresh step context.
+- On `Step result: STOPPED`, report its allowed Factory outcome and compact
+  reason/resume condition.
+- On `Step result: FINISHED`, report the commit-message path and completion.
 
-- title;
-- `Goal`;
-- `Context`;
-- `Scope`;
-- `Requirements`;
-- `Done When`;
-- `Verification`;
-- optional `Out of Scope`, `Preservation Boundaries`, `Dependencies`, and
-  `Intent References` sections when they add concrete information.
+Do not directly own a monolithic work loop, execute a worker, inspect each
+completed step's diff, or retain corrective-cycle detail. `NEEDS_REPLAN` is
+internal, never a Factory outcome. The step coordinator handles activation,
+Completion/Blocker records, checkpoint correction, replanning, intent
+orchestration, final review, and finalization.
 
-Omit empty optional sections. Do not add status, dates, owners, attempts,
-history, or logs. A Subtask must not edit `.idd/intent/`, invoke an
-intent-changing workflow, or own an intent update. The executor must not need
-`request.md` or other work-item files.
+## Resume and Cancel
 
-### Review Checkpoint Contract
+For a blocked state without a new answer, report the saved exact `Resume when`.
+When the answer satisfies it, dispatch it to one fresh step; no separate
+continue command is required. An interrupted active Subtask is resumed by a
+fresh step, which may use verification-only resume when implementation is
+unchanged and evidence is missing.
 
-A Review checkpoint contains:
+Cancel only explicitly: warn about worktree changes, clear only `current/`,
+preserve `results/`, and do not revert code or create a commit message.
 
-- title;
-- `Review Checkpoint`: why independent review is required before later work;
-- `Covers`: a contiguous ordered list of preceding completed Subtasks
-  since the previous checkpoint, including any checkpoint correction tasks;
-- `Review Scope`: the contracts, integration surface, public boundaries, and
-  risks to inspect;
-- `Verification`: focused checkpoint-level evidence to run or inspect;
-- optional `Intent References`.
-
-A checkpoint never covers another checkpoint. Use the fewest checkpoints that
-protect later work. Do not add a terminal checkpoint that only duplicates the
-mandatory final integrated review.
-
-## Work Loop
-
-Activate the lowest ready work item.
-
-### Subtask
-
-Run `idd-factory-execute-subtask` with the active Subtask and optional
-`run-context.md`.
-
-- `DONE`: accept only when implementation is complete and every assigned
-  `subtask` check has conclusive evidence. Clear any resolved blocker, append
-  `Completion`, and mark the Subtask completed. Subtask completion does not
-  invoke `idd-factory-review-checkpoint`.
-- worker `DONE` with any assigned `Not verified`: treat as `BLOCKED`, persist
-  `Reason`, `Verified`, `Not verified`, and `Resume when`, and do not mark the
-  item completed.
-- `NEEDS_REPLAN`: replan.
-- `BLOCKED`: classify the blocker.
-- `INTENT_REQUIRED`: persist the intent blocker and resolve intent outside the
-  task list.
-
-After a valid `DONE`, activate the next ready item. Independent review happens
-only when a Review checkpoint becomes active.
-
-### Review Checkpoint
-
-Run fresh `idd-factory-review-checkpoint` with:
-
-- the active checkpoint;
-- all completed Subtasks named by `Covers`;
-- optional `run-context.md`;
-- only relevant current intent;
-- checkpoint-local diff/evidence derived from the covered tasks' `Changes`,
-  checkpoint scope, and verification.
-
-Apply the verdict:
-
-- `approved`: append `Completion` to the checkpoint and mark it completed;
-- `needs-fix`: atomically create one self-contained corrective Subtask
-  immediately before the checkpoint, add it to `Covers`, return the checkpoint
-  to ready, renumber only active/ready items, validate, and continue;
-- `needs-replan`: replan;
-- `blocked`: classify the blocker;
-- `intent-required`: persist the intent blocker and resolve intent outside the
-  task list.
-
-Do not reopen completed Subtasks. Checkpoint corrections are new Subtasks.
-
-After `INTENT_REQUIRED`, reread relevant intent, revise `run-context.md` and only
-active/ready Subtasks or checkpoints when needed, reactivate the blocked
-item, and continue. Intent work is never a Factory work item or completion.
-
-### Replanning
-
-`NEEDS_REPLAN` is internal, never a Factory outcome. Confirm the prerequisite is
-inside the request and current active/ready work. Atomically revise
-`run-context.md` and only active/ready items by moving the minimum prerequisite
-forward or, when necessary, reordering, splitting, merging, adding, or removing
-Subtasks and Review checkpoints.
-
-Keep Subtasks self-contained, keep checkpoint coverage contiguous, use
-the fewest Review checkpoints, remove duplicate scope, preserve completed items
-and original request text, restore valid numbering/state, and continue.
-
-When the prerequisite is not covered, classify it as a user clarification,
-`INTENT_REQUIRED`, or a genuine blocker.
-
-### Blocker Classification
-
-Treat worker `BLOCKED` as proposed. If remaining planned work resolves it,
-replan instead.
-
-When an exact non-intent user decision resolves it, persist a `Blocker` whose
-`Resume when` contains the question, mark the active item blocked, and ask. The
-answer is enough to append the clarification, update `run-context.md` and
-affected active/ready items, reactivate, and continue; do not require a separate
-continue command.
-
-Use `INTENT_REQUIRED` for unknown durable behavior. Otherwise persist the
-genuine external or repository blocker and stop before later items.
-
-## Records and Reporting
-
-Subtask `Completion` contains `Result`, `Changes`, `Verification`, and
-`Concerns`. `Changes` is a compact list of changed paths, public symbols, or
-other evidence needed to focus a later checkpoint.
-
-Review-checkpoint `Completion` contains `Result`, `Verification`, and `Concerns`.
-
-A persisted `Blocker` uses these literal fields:
-
-```text
-Reason:
-Verified:
-Not verified:
-Resume when:
-```
-
-Blocked work never receives `Completion`.
+## Reporting and Outcomes
 
 Every stop or finish reports separately:
 
@@ -224,31 +91,7 @@ Implementation assessment: <assessment>
 Verification assessment: <assessment>
 ```
 
-Missing verification never becomes approval. Never describe the blocked item or
-run as approved, review passed, completed, accepted, or finished.
-
-## Resume and Finish
-
-After validation:
-
-- active Subtask: inspect its contract and diff; use verification-only resume
-  mode when implementation is unchanged and only evidence is missing;
-- active Review checkpoint: run checkpoint review;
-- blocked: when `Resume when` is satisfied, record any clarification, update
-  affected active/ready items, reactivate, and continue without a separate
-  command;
-- completed plus ready: activate the lowest ready item;
-- all items completed: run `idd-factory-review-task`.
-
-Final review `approved` invokes `idd-factory-finalize-run`; `needs-fix` creates
-the next self-contained corrective Subtask and relies on the next final
-review rather than an extra terminal checkpoint; `blocked` and
-`intent-required` use the same handling. Never reopen completed items.
-
-Cancel only explicitly: warn about worktree changes, clear only `current/`,
-preserve `results/`, and do not revert code or create a commit message.
-
-## Outcomes
-
-`COMPLETED`, `FOCUSED_HANDOFF`, `NEEDS_CLARIFICATION`, `INTENT_REQUIRED`,
-`BLOCKED`, or `CORRUPT_FACTORY_STATE`.
+Allowed outcomes are `COMPLETED`, `FOCUSED_HANDOFF`, `NEEDS_CLARIFICATION`,
+`INTENT_REQUIRED`, `BLOCKED`, and `CORRUPT_FACTORY_STATE`. Missing verification
+never becomes approval. A persisted Blocker uses literal `Reason:`, `Verified:`,
+`Not verified:`, and `Resume when:` fields.

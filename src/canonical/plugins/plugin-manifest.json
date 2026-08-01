@@ -93,6 +93,7 @@
       ],
       "skills": [
         "idd-factory-run",
+        "idd-factory-coordinate-step",
         "idd-factory-decompose-task",
         "idd-factory-execute-subtask",
         "idd-factory-review-checkpoint",
@@ -101,6 +102,7 @@
       ],
       "roles": [
         "factory-coordinator",
+        "factory-step-coordinator",
         "task-decomposer",
         "implementer",
         "checkpoint-reviewer",
@@ -109,6 +111,9 @@
       "skillRoleReferences": {
         "idd-factory-run": [
           "factory-coordinator"
+        ],
+        "idd-factory-coordinate-step": [
+          "factory-step-coordinator"
         ],
         "idd-factory-decompose-task": [
           "task-decomposer"
@@ -123,7 +128,7 @@
           "final-reviewer"
         ],
         "idd-factory-finalize-run": [
-          "factory-coordinator"
+          "factory-step-coordinator"
         ]
       },
       "assets": [

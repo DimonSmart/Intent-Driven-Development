@@ -163,6 +163,7 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     foreach (var skill in new[]
     {
         "idd-factory-run",
+        "idd-factory-coordinate-step",
         "idd-factory-decompose-task",
         "idd-factory-execute-subtask",
         "idd-factory-review-checkpoint",
@@ -187,11 +188,12 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     foreach (var reference in new[]
     {
         (Skill: "idd-factory-run", Role: "factory-coordinator"),
+        (Skill: "idd-factory-coordinate-step", Role: "factory-step-coordinator"),
         (Skill: "idd-factory-decompose-task", Role: "task-decomposer"),
         (Skill: "idd-factory-execute-subtask", Role: "implementer"),
         (Skill: "idd-factory-review-checkpoint", Role: "checkpoint-reviewer"),
         (Skill: "idd-factory-review-task", Role: "final-reviewer"),
-        (Skill: "idd-factory-finalize-run", Role: "factory-coordinator")
+        (Skill: "idd-factory-finalize-run", Role: "factory-step-coordinator")
     })
     {
         ExpectFile(Path.Combine(
@@ -207,6 +209,7 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     var workerSkills = new[]
     {
         "idd-factory-decompose-task",
+        "idd-factory-coordinate-step",
         "idd-factory-execute-subtask",
         "idd-factory-review-checkpoint",
         "idd-factory-review-task"

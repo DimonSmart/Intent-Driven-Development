@@ -22,11 +22,9 @@ idd-factory-run
       idd-intent workflow
       idd-factory-decompose-task again
   → create ordered Subtasks and Review checkpoints
-  → idd-factory-execute-subtask for each execution item
-  → idd-factory-review-checkpoint only at checkpoints
-  → repeat corrections when necessary
-  → idd-factory-review-task
-  → idd-factory-finalize-run
+  → fresh idd-factory-coordinate-step (one action, persisted)
+  → fresh idd-factory-coordinate-step (next action, persisted)
+  → … until final review and finalization
 ```
 
 Execution completion does not automatically invoke independent review.
@@ -39,9 +37,10 @@ mandatory.
 
 Public entry point for starting, continuing, or cancelling one Factory run.
 
-It owns intent preflight, workspace validation, clarification, Subtask
-sequencing, checkpoint dispatch, status transitions, correction insertion, final
-review, and finalization.
+It owns intent preflight, workspace validation, clarification, initial state,
+cancel semantics, and dispatch of fresh one-step coordinators. Persisted Factory
+state, rather than its context, carries sequencing, status transitions,
+correction insertion, final review, and finalization between steps.
 
 ### Start a complete run
 
@@ -66,8 +65,22 @@ and optional Review checkpoints.
 Continue the current IDD Factory work.
 ```
 
-Factory identifies whether the active item is a Subtask or review
-checkpoint and resumes the corresponding worker.
+Factory dispatches a fresh step coordinator, which identifies the active item
+from persisted state and resumes the corresponding worker.
+
+## `idd-factory-coordinate-step`
+
+### Purpose
+
+Internal one-step coordinator. It restores `.idd/factory/current/`, performs
+one Subtask, checkpoint, replan, intent action, or final-review/finalization
+operation, saves the result atomically, returns a compact result, and ends.
+It never begins the next work item after saving state.
+
+### Normal caller
+
+`idd-factory-run`. Normal users do not invoke it directly; manual use is only
+for advanced troubleshooting.
 
 ### Cancel the current run
 
@@ -123,7 +136,7 @@ without invoking `idd-factory-review-checkpoint`.
 
 ### Normal caller
 
-`idd-factory-run`.
+`idd-factory-coordinate-step`.
 
 ### Advanced manual use
 

@@ -7,16 +7,19 @@ internal static class FactoryContractSmokeTests
     {
         var root = FindRepoRoot();
         var run = Read(root, "src/canonical/skills/idd-factory-run.md");
+        var step = Read(root, "src/canonical/skills/idd-factory-coordinate-step.md");
         var decompose = Read(root, "src/canonical/skills/idd-factory-decompose-task.md");
         var execute = Read(root, "src/canonical/skills/idd-factory-execute-subtask.md");
         var review = Read(root, "src/canonical/skills/idd-factory-review-checkpoint.md");
         var finalReview = Read(root, "src/canonical/skills/idd-factory-review-task.md");
         var coordinator = Read(root, "src/canonical/factory/roles/factory-coordinator.md");
+        var stepCoordinator = Read(root, "src/canonical/factory/roles/factory-step-coordinator.md");
         var taskDecomposer = Read(root, "src/canonical/factory/roles/task-decomposer.md");
         var implementer = Read(root, "src/canonical/factory/roles/implementer.md");
         var checkpointReviewer = Read(root, "src/canonical/factory/roles/checkpoint-reviewer.md");
         var finalReviewer = Read(root, "src/canonical/factory/roles/final-reviewer.md");
         var manifest = Read(root, "src/canonical/plugins/plugin-manifest.json");
+        var descriptions = Read(root, "src/canonical/skills/skill-descriptions.json");
         var failures = new List<string>();
 
         foreach (var field in new[] { "Reason:", "Verified:", "Not verified:", "Resume when:" })
@@ -30,6 +33,18 @@ internal static class FactoryContractSmokeTests
         foreach (var check in new (string Text, string Expected, string Name)[]
         {
             (run, "Factory outcome:", "outcome label"),
+            (step, "Step result: ADVANCED", "advanced step result"),
+            (step, "Step result: STOPPED", "stopped step result"),
+            (step, "Step result: FINISHED", "finished step result"),
+            (step, "authoritative", "persisted state authority"),
+            (step, "Process exactly one logical action", "one logical step"),
+            (step, "do not begin the next work item", "one-step stop boundary"),
+            (step, "original user conversation", "fresh context boundary"),
+            (run, "idd-factory-coordinate-step", "run dispatches step"),
+            (run, "thin dispatcher", "run dispatcher ownership"),
+            (stepCoordinator, "exactly one logical Factory", "step coordinator role"),
+            (descriptions, "idd-factory-coordinate-step", "step skill description"),
+            (descriptions, "\"context\": \"fork\"", "Claude fresh context adapter"),
             (run, "Implementation assessment:", "implementation label"),
             (run, "Verification assessment:", "verification label"),
             (run, "verification-only resume", "verification-only dispatch"),
@@ -38,17 +53,17 @@ internal static class FactoryContractSmokeTests
             (coordinator, "use verification-only resume", "coordinator resume boundary"),
             (implementer, "perform only", "implementer resume boundary"),
             (decompose, "without implementation from later tasks", "forward-dependency guard"),
-            (run, "`NEEDS_REPLAN` is internal, never a Factory outcome", "replanning contract"),
+            (run, "`NEEDS_REPLAN` is", "replanning contract"),
             (execute, "Return `NEEDS_REPLAN`", "implementer replanning result"),
             (review, "Use `needs-replan`", "checkpoint replanning verdict"),
-            (run, "do not require a separate", "automatic resume after decision"),
-            (run, "an optional `run-context.md`", "optional run context"),
+            (run, "no separate", "automatic resume after decision"),
+            (run, "optional `run-context.md`", "optional run context"),
             (run, "Each Subtask is self-contained", "self-contained execution contract"),
             (run, "Subtask completion does", "no automatic checkpoint review"),
             (run, "A Review checkpoint contains", "checkpoint contract"),
-            (run, "active review-checkpoint -> ready", "checkpoint correction transition"),
+            (run, "review-checkpoint -> ready", "checkpoint correction transition"),
             (run, "immediately before the checkpoint", "checkpoint correction insertion"),
-            (run, "Do not add a terminal checkpoint", "terminal checkpoint guard"),
+            (run, "terminal checkpoint", "terminal checkpoint guard"),
             (run, "`Changes` is a compact list", "checkpoint evidence focus"),
             (decompose, "Separate execution boundaries from review boundaries", "separate review boundaries"),
             (decompose, "Use the fewest Review checkpoints", "minimal checkpoints"),
@@ -68,7 +83,7 @@ internal static class FactoryContractSmokeTests
             (finalReview, "run every assigned automatic check", "final automatic check ownership"),
             (finalReview, "Read-only review forbids code", "final read-only verification boundary"),
             (finalReview, "requires `blocked`, never", "unverified final check blocks approval"),
-            (coordinator, "Subtasks and Review checkpoints", "coordinator item kinds"),
+            (coordinator, "two distinct item kinds", "coordinator item kinds"),
             (coordinator, "Accept Subtask `DONE` only", "coordinator verification completion guard"),
             (taskDecomposer, "Separate execution boundaries from review boundaries", "role separates boundaries"),
             (implementer, "Never add checks selected only for checkpoint or final", "implementer exact verification boundary"),
@@ -99,14 +114,15 @@ internal static class FactoryContractSmokeTests
             CheckAbsent(absent.Text, absent.Unexpected, absent.Name, failures);
         }
 
-        Check(run, "The original user request defines the Factory Task", "request defines task", failures);
-        Check(run, "a Subtask, identified by a `## Goal` section", "subtask persisted contract", failures);
-        Check(run, "a Review checkpoint, identified by a `## Review Checkpoint` section", "checkpoint persisted contract", failures);
+        Check(run, "original user request defines", "request defines task", failures);
+        Check(run, "Subtask, identified", "subtask persisted contract", failures);
+        Check(run, "Review checkpoint, identified", "checkpoint persisted contract", failures);
         Check(execute, "is a Subtask, not", "subtask executor rejects checkpoint", failures);
         Check(finalReview, "all work items are `.completed.md`", "final review completion precondition", failures);
         foreach (var skill in new[]
         {
             "idd-factory-run",
+            "idd-factory-coordinate-step",
             "idd-factory-decompose-task",
             "idd-factory-execute-subtask",
             "idd-factory-review-checkpoint",
@@ -117,12 +133,12 @@ internal static class FactoryContractSmokeTests
             Check(manifest, $"\"{skill}\"", $"manifest skill {skill}", failures);
         }
 
-        foreach (var role in new[] { "task-decomposer", "checkpoint-reviewer" })
+        foreach (var role in new[] { "task-decomposer", "checkpoint-reviewer", "factory-step-coordinator" })
         {
             Check(manifest, $"\"{role}\"", $"manifest role {role}", failures);
         }
 
-        foreach (var text in new[] { run, decompose, execute, review, finalReview, coordinator, taskDecomposer, implementer, checkpointReviewer, finalReviewer })
+        foreach (var text in new[] { run, step, decompose, execute, review, finalReview, coordinator, stepCoordinator, taskDecomposer, implementer, checkpointReviewer, finalReviewer })
         {
             CheckAbsent(text, "execution task", "obsolete execution-task terminology", failures);
         }

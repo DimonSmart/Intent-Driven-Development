@@ -124,7 +124,19 @@
     "description": "Update `.idd/intent/` product intent from confirmed implementation behavior."
   },
   "idd-factory-run": {
-    "description": "Run or resume one Factory run for a Task through intent preflight, bounded Subtasks, Review checkpoints, final Task review, and commit-message handoff."
+    "description": "Run or resume one Factory run through bootstrap and fresh one-step coordinator dispatch until a terminal outcome."
+  },
+  "idd-factory-coordinate-step": {
+    "description": "Internal Factory worker that restores persisted state and atomically coordinates exactly one logical step in a fresh isolated context.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "general-purpose",
+          "argument-hint": "[repository path and current Factory run]"
+        }
+      }
+    }
   },
   "idd-factory-decompose-task": {
     "description": "Decompose one Factory Task into ordered Subtasks and Review checkpoints.",

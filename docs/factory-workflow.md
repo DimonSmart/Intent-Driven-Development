@@ -82,6 +82,12 @@ checkpoints only where early review protects later work. After all work items
 complete, Factory performs one final integrated review and prepares a concise
 commit-message handoff.
 
+After bootstrap, Factory uses `.idd/factory/current/` as its persisted memory.
+Each Subtask, checkpoint, replanning action, and final-review action is handled
+by a new one-step coordinator context. The public `idd-factory-run` dispatcher
+receives only a compact result, starts the next fresh step automatically, and
+does not retain the detailed history of previous steps.
+
 The user normally does not invoke internal worker skills separately.
 
 ## Intent Preflight
@@ -176,9 +182,10 @@ fails, continue the existing run with:
 Continue the current IDD Factory work.
 ```
 
-Factory validates saved state and the current repository diff before deciding
-whether to resume a Subtask, review an active checkpoint, activate the
-next item, perform final review, or finish the result.
+Factory validates saved state before a new one-step coordinator decides whether
+to resume a Subtask, review an active checkpoint, activate the next item,
+perform final review, or finish the result. An interruption never requires the
+previous coordinator context: persisted state and repository evidence suffice.
 
 Do not start a different Factory request while unfinished work exists.
 
