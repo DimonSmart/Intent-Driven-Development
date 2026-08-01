@@ -7,15 +7,16 @@ internal static class FactoryContractSmokeTests
     {
         var root = FindRepoRoot();
         var run = Read(root, "src/canonical/skills/idd-factory-run.md");
-        var decompose = Read(root, "src/canonical/skills/idd-factory-decompose-work.md");
-        var execute = Read(root, "src/canonical/skills/idd-factory-execute-task.md");
-        var review = Read(root, "src/canonical/skills/idd-factory-review-task.md");
-        var finalReview = Read(root, "src/canonical/skills/idd-factory-review-work-result.md");
+        var decompose = Read(root, "src/canonical/skills/idd-factory-decompose-task.md");
+        var execute = Read(root, "src/canonical/skills/idd-factory-execute-subtask.md");
+        var review = Read(root, "src/canonical/skills/idd-factory-review-checkpoint.md");
+        var finalReview = Read(root, "src/canonical/skills/idd-factory-review-task.md");
         var coordinator = Read(root, "src/canonical/factory/roles/factory-coordinator.md");
-        var workDecomposer = Read(root, "src/canonical/factory/roles/work-decomposer.md");
+        var taskDecomposer = Read(root, "src/canonical/factory/roles/task-decomposer.md");
         var implementer = Read(root, "src/canonical/factory/roles/implementer.md");
-        var taskReviewer = Read(root, "src/canonical/factory/roles/task-reviewer.md");
+        var checkpointReviewer = Read(root, "src/canonical/factory/roles/checkpoint-reviewer.md");
         var finalReviewer = Read(root, "src/canonical/factory/roles/final-reviewer.md");
+        var manifest = Read(root, "src/canonical/plugins/plugin-manifest.json");
         var failures = new List<string>();
 
         foreach (var field in new[] { "Reason:", "Verified:", "Not verified:", "Resume when:" })
@@ -42,38 +43,37 @@ internal static class FactoryContractSmokeTests
             (review, "Use `needs-replan`", "checkpoint replanning verdict"),
             (run, "do not require a separate", "automatic resume after decision"),
             (run, "an optional `run-context.md`", "optional run context"),
-            (run, "Each execution task is self-contained", "self-contained execution contract"),
-            (run, "Execution completion does", "no automatic task review"),
-            (run, "A review checkpoint contains", "checkpoint contract"),
+            (run, "Each Subtask is self-contained", "self-contained execution contract"),
+            (run, "Subtask completion does", "no automatic checkpoint review"),
+            (run, "A Review checkpoint contains", "checkpoint contract"),
             (run, "active review-checkpoint -> ready", "checkpoint correction transition"),
             (run, "immediately before the checkpoint", "checkpoint correction insertion"),
             (run, "Do not add a terminal checkpoint", "terminal checkpoint guard"),
             (run, "`Changes` is a compact list", "checkpoint evidence focus"),
             (decompose, "Separate execution boundaries from review boundaries", "separate review boundaries"),
-            (decompose, "Use the fewest review checkpoints", "minimal checkpoints"),
+            (decompose, "Use the fewest Review checkpoints", "minimal checkpoints"),
             (decompose, "do not add a terminal checkpoint", "decomposer terminal checkpoint guard"),
-            (decompose, "all ordered execution-task and review-checkpoint", "decomposition item result"),
-            (execute, "active execution task", "execution-only worker"),
+            (decompose, "all ordered Subtask and Review checkpoint", "decomposition item result"),
+            (execute, "active Subtask", "execution-only worker"),
             (execute, "Do not read `request.md`, checkpoints, or other", "execute context boundary"),
             (execute, "Changes:", "execution changes output"),
             (execute, "run exactly the check IDs assigned", "exact subtask verification set"),
             (execute, "return `BLOCKED`, never `DONE`", "incomplete subtask verification blocks"),
-            (review, "active review checkpoint", "checkpoint-only reviewer"),
-            (review, "does not review every execution task", "legacy name boundary"),
-            (review, "every completed execution task named by its `Covers`", "checkpoint coverage input"),
-            (review, "Do not read `request.md`, unrelated execution tasks", "checkpoint context boundary"),
-            (review, "Corrective execution task:", "checkpoint corrective output"),
-            (finalReview, "all completed review checkpoints", "final checkpoint ownership"),
+            (review, "active Review checkpoint", "checkpoint-only reviewer"),
+            (review, "every completed Subtask named by its `Covers`", "checkpoint coverage input"),
+            (review, "Do not read `request.md`, unrelated Subtasks", "checkpoint context boundary"),
+            (review, "Corrective Subtask:", "checkpoint corrective output"),
+            (finalReview, "all completed Review checkpoints", "final checkpoint ownership"),
             (finalReview, "do not add a terminal", "final correction review gate"),
             (finalReview, "run every assigned automatic check", "final automatic check ownership"),
             (finalReview, "Read-only review forbids code", "final read-only verification boundary"),
             (finalReview, "requires `blocked`, never", "unverified final check blocks approval"),
-            (coordinator, "execution tasks and review checkpoints", "coordinator item kinds"),
-            (coordinator, "Accept execution-task `DONE` only", "coordinator verification completion guard"),
-            (workDecomposer, "Separate execution boundaries from review boundaries", "role separates boundaries"),
+            (coordinator, "Subtasks and Review checkpoints", "coordinator item kinds"),
+            (coordinator, "Accept Subtask `DONE` only", "coordinator verification completion guard"),
+            (taskDecomposer, "Separate execution boundaries from review boundaries", "role separates boundaries"),
             (implementer, "Never add checks selected only for checkpoint or final", "implementer exact verification boundary"),
-            (implementer, "return\n  `BLOCKED`, never `DONE`", "implementer incomplete verification guard"),
-            (taskReviewer, "reviews checkpoints, not every execution task", "reviewer checkpoint responsibility"),
+            (implementer, "`BLOCKED`, never `DONE`", "implementer incomplete verification guard"),
+            (checkpointReviewer, "active Review checkpoint", "reviewer checkpoint responsibility"),
             (finalReviewer, "run every assigned automatic final check", "final role verification ownership"),
             (decompose, "`subtask` checks", "subtask verification context"),
             (decompose, "`checkpoint` checks", "checkpoint verification context"),
@@ -88,7 +88,7 @@ internal static class FactoryContractSmokeTests
 
         foreach (var absent in new (string Text, string Unexpected, string Name)[]
         {
-            (run, "`DONE`: run fresh `idd-factory-review-task`", "legacy per-task review dispatch"),
+            (run, "`DONE`: run fresh `idd-factory-review-checkpoint`", "legacy per-task review dispatch"),
             (review, "Independently review one explicit `.active.md` task", "legacy single-task reviewer"),
             (review, "Do not read `request.md` or other task files; review the active task", "legacy task-only review context"),
             (execute, "run final review", "executor final-review ownership"),
@@ -97,6 +97,45 @@ internal static class FactoryContractSmokeTests
         })
         {
             CheckAbsent(absent.Text, absent.Unexpected, absent.Name, failures);
+        }
+
+        Check(run, "The original user request defines the Factory Task", "request defines task", failures);
+        Check(run, "a Subtask, identified by a `## Goal` section", "subtask persisted contract", failures);
+        Check(run, "a Review checkpoint, identified by a `## Review Checkpoint` section", "checkpoint persisted contract", failures);
+        Check(execute, "is a Subtask, not", "subtask executor rejects checkpoint", failures);
+        Check(finalReview, "all work items are `.completed.md`", "final review completion precondition", failures);
+        foreach (var skill in new[]
+        {
+            "idd-factory-run",
+            "idd-factory-decompose-task",
+            "idd-factory-execute-subtask",
+            "idd-factory-review-checkpoint",
+            "idd-factory-review-task",
+            "idd-factory-finalize-run"
+        })
+        {
+            Check(manifest, $"\"{skill}\"", $"manifest skill {skill}", failures);
+        }
+
+        foreach (var role in new[] { "task-decomposer", "checkpoint-reviewer" })
+        {
+            Check(manifest, $"\"{role}\"", $"manifest role {role}", failures);
+        }
+
+        foreach (var text in new[] { run, decompose, execute, review, finalReview, coordinator, taskDecomposer, implementer, checkpointReviewer, finalReviewer })
+        {
+            CheckAbsent(text, "execution task", "obsolete execution-task terminology", failures);
+        }
+
+        foreach (var obsoleteSkill in new[]
+        {
+            "idd-factory-decompose-work",
+            "idd-factory-execute-task",
+            "idd-factory-review-work-result",
+            "idd-factory-finish-work"
+        })
+        {
+            CheckAbsent(manifest, obsoleteSkill, $"obsolete manifest skill {obsoleteSkill}", failures);
         }
 
         if (failures.Count > 0)

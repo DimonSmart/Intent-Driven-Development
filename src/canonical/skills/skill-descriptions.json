@@ -124,10 +124,10 @@
     "description": "Update `.idd/intent/` product intent from confirmed implementation behavior."
   },
   "idd-factory-run": {
-    "description": "Run or resume one file-backed IDD Factory workflow through intent preflight, small execution tasks, explicit review checkpoints, final integrated review, and commit-message handoff."
+    "description": "Run or resume one Factory run for a Task through intent preflight, bounded Subtasks, Review checkpoints, final Task review, and commit-message handoff."
   },
-  "idd-factory-decompose-work": {
-    "description": "Analyze one supplied request against relevant intent and repository evidence, then return clarification, a focused handoff, or ordered execution tasks with the fewest useful review checkpoints.",
+  "idd-factory-decompose-task": {
+    "description": "Decompose one Factory Task into ordered Subtasks and Review checkpoints.",
     "adapters": {
       "claude": {
         "frontmatter": {
@@ -139,20 +139,20 @@
       }
     }
   },
-  "idd-factory-execute-task": {
-    "description": "Implement exactly one explicit active Factory execution task from its self-contained contract and current intent, then return focused changes and verification evidence.",
+  "idd-factory-execute-subtask": {
+    "description": "Implement one explicit active Subtask in an isolated worker context.",
     "adapters": {
       "claude": {
         "frontmatter": {
           "context": "fork",
           "agent": "general-purpose",
-          "argument-hint": "[active execution-task path]"
+          "argument-hint": "[active subtask path]"
         }
       }
     }
   },
-  "idd-factory-review-task": {
-    "description": "Independently review one active Factory review checkpoint across its covered completed execution tasks, focused diff, and checkpoint verification evidence.",
+  "idd-factory-review-checkpoint": {
+    "description": "Independently review one active Review checkpoint across its covered completed Subtasks.",
     "adapters": {
       "claude": {
         "frontmatter": {
@@ -164,8 +164,8 @@
       }
     }
   },
-  "idd-factory-review-work-result": {
-    "description": "Independently review the complete result of the current Factory run across all execution tasks, review checkpoints, current intent, integration requirements, and verification evidence.",
+  "idd-factory-review-task": {
+    "description": "Independently review the complete result of the Factory Task.",
     "adapters": {
       "claude": {
         "frontmatter": {
@@ -176,7 +176,7 @@
       }
     }
   },
-  "idd-factory-finish-work": {
-    "description": "Create a compact commit-message handoff for an approved Factory run, then safely clear its current temporary state."
+  "idd-factory-finalize-run": {
+    "description": "Create the commit-message handoff for an approved Task result and safely finalize the current Factory run."
   }
 }

@@ -93,36 +93,36 @@
       ],
       "skills": [
         "idd-factory-run",
-        "idd-factory-decompose-work",
-        "idd-factory-execute-task",
+        "idd-factory-decompose-task",
+        "idd-factory-execute-subtask",
+        "idd-factory-review-checkpoint",
         "idd-factory-review-task",
-        "idd-factory-review-work-result",
-        "idd-factory-finish-work"
+        "idd-factory-finalize-run"
       ],
       "roles": [
         "factory-coordinator",
-        "work-decomposer",
+        "task-decomposer",
         "implementer",
-        "task-reviewer",
+        "checkpoint-reviewer",
         "final-reviewer"
       ],
       "skillRoleReferences": {
         "idd-factory-run": [
           "factory-coordinator"
         ],
-        "idd-factory-decompose-work": [
-          "work-decomposer"
+        "idd-factory-decompose-task": [
+          "task-decomposer"
         ],
-        "idd-factory-execute-task": [
+        "idd-factory-execute-subtask": [
           "implementer"
         ],
-        "idd-factory-review-task": [
-          "task-reviewer"
+        "idd-factory-review-checkpoint": [
+          "checkpoint-reviewer"
         ],
-        "idd-factory-review-work-result": [
+        "idd-factory-review-task": [
           "final-reviewer"
         ],
-        "idd-factory-finish-work": [
+        "idd-factory-finalize-run": [
           "factory-coordinator"
         ]
       },

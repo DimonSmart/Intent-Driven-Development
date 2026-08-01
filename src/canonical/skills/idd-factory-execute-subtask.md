@@ -1,7 +1,7 @@
-# idd-factory-execute-task
+# idd-factory-execute-subtask
 
-For an execution subtask, resolve its recorded IDs from the current
-`.idd/verification.md` using context `subtask`. Run exactly those recorded IDs;
+Resolve verification checks using context `subtask` for the active Subtask. Run
+exactly its recorded IDs;
 do not add checks selected only for checkpoint or final contexts. A
 missing/changed referenced ID blocks the item. Confirmation refusal, user
 instructions without confirmation, and unavailable checks are `Not verified`.
@@ -12,20 +12,20 @@ checks yourself.
 
 ## Purpose
 
-Implement one explicit active execution task in an isolated worker context.
+Implement one explicit active Subtask in an isolated worker context.
 
 ## Inputs
 
-Read the active execution task (including resumed `Blocker`), optional
+Read the active Subtask (including resumed `Blocker`), optional
 `run-context.md`, relevant intent, current diff, and focused repository evidence.
 Use project skills normally. Do not read `request.md`, checkpoints, or other
-execution tasks; the coordinator owns decomposition and must provide a sufficient
+Subtasks; the coordinator owns decomposition and must provide a sufficient
 local contract.
 
 ## Rules
 
-- Confirm the supplied item is the only active item and is an execution task, not
-  a review checkpoint.
+- Confirm the supplied item is the only active item and is a Subtask, not
+  a Review checkpoint.
 - Confirm current intent is sufficient.
 - If the item asks to edit `.idd/intent/`, invoke an intent-changing workflow, or
   own an intent update, return `NEEDS_REPLAN`; do not perform that scope.
@@ -34,7 +34,7 @@ local contract.
   `Verified`, perform only `Not verified`, and leave the mode only for changed
   code or a newly revealed defect.
 - Make the smallest coherent change, preserve named boundaries, add only affected
-  tests, and run exactly the check IDs assigned to the execution subtask.
+  tests, and run exactly the check IDs assigned to the Subtask.
 - Do not add checks selected only for checkpoint or final contexts, even when a
   broader command appears useful.
 - Return `BLOCKED`, not `DONE`, whenever any assigned verification check remains
@@ -66,7 +66,7 @@ Concerns:
 ```
 
 `Changes` lists only paths, public symbols, contracts, or other evidence needed
-to focus a later review checkpoint.
+to focus a later Review checkpoint.
 
 For `NEEDS_REPLAN`, append `Dependency`.
 

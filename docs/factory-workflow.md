@@ -7,6 +7,26 @@ continuation after interruption.
 Factory remains temporary. It may read `.idd/intent/`, but it does not create
 product truth and does not turn execution state into permanent specifications.
 
+## Factory Vocabulary
+
+Request
+: The original user instruction that defines a Factory Task.
+
+Task
+: The complete unit of work accepted by Factory.
+
+Subtask
+: One bounded executable part produced by decomposing the Task.
+
+Review checkpoint
+: An independent review boundary covering completed Subtasks.
+
+Work item
+: A persisted Subtask or Review checkpoint.
+
+Factory run
+: One resumable execution instance of a Task.
+
 ## When to Use Factory
 
 Use Factory when the work involves one or more of the following:
@@ -57,7 +77,7 @@ Under normal conditions, this single invocation carries the requested work
 through to completion.
 
 Factory first checks whether current intent is sufficient. It then decomposes
-implementation into small execution tasks and places independent review
+implementation into small Subtasks and places independent review
 checkpoints only where early review protects later work. After all work items
 complete, Factory performs one final integrated review and prepares a concise
 commit-message handoff.
@@ -75,23 +95,23 @@ Factory runs the appropriate intent workflow, rereads current intent, and
 decomposes the original request again.
 
 Only after intent is sufficient does Factory create implementation work. An
-execution task must not edit `.idd/intent/`, invoke an intent-changing workflow,
+Subtask must not edit `.idd/intent/`, invoke an intent-changing workflow,
 or use an intent update as its goal, dependency, or completion condition.
 
 If missing intent is discovered during execution or checkpoint review, the
 coordinator handles it outside the work-item list and updates affected
 implementation contracts before resuming.
 
-## Execution Tasks and Review Checkpoints
+## Subtasks and Review Checkpoints
 
 Execution and review boundaries are separate.
 
-An execution task is a small self-contained implementation contract. Successful
+A Subtask is a small self-contained implementation contract. Successful
 execution records its result, changed areas, focused verification, and concerns,
 then completes without automatically starting an independent reviewer.
 
-A review checkpoint is a separate ordered work item. It reviews one contiguous
-group of preceding completed execution tasks. Several mechanical or closely
+A Review checkpoint is a separate ordered work item. It reviews one contiguous
+group of preceding completed Subtasks. Several mechanical or closely
 related tasks may share one checkpoint.
 
 Factory uses checkpoints when early independent review protects dependent later
@@ -107,19 +127,19 @@ Factory does not create a terminal checkpoint that merely duplicates the
 mandatory final integrated review.
 
 When checkpoint review finds a material problem, Factory creates a new
-corrective execution task immediately before that checkpoint. Completed tasks
+corrective Subtask immediately before that checkpoint. Completed tasks
 remain immutable. After correction, the same checkpoint reviews the covered
 group again.
 
-The skill name `idd-factory-review-task` is retained for compatibility, but it
-reviews active checkpoints rather than every execution task.
+`idd-factory-review-checkpoint` reviews active Review checkpoints; final Task
+review is performed by `idd-factory-review-task`.
 
 ## Self-Contained Contracts
 
 Factory preserves the complete original request in `request.md`, but execution
 workers and checkpoint reviewers do not reread it.
 
-Execution tasks contain the local context, requirements, boundaries, completion
+Subtasks contain the local context, requirements, boundaries, completion
 conditions, and verification needed for implementation. Review checkpoints
 contain their covered task list, review scope, and checkpoint-level
 verification.
@@ -145,7 +165,7 @@ Factory may pause when:
 Questions are limited to information required for safe execution.
 
 After a clarification or mid-run intent change, Factory updates affected active
-and ready execution tasks, checkpoints, and shared run context before resuming.
+and ready Subtasks, checkpoints, and shared run context before resuming.
 
 ## Continue an Interrupted Run
 
@@ -157,7 +177,7 @@ Continue the current IDD Factory work.
 ```
 
 Factory validates saved state and the current repository diff before deciding
-whether to resume an execution task, review an active checkpoint, activate the
+whether to resume a Subtask, review an active checkpoint, activate the
 next item, perform final review, or finish the result.
 
 Do not start a different Factory request while unfinished work exists.
@@ -196,7 +216,7 @@ Factory keeps local temporary state under:
   current/
     request.md
     run-context.md        # optional
-    001-*.ready.md        # execution task or review checkpoint
+    001-*.ready.md        # Subtask or Review checkpoint
   results/
 ```
 

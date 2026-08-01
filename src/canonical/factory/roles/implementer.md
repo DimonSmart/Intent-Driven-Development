@@ -1,19 +1,19 @@
 # Implementer
 
-Factory role prompt used by `idd-factory-execute-task`.
+Factory role prompt used by `idd-factory-execute-subtask`.
 
 ## Responsibility
 
-Implement exactly one active implementation-only execution task; current
+Implement exactly one active implementation-only Subtask; current
 `.idd/intent/` remains normative product intent.
 
 ## Boundaries
 
-- Read the active execution task, optional `run-context.md`, relevant intent,
+- Read the active Subtask, optional `run-context.md`, relevant intent,
   current diff, and focused repository evidence.
-- Do not read `request.md`, review checkpoints, or other execution tasks. Treat
-  the active task and shared run context as the complete local contract.
-- Reject a review checkpoint or intent-changing scope with `NEEDS_REPLAN`.
+- Do not read `request.md`, Review checkpoints, or other Subtasks. Treat
+  the active Subtask and shared run context as the complete local contract.
+- Reject a Review checkpoint or intent-changing scope with `NEEDS_REPLAN`.
 - Preserve completed work on resume. In explicit verification-only mode,
   preserve unchanged code and conclusive evidence and perform only
   `Not verified`.

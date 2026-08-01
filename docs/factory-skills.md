@@ -1,8 +1,8 @@
 # IDD Factory Skills Reference
 
-When present, `.idd/verification.md` assigns `subtask` checks to execution
-subtasks, `checkpoint` checks to reviews, and `final` checks to integrated
-review. An execution subtask never broadens its own checks.
+When present, `.idd/verification.md` assigns `subtask` checks to Subtasks,
+`checkpoint` checks to Review checkpoints, and `final` checks to final Task
+review. A Subtask never broadens its own checks.
 
 Most users should invoke only:
 
@@ -17,16 +17,16 @@ documents them for transparency, advanced inspection, and troubleshooting.
 
 ```text
 idd-factory-run
-  → idd-factory-decompose-work (intent preflight)
+  → idd-factory-decompose-task (intent preflight)
   → when INTENT_REQUIRED:
       idd-intent workflow
-      idd-factory-decompose-work again
-  → create ordered execution tasks and review checkpoints
-  → idd-factory-execute-task for each execution item
-  → idd-factory-review-task only at checkpoints
+      idd-factory-decompose-task again
+  → create ordered Subtasks and Review checkpoints
+  → idd-factory-execute-subtask for each execution item
+  → idd-factory-review-checkpoint only at checkpoints
   → repeat corrections when necessary
-  → idd-factory-review-work-result
-  → idd-factory-finish-work
+  → idd-factory-review-task
+  → idd-factory-finalize-run
 ```
 
 Execution completion does not automatically invoke independent review.
@@ -39,7 +39,7 @@ mandatory.
 
 Public entry point for starting, continuing, or cancelling one Factory run.
 
-It owns intent preflight, workspace validation, clarification, execution-task
+It owns intent preflight, workspace validation, clarification, Subtask
 sequencing, checkpoint dispatch, status transitions, correction insertion, final
 review, and finalization.
 
@@ -57,8 +57,8 @@ existing callers, preserve compatibility, and verify the result.
 ```
 
 Before state creation, Factory resolves missing durable intent and repeats
-decomposition. The saved sequence contains implementation-only execution tasks
-and optional review checkpoints.
+decomposition. The saved sequence contains implementation-only Subtasks
+and optional Review checkpoints.
 
 ### Continue an interrupted run
 
@@ -66,7 +66,7 @@ and optional review checkpoints.
 Continue the current IDD Factory work.
 ```
 
-Factory identifies whether the active item is an execution task or review
+Factory identifies whether the active item is a Subtask or review
 checkpoint and resumes the corresponding worker.
 
 ### Cancel the current run
@@ -77,20 +77,19 @@ Cancel the current IDD Factory work.
 
 Cancellation removes temporary current state but does not revert code changes.
 
-## `idd-factory-decompose-work`
+## `idd-factory-decompose-task`
 
 ### Purpose
 
-Analyze one request and return the smallest safe ordered set of execution tasks
-and review checkpoints.
+Analyze one request and return the smallest safe ordered set of Subtasks
+and Review checkpoints.
 
 It determines whether the request is ready, small enough for focused
 implementation, blocked by missing clarification, blocked by missing intent, or
 blocked by another condition.
 
-Execution tasks are small self-contained implementation contracts. Review
-checkpoints are separate boundaries that may cover several adjacent execution
-tasks.
+Subtasks are small self-contained implementation contracts. Review
+checkpoints are separate boundaries that may cover several adjacent Subtasks.
 
 The decomposer uses the fewest checkpoints that protect dependent later work. It
 does not add a terminal checkpoint that only duplicates final review.
@@ -102,25 +101,25 @@ does not add a terminal checkpoint that only duplicates final review.
 ### Advanced manual use
 
 ```text
-Use idd-factory-decompose-work to show how ./migration-plan.md would be divided
-into execution tasks and review checkpoints. Do not execute them.
+Use idd-factory-decompose-task to show how ./migration-plan.md would be divided
+into Subtasks and Review checkpoints. Do not execute them.
 ```
 
 The skill does not write Factory state, code, tests, or product intent.
 
-## `idd-factory-execute-task`
+## `idd-factory-execute-subtask`
 
 ### Purpose
 
-Implement exactly one active execution task.
+Implement exactly one active Subtask.
 
-It reads the active self-contained task, optional shared `run-context.md`,
+It reads the active self-contained Subtask, optional shared `run-context.md`,
 relevant current intent, current diff, and focused repository evidence. It does
-not read the original request, checkpoints, or other execution tasks.
+not read the original request, checkpoints, or other Subtasks.
 
 A successful result returns compact `Implementation`, `Changes`,
-`Verification`, and `Concerns`. The coordinator completes the execution task
-without invoking `idd-factory-review-task`.
+`Verification`, and `Concerns`. The coordinator completes the Subtask
+without invoking `idd-factory-review-checkpoint`.
 
 ### Normal caller
 
@@ -129,7 +128,7 @@ without invoking `idd-factory-review-task`.
 ### Advanced manual use
 
 ```text
-Use idd-factory-execute-task for
+Use idd-factory-execute-subtask for
 .idd/factory/current/002-update-storage.active.md only. Do not advance the
 Factory workflow.
 ```
@@ -137,16 +136,15 @@ Factory workflow.
 The skill does not select another item, rename files, perform checkpoint or final
 review, create a commit message, or clean the workspace.
 
-## `idd-factory-review-task`
+## `idd-factory-review-checkpoint`
 
 ### Purpose
 
-Independently review one active review checkpoint.
+Independently review one active Review checkpoint.
 
-The skill name is retained for compatibility. It does not review every execution
-task.
+It reviews only its active Review checkpoint and covered completed Subtasks.
 
-It reads the checkpoint, the completed execution tasks listed in `Covers`,
+It reads the checkpoint, the completed Subtasks listed in `Covers`,
 optional shared run context, relevant current intent, and checkpoint-local diff
 and verification evidence. It does not read the original request, unrelated
 tasks, or later work.
@@ -162,7 +160,7 @@ intent-required
 ```
 
 For `needs-fix`, the reviewer returns one complete self-contained corrective
-execution task. The coordinator inserts it immediately before the checkpoint,
+Subtask. The coordinator inserts it immediately before the checkpoint,
 updates checkpoint coverage, and reviews the group again after correction.
 
 For `needs-replan`, the coordinator corrects coverage, checkpoint placement,
@@ -171,20 +169,20 @@ contracts, or ordering.
 ### Advanced manual use
 
 ```text
-Use idd-factory-review-task to review the current active review checkpoint. Do
+Use idd-factory-review-checkpoint to review the current active Review checkpoint. Do
 not modify code or Factory files.
 ```
 
 The reviewer is read-only.
 
-## `idd-factory-review-work-result`
+## `idd-factory-review-task`
 
 ### Purpose
 
-Independently review the complete integrated result after all execution tasks and
-review checkpoints are completed.
+Independently review the complete integrated result after all Subtasks and
+Review checkpoints are completed.
 
-It checks the original request, optional run context, every execution-task
+It checks the original request, optional run context, every Subtask
 contract and completion, every checkpoint result, current product intent, the
 full diff, cross-task integration, preservation boundaries, public contracts,
 and verification sufficiency.
@@ -202,19 +200,19 @@ intent-required
 ```
 
 When the verdict is `needs-fix`, the coordinator appends one self-contained
-corrective execution task. The next final review is its review gate; Factory does
+corrective Subtask. The next final review is its review gate; Factory does
 not add a redundant terminal checkpoint.
 
 ### Advanced manual use
 
 ```text
-Use idd-factory-review-work-result to review the completed current Factory run.
+Use idd-factory-review-task to review the completed current Factory run.
 Do not create the result handoff or clear current state.
 ```
 
 The reviewer is read-only.
 
-## `idd-factory-finish-work`
+## `idd-factory-finalize-run`
 
 ### Purpose
 
@@ -266,9 +264,9 @@ blocked
 
 Factory allows at most one active or blocked item.
 
-### Execution task format
+### Subtask format
 
-An execution task contains:
+A Subtask contains:
 
 ```text
 Goal
@@ -282,7 +280,7 @@ Verification
 It may also contain concrete `Out of Scope`, `Preservation Boundaries`,
 `Dependencies`, and `Intent References`. It never owns intent changes.
 
-Execution-task `Completion` contains:
+Subtask `Completion` contains:
 
 ```text
 Result
@@ -303,7 +301,7 @@ Verification
 ```
 
 It may also contain `Intent References`. `Covers` names a contiguous group of
-preceding completed execution tasks since the previous checkpoint.
+preceding completed Subtasks since the previous checkpoint.
 
 Checkpoint `Completion` contains:
 
@@ -316,7 +314,7 @@ Concerns
 A checkpoint never covers another checkpoint.
 
 On `needs-fix`, completed tasks remain immutable. Factory inserts a new
-corrective execution task before the checkpoint and adds it to `Covers`.
+corrective Subtask before the checkpoint and adds it to `Covers`.
 
 ## Choosing Checkpoints
 
@@ -345,7 +343,7 @@ The number of changed files alone does not determine the choice.
 ## Product Intent Boundary
 
 Factory may read `.idd/intent/`, but it must not invent or change product
-behavior inside an execution task.
+behavior inside a Subtask.
 
 When durable behavior is missing or contradictory, Factory returns:
 
@@ -357,5 +355,5 @@ Before state creation, resolve intent and repeat decomposition. During an
 existing run, the coordinator resolves intent outside the work-item list and
 updates only implementation contracts and checkpoints.
 
-Factory requests, shared context, execution tasks, checkpoints, blockers,
+Factory requests, shared context, Subtasks, checkpoints, blockers,
 completions, and commit-message handoffs remain temporary execution artifacts.

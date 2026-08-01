@@ -54,22 +54,22 @@ Use IDD skills when a request involves durable product intent, implementation
 based on current intent, conformance checking, or Factory orchestration. Use
 `idd-code-implement` for one focused implementation change. Use the optional
 `idd-factory-run` entry point when temporary multi-task sequencing, explicit
-review checkpoints, or coordinated execution is required; Factory may be
+Review checkpoints, or coordinated execution is required; Factory may be
 selected automatically and never becomes product intent.
 
 Factory keeps at most one resumable run in `.idd/factory/current/`. Its work
-items are a flat numbered sequence of small execution tasks and optional review
+items are a flat numbered sequence of small Subtasks and optional review
 checkpoints; the filename suffix is the only status source. Successful execution
-tasks complete without automatic independent review. `idd-factory-review-task`
+tasks complete without automatic independent review. `idd-factory-review-checkpoint`
 runs only for an explicit checkpoint covering one contiguous group of completed
-execution tasks. After all work items complete, Factory performs a mandatory
+Subtasks. After all work items complete, Factory performs a mandatory
 final integrated review and writes
 `.idd/factory/results/<work-slug>_<timestamp>/commit-message.md` before clearing
 `current/`.
 
 When Factory decomposition discovers missing durable intent, it creates no task
 state. Resolve intent first, then decompose the original request again. Intent
-changes never become Factory execution tasks.
+changes never become Factory Subtasks.
 
 When a user asks to continue current Factory work, validate and resume saved
 state instead of reconstructing work from conversation history. A new request

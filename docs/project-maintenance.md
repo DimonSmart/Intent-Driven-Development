@@ -60,10 +60,10 @@ Ownership rules:
 - Intent must not depend on Factory.
 
 The canonical Factory skill set is `idd-factory-run`,
-`idd-factory-decompose-work`, `idd-factory-execute-task`,
-`idd-factory-review-task`, `idd-factory-review-work-result`, and
-`idd-factory-finish-work`. Its roles are `factory-coordinator`,
-`work-decomposer`, `implementer`, `task-reviewer`, and `final-reviewer`.
+`idd-factory-decompose-task`, `idd-factory-execute-subtask`,
+`idd-factory-review-checkpoint`, `idd-factory-review-task`, and
+`idd-factory-finalize-run`. Its roles are `factory-coordinator`,
+`task-decomposer`, `implementer`, `checkpoint-reviewer`, and `final-reviewer`.
 Do not reintroduce the obsolete single `work-plan.md` create/execute workflow.
 
 Claude adapter metadata forks only the decomposer, implementer, task reviewer,

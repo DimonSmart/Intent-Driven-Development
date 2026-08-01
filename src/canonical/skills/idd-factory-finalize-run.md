@@ -1,16 +1,16 @@
-# idd-factory-finish-work
+# idd-factory-finalize-run
 
 ## Purpose
 
-Create a compact Git commit-message handoff for an approved Factory run, then
-clear its temporary current state. This workflow does not run Git commands.
+Create the commit-message handoff for an approved Task result and safely
+finalize the current Factory run. This workflow does not run Git commands.
 
 ## Preconditions
 
 - The final review verdict is `approved` for the current actual diff.
 - `current/` passes the state invariants from `idd-factory-run`.
-- It contains one `request.md`, one or more work items, and every execution task
-  and review checkpoint is completed.
+- It contains one `request.md`, one or more Work items, and every Subtask and
+  Review checkpoint is completed.
 
 Stop without cleanup if any precondition fails.
 
@@ -28,11 +28,11 @@ Never overwrite a result directory. If the complete timestamped name exists,
 append `-2`, then `-3`, and so on.
 
 The result directory contains only `commit-message.md`. Do not copy the request,
-execution tasks, checkpoints, reviews, or other state into `results/`.
+Subtasks, checkpoints, reviews, or other state into `results/`.
 
 ## Commit Message
 
-Derive the message from `request.md`, completed execution-task goals, checkpoint
+Derive the message from `request.md`, completed Subtask goals, checkpoint
 results, the actual diff, and final review. The diff takes precedence over
 planning assumptions.
 

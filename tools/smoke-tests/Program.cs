@@ -163,11 +163,11 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     foreach (var skill in new[]
     {
         "idd-factory-run",
-        "idd-factory-decompose-work",
-        "idd-factory-execute-task",
+        "idd-factory-decompose-task",
+        "idd-factory-execute-subtask",
+        "idd-factory-review-checkpoint",
         "idd-factory-review-task",
-        "idd-factory-review-work-result",
-        "idd-factory-finish-work"
+        "idd-factory-finalize-run"
     })
     {
         ExpectFile(Path.Combine(factoryRoot, "skills", skill, "SKILL.md"));
@@ -175,6 +175,10 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
 
     ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-factory-create-work-plan"));
     ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-factory-execute-work-plan"));
+    ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-factory-decompose-work"));
+    ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-factory-execute-task"));
+    ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-factory-review-work-result"));
+    ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-factory-finish-work"));
     ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-project-init"));
     ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-intent-change"));
     ExpectDirectory(Path.Combine(factoryRoot, "assets", "bootstrap", ".idd", "factory"));
@@ -183,11 +187,11 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     foreach (var reference in new[]
     {
         (Skill: "idd-factory-run", Role: "factory-coordinator"),
-        (Skill: "idd-factory-decompose-work", Role: "work-decomposer"),
-        (Skill: "idd-factory-execute-task", Role: "implementer"),
-        (Skill: "idd-factory-review-task", Role: "task-reviewer"),
-        (Skill: "idd-factory-review-work-result", Role: "final-reviewer"),
-        (Skill: "idd-factory-finish-work", Role: "factory-coordinator")
+        (Skill: "idd-factory-decompose-task", Role: "task-decomposer"),
+        (Skill: "idd-factory-execute-subtask", Role: "implementer"),
+        (Skill: "idd-factory-review-checkpoint", Role: "checkpoint-reviewer"),
+        (Skill: "idd-factory-review-task", Role: "final-reviewer"),
+        (Skill: "idd-factory-finalize-run", Role: "factory-coordinator")
     })
     {
         ExpectFile(Path.Combine(
@@ -202,10 +206,10 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     var runFrontMatter = ReadFrontMatter(ReadText(Path.Combine(factoryRoot, "skills", "idd-factory-run", "SKILL.md")));
     var workerSkills = new[]
     {
-        "idd-factory-decompose-work",
-        "idd-factory-execute-task",
-        "idd-factory-review-task",
-        "idd-factory-review-work-result"
+        "idd-factory-decompose-task",
+        "idd-factory-execute-subtask",
+        "idd-factory-review-checkpoint",
+        "idd-factory-review-task"
     };
 
     if (platform == "claude")
@@ -223,7 +227,7 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     }
     else
     {
-        foreach (var skill in workerSkills.Prepend("idd-factory-run").Append("idd-factory-finish-work"))
+        foreach (var skill in workerSkills.Prepend("idd-factory-run").Append("idd-factory-finalize-run"))
         {
             var skillFrontMatter = ReadFrontMatter(ReadText(Path.Combine(factoryRoot, "skills", skill, "SKILL.md")));
             foreach (var claudeField in new[] { "context:", "agent:", "allowed-tools:", "argument-hint:" })

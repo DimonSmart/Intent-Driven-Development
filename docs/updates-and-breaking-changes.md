@@ -4,6 +4,24 @@ This page records IDD changes that require action in repositories that already u
 
 Updating the installed plugins and migrating project-owned files are separate operations. Follow [Updating IDD](updating-idd.md) to refresh `idd-intent` and `idd-factory`. Then apply any relevant migration instructions below. Plugin updates do not automatically rewrite a repository's `.idd/intent/` directory.
 
+## 2026-07-31 — Factory Task and Subtask terminology
+
+Factory now reserves `Task` for the complete user-requested unit of work and
+uses `Subtask` for each decomposed executable unit. Existing persisted Factory
+state remains readable: `request.md`, `run-context.md`, work-item filenames,
+and their content-based type detection are unchanged.
+
+Update manual invocations and generated integrations using this migration map:
+
+- `idd-factory-decompose-work` → `idd-factory-decompose-task`
+- `idd-factory-execute-task` → `idd-factory-execute-subtask`
+- `idd-factory-review-work-result` → `idd-factory-review-task`
+- `idd-factory-finish-work` → `idd-factory-finalize-run`
+
+`idd-factory-review-task` formerly meant checkpoint review and now means final
+Task review. It has no runtime alias because routing the old name would be
+ambiguous; use `idd-factory-review-checkpoint` for a Review checkpoint.
+
 ## 2026-07-23 — Intent document filename namespace
 
 Intent document identifiers and filenames now use the `IDD-` prefix: `IDD-0001.spec-example.md` instead of `0001.spec-example.md`. The namespace makes document IDs unambiguous in prose, search results, links, logs, and automated repository scans.
