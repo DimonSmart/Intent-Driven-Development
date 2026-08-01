@@ -390,10 +390,11 @@ implementation, sequencing, temporary planning, review gates, or high-risk
 preservation boundaries. Factory remains optional and must not become a
 dependency of `idd-intent`.
 
-Factory stores one resumable run under `.idd/factory/current/`: `request.md`
-and a flat sequence of task files whose `ready`, `active`, `completed`, or
-`blocked` filename suffix is the only status source. It performs independent
-task reviews and a final integration review, then writes a compact commit-message
+The original user request defines the Factory Task and is stored unchanged in
+`request.md`. Factory stores one resumable run under `.idd/factory/current/`:
+`request.md` and a flat sequence of Work item files whose `ready`, `active`,
+`completed`, or `blocked` filename suffix is the only status source. It performs
+independent Review checkpoint reviews and a final Task review, then writes a compact commit-message
 handoff under `.idd/factory/results/` before clearing `current/`. Neither
 directory is product intent, and both are ignored by default.
 

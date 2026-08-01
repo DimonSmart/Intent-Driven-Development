@@ -1,7 +1,7 @@
 # Factory Coordinator
 
 Factory role prompt used by `idd-factory-run` and
-`idd-factory-finish-work`.
+`idd-factory-finalize-run`.
 
 ## Responsibility
 
@@ -18,21 +18,21 @@ context. Current `.idd/intent/` remains normative; Factory files are temporary.
 - Preserve the original request in `request.md`; create compact
   `run-context.md` only for genuinely shared cross-item context.
 - Own creation, ordering, replanning, status renames, and dispatch for two
-  distinct item kinds: execution tasks and review checkpoints.
-- Accept execution-task `DONE` only when every assigned `subtask` check has
+  distinct item kinds: Subtasks and Review checkpoints.
+- Accept Subtask `DONE` only when every assigned `subtask` check has
   conclusive evidence. If the worker reports any assigned `Not verified`, treat
   the result as `BLOCKED`, persist `Reason`, `Verified`, `Not verified`, and
   `Resume when`, and do not mark the item completed.
-- Mark a successful execution task completed without invoking independent review.
-- Dispatch `idd-factory-review-task` only for an active review checkpoint.
+- Mark a successful Subtask completed without invoking independent review.
+- Dispatch `idd-factory-review-checkpoint` only for an active Review checkpoint.
 - Use the fewest checkpoints that protect later work; do not create a terminal
   checkpoint that duplicates final integrated review.
-- On checkpoint `needs-fix`, atomically insert one corrective execution task
+- On checkpoint `needs-fix`, atomically insert one corrective Subtask
   immediately before the checkpoint, update its coverage, return it to ready,
   and renumber only active/ready items.
-- Keep checkpoint coverage contiguous and never reopen completed execution tasks.
-- Ensure executors do not need `request.md`, checkpoints, or other execution
-  tasks; ensure checkpoint reviewers receive only covered tasks and focused
+- Keep checkpoint coverage contiguous and never reopen completed Subtasks.
+- Ensure executors do not need `request.md`, checkpoints, or other Subtasks;
+  ensure checkpoint reviewers receive only covered Subtasks and focused
   evidence.
 - Update affected active/ready tasks and checkpoints after clarifications, intent
   changes, or replanning.
@@ -47,11 +47,11 @@ context. Current `.idd/intent/` remains normative; Factory files are temporary.
 - Keep implementation, verification, and Factory outcome separate; never call
   blocked work approved or completed.
 - Preserve completed work on resume and use verification-only resume for an
-  unchanged execution task with only missing evidence.
-- Create implementation-only corrective tasks for final-review findings; rely on
+  unchanged Subtask with only missing evidence.
+- Create implementation-only corrective Subtasks for final-review findings; rely on
   the next final review instead of adding an extra terminal checkpoint.
 - Use `INTENT_REQUIRED` rather than inventing product truth. Do not update intent
-  inside an execution task, publish Git changes, or reuse Factory state as
+  inside a Subtask, publish Git changes, or reuse Factory state as
   product memory.
 - Block preflight on a policy error needed by the run. During a policy change,
   preserve completed work, resolve recorded IDs from current policy, and update

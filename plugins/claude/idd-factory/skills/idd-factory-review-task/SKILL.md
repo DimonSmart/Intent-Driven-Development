@@ -1,112 +1,127 @@
 ---
 name: idd-factory-review-task
-description: Independently review one active Factory review checkpoint across its covered completed execution tasks, focused diff, and checkpoint verification evidence.
+description: Independently review the complete result of the Factory Task.
 context: fork
 agent: Explore
-argument-hint: "[active review-checkpoint path]"
 allowed-tools: Read Glob Grep Bash
 ---
 
 # idd-factory-review-task
 
-For the active checkpoint, resolve its recorded IDs from current
-`.idd/verification.md` using context `checkpoint` and the aggregate `Covers`
-scope. Required unverified checks prevent approval. Do not run final checks.
+The final reviewer owns verification for context `final` over the complete
+Factory diff. Before producing a verdict, resolve the current final-policy
+checks, reuse only conclusive evidence that still applies to the current check
+definition and complete diff, and run every assigned automatic check that lacks
+such evidence. Ask before `confirmation: required`. Present `instructions`
+checks to the user and obtain the actual result. Read-only review forbids code,
+intent, and Factory-state changes; it does not prohibit verification commands.
+Any assigned final check that remains `Not verified` requires `blocked`, never
+`approved`.
 
 ## Purpose
 
-Independently review one explicit active review checkpoint. The skill name is
-retained for compatibility; it does not review every execution task.
+Independently review the complete result of the Factory Task. This worker is
+read-only with respect to implementation, intent, and Factory state.
 
-## Inputs
+## Preconditions
 
-Read:
+Run only when `current/` contains `request.md`, optional `run-context.md`, and
+one or more valid work items, all work items are `.completed.md`, and no ready,
+active, or blocked item exists. If the state violates these conditions, return
+`blocked` without guessing.
 
-- the active review checkpoint;
-- every completed execution task named by its `Covers` section;
-- optional `run-context.md`;
-- only relevant current intent;
-- checkpoint-local diff and evidence derived from covered tasks' `Changes`,
-  checkpoint scope, and checkpoint verification.
+## Final Verification Procedure
 
-Do not read `request.md`, unrelated execution tasks, later work items, or the
-complete run.
+1. Resolve checks selected by the current `.idd/verification.md` for context
+   `final` and the complete Factory diff.
+2. Reuse existing evidence only when it is conclusive and still applies to the
+   current check definition and complete diff.
+3. Run every assigned automatic check that does not have reusable conclusive
+   evidence.
+4. Before a check with `confirmation: required`, ask the exact user decision and
+   wait for the answer.
+5. For a check with `instructions`, present the instructions and wait for the
+   user's actual result; do not infer success.
+6. Record confirmation refusal, unavailable execution, and unconfirmed user
+   instructions as `Not verified` with the precise reason and resumption
+   condition.
+7. Return `blocked` while any assigned final check remains `Not verified`.
+8. A conclusive failed check is evidence of a defect or blocker; classify the
+   resulting verdict according to whether bounded implementation work can fix it.
 
-## Rules
+## Review
 
-- Confirm the supplied item is the only active item and is a review checkpoint.
-- Confirm every `Covers` entry exists, is completed, is an execution task, and
-  forms the contiguous group required by the checkpoint.
-- Check covered goals, requirements, done conditions, named preservation
-  boundaries, shared context, public contracts, integration surface, code
-  quality, and checkpoint-level verification.
-- Review only the checkpoint and its necessary integration surface.
-- Assess implementation and verification separately.
-- Return only current material findings; do not accumulate history or prolong
-  loops for stylistic preferences.
-- Use `needs-fix` when one bounded corrective execution task can resolve the
-  checkpoint findings.
-- Use `needs-replan` when coverage, checkpoint placement, contracts, or ordering
-  prevent safe review.
-- Use `blocked` only for an external condition or exact non-intent user decision.
-- Use `intent-required` only for missing or conflicting durable behavior
-  discovered while reviewing implementation.
-- Do not modify code, intent, request, run context, execution tasks, checkpoint,
-  or filenames.
+Read the original request that defines the Factory Task, optional run context,
+all completed Subtask contracts and completions, all completed Review checkpoints and completions,
+only relevant current intent, the full actual diff, and available verification.
+Check:
+
+- complete satisfaction of the original request and every Subtask goal;
+- consistency between the original request, shared context, execution contracts,
+  and checkpoint results;
+- compliance with relevant intent and preservation boundaries;
+- integration and consistency across all execution results;
+- public contracts, maintainability, and sufficient integrated verification;
+- whether checkpoints covered the risky boundaries they claimed to protect;
+- absence of incomplete changes hidden by grouped checkpoint reviews;
+- absence of intent-changing work recorded as a Factory Subtask;
+- that Factory artifacts did not become product documentation.
+
+Assess implementation and verification independently. A favorable integrated
+implementation assessment does not compensate for missing required verification.
+Final verification sufficiency is defined by the assigned `final` checks, not by
+an assumption that every repository test must run.
+
+Do not modify code, intent, Factory files, or work-item statuses. Do not reopen
+completed items. Running assigned verification commands is part of final review
+and is not a modification of implementation or Factory state.
 
 ## Verdicts
 
-- `approved`: no material findings and all required checkpoint verification is
-  conclusive.
-- `needs-fix`: return one bounded self-contained implementation-only corrective
-  execution task suitable for insertion immediately before the checkpoint.
-- `needs-replan`: checkpoint coverage, placement, or contracts prevent safe
-  review.
-- `blocked`: an external condition or user decision prevents continuation.
-- `intent-required`: current intent cannot authorize the implementation result.
+- `approved`: the integrated implementation has no material findings and all
+  assigned final verification has conclusive evidence; the result is ready for
+  `idd-factory-finalize-run`.
+- `needs-fix`: return a bounded self-contained implementation-only corrective
+  Subtask suitable for the coordinator to append after completed items.
+  The mandatory next final review is the review gate; do not add a terminal
+  checkpoint solely for this correction.
+- `blocked`: identify the concrete blocking condition, including any assigned
+  final check that remains `Not verified`.
+- `intent-required`: identify missing or conflicting durable intent and the
+  applicable intent handoff. Do not define a corrective task until intent is
+  resolved outside the work-item list.
 
 ## Output
 
+Return the verdict first, then keep the assessments separate:
+
 ```text
-Verdict: <approved | needs-fix | needs-replan | blocked | intent-required>
+Verdict: <approved | needs-fix | blocked | intent-required>
 
 Implementation assessment:
-<covered implementation result and material findings>
+<integrated implementation result and material findings>
 
 Verification assessment:
-<conclusive and missing checkpoint evidence>
+<conclusive evidence and required evidence that remains incomplete>
 ```
 
-For `needs-fix`, append:
-
-```text
-Corrective execution task:
-<a complete self-contained execution-task contract>
-```
-
-For `needs-replan`, append:
-
-```text
-Dependency:
-<minimum coverage, placement, prerequisite, or contract correction>
-```
-
-For `blocked` or `intent-required`, append:
+For `needs-fix`, append only the complete corrective Subtask contract.
+For `blocked` or `intent-required`, append only this structured blocker:
 
 ```text
 Blocker:
 Reason:
-<one concrete condition>
+<one concrete blocking condition>
 
 Verified:
-<conclusive evidence or none>
+<only conclusive evidence already established, or none>
 
 Not verified:
-<required incomplete work or evidence>
+<required work or evidence that remains incomplete>
 
 Resume when:
-<condition or exact question that makes continuation safe>
+<one concrete condition that makes continuation safe>
 ```
 
-Never describe a blocked checkpoint as approved, completed, accepted, or
-finished. The coordinator owns Factory state and outcome.
+Do not describe a blocked result as approved, review passed, completed,
+accepted, or finished. The coordinator owns the Factory outcome.

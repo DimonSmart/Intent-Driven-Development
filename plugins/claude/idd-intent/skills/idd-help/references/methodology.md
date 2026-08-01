@@ -19,6 +19,11 @@ sequencing, review gates, or coordinated execution across bounded tasks. Factory
 may be selected automatically for those conditions, but it never becomes
 product intent and must stop when current intent is missing or insufficient.
 
+For Factory terminology, a Request is the original user instruction that
+defines one complete Task. A Factory run decomposes that Task into persisted
+Work items: Subtasks and Review checkpoints. Final Task review validates the
+complete Task result.
+
 Guiding rule:
 
 > Specifications should be complete enough to rebuild the product from scratch,
