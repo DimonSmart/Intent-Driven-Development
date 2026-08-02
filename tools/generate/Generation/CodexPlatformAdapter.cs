@@ -66,6 +66,23 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
         return files;
     }
 
+    protected override IReadOnlyList<GeneratedFile> BuildAdditionalPluginFiles(string pluginName, string version)
+    {
+        if (!StringComparer.Ordinal.Equals(pluginName, "idd-factory"))
+        {
+            return [];
+        }
+
+        var methodologyVersion = new JsonObject
+        {
+            ["schemaVersion"] = 1,
+            ["methodologyVersion"] = version
+        };
+        return [new GeneratedFile(
+            Path.Combine("skills", "idd-factory-run", "references", "methodology-version.json"),
+            methodologyVersion.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n")];
+    }
+
     protected override string BuildSkillFrontMatter(
         string skillName,
         SkillDescription skillDescription,

@@ -35,6 +35,11 @@ checkpoint evidence.
 Before state exists, run intent preflight and `idd-factory-decompose-task` with
 the complete request.
 
+Read `references/methodology-version.json` before creating state. Record its
+`methodologyVersion` as `Methodology version:` in `current/request.md`, carry it
+through finalization, and require the finalizer to include the same value in
+`factory-result.json`.
+
 - `NEEDS_CLARIFICATION`: ask all questions together; create no partial state.
 - `INTENT_REQUIRED`: create no state, run the intent workflow, reread intent,
   and decompose the complete original request again.

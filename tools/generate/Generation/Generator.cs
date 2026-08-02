@@ -2,7 +2,7 @@ using System.Text;
 
 internal sealed class Generator(RepositoryLayout layout)
 {
-    public IReadOnlyList<string> Run(bool checkOnly, string manifestVersion)
+    public IReadOnlyList<string> Run(bool checkOnly, string manifestVersion, string? outputDirectory = null)
     {
         if (Environment.ExitCode != 0)
         {
@@ -32,11 +32,11 @@ internal sealed class Generator(RepositoryLayout layout)
 
         if (checkOnly)
         {
-            errors.AddRange(GeneratedOutputChecker.CheckFiles(layout.MarketplaceRoot, expectedFiles));
+            errors.AddRange(GeneratedOutputChecker.CheckFiles(outputDirectory ?? layout.MarketplaceRoot, expectedFiles));
             return errors;
         }
 
-        GeneratedOutputWriter.Write(layout.MarketplaceRoot, expectedFiles);
+        GeneratedOutputWriter.Write(outputDirectory ?? layout.MarketplaceRoot, expectedFiles);
         return errors;
     }
 

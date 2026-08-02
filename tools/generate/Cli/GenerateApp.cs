@@ -5,7 +5,8 @@ internal sealed class GenerateApp
         var options = GeneratorOptionsParser.Parse(args);
         var repoRoot = RepositoryRootFinder.Find();
         var generator = new Generator(new RepositoryLayout(repoRoot));
-        var result = generator.Run(options.CheckOnly, options.ManifestVersion);
+        var outputDirectory = options.OutputDirectory is null ? null : Path.GetFullPath(options.OutputDirectory);
+        var result = generator.Run(options.CheckOnly, options.ManifestVersion, outputDirectory);
 
         if (result.Count == 0)
         {

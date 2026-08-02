@@ -4,6 +4,7 @@ internal static class GeneratorOptionsParser
     {
         var checkOnly = false;
         string? manifestVersion = null;
+        string? outputDirectory = null;
 
         for (var index = 0; index < args.Length; index++)
         {
@@ -20,25 +21,38 @@ internal static class GeneratorOptionsParser
                 {
                     Console.Error.WriteLine("Missing value for --version.");
                     Environment.ExitCode = 1;
-                    return new GeneratorOptions(checkOnly, "");
+                    return new GeneratorOptions(checkOnly, "", null);
                 }
 
                 manifestVersion = args[++index];
                 continue;
             }
 
+            if (StringComparer.Ordinal.Equals(arg, "--output"))
+            {
+                if (index + 1 >= args.Length || args[index + 1].StartsWith("--", StringComparison.Ordinal))
+                {
+                    Console.Error.WriteLine("Missing value for --output.");
+                    Environment.ExitCode = 1;
+                    return new GeneratorOptions(checkOnly, "", null);
+                }
+
+                outputDirectory = args[++index];
+                continue;
+            }
+
             Console.Error.WriteLine($"Unknown option: {arg}");
             Environment.ExitCode = 1;
-            return new GeneratorOptions(checkOnly, "");
+            return new GeneratorOptions(checkOnly, "", null);
         }
 
         if (string.IsNullOrWhiteSpace(manifestVersion))
         {
             Console.Error.WriteLine("Missing required --version MAJOR.MINOR.PATCH option.");
             Environment.ExitCode = 1;
-            return new GeneratorOptions(checkOnly, "");
+            return new GeneratorOptions(checkOnly, "", null);
         }
 
-        return new GeneratorOptions(checkOnly, manifestVersion);
+        return new GeneratorOptions(checkOnly, manifestVersion, outputDirectory);
     }
 }

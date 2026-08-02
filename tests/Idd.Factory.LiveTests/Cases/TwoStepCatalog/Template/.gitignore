@@ -1,0 +1,19 @@
+# .NET build output
+**/bin/
+**/obj/
+TestResults/
+artifacts/
+
+# IDE files
+.vs/
+.idea/
+*.user
+*.suo
+
+# Local agent and eval files
+.agents/
+.codex/
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -36,6 +36,8 @@ function Invoke-CheckedNative {
 
 Invoke-CheckedNative dotnet build tools/generate/Generate.csproj --nologo
 Invoke-CheckedNative dotnet build tools/smoke-tests/SmokeTests.csproj --nologo
+Invoke-CheckedNative dotnet build tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj --nologo
+Invoke-CheckedNative dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj --no-build --nologo
 
 Invoke-CheckedNative dotnet exec tools/generate/bin/Debug/net10.0/Generate.dll --version $Version
 if (-not (Test-Path -LiteralPath (Join-Path $repoRoot "artifacts/marketplace/.agents/plugins/marketplace.json"))) {

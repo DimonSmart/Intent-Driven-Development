@@ -36,8 +36,12 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
             files.AddRange(BuildAssetFiles(asset));
         }
 
+        files.AddRange(BuildAdditionalPluginFiles(pluginName, version));
+
         return files;
     }
+
+    protected virtual IReadOnlyList<GeneratedFile> BuildAdditionalPluginFiles(string pluginName, string version) => [];
 
     protected abstract string BuildPluginManifest(
         AdapterConfig adapter,
