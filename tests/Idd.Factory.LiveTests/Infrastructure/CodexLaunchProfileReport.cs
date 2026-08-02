@@ -18,6 +18,7 @@ public sealed record CodexLaunchProfileAttempt(
     string? CreatedFileContent,
     bool ExistingFileExists,
     string? ExistingFileContent,
+    string? FailureReason,
     bool Passed);
 
 public static partial class CodexLaunchProfileReport
@@ -66,6 +67,7 @@ public static partial class CodexLaunchProfileReport
                 .AppendLine($"- Codex version: `{EscapeMarkdown(result.CodexVersion)}`")
                 .AppendLine($"- Exit code: {result.ExitCode?.ToString() ?? "unavailable"}")
                 .AppendLine($"- Timeout: {result.TimedOut?.ToString() ?? "unavailable"}")
+                .AppendLine($"- Failure reason: {result.FailureReason ?? "none"}")
                 .AppendLine($"- Command: `{EscapeMarkdown(result.CommandLine)}`")
                 .AppendLine($"- Attempt directory: `{Path.GetRelativePath(repositoryRoot, result.AttemptDirectory)}`")
                 .AppendLine($"- stderr: `{Path.GetRelativePath(repositoryRoot, result.StderrPath)}`")
@@ -77,6 +79,27 @@ public static partial class CodexLaunchProfileReport
         var reportPath = Path.Combine(repositoryRoot, "artifacts", "factory-evals", "codex-launch-profile-report.md");
         Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
         await File.WriteAllTextAsync(reportPath, report.ToString(), cancellationToken);
+    }
+
+    internal static ProbeResponseReadResult TryReadProbeResponse(string path, string expectedResult)
+    {
+        if (!File.Exists(path)) return new(false, "structured response is missing or invalid");
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object || root.EnumerateObject().Count() != 1 ||
+                !root.TryGetProperty("result", out var result) || result.ValueKind != JsonValueKind.String ||
+                result.GetString() != expectedResult)
+                return new(false, "structured response is missing or invalid");
+        }
+        catch (JsonException)
+        {
+            return new(false, "structured response is missing or invalid");
+        }
+
+        return new(true, null);
     }
 
     private static string QuoteArgument(string argument)
@@ -92,3 +115,5 @@ public static partial class CodexLaunchProfileReport
     [GeneratedRegex("(?i)\\b([a-z0-9_-]*(?:api[_-]?key|token|authorization|password))=([^\\s]+)")]
     private static partial Regex SecretPattern();
 }
+
+internal sealed record ProbeResponseReadResult(bool Passed, string? FailureReason);

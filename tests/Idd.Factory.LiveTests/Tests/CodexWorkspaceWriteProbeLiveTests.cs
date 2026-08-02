@@ -24,6 +24,7 @@ public sealed class CodexWorkspaceWriteProbeLiveTests
         var environment = new LocalFactoryEvalEnvironment(runner);
         var options = CreateOptions();
         ProcessResult? codex = null;
+        ProbeResponseReadResult response = new(false, "structured response is missing or invalid");
         string codexVersion = "unavailable";
         var commandLine = CodexLaunchProfileReport.FormatCommandLine(
             environment.CodexCommand.Executable,
@@ -50,7 +51,9 @@ public sealed class CodexWorkspaceWriteProbeLiveTests
             var existingPath = Path.Combine(workspace.WorkspaceDirectory, "existing.txt");
             var createdContent = File.Exists(createdPath) ? await File.ReadAllTextAsync(createdPath, cancellationToken) : null;
             var existingContent = File.Exists(existingPath) ? await File.ReadAllTextAsync(existingPath, cancellationToken) : null;
-            var passed = createdContent == "WORKSPACE_WRITE_OK" && existingContent == "WORKSPACE_UPDATE_OK";
+            response = CodexLaunchProfileReport.TryReadProbeResponse(workspace.LastMessagePath, "WORKSPACE_WRITE_OK");
+            var failureReason = GetFailureReason(codex, response, File.Exists(createdPath), createdContent, File.Exists(existingPath), existingContent);
+            var passed = failureReason is null;
             var attempt = new CodexLaunchProfileAttempt(
                 profileName,
                 workspace.RunDirectory,
@@ -64,10 +67,15 @@ public sealed class CodexWorkspaceWriteProbeLiveTests
                 createdContent,
                 File.Exists(existingPath),
                 existingContent,
+                failureReason,
                 passed);
             await CodexLaunchProfileReport.WriteAsync(repositoryRoot, discoveryId, attempt, cancellationToken);
         }
 
+        Assert.NotNull(codex);
+        Assert.False(codex.TimedOut);
+        Assert.Equal(0, codex.ExitCode);
+        Assert.True(response.Passed, response.FailureReason);
         Assert.Equal("WORKSPACE_WRITE_OK", await ReadIfPresentAsync(Path.Combine(workspace.WorkspaceDirectory, "codex-write-probe.txt"), cancellationToken));
         Assert.Equal("WORKSPACE_UPDATE_OK", await ReadIfPresentAsync(Path.Combine(workspace.WorkspaceDirectory, "existing.txt"), cancellationToken));
     }
@@ -109,4 +117,17 @@ public sealed class CodexWorkspaceWriteProbeLiveTests
 
     private static async Task<string?> ReadIfPresentAsync(string path, CancellationToken cancellationToken)
         => File.Exists(path) ? await File.ReadAllTextAsync(path, cancellationToken) : null;
+
+    private static string? GetFailureReason(ProcessResult? codex, ProbeResponseReadResult response, bool createdFileExists, string? createdContent, bool existingFileExists, string? existingContent)
+    {
+        if (codex is null) return "Codex did not produce a process result";
+        if (codex.TimedOut) return "Codex timed out";
+        if (codex.ExitCode != 0) return $"Codex exited with code {codex.ExitCode}";
+        if (!response.Passed) return response.FailureReason;
+        if (!createdFileExists) return "created file is missing";
+        if (createdContent != "WORKSPACE_WRITE_OK") return "created file has unexpected content";
+        if (!existingFileExists) return "existing file is missing";
+        if (existingContent != "WORKSPACE_UPDATE_OK") return "existing file was not updated";
+        return null;
+    }
 }

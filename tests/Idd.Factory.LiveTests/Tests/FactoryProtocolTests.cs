@@ -206,6 +206,7 @@ public sealed class FactoryProtocolTests
             Assert.Contains("| `isolated-workspace-write` | FAIL |", report, StringComparison.Ordinal);
             Assert.Contains("| `configured-workspace-write` | PASS |", report, StringComparison.Ordinal);
             Assert.Contains("Selected profile: `configured-workspace-write`", report, StringComparison.Ordinal);
+            Assert.Contains("- Failure reason: none", report, StringComparison.Ordinal);
         }
         finally
         {
@@ -214,7 +215,22 @@ public sealed class FactoryProtocolTests
     }
 
     private static CodexLaunchProfileAttempt CreateAttempt(string profileName, string attemptDirectory, bool passed)
-        => new(profileName, attemptDirectory, "codex exec", "codex 1.0", 0, false, Path.Combine(attemptDirectory, "stderr.log"), Path.Combine(attemptDirectory, "events.jsonl"), passed, passed ? "WORKSPACE_WRITE_OK" : null, true, passed ? "WORKSPACE_UPDATE_OK" : "WORKSPACE_UPDATE_PENDING", passed);
+        => new(profileName, attemptDirectory, "codex exec", "codex 1.0", 0, false, Path.Combine(attemptDirectory, "stderr.log"), Path.Combine(attemptDirectory, "events.jsonl"), passed, passed ? "WORKSPACE_WRITE_OK" : null, true, passed ? "WORKSPACE_UPDATE_OK" : "WORKSPACE_UPDATE_PENDING", passed ? null : "created file is missing", passed);
+
+    [Theory]
+    [InlineData("{\"result\":\"WORKSPACE_WRITE_OK\"}", true)]
+    [InlineData("{\"result\":\"WRONG\"}", false)]
+    [InlineData("{\"result\":\"WORKSPACE_WRITE_OK\",\"extra\":true}", false)]
+    [InlineData("not json", false)]
+    public void WorkspaceWriteProbeResponse_RequiresTheExpectedStructuredResult(string content, bool expectedPassed)
+    {
+        using var fixture = new FactoryFixture();
+        File.WriteAllText(fixture.LastMessagePath, content);
+
+        var result = CodexLaunchProfileReport.TryReadProbeResponse(fixture.LastMessagePath, "WORKSPACE_WRITE_OK");
+
+        Assert.Equal(expectedPassed, result.Passed);
+    }
 
     private static bool HasOption(IReadOnlyList<string> arguments, string option, string value) => arguments.Select((argument, index) => (argument, index)).Any(pair => pair.argument == option && pair.index + 1 < arguments.Count && arguments[pair.index + 1] == value);
 
