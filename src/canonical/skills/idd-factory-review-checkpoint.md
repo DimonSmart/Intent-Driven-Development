@@ -1,7 +1,7 @@
 # idd-factory-review-checkpoint
 
 For the active checkpoint, resolve its recorded IDs from current
-`.idd/verification.md` using context `checkpoint` and the aggregate `Covers`
+`.idd/verification.yaml` using context `checkpoint` and the aggregate `Covers`
 scope. Required unverified checks prevent approval. Do not run final checks.
 
 ## Purpose

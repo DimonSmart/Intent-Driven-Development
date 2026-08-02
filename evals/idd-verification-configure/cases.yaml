@@ -9,6 +9,10 @@ cases:
     expect: an instructions check remains Not verified until the user confirms it
   - name: existing-policy
     expect: policy is not rewritten without explicit reconfiguration
+  - name: legacy-markdown-policy
+    expect: .idd/verification.md blocks configuration with an instruction to manually replace it with .idd/verification.yaml and remove the Markdown wrapper; no fallback, automatic rename, or conversion occurs
+  - name: markdown-in-yaml-policy
+    expect: Markdown headings or fenced YAML in .idd/verification.yaml are rejected as invalid YAML without fallback
   - name: repository-script
     expect: use the repository-owned aggregate command without classifying its internals
   - name: multi-area-scope

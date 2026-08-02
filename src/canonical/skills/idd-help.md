@@ -40,7 +40,7 @@ Answer questions such as:
   implementation checks fit the methodology;
 - how a current IDD rule should be interpreted;
 - what an installed IDD skill is expected to do or not do.
-- `.idd/verification.md`, its `direct`, `subtask`, `checkpoint`, and `final`
+- `.idd/verification.yaml`, its `direct`, `subtask`, `checkpoint`, and `final`
   contexts, confirmation checks, user instructions, and missing-policy fallback.
 
 When a question concerns one concrete project, inspect project-owned IDD context

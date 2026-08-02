@@ -18,7 +18,7 @@ cases:
 
   - id: implicit-verification-configuration
     mode: implicit-routing
-    request: "Configure project verification rules in .idd/verification.md. Use dotnet test for direct changes and the repository check script for final review."
+    request: "Configure project verification rules in .idd/verification.yaml. Use dotnet test for direct changes and the repository check script for final review."
     repository_fixture: null
     expected_router_invoked: true
     expected_classification: verification-configuration

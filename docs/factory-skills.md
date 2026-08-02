@@ -1,6 +1,6 @@
 # IDD Factory Skills Reference
 
-When present, `.idd/verification.md` assigns `subtask` checks to Subtasks,
+When present, `.idd/verification.yaml` assigns `subtask` checks to Subtasks,
 `checkpoint` checks to Review checkpoints, and `final` checks to final Task
 review. A Subtask never broadens its own checks.
 

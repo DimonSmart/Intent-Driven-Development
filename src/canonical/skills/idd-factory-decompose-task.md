@@ -51,12 +51,12 @@ state.
 - Use the Subtask, Review checkpoint, and run-context formats from
   `idd-factory-run`.
 - Do not create Factory state, product intent, code, or tests.
-- Read `.idd/verification.md` when present before producing items. Resolve
+- Read `.idd/verification.yaml` when present before producing items. Resolve
   `subtask` checks for each Subtask and `checkpoint` checks for each
   Review checkpoint from its complete scope; record stable check IDs only, never
   commands, timeout, or instructions. Put shared costly checks at checkpoint or
   final instead of every subtask. Invalid or unresolved verification-policy
-  entries from `.idd/verification.md` block planning before Factory state is
+  entries from `.idd/verification.yaml` block planning before Factory state is
   created.
 - If a read-only command is rejected by execution policy or fails because of its
   form, make at most two narrower, simpler alternatives: split a compound

@@ -31,7 +31,7 @@
     "invocation": "manual"
   },
   "idd-verification-configure": {
-    "description": "Create or deliberately update project-specific `.idd/verification.md` rules without changing product intent.",
+    "description": "Create or deliberately update project-specific `.idd/verification.yaml` rules without changing product intent.",
     "invocation": "manual"
   },
   "idd-intent-bootstrap": {

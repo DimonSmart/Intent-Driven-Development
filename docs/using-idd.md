@@ -8,7 +8,7 @@ In Factory, the original Request defines one complete Task. A Factory run
 decomposes the Task into Work items: bounded Subtasks and Review checkpoints.
 The final Task review validates the complete Task result.
 
-For project-specific commands, use `idd-verification-configure` to create `.idd/verification.md`. It assigns checks by `direct`, `subtask`, `checkpoint`, and `final` context without putting commands in product intent.
+For project-specific commands, use `idd-verification-configure` to create `.idd/verification.yaml`. It assigns checks by `direct`, `subtask`, `checkpoint`, and `final` context without putting commands in product intent.
 
 ## Find the Right Action
 

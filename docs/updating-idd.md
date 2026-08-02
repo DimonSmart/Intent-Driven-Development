@@ -1,6 +1,6 @@
 # Updating IDD
 
-`.idd/verification.md` is project-owned and is not automatically rewritten by a plugin update. Review or reconfigure it explicitly with `idd-verification-configure`.
+`.idd/verification.yaml` is project-owned and is not automatically rewritten by a plugin update. Review or reconfigure it explicitly with `idd-verification-configure`.
 
 Intent-Driven Development is actively developed. New releases may add workflows, improve agent instructions, fix problems, or clarify the methodology.
 

@@ -24,7 +24,7 @@ active, or blocked item exists. If the state violates these conditions, return
 
 ## Final Verification Procedure
 
-1. Resolve checks selected by the current `.idd/verification.md` for context
+1. Resolve checks selected by the current `.idd/verification.yaml` for context
    `final` and the complete Factory diff.
 2. Reuse existing evidence only when it is conclusive and still applies to the
    current check definition and complete diff.

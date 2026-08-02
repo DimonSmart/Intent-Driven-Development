@@ -83,7 +83,7 @@ The root Coding Agent instruction file must contain exactly one managed IDD bloc
 ## Intent-Driven Development
 
 This project uses Intent-Driven Development (IDD). Treat `.idd/intent/` as the
-current product truth. When `.idd/verification.md` exists, follow it as the
+current product truth. When `.idd/verification.yaml` exists, follow it as the
 project-owned verification policy. Use the installed IDD skills when changing
 intent, implementing behavior, or verifying implementation.
 <!-- idd:project:end -->
@@ -104,9 +104,12 @@ Apply these rules:
 ### 4. Offer verification configuration
 
 After structural initialization, cheaply inspect only repository technology
-markers. If `.idd/verification.md` is absent and the user did not explicitly
-request structural initialization only, ask: `Configure project-specific
-verification rules?` Offer `configure` to hand off to
+markers. If `.idd/verification.md` exists, stop verification-policy handling and
+report that it must be manually replaced with `.idd/verification.yaml` with the
+Markdown wrapper removed; do not rename, convert, or fall back. Otherwise, if
+`.idd/verification.yaml` is absent and the user did not explicitly request
+structural initialization only, ask: `Configure project-specific verification
+rules?` Offer `configure` to hand off to
 `idd-verification-configure`, or `use-defaults` to continue with repository or
 platform fallback. The latter creates no marker file. Do not repeat this offer
 on idempotent initialization and never modify an existing policy without an

@@ -153,7 +153,7 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
    - create a spike if the correct intent requires research.
 
 9. Do not apply fixes unless the user explicitly asks for them.
-10. When repository commands are needed, resolve `.idd/verification.md` with
+10. When repository commands are needed, resolve `.idd/verification.yaml` with
     context `direct` for the focused changed paths. Run only assigned automatic
     checks; request confirmation when required; and keep user instructions
     `Not verified` until confirmed. If no policy exists, report the

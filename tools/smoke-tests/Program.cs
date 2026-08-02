@@ -154,10 +154,19 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     {
         var initText = File.ReadAllText(initSkillPath);
         ExpectContains(initText, "idd-intent", $"{platform} project initialization plugin declaration");
+        ExpectContains(initText, ".idd/verification.yaml", $"{platform} project initialization verification policy path");
         if (initText.Contains("\"idd\"", StringComparison.Ordinal))
         {
             failures.Add($"{platform} project initialization still declares the unified idd plugin.");
         }
+    }
+
+    var verificationSkillPath = Path.Combine(intentRoot, "skills", "idd-verification-configure", "SKILL.md");
+    if (File.Exists(verificationSkillPath))
+    {
+        var verificationText = File.ReadAllText(verificationSkillPath);
+        ExpectContains(verificationText, ".idd/verification.yaml", $"{platform} verification configuration path");
+        ExpectContains(verificationText, "manually replaced", $"{platform} legacy verification migration error");
     }
 
     foreach (var skill in new[]
