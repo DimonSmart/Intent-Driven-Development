@@ -10,6 +10,11 @@ Formula:
 idd-code-implement = current spec intent + mode + code change + verification
 ```
 
+## Required Reference
+
+Read `references/project-verification.md` before resolving verification checks
+or repository/platform fallback.
+
 ## Modes
 
 ```text

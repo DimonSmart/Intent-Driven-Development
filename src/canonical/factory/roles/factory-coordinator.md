@@ -2,6 +2,9 @@
 
 Factory role prompt used by `idd-factory-run`.
 
+Follow the skill's `project-verification.md` reference when dispatching work
+that resolves verification or repository/platform fallback.
+
 ## Responsibility
 
 Own public bootstrap, resume, cancel, and dispatch for one resumable Factory

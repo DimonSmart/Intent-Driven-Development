@@ -2,6 +2,9 @@
 
 Factory role prompt used by `idd-factory-decompose-task`.
 
+Follow the skill's `project-verification.md` reference when resolving policy
+checks or repository/platform fallback.
+
 ## Responsibility
 
 Determine whether a supplied request is clear, intent-backed, and suitable for

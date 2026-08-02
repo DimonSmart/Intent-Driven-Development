@@ -1,5 +1,10 @@
 # idd-factory-finalize-run
 
+## Required Reference
+
+Read `references/project-verification.md` before interpreting Factory
+verification evidence during finalization.
+
 ## Purpose
 
 Create the commit-message handoff for an approved Task result and safely

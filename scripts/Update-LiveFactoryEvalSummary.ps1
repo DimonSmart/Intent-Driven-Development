@@ -27,7 +27,7 @@ $windowsVersion = "$($windows.Caption) $($windows.Version) (build $($windows.Bui
 $lines = [System.Collections.Generic.List[string]]::new()
 $lines.Add('# Codex Windows launch-profile result')
 $lines.Add('')
-$lines.Add("Generated (UTC): $(Get-Date -AsUTC -Format 'yyyy-MM-dd HH:mm:ss')")
+$lines.Add("Generated (UTC): $([DateTime]::UtcNow.ToString('yyyy-MM-dd HH:mm:ss') -Format 'yyyy-MM-dd HH:mm:ss')")
 $lines.Add("Discovery: ``$DiscoveryId``")
 $lines.Add("Codex version: ``$codexVersion``")
 $lines.Add("Windows version: $windowsVersion")

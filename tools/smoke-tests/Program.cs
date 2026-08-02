@@ -16,6 +16,7 @@ CheckCodexMarketplace();
 CheckPlatformPlugins("claude", ".claude-plugin");
 CheckPlatformPlugins("codex", ".codex-plugin");
 CheckCanonicalSkillReferences();
+CheckVerificationPolicyContract();
 CheckPublishedLayout();
 CheckGeneratorCheckMode();
 CheckSecondRunIsStable();
@@ -138,7 +139,16 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     ExpectMissing(Path.Combine(intentRoot, "skills", "idd-factory-create-work-plan"));
     ExpectMissing(Path.Combine(intentRoot, "skills", "idd-factory-execute-work-plan"));
     ExpectFile(Path.Combine(intentRoot, "assets", "bootstrap", ".idd", "intent", "README.md"));
-    ExpectFile(Path.Combine(intentRoot, "skills", "idd-verification-configure", "references", "project-verification.md"));
+    foreach (var skill in new[]
+    {
+        "idd-project-init",
+        "idd-verification-configure",
+        "idd-code-implement",
+        "idd-code-check-implementation"
+    })
+    {
+        ExpectFile(Path.Combine(intentRoot, "skills", skill, "references", "project-verification.md"));
+    }
     ExpectFile(Path.Combine(
         intentRoot,
         "skills",
@@ -166,7 +176,6 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     {
         var verificationText = File.ReadAllText(verificationSkillPath);
         ExpectContains(verificationText, ".idd/verification.yaml", $"{platform} verification configuration path");
-        ExpectContains(verificationText, "manually replaced", $"{platform} legacy verification migration error");
     }
 
     foreach (var skill in new[]
@@ -181,6 +190,7 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     })
     {
         ExpectFile(Path.Combine(factoryRoot, "skills", skill, "SKILL.md"));
+        ExpectFile(Path.Combine(factoryRoot, "skills", skill, "references", "project-verification.md"));
     }
 
     ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-factory-create-work-plan"));
@@ -415,6 +425,32 @@ void CheckCanonicalSkillReferences()
     foreach (var platform in new[] { "claude", "codex" })
     {
         ExpectMissing(Path.Combine(marketplaceRoot, "plugins", platform, "idd-factory", "skills", "idd-route", "references"));
+    }
+}
+
+void CheckVerificationPolicyContract()
+{
+    var legacyPolicyPath = ".idd/" + "verification" + ".md";
+    var roots = new[] { "README.md", "docs", "evals", "src", "tests", "tools" };
+
+    foreach (var root in roots)
+    {
+        var path = Path.Combine(repoRoot, root);
+        var files = File.Exists(path)
+            ? [path]
+            : Directory.Exists(path)
+                ? Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories)
+                    .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                    .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                : [];
+
+        foreach (var file in files)
+        {
+            if (File.ReadAllText(file).Contains(legacyPolicyPath, StringComparison.Ordinal))
+            {
+                failures.Add($"Active repository content still references unsupported verification policy '{legacyPolicyPath}': {file}.");
+            }
+        }
     }
 }
 

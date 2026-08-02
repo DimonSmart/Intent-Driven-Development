@@ -9,10 +9,20 @@ cases:
     expect: an instructions check remains Not verified until the user confirms it
   - name: existing-policy
     expect: policy is not rewritten without explicit reconfiguration
-  - name: legacy-markdown-policy
-    expect: .idd/verification.md blocks configuration with an instruction to manually replace it with .idd/verification.yaml and remove the Markdown wrapper; no fallback, automatic rename, or conversion occurs
+  - name: valid-yaml-policy
+    expect: a complete valid .idd/verification.yaml document is loaded as the project policy
+  - name: yaml-document-loading
+    expect: .idd/verification.yaml is read directly as one YAML document without extracting Markdown fenced content
   - name: markdown-in-yaml-policy
     expect: Markdown headings or fenced YAML in .idd/verification.yaml are rejected as invalid YAML without fallback
+  - name: invalid-yaml-policy
+    expect: invalid YAML blocks the current operation without repository or platform fallback
+  - name: unsupported-policy-version
+    expect: an unsupported policy version blocks the current operation without repository or platform fallback
+  - name: missing-yaml-policy
+    expect: absent .idd/verification.yaml uses the repository or platform fallback
+  - name: unrelated-markdown-file
+    expect: an unrelated .idd verification Markdown file does not affect policy discovery or fallback
   - name: repository-script
     expect: use the repository-owned aggregate command without classifying its internals
   - name: multi-area-scope

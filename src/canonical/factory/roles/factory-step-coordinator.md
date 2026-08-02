@@ -3,6 +3,9 @@
 Role prompt used by `idd-factory-coordinate-step` and
 `idd-factory-finalize-run`.
 
+Follow the skill's `project-verification.md` reference when coordinating
+verification or repository/platform fallback.
+
 ## Responsibility
 
 Restore one persisted Factory state, coordinate exactly one logical Factory

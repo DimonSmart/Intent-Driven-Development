@@ -1,5 +1,10 @@
 # idd-factory-coordinate-step
 
+## Required Reference
+
+Read `references/project-verification.md` before coordinating a worker whose
+verification is unresolved or falls back to repository/platform checks.
+
 ## Purpose
 
 Process exactly one logical action of the current Factory run in a fresh,

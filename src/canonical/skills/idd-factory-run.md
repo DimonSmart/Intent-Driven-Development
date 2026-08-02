@@ -1,5 +1,10 @@
 # idd-factory-run
 
+## Required Reference
+
+Read `references/project-verification.md` before Factory planning, execution,
+review, or verification fallback.
+
 ## Purpose
 
 The sole public entry point for starting, resuming, or cancelling one Factory

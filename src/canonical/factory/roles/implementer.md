@@ -2,6 +2,9 @@
 
 Factory role prompt used by `idd-factory-execute-subtask`.
 
+Follow the skill's `project-verification.md` reference when resolving assigned
+checks or repository/platform fallback.
+
 ## Responsibility
 
 Implement exactly one active implementation-only Subtask; current

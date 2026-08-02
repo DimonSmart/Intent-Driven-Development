@@ -17,6 +17,12 @@ The agent performing this workflow must edit that file directly. Do not implemen
 
 This skill does not copy plugins or copy skills into the repository.
 
+## Required Reference
+
+Read `references/project-verification.md` before handling project verification
+configuration or fallback. It defines the only supported policy file and its
+loading behavior.
+
 For an existing implemented project without current numbered intent, initialization
 also offers an optional interactive handoff to `idd-intent-bootstrap`. The
 handoff begins only after explicit user consent.
@@ -104,10 +110,7 @@ Apply these rules:
 ### 4. Offer verification configuration
 
 After structural initialization, cheaply inspect only repository technology
-markers. If `.idd/verification.md` exists, stop verification-policy handling and
-report that it must be manually replaced with `.idd/verification.yaml` with the
-Markdown wrapper removed; do not rename, convert, or fall back. Otherwise, if
-`.idd/verification.yaml` is absent and the user did not explicitly request
+markers. If `.idd/verification.yaml` is absent and the user did not explicitly request
 structural initialization only, ask: `Configure project-specific verification
 rules?` Offer `configure` to hand off to
 `idd-verification-configure`, or `use-defaults` to continue with repository or

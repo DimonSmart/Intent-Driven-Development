@@ -1,5 +1,10 @@
 # idd-factory-review-task
 
+## Required Reference
+
+Read `references/project-verification.md` before resolving assigned checks or
+repository/platform fallback.
+
 The final reviewer owns verification for context `final` over the complete
 Factory diff. Before producing a verdict, resolve the current final-policy
 checks, reuse only conclusive evidence that still applies to the current check

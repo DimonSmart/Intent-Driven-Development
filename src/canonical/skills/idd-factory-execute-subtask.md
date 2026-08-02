@@ -1,5 +1,10 @@
 # idd-factory-execute-subtask
 
+## Required Reference
+
+Read `references/project-verification.md` before resolving assigned checks or
+repository/platform fallback.
+
 Resolve verification checks using context `subtask` for the active Subtask. Run
 exactly its recorded IDs;
 do not add checks selected only for checkpoint or final contexts. A

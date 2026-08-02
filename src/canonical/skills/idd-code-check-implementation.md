@@ -6,6 +6,11 @@ Use this skill to check whether the current implementation satisfies current
 This skill compares implementation evidence with current specifications and
 classifies differences. It does not silently change specifications or code.
 
+## Required Reference
+
+Read `references/project-verification.md` before resolving verification checks
+or repository/platform fallback.
+
 ## Required Input
 
 The request must provide at least one concrete check focus:

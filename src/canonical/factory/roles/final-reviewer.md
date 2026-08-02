@@ -2,6 +2,9 @@
 
 Factory role prompt used by `idd-factory-review-task`.
 
+Follow the skill's `project-verification.md` reference when resolving assigned
+checks or repository/platform fallback.
+
 ## Responsibility
 
 Independently review the integrated Factory result after every Subtask and

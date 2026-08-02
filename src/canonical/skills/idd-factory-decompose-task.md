@@ -1,5 +1,10 @@
 # idd-factory-decompose-task
 
+## Required Reference
+
+Read `references/project-verification.md` before resolving policy checks or
+repository/platform fallback.
+
 ## Purpose
 
 Produce the smallest safe ordered decomposition for one Factory Task defined by

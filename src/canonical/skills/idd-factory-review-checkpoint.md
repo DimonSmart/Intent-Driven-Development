@@ -1,5 +1,10 @@
 # idd-factory-review-checkpoint
 
+## Required Reference
+
+Read `references/project-verification.md` before resolving assigned checks or
+repository/platform fallback.
+
 For the active checkpoint, resolve its recorded IDs from current
 `.idd/verification.yaml` using context `checkpoint` and the aggregate `Covers`
 scope. Required unverified checks prevent approval. Do not run final checks.

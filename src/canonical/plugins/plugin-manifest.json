@@ -66,6 +66,16 @@
           "destination": "project-verification.md"
         },
         {
+          "skill": "idd-code-implement",
+          "source": "src/canonical/methodology/project-verification.md",
+          "destination": "project-verification.md"
+        },
+        {
+          "skill": "idd-code-check-implementation",
+          "source": "src/canonical/methodology/project-verification.md",
+          "destination": "project-verification.md"
+        },
+        {
           "skill": "idd-intent-bootstrap",
           "source": "src/canonical/methodology/glossary-integration.md",
           "destination": "glossary-integration.md"
@@ -131,6 +141,43 @@
           "factory-step-coordinator"
         ]
       },
+      "skillReferences": [
+        {
+          "skill": "idd-factory-run",
+          "source": "src/canonical/methodology/project-verification.md",
+          "destination": "project-verification.md"
+        },
+        {
+          "skill": "idd-factory-coordinate-step",
+          "source": "src/canonical/methodology/project-verification.md",
+          "destination": "project-verification.md"
+        },
+        {
+          "skill": "idd-factory-decompose-task",
+          "source": "src/canonical/methodology/project-verification.md",
+          "destination": "project-verification.md"
+        },
+        {
+          "skill": "idd-factory-execute-subtask",
+          "source": "src/canonical/methodology/project-verification.md",
+          "destination": "project-verification.md"
+        },
+        {
+          "skill": "idd-factory-review-checkpoint",
+          "source": "src/canonical/methodology/project-verification.md",
+          "destination": "project-verification.md"
+        },
+        {
+          "skill": "idd-factory-review-task",
+          "source": "src/canonical/methodology/project-verification.md",
+          "destination": "project-verification.md"
+        },
+        {
+          "skill": "idd-factory-finalize-run",
+          "source": "src/canonical/methodology/project-verification.md",
+          "destination": "project-verification.md"
+        }
+      ],
       "assets": [
         {
           "source": "src/canonical/project-files/factory",
