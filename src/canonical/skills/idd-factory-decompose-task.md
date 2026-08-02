@@ -55,8 +55,16 @@ state.
   `subtask` checks for each Subtask and `checkpoint` checks for each
   Review checkpoint from its complete scope; record stable check IDs only, never
   commands, timeout, or instructions. Put shared costly checks at checkpoint or
-  final instead of every subtask. Policy errors required by the run block
-  planning before Factory state exists.
+  final instead of every subtask. Invalid or unresolved verification-policy
+  entries from `.idd/verification.md` block planning before Factory state is
+  created.
+- If a read-only command is rejected by execution policy or fails because of its
+  form, make at most two narrower, simpler alternatives: split a compound
+  command, remove recursion or wildcards, then read a specific directory or
+  file. An equivalent read-only tool is allowed. Do not repeat a command,
+  elevate permissions, change approval or sandbox policy, or write. Return
+  `BLOCKED` only after required information remains unavailable after those
+  alternatives; record only `Reason`, `Not verified`, and `Resume when`.
 
 ## Results
 

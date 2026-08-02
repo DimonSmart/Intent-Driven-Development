@@ -2,20 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "methodologyVersion", "factoryOutcome", "subtaskCount", "completedSubtaskCount", "reviewCheckpointCount", "completedReviewCheckpointCount", "correctiveSubtaskCount", "blockedItemCount", "incompleteItemCount", "finalReviewVerdict", "verificationStatus", "commitMessagePath"],
+  "required": ["schemaVersion", "factoryOutcome", "factoryResultPath", "reason"],
   "properties": {
     "schemaVersion": { "type": "integer", "const": 1 },
-    "methodologyVersion": { "type": "string", "minLength": 1 },
-    "factoryOutcome": { "enum": ["COMPLETED", "BLOCKED", "INTENT_REQUIRED", "CANCELLED"] },
-    "subtaskCount": { "type": "integer", "minimum": 0 },
-    "completedSubtaskCount": { "type": "integer", "minimum": 0 },
-    "reviewCheckpointCount": { "type": "integer", "minimum": 0 },
-    "completedReviewCheckpointCount": { "type": "integer", "minimum": 0 },
-    "correctiveSubtaskCount": { "type": "integer", "minimum": 0 },
-    "blockedItemCount": { "type": "integer", "minimum": 0 },
-    "incompleteItemCount": { "type": "integer", "minimum": 0 },
-    "finalReviewVerdict": { "enum": ["approved", "needs-fix", "blocked", "intent-required", "not-run"] },
-    "verificationStatus": { "enum": ["passed", "failed", "incomplete", "not-run"] },
-    "commitMessagePath": { "type": "string", "minLength": 1 }
+    "factoryOutcome": { "enum": ["COMPLETED", "FOCUSED_HANDOFF", "NEEDS_CLARIFICATION", "INTENT_REQUIRED", "BLOCKED", "CORRUPT_FACTORY_STATE"] },
+    "factoryResultPath": { "type": ["string", "null"] },
+    "reason": { "type": ["string", "null"] }
   }
 }

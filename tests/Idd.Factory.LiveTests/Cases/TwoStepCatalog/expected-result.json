@@ -1,13 +1,6 @@
 {
   "schemaVersion": 1,
   "factoryOutcome": "COMPLETED",
-  "subtaskCount": 2,
-  "completedSubtaskCount": 2,
-  "reviewCheckpointCount": 1,
-  "completedReviewCheckpointCount": 1,
-  "correctiveSubtaskCount": 0,
-  "blockedItemCount": 0,
-  "incompleteItemCount": 0,
-  "finalReviewVerdict": "approved",
-  "verificationStatus": "passed"
+  "factoryResultPath": ".idd/factory/results/example/factory-result.json",
+  "reason": null
 }

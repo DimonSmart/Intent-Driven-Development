@@ -13,4 +13,11 @@ Create exactly one independent Review checkpoint after the first Subtask and bef
 Do not change durable product intent, add external packages, or modify prepared tests except to repair an objective test infrastructure error.
 Complete all required verification and final integrated review.
 
-After Factory finalization, return only the exact JSON contents of the generated factory-result.json file.
+After the Factory attempt finishes or stops, return only one JSON object
+matching final-response.schema.json.
+
+For COMPLETED, factoryResultPath must point to the generated
+factory-result.json.
+
+For any other outcome, factoryResultPath must be null and reason must
+describe the actual stop condition.

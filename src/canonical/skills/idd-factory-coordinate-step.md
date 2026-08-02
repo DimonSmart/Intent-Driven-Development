@@ -20,6 +20,15 @@ lowest ready item. Validate filename-based state before changing it. Read
 or final integrated review. Read covered completed Subtasks only for a
 checkpoint and all completed work items only for final review.
 
+If a read-only command is rejected by execution policy or fails because of its
+form, make at most two alternative attempts. Each must be narrower and simpler:
+first split a compound command, then remove recursion or wildcards, then read a
+specific directory or file; an equivalent read-only tool is allowed. Never
+repeat the same command, elevate permissions, change approval or sandbox policy,
+or switch to writing. Return `BLOCKED` only after these alternatives are
+exhausted and the information remains required. Persist only `Reason`, `Not verified`, and
+`Resume when` in that blocker.
+
 ## One-Step Rules
 
 - Process at most one Subtask, Review checkpoint, replanning action, intent
