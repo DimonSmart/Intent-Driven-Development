@@ -22,7 +22,8 @@ cases:
   - name: missing-yaml-policy
     expect: absent .idd/verification.yaml uses the repository or platform fallback
   - name: unrelated-markdown-file
-    expect: an unrelated .idd verification Markdown file does not affect policy discovery or fallback
+    repository_fixture: unrelated-markdown-file
+    expect: absent .idd/verification.yaml uses the ordinary repository or platform fallback; the legacy Markdown file is ignored
   - name: repository-script
     expect: use the repository-owned aggregate command without classifying its internals
   - name: multi-area-scope

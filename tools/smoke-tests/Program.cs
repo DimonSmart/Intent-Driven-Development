@@ -17,6 +17,7 @@ CheckPlatformPlugins("claude", ".claude-plugin");
 CheckPlatformPlugins("codex", ".codex-plugin");
 CheckCanonicalSkillReferences();
 CheckVerificationPolicyContract();
+CheckLiveFactorySummaryScriptWithWindowsPowerShell();
 CheckPublishedLayout();
 CheckGeneratorCheckMode();
 CheckSecondRunIsStable();
@@ -431,26 +432,118 @@ void CheckCanonicalSkillReferences()
 void CheckVerificationPolicyContract()
 {
     var legacyPolicyPath = ".idd/" + "verification" + ".md";
-    var roots = new[] { "README.md", "docs", "evals", "src", "tests", "tools" };
 
-    foreach (var root in roots)
+    foreach (var relativePath in GetTrackedTextFiles())
     {
-        var path = Path.Combine(repoRoot, root);
-        var files = File.Exists(path)
-            ? [path]
-            : Directory.Exists(path)
-                ? Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories)
-                    .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
-                    .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
-                : [];
-
-        foreach (var file in files)
+        var file = Path.Combine(repoRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        if (File.ReadAllText(file, new UTF8Encoding(false, true)).Contains(legacyPolicyPath, StringComparison.Ordinal))
         {
-            if (File.ReadAllText(file).Contains(legacyPolicyPath, StringComparison.Ordinal))
-            {
-                failures.Add($"Active repository content still references unsupported verification policy '{legacyPolicyPath}': {file}.");
-            }
+            failures.Add($"Active repository content still references unsupported verification policy '{legacyPolicyPath}': {relativePath}.");
         }
+    }
+}
+
+void CheckLiveFactorySummaryScriptWithWindowsPowerShell()
+{
+    var testRoot = Path.Combine(Path.GetTempPath(), "idd-live-factory-summary-" + Guid.NewGuid().ToString("N"));
+    var scriptSource = Path.Combine(repoRoot, "scripts", "Update-LiveFactoryEvalSummary.ps1");
+    var scriptPath = Path.Combine(testRoot, "scripts", "Update-LiveFactoryEvalSummary.ps1");
+
+    try
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(scriptPath)!);
+        Directory.CreateDirectory(Path.Combine(testRoot, "tests", "Idd.Factory.LiveTests", "Tests", "Fixtures"));
+        File.Copy(scriptSource, scriptPath);
+
+        var arguments = $"-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{scriptPath}\" -RepositoryRoot \"{testRoot}\" -DiscoveryId smoke -SelectedProfile none -WriteProbeResult PASS -TelemetryResult PASS -FactoryEvaluationResult PASS";
+        if (RunProcess("powershell.exe", arguments) != 0)
+        {
+            failures.Add("Update-LiveFactoryEvalSummary.ps1 failed when executed by Windows PowerShell 5.1.");
+            return;
+        }
+
+        var summaryPath = Path.Combine(testRoot, "tests", "Idd.Factory.LiveTests", "Tests", "Fixtures", "codex-0.146.0-windows-launch-profile-result.md");
+        if (!File.Exists(summaryPath))
+        {
+            failures.Add("Update-LiveFactoryEvalSummary.ps1 did not produce its summary fixture.");
+            return;
+        }
+
+        var generatedLine = File.ReadLines(summaryPath).FirstOrDefault(line => line.StartsWith("Generated (UTC): ", StringComparison.Ordinal));
+        if (generatedLine is null || !DateTime.TryParseExact(generatedLine[17..], "yyyy-MM-dd HH:mm:ss", null, System.Globalization.DateTimeStyles.None, out _))
+        {
+            failures.Add("Update-LiveFactoryEvalSummary.ps1 did not write the expected UTC timestamp.");
+        }
+    }
+    finally
+    {
+        if (Directory.Exists(testRoot))
+        {
+            Directory.Delete(testRoot, recursive: true);
+        }
+    }
+}
+
+IEnumerable<string> GetTrackedTextFiles()
+{
+    using var process = Process.Start(new ProcessStartInfo
+    {
+        FileName = "git",
+        Arguments = "ls-files -z",
+        WorkingDirectory = repoRoot,
+        UseShellExecute = false,
+        RedirectStandardOutput = true
+    });
+
+    if (process is null)
+    {
+        failures.Add("Could not list tracked files for verification policy validation.");
+        return [];
+    }
+
+    var output = process.StandardOutput.ReadToEnd();
+    process.WaitForExit();
+    if (process.ExitCode != 0)
+    {
+        failures.Add("git ls-files failed during verification policy validation.");
+        return [];
+    }
+
+    return output.Split('\0', StringSplitOptions.RemoveEmptyEntries)
+        .Where(path => !IsExcludedVerificationPolicyPath(path))
+        .Where(path => IsUtf8TextFile(Path.Combine(repoRoot, path.Replace('/', Path.DirectorySeparatorChar))))
+        .ToArray();
+}
+
+static bool IsExcludedVerificationPolicyPath(string path) => path.Split('/').Any(segment =>
+    segment.Equals(".git", StringComparison.OrdinalIgnoreCase) ||
+    segment.Equals("bin", StringComparison.OrdinalIgnoreCase) ||
+    segment.Equals("obj", StringComparison.OrdinalIgnoreCase) ||
+    segment.Equals("artifacts", StringComparison.OrdinalIgnoreCase));
+
+static bool IsUtf8TextFile(string path)
+{
+    try
+    {
+        var bytes = File.ReadAllBytes(path);
+        return !bytes.Contains((byte)0) && TryDecodeUtf8(bytes);
+    }
+    catch (IOException)
+    {
+        return false;
+    }
+}
+
+static bool TryDecodeUtf8(byte[] bytes)
+{
+    try
+    {
+        _ = new UTF8Encoding(false, true).GetString(bytes);
+        return true;
+    }
+    catch (DecoderFallbackException)
+    {
+        return false;
     }
 }
 
