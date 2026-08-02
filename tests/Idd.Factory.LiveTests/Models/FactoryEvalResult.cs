@@ -5,6 +5,8 @@ public sealed class FactoryEvalResult
     public required string RunDirectory { get; init; }
     public required string Outcome { get; set; }
     public bool ProductPassed { get; set; }
+    public bool FinalBuildPassed { get; set; }
+    public bool FinalTestsPassed { get; set; }
     public bool FactoryPassed { get; set; }
     public bool CodexProcessPassed { get; set; }
     public bool ExecutionResponsePassed { get; set; }

@@ -71,7 +71,9 @@ public sealed class TwoStepCatalogFactoryEvalTests
             result.FactoryResultExpected = executionResponse.Response?.FactoryOutcome == "COMPLETED";
             FactoryPostRunDiagnostics.Assert(assertions, executionResponse, factoryResult, options.MethodologyVersion);
             var (finalBuild, finalTests) = await FinalProductVerification.RunAsync(environment, workspace, cancellationToken);
-            var finalVerificationPassed = finalBuild.ExitCode == 0 && finalTests.ExitCode == 0;
+            result.FinalBuildPassed = finalBuild.ExitCode == 0;
+            result.FinalTestsPassed = finalTests.ExitCode == 0;
+            var finalVerificationPassed = result.FinalBuildPassed && result.FinalTestsPassed;
             assertions.Require(finalVerificationPassed, "Product", "Final verification", $"Expected final product verification to pass, but build={finalBuild.ExitCode} and test={finalTests.ExitCode}. See {workspace.VerificationDirectory}.");
             assertions.Require(Directory.GetFiles(Path.Combine(workspace.WorkspaceDirectory, "src", "MiniCatalog"), "*.cs").Any(path => File.ReadAllText(path).Contains("ProductCode", StringComparison.Ordinal)), "Product", "ProductCode type", "Expected a ProductCode production type under src/MiniCatalog/.");
             assertions.Require(!File.ReadAllText(Path.Combine(workspace.WorkspaceDirectory, "src", "MiniCatalog", "MiniCatalog.csproj")).Contains("PackageReference", StringComparison.Ordinal), "Product", "External packages", "Expected no external package to be added to the product project.");
