@@ -127,7 +127,7 @@ public sealed class FactoryProtocolTests
         var workspace = new FactoryEvalWorkspace(fixture.Workspace, fixture.Workspace, fixture.Workspace, fixture.Workspace, caseDirectory);
         var options = new FactoryEvalOptions("model", "medium", TimeSpan.FromMinutes(1), "1.0");
 
-        var arguments = LocalFactoryEvalEnvironment.BuildRunCodexArguments(workspace, options);
+        var arguments = LocalFactoryEvalEnvironment.BuildRunCodexArguments(workspace, options, "isolated-workspace-write");
 
         Assert.Equal(["--sandbox", "workspace-write"], arguments.SkipWhile(argument => argument != "--sandbox").Take(2));
         Assert.Contains("--ignore-user-config", arguments);
@@ -139,6 +139,82 @@ public sealed class FactoryProtocolTests
         Assert.DoesNotContain(arguments, argument => argument.StartsWith("windows.sandbox=", StringComparison.Ordinal));
         Assert.Equal("-", arguments[^1]);
     }
+
+    [Theory]
+    [InlineData("isolated-workspace-write", true, null)]
+    [InlineData("configured-workspace-write", false, null)]
+    [InlineData("windows-unelevated-workspace-write", false, "windows.sandbox=\"unelevated\"")]
+    [InlineData("windows-elevated-workspace-write", false, "windows.sandbox=\"elevated\"")]
+    public void CodexRun_BuildsNamedLaunchProfile(string profileName, bool ignoresUserConfig, string? windowsSandbox)
+    {
+        using var fixture = new FactoryFixture();
+        var caseDirectory = Path.Combine(RepositoryRootFinder.Find(), "tests", "Idd.Factory.LiveTests", "Cases", "TwoStepCatalog");
+        var workspace = new FactoryEvalWorkspace(fixture.Workspace, fixture.Workspace, fixture.Workspace, fixture.Workspace, caseDirectory);
+        var options = new FactoryEvalOptions("model", "medium", TimeSpan.FromMinutes(1), "1.0");
+
+        var arguments = LocalFactoryEvalEnvironment.BuildRunCodexArguments(workspace, options, profileName);
+
+        Assert.Equal(ignoresUserConfig, arguments.Contains("--ignore-user-config"));
+        Assert.True(HasOption(arguments, "-c", "approval_policy=never"));
+        Assert.True(HasOption(arguments, "--enable", "multi_agent"));
+        Assert.True(HasOption(arguments, "--disable", "multi_agent_v2"));
+        Assert.Equal(["--sandbox", "workspace-write"], arguments.SkipWhile(argument => argument != "--sandbox").Take(2));
+        if (windowsSandbox is null)
+            Assert.DoesNotContain(arguments, argument => argument.StartsWith("windows.sandbox=", StringComparison.Ordinal));
+        else
+            Assert.True(HasOption(arguments, "-c", windowsSandbox));
+        Assert.DoesNotContain("danger-full-access", arguments);
+    }
+
+    [Fact]
+    public void CodexRun_RejectsUnknownLaunchProfile()
+    {
+        using var fixture = new FactoryFixture();
+        var workspace = new FactoryEvalWorkspace(fixture.Workspace, fixture.Workspace, fixture.Workspace, fixture.Workspace, fixture.Workspace);
+        var options = new FactoryEvalOptions("model", "medium", TimeSpan.FromMinutes(1), "1.0");
+
+        var exception = Assert.Throws<InvalidOperationException>(() => LocalFactoryEvalEnvironment.BuildRunCodexArguments(workspace, options, "surprising-profile"));
+
+        Assert.Contains("Unknown Codex launch profile", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LaunchProfileCommandLine_RedactsNamedSecrets()
+    {
+        var commandLine = CodexLaunchProfileReport.FormatCommandLine("codex", ["exec", "OPENAI_API_KEY=secret-value", "--sandbox", "workspace-write"]);
+
+        Assert.DoesNotContain("secret-value", commandLine, StringComparison.Ordinal);
+        Assert.Contains("OPENAI_API_KEY=<redacted>", commandLine, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LaunchProfileReport_AggregatesAttemptsAndSelectsFirstPassingProfile()
+    {
+        var repositoryRoot = Path.Combine(Path.GetTempPath(), "idd-launch-profile-report-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var discoveryDirectory = Path.Combine(repositoryRoot, "artifacts", "factory-evals", "codex-launch-profiles", "discovery");
+            var isolatedDirectory = Path.Combine(discoveryDirectory, "isolated-workspace-write", "attempt-1");
+            var configuredDirectory = Path.Combine(discoveryDirectory, "configured-workspace-write", "attempt-2");
+            Directory.CreateDirectory(isolatedDirectory);
+            Directory.CreateDirectory(configuredDirectory);
+            await CodexLaunchProfileReport.WriteAsync(repositoryRoot, "discovery", CreateAttempt("isolated-workspace-write", isolatedDirectory, passed: false), CancellationToken.None);
+            await CodexLaunchProfileReport.WriteAsync(repositoryRoot, "discovery", CreateAttempt("configured-workspace-write", configuredDirectory, passed: true), CancellationToken.None);
+
+            var report = await File.ReadAllTextAsync(Path.Combine(repositoryRoot, "artifacts", "factory-evals", "codex-launch-profile-report.md"));
+
+            Assert.Contains("| `isolated-workspace-write` | FAIL |", report, StringComparison.Ordinal);
+            Assert.Contains("| `configured-workspace-write` | PASS |", report, StringComparison.Ordinal);
+            Assert.Contains("Selected profile: `configured-workspace-write`", report, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(repositoryRoot)) Directory.Delete(repositoryRoot, recursive: true);
+        }
+    }
+
+    private static CodexLaunchProfileAttempt CreateAttempt(string profileName, string attemptDirectory, bool passed)
+        => new(profileName, attemptDirectory, "codex exec", "codex 1.0", 0, false, Path.Combine(attemptDirectory, "stderr.log"), Path.Combine(attemptDirectory, "events.jsonl"), passed, passed ? "WORKSPACE_WRITE_OK" : null, true, passed ? "WORKSPACE_UPDATE_OK" : "WORKSPACE_UPDATE_PENDING", passed);
 
     private static bool HasOption(IReadOnlyList<string> arguments, string option, string value) => arguments.Select((argument, index) => (argument, index)).Any(pair => pair.argument == option && pair.index + 1 < arguments.Count && arguments[pair.index + 1] == value);
 

@@ -5,6 +5,16 @@ namespace Idd.Factory.LiveTests.Environments;
 
 public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : IFactoryEvalEnvironment
 {
+    public const string LaunchProfileEnvironmentVariable = "IDD_CODEX_LAUNCH_PROFILE";
+
+    public static IReadOnlyList<string> LaunchProfileDiscoveryOrder { get; } =
+    [
+        "isolated-workspace-write",
+        "configured-workspace-write",
+        "windows-unelevated-workspace-write",
+        "windows-elevated-workspace-write"
+    ];
+
     public CodexCommand CodexCommand { get; } = CodexExecutableResolver.Resolve();
     public Task PrepareAsync(FactoryEvalWorkspace workspace, CancellationToken cancellationToken)
     {
@@ -27,17 +37,36 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
         return processRunner.RunAsync(CodexCommand.Executable, CodexCommand.PrefixArguments.Concat(BuildRunCodexArguments(workspace, options)).ToArray(), workspace.WorkspaceDirectory, workspace.EventsPath, workspace.StderrPath, options.Timeout, cancellationToken, prompt, environmentOverrides);
     }
 
-    internal static IReadOnlyList<string> BuildRunCodexArguments(FactoryEvalWorkspace workspace, FactoryEvalOptions options)
+    internal static IReadOnlyList<string> BuildRunCodexArguments(FactoryEvalWorkspace workspace, FactoryEvalOptions options, string? launchProfileName = null)
     {
+        var profile = ResolveLaunchProfile(launchProfileName ?? Environment.GetEnvironmentVariable(LaunchProfileEnvironmentVariable));
         var arguments = new List<string>
         {
-            "exec", "--json", "--ephemeral", "--ignore-user-config", "--ignore-rules",
+            "exec", "--json", "--ephemeral"
+        };
+        if (profile.IgnoreUserConfig) arguments.Add("--ignore-user-config");
+        arguments.AddRange([
+            "--ignore-rules",
             "--enable", "multi_agent", "--disable", "multi_agent_v2",
             "--disable", "plugins", "--disable", "apps", "--disable", "browser_use", "--disable", "code_mode_host",
             "-c", "mcp_servers={}", "-c", "approval_policy=never", "-c", $"model_reasoning_effort={options.ReasoningEffort}"
-        };
+        ]);
+        if (profile.WindowsSandbox is not null) arguments.AddRange(["-c", $"windows.sandbox=\"{profile.WindowsSandbox}\""]);
         arguments.AddRange(["--model", options.Model, "--sandbox", "workspace-write", "--cd", workspace.WorkspaceDirectory, "--output-schema", Path.Combine(workspace.CaseDirectory, "final-response.schema.json"), "--output-last-message", workspace.LastMessagePath, "-"]);
         return arguments;
+    }
+
+    internal static CodexLaunchProfile ResolveLaunchProfile(string? name)
+    {
+        var effectiveName = string.IsNullOrWhiteSpace(name) ? LaunchProfileDiscoveryOrder[0] : name;
+        return effectiveName switch
+        {
+            "isolated-workspace-write" => new(effectiveName, IgnoreUserConfig: true, WindowsSandbox: null),
+            "configured-workspace-write" => new(effectiveName, IgnoreUserConfig: false, WindowsSandbox: null),
+            "windows-unelevated-workspace-write" => new(effectiveName, IgnoreUserConfig: false, WindowsSandbox: "unelevated"),
+            "windows-elevated-workspace-write" => new(effectiveName, IgnoreUserConfig: false, WindowsSandbox: "elevated"),
+            _ => throw new InvalidOperationException($"Unknown Codex launch profile '{effectiveName}'. Expected one of: {string.Join(", ", LaunchProfileDiscoveryOrder)}.")
+        };
     }
 
     internal static IReadOnlyDictionary<string, string> BuildCodexEnvironment(string path, bool isWindows)
@@ -65,3 +94,5 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
         }
     }
 }
+
+internal sealed record CodexLaunchProfile(string Name, bool IgnoreUserConfig, string? WindowsSandbox);

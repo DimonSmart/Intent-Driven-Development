@@ -10,6 +10,20 @@ public sealed class FactoryEvalWorkspaceBuilder
     public FactoryEvalWorkspace CreateTelemetryProbe(string repositoryRoot)
         => Create(repositoryRoot, "CodexSubagentTelemetry", copyTemplate: false);
 
+    public FactoryEvalWorkspace CreateWorkspaceWriteProbe(string repositoryRoot, string discoveryId, string launchProfile)
+    {
+        var attemptId = $"{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"[..24];
+        var runDirectory = Path.Combine(repositoryRoot, "artifacts", "factory-evals", "codex-launch-profiles", SanitizePathSegment(discoveryId), SanitizePathSegment(launchProfile), attemptId);
+        var caseDirectory = Path.Combine(repositoryRoot, "tests", "Idd.Factory.LiveTests", "Cases", "CodexWorkspaceWriteProbe");
+        var workspace = new FactoryEvalWorkspace(runDirectory, Path.Combine(runDirectory, "workspace"), Path.Combine(runDirectory, "generated-marketplace"), Path.Combine(runDirectory, "verification"), caseDirectory);
+        Directory.CreateDirectory(workspace.RunDirectory);
+        Directory.CreateDirectory(workspace.VerificationDirectory);
+        Directory.CreateDirectory(workspace.WorkspaceDirectory);
+        File.WriteAllText(Path.Combine(workspace.WorkspaceDirectory, "existing.txt"), "WORKSPACE_UPDATE_PENDING");
+        File.Copy(Path.Combine(caseDirectory, "task.md"), Path.Combine(workspace.RunDirectory, "task.md"), overwrite: true);
+        return workspace;
+    }
+
     private static FactoryEvalWorkspace Create(string repositoryRoot, string caseName, bool copyTemplate)
     {
         var runId = $"{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"[..24];
@@ -32,5 +46,12 @@ public sealed class FactoryEvalWorkspaceBuilder
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             File.Copy(file, target, overwrite: false);
         }
+    }
+
+    private static string SanitizePathSegment(string value)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var sanitized = new string(value.Select(character => invalid.Contains(character) ? '-' : character).ToArray());
+        return string.IsNullOrWhiteSpace(sanitized) ? "unknown" : sanitized;
     }
 }

@@ -10,9 +10,30 @@ set "FRAMEWORK=net10.0"
 set "TEST_DLL=%CD%\tests\Idd.Factory.LiveTests\bin\%CONFIGURATION%\%FRAMEWORK%\Idd.Factory.LiveTests.dll"
 
 set "IDD_RUN_LIVE_FACTORY_EVALS=1"
+set "IDD_CODEX_LAUNCH_PROFILE="
+for /f "usebackq delims=" %%I in (`powershell.exe -NoLogo -NoProfile -NonInteractive -Command "'{0:yyyyMMdd-HHmmss}-{1}' -f (Get-Date).ToUniversalTime(), ([Guid]::NewGuid().ToString('N').Substring(0,8))"`) do set "IDD_CODEX_LAUNCH_DISCOVERY_ID=%%I"
+if not defined IDD_CODEX_LAUNCH_DISCOVERY_ID set "IDD_CODEX_LAUNCH_DISCOVERY_ID=manual-%RANDOM%-%RANDOM%"
 
 call :UnlockTestDll
 if errorlevel 1 exit /b %ERRORLEVEL%
+
+echo Codex launch profile discovery
+echo.
+
+for %%P in (isolated-workspace-write configured-workspace-write windows-unelevated-workspace-write windows-elevated-workspace-write) do (
+  call :TryLaunchProfile "%%P"
+  if not errorlevel 1 goto LaunchProfileSelected
+)
+
+echo No Codex launch profile passed the workspace write probe.
+echo Factory evaluation will not run.
+exit /b 1
+
+:LaunchProfileSelected
+echo.
+echo Selected profile: %IDD_CODEX_LAUNCH_PROFILE%
+echo Workspace write probe: PASS
+echo.
 
 dotnet test "%PROJECT%" ^
   --configuration "%CONFIGURATION%" ^
@@ -29,6 +50,26 @@ dotnet test "%PROJECT%" ^
   --logger "console;verbosity=detailed"
 
 exit /b %ERRORLEVEL%
+
+
+:TryLaunchProfile
+set "IDD_CODEX_LAUNCH_PROFILE=%~1"
+echo Trying Codex launch profile: %IDD_CODEX_LAUNCH_PROFILE%
+
+dotnet test "%PROJECT%" ^
+  --configuration "%CONFIGURATION%" ^
+  --filter "FullyQualifiedName~CodexWorkspaceWriteProbeLiveTests" ^
+  --logger "console;verbosity=detailed"
+
+set "PROBE_EXIT_CODE=%ERRORLEVEL%"
+if "%PROBE_EXIT_CODE%"=="0" (
+  echo %IDD_CODEX_LAUNCH_PROFILE%: PASS
+  exit /b 0
+)
+
+echo %IDD_CODEX_LAUNCH_PROFILE%: FAIL
+echo.
+exit /b %PROBE_EXIT_CODE%
 
 
 :UnlockTestDll
