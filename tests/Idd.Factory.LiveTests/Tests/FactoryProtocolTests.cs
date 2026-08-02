@@ -119,6 +119,29 @@ public sealed class FactoryProtocolTests
         Assert.Contains("only after", content, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void WindowsSandboxProbe_UsesUnelevatedWorkspaceWriteMode()
+    {
+        var arguments = LocalFactoryEvalEnvironment.BuildWindowsSandboxProbeArguments(".codex-sandbox-write-probe");
+
+        Assert.Contains("windows.sandbox=\"unelevated\"", arguments);
+        Assert.Contains("sandbox_mode=\"workspace-write\"", arguments);
+        Assert.Equal(["sandbox", "windows"], arguments.SkipWhile(argument => argument != "sandbox").Take(2));
+    }
+
+    [Fact]
+    public void CodexRun_UsesWorkspaceWriteSandbox()
+    {
+        using var fixture = new FactoryFixture();
+        var caseDirectory = Path.Combine(RepositoryRootFinder.Find(), "tests", "Idd.Factory.LiveTests", "Cases", "TwoStepCatalog");
+        var workspace = new FactoryEvalWorkspace(fixture.Workspace, fixture.Workspace, fixture.Workspace, fixture.Workspace, caseDirectory);
+        var options = new FactoryEvalOptions("model", "medium", TimeSpan.FromMinutes(1), "1.0");
+
+        var arguments = LocalFactoryEvalEnvironment.BuildRunCodexArguments(workspace, options, isWindows: true);
+
+        Assert.Equal(["--sandbox", "workspace-write"], arguments.SkipWhile(argument => argument != "--sandbox").Take(2));
+    }
+
     private const string ValidFactoryResult = "{\"methodologyVersion\":\"1.0\",\"factoryOutcome\":\"COMPLETED\",\"subtaskCount\":2,\"completedSubtaskCount\":2,\"reviewCheckpointCount\":1,\"completedReviewCheckpointCount\":1,\"correctiveSubtaskCount\":0,\"blockedItemCount\":0,\"incompleteItemCount\":0,\"finalReviewVerdict\":\"approved\",\"verificationStatus\":\"passed\",\"commitMessagePath\":\"notes/commit-message.md\"}";
 
     private sealed class FactoryFixture : IDisposable
