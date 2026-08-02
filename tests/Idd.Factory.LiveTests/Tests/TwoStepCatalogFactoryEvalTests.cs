@@ -129,9 +129,9 @@ public sealed class TwoStepCatalogFactoryEvalTests
         }
     }
 
-    private static void AssertOrchestration(EvalAssertionCollector assertions, FactoryEvalMetrics metrics)
+    internal static void AssertOrchestration(EvalAssertionCollector assertions, FactoryEvalMetrics metrics)
     {
         assertions.Require(metrics.SpawnedAgentCount >= 2, "Orchestration failure", "Successfully spawned subagents", $"Expected spawned agents: at least 2{Environment.NewLine}Actual spawned agents: {metrics.SpawnedAgentCount}");
-        assertions.Require(metrics.WaitAgentCallCount == 0, "Orchestration", "Wait-only calls", $"Expected no wait_agent calls, but Codex JSONL reports {metrics.WaitAgentCallCount}.");
+        assertions.Require(metrics.CompletedChildAgentCount >= 2, "Orchestration failure", "Completed subagents", $"Expected completed agents: at least 2{Environment.NewLine}Actual completed agents: {metrics.CompletedChildAgentCount}");
     }
 }

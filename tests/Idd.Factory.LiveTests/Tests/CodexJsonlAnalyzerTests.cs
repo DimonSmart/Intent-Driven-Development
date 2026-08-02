@@ -32,6 +32,28 @@ public sealed class CodexJsonlAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_StartedAndCompletedWaitEventsDoNotDoubleCount()
+    {
+        var metrics = AnalyzeLines(
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"spawn_1\",\"type\":\"collab_tool_call\",\"tool\":\"spawn_agent\",\"receiver_thread_ids\":[\"child_1\"],\"status\":\"completed\"}}",
+            "{\"type\":\"item.started\",\"item\":{\"id\":\"wait_1\",\"type\":\"collab_tool_call\",\"tool\":\"wait\",\"status\":\"in_progress\"}}",
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"wait_1\",\"type\":\"collab_tool_call\",\"tool\":\"wait\",\"status\":\"completed\",\"agents_states\":{\"child_1\":{\"status\":\"completed\"}}}}");
+
+        Assert.Equal(1, metrics.WaitAgentCallCount);
+        Assert.Equal(1, metrics.CompletedChildAgentCount);
+    }
+
+    [Fact]
+    public void Analyze_CompletedAgentsExcludeIdsThatWereNotSuccessfullySpawned()
+    {
+        var metrics = AnalyzeLines(
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"spawn_1\",\"type\":\"collab_tool_call\",\"tool\":\"spawn_agent\",\"receiver_thread_ids\":[\"child_1\"],\"status\":\"completed\"}}",
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"wait_1\",\"type\":\"collab_tool_call\",\"tool\":\"wait\",\"status\":\"completed\",\"agents_states\":{\"child_1\":{\"status\":\"completed\"},\"unspawned\":{\"status\":\"completed\"}}}}");
+
+        Assert.Equal(1, metrics.CompletedChildAgentCount);
+    }
+
+    [Fact]
     public void Analyze_FailedSpawnIsCountedSeparately()
     {
         var metrics = AnalyzeLines("{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"collab_tool_call\",\"tool\":\"spawn_agent\",\"receiver_thread_ids\":[],\"status\":\"failed\",\"error\":{\"message\":\"capacity\"}}}");
