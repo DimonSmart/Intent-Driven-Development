@@ -6,25 +6,10 @@ namespace Idd.Factory.LiveTests.Environments;
 public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : IFactoryEvalEnvironment
 {
     public CodexCommand CodexCommand { get; } = CodexExecutableResolver.Resolve();
-    public async Task PrepareAsync(FactoryEvalWorkspace workspace, CancellationToken cancellationToken)
+    public Task PrepareAsync(FactoryEvalWorkspace workspace, CancellationToken cancellationToken)
     {
-        if (!OperatingSystem.IsWindows()) return;
-
         VerifyWorkspaceWriteAccess(workspace.WorkspaceDirectory);
-
-        const string probeFileName = ".codex-sandbox-write-probe";
-        var probePath = Path.Combine(workspace.WorkspaceDirectory, probeFileName);
-        var stderrPath = Path.Combine(workspace.VerificationDirectory, "codex-sandbox-probe.stderr.log");
-        try
-        {
-            var result = await processRunner.RunAsync(CodexCommand.Executable, CodexCommand.PrefixArguments.Concat(BuildWindowsSandboxProbeArguments(probeFileName)).ToArray(), workspace.WorkspaceDirectory, Path.Combine(workspace.VerificationDirectory, "codex-sandbox-probe.log"), stderrPath, TimeSpan.FromMinutes(1), cancellationToken);
-            if (result.ExitCode != 0 || result.TimedOut || !File.Exists(probePath))
-                throw new InvalidOperationException($"Codex Windows sandbox could not write to the prepared workspace. Workspace: '{workspace.WorkspaceDirectory}'. Exit code: {result.ExitCode}. Timed out: {result.TimedOut}. Windows sandbox backend: unelevated. Sandbox mode: workspace-write. Stderr: {ReadStderr(stderrPath)}");
-        }
-        finally
-        {
-            if (File.Exists(probePath)) File.Delete(probePath);
-        }
+        return Task.CompletedTask;
     }
 
     public Task<ProcessResult> RunCommandAsync(FactoryEvalWorkspace workspace, string executable, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
@@ -37,18 +22,31 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
 
     public Task<ProcessResult> RunCodexAsync(FactoryEvalWorkspace workspace, FactoryEvalOptions options, CancellationToken cancellationToken)
     {
-        return processRunner.RunAsync(CodexCommand.Executable, CodexCommand.PrefixArguments.Concat(BuildRunCodexArguments(workspace, options, OperatingSystem.IsWindows())).ToArray(), workspace.WorkspaceDirectory, workspace.EventsPath, workspace.StderrPath, options.Timeout, cancellationToken);
+        var prompt = File.ReadAllText(Path.Combine(workspace.CaseDirectory, "task.md"));
+        var environmentOverrides = BuildCodexEnvironment(Environment.GetEnvironmentVariable("PATH") ?? string.Empty, OperatingSystem.IsWindows());
+        return processRunner.RunAsync(CodexCommand.Executable, CodexCommand.PrefixArguments.Concat(BuildRunCodexArguments(workspace, options)).ToArray(), workspace.WorkspaceDirectory, workspace.EventsPath, workspace.StderrPath, options.Timeout, cancellationToken, prompt, environmentOverrides);
     }
 
-    internal static IReadOnlyList<string> BuildWindowsSandboxProbeArguments(string probeFileName) =>
-        ["-c", "windows.sandbox=\"unelevated\"", "-c", "sandbox_mode=\"workspace-write\"", "sandbox", "windows", "cmd.exe", "/d", "/c", $"echo probe>{probeFileName}"];
-
-    internal static IReadOnlyList<string> BuildRunCodexArguments(FactoryEvalWorkspace workspace, FactoryEvalOptions options, bool isWindows)
+    internal static IReadOnlyList<string> BuildRunCodexArguments(FactoryEvalWorkspace workspace, FactoryEvalOptions options)
     {
-        var arguments = new List<string> { "exec", "--json", "--ephemeral", "--ignore-user-config", "--ignore-rules", "-c", "approval_policy=never", "-c", $"model_reasoning_effort={options.ReasoningEffort}" };
-        if (isWindows) arguments.AddRange(["-c", "windows.sandbox=\"unelevated\""]);
-        arguments.AddRange(["--model", options.Model, "--sandbox", "workspace-write", "--cd", workspace.WorkspaceDirectory, "--output-schema", Path.Combine(workspace.CaseDirectory, "final-response.schema.json"), "--output-last-message", workspace.LastMessagePath, File.ReadAllText(Path.Combine(workspace.CaseDirectory, "task.md"))]);
+        var arguments = new List<string>
+        {
+            "exec", "--json", "--ephemeral", "--ignore-rules",
+            "--disable", "plugins", "--disable", "apps", "--disable", "browser_use", "--disable", "code_mode_host",
+            "-c", "mcp_servers={}", "-c", "approval_policy=never", "-c", $"model_reasoning_effort={options.ReasoningEffort}"
+        };
+        arguments.AddRange(["--model", options.Model, "--sandbox", "workspace-write", "--cd", workspace.WorkspaceDirectory, "--output-schema", Path.Combine(workspace.CaseDirectory, "final-response.schema.json"), "--output-last-message", workspace.LastMessagePath, "-"]);
         return arguments;
+    }
+
+    internal static IReadOnlyDictionary<string, string> BuildCodexEnvironment(string path, bool isWindows)
+    {
+        if (!isWindows) return new Dictionary<string, string>();
+
+        var sandboxCompatiblePath = string.Join(Path.PathSeparator,
+            path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(directory => !directory.Contains("WindowsApps", StringComparison.OrdinalIgnoreCase)));
+        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["PATH"] = sandboxCompatiblePath };
     }
 
     private static void VerifyWorkspaceWriteAccess(string workspaceDirectory)
@@ -65,6 +63,4 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
             throw new InvalidOperationException($"Workspace write check failed for '{workspaceDirectory}'. This indicates an ACL or workspace filesystem problem, not a Codex sandbox problem.", exception);
         }
     }
-
-    private static string ReadStderr(string stderrPath) => File.Exists(stderrPath) ? File.ReadAllText(stderrPath) : "<stderr log not found>";
 }

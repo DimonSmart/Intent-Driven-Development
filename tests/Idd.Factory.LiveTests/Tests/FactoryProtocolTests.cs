@@ -120,26 +120,32 @@ public sealed class FactoryProtocolTests
     }
 
     [Fact]
-    public void WindowsSandboxProbe_UsesUnelevatedWorkspaceWriteMode()
-    {
-        var arguments = LocalFactoryEvalEnvironment.BuildWindowsSandboxProbeArguments(".codex-sandbox-write-probe");
-
-        Assert.Contains("windows.sandbox=\"unelevated\"", arguments);
-        Assert.Contains("sandbox_mode=\"workspace-write\"", arguments);
-        Assert.Equal(["sandbox", "windows"], arguments.SkipWhile(argument => argument != "sandbox").Take(2));
-    }
-
-    [Fact]
-    public void CodexRun_UsesWorkspaceWriteSandbox()
+    public void CodexRun_UsesWorkspaceWriteSandboxAndReadsPromptFromStdin()
     {
         using var fixture = new FactoryFixture();
         var caseDirectory = Path.Combine(RepositoryRootFinder.Find(), "tests", "Idd.Factory.LiveTests", "Cases", "TwoStepCatalog");
         var workspace = new FactoryEvalWorkspace(fixture.Workspace, fixture.Workspace, fixture.Workspace, fixture.Workspace, caseDirectory);
         var options = new FactoryEvalOptions("model", "medium", TimeSpan.FromMinutes(1), "1.0");
 
-        var arguments = LocalFactoryEvalEnvironment.BuildRunCodexArguments(workspace, options, isWindows: true);
+        var arguments = LocalFactoryEvalEnvironment.BuildRunCodexArguments(workspace, options);
 
         Assert.Equal(["--sandbox", "workspace-write"], arguments.SkipWhile(argument => argument != "--sandbox").Take(2));
+        Assert.DoesNotContain("--ignore-user-config", arguments);
+        Assert.Contains(arguments.Chunk(2), pair => pair.SequenceEqual(["--disable", "plugins"]));
+        Assert.Contains(arguments.Chunk(2), pair => pair.SequenceEqual(["--disable", "apps"]));
+        Assert.Contains("mcp_servers={}", arguments);
+        Assert.DoesNotContain(arguments, argument => argument.StartsWith("windows.sandbox=", StringComparison.Ordinal));
+        Assert.Equal("-", arguments[^1]);
+    }
+
+    [Fact]
+    public void CodexEnvironment_RemovesWindowsAppsShellsFromPath()
+    {
+        var path = string.Join(Path.PathSeparator, @"C:\Tools", @"C:\Program Files\WindowsApps\PowerShell", @"C:\Windows\System32\WindowsPowerShell\v1.0");
+
+        var environment = LocalFactoryEvalEnvironment.BuildCodexEnvironment(path, isWindows: true);
+
+        Assert.Equal(string.Join(Path.PathSeparator, @"C:\Tools", @"C:\Windows\System32\WindowsPowerShell\v1.0"), environment["PATH"]);
     }
 
     private const string ValidFactoryResult = "{\"methodologyVersion\":\"1.0\",\"factoryOutcome\":\"COMPLETED\",\"subtaskCount\":2,\"completedSubtaskCount\":2,\"reviewCheckpointCount\":1,\"completedReviewCheckpointCount\":1,\"correctiveSubtaskCount\":0,\"blockedItemCount\":0,\"incompleteItemCount\":0,\"finalReviewVerdict\":\"approved\",\"verificationStatus\":\"passed\",\"commitMessagePath\":\"notes/commit-message.md\"}";
