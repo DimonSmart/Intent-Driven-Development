@@ -131,7 +131,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
 
     private static void AssertOrchestration(EvalAssertionCollector assertions, FactoryEvalMetrics metrics)
     {
-        assertions.Require(metrics.SpawnedAgentCount >= 2, "Orchestration failure", "Successfully spawned subagents", $"Expected at least 2 successfully spawned subagents, but Codex execution trace contains {metrics.SpawnedAgentCount}.");
+        assertions.Require(metrics.SpawnedAgentCount >= 2, "Orchestration failure", "Successfully spawned subagents", $"Expected spawned agents: at least 2{Environment.NewLine}Actual spawned agents: {metrics.SpawnedAgentCount}");
         assertions.Require(metrics.WaitAgentCallCount == 0, "Orchestration", "Wait-only calls", $"Expected no wait_agent calls, but Codex JSONL reports {metrics.WaitAgentCallCount}.");
     }
 }

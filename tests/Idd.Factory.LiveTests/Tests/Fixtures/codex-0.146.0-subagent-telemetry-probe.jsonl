@@ -1,0 +1,9 @@
+{"type":"thread.started","thread_id":"thread_root"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Starting one subagent."}}
+{"type":"item.started","item":{"id":"item_1","type":"collab_tool_call","tool":"spawn_agent","sender_thread_id":"thread_root","receiver_thread_ids":[],"prompt":"Return exactly SUBAGENT_OK","agents_states":{},"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"collab_tool_call","tool":"spawn_agent","sender_thread_id":"thread_root","receiver_thread_ids":["thread_child"],"prompt":"Return exactly SUBAGENT_OK","agents_states":{"thread_child":{"status":"pending_init","message":null}},"status":"completed"}}
+{"type":"item.started","item":{"id":"item_2","type":"collab_tool_call","tool":"wait","sender_thread_id":"thread_root","receiver_thread_ids":["thread_child"],"prompt":null,"agents_states":{},"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_2","type":"collab_tool_call","tool":"wait","sender_thread_id":"thread_root","receiver_thread_ids":["thread_child"],"prompt":null,"agents_states":{"thread_child":{"status":"completed","message":"SUBAGENT_OK"}},"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"Successful: SUBAGENT_OK."}}
+{"type":"turn.completed","usage":{"input_tokens":40265,"cached_input_tokens":25088,"cache_write_input_tokens":0,"output_tokens":193,"reasoning_output_tokens":22}}

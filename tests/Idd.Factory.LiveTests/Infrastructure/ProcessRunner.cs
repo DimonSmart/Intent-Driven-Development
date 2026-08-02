@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 
 namespace Idd.Factory.LiveTests.Infrastructure;
 
@@ -13,6 +14,7 @@ public sealed class ProcessRunner
     {
         Directory.CreateDirectory(Path.GetDirectoryName(stdoutPath)!);
         var start = new ProcessStartInfo(executable) { WorkingDirectory = workingDirectory, RedirectStandardInput = standardInput is not null, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+        if (standardInput is not null) start.StandardInputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
         if (environmentOverrides is not null)
             foreach (var (name, value) in environmentOverrides)

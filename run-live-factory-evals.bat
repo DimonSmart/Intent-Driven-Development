@@ -16,7 +16,16 @@ if errorlevel 1 exit /b %ERRORLEVEL%
 
 dotnet test "%PROJECT%" ^
   --configuration "%CONFIGURATION%" ^
-  --filter "Category=LiveFactoryEval" ^
+  --filter "FullyQualifiedName~CodexSubagentTelemetryLiveTests" ^
+  --logger "console;verbosity=detailed"
+
+if errorlevel 1 exit /b %ERRORLEVEL%
+
+echo Subagent telemetry probe: PASS
+
+dotnet test "%PROJECT%" ^
+  --configuration "%CONFIGURATION%" ^
+  --filter "FullyQualifiedName~TwoStepCatalogFactoryEvalTests" ^
   --logger "console;verbosity=detailed"
 
 exit /b %ERRORLEVEL%

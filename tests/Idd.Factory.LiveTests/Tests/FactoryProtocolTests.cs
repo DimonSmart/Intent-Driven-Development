@@ -130,13 +130,17 @@ public sealed class FactoryProtocolTests
         var arguments = LocalFactoryEvalEnvironment.BuildRunCodexArguments(workspace, options);
 
         Assert.Equal(["--sandbox", "workspace-write"], arguments.SkipWhile(argument => argument != "--sandbox").Take(2));
-        Assert.DoesNotContain("--ignore-user-config", arguments);
-        Assert.Contains(arguments.Chunk(2), pair => pair.SequenceEqual(["--disable", "plugins"]));
-        Assert.Contains(arguments.Chunk(2), pair => pair.SequenceEqual(["--disable", "apps"]));
+        Assert.Contains("--ignore-user-config", arguments);
+        Assert.True(HasOption(arguments, "--enable", "multi_agent"));
+        Assert.True(HasOption(arguments, "--disable", "multi_agent_v2"));
+        Assert.True(HasOption(arguments, "--disable", "plugins"));
+        Assert.True(HasOption(arguments, "--disable", "apps"));
         Assert.Contains("mcp_servers={}", arguments);
         Assert.DoesNotContain(arguments, argument => argument.StartsWith("windows.sandbox=", StringComparison.Ordinal));
         Assert.Equal("-", arguments[^1]);
     }
+
+    private static bool HasOption(IReadOnlyList<string> arguments, string option, string value) => arguments.Select((argument, index) => (argument, index)).Any(pair => pair.argument == option && pair.index + 1 < arguments.Count && arguments[pair.index + 1] == value);
 
     [Fact]
     public void CodexEnvironment_RemovesWindowsAppsShellsFromPath()

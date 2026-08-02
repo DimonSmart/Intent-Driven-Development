@@ -31,7 +31,8 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
     {
         var arguments = new List<string>
         {
-            "exec", "--json", "--ephemeral", "--ignore-rules",
+            "exec", "--json", "--ephemeral", "--ignore-user-config", "--ignore-rules",
+            "--enable", "multi_agent", "--disable", "multi_agent_v2",
             "--disable", "plugins", "--disable", "apps", "--disable", "browser_use", "--disable", "code_mode_host",
             "-c", "mcp_servers={}", "-c", "approval_policy=never", "-c", $"model_reasoning_effort={options.ReasoningEffort}"
         };

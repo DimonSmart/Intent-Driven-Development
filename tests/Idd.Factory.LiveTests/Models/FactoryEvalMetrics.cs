@@ -14,6 +14,7 @@ public sealed class FactoryEvalMetrics
     public long SpawnedAgentCount { get; set; }
     public long FailedSpawnAgentCallCount { get; set; }
     public long WaitAgentCallCount { get; set; }
+    public long CompletedChildAgentCount { get; set; }
     public long? InputTokens { get; set; }
     public long? CachedInputTokens { get; set; }
     public long? OutputTokens { get; set; }

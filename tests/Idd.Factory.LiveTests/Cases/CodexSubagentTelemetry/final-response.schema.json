@@ -1,0 +1,8 @@
+{
+  "type": "object",
+  "properties": {
+    "result": { "type": "string", "const": "SUBAGENT_OK" }
+  },
+  "required": ["result"],
+  "additionalProperties": false
+}
