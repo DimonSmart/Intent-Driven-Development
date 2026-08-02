@@ -1,0 +1,11 @@
+{"type":"thread.started","thread_id":"thread_fixture"}
+{"type":"item.started","item":{"id":"call_normal","type":"function_call","name":"shell_command","arguments":"{}","status":"in_progress"}}
+{"type":"item.completed","item":{"id":"call_normal","type":"function_call","name":"shell_command","output":"{\"exit_code\":0}","status":"completed"}}
+{"type":"item.started","item":{"id":"call_spawn_1","type":"function_call","name":"spawn_agent","arguments":"{}","status":"in_progress"}}
+{"type":"item.completed","item":{"id":"call_spawn_1","type":"function_call","output":"{\"agent_id\":\"agent_1\"}","status":"completed"}}
+{"type":"item.started","item":{"id":"call_spawn_2","type":"function_call","name":"spawn_agent","arguments":"{}","status":"in_progress"}}
+{"type":"item.completed","item":{"id":"call_spawn_2","type":"function_call","name":"spawn_agent","output":{"child_context_id":"child_2"},"status":"completed"}}
+{"type":"item.started","item":{"id":"call_spawn_3","type":"function_call","name":"spawn_agent","arguments":"{}","status":"in_progress"}}
+{"type":"item.completed","item":{"id":"call_spawn_3","type":"function_call","name":"spawn_agent","error":{"message":"capacity"},"status":"failed"}}
+{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":80,"output_tokens":20,"total_tokens":120}}
+{"type":"turn.completed","usage":{"input_tokens":130,"cached_input_tokens":90,"output_tokens":30,"total_tokens":160}}

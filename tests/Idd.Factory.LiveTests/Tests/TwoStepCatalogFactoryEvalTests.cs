@@ -68,6 +68,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
             factoryResult = FactoryResultReader.TryReadSingle(workspace.WorkspaceDirectory);
             result.ExecutionResponsePassed = executionResponse.IsSuccess;
             result.FactoryOutcome = executionResponse.Response?.FactoryOutcome;
+            metrics.FactoryOutcome = result.FactoryOutcome;
             result.FactoryResultExpected = executionResponse.Response?.FactoryOutcome == "COMPLETED";
             FactoryPostRunDiagnostics.Assert(assertions, executionResponse, factoryResult, options.MethodologyVersion);
             var (finalBuild, finalTests) = await FinalProductVerification.RunAsync(environment, workspace, cancellationToken);
@@ -81,7 +82,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
             AssertPreservation(assertions, workspace, await GitOutputAsync(processRunner, workspace, ["diff", "--binary", "HEAD"], "git-diff.patch", cancellationToken), executionResponse.Response?.FactoryOutcome == "COMPLETED");
             AssertOrchestration(assertions, metrics);
             result.ProductPassed = !assertions.HasFailuresIn("Product");
-            result.FactoryPassed = !assertions.HasFailuresIn("Factory contract") && !assertions.HasFailuresIn("Factory execution") && !assertions.HasFailuresIn("Factory") && !assertions.HasFailuresIn("Version");
+            result.FactoryPassed = !assertions.HasFailuresIn("Factory contract") && !assertions.HasFailuresIn("Factory execution") && !assertions.HasFailuresIn("Factory") && !assertions.HasFailuresIn("Version") && !assertions.HasFailuresIn("Orchestration failure");
             result.Outcome = FactoryPostRunDiagnostics.Outcome(result.ProductPassed, result.FactoryPassed, !assertions.HasFailuresIn("Infrastructure"));
         }
         catch (Exception exception) when (exception is not Xunit.Sdk.XunitException)
@@ -130,7 +131,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
 
     private static void AssertOrchestration(EvalAssertionCollector assertions, FactoryEvalMetrics metrics)
     {
-        assertions.Inconclusive("Orchestration", "Worker classification", "Current Codex JSONL format did not provide enough role and write-provenance data to classify workers safely.");
+        assertions.Require(metrics.SpawnedAgentCount >= 2, "Orchestration failure", "Successfully spawned subagents", $"Expected at least 2 successfully spawned subagents, but Codex execution trace contains {metrics.SpawnedAgentCount}.");
         assertions.Require(metrics.WaitAgentCallCount == 0, "Orchestration", "Wait-only calls", $"Expected no wait_agent calls, but Codex JSONL reports {metrics.WaitAgentCallCount}.");
     }
 }

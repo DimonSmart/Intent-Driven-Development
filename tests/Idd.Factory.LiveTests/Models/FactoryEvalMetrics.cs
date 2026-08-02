@@ -3,12 +3,16 @@ namespace Idd.Factory.LiveTests.Models;
 public sealed class FactoryEvalMetrics
 {
     public int SchemaVersion { get; init; } = 1;
+    public string? FactoryOutcome { get; set; }
+    public long ExpectedMinimumSpawnedAgents { get; init; } = 2;
     public string? ModelEffective { get; set; }
     public string? ReasoningEffortEffective { get; set; }
     public string? SessionId { get; set; }
     public long ModelTurnCount { get; set; }
     public long ToolCallCount { get; set; }
     public long SpawnAgentCallCount { get; set; }
+    public long SpawnedAgentCount { get; set; }
+    public long FailedSpawnAgentCallCount { get; set; }
     public long WaitAgentCallCount { get; set; }
     public long? InputTokens { get; set; }
     public long? CachedInputTokens { get; set; }
