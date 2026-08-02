@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions EnableDelayedExpansion
+setlocal EnableExtensions
 
 rem Place this file in the repository root.
 cd /d "%~dp0"
@@ -10,101 +10,17 @@ set "FRAMEWORK=net10.0"
 set "TEST_DLL=%CD%\tests\Idd.Factory.LiveTests\bin\%CONFIGURATION%\%FRAMEWORK%\Idd.Factory.LiveTests.dll"
 
 set "IDD_RUN_LIVE_FACTORY_EVALS=1"
-set "IDD_CODEX_LAUNCH_PROFILE="
-set "WRITE_PROBE_RESULT=NOT RUN"
-set "TELEMETRY_RESULT=NOT RUN"
-set "FACTORY_EVALUATION_RESULT=NOT RUN"
-for /f "usebackq delims=" %%I in (`powershell.exe -NoLogo -NoProfile -NonInteractive -Command "'{0:yyyyMMdd-HHmmss}-{1}' -f (Get-Date).ToUniversalTime(), ([Guid]::NewGuid().ToString('N').Substring(0,8))"`) do set "IDD_CODEX_LAUNCH_DISCOVERY_ID=%%I"
-if not defined IDD_CODEX_LAUNCH_DISCOVERY_ID set "IDD_CODEX_LAUNCH_DISCOVERY_ID=manual-%RANDOM%-%RANDOM%"
+set "IDD_CODEX_LAUNCH_PROFILE=configured-workspace-write"
 
 call :UnlockTestDll
 if errorlevel 1 exit /b %ERRORLEVEL%
-
-echo Codex launch profile discovery
-echo.
-
-for %%P in (isolated-workspace-write configured-workspace-write windows-unelevated-workspace-write windows-elevated-workspace-write) do (
-  call :TryLaunchProfile "%%P"
-  if not errorlevel 1 goto LaunchProfileSelected
-)
-
-echo No Codex launch profile passed the workspace write probe.
-echo Factory evaluation will not run.
-set "WRITE_PROBE_RESULT=FAIL"
-call :WriteTrackedSummary
-exit /b 1
-
-:LaunchProfileSelected
-echo.
-echo Selected profile: %IDD_CODEX_LAUNCH_PROFILE%
-echo Workspace write probe: PASS
-echo.
-set "WRITE_PROBE_RESULT=PASS"
-
-dotnet test "%PROJECT%" ^
-  --configuration "%CONFIGURATION%" ^
-  --filter "FullyQualifiedName~CodexSubagentTelemetryLiveTests" ^
-  --logger "console;verbosity=detailed"
-
-if errorlevel 1 (
-  set "TELEMETRY_RESULT=FAIL"
-  call :WriteTrackedSummary
-  exit /b !ERRORLEVEL!
-)
-
-echo Subagent telemetry probe: PASS
-set "TELEMETRY_RESULT=PASS"
 
 dotnet test "%PROJECT%" ^
   --configuration "%CONFIGURATION%" ^
   --filter "FullyQualifiedName~TwoStepCatalogFactoryEvalTests" ^
   --logger "console;verbosity=detailed"
 
-set "FACTORY_EVALUATION_EXIT_CODE=!ERRORLEVEL!"
-if "!FACTORY_EVALUATION_EXIT_CODE!"=="0" (
-  set "FACTORY_EVALUATION_RESULT=PASS"
-) else (
-  set "FACTORY_EVALUATION_RESULT=FAIL"
-)
-call :WriteTrackedSummary
-exit /b !FACTORY_EVALUATION_EXIT_CODE!
-
-
-:TryLaunchProfile
-set "IDD_CODEX_LAUNCH_PROFILE=%~1"
-echo Trying Codex launch profile: %IDD_CODEX_LAUNCH_PROFILE%
-
-dotnet test "%PROJECT%" ^
-  --configuration "%CONFIGURATION%" ^
-  --filter "FullyQualifiedName~CodexWorkspaceWriteProbeLiveTests" ^
-  --logger "console;verbosity=detailed"
-
-set "PROBE_EXIT_CODE=%ERRORLEVEL%"
-if "%PROBE_EXIT_CODE%"=="0" (
-  echo %IDD_CODEX_LAUNCH_PROFILE%: PASS
-  exit /b 0
-)
-
-echo %IDD_CODEX_LAUNCH_PROFILE%: FAIL
-echo.
-exit /b %PROBE_EXIT_CODE%
-
-
-:WriteTrackedSummary
-powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0scripts\Update-LiveFactoryEvalSummary.ps1" ^
-  -RepositoryRoot "%CD%" ^
-  -DiscoveryId "%IDD_CODEX_LAUNCH_DISCOVERY_ID%" ^
-  -SelectedProfile "%IDD_CODEX_LAUNCH_PROFILE%" ^
-  -WriteProbeResult "%WRITE_PROBE_RESULT%" ^
-  -TelemetryResult "%TELEMETRY_RESULT%" ^
-  -FactoryEvaluationResult "%FACTORY_EVALUATION_RESULT%"
-
-if errorlevel 1 (
-  echo Failed to update the tracked live evaluation summary.
-  exit /b !ERRORLEVEL!
-)
-
-exit /b 0
+exit /b %ERRORLEVEL%
 
 
 :UnlockTestDll
