@@ -18,7 +18,9 @@ if errorlevel 1 exit /b %ERRORLEVEL%
 dotnet test "%PROJECT%" ^
   --configuration "%CONFIGURATION%" ^
   --filter "FullyQualifiedName~TwoStepCatalogFactoryEvalTests" ^
-  --logger "console;verbosity=detailed"
+  --nologo ^
+  --verbosity quiet ^
+  --logger "console;verbosity=minimal"
 
 exit /b %ERRORLEVEL%
 
