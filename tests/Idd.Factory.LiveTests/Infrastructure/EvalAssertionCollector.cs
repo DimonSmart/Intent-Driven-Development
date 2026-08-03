@@ -25,11 +25,28 @@ public sealed class EvalAssertionCollector
         var failures = assertions.Where(assertion => assertion.Status == "FAIL").ToArray();
         if (failures.Length == 0) return;
 
+        var consoleFailures = SelectConsoleFailures(failures);
         var reportPath = Path.Combine(runDirectory, "report.md");
         throw new Xunit.Sdk.XunitException(
-            $"IDD Factory eval failed ({failures.Length} checks):{Environment.NewLine}" +
-            string.Join(Environment.NewLine, failures.Select(FormatFailure)) +
+            $"IDD Factory eval failed:{Environment.NewLine}" +
+            string.Join(Environment.NewLine, consoleFailures.Select(FormatFailure)) +
             $"{Environment.NewLine}Report: {reportPath}");
+    }
+
+    private static FactoryEvalAssertion[] SelectConsoleFailures(IEnumerable<FactoryEvalAssertion> failures)
+    {
+        var result = new List<FactoryEvalAssertion>();
+        var orchestrationFailureShown = false;
+        foreach (var failure in failures)
+        {
+            if (failure.Category == "Orchestration failure")
+            {
+                if (orchestrationFailureShown) continue;
+                orchestrationFailureShown = true;
+            }
+            result.Add(failure);
+        }
+        return result.ToArray();
     }
 
     private static string FormatFailure(FactoryEvalAssertion assertion)
