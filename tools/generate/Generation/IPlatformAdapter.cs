@@ -7,6 +7,7 @@ internal interface IPlatformAdapter
         PluginManifest manifest,
         string pluginName,
         PluginDefinition plugin,
+        IReadOnlyDictionary<string, RoleDefinition> roleDefinitions,
         IReadOnlyDictionary<string, SkillDescription> skillDescriptions,
         string version);
 }

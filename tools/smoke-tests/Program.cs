@@ -15,6 +15,8 @@ CheckClaudeMarketplace();
 CheckCodexMarketplace();
 CheckPlatformPlugins("claude", ".claude-plugin");
 CheckPlatformPlugins("codex", ".codex-plugin");
+CheckCanonicalRoleReader();
+CheckFactoryRoleGeneration();
 CheckCanonicalSkillReferences();
 CheckVerificationPolicyContract();
 CheckLiveFactorySummaryScriptWithWindowsPowerShell();
@@ -330,6 +332,135 @@ void CheckIddMetadata(
     if (!destinations.SequenceEqual([expectedAssetDestination]))
     {
         failures.Add($"{platform} {pluginName} asset destinations are [{string.Join(", ", destinations)}], expected {expectedAssetDestination}.");
+    }
+}
+
+void CheckFactoryRoleGeneration()
+{
+    var expectedTools = new Dictionary<string, string[]>(StringComparer.Ordinal)
+    {
+        ["factory-coordinator"] = ["repository.read", "factory-state.read", "agent.spawn", "agent.wait"],
+        ["factory-step-coordinator"] = ["repository.read", "factory-state.read", "factory-state.write", "factory-result.write", "agent.spawn", "agent.wait"],
+        ["task-decomposer"] = ["repository.read", "factory-state.read"],
+        ["implementer"] = ["repository.read", "repository.write", "command.execute"],
+        ["checkpoint-reviewer"] = ["repository.read", "command.execute"],
+        ["final-reviewer"] = ["repository.read", "command.execute"]
+    };
+
+    foreach (var platform in new[] { "claude", "codex" })
+    {
+        var root = Path.Combine(marketplaceRoot, "plugins", platform, "idd-factory");
+        using var metadata = ReadJson(Path.Combine(root, "idd-plugin.json"));
+        if (metadata is null)
+        {
+            continue;
+        }
+
+        if (!metadata.RootElement.TryGetProperty("roleDefinitions", out var roleDefinitions))
+        {
+            failures.Add($"{platform} Factory metadata is missing roleDefinitions.");
+            continue;
+        }
+
+        var definitionsByName = roleDefinitions.EnumerateArray()
+            .ToDictionary(item => item.GetProperty("name").GetString() ?? "", StringComparer.Ordinal);
+        foreach (var (roleName, tools) in expectedTools)
+        {
+            if (!definitionsByName.TryGetValue(roleName, out var definition))
+            {
+                failures.Add($"{platform} Factory metadata is missing role '{roleName}'.");
+                continue;
+            }
+
+            var actualTools = definition.GetProperty("tools").EnumerateArray()
+                .Select(tool => tool.GetString() ?? "")
+                .ToArray();
+            if (!actualTools.SequenceEqual(tools))
+            {
+                failures.Add($"{platform} role '{roleName}' tools are [{string.Join(", ", actualTools)}].");
+            }
+        }
+    }
+
+    foreach (var (skill, role) in new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["idd-factory-run"] = "factory-coordinator",
+        ["idd-factory-coordinate-step"] = "factory-step-coordinator",
+        ["idd-factory-decompose-task"] = "task-decomposer",
+        ["idd-factory-execute-subtask"] = "implementer",
+        ["idd-factory-review-checkpoint"] = "checkpoint-reviewer",
+        ["idd-factory-review-task"] = "final-reviewer",
+        ["idd-factory-finalize-run"] = "factory-step-coordinator"
+    })
+    {
+        foreach (var platform in new[] { "claude", "codex" })
+        {
+            var rolePath = Path.Combine(marketplaceRoot, "plugins", platform, "idd-factory", "skills", skill, "references", "roles", role + ".md");
+            var content = ReadText(rolePath);
+            ExpectContains(content, "## Available tools", $"{platform} {role} available-tools contract");
+            foreach (var tool in expectedTools[role])
+            {
+                ExpectContains(content, $"- {tool}", $"{platform} {role} tool '{tool}'");
+            }
+        }
+    }
+
+    var implementerClaudeSkill = ReadFrontMatter(ReadText(Path.Combine(
+        marketplaceRoot, "plugins", "claude", "idd-factory", "skills", "idd-factory-execute-subtask", "SKILL.md")));
+    ExpectContains(implementerClaudeSkill, "allowed-tools: [Read, Glob, Grep, Edit, Write, Bash]", "Claude implementer native tools");
+    var reviewerClaudeSkill = ReadFrontMatter(ReadText(Path.Combine(
+        marketplaceRoot, "plugins", "claude", "idd-factory", "skills", "idd-factory-review-task", "SKILL.md")));
+    ExpectContains(reviewerClaudeSkill, "allowed-tools: [Read, Glob, Grep, Bash]", "Claude reviewer native tools");
+}
+
+void CheckCanonicalRoleReader()
+{
+    var root = Path.Combine(Path.GetTempPath(), "idd-role-reader-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    var path = Path.Combine(root, "sample.md");
+    var reader = new CanonicalRoleReader();
+
+    try
+    {
+        File.WriteAllText(path, "---\ntools:\n  - repository.read\n  - command.execute\n---\n\n# Sample\n\nInstructions.\n");
+        var role = reader.Read("sample", path);
+        if (!role.Tools.SequenceEqual([RoleTool.RepositoryRead, RoleTool.CommandExecute]) ||
+            !StringComparer.Ordinal.Equals(role.Instructions, "# Sample\n\nInstructions."))
+        {
+            failures.Add("Canonical role reader did not preserve tools or Markdown instructions.");
+        }
+
+        foreach (var (name, content) in new Dictionary<string, string>
+        {
+            ["missing-front-matter"] = "# Sample\n",
+            ["missing-tools"] = "---\nname: sample\n---\n# Sample\n",
+            ["empty-tools"] = "---\ntools:\n---\n# Sample\n",
+            ["unknown-tool"] = "---\ntools:\n  - workspace.write\n---\n# Sample\n",
+            ["duplicate-tool"] = "---\ntools:\n  - repository.read\n  - repository.read\n---\n# Sample\n",
+            ["invalid-yaml"] = "---\ntools: repository.read\n---\n# Sample\n",
+            ["empty-instructions"] = "---\ntools:\n  - repository.read\n---\n"
+        })
+        {
+            File.WriteAllText(path, content);
+            try
+            {
+                _ = reader.Read(name, path);
+                failures.Add($"Canonical role reader accepted {name}.");
+            }
+            catch (InvalidOperationException exception) when (
+                exception.Message.Contains($"Role '{name}'", StringComparison.Ordinal) &&
+                exception.Message.Contains(path, StringComparison.Ordinal))
+            {
+            }
+            catch (InvalidOperationException exception)
+            {
+                failures.Add($"Canonical role reader diagnostic for {name} omits its name or path: {exception.Message}");
+            }
+        }
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
     }
 }
 

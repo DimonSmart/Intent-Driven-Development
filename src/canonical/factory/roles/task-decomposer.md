@@ -1,3 +1,9 @@
+---
+tools:
+  - repository.read
+  - factory-state.read
+---
+
 # Task Decomposer
 
 Factory role prompt used by `idd-factory-decompose-task`.

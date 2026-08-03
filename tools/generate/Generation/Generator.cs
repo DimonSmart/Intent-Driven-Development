@@ -21,13 +21,14 @@ internal sealed class Generator(RepositoryLayout layout)
             .ToHashSet(StringComparer.Ordinal);
         var skillDescriptions = new SkillDescriptionReader().Read(layout.SkillDescriptionsPath, supportedCodingAgents);
         var pluginManifest = new PluginManifestReader(layout).Read();
-        new PluginManifestValidator(layout).Validate(pluginManifest);
+        var roleDefinitions = ReadRoleDefinitions(pluginManifest);
+        new PluginManifestValidator(layout).Validate(pluginManifest, roleDefinitions);
 
         var expectedFiles = new List<GeneratedFile>();
         foreach (var adapterDefinition in adapterDefinitions)
         {
             var platformAdapter = PlatformAdapterFactory.Create(adapterDefinition.Config.CodingAgent);
-            expectedFiles.AddRange(BuildMarketplaceFiles(platformAdapter, adapterDefinition, pluginManifest, skillDescriptions, manifestVersion));
+            expectedFiles.AddRange(BuildMarketplaceFiles(platformAdapter, adapterDefinition, pluginManifest, roleDefinitions, skillDescriptions, manifestVersion));
         }
 
         if (checkOnly)
@@ -40,10 +41,24 @@ internal sealed class Generator(RepositoryLayout layout)
         return errors;
     }
 
+    private IReadOnlyDictionary<string, RoleDefinition> ReadRoleDefinitions(PluginManifest manifest)
+    {
+        var reader = new CanonicalRoleReader();
+        return manifest.Plugins.Values
+            .SelectMany(plugin => plugin.Roles)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToDictionary(
+                name => name,
+                name => reader.Read(name, Path.Combine(layout.FactoryRolesRoot, name + ".md")),
+                StringComparer.Ordinal);
+    }
+
     private static IReadOnlyList<GeneratedFile> BuildMarketplaceFiles(
         IPlatformAdapter platformAdapter,
         AdapterDefinition adapterDefinition,
         PluginManifest pluginManifest,
+        IReadOnlyDictionary<string, RoleDefinition> roleDefinitions,
         IReadOnlyDictionary<string, SkillDescription> skillDescriptions,
         string version)
     {
@@ -51,7 +66,7 @@ internal sealed class Generator(RepositoryLayout layout)
 
         foreach (var (pluginName, plugin) in pluginManifest.Plugins.OrderBy(item => item.Key, StringComparer.Ordinal))
         {
-            foreach (var file in platformAdapter.BuildPluginFiles(adapterDefinition, pluginManifest, pluginName, plugin, skillDescriptions, version))
+            foreach (var file in platformAdapter.BuildPluginFiles(adapterDefinition, pluginManifest, pluginName, plugin, roleDefinitions, skillDescriptions, version))
             {
                 files.Add(new GeneratedFile(Path.Combine("plugins", platformAdapter.Platform, pluginName, file.RelativePath), file.Content));
             }

@@ -6,7 +6,7 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
         encoderShouldEmitUTF8Identifier: false,
         throwOnInvalidBytes: true);
 
-    public void Validate(PluginManifest manifest)
+    public void Validate(PluginManifest manifest, IReadOnlyDictionary<string, RoleDefinition> roleDefinitions)
     {
         if (manifest.Plugins.Count == 0)
         {
@@ -48,6 +48,11 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
                 if (!knownRoles.Contains(role))
                 {
                     throw new InvalidOperationException($"Plugin '{pluginName}' references unknown role '{role}'.");
+                }
+
+                if (!roleDefinitions.ContainsKey(role))
+                {
+                    throw new InvalidOperationException($"Plugin '{pluginName}' role '{role}' could not be read.");
                 }
             }
 

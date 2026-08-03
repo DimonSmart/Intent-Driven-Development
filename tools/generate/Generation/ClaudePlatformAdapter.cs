@@ -35,6 +35,11 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
     protected override string BuildSkillFrontMatter(
         string skillName,
         SkillDescription skillDescription,
-        AdapterConfig adapter) =>
-        YamlFrontMatterWriter.BuildClaudeSkillFrontMatter(skillName, skillDescription, adapter);
+        AdapterConfig adapter,
+        IReadOnlyList<RoleDefinition> roles) =>
+        YamlFrontMatterWriter.BuildClaudeSkillFrontMatter(
+            skillName,
+            skillDescription,
+            adapter,
+            ClaudeRoleToolMapper.Map(roles));
 }

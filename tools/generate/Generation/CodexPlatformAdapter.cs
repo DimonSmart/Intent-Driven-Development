@@ -48,10 +48,11 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
     protected override IReadOnlyList<GeneratedFile> BuildSkillFiles(
         AdapterConfig adapter,
         PluginDefinition plugin,
+        IReadOnlyDictionary<string, RoleDefinition> roleDefinitions,
         string skillName,
         IReadOnlyDictionary<string, SkillDescription> skillDescriptions)
     {
-        var files = base.BuildSkillFiles(adapter, plugin, skillName, skillDescriptions).ToList();
+        var files = base.BuildSkillFiles(adapter, plugin, roleDefinitions, skillName, skillDescriptions).ToList();
         if (skillDescriptions.TryGetValue(skillName, out var skillDescription) &&
             skillDescription.Invocation == SkillInvocation.Manual)
         {
@@ -86,6 +87,7 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
     protected override string BuildSkillFrontMatter(
         string skillName,
         SkillDescription skillDescription,
-        AdapterConfig adapter) =>
+        AdapterConfig adapter,
+        IReadOnlyList<RoleDefinition> roles) =>
         YamlFrontMatterWriter.BuildCodexSkillFrontMatter(skillName, skillDescription);
 }

@@ -7,5 +7,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\generate\Validation\SkillReferencePathValidator.cs" Link="Validation\SkillReferencePathValidator.cs" />
+    <Compile Include="..\generate\Models\RoleDefinition.cs" Link="Models\RoleDefinition.cs" />
+    <Compile Include="..\generate\Models\RoleTool.cs" Link="Models\RoleTool.cs" />
+    <Compile Include="..\generate\Models\RoleToolNames.cs" Link="Models\RoleToolNames.cs" />
+    <Compile Include="..\generate\Reading\CanonicalRoleReader.cs" Link="Reading\CanonicalRoleReader.cs" />
   </ItemGroup>
 </Project>

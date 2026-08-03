@@ -16,6 +16,7 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         PluginManifest manifest,
         string pluginName,
         PluginDefinition plugin,
+        IReadOnlyDictionary<string, RoleDefinition> roleDefinitions,
         IReadOnlyDictionary<string, SkillDescription> skillDescriptions,
         string version)
     {
@@ -23,12 +24,12 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         var files = new List<GeneratedFile>
         {
             new(Path.Combine(ManifestDirectory, ManifestFileName), BuildPluginManifest(adapter, pluginName, plugin, version)),
-            new("idd-plugin.json", BuildIddPluginMetadata(adapter, plugin, version))
+            new("idd-plugin.json", BuildIddPluginMetadata(adapter, plugin, roleDefinitions, version))
         };
 
         foreach (var skillName in plugin.Skills.OrderBy(name => name, StringComparer.Ordinal))
         {
-            files.AddRange(BuildSkillFiles(adapter, plugin, skillName, skillDescriptions));
+            files.AddRange(BuildSkillFiles(adapter, plugin, roleDefinitions, skillName, skillDescriptions));
         }
 
         foreach (var asset in plugin.Assets)
@@ -49,7 +50,11 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         PluginDefinition plugin,
         string version);
 
-    private static string BuildIddPluginMetadata(AdapterConfig adapter, PluginDefinition plugin, string version)
+    private static string BuildIddPluginMetadata(
+        AdapterConfig adapter,
+        PluginDefinition plugin,
+        IReadOnlyDictionary<string, RoleDefinition> roleDefinitions,
+        string version)
     {
         var metadata = new JsonObject
         {
@@ -57,6 +62,7 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
             ["platform"] = adapter.CodingAgent,
             ["dependencies"] = JsonStringArray(plugin.Dependencies),
             ["roles"] = JsonStringArray(plugin.Roles),
+            ["roleDefinitions"] = BuildRoleDefinitions(plugin, roleDefinitions),
             ["assets"] = BuildAssets(plugin),
             ["canonicalSource"] = "src/canonical"
         };
@@ -67,6 +73,7 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
     protected virtual IReadOnlyList<GeneratedFile> BuildSkillFiles(
         AdapterConfig adapter,
         PluginDefinition plugin,
+        IReadOnlyDictionary<string, RoleDefinition> roleDefinitions,
         string skillName,
         IReadOnlyDictionary<string, SkillDescription> skillDescriptions)
     {
@@ -77,8 +84,11 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
 
         var sourcePath = Path.Combine("src", "canonical", "skills", skillName + ".md");
         var content = RequiredFileReader.Read(sourcePath);
+        var roles = plugin.SkillRoleReferences.TryGetValue(skillName, out var roleNames)
+            ? roleNames.Select(name => roleDefinitions[name]).ToArray()
+            : [];
         content = ContentNormalizer.JoinBlocks(
-            BuildSkillFrontMatter(skillName, skillDescription, adapter),
+            BuildSkillFrontMatter(skillName, skillDescription, adapter, roles),
             content);
 
         var files = new List<GeneratedFile>
@@ -90,10 +100,9 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         {
             foreach (var rolePrompt in rolePrompts)
             {
-                var roleContent = RequiredFileReader.Read(Path.Combine("src", "canonical", "factory", "roles", rolePrompt + ".md"));
                 files.Add(new GeneratedFile(
                     Path.Combine("skills", skillName, "references", "roles", rolePrompt + ".md"),
-                    ContentNormalizer.NormalizeContent(roleContent)));
+                    ContentNormalizer.NormalizeContent(BuildRole(roleDefinitions[rolePrompt]))));
             }
         }
 
@@ -125,7 +134,23 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
     protected abstract string BuildSkillFrontMatter(
         string skillName,
         SkillDescription skillDescription,
-        AdapterConfig adapter);
+        AdapterConfig adapter,
+        IReadOnlyList<RoleDefinition> roles);
+
+    protected virtual string BuildRole(RoleDefinition role) => ContentNormalizer.JoinBlocks(
+        role.Instructions,
+        """
+        ## Available tools
+
+        This role may use only:
+
+        """ + string.Join("\n", role.Tools.Select(tool => $"- {RoleToolNames.GetName(tool)}")) +
+        """
+
+        Do not substitute unavailable tools with another mechanism.
+        If the required operation cannot be completed with these tools, return the
+        role-specific blocked result.
+        """);
 
     private static JsonArray JsonStringArray(IEnumerable<string> values)
     {
@@ -136,6 +161,24 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         }
 
         return array;
+    }
+
+    private static JsonArray BuildRoleDefinitions(
+        PluginDefinition plugin,
+        IReadOnlyDictionary<string, RoleDefinition> roleDefinitions)
+    {
+        var roles = new JsonArray();
+        foreach (var roleName in plugin.Roles)
+        {
+            var role = roleDefinitions[roleName];
+            roles.Add(new JsonObject
+            {
+                ["name"] = role.Name,
+                ["tools"] = JsonStringArray(role.Tools.Select(RoleToolNames.GetName))
+            });
+        }
+
+        return roles;
     }
 
     private static JsonArray BuildAssets(PluginDefinition plugin)

@@ -1,3 +1,9 @@
+---
+tools:
+  - repository.read
+  - command.execute
+---
+
 # Final Reviewer
 
 Factory role prompt used by `idd-factory-review-task`.

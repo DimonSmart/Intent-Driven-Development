@@ -2,7 +2,11 @@ using System.Text.Json;
 
 internal static class YamlFrontMatterWriter
 {
-    public static string BuildClaudeSkillFrontMatter(string skillName, SkillDescription skillDescription, AdapterConfig adapter)
+    public static string BuildClaudeSkillFrontMatter(
+        string skillName,
+        SkillDescription skillDescription,
+        AdapterConfig adapter,
+        IReadOnlyList<string> allowedTools)
     {
         var generatedManualFields = adapter.SupportsManualOnlySkills &&
             skillDescription.Invocation == SkillInvocation.Manual
@@ -22,6 +26,12 @@ internal static class YamlFrontMatterWriter
         if (skillDescription.Adapters?.TryGetValue(adapter.CodingAgent, out var adapterMetadata) == true &&
             adapterMetadata.Frontmatter is not null)
         {
+            if (allowedTools.Count > 0 && adapterMetadata.Frontmatter.ContainsKey("allowed-tools"))
+            {
+                throw new InvalidOperationException(
+                    $"Skill '{skillName}' defines Claude allowed-tools outside its canonical role.");
+            }
+
             foreach (var field in adapterMetadata.Frontmatter)
             {
                 if (generatedManualFields is not null &&
@@ -47,6 +57,11 @@ internal static class YamlFrontMatterWriter
             {
                 lines.Add($"{field.Key}: true");
             }
+        }
+
+        if (allowedTools.Count > 0)
+        {
+            lines.Add($"allowed-tools: [{string.Join(", ", allowedTools)}]");
         }
 
         lines.Add("---");

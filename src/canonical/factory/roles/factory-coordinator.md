@@ -1,3 +1,11 @@
+---
+tools:
+  - repository.read
+  - factory-state.read
+  - agent.spawn
+  - agent.wait
+---
+
 # Factory Coordinator
 
 Factory role prompt used by `idd-factory-run`.

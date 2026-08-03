@@ -146,8 +146,7 @@
         "frontmatter": {
           "context": "fork",
           "agent": "Explore",
-          "argument-hint": "[request text or file contents]",
-          "allowed-tools": "Read Glob Grep"
+          "argument-hint": "[request text or file contents]"
         }
       }
     }
@@ -171,8 +170,7 @@
         "frontmatter": {
           "context": "fork",
           "agent": "Explore",
-          "argument-hint": "[active review-checkpoint path]",
-          "allowed-tools": "Read Glob Grep Bash"
+          "argument-hint": "[active review-checkpoint path]"
         }
       }
     }
@@ -183,8 +181,7 @@
       "claude": {
         "frontmatter": {
           "context": "fork",
-          "agent": "Explore",
-          "allowed-tools": "Read Glob Grep Bash"
+          "agent": "Explore"
         }
       }
     }

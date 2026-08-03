@@ -1,3 +1,9 @@
+---
+tools:
+  - repository.read
+  - command.execute
+---
+
 # Checkpoint Reviewer
 
 Factory role prompt used by `idd-factory-review-checkpoint`.

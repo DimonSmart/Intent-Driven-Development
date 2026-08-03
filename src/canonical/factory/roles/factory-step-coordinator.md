@@ -1,3 +1,13 @@
+---
+tools:
+  - repository.read
+  - factory-state.read
+  - factory-state.write
+  - factory-result.write
+  - agent.spawn
+  - agent.wait
+---
+
 # Factory Step Coordinator
 
 Role prompt used by `idd-factory-coordinate-step` and

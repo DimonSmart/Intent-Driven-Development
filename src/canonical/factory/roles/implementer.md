@@ -1,3 +1,10 @@
+---
+tools:
+  - repository.read
+  - repository.write
+  - command.execute
+---
+
 # Implementer
 
 Factory role prompt used by `idd-factory-execute-subtask`.
