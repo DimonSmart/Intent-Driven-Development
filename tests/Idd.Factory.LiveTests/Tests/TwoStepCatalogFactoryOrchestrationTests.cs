@@ -27,13 +27,14 @@ public sealed class TwoStepCatalogFactoryOrchestrationTests
     }
 
     [Fact]
-    public void AssertOrchestration_ReportsBothMissingSpawnsAndCompletions()
+    public void AssertOrchestration_ReportsPrimaryFailureWithoutCascadingCompletionNoise()
     {
         var assertions = AssertOrchestration(new FactoryEvalMetrics());
 
         var exception = Assert.Throws<Xunit.Sdk.XunitException>(() => assertions.ThrowIfFailed("run"));
         Assert.Contains("Actual spawned agents: 0", exception.Message);
-        Assert.Contains("Actual completed agents: 0", exception.Message);
+        Assert.DoesNotContain("Actual completed agents: 0", exception.Message);
+        Assert.Contains(Path.Combine("run", "report.md"), exception.Message);
     }
 
     [Fact]
