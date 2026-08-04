@@ -74,6 +74,17 @@ public sealed class CodexJsonlAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_CommandExecutionMentioningSpawnAgentIsIgnored()
+    {
+        var metrics = AnalyzeLines(
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"command_1\",\"type\":\"command_execution\",\"command\":\"Get-Content references/codex-dispatch.md\",\"aggregated_output\":\"Use spawn_agent with message only.\",\"status\":\"completed\"}}");
+
+        Assert.Equal(0, metrics.ToolCallCount);
+        Assert.Equal(0, metrics.SpawnAgentCallCount);
+        Assert.Equal(0, metrics.SpawnedAgentCount);
+    }
+
+    [Fact]
     public void Analyze_UnknownCollaborationItemIsInfrastructureError()
     {
         var exception = Assert.Throws<CodexJsonlAnalysisException>(() => AnalyzeLines("{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"collab_tool_call\",\"tool\":\"delegate_task\",\"status\":\"completed\"}}"));
