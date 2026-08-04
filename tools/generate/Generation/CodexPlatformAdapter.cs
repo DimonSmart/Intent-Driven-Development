@@ -168,7 +168,7 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
             Do not treat a semantic capability as unavailable merely because no
             runtime tool has the same name. A capability is unavailable only when
             its mapped Codex tool or operation is actually unavailable. In
-            particular, use `spawn_agent` for `agent.spawn`, use `wait` for
+            particular, use `spawn_agent` for `agent.spawn`, use `wait_agent` for
             `agent.wait`, and use repository file operations for Factory state.
             Before returning `BLOCKED`, attempt the mapped operation and preserve
             the actual runtime error if it fails.
@@ -192,7 +192,7 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
         RoleTool.AgentSpawn =>
             "Call the Codex `spawn_agent` collaboration tool.",
         RoleTool.AgentWait =>
-            "Call the Codex `wait` collaboration tool and wait for the child result.",
+            "Call the Codex `wait_agent` collaboration tool with the spawned agent id and wait for the child result.",
         RoleTool.FactoryStateRead =>
             "Read files under `.idd/factory/current/` using the mapped `repository.read` operations.",
         RoleTool.FactoryStateWrite =>
