@@ -64,7 +64,10 @@ public static class CodexJsonlAnalyzer
             ReadCollaborationCall(item, eventType, calls);
             return;
         }
-        if (ContainsSpawnAgent(item)) throw new CodexJsonlAnalysisException($"Unsupported spawn_agent item type '{itemType ?? "missing"}'.");
+        if (IsStructuredSpawnAgentCall(item))
+        {
+            throw new CodexJsonlAnalysisException($"Unsupported spawn_agent item type '{itemType ?? "missing"}'.");
+        }
     }
 
     private static void ReadFunctionCall(JsonElement item, string eventType, Dictionary<string, ToolCall> calls)
@@ -138,13 +141,9 @@ public static class CodexJsonlAnalyzer
             ? array.EnumerateArray().Where(value => value.ValueKind == JsonValueKind.String).Select(value => value.GetString()).Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value!).ToArray()
             : [];
 
-    private static bool ContainsSpawnAgent(JsonElement value) => value.ValueKind switch
-    {
-        JsonValueKind.String => value.GetString()?.Contains("spawn_agent", StringComparison.OrdinalIgnoreCase) == true,
-        JsonValueKind.Object => value.EnumerateObject().Any(property => property.Name.Contains("spawn_agent", StringComparison.OrdinalIgnoreCase) || ContainsSpawnAgent(property.Value)),
-        JsonValueKind.Array => value.EnumerateArray().Any(ContainsSpawnAgent),
-        _ => false
-    };
+    private static bool IsStructuredSpawnAgentCall(JsonElement item) =>
+        FindString(item, "name")?.Equals("spawn_agent", StringComparison.OrdinalIgnoreCase) == true ||
+        FindString(item, "tool")?.Equals("spawn_agent", StringComparison.OrdinalIgnoreCase) == true;
 
     private static JsonElement? FindProperty(JsonElement value, string name) => value.ValueKind == JsonValueKind.Object && value.TryGetProperty(name, out var property) ? property.Clone() : null;
     private static string? FindString(JsonElement value, string name) => value.ValueKind == JsonValueKind.Object && value.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.String ? property.GetString() : null;
