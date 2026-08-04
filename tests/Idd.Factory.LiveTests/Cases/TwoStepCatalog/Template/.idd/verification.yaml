@@ -3,10 +3,13 @@ version: 1
 checks:
   product-code-contract:
     run: dotnet test tests/MiniCatalog.Tests/MiniCatalog.Tests.csproj --no-restore --filter FullyQualifiedName~ProductCodeTests
+
   catalog-integration:
     run: dotnet test tests/MiniCatalog.Tests/MiniCatalog.Tests.csproj --no-restore --filter FullyQualifiedName~CatalogIntegrationTests
+
   final-build:
     run: dotnet build MiniCatalog.sln --no-restore
+
   final-tests:
     run: dotnet test tests/MiniCatalog.Tests/MiniCatalog.Tests.csproj --no-restore
 
@@ -15,12 +18,18 @@ default:
     - product-code-contract
 
 subtask:
-  use:
-    - product-code-contract
+  rules:
+    - paths:
+        - src/MiniCatalog/ProductCode.cs
+      use:
+        - product-code-contract
+
+    - use:
+        - catalog-integration
 
 checkpoint:
   use:
-    - catalog-integration
+    - product-code-contract
 
 final:
   use:
