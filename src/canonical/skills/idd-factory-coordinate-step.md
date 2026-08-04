@@ -44,11 +44,23 @@ exhausted and the information remains required. Persist only `Reason`, `Not veri
   never guess repairs. Completed items are immutable.
 - Activate the lowest ready item and process it in the same step. Only this
   coordinator may rename work-item files or alter their sequence.
-- For implementation, dispatch a registered `implementer` child agent; for a
-  Review checkpoint, dispatch a registered `checkpoint-reviewer` child agent;
-  for final review, dispatch a registered `final-reviewer` child agent. Apply
-  only the returned result contract. Do not duplicate worker scope or perform
-  it here.
+- For implementation, spawn a fresh generic child agent and assign it the
+  `implementer` role through a dispatch message that names
+  `.agents/skills/idd-factory-execute-subtask/SKILL.md`, its implementer role
+  reference at
+  `.agents/skills/idd-factory-execute-subtask/references/roles/implementer.md`,
+  `.agents/skills/idd-factory-execute-subtask/references/project-verification.md`,
+  and the active Subtask path. For a Review checkpoint, assign
+  `checkpoint-reviewer` with
+  `.agents/skills/idd-factory-review-checkpoint/SKILL.md`,
+  `.agents/skills/idd-factory-review-checkpoint/references/roles/checkpoint-reviewer.md`,
+  `.agents/skills/idd-factory-review-checkpoint/references/project-verification.md`,
+  and the active checkpoint path. For final review, assign `final-reviewer`
+  with `.agents/skills/idd-factory-review-task/SKILL.md`,
+  `.agents/skills/idd-factory-review-task/references/roles/final-reviewer.md`,
+  and `.agents/skills/idd-factory-review-task/references/project-verification.md`;
+  it reads current state and the actual diff. Apply only a valid returned result
+  contract. Do not duplicate worker scope or perform it here.
 - A Subtask becomes completed only when its required verification is confirmed.
   Otherwise persist its Blocker and return `BLOCKED`.
 - For `NEEDS_REPLAN` or `needs-replan`, verify the prerequisite belongs to the
@@ -101,8 +113,11 @@ Result: <commit-message path>
 `ADVANCED`, `STOPPED`, and `FINISHED` are internal step results, never Factory
 outcomes.
 
-Dispatching a worker means spawning the required registered child agent and
-waiting for its result. Reading the worker skill and performing its instructions
-in this coordinator context is forbidden. If dispatch fails, return `BLOCKED`
-and do not implement, review, simulate a worker result, create completed work
-items, or continue the Factory run.
+For Codex dispatch, read `references/codex-dispatch.md`. Every worker dispatch
+must spawn a generic child agent using only `message`; do not provide `items`,
+never provide both, and use `fork_context = false`. Wait for its terminal
+result, validate the worker result contract, and only then change Factory
+state. Reading the worker skill and performing its instructions in this
+coordinator context is forbidden. If dispatch or wait fails, return `BLOCKED`
+with the actual technical reason and do not implement, review, simulate a
+worker result, create completed work items, or continue the Factory run.

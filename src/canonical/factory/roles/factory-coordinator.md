@@ -37,8 +37,10 @@ Factory files are temporary.
 - Report terminal outcomes and the final handoff. The step coordinator owns all
   work-item transitions, worker results, replanning, review, and finalization.
 - Do not implement, review, or alter durable intent in this coordinator.
-- Dispatch means spawning a registered child agent and waiting for its result.
-  Reading another skill and following it in this context is not dispatch.
+- Dispatch means spawning a fresh child agent and assigning its role by passing
+  its skill and role-reference paths in the dispatch message, then waiting for
+  its result. Reading another skill and following it in this context is not
+  dispatch.
 - If a required child agent cannot be spawned, return `BLOCKED`. Do not perform
   worker scope directly, modify product files, simulate a worker result, create
   completed work items for work not performed by a child agent, substitute skill

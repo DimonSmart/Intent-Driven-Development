@@ -17,8 +17,7 @@ CheckPlatformPlugins("claude", ".claude-plugin");
 CheckPlatformPlugins("codex", ".codex-plugin");
 CheckCanonicalRoleReader();
 CheckFactoryRoleGeneration();
-CheckCodexFactoryAgentDefinitions();
-CheckCodexRoleToolMapper();
+CheckCodexFactoryGenericSubagents();
 CheckCanonicalSkillReferences();
 CheckVerificationPolicyContract();
 CheckLiveFactorySummaryScriptWithWindowsPowerShell();
@@ -415,7 +414,7 @@ void CheckFactoryRoleGeneration()
     ExpectContains(reviewerClaudeSkill, "allowed-tools: [Read, Glob, Grep, Bash]", "Claude reviewer native tools");
 }
 
-void CheckCodexFactoryAgentDefinitions()
+void CheckCodexFactoryGenericSubagents()
 {
     var root = Path.Combine(marketplaceRoot, "plugins", "codex", "idd-factory");
     var expectedRoles = new[]
@@ -439,81 +438,77 @@ void CheckCodexFactoryAgentDefinitions()
         .ToDictionary(item => item.GetProperty("name").GetString() ?? "", StringComparer.Ordinal);
     foreach (var role in expectedRoles)
     {
-        var path = Path.Combine(root, "agents", role + ".toml");
-        ExpectFile(path);
-        var content = ReadText(path);
-        ExpectContains(content, $"name = \"{role}\"", $"Codex {role} agent type");
-        ExpectContains(content, "description = ", $"Codex {role} description");
-        ExpectContains(content, "developer_instructions = ", $"Codex {role} role prompt");
-        if (content.Contains("tools:", StringComparison.Ordinal))
-        {
-            failures.Add($"Codex {role} agent definition retains canonical YAML front matter.");
-        }
-
         if (!definitions.TryGetValue(role, out var definition))
         {
             failures.Add($"Codex metadata has no definition for {role}.");
             continue;
         }
 
-        ExpectString(definition, "agentType", role, $"Codex {role} metadata agent type");
-        foreach (var tool in definition.GetProperty("toolDefinitions").EnumerateArray())
+        ExpectString(definition, "dispatchMode", "generic-subagent", $"Codex {role} dispatch mode");
+        ExpectString(definition, "roleDelivery", "prompt-reference", $"Codex {role} role delivery");
+        ExpectString(definition, "toolsEnforcement", "prompt-only", $"Codex {role} tool enforcement");
+        if (definition.TryGetProperty("agentType", out _))
         {
-            ExpectString(tool, "enforcement", "prompt-only", $"Codex {role} tool enforcement");
+            failures.Add($"Codex {role} metadata claims a native agent type.");
         }
     }
+
+    ExpectMissing(Path.Combine(root, "agents"));
+    ExpectMissing(Path.Combine(marketplaceRoot, "plugins", "codex", "idd-intent", "agents"));
 
     var bindings = metadata.RootElement.GetProperty("skillRoleBindings").EnumerateArray().ToArray();
     foreach (var binding in bindings)
     {
         var role = binding.GetProperty("role").GetString() ?? "";
-        ExpectString(binding, "agentType", role, $"Codex skill runtime binding for {binding.GetProperty("skill").GetString()}");
-        if (!File.Exists(Path.Combine(root, "agents", role + ".toml")))
+        ExpectString(binding, "dispatchMode", "generic-subagent", $"Codex skill dispatch mode for {binding.GetProperty("skill").GetString()}");
+        if (binding.TryGetProperty("agentType", out _))
         {
-            failures.Add($"Codex skill binding for {role} has no agent definition.");
+            failures.Add($"Codex skill binding for {role} claims a native agent type.");
         }
     }
 
     var run = ReadText(Path.Combine(root, "skills", "idd-factory-run", "SKILL.md"));
     var step = ReadText(Path.Combine(root, "skills", "idd-factory-coordinate-step", "SKILL.md"));
     var finalizer = ReadText(Path.Combine(root, "skills", "idd-factory-finalize-run", "SKILL.md"));
-    ExpectContains(run, "Reading another skill and following it in the root", "Factory runner dispatch contract");
+    ExpectContains(run, "Reading another skill and following it", "Factory runner dispatch contract");
     ExpectContains(run, "must never modify product files", "Factory runner product boundary");
     ExpectContains(run, "Do not emit a public Factory outcome as a progress message", "Factory progress outcome contract");
-    ExpectContains(step, "registered `implementer` child agent", "Step coordinator implementation dispatch");
-    ExpectContains(step, "registered `checkpoint-reviewer` child agent", "Step coordinator checkpoint dispatch");
-    ExpectContains(step, "registered `final-reviewer` child agent", "Step coordinator final review dispatch");
+    ExpectContains(run, "generic child agent", "Factory runner generic dispatch");
+    ExpectContains(step, "generic child agent", "Step coordinator generic dispatch");
+    ExpectContains(run, "only `message`", "Factory runner message-only dispatch");
+    ExpectContains(step, "only `message`", "Step coordinator message-only dispatch");
+    ExpectContains(run, "do not provide `items`", "Factory runner items prohibition");
+    ExpectContains(step, "do not provide `items`", "Step coordinator items prohibition");
+    ExpectContains(run, "fork_context = false", "Factory runner isolated dispatch");
+    ExpectContains(step, "fork_context = false", "Step coordinator isolated dispatch");
+    ExpectContains(ReadText(Path.Combine(root, "skills", "idd-factory-run", "references", "codex-dispatch.md")), "wait for the child result", "Factory runner dispatch reference");
+    ExpectContains(ReadText(Path.Combine(root, "skills", "idd-factory-coordinate-step", "references", "codex-dispatch.md")), "wait for the child result", "Step coordinator dispatch reference");
+    ExpectContains(run, "actual technical\nreason", "Factory runner dispatch error preservation");
+    ExpectContains(step, "actual technical reason", "Step coordinator dispatch error preservation");
+    foreach (var (skill, role) in new[]
+    {
+        ("idd-factory-decompose-task", "task-decomposer"),
+        ("idd-factory-execute-subtask", "implementer"),
+        ("idd-factory-review-checkpoint", "checkpoint-reviewer"),
+        ("idd-factory-review-task", "final-reviewer")
+    })
+    {
+        var workerRole = ReadText(Path.Combine(root, "skills", skill, "references", "roles", role + ".md"));
+        ExpectContains(workerRole, "Do not create child agents", $"Codex {role} no-delegation boundary");
+    }
     ExpectContains(finalizer, "exactly `\"passed\"`", "Finalizer verification status contract");
-    ExpectContains(
-        ReadText(Path.Combine(root, "agents", "factory-coordinator.toml")),
-        "spawn_agent",
-        "Codex coordinator spawn_agent dispatch binding");
+    if (run.Contains("registered agent type", StringComparison.OrdinalIgnoreCase) ||
+        step.Contains("registered agent type", StringComparison.OrdinalIgnoreCase) ||
+        run.Contains("agent_type", StringComparison.Ordinal) ||
+        step.Contains("agent_type", StringComparison.Ordinal))
+    {
+        failures.Add("Codex Factory instructions retain native-agent registration semantics.");
+    }
     if (run.Contains("Get-Date -AsUTC", StringComparison.Ordinal) ||
         step.Contains("Get-Date -AsUTC", StringComparison.Ordinal) ||
         finalizer.Contains("Get-Date -AsUTC", StringComparison.Ordinal))
     {
         failures.Add("Factory instructions contain unsupported Get-Date -AsUTC.");
-    }
-}
-
-void CheckCodexRoleToolMapper()
-{
-    foreach (var tool in Enum.GetValues<RoleTool>())
-    {
-        var mapping = CodexRoleToolMapper.Map(tool);
-        if (!mapping.PromptOnly || mapping.NativeCapabilities.Count != 0)
-        {
-            failures.Add($"Codex tool mapping for {tool} does not honestly report prompt-only enforcement.");
-        }
-    }
-
-    try
-    {
-        _ = CodexRoleToolMapper.Map((RoleTool)999);
-        failures.Add("Codex tool mapper silently accepted an unknown tool.");
-    }
-    catch (ArgumentOutOfRangeException)
-    {
     }
 }
 

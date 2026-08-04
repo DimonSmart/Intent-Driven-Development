@@ -10,27 +10,6 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
     public override GeneratedFile BuildMarketplaceFile(PluginManifest manifest, string version) =>
         CodexMarketplaceBuilder.Build(manifest);
 
-    public override IReadOnlyList<GeneratedFile> BuildPluginFiles(
-        AdapterDefinition adapterDefinition,
-        PluginManifest manifest,
-        string pluginName,
-        PluginDefinition plugin,
-        IReadOnlyDictionary<string, RoleDefinition> roleDefinitions,
-        IReadOnlyDictionary<string, SkillDescription> skillDescriptions,
-        string version)
-    {
-        var files = base.BuildPluginFiles(
-            adapterDefinition, manifest, pluginName, plugin, roleDefinitions, skillDescriptions, version).ToList();
-
-        foreach (var roleName in plugin.Roles.OrderBy(name => name, StringComparer.Ordinal))
-        {
-            var role = roleDefinitions[roleName];
-            files.Add(new GeneratedFile(Path.Combine("agents", role.Name + ".toml"), BuildAgentDefinition(role)));
-        }
-
-        return files;
-    }
-
     protected override string BuildPluginManifest(
         AdapterConfig adapter,
         string pluginName,
@@ -85,6 +64,15 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                 """.ReplaceLineEndings("\n") + "\n"));
         }
 
+        if (StringComparer.Ordinal.Equals(skillName, "idd-factory-run") ||
+            StringComparer.Ordinal.Equals(skillName, "idd-factory-coordinate-step"))
+        {
+            files.Add(new GeneratedFile(
+                Path.Combine("skills", skillName, "references", "codex-dispatch.md"),
+                ContentNormalizer.NormalizeContent(RequiredFileReader.Read(
+                    "src/canonical/methodology/codex-dispatch.md"))));
+        }
+
         return files;
     }
 
@@ -134,23 +122,13 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
         foreach (var roleName in plugin.Roles)
         {
             var role = roleDefinitions[roleName];
-            var tools = new JsonArray();
-            foreach (var mapping in CodexRoleToolMapper.Map(role.Tools))
-            {
-                tools.Add(new JsonObject
-                {
-                    ["name"] = RoleToolNames.GetName(mapping.Tool),
-                    ["enforcement"] = mapping.PromptOnly ? "prompt-only" : "native"
-                });
-            }
-
             definitions.Add(new JsonObject
             {
                 ["name"] = role.Name,
-                ["agentType"] = role.Name,
-                // Keep the existing string array for metadata consumers.
                 ["tools"] = JsonStringArray(role.Tools.Select(RoleToolNames.GetName)),
-                ["toolDefinitions"] = tools
+                ["dispatchMode"] = "generic-subagent",
+                ["roleDelivery"] = "prompt-reference",
+                ["toolsEnforcement"] = "prompt-only"
             });
         }
 
@@ -164,40 +142,21 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
         {
             foreach (var role in roles)
             {
-                bindings.Add(new JsonObject { ["skill"] = skill, ["role"] = role, ["agentType"] = role });
+                bindings.Add(new JsonObject { ["skill"] = skill, ["role"] = role, ["dispatchMode"] = "generic-subagent" });
             }
         }
 
         return bindings;
     }
 
-    private string BuildAgentDefinition(RoleDefinition role)
-    {
-        var prompt = ContentNormalizer.NormalizeContent(BuildCodexRolePrompt(role)).TrimEnd('\n');
-        return $"""
-            name = {JsonSerializer.Serialize(role.Name)}
-            description = {JsonSerializer.Serialize($"IDD Factory role: {role.Name}.")}
-            developer_instructions = {JsonSerializer.Serialize(prompt)}
-            """.ReplaceLineEndings("\n") + "\n";
-    }
+    protected override string BuildRole(RoleDefinition role) => ContentNormalizer.JoinBlocks(
+        base.BuildRole(role),
+        """
+        ## Codex role delivery
 
-    private string BuildCodexRolePrompt(RoleDefinition role)
-    {
-        var prompt = BuildRole(role);
-        if (!role.Tools.Contains(RoleTool.AgentSpawn))
-        {
-            return prompt;
-        }
-
-        return ContentNormalizer.JoinBlocks(
-            prompt,
-            """
-            ## Codex dispatch
-
-            In Codex, dispatch means calling `spawn_agent` with the required
-            registered `agent_type`, then waiting for that child agent's result.
-            """);
-    }
+        Codex Factory roles are delivered to generic child agents through the
+        dispatch message. A role is not a native custom agent type.
+        """);
 
     protected override string BuildSkillFrontMatter(
         string skillName,

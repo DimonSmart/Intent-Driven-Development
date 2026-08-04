@@ -37,8 +37,13 @@ checkpoint evidence.
 
 ## Bootstrap
 
-Before state exists, run intent preflight and dispatch a registered
-`task-decomposer` child agent with the complete request.
+Before state exists, run intent preflight and spawn a fresh generic child agent.
+Assign it the `task-decomposer` role by passing a dispatch `message` with the
+complete request, workspace path, durable-intent path,
+`.agents/skills/idd-factory-decompose-task/SKILL.md`, and
+`.agents/skills/idd-factory-decompose-task/references/roles/task-decomposer.md`.
+Also pass its `project-verification.md` reference when required by the worker
+skill.
 
 Read `references/methodology-version.json` before creating state. Record its
 `methodologyVersion` as `Methodology version:` in `current/request.md`, carry it
@@ -63,10 +68,13 @@ terminal checkpoint that duplicates final integrated review.
 
 ## Dispatch
 
-After bootstrap or a valid resume, dispatch a registered
-`factory-step-coordinator` child agent. Pass only the worktree path, resume request,
-and any confirmed answer to the current blocker. Do not pass detailed parent
-history, worker reports, or test logs.
+After bootstrap or a valid resume, spawn a fresh generic child agent and assign
+it the `factory-step-coordinator` role through the dispatch `message`. Include
+the worktree path, resume request, confirmed blocker answer when present,
+`.agents/skills/idd-factory-coordinate-step/SKILL.md`,
+`.agents/skills/idd-factory-coordinate-step/references/roles/factory-step-coordinator.md`,
+and `.agents/skills/idd-factory-coordinate-step/references/project-verification.md`.
+Do not pass detailed parent history, worker reports, or test logs.
 
 - On `Step result: ADVANCED`, discard the completed step context and invoke a
   new fresh step context.
@@ -80,12 +88,16 @@ internal, never a Factory outcome. The step coordinator handles activation,
 Completion/Blocker records, checkpoint correction, replanning, intent
 orchestration, final review, and finalization.
 
-Dispatch means spawning a registered child agent with the required agent type
-and waiting for its result. Reading another skill and following it in the root
-context is not dispatch. The Factory runner must not execute coordinator,
+For Codex dispatch, read `references/codex-dispatch.md`. Every call to
+`spawn_agent` uses only `message`; do not provide `items`, never provide both,
+and use `fork_context = false`. Dispatch means spawning a generic child agent,
+waiting for its terminal result, and validating that result against its role
+contract before changing Factory state. Reading another skill and following it
+in the root context is not dispatch. The Factory runner must not execute coordinator,
 implementation, review, or finalization work in its own context. The root
 context must never modify product files. If a required child agent cannot be
-spawned, stop the attempt as `BLOCKED`; never fall back to self-execution.
+spawned or waited for, stop the attempt as `BLOCKED` with the actual technical
+reason; never fall back to self-execution.
 
 ## Resume and Cancel
 

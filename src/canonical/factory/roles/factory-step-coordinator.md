@@ -42,9 +42,10 @@ normative; `.idd/factory/current/` is the authoritative temporary memory.
   correction, replan, intent, blocker, or finalization handling, then stop.
 - Return only compact `ADVANCED`, `STOPPED`, or `FINISHED` result data. Those
   labels are not public Factory outcomes.
-- Dispatching a worker means spawning the required registered child agent and
-  waiting for its result. Reading the worker skill and performing its
-  instructions in this coordinator context is forbidden.
+- Dispatching a worker means spawning a fresh child agent and assigning the
+  worker role by passing its skill and role-reference paths in the dispatch
+  message, then waiting for its result. Reading the worker skill and performing
+  its instructions in this coordinator context is forbidden.
 - If a required child agent cannot be spawned, return `BLOCKED`. Do not perform
   worker scope directly, modify product files, simulate a worker result, create
   completed work items for work not performed by a child agent, substitute skill
