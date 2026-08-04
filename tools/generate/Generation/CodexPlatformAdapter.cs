@@ -149,14 +149,58 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
         return bindings;
     }
 
-    protected override string BuildRole(RoleDefinition role) => ContentNormalizer.JoinBlocks(
-        base.BuildRole(role),
-        """
-        ## Codex role delivery
+    protected override string BuildRole(RoleDefinition role)
+    {
+        var mappings = string.Join(
+            "\n",
+            role.Tools.Select(tool => $"- `{RoleToolNames.GetName(tool)}`: {DescribeCodexCapability(tool)}"));
 
-        Codex Factory roles are delivered to generic child agents through the
-        dispatch message. A role is not a native custom agent type.
-        """);
+        return ContentNormalizer.JoinBlocks(
+            base.BuildRole(role),
+            $"""
+            ## Codex capability mapping
+
+            The names in `Available tools` are semantic Factory capabilities,
+            not literal Codex tool names. Use these runtime operations:
+
+            {mappings}
+
+            Do not treat a semantic capability as unavailable merely because no
+            runtime tool has the same name. A capability is unavailable only when
+            its mapped Codex tool or operation is actually unavailable. In
+            particular, use `spawn_agent` for `agent.spawn`, use `wait` for
+            `agent.wait`, and use repository file operations for Factory state.
+            Before returning `BLOCKED`, attempt the mapped operation and preserve
+            the actual runtime error if it fails.
+            """,
+            """
+            ## Codex role delivery
+
+            Codex Factory roles are delivered to generic child agents through the
+            dispatch message. A role is not a native custom agent type.
+            """);
+    }
+
+    private static string DescribeCodexCapability(RoleTool tool) => tool switch
+    {
+        RoleTool.RepositoryRead =>
+            "Read repository files using the available shell or file-reading operations.",
+        RoleTool.RepositoryWrite =>
+            "Create or modify repository files using the available file-editing or shell operations.",
+        RoleTool.CommandExecute =>
+            "Execute repository commands using the available command-execution operation.",
+        RoleTool.AgentSpawn =>
+            "Call the Codex `spawn_agent` collaboration tool.",
+        RoleTool.AgentWait =>
+            "Call the Codex `wait` collaboration tool and wait for the child result.",
+        RoleTool.FactoryStateRead =>
+            "Read files under `.idd/factory/current/` using the mapped `repository.read` operations.",
+        RoleTool.FactoryStateWrite =>
+            "Create, update, rename, or remove files under `.idd/factory/current/` using the mapped `repository.write` operations.",
+        RoleTool.FactoryResultWrite =>
+            "Write Factory result artifacts under `.idd/factory/results/` using the mapped `repository.write` operations.",
+        _ => throw new ArgumentOutOfRangeException(nameof(tool), tool, "Unknown role capability.")
+    };
 
     protected override string BuildSkillFrontMatter(
         string skillName,
