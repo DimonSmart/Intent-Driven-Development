@@ -84,7 +84,7 @@ public static class CodexJsonlAnalyzer
     private static void ReadCollaborationCall(JsonElement item, string eventType, Dictionary<string, ToolCall> calls)
     {
         var tool = FindString(item, "tool");
-        if (tool is not ("spawn_agent" or "wait" or "wait_agent")) throw new CodexJsonlAnalysisException($"Unsupported collaboration tool '{tool ?? "missing"}'. Cannot determine whether subagents were used.");
+        if (tool is not ("spawn_agent" or "wait" or "wait_agent" or "close_agent")) throw new CodexJsonlAnalysisException($"Unsupported collaboration tool '{tool ?? "missing"}'. Cannot determine whether subagents were used.");
         var call = GetOrCreateCall(item, tool, calls);
         if (eventType != "item.completed") return;
         call.Completed = true;
