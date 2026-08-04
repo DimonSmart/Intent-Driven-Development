@@ -37,8 +37,8 @@ checkpoint evidence.
 
 ## Bootstrap
 
-Before state exists, run intent preflight and `idd-factory-decompose-task` with
-the complete request.
+Before state exists, run intent preflight and dispatch a registered
+`task-decomposer` child agent with the complete request.
 
 Read `references/methodology-version.json` before creating state. Record its
 `methodologyVersion` as `Methodology version:` in `current/request.md`, carry it
@@ -63,8 +63,8 @@ terminal checkpoint that duplicates final integrated review.
 
 ## Dispatch
 
-After bootstrap or a valid resume, invoke `idd-factory-coordinate-step` in a
-new isolated coordinator context. Pass only the worktree path, resume request,
+After bootstrap or a valid resume, dispatch a registered
+`factory-step-coordinator` child agent. Pass only the worktree path, resume request,
 and any confirmed answer to the current blocker. Do not pass detailed parent
 history, worker reports, or test logs.
 
@@ -79,6 +79,13 @@ completed step's diff, or retain corrective-cycle detail. `NEEDS_REPLAN` is
 internal, never a Factory outcome. The step coordinator handles activation,
 Completion/Blocker records, checkpoint correction, replanning, intent
 orchestration, final review, and finalization.
+
+Dispatch means spawning a registered child agent with the required agent type
+and waiting for its result. Reading another skill and following it in the root
+context is not dispatch. The Factory runner must not execute coordinator,
+implementation, review, or finalization work in its own context. The root
+context must never modify product files. If a required child agent cannot be
+spawned, stop the attempt as `BLOCKED`; never fall back to self-execution.
 
 ## Resume and Cancel
 
@@ -105,3 +112,6 @@ Allowed outcomes are `COMPLETED`, `FOCUSED_HANDOFF`, `NEEDS_CLARIFICATION`,
 `INTENT_REQUIRED`, `BLOCKED`, and `CORRUPT_FACTORY_STATE`. Missing verification
 never becomes approval. A persisted Blocker uses literal `Reason:`, `Verified:`,
 `Not verified:`, and `Resume when:` fields.
+
+Do not emit a public Factory outcome as a progress message. Emit the final
+response object only after the Factory attempt has actually finished or stopped.

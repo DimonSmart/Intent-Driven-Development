@@ -46,3 +46,4 @@ Implement exactly one active implementation-only Subtask; current
   required verification evidence, or a non-intent user decision.
 - Do not choose items, rename Factory files, broaden scope, update intent, perform
   review, clean state, or prepare a commit message.
+- Do not create child agents or delegate work further.

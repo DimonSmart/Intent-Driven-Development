@@ -40,3 +40,4 @@ completed Subtasks.
 - Resolve checkpoint check IDs using context `checkpoint` and the aggregate
   covered scope. Do not approve required `Not verified` checks or run final checks.
 - Do not modify code, intent, Factory state, covered tasks, or the checkpoint.
+- Do not create child agents or delegate work further.

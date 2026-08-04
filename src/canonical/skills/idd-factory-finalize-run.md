@@ -37,6 +37,10 @@ JSON object containing `schemaVersion`, `methodologyVersion`, `factoryOutcome`,
 `commitMessagePath`. Take the methodology version from the `Methodology version:`
 field in `current/request.md`.
 
+For a successfully verified completed Factory run, `verificationStatus` must be
+exactly `"passed"`. If successful verification cannot be confirmed, do not
+create `factoryOutcome: COMPLETED`.
+
 Never overwrite a result directory. If the complete timestamped name exists,
 append `-2`, then `-3`, and so on.
 

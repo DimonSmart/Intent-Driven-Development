@@ -11,7 +11,7 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
 
     public abstract GeneratedFile BuildMarketplaceFile(PluginManifest manifest, string version);
 
-    public IReadOnlyList<GeneratedFile> BuildPluginFiles(
+    public virtual IReadOnlyList<GeneratedFile> BuildPluginFiles(
         AdapterDefinition adapterDefinition,
         PluginManifest manifest,
         string pluginName,
@@ -50,7 +50,7 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         PluginDefinition plugin,
         string version);
 
-    private static string BuildIddPluginMetadata(
+    protected virtual string BuildIddPluginMetadata(
         AdapterConfig adapter,
         PluginDefinition plugin,
         IReadOnlyDictionary<string, RoleDefinition> roleDefinitions,
@@ -152,7 +152,7 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         role-specific blocked result.
         """);
 
-    private static JsonArray JsonStringArray(IEnumerable<string> values)
+    protected static JsonArray JsonStringArray(IEnumerable<string> values)
     {
         var array = new JsonArray();
         foreach (var value in values)
@@ -163,7 +163,7 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         return array;
     }
 
-    private static JsonArray BuildRoleDefinitions(
+    protected virtual JsonArray BuildRoleDefinitions(
         PluginDefinition plugin,
         IReadOnlyDictionary<string, RoleDefinition> roleDefinitions)
     {
@@ -181,7 +181,7 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         return roles;
     }
 
-    private static JsonArray BuildAssets(PluginDefinition plugin)
+    protected static JsonArray BuildAssets(PluginDefinition plugin)
     {
         var assets = new JsonArray();
         foreach (var asset in plugin.Assets)

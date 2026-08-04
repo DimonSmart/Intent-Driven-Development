@@ -44,9 +44,11 @@ exhausted and the information remains required. Persist only `Reason`, `Not veri
   never guess repairs. Completed items are immutable.
 - Activate the lowest ready item and process it in the same step. Only this
   coordinator may rename work-item files or alter their sequence.
-- For implementation, checkpoint review, or final review, dispatch only the
-  corresponding specialized Factory skill and apply its result contract. Do
-  not duplicate that worker's detailed scope or perform it here.
+- For implementation, dispatch a registered `implementer` child agent; for a
+  Review checkpoint, dispatch a registered `checkpoint-reviewer` child agent;
+  for final review, dispatch a registered `final-reviewer` child agent. Apply
+  only the returned result contract. Do not duplicate worker scope or perform
+  it here.
 - A Subtask becomes completed only when its required verification is confirmed.
   Otherwise persist its Blocker and return `BLOCKED`.
 - For `NEEDS_REPLAN` or `needs-replan`, verify the prerequisite belongs to the
@@ -98,3 +100,9 @@ Result: <commit-message path>
 
 `ADVANCED`, `STOPPED`, and `FINISHED` are internal step results, never Factory
 outcomes.
+
+Dispatching a worker means spawning the required registered child agent and
+waiting for its result. Reading the worker skill and performing its instructions
+in this coordinator context is forbidden. If dispatch fails, return `BLOCKED`
+and do not implement, review, simulate a worker result, create completed work
+items, or continue the Factory run.

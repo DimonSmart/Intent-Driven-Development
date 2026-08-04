@@ -40,6 +40,7 @@ checkpoints.
 - Do not make executors read `request.md`, checkpoints, or other Subtasks.
 - Do not write code, Factory state, or `.idd/intent/`.
 - Do not read previous Factory runs or add status/history metadata to work items.
+- Do not create child agents or delegate work further.
 - Read project verification policy when it exists. Assign only stable check IDs:
   `subtask` to Subtasks and `checkpoint` to Review checkpoints; never
   copy commands or broaden narrow rules beyond their complete scope.

@@ -70,6 +70,16 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
                         throw new InvalidOperationException($"Plugin '{pluginName}' references role '{role}' from skill '{skill}' without owning it.");
                     }
                 }
+
+                if (StringComparer.Ordinal.Equals(pluginName, "idd-factory") && roles.Length != 1)
+                {
+                    throw new InvalidOperationException($"Codex Factory skill '{skill}' must reference exactly one runtime role.");
+                }
+            }
+
+            if (StringComparer.Ordinal.Equals(pluginName, "idd-factory"))
+            {
+                ValidateCodexRuntimeRoles(plugin, roleDefinitions);
             }
 
             ValidateSkillReferences(pluginName, plugin);
@@ -81,6 +91,35 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
                 {
                     throw new InvalidOperationException($"Plugin '{pluginName}' references missing asset source '{asset.Source}'.");
                 }
+            }
+        }
+    }
+
+    private static void ValidateCodexRuntimeRoles(
+        PluginDefinition plugin,
+        IReadOnlyDictionary<string, RoleDefinition> roleDefinitions)
+    {
+        var agentTypes = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var roleName in plugin.Roles)
+        {
+            var role = roleDefinitions[roleName];
+            if (!System.Text.RegularExpressions.Regex.IsMatch(role.Name, "^[a-z0-9]+(?:-[a-z0-9]+)*$"))
+            {
+                throw new InvalidOperationException($"Codex agent type '{role.Name}' is invalid.");
+            }
+
+            if (!agentTypes.Add(role.Name))
+            {
+                throw new InvalidOperationException($"Codex agent type '{role.Name}' is defined more than once.");
+            }
+        }
+
+        foreach (var (skill, roles) in plugin.SkillRoleReferences)
+        {
+            var role = roleDefinitions[roles.Single()];
+            if (!agentTypes.Contains(role.Name))
+            {
+                throw new InvalidOperationException($"Codex Factory skill '{skill}' has no generated agent type.");
             }
         }
     }
