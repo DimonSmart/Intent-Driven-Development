@@ -85,6 +85,22 @@ public sealed class CodexJsonlAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_CloseAgentIsCountedWithoutChangingAgentMetrics()
+    {
+        var metrics = AnalyzeLines(
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"spawn_1\",\"type\":\"collab_tool_call\",\"tool\":\"spawn_agent\",\"receiver_thread_ids\":[\"child_1\"],\"status\":\"completed\"}}",
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"wait_1\",\"type\":\"collab_tool_call\",\"tool\":\"wait\",\"agents_states\":{\"child_1\":{\"status\":\"completed\"}},\"status\":\"completed\"}}",
+            "{\"type\":\"item.started\",\"item\":{\"id\":\"close_1\",\"type\":\"collab_tool_call\",\"tool\":\"close_agent\",\"receiver_thread_ids\":[\"child_1\"],\"status\":\"in_progress\"}}",
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"close_1\",\"type\":\"collab_tool_call\",\"tool\":\"close_agent\",\"receiver_thread_ids\":[\"child_1\"],\"agents_states\":{\"child_1\":{\"status\":\"completed\"}},\"status\":\"completed\"}}");
+
+        Assert.Equal(3, metrics.ToolCallCount);
+        Assert.Equal(1, metrics.SpawnAgentCallCount);
+        Assert.Equal(1, metrics.SpawnedAgentCount);
+        Assert.Equal(1, metrics.WaitAgentCallCount);
+        Assert.Equal(1, metrics.CompletedChildAgentCount);
+    }
+
+    [Fact]
     public void Analyze_UnknownCollaborationItemIsInfrastructureError()
     {
         var exception = Assert.Throws<CodexJsonlAnalysisException>(() => AnalyzeLines("{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"collab_tool_call\",\"tool\":\"delegate_task\",\"status\":\"completed\"}}"));
