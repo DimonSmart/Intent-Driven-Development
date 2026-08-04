@@ -49,7 +49,7 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
             "--ignore-rules",
             "--enable", "multi_agent", "--disable", "multi_agent_v2",
             "--disable", "plugins", "--disable", "apps", "--disable", "browser_use", "--disable", "code_mode_host",
-            "-c", "mcp_servers={}", "-c", "approval_policy=never", "-c", $"model_reasoning_effort={options.ReasoningEffort}"
+            "-c", "agents.max_depth=2", "-c", "mcp_servers={}", "-c", "approval_policy=never", "-c", $"model_reasoning_effort={options.ReasoningEffort}"
         ]);
         if (profile.WindowsSandbox is not null) arguments.AddRange(["-c", $"windows.sandbox=\"{profile.WindowsSandbox}\""]);
         arguments.AddRange(["--model", options.Model, "--sandbox", "workspace-write", "--cd", workspace.WorkspaceDirectory, "--output-schema", Path.Combine(workspace.CaseDirectory, "final-response.schema.json"), "--output-last-message", workspace.LastMessagePath, "-"]);
