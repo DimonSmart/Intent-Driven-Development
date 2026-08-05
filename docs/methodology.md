@@ -34,6 +34,18 @@ Good intent answers questions such as:
 
 Intent does not need to prescribe every class, command, library, or implementation step.
 
+Current means currently accepted as normative, not necessarily already implemented. Implementation may temporarily lag behind accepted intent.
+
+## Decision-Relevant Future Intent
+
+Do not design for an imagined future, but do not ignore known future intent that changes a decision being made now.
+
+Ask:
+
+> Would knowing this future intent materially change the current decision?
+
+If no, do not persist it in current intent. If yes, record the minimum required capability, invariant, or prohibited lock-in—not a speculative future implementation.
+
 ## Durable and Temporary Knowledge
 
 ```text
