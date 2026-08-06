@@ -37,12 +37,13 @@ public sealed class AgentTraceTests
         try
         {
             Write(directory, "root", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"root\",\"timestamp\":\"2026-01-01T00:00:00Z\"}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"collab_tool_call\",\"id\":\"spawn\",\"tool\":\"spawn_agent\",\"receiver_thread_ids\":[\"coordinator\"]}}}");
-            Write(directory, "coordinator", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"coordinator\",\"parent_thread_id\":\"root\"}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"message\",\"text\":\"Role:\\nfactory-step-coordinator\"}}}");
+            Write(directory, "coordinator", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"coordinator\",\"parent_thread_id\":\"root\"}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"message\",\"text\":\"Role:\\nfactory-step-coordinator\"}}}", "{\"timestamp\":\"2026-01-01T00:00:01Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"task_complete\",\"completed_at\":1767225601}} ");
             Write(directory, "implementer", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"implementer\",\"parent_thread_id\":\"coordinator\"}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"message\",\"text\":\"Role:\\nimplementer\\n.idd/factory/current/001-code.active.md\"}}}");
             Write(directory, "foreign", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"foreign\"}}");
             var trace = new AgentTraceBuilder().Build(directory, "root");
             Assert.Equal(["root", "coordinator", "implementer"], trace.Agents.Select(agent => agent.ThreadId));
             Assert.Equal("factory-step-coordinator", trace.Agents.Single(agent => agent.ThreadId == "coordinator").Role);
+            Assert.Equal("completed", trace.Agents.Single(agent => agent.ThreadId == "coordinator").Status);
             Assert.Equal("001-code", trace.Agents.Single(agent => agent.ThreadId == "implementer").WorkItem);
         }
         finally { Directory.Delete(directory, true); }

@@ -73,7 +73,7 @@ public sealed class CodexRolloutReader
         var type = String(root, "type");
         var payload = Object(root, "payload") ?? root;
         var item = Object(payload, "item") ?? Object(payload, "response_item") ?? payload;
-        var timestamp = ParseDate(String(root, "timestamp") ?? String(payload, "timestamp"));
+        var timestamp = ParseDate(String(root, "timestamp") ?? String(payload, "timestamp")) ?? ParseUnixDate(Number(payload, "completed_at"));
         var itemType = String(item, "type");
         if (itemType is "function_call" or "collab_tool_call")
         {
@@ -82,15 +82,20 @@ public sealed class CodexRolloutReader
             if (string.Equals(String(item, "tool") ?? String(item, "name"), "spawn_agent", StringComparison.OrdinalIgnoreCase))
                 foreach (var child in Strings(item, "receiver_thread_ids")) analysis.SpawnedThreadIds.Add(child);
         }
-        if (analysis.DispatchMessage is null && itemType is "message" or "input_message" or "user_message")
-            analysis.DispatchMessage = Text(item);
+        if (itemType is "message" or "input_message" or "user_message")
+        {
+            var text = Text(item);
+            if (text is not null && (analysis.DispatchMessage is null || text.Contains("Role:", StringComparison.OrdinalIgnoreCase)))
+                analysis.DispatchMessage = text;
+        }
 
-        if (type is "turn.completed" or "session.completed" or "thread.completed")
+        var eventType = type == "event_msg" ? String(payload, "type") : type;
+        if (eventType is "turn.completed" or "session.completed" or "thread.completed" or "task_complete")
         {
             analysis.CompletedAt ??= timestamp;
             analysis.Status = "completed";
         }
-        else if (type is "turn.failed" or "session.failed" or "thread.failed" or "turn.error" or "session.error")
+        else if (eventType is "turn.failed" or "session.failed" or "thread.failed" or "turn.error" or "session.error")
         {
             analysis.CompletedAt ??= timestamp;
             analysis.Status = "failed";
@@ -99,9 +104,11 @@ public sealed class CodexRolloutReader
 
     private static JsonElement? Object(JsonElement value, string name) => value.ValueKind == JsonValueKind.Object && value.TryGetProperty(name, out var result) && result.ValueKind == JsonValueKind.Object ? result : null;
     private static string? String(JsonElement value, string name) => value.ValueKind == JsonValueKind.Object && value.TryGetProperty(name, out var result) && result.ValueKind == JsonValueKind.String ? result.GetString() : null;
+    private static double? Number(JsonElement value, string name) => value.ValueKind == JsonValueKind.Object && value.TryGetProperty(name, out var result) && result.ValueKind == JsonValueKind.Number && result.TryGetDouble(out var number) ? number : null;
     private static IEnumerable<string> Strings(JsonElement value, string name) => value.ValueKind == JsonValueKind.Object && value.TryGetProperty(name, out var result) && result.ValueKind == JsonValueKind.Array ? result.EnumerateArray().Where(v => v.ValueKind == JsonValueKind.String).Select(v => v.GetString()!).ToArray() : [];
     private static string? Text(JsonElement item) => String(item, "text") ?? String(item, "content") ?? (item.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array ? content.EnumerateArray().Select(v => String(v, "text")).FirstOrDefault(v => v is not null) : null);
     private static DateTimeOffset? ParseDate(string? text) => DateTimeOffset.TryParse(text, out var value) ? value : null;
+    private static DateTimeOffset? ParseUnixDate(double? seconds) => seconds is null ? null : DateTimeOffset.FromUnixTimeMilliseconds((long)(seconds.Value * 1000));
 }
 
 public sealed record CodexRollout(string Path, string File, string ThreadId, string? ParentThreadId, string? MetadataRole, DateTimeOffset? StartedAt);

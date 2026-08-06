@@ -133,6 +133,7 @@ public sealed class FactoryProtocolTests
         Assert.Contains("--ignore-user-config", arguments);
         Assert.True(HasOption(arguments, "--enable", "multi_agent"));
         Assert.True(HasOption(arguments, "--disable", "multi_agent_v2"));
+        Assert.True(HasOption(arguments, "-c", "agents.max_threads=10"));
         Assert.True(HasOption(arguments, "--disable", "plugins"));
         Assert.True(HasOption(arguments, "--disable", "apps"));
         Assert.Contains("mcp_servers={}", arguments);

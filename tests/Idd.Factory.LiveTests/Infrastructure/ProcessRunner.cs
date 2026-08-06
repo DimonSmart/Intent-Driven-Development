@@ -10,6 +10,8 @@ public sealed record ProcessResult(int ExitCode, DateTimeOffset StartedAtUtc, Da
 
 public sealed class ProcessRunner
 {
+    private static readonly TimeSpan OutputDrainTimeout = TimeSpan.FromSeconds(5);
+
     public async Task<ProcessResult> RunAsync(string executable, IReadOnlyList<string> arguments, string workingDirectory, string stdoutPath, string stderrPath, TimeSpan timeout, CancellationToken cancellationToken, string? standardInput = null, IReadOnlyDictionary<string, string>? environmentOverrides = null)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(stdoutPath)!);
@@ -25,8 +27,9 @@ public sealed class ProcessRunner
         catch (Exception exception) { throw new InvalidOperationException($"Could not start '{executable}'. Ensure it is installed and available on PATH.", exception); }
         await using var stdout = File.Create(stdoutPath);
         await using var stderr = File.Create(stderrPath);
-        var stdoutTask = process.StandardOutput.BaseStream.CopyToAsync(stdout, cancellationToken);
-        var stderrTask = process.StandardError.BaseStream.CopyToAsync(stderr, cancellationToken);
+        using var outputCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var stdoutTask = process.StandardOutput.BaseStream.CopyToAsync(stdout, outputCancellation.Token);
+        var stderrTask = process.StandardError.BaseStream.CopyToAsync(stderr, outputCancellation.Token);
         var stdinTask = standardInput is null ? Task.CompletedTask : WriteStandardInputAsync(process, standardInput, cancellationToken);
         var timedOut = false;
         using var timeoutCancellation = new CancellationTokenSource(timeout);
@@ -37,8 +40,16 @@ public sealed class ProcessRunner
             timedOut = true;
             if (!process.HasExited) process.Kill(entireProcessTree: true);
             await process.WaitForExitAsync(CancellationToken.None);
+            outputCancellation.Cancel();
         }
-        await Task.WhenAll(stdinTask, stdoutTask, stderrTask);
+        try { await Task.WhenAll(stdoutTask, stderrTask).WaitAsync(OutputDrainTimeout); }
+        catch (TimeoutException)
+        {
+            outputCancellation.Cancel();
+            try { await Task.WhenAll(stdoutTask, stderrTask); }
+            catch (OperationCanceledException) { }
+        }
+        await stdinTask;
         return new ProcessResult(process.ExitCode, startedAt, DateTimeOffset.UtcNow, timedOut, stdoutPath, stderrPath);
     }
 

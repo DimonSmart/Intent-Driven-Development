@@ -5,7 +5,7 @@ namespace Idd.Factory.LiveTests.Infrastructure;
 
 public sealed class AgentTraceBuilder(CodexRolloutReader? reader = null)
 {
-    private static readonly Regex RolePattern = new("(?im)^\\s*Role:\\s*(?<role>[^\\r\\n]+)", RegexOptions.Compiled);
+    private static readonly Regex RolePattern = new("(?im)^\\s*Role:[ \\t]*(?:\\r?\\n[ \\t]*)?(?<role>[^\\r\\n]+)", RegexOptions.Compiled);
     private static readonly Regex WorkItemPattern = new("(?im)(?<path>\\.idd/factory/current/[^\\s`]+\\.active\\.md)", RegexOptions.Compiled);
 
     public AgentTrace Build(string sessionsDirectory, string? rootThreadId, bool processInterrupted = false)
