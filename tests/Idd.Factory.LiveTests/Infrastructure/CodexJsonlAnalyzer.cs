@@ -5,6 +5,23 @@ namespace Idd.Factory.LiveTests.Infrastructure;
 
 public static class CodexJsonlAnalyzer
 {
+    public static string? TryReadRootThreadId(string eventsPath)
+    {
+        if (!File.Exists(eventsPath)) return null;
+        foreach (var line in File.ReadLines(eventsPath))
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            try
+            {
+                using var document = JsonDocument.Parse(line);
+                var root = document.RootElement;
+                if (FindString(root, "type") == "thread.started" && FindString(root, "thread_id") is { Length: > 0 } id) return id;
+            }
+            catch (JsonException) { }
+        }
+        return null;
+    }
+
     public static FactoryEvalMetrics Analyze(string eventsPath, TimeSpan wallTime)
     {
         var metrics = new FactoryEvalMetrics { WallTimeMs = (long)wallTime.TotalMilliseconds };
@@ -19,6 +36,8 @@ public static class CodexJsonlAnalyzer
                 var root = document.RootElement;
                 var type = FindString(root, "type");
                 if (type is null) { metrics.UnknownEventCount++; continue; }
+
+                if (type == "thread.started") metrics.RootThreadId ??= FindString(root, "thread_id");
 
                 if (type.Contains("turn", StringComparison.OrdinalIgnoreCase) || type.Contains("message", StringComparison.OrdinalIgnoreCase)) metrics.ModelTurnCount++;
                 metrics.ModelEffective ??= FindString(root, "model");

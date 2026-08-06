@@ -8,6 +8,7 @@ public sealed class FactoryEvalMetrics
     public string? ModelEffective { get; set; }
     public string? ReasoningEffortEffective { get; set; }
     public string? SessionId { get; set; }
+    public string? RootThreadId { get; set; }
     public long ModelTurnCount { get; set; }
     public long ToolCallCount { get; set; }
     public long SpawnAgentCallCount { get; set; }

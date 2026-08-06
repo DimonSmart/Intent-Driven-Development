@@ -42,8 +42,9 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
         var profile = ResolveLaunchProfile(launchProfileName ?? Environment.GetEnvironmentVariable(LaunchProfileEnvironmentVariable));
         var arguments = new List<string>
         {
-            "exec", "--json", "--ephemeral"
+            "exec", "--json"
         };
+        if (!options.PersistSessionRollouts) arguments.Add("--ephemeral");
         if (profile.IgnoreUserConfig) arguments.Add("--ignore-user-config");
         arguments.AddRange([
             "--ignore-rules",

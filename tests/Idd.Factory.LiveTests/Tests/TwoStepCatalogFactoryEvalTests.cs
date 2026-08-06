@@ -23,12 +23,13 @@ public sealed class TwoStepCatalogFactoryEvalTests
         var assertions = new EvalAssertionCollector();
         var factoryResult = new FactoryResultReadResult(null, "Factory result was not read.");
         var metrics = new FactoryEvalMetrics();
+        var agentTrace = new AgentTrace(1, null, [], []);
         var result = new FactoryEvalResult { RunDirectory = workspace.RunDirectory, Outcome = "INFRASTRUCTURE_FAILURE" };
 
         try
         {
             var version = await MethodologyVersionResolver.ResolveAsync(repositoryRoot, cancellationToken);
-            var options = FactoryEvalOptions.FromEnvironment(version.Value);
+            var options = FactoryEvalOptions.FromEnvironment(version.Value) with { PersistSessionRollouts = true };
             var codexCommand = CodexExecutableResolver.Resolve();
             var codexVersion = await RequireVersionAsync(processRunner, codexCommand.Executable, codexCommand.PrefixArguments.Concat(["--version"]).ToArray(), repositoryRoot, workspace, "codex-version", cancellationToken);
             var dotnetVersion = await RequireVersionAsync(processRunner, "dotnet", ["--version"], repositoryRoot, workspace, "dotnet-version", cancellationToken);
@@ -60,6 +61,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
             result.CodexProcessPassed = !codex.TimedOut && codex.ExitCode == 0;
             assertions.Require(!codex.TimedOut, "Infrastructure", "Codex timeout", $"Codex exceeded the {options.Timeout.TotalMinutes} minute timeout. Partial logs are in {workspace.RunDirectory}.");
             assertions.Require(codex.ExitCode == 0, "Infrastructure", "Codex execution", $"Codex exited with code {codex.ExitCode}. See {workspace.StderrPath}.");
+            agentTrace = TryBuildAgentTrace(workspace, codex.TimedOut);
             metrics = CodexJsonlAnalyzer.Analyze(workspace.EventsPath, codex.Duration);
             assertions.Require(metrics.MalformedLineCount == 0, "Infrastructure", "Codex JSONL", $"Codex JSONL contains {metrics.MalformedLineCount} malformed line(s). See {workspace.EventsPath}.");
             assertions.Require(metrics.ModelEffective is null || metrics.ModelEffective == options.Model, "Infrastructure", "Effective Codex model", $"Expected Codex to use requested model '{options.Model}' without fallback, but JSONL reports '{metrics.ModelEffective}'.");
@@ -92,9 +94,29 @@ public sealed class TwoStepCatalogFactoryEvalTests
         }
         finally
         {
-            await assertions.WriteAsync(workspace, result, metrics, factoryResult);
+            if (agentTrace.RootThreadId is null && agentTrace.Diagnostics.Count == 0)
+                agentTrace = TryBuildAgentTrace(workspace, processInterrupted: false);
+            await File.WriteAllTextAsync(workspace.AgentTracePath, JsonSerializer.Serialize(agentTrace, new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase }) + "\n", cancellationToken);
+            await assertions.WriteAsync(workspace, result, metrics, factoryResult, agentTrace);
         }
         assertions.ThrowIfFailed(workspace.RunDirectory);
+    }
+
+    private static AgentTrace TryBuildAgentTrace(FactoryEvalWorkspace workspace, bool processInterrupted)
+    {
+        var diagnostics = new List<AgentTraceDiagnostic>();
+        var rootThreadId = CodexJsonlAnalyzer.TryReadRootThreadId(workspace.EventsPath);
+        if (rootThreadId is null)
+            return new(1, null, [], [new("ROOT_THREAD_ID_NOT_FOUND", "warning", "Root thread ID was not found in events.jsonl.", null, "events.jsonl")]);
+
+        var sessions = new CodexHomeLocator().FindSessionsDirectory();
+        if (sessions is null)
+        {
+            diagnostics.Add(new("CODEX_HOME_NOT_FOUND", "warning", "The standard Codex sessions directory was not found.", rootThreadId, null));
+            return new(1, rootThreadId, [], diagnostics);
+        }
+        try { return new AgentTraceBuilder().Build(sessions, rootThreadId, processInterrupted); }
+        catch (Exception exception) { return new(1, rootThreadId, [], [new("ROLLOUT_READ_FAILED", "warning", "Agent trace could not be built: " + exception.Message, rootThreadId, null)]); }
     }
 
     private static async Task<string> RequireVersionAsync(ProcessRunner runner, string executable, IReadOnlyList<string> arguments, string workingDirectory, FactoryEvalWorkspace workspace, string name, CancellationToken token)

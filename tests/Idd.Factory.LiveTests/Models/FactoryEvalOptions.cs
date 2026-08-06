@@ -4,7 +4,8 @@ public sealed record FactoryEvalOptions(
     string Model,
     string ReasoningEffort,
     TimeSpan Timeout,
-    string MethodologyVersion)
+    string MethodologyVersion,
+    bool PersistSessionRollouts = false)
 {
     public static FactoryEvalOptions FromEnvironment(string methodologyVersion)
     {

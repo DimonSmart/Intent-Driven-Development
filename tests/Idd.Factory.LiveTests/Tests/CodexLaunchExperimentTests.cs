@@ -1,11 +1,26 @@
 using CodexLaunchExperiment;
 using Idd.Factory.LiveTests.Infrastructure;
+using Idd.Factory.LiveTests.Environments;
+using Idd.Factory.LiveTests.Models;
 using Xunit;
 
 namespace Idd.Factory.LiveTests.Tests;
 
 public sealed class CodexLaunchExperimentTests
 {
+    [Fact]
+    public void RunArguments_PersistOnlyWhenRequested()
+    {
+        var workspace = new FactoryEvalWorkspace("run", "workspace", "marketplace", "verification", "case");
+        var options = new FactoryEvalOptions("model", "low", TimeSpan.FromMinutes(1), "version");
+        var defaultArguments = LocalFactoryEvalEnvironment.BuildRunCodexArguments(workspace, options);
+        var persistentArguments = LocalFactoryEvalEnvironment.BuildRunCodexArguments(workspace, options with { PersistSessionRollouts = true });
+
+        Assert.Contains("--ephemeral", defaultArguments);
+        Assert.DoesNotContain("--ephemeral", persistentArguments);
+        Assert.Equal(defaultArguments.Where(argument => argument != "--ephemeral"), persistentArguments);
+    }
+
     [Fact]
     public void Resolver_PrefersTheNpmPackagedNativeExecutable()
     {
