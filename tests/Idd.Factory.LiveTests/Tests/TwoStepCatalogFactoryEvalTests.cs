@@ -24,7 +24,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
         var assertions = new EvalAssertionCollector();
         var factoryResult = new FactoryResultReadResult(null, "Factory result was not read.");
         var metrics = new FactoryEvalMetrics();
-        var agentTrace = new AgentTrace(1, null, [], []);
+        var agentTrace = new AgentTrace(2, null, [], []);
         var result = new FactoryEvalResult { RunDirectory = workspace.RunDirectory, Outcome = "INFRASTRUCTURE_FAILURE" };
 
         try
@@ -70,6 +70,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
             assertions.Require(codex.ExitCode == 0 || codex.CompletionSignaled, "Infrastructure", "Codex execution", $"Codex exited with code {codex.ExitCode} before producing its final response. See {workspace.StderrPath}.");
             agentTrace = TryBuildAgentTrace(workspace, codex.TimedOut);
             metrics = CodexJsonlAnalyzer.Analyze(workspace.EventsPath, codex.Duration);
+            metrics.TotalSpawnedAgentCount = agentTrace.Agents.Count == 0 ? null : agentTrace.Agents.Count - 1;
             assertions.Require(metrics.MalformedLineCount == 0, "Infrastructure", "Codex JSONL", $"Codex JSONL contains {metrics.MalformedLineCount} malformed line(s). See {workspace.EventsPath}.");
             assertions.Require(metrics.ModelEffective is null || metrics.ModelEffective == options.Model, "Infrastructure", "Effective Codex model", $"Expected Codex to use requested model '{options.Model}' without fallback, but JSONL reports '{metrics.ModelEffective}'.");
 
@@ -118,16 +119,16 @@ public sealed class TwoStepCatalogFactoryEvalTests
         var diagnostics = new List<AgentTraceDiagnostic>();
         var rootThreadId = CodexJsonlAnalyzer.TryReadRootThreadId(workspace.EventsPath);
         if (rootThreadId is null)
-            return new(1, null, [], [new("ROOT_THREAD_ID_NOT_FOUND", "warning", "Root thread ID was not found in events.jsonl.", null, "events.jsonl")]);
+            return new(2, null, [], [new("ROOT_THREAD_ID_NOT_FOUND", "warning", "Root thread ID was not found in events.jsonl.", null, "events.jsonl")]);
 
         var sessions = new CodexHomeLocator().FindSessionsDirectory();
         if (sessions is null)
         {
             diagnostics.Add(new("CODEX_HOME_NOT_FOUND", "warning", "The standard Codex sessions directory was not found.", rootThreadId, null));
-            return new(1, rootThreadId, [], diagnostics);
+            return new(2, rootThreadId, [], diagnostics);
         }
         try { return new AgentTraceBuilder().Build(sessions, rootThreadId, processInterrupted); }
-        catch (Exception exception) { return new(1, rootThreadId, [], [new("ROLLOUT_READ_FAILED", "warning", "Agent trace could not be built: " + exception.Message, rootThreadId, null)]); }
+        catch (Exception exception) { return new(2, rootThreadId, [], [new("ROLLOUT_READ_FAILED", "warning", "Agent trace could not be built: " + exception.Message, rootThreadId, null)]); }
     }
 
     private static async Task<string> RequireVersionAsync(ProcessRunner runner, string executable, IReadOnlyList<string> arguments, string workingDirectory, FactoryEvalWorkspace workspace, string name, CancellationToken token)
@@ -164,7 +165,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
 
     internal static void AssertOrchestration(EvalAssertionCollector assertions, FactoryEvalMetrics metrics)
     {
-        assertions.Require(metrics.SpawnedAgentCount >= 2, "Orchestration failure", "Successfully spawned subagents", $"Expected spawned agents: at least 2{Environment.NewLine}Actual spawned agents: {metrics.SpawnedAgentCount}");
+        assertions.Require(metrics.RootLevelSpawnedAgentCount >= 2, "Orchestration failure", "Root-level spawned agents", $"Expected root-level spawned agents: at least 2{Environment.NewLine}Actual root-level spawned agents: {metrics.RootLevelSpawnedAgentCount}");
         assertions.Require(metrics.CompletedChildAgentCount >= 2, "Orchestration failure", "Completed subagents", $"Expected completed agents: at least 2{Environment.NewLine}Actual completed agents: {metrics.CompletedChildAgentCount}");
     }
 }

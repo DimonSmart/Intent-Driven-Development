@@ -12,13 +12,15 @@ public sealed class FactoryEvalMetrics
     public long ModelTurnCount { get; set; }
     public long ToolCallCount { get; set; }
     public long SpawnAgentCallCount { get; set; }
-    public long SpawnedAgentCount { get; set; }
+    public long RootLevelSpawnedAgentCount { get; set; }
+    public long? TotalSpawnedAgentCount { get; set; }
     public long FailedSpawnAgentCallCount { get; set; }
     public long WaitAgentCallCount { get; set; }
     public long CompletedChildAgentCount { get; set; }
     public long? InputTokens { get; set; }
     public long? CachedInputTokens { get; set; }
     public long? OutputTokens { get; set; }
+    public long? ReasoningOutputTokens { get; set; }
     public long? TotalTokens { get; set; }
     public long? WallTimeMs { get; set; }
     public long? ImplementationAgentCount { get; set; }

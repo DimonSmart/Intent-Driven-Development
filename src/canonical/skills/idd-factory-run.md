@@ -15,10 +15,11 @@ is the authoritative memory between steps.
 
 ## Workspace and State
 
-On first explicit use, require `.idd/intent/`, install the packaged Factory
-`.gitignore`, create `current/` and `results/`, and register `idd-factory` when
-needed. Only one run may exist. A new request requires empty `current/`;
-otherwise summarize it and require continue or cancel.
+On first explicit use, require `.idd/intent/` and verify that the packaged
+Factory assets are available. The initializer coordinator installs the Factory
+`.gitignore` and creates `current/` and `results/` when needed. Only one run may
+exist. A new request requires absent or empty `current/`; otherwise summarize it
+and require continue or cancel.
 
 `current/` contains `request.md`, optional `run-context.md`, and contiguous
 `<sequence>-<slug>.<status>.md` work items. A work item is a Subtask, identified
@@ -45,10 +46,10 @@ complete request, workspace path, durable-intent path,
 Also pass its `project-verification.md` reference when required by the worker
 skill.
 
-Read `references/methodology-version.json` before creating state. Record its
-`methodologyVersion` as `Methodology version:` in `current/request.md`, carry it
-through finalization, and require the finalizer to include the same value in
-`factory-result.json`.
+Read `references/methodology-version.json` before initialization. Pass its
+`methodologyVersion` to the initializer, which records `Methodology version:`
+in `current/request.md`; carry it through finalization and require the finalizer
+to include the same value in `factory-result.json`.
 
 - `NEEDS_CLARIFICATION`: ask all questions together; create no partial state.
 - `INTENT_REQUIRED`: create no state, run the intent workflow, reread intent,
@@ -56,21 +57,25 @@ through finalization, and require the finalizer to include the same value in
 - `FOCUSED_HANDOFF`: use one `idd-code-implement` when Factory was implicit; an
   explicit Factory request may use one bounded Subtask.
 - `BLOCKED`: report the planning blocker; create no state.
-- `READY`: reject intent-changing execution scope; write unchanged `request.md`,
-  optional compact `run-context.md`, and all ordered Subtask and Review
-  checkpoint contracts as `.ready.md` files.
+- `READY`: reject intent-changing execution scope and validate the complete
+  result contract. Do not write files. Spawn a fresh `factory-step-coordinator`
+  with `Action: INITIALIZE`, the complete original request, methodology version,
+  confirmed clarifications when applicable, and the complete validated `READY`
+  result in its dispatch message. Require `Step result: ADVANCED` for `factory
+  initialization`, then discard that context and dispatch a different fresh
+  coordinator in `CONTINUE` mode.
 
-Append confirmed later decisions only to `## Resolved Clarifications` in
-`request.md`. Each Subtask is self-contained with optional `run-context.md`;
+The fresh step coordinator appends confirmed later decisions only to
+`## Resolved Clarifications` in `request.md`. Each Subtask is self-contained with optional `run-context.md`;
 workers do not need the original request. A Review checkpoint contains its
 contiguous `Covers`, review scope, and focused verification. Do not add a
 terminal checkpoint that duplicates final integrated review.
 
 ## Dispatch
 
-After bootstrap or a valid resume, spawn a fresh generic child agent and assign
+After successful initialization or a valid resume, spawn a fresh generic child agent and assign
 it the `factory-step-coordinator` role through the dispatch `message`. Include
-the worktree path, resume request, confirmed blocker answer when present,
+`Action: CONTINUE`, the worktree path, resume request, confirmed blocker answer when present,
 `.agents/skills/idd-factory-coordinate-step/SKILL.md`,
 `.agents/skills/idd-factory-coordinate-step/references/roles/factory-step-coordinator.md`,
 and `.agents/skills/idd-factory-coordinate-step/references/project-verification.md`.
@@ -82,6 +87,7 @@ Do not pass detailed parent history, worker reports, or test logs.
   reason/resume condition.
 - On `Step result: FINISHED`, report the commit-message path and completion.
 
+Resume of an existing run always uses `CONTINUE`; never initialize it again.
 Do not directly own a monolithic work loop, execute a worker, inspect each
 completed step's diff, or retain corrective-cycle detail. `NEEDS_REPLAN` is
 internal, never a Factory outcome. The step coordinator handles activation,
@@ -95,7 +101,8 @@ waiting for its terminal result, and validating that result against its role
 contract before changing Factory state. Reading another skill and following it
 in the root context is not dispatch. The Factory runner must not execute coordinator,
 implementation, review, or finalization work in its own context. The root
-context must never modify product files. If a required child agent cannot be
+context is read-only and must never modify repository or Factory-state files.
+If a required child agent cannot be
 spawned or waited for, stop the attempt as `BLOCKED` with the actual technical
 reason; never fall back to self-execution.
 
@@ -107,8 +114,10 @@ continue command is required. An interrupted active Subtask is resumed by a
 fresh step, which may use verification-only resume when implementation is
 unchanged and evidence is missing.
 
-Cancel only explicitly: warn about worktree changes, clear only `current/`,
-preserve `results/`, and do not revert code or create a commit message.
+Cancel only explicitly: warn about worktree changes, then dispatch a fresh step
+coordinator with `Action: CONTINUE` and the cancellation request. That
+coordinator clears only `current/`, preserves `results/`, and does not revert
+code or create a commit message. The read-only root does not clear files itself.
 
 ## Reporting and Outcomes
 

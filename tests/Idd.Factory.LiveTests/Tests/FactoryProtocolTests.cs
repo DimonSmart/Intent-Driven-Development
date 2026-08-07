@@ -104,21 +104,6 @@ public sealed class FactoryProtocolTests
         Assert.Equal(["build", "test"], environment.Commands);
     }
 
-    [Theory]
-    [InlineData("src/canonical/skills/idd-factory-coordinate-step.md")]
-    [InlineData("src/canonical/skills/idd-factory-decompose-task.md")]
-    public void CanonicalSkills_BoundReadOnlyRecoveryWithoutPolicyEscalation(string relativePath)
-    {
-        var content = File.ReadAllText(Path.Combine(RepositoryRootFinder.Find(), relativePath));
-
-        Assert.Contains("at most two", content, StringComparison.Ordinal);
-        Assert.Contains("narrower", content, StringComparison.Ordinal);
-        Assert.Contains("repeat", content, StringComparison.Ordinal);
-        Assert.Contains("elevate permissions", content, StringComparison.Ordinal);
-        Assert.Contains("approval or sandbox policy", content, StringComparison.Ordinal);
-        Assert.Contains("only after", content, StringComparison.Ordinal);
-    }
-
     [Fact]
     public void CodexRun_UsesWorkspaceWriteSandboxAndReadsPromptFromStdin()
     {

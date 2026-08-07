@@ -13,7 +13,7 @@ public sealed class CodexJsonlAnalyzerTests
 
         Assert.Equal(2, metrics.ToolCallCount);
         Assert.Equal(1, metrics.SpawnAgentCallCount);
-        Assert.Equal(1, metrics.SpawnedAgentCount);
+        Assert.Equal(1, metrics.RootLevelSpawnedAgentCount);
         Assert.Equal(0, metrics.FailedSpawnAgentCallCount);
         Assert.Equal(1, metrics.WaitAgentCallCount);
         Assert.Equal(1, metrics.CompletedChildAgentCount);
@@ -28,7 +28,7 @@ public sealed class CodexJsonlAnalyzerTests
             "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"collab_tool_call\",\"tool\":\"spawn_agent\",\"receiver_thread_ids\":[\"child_1\"],\"status\":\"completed\"}}");
 
         Assert.Equal(1, metrics.SpawnAgentCallCount);
-        Assert.Equal(1, metrics.SpawnedAgentCount);
+        Assert.Equal(1, metrics.RootLevelSpawnedAgentCount);
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public sealed class CodexJsonlAnalyzerTests
         var metrics = AnalyzeLines("{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"collab_tool_call\",\"tool\":\"spawn_agent\",\"receiver_thread_ids\":[],\"status\":\"failed\",\"error\":{\"message\":\"capacity\"}}}");
 
         Assert.Equal(1, metrics.SpawnAgentCallCount);
-        Assert.Equal(0, metrics.SpawnedAgentCount);
+        Assert.Equal(0, metrics.RootLevelSpawnedAgentCount);
         Assert.Equal(1, metrics.FailedSpawnAgentCallCount);
     }
 
@@ -69,7 +69,7 @@ public sealed class CodexJsonlAnalyzerTests
         var metrics = AnalyzeLines("{\"type\":\"thread.started\",\"thread_id\":\"factory\"}", "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":1}}");
 
         Assert.Equal(0, metrics.SpawnAgentCallCount);
-        Assert.Equal(0, metrics.SpawnedAgentCount);
+        Assert.Equal(0, metrics.RootLevelSpawnedAgentCount);
         Assert.Equal(0, metrics.FailedSpawnAgentCallCount);
     }
 
@@ -81,7 +81,7 @@ public sealed class CodexJsonlAnalyzerTests
 
         Assert.Equal(0, metrics.ToolCallCount);
         Assert.Equal(0, metrics.SpawnAgentCallCount);
-        Assert.Equal(0, metrics.SpawnedAgentCount);
+        Assert.Equal(0, metrics.RootLevelSpawnedAgentCount);
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public sealed class CodexJsonlAnalyzerTests
 
         Assert.Equal(3, metrics.ToolCallCount);
         Assert.Equal(1, metrics.SpawnAgentCallCount);
-        Assert.Equal(1, metrics.SpawnedAgentCount);
+        Assert.Equal(1, metrics.RootLevelSpawnedAgentCount);
         Assert.Equal(1, metrics.WaitAgentCallCount);
         Assert.Equal(1, metrics.CompletedChildAgentCount);
     }
@@ -106,6 +106,33 @@ public sealed class CodexJsonlAnalyzerTests
         var exception = Assert.Throws<CodexJsonlAnalysisException>(() => AnalyzeLines("{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"collab_tool_call\",\"tool\":\"delegate_task\",\"status\":\"completed\"}}"));
 
         Assert.Contains("Unsupported collaboration tool", exception.Message);
+    }
+
+    [Fact]
+    public void Analyze_CountsCompletedTurnsAndLatestCumulativeUsage()
+    {
+        var metrics = AnalyzeLines(
+            "{\"type\":\"turn.started\"}",
+            "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":100,\"cached_input_tokens\":60,\"output_tokens\":20,\"reasoning_output_tokens\":5}}",
+            "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":150,\"cached_input_tokens\":80,\"output_tokens\":30,\"reasoning_output_tokens\":7}}");
+
+        Assert.Equal(2, metrics.ModelTurnCount);
+        Assert.Equal(150, metrics.InputTokens);
+        Assert.Equal(80, metrics.CachedInputTokens);
+        Assert.Equal(30, metrics.OutputTokens);
+        Assert.Equal(7, metrics.ReasoningOutputTokens);
+        Assert.Equal(180, metrics.TotalTokens);
+    }
+
+    [Fact]
+    public void Analyze_CountsAdditionalCallTypesButNotResults()
+    {
+        var metrics = AnalyzeLines(
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"custom\",\"type\":\"custom_tool_call\",\"status\":\"completed\"}}",
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"shell\",\"type\":\"local_shell_call\",\"status\":\"completed\"}}",
+            "{\"type\":\"item.completed\",\"item\":{\"call_id\":\"custom\",\"type\":\"custom_tool_call_output\",\"status\":\"completed\"}}");
+
+        Assert.Equal(2, metrics.ToolCallCount);
     }
 
     private static FactoryEvalMetrics AnalyzeLines(params string[] lines)

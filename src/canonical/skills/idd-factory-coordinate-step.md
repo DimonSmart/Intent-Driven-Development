@@ -14,10 +14,38 @@ This is an internal skill whose normal caller is `idd-factory-run`.
 
 ## Fresh Context and Inputs
 
-Receive only the repository/worktree path, instruction to continue the current
-run, and, when applicable, a confirmed answer to the current blocker. Do not
-inherit the original user conversation, previous coordinator messages, worker
-transcripts, or detailed test logs.
+Receive an explicit `Action: INITIALIZE` or `Action: CONTINUE`.
+
+For `INITIALIZE`, receive the repository/worktree path, complete original
+Factory request, methodology version, complete validated `READY` decomposition
+result, and any confirmed bootstrap clarifications. For `CONTINUE`, receive
+only the path, instruction to continue the current run, and, when applicable, a
+confirmed answer to the current blocker. Do not inherit the original user
+conversation, previous coordinator messages, worker transcripts, or test logs.
+
+## INITIALIZE
+
+Use only after the first successful decomposition while no Factory run exists.
+Ensure `.idd/factory/current/` is absent or empty; otherwise stop as
+`CORRUPT_FACTORY_STATE`. Install the packaged Factory `.gitignore` and create
+the Factory directories when needed. Do not repeat decomposition, read the
+decomposer skill for planning, dispatch a decomposer or any other agent,
+implement code, or run review. Mechanically materialize the supplied result as
+unchanged `request.md`, optional `run-context.md`, and contiguous Subtask and
+Review checkpoint `.ready.md` files. Record the supplied `Methodology version`
+in `request.md`, validate all resulting state invariants, and return immediately:
+
+```text
+Step result: ADVANCED
+Processed: factory initialization
+Persisted state: <compact state>
+Next: <first work item>
+```
+
+The decomposition result in the dispatch message is authoritative for this
+transition. `INITIALIZE` is persistence, not planning.
+
+## CONTINUE
 
 First list `current/`, read optional `run-context.md`, and read the active or
 lowest ready item. Validate filename-based state before changing it. Read

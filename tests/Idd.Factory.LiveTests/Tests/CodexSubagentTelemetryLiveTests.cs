@@ -28,7 +28,7 @@ public sealed class CodexSubagentTelemetryLiveTests
         var metrics = CodexJsonlAnalyzer.Analyze(workspace.EventsPath, codex.Duration);
         Assert.Equal(0, metrics.MalformedLineCount);
         Assert.Equal(1, metrics.SpawnAgentCallCount);
-        Assert.Equal(1, metrics.SpawnedAgentCount);
+        Assert.Equal(1, metrics.RootLevelSpawnedAgentCount);
         Assert.Equal(0, metrics.FailedSpawnAgentCallCount);
         Assert.Equal(1, metrics.CompletedChildAgentCount);
 

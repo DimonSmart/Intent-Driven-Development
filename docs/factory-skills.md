@@ -21,7 +21,7 @@ idd-factory-run
   → when INTENT_REQUIRED:
       idd-intent workflow
       idd-factory-decompose-task again
-  → create ordered Subtasks and Review checkpoints
+  → fresh idd-factory-coordinate-step (INITIALIZE persisted state)
   → fresh idd-factory-coordinate-step (one action, persisted)
   → fresh idd-factory-coordinate-step (next action, persisted)
   → … until final review and finalization
@@ -41,8 +41,9 @@ worker, it returns resumable `BLOCKED` without taking that worker's scope.
 
 Public entry point for starting, continuing, or cancelling one Factory run.
 
-It owns intent preflight, workspace validation, clarification, initial state,
-cancel semantics, and dispatch of fresh one-step coordinators. Persisted Factory
+It owns read-only intent preflight, workspace validation, clarification,
+cancel semantics, and dispatch of fresh one-step coordinators. An initializer
+coordinator owns initial state. Persisted Factory
 state, rather than its context, carries sequencing, status transitions,
 correction insertion, final review, and finalization between steps.
 
@@ -76,9 +77,11 @@ from persisted state and resumes the corresponding worker.
 
 ### Purpose
 
-Internal one-step coordinator. It restores `.idd/factory/current/`, performs
-one Subtask, checkpoint, replan, intent action, or final-review/finalization
-operation, saves the result atomically, returns a compact result, and ends.
+Internal one-step coordinator. In `INITIALIZE`, it mechanically persists one
+validated decomposition without planning or worker dispatch. In `CONTINUE`, it
+restores `.idd/factory/current/`, performs one Subtask, checkpoint, replan,
+intent action, or final-review/finalization operation, saves the result
+atomically, returns a compact result, and ends.
 It never begins the next work item after saving state.
 
 ### Normal caller

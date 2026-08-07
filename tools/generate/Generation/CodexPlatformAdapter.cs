@@ -160,16 +160,16 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
             $"""
             ## Codex capability mapping
 
-            The names in `Available tools` are semantic Factory capabilities,
-            not literal Codex tool names. Use these runtime operations:
+            The names in `Available tools` describe technical permissions, not
+            literal Codex tool names. Use these runtime operations:
 
             {mappings}
 
             Do not treat a semantic capability as unavailable merely because no
             runtime tool has the same name. A capability is unavailable only when
             its mapped Codex tool or operation is actually unavailable. In
-            particular, use `spawn_agent` for `agent.spawn`, use `wait_agent` for
-            `agent.wait`, and use repository file operations for Factory state.
+            particular, use `spawn_agent` for `agent.spawn` and use `wait_agent`
+            for `agent.wait`.
             Before returning `BLOCKED`, attempt the mapped operation and preserve
             the actual runtime error if it fails.
             """,
@@ -183,22 +183,16 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
 
     private static string DescribeCodexCapability(RoleTool tool) => tool switch
     {
-        RoleTool.RepositoryRead =>
-            "Read repository files using the available shell or file-reading operations.",
-        RoleTool.RepositoryWrite =>
-            "Create or modify repository files using the available file-editing or shell operations.",
+        RoleTool.FileRead =>
+            "Read files using the available shell or file-reading operations.",
+        RoleTool.FileWrite =>
+            "Create, modify, rename, or remove files using the available file-editing or shell operations.",
         RoleTool.CommandExecute =>
             "Execute repository commands using the available command-execution operation.",
         RoleTool.AgentSpawn =>
             "Call the Codex `spawn_agent` collaboration tool.",
         RoleTool.AgentWait =>
             "Call the Codex `wait_agent` collaboration tool with the spawned agent id and wait for the child result.",
-        RoleTool.FactoryStateRead =>
-            "Read files under `.idd/factory/current/` using the mapped `repository.read` operations.",
-        RoleTool.FactoryStateWrite =>
-            "Create, update, rename, or remove files under `.idd/factory/current/` using the mapped `repository.write` operations.",
-        RoleTool.FactoryResultWrite =>
-            "Write Factory result artifacts under `.idd/factory/results/` using the mapped `repository.write` operations.",
         _ => throw new ArgumentOutOfRangeException(nameof(tool), tool, "Unknown role capability.")
     };
 

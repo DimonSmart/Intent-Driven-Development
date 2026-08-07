@@ -21,7 +21,7 @@ public sealed class TwoStepCatalogFactoryOrchestrationTests
     [Fact]
     public void AssertOrchestration_FailsWhenOnlyOneChildAgentCompleted()
     {
-        var assertions = AssertOrchestration(new FactoryEvalMetrics { SpawnedAgentCount = 2, CompletedChildAgentCount = 1 });
+        var assertions = AssertOrchestration(new FactoryEvalMetrics { RootLevelSpawnedAgentCount = 2, CompletedChildAgentCount = 1 });
 
         Assert.True(assertions.HasFailuresIn("Orchestration failure"));
     }
@@ -32,7 +32,7 @@ public sealed class TwoStepCatalogFactoryOrchestrationTests
         var assertions = AssertOrchestration(new FactoryEvalMetrics());
 
         var exception = Assert.Throws<Xunit.Sdk.XunitException>(() => assertions.ThrowIfFailed("run"));
-        Assert.Contains("Actual spawned agents: 0", exception.Message);
+        Assert.Contains("Actual root-level spawned agents: 0", exception.Message);
         Assert.DoesNotContain("Actual completed agents: 0", exception.Message);
         Assert.Contains(Path.Combine("run", "report.md"), exception.Message);
     }
@@ -40,9 +40,30 @@ public sealed class TwoStepCatalogFactoryOrchestrationTests
     [Fact]
     public void AssertOrchestration_DoesNotTreatWaitCallsAsFailure()
     {
-        var assertions = AssertOrchestration(new FactoryEvalMetrics { SpawnedAgentCount = 2, CompletedChildAgentCount = 2, WaitAgentCallCount = 3 });
+        var assertions = AssertOrchestration(new FactoryEvalMetrics { RootLevelSpawnedAgentCount = 2, CompletedChildAgentCount = 2, WaitAgentCallCount = 3 });
 
         Assert.False(assertions.HasFailures);
+    }
+
+    [Fact]
+    public async Task EvalReport_DistinguishesRootLevelAndTotalSpawnedAgents()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var workspace = new FactoryEvalWorkspace(directory, directory, directory, directory, directory);
+            var result = new FactoryEvalResult { RunDirectory = directory, Outcome = "PASS" };
+            var metrics = new FactoryEvalMetrics { RootLevelSpawnedAgentCount = 2, TotalSpawnedAgentCount = 4 };
+
+            await new EvalAssertionCollector().WriteAsync(workspace, result, metrics, new(null, "not expected"), new(2, null, [], []));
+
+            var report = await File.ReadAllTextAsync(Path.Combine(directory, "report.md"));
+            Assert.Contains("Root-level spawned agents: 2", report);
+            Assert.Contains("Total spawned agents: 4", report);
+            Assert.DoesNotContain("Successfully spawned agents", report);
+        }
+        finally { Directory.Delete(directory, true); }
     }
 
     private static EvalAssertionCollector AssertOrchestration(FactoryEvalMetrics metrics)

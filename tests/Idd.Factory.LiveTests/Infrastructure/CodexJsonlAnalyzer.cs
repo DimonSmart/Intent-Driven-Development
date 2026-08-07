@@ -39,7 +39,7 @@ public static class CodexJsonlAnalyzer
 
                 if (type == "thread.started") metrics.RootThreadId ??= FindString(root, "thread_id");
 
-                if (type.Contains("turn", StringComparison.OrdinalIgnoreCase) || type.Contains("message", StringComparison.OrdinalIgnoreCase)) metrics.ModelTurnCount++;
+                if (type == "turn.completed") metrics.ModelTurnCount++;
                 metrics.ModelEffective ??= FindString(root, "model");
                 metrics.ReasoningEffortEffective ??= FindString(root, "reasoning_effort") ?? FindString(root, "reasoningEffort");
                 metrics.SessionId ??= FindString(root, "session_id") ?? FindString(root, "sessionId") ?? FindString(root, "thread_id");
@@ -60,7 +60,7 @@ public static class CodexJsonlAnalyzer
             if (!call.Completed) throw new CodexJsonlAnalysisException($"spawn_agent call '{call.Id}' has no item.completed event.");
             if (call.Failed) { metrics.FailedSpawnAgentCallCount++; continue; }
             if (call.CreatedAgentIds.Count == 0) throw new CodexJsonlAnalysisException($"Successful spawn_agent call '{call.Id}' did not confirm a created child agent or thread.");
-            metrics.SpawnedAgentCount += call.CreatedAgentIds.Count;
+            metrics.RootLevelSpawnedAgentCount += call.CreatedAgentIds.Count;
         }
 
         var spawnedChildIds = calls.Values.Where(call => call.IsSpawn && call.Completed && !call.Failed).SelectMany(call => call.CreatedAgentIds).ToHashSet(StringComparer.Ordinal);
@@ -81,6 +81,16 @@ public static class CodexJsonlAnalyzer
         if (itemType == "collab_tool_call")
         {
             ReadCollaborationCall(item, eventType, calls);
+            return;
+        }
+        if (itemType is "custom_tool_call" or "local_shell_call")
+        {
+            var call = GetOrCreateCall(item, FindString(item, "name") ?? FindString(item, "tool") ?? itemType, calls);
+            if (eventType == "item.completed")
+            {
+                call.Completed = true;
+                call.Failed = IsFailed(item);
+            }
             return;
         }
         if (IsStructuredSpawnAgentCall(item))
@@ -127,7 +137,9 @@ public static class CodexJsonlAnalyzer
         metrics.InputTokens = GetNullableLong(usage, "input_tokens");
         metrics.CachedInputTokens = GetNullableLong(usage, "cached_input_tokens");
         metrics.OutputTokens = GetNullableLong(usage, "output_tokens");
-        metrics.TotalTokens = GetNullableLong(usage, "total_tokens");
+        metrics.ReasoningOutputTokens = GetNullableLong(usage, "reasoning_output_tokens");
+        metrics.TotalTokens = GetNullableLong(usage, "total_tokens") ??
+            (metrics.InputTokens is not null && metrics.OutputTokens is not null ? metrics.InputTokens + metrics.OutputTokens : null);
     }
 
     private static bool IsFailed(JsonElement item) =>

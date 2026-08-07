@@ -82,7 +82,9 @@ checkpoints only where early review protects later work. After all work items
 complete, Factory performs one final integrated review and prepares a concise
 commit-message handoff.
 
-After bootstrap, Factory uses `.idd/factory/current/` as its persisted memory.
+After decomposition, the read-only root dispatches a fresh step coordinator in
+`INITIALIZE` mode to materialize `.idd/factory/current/`; the root does not
+write Factory state itself. Factory then uses that directory as its persisted memory.
 Each Subtask, checkpoint, replanning action, and final-review action is handled
 by a new one-step coordinator context. The public `idd-factory-run` dispatcher
 receives only a compact result, starts the next fresh step automatically, and

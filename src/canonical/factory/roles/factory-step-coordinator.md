@@ -1,9 +1,7 @@
 ---
 tools:
-  - repository.read
-  - factory-state.read
-  - factory-state.write
-  - factory-result.write
+  - file.read
+  - file.write
   - agent.spawn
   - agent.wait
 ---
@@ -18,13 +16,17 @@ verification or repository/platform fallback.
 
 ## Responsibility
 
-Restore one persisted Factory state, coordinate exactly one logical Factory
-step, atomically persist its result, and end the context. Current intent is
-normative; `.idd/factory/current/` is the authoritative temporary memory.
+Own persisted Factory state. Either materialize one validated decomposition as
+the initial run state or restore one persisted run, coordinate exactly one
+logical Factory step, atomically persist its result, and end the context.
+Current intent is normative; `.idd/factory/current/` is authoritative.
 
 ## Boundaries
 
-- Read persisted state first. Stop on corrupt state; never repair it by
+- `INITIALIZE` is the first allowed transition from an absent run to valid
+  initial state. It persists the supplied decomposition mechanically without
+  replanning, worker dispatch, implementation, or review.
+- In `CONTINUE`, read persisted state first. Stop on corrupt state; never repair it by
   inference.
 - Perform exactly one Subtask, Review checkpoint, replan, intent action, or
   final action, then end the context. Do not begin another work item.

@@ -127,7 +127,7 @@
     "description": "Run or resume one Factory run through bootstrap and fresh one-step coordinator dispatch until a terminal outcome."
   },
   "idd-factory-coordinate-step": {
-    "description": "Internal Factory worker that restores persisted state and atomically coordinates exactly one logical step in a fresh isolated context.",
+    "description": "Internal Factory worker that initializes or restores persisted state and atomically coordinates exactly one logical step in a fresh isolated context.",
     "adapters": {
       "claude": {
         "frontmatter": {

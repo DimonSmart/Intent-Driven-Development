@@ -26,6 +26,9 @@ You are executing one IDD Factory role in a separate child-agent context.
 Role:
 <role-name>
 
+Action:
+<INITIALIZE | CONTINUE | role-specific action>
+
 Workspace:
 <absolute-workspace-path>
 
@@ -41,6 +44,13 @@ Do not perform work owned by another Factory role.
 Do not create child agents unless the role explicitly allows agent.spawn.
 Return only the compact result required by the skill.
 ```
+
+For `factory-step-coordinator` `INITIALIZE`, include the complete original
+Factory request, methodology version, confirmed clarifications when present,
+and the complete validated decomposition result directly in `message`. Do not
+refer to a decomposer result that is absent from the fresh child context. For
+`CONTINUE`, identify the current work item when known; for final review use
+`Action: FINAL REVIEW`.
 
 The dispatch sequence is:
 

@@ -1,7 +1,7 @@
 ---
 tools:
-  - repository.read
-  - repository.write
+  - file.read
+  - file.write
   - command.execute
 ---
 

@@ -1,11 +1,8 @@
 internal enum RoleTool
 {
-    RepositoryRead,
-    RepositoryWrite,
+    FileRead,
+    FileWrite,
     CommandExecute,
     AgentSpawn,
-    AgentWait,
-    FactoryStateRead,
-    FactoryStateWrite,
-    FactoryResultWrite
+    AgentWait
 }

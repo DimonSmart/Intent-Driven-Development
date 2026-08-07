@@ -6,13 +6,15 @@ namespace Idd.Factory.LiveTests.Infrastructure;
 public sealed class AgentTraceBuilder(CodexRolloutReader? reader = null)
 {
     private static readonly Regex RolePattern = new("(?im)^\\s*Role:[ \\t]*(?:\\r?\\n[ \\t]*)?(?<role>[^\\r\\n]+)", RegexOptions.Compiled);
+    private static readonly Regex ActionPattern = new("(?im)^\\s*Action:[ \\t]*(?:\\r?\\n[ \\t]*)?(?<action>[^\\r\\n]+)", RegexOptions.Compiled);
+    private static readonly Regex WorkItemFieldPattern = new("(?im)^\\s*Work item:[ \\t]*(?:\\r?\\n[ \\t]*)?(?<item>[^\\r\\n]+)", RegexOptions.Compiled);
     private static readonly Regex WorkItemPattern = new("(?im)(?<path>\\.idd/factory/current/[^\\s`]+\\.active\\.md)", RegexOptions.Compiled);
 
     public AgentTrace Build(string sessionsDirectory, string? rootThreadId, bool processInterrupted = false)
     {
         var diagnostics = new List<AgentTraceDiagnostic>();
         if (rootThreadId is null)
-            return new(1, null, [], [new("ROOT_THREAD_ID_NOT_FOUND", "warning", "Root thread ID was not found in events.jsonl.", null, "events.jsonl")]);
+            return new(2, null, [], [new("ROOT_THREAD_ID_NOT_FOUND", "warning", "Root thread ID was not found in events.jsonl.", null, "events.jsonl")]);
 
         var rollouts = (reader ?? new CodexRolloutReader()).Index(sessionsDirectory);
         var byId = new Dictionary<string, CodexRollout>(StringComparer.Ordinal);
@@ -21,12 +23,13 @@ public sealed class AgentTraceBuilder(CodexRolloutReader? reader = null)
         if (!byId.TryGetValue(rootThreadId, out var root))
         {
             diagnostics.Add(new("ROOT_ROLLOUT_NOT_FOUND", "warning", "The root thread rollout was not found in Codex session storage.", rootThreadId, null));
-            return new(1, rootThreadId, [], diagnostics);
+            return new(2, rootThreadId, [], diagnostics);
         }
 
         var included = new Dictionary<string, CodexRollout>(StringComparer.Ordinal) { [root.ThreadId] = root };
         var analyses = new Dictionary<string, CodexRolloutAnalysis>(StringComparer.Ordinal);
         var spawnParents = new Dictionary<string, string>(StringComparer.Ordinal);
+        var spawnPrompts = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var changed = true; changed;)
         {
             changed = false;
@@ -44,26 +47,39 @@ public sealed class AgentTraceBuilder(CodexRolloutReader? reader = null)
                         if (included.TryAdd(child.ThreadId, child)) changed = true;
                     }
                     else if (child.ParentThreadId is not null && !string.Equals(child.ParentThreadId, rollout.ThreadId, StringComparison.Ordinal)) diagnostics.Add(new("TRACE_PARENT_CONFLICT", "warning", "Session metadata takes precedence over the structured spawn event.", child.ThreadId, child.File));
+                    if (analysis.SpawnPrompts.TryGetValue(childId, out var prompt)) spawnPrompts.TryAdd(childId, prompt);
                 }
             }
         }
 
-        var nodes = included.Values.Select(rollout => ToNode(rollout, GetAnalysis(rollout), rootThreadId, spawnParents.GetValueOrDefault(rollout.ThreadId), processInterrupted, diagnostics)).ToArray();
-        return new(1, rootThreadId, nodes, diagnostics);
+        var nodes = included.Values.Select(rollout => ToNode(rollout, GetAnalysis(rollout), rootThreadId, spawnParents.GetValueOrDefault(rollout.ThreadId), spawnPrompts.GetValueOrDefault(rollout.ThreadId), processInterrupted, diagnostics)).ToArray();
+        return new(2, rootThreadId, nodes, diagnostics);
 
         CodexRolloutAnalysis GetAnalysis(CodexRollout rollout) => analyses.TryGetValue(rollout.ThreadId, out var analysis) ? analysis : analyses[rollout.ThreadId] = (reader ?? new CodexRolloutReader()).Analyze(rollout, diagnostics);
     }
 
-    private static AgentTraceNode ToNode(CodexRollout rollout, CodexRolloutAnalysis analysis, string rootThreadId, string? spawnParent, bool interrupted, ICollection<AgentTraceDiagnostic> diagnostics)
+    private static AgentTraceNode ToNode(CodexRollout rollout, CodexRolloutAnalysis analysis, string rootThreadId, string? spawnParent, string? spawnPrompt, bool interrupted, ICollection<AgentTraceDiagnostic> diagnostics)
     {
-        var role = rollout.ThreadId == rootThreadId ? "factory-root" : NormalizeRole(rollout.MetadataRole) ?? NormalizeRole(RolePattern.Match(analysis.DispatchMessage ?? string.Empty).Groups["role"].Value) ?? "unknown";
+        var role = rollout.ThreadId == rootThreadId ? "factory-root" : NormalizeRole(rollout.MetadataRole) ?? Role(spawnPrompt) ?? Role(analysis.DispatchMessage) ?? "unknown";
         if (role == "unknown") diagnostics.Add(new("TRACE_ROLE_UNKNOWN", "info", "The Factory role could not be determined from rollout metadata or dispatch message.", rollout.ThreadId, rollout.File));
-        var workItem = role is "implementer" or "checkpoint-reviewer" or "final-reviewer" ? WorkItem(analysis.DispatchMessage) : null;
+        var dispatch = spawnPrompt ?? analysis.DispatchMessage;
+        var action = role == "factory-step-coordinator" ? Action(dispatch) : role == "final-reviewer" ? "FINAL REVIEW" : null;
+        var workItem = WorkItem(dispatch);
+        if (action is "INITIALIZE" or "FINAL REVIEW") workItem = null;
         var status = analysis.Status ?? (interrupted ? "interrupted" : "unknown");
         var duration = rollout.StartedAt is not null && analysis.CompletedAt is not null ? (long?)(analysis.CompletedAt.Value - rollout.StartedAt.Value).TotalMilliseconds : null;
-        return new(rollout.ThreadId, rollout.ThreadId == rootThreadId ? null : rollout.ParentThreadId ?? spawnParent, role, workItem, status, rollout.StartedAt, analysis.CompletedAt, duration, analysis.ToolCallIds.Count == 0 ? null : analysis.ToolCallIds.Count);
+        var tokens = analysis.TokenUsage;
+        return new(rollout.ThreadId, rollout.ThreadId == rootThreadId ? null : rollout.ParentThreadId ?? spawnParent, role, workItem, action, status, rollout.StartedAt, analysis.CompletedAt, duration, analysis.TurnCount, analysis.ToolCallCount, tokens?.InputTokens, tokens?.CachedInputTokens, tokens?.OutputTokens, tokens?.ReasoningOutputTokens, tokens?.TotalTokens);
     }
 
     private static string? NormalizeRole(string? value) => value?.Trim() switch { "factory-root" or "task-decomposer" or "factory-step-coordinator" or "implementer" or "checkpoint-reviewer" or "final-reviewer" => value.Trim(), _ => null };
-    private static string? WorkItem(string? text) { var match = WorkItemPattern.Match(text ?? string.Empty); return match.Success ? Path.GetFileNameWithoutExtension(match.Groups["path"].Value)[..^".active".Length] : null; }
+    private static string? Role(string? text) => NormalizeRole(RolePattern.Match(text ?? string.Empty).Groups["role"].Value);
+    private static string? Action(string? text) { var value = ActionPattern.Match(text ?? string.Empty).Groups["action"].Value.Trim(); return value.Length == 0 ? null : value.ToUpperInvariant() switch { "INITIALIZE" => "INITIALIZE", "FINAL REVIEW" => "FINAL REVIEW", "CONTINUE" => null, _ => value }; }
+    private static string? WorkItem(string? text)
+    {
+        var field = WorkItemFieldPattern.Match(text ?? string.Empty).Groups["item"].Value.Trim();
+        if (field.Length > 0) return field;
+        var match = WorkItemPattern.Match(text ?? string.Empty);
+        return match.Success ? Path.GetFileNameWithoutExtension(match.Groups["path"].Value)[..^".active".Length] : null;
+    }
 }

@@ -1,7 +1,6 @@
 ---
 tools:
-  - repository.read
-  - factory-state.read
+  - file.read
 ---
 
 # Task Decomposer

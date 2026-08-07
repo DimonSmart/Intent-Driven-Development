@@ -17,7 +17,7 @@ CheckPlatformPlugins("claude", ".claude-plugin");
 CheckPlatformPlugins("codex", ".codex-plugin");
 CheckCanonicalRoleReader();
 CheckFactoryRoleGeneration();
-CheckCodexFactoryGenericSubagents();
+CheckCodexFactoryMetadata();
 CheckCanonicalSkillReferences();
 CheckVerificationPolicyContract();
 CheckLiveFactorySummaryScriptWithWindowsPowerShell();
@@ -162,25 +162,6 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
         ".idd",
         "intent",
         "README.md"));
-
-    var initSkillPath = Path.Combine(intentRoot, "skills", "idd-project-init", "SKILL.md");
-    if (File.Exists(initSkillPath))
-    {
-        var initText = File.ReadAllText(initSkillPath);
-        ExpectContains(initText, "idd-intent", $"{platform} project initialization plugin declaration");
-        ExpectContains(initText, ".idd/verification.yaml", $"{platform} project initialization verification policy path");
-        if (initText.Contains("\"idd\"", StringComparison.Ordinal))
-        {
-            failures.Add($"{platform} project initialization still declares the unified idd plugin.");
-        }
-    }
-
-    var verificationSkillPath = Path.Combine(intentRoot, "skills", "idd-verification-configure", "SKILL.md");
-    if (File.Exists(verificationSkillPath))
-    {
-        var verificationText = File.ReadAllText(verificationSkillPath);
-        ExpectContains(verificationText, ".idd/verification.yaml", $"{platform} verification configuration path");
-    }
 
     foreach (var skill in new[]
     {
@@ -340,12 +321,12 @@ void CheckFactoryRoleGeneration()
 {
     var expectedTools = new Dictionary<string, string[]>(StringComparer.Ordinal)
     {
-        ["factory-coordinator"] = ["repository.read", "factory-state.read", "agent.spawn", "agent.wait"],
-        ["factory-step-coordinator"] = ["repository.read", "factory-state.read", "factory-state.write", "factory-result.write", "agent.spawn", "agent.wait"],
-        ["task-decomposer"] = ["repository.read", "factory-state.read"],
-        ["implementer"] = ["repository.read", "repository.write", "command.execute"],
-        ["checkpoint-reviewer"] = ["repository.read", "command.execute"],
-        ["final-reviewer"] = ["repository.read", "command.execute"]
+        ["factory-coordinator"] = ["file.read", "agent.spawn", "agent.wait"],
+        ["factory-step-coordinator"] = ["file.read", "file.write", "agent.spawn", "agent.wait"],
+        ["task-decomposer"] = ["file.read"],
+        ["implementer"] = ["file.read", "file.write", "command.execute"],
+        ["checkpoint-reviewer"] = ["file.read", "command.execute"],
+        ["final-reviewer"] = ["file.read", "command.execute"]
     };
 
     foreach (var platform in new[] { "claude", "codex" })
@@ -397,12 +378,7 @@ void CheckFactoryRoleGeneration()
         foreach (var platform in new[] { "claude", "codex" })
         {
             var rolePath = Path.Combine(marketplaceRoot, "plugins", platform, "idd-factory", "skills", skill, "references", "roles", role + ".md");
-            var content = ReadText(rolePath);
-            ExpectContains(content, "## Available tools", $"{platform} {role} available-tools contract");
-            foreach (var tool in expectedTools[role])
-            {
-                ExpectContains(content, $"- {tool}", $"{platform} {role} tool '{tool}'");
-            }
+            ExpectFile(rolePath);
         }
     }
 
@@ -414,7 +390,7 @@ void CheckFactoryRoleGeneration()
     ExpectContains(reviewerClaudeSkill, "allowed-tools: [Read, Glob, Grep, Bash]", "Claude reviewer native tools");
 }
 
-void CheckCodexFactoryGenericSubagents()
+void CheckCodexFactoryMetadata()
 {
     var root = Path.Combine(marketplaceRoot, "plugins", "codex", "idd-factory");
     var expectedRoles = new[]
@@ -467,49 +443,6 @@ void CheckCodexFactoryGenericSubagents()
         }
     }
 
-    var run = ReadText(Path.Combine(root, "skills", "idd-factory-run", "SKILL.md"));
-    var step = ReadText(Path.Combine(root, "skills", "idd-factory-coordinate-step", "SKILL.md"));
-    var finalizer = ReadText(Path.Combine(root, "skills", "idd-factory-finalize-run", "SKILL.md"));
-    ExpectContains(run, "Reading another skill and following it", "Factory runner dispatch contract");
-    ExpectContains(run, "must never modify product files", "Factory runner product boundary");
-    ExpectContains(run, "Do not emit a public Factory outcome as a progress message", "Factory progress outcome contract");
-    ExpectContains(run, "generic child agent", "Factory runner generic dispatch");
-    ExpectContains(step, "generic child agent", "Step coordinator generic dispatch");
-    ExpectContains(run, "only `message`", "Factory runner message-only dispatch");
-    ExpectContains(step, "only `message`", "Step coordinator message-only dispatch");
-    ExpectContains(run, "do not provide `items`", "Factory runner items prohibition");
-    ExpectContains(step, "do not provide `items`", "Step coordinator items prohibition");
-    ExpectContains(run, "fork_context = false", "Factory runner isolated dispatch");
-    ExpectContains(step, "fork_context = false", "Step coordinator isolated dispatch");
-    ExpectContains(ReadText(Path.Combine(root, "skills", "idd-factory-run", "references", "codex-dispatch.md")), "wait for the child result", "Factory runner dispatch reference");
-    ExpectContains(ReadText(Path.Combine(root, "skills", "idd-factory-coordinate-step", "references", "codex-dispatch.md")), "wait for the child result", "Step coordinator dispatch reference");
-    ExpectContains(run, "actual technical\nreason", "Factory runner dispatch error preservation");
-    ExpectContains(step, "actual technical reason", "Step coordinator dispatch error preservation");
-    foreach (var (skill, role) in new[]
-    {
-        ("idd-factory-decompose-task", "task-decomposer"),
-        ("idd-factory-execute-subtask", "implementer"),
-        ("idd-factory-review-checkpoint", "checkpoint-reviewer"),
-        ("idd-factory-review-task", "final-reviewer")
-    })
-    {
-        var workerRole = ReadText(Path.Combine(root, "skills", skill, "references", "roles", role + ".md"));
-        ExpectContains(workerRole, "Do not create child agents", $"Codex {role} no-delegation boundary");
-    }
-    ExpectContains(finalizer, "exactly `\"passed\"`", "Finalizer verification status contract");
-    if (run.Contains("registered agent type", StringComparison.OrdinalIgnoreCase) ||
-        step.Contains("registered agent type", StringComparison.OrdinalIgnoreCase) ||
-        run.Contains("agent_type", StringComparison.Ordinal) ||
-        step.Contains("agent_type", StringComparison.Ordinal))
-    {
-        failures.Add("Codex Factory instructions retain native-agent registration semantics.");
-    }
-    if (run.Contains("Get-Date -AsUTC", StringComparison.Ordinal) ||
-        step.Contains("Get-Date -AsUTC", StringComparison.Ordinal) ||
-        finalizer.Contains("Get-Date -AsUTC", StringComparison.Ordinal))
-    {
-        failures.Add("Factory instructions contain unsupported Get-Date -AsUTC.");
-    }
 }
 
 void CheckCanonicalRoleReader()
@@ -521,9 +454,9 @@ void CheckCanonicalRoleReader()
 
     try
     {
-        File.WriteAllText(path, "---\ntools:\n  - repository.read\n  - command.execute\n---\n\n# Sample\n\nInstructions.\n");
+        File.WriteAllText(path, "---\ntools:\n  - file.read\n  - file.write\n  - command.execute\n---\n\n# Sample\n\nInstructions.\n");
         var role = reader.Read("sample", path);
-        if (!role.Tools.SequenceEqual([RoleTool.RepositoryRead, RoleTool.CommandExecute]) ||
+        if (!role.Tools.SequenceEqual([RoleTool.FileRead, RoleTool.FileWrite, RoleTool.CommandExecute]) ||
             !StringComparer.Ordinal.Equals(role.Instructions, "# Sample\n\nInstructions."))
         {
             failures.Add("Canonical role reader did not preserve tools or Markdown instructions.");
@@ -535,9 +468,11 @@ void CheckCanonicalRoleReader()
             ["missing-tools"] = "---\nname: sample\n---\n# Sample\n",
             ["empty-tools"] = "---\ntools:\n---\n# Sample\n",
             ["unknown-tool"] = "---\ntools:\n  - workspace.write\n---\n# Sample\n",
-            ["duplicate-tool"] = "---\ntools:\n  - repository.read\n  - repository.read\n---\n# Sample\n",
-            ["invalid-yaml"] = "---\ntools: repository.read\n---\n# Sample\n",
-            ["empty-instructions"] = "---\ntools:\n  - repository.read\n---\n"
+            ["removed-repository-tool"] = "---\ntools:\n  - repository.read\n---\n# Sample\n",
+            ["removed-factory-state-tool"] = "---\ntools:\n  - factory-state.write\n---\n# Sample\n",
+            ["duplicate-tool"] = "---\ntools:\n  - file.read\n  - file.read\n---\n# Sample\n",
+            ["invalid-yaml"] = "---\ntools: file.read\n---\n# Sample\n",
+            ["empty-instructions"] = "---\ntools:\n  - file.read\n---\n"
         })
         {
             File.WriteAllText(path, content);

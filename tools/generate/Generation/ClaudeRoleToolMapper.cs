@@ -8,14 +8,11 @@ internal static class ClaudeRoleToolMapper
 
     private static IReadOnlyList<string> Map(RoleTool tool) => tool switch
     {
-        RoleTool.RepositoryRead => ["Read", "Glob", "Grep"],
-        RoleTool.RepositoryWrite => ["Edit", "Write"],
+        RoleTool.FileRead => ["Read", "Glob", "Grep"],
+        RoleTool.FileWrite => ["Edit", "Write"],
         RoleTool.CommandExecute => ["Bash"],
         RoleTool.AgentSpawn => ["Task"],
         RoleTool.AgentWait => ["TaskOutput"],
-        RoleTool.FactoryStateRead => ["Read"],
-        RoleTool.FactoryStateWrite => ["Edit", "Write"],
-        RoleTool.FactoryResultWrite => ["Write"],
         _ => throw new ArgumentOutOfRangeException(nameof(tool), tool, "Unknown role tool.")
     };
 }

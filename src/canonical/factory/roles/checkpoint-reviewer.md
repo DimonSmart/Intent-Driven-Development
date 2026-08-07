@@ -1,6 +1,6 @@
 ---
 tools:
-  - repository.read
+  - file.read
   - command.execute
 ---
 
