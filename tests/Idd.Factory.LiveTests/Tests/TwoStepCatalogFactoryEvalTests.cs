@@ -16,6 +16,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
     [Trait("Category", "LiveFactoryEval")]
     public async Task TwoStepCatalog_CompletesTwoSubtasksAndReviewCheckpoint()
     {
+        using var sleepPrevention = SystemSleepPrevention.Acquire();
         var cancellationToken = CancellationToken.None;
         var repositoryRoot = RepositoryRootFinder.Find();
         var processRunner = new ProcessRunner();
@@ -28,6 +29,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
 
         try
         {
+            await LogProgressAsync(workspace, "Workspace created; resolving methodology and tool versions.", cancellationToken);
             var version = await MethodologyVersionResolver.ResolveAsync(repositoryRoot, cancellationToken);
             var options = FactoryEvalOptions.FromEnvironment(version.Value) with { PersistSessionRollouts = true };
             var codexCommand = CodexExecutableResolver.Resolve();
@@ -35,6 +37,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
             var dotnetVersion = await RequireVersionAsync(processRunner, "dotnet", ["--version"], repositoryRoot, workspace, "dotnet-version", cancellationToken);
             await RequireVersionAsync(processRunner, "git", ["--version"], repositoryRoot, workspace, "git-version", cancellationToken);
             await File.WriteAllTextAsync(Path.Combine(workspace.RunDirectory, "run-manifest.json"), JsonSerializer.Serialize(new FactoryEvalRunManifest(1, "two-step-catalog", options.Model, options.ReasoningEffort, version.Value, version.SourceRevision, version.SourceDirty, codexVersion, dotnetVersion, DateTimeOffset.UtcNow), new JsonSerializerOptions { WriteIndented = true }) + "\n", cancellationToken);
+            await LogProgressAsync(workspace, $"Prerequisites ready; model={options.Model}, reasoning={options.ReasoningEffort}, Codex timeout={options.Timeout.TotalMinutes:0} minutes.", cancellationToken);
             assertions.Require(dotnetVersion.StartsWith("10.", StringComparison.Ordinal), "Infrastructure", "NET 10 SDK", $"Expected a .NET 10 SDK, but dotnet --version reported '{dotnetVersion}'.");
 
             var buildGenerator = await processRunner.RunAsync("dotnet", ["build", "tools/generate/Generate.csproj", "--nologo"], repositoryRoot, Path.Combine(workspace.VerificationDirectory, "generator-build.log"), Path.Combine(workspace.VerificationDirectory, "generator-build.stderr.log"), TimeSpan.FromMinutes(2), cancellationToken);
@@ -42,10 +45,12 @@ public sealed class TwoStepCatalogFactoryEvalTests
             if (buildGenerator.ExitCode != 0) throw new InvalidOperationException("Generator build failed.");
 
             await new CurrentIddArtifactBuilder(processRunner).BuildAsync(repositoryRoot, workspace, version.Value, cancellationToken);
+            await LogProgressAsync(workspace, "Generated current IDD artifacts.", cancellationToken);
             assertions.Require(Directory.Exists(Path.Combine(workspace.WorkspaceDirectory, ".agents", "skills", "idd-factory-run")), "Infrastructure", "Local Factory skills", "Generated Factory skills were not copied into the project-local .agents/skills directory.");
             assertions.Require(File.Exists(Path.Combine(workspace.WorkspaceDirectory, ".agents", "skills", "idd-factory-run", "references", "methodology-version.json")), "Version", "Methodology reference", "The generated idd-factory-run methodology version reference is missing.");
 
             await InitializeGitAsync(processRunner, workspace, cancellationToken);
+            await LogProgressAsync(workspace, "Initialized fixture repository; restoring and checking its baseline.", cancellationToken);
             var restore = await RunWorkspaceAsync(processRunner, workspace, "dotnet", ["restore", "MiniCatalog.sln"], "restore", TimeSpan.FromMinutes(3), cancellationToken);
             assertions.Require(restore.ExitCode == 0, "Infrastructure", "Fixture restore", $"Fixture restore failed. See {restore.StderrPath}.");
             if (restore.ExitCode != 0) throw new InvalidOperationException("Fixture restore failed.");
@@ -57,10 +62,12 @@ public sealed class TwoStepCatalogFactoryEvalTests
 
             var environment = new LocalFactoryEvalEnvironment(processRunner);
             await environment.PrepareAsync(workspace, cancellationToken);
+            await LogProgressAsync(workspace, "Fixture baseline is valid; starting Codex Factory execution.", cancellationToken);
             var codex = await environment.RunCodexAsync(workspace, options, cancellationToken);
-            result.CodexProcessPassed = !codex.TimedOut && codex.ExitCode == 0;
+            await LogProgressAsync(workspace, $"Codex finished after {codex.Duration.TotalMinutes:0.0} minutes; exit={codex.ExitCode}, timedOut={codex.TimedOut}, completionSignaled={codex.CompletionSignaled}.", cancellationToken);
+            result.CodexProcessPassed = !codex.TimedOut && (codex.ExitCode == 0 || codex.CompletionSignaled);
             assertions.Require(!codex.TimedOut, "Infrastructure", "Codex timeout", $"Codex exceeded the {options.Timeout.TotalMinutes} minute timeout. Partial logs are in {workspace.RunDirectory}.");
-            assertions.Require(codex.ExitCode == 0, "Infrastructure", "Codex execution", $"Codex exited with code {codex.ExitCode}. See {workspace.StderrPath}.");
+            assertions.Require(codex.ExitCode == 0 || codex.CompletionSignaled, "Infrastructure", "Codex execution", $"Codex exited with code {codex.ExitCode} before producing its final response. See {workspace.StderrPath}.");
             agentTrace = TryBuildAgentTrace(workspace, codex.TimedOut);
             metrics = CodexJsonlAnalyzer.Analyze(workspace.EventsPath, codex.Duration);
             assertions.Require(metrics.MalformedLineCount == 0, "Infrastructure", "Codex JSONL", $"Codex JSONL contains {metrics.MalformedLineCount} malformed line(s). See {workspace.EventsPath}.");
@@ -74,6 +81,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
             result.FactoryResultExpected = executionResponse.Response?.FactoryOutcome == "COMPLETED";
             FactoryPostRunDiagnostics.Assert(assertions, executionResponse, factoryResult, options.MethodologyVersion);
             var (finalBuild, finalTests) = await FinalProductVerification.RunAsync(environment, workspace, cancellationToken);
+            await LogProgressAsync(workspace, $"Final product verification finished; build={finalBuild.ExitCode}, tests={finalTests.ExitCode}.", cancellationToken);
             result.FinalBuildPassed = finalBuild.ExitCode == 0;
             result.FinalTestsPassed = finalTests.ExitCode == 0;
             var finalVerificationPassed = result.FinalBuildPassed && result.FinalTestsPassed;
@@ -101,6 +109,9 @@ public sealed class TwoStepCatalogFactoryEvalTests
         }
         assertions.ThrowIfFailed(workspace.RunDirectory);
     }
+
+    private static Task LogProgressAsync(FactoryEvalWorkspace workspace, string message, CancellationToken cancellationToken)
+        => File.AppendAllTextAsync(workspace.ProgressPath, $"{DateTimeOffset.Now:O} {message}{Environment.NewLine}", cancellationToken);
 
     private static AgentTrace TryBuildAgentTrace(FactoryEvalWorkspace workspace, bool processInterrupted)
     {

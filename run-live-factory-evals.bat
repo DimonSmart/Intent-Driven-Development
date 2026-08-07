@@ -11,6 +11,13 @@ set "TEST_DLL=%CD%\tests\Idd.Factory.LiveTests\bin\%CONFIGURATION%\%FRAMEWORK%\I
 
 set "IDD_RUN_LIVE_FACTORY_EVALS=1"
 set "IDD_CODEX_LAUNCH_PROFILE=configured-workspace-write"
+if not defined IDD_FACTORY_EVAL_TIMEOUT_MINUTES set "IDD_FACTORY_EVAL_TIMEOUT_MINUTES=20"
+
+echo [%DATE% %TIME%] Starting IDD Factory live eval.
+echo Launch profile: %IDD_CODEX_LAUNCH_PROFILE%
+echo Codex timeout: %IDD_FACTORY_EVAL_TIMEOUT_MINUTES% minutes
+echo Live artifacts: %CD%\artifacts\factory-evals
+echo Current phase is recorded in the newest artifacts\factory-evals\*\progress.log.
 
 call :UnlockTestDll
 if errorlevel 1 exit /b %ERRORLEVEL%
@@ -19,10 +26,12 @@ dotnet test "%PROJECT%" ^
   --configuration "%CONFIGURATION%" ^
   --filter "FullyQualifiedName~TwoStepCatalogFactoryEvalTests" ^
   --nologo ^
-  --verbosity quiet ^
-  --logger "console;verbosity=minimal"
+  --verbosity minimal ^
+  --logger "console;verbosity=detailed"
 
-exit /b %ERRORLEVEL%
+set "TEST_EXIT_CODE=%ERRORLEVEL%"
+echo [%DATE% %TIME%] IDD Factory live eval finished with exit code %TEST_EXIT_CODE%.
+exit /b %TEST_EXIT_CODE%
 
 
 :UnlockTestDll
@@ -36,14 +45,15 @@ powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Comma
   "  exit 0; " ^
   "} catch [System.IO.IOException] { " ^
   "  Write-Host ('Test DLL is locked: ' + $path); " ^
-  "  $processes = Get-Process -Name testhost -ErrorAction SilentlyContinue; " ^
+  "  $processes = Get-CimInstance Win32_Process -Filter \"Name = 'testhost.exe'\" | Where-Object { $_.CommandLine -like '*Idd.Factory.LiveTests*' }; " ^
   "  if (-not $processes) { " ^
   "    Write-Error 'The DLL is locked, but no testhost process was found.'; " ^
   "    exit 2; " ^
   "  }; " ^
   "  foreach ($process in $processes) { " ^
-  "    Write-Host ('Stopping stale testhost process, PID ' + $process.Id); " ^
-  "    Stop-Process -Id $process.Id -Force; " ^
+  "    Write-Host ('Stopping stale live-eval process tree, PID ' + $process.ProcessId); " ^
+  "    & taskkill.exe /PID $process.ProcessId /T /F; " ^
+  "    if ($LASTEXITCODE -ne 0) { exit 4; } " ^
   "  }; " ^
   "  Start-Sleep -Milliseconds 500; " ^
   "  try { " ^

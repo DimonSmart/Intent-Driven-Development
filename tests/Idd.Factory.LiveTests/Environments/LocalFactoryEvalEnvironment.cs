@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Idd.Factory.LiveTests.Infrastructure;
 using Idd.Factory.LiveTests.Models;
 
@@ -34,10 +35,10 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
     {
         var prompt = File.ReadAllText(Path.Combine(workspace.CaseDirectory, "task.md"));
         var environmentOverrides = BuildCodexEnvironment(Environment.GetEnvironmentVariable("PATH") ?? string.Empty, OperatingSystem.IsWindows());
-        return processRunner.RunAsync(CodexCommand.Executable, CodexCommand.PrefixArguments.Concat(BuildRunCodexArguments(workspace, options)).ToArray(), workspace.WorkspaceDirectory, workspace.EventsPath, workspace.StderrPath, options.Timeout, cancellationToken, prompt, environmentOverrides);
+        return processRunner.RunAsync(CodexCommand.Executable, CodexCommand.PrefixArguments.Concat(BuildRunCodexArguments(workspace, options)).ToArray(), workspace.WorkspaceDirectory, workspace.EventsPath, workspace.StderrPath, options.Timeout, cancellationToken, prompt, environmentOverrides, workspace.LastMessagePath);
     }
 
-    internal static IReadOnlyList<string> BuildRunCodexArguments(FactoryEvalWorkspace workspace, FactoryEvalOptions options, string? launchProfileName = null)
+    internal static IReadOnlyList<string> BuildRunCodexArguments(FactoryEvalWorkspace workspace, FactoryEvalOptions options, string? launchProfileName = null, string? userConfigPath = null)
     {
         var profile = ResolveLaunchProfile(launchProfileName ?? Environment.GetEnvironmentVariable(LaunchProfileEnvironmentVariable));
         var arguments = new List<string>
@@ -52,6 +53,9 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
             "--disable", "plugins", "--disable", "apps", "--disable", "browser_use", "--disable", "code_mode_host",
             "-c", "agents.max_depth=2", "-c", "agents.max_threads=10", "-c", "mcp_servers={}", "-c", "approval_policy=never", "-c", $"model_reasoning_effort={options.ReasoningEffort}"
         ]);
+        if (!profile.IgnoreUserConfig)
+            foreach (var serverName in FindConfiguredMcpServerNames(userConfigPath))
+                arguments.AddRange(["-c", $"mcp_servers.{FormatTomlKey(serverName)}.enabled=false"]);
         if (profile.WindowsSandbox is not null) arguments.AddRange(["-c", $"windows.sandbox=\"{profile.WindowsSandbox}\""]);
         arguments.AddRange(["--model", options.Model, "--sandbox", "workspace-write", "--cd", workspace.WorkspaceDirectory, "--output-schema", Path.Combine(workspace.CaseDirectory, "final-response.schema.json"), "--output-last-message", workspace.LastMessagePath, "-"]);
         return arguments;
@@ -79,6 +83,44 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
                 .Where(directory => !directory.Contains("WindowsApps", StringComparison.OrdinalIgnoreCase)));
         return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["PATH"] = sandboxCompatiblePath };
     }
+
+    internal static IReadOnlyList<string> FindConfiguredMcpServerNames(string? configPath = null)
+    {
+        configPath ??= Path.Combine(
+            Environment.GetEnvironmentVariable("CODEX_HOME")
+                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex"),
+            "config.toml");
+        if (!File.Exists(configPath)) return [];
+
+        const string prefix = "[mcp_servers.";
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var line in File.ReadLines(configPath))
+        {
+            var trimmed = line.Trim();
+            if (!trimmed.StartsWith(prefix, StringComparison.Ordinal) || !trimmed.EndsWith(']')) continue;
+            var key = trimmed[prefix.Length..^1].Trim();
+            var name = ParseTomlKey(key);
+            if (name is not null) names.Add(name);
+        }
+        return names.Order(StringComparer.Ordinal).ToArray();
+    }
+
+    private static string? ParseTomlKey(string key)
+    {
+        if (key.Length == 0) return null;
+        if (key[0] == '"' && key[^1] == '"')
+        {
+            try { return JsonSerializer.Deserialize<string>(key); }
+            catch (JsonException) { return null; }
+        }
+        if (key[0] == '\'' && key[^1] == '\'') return key[1..^1];
+        return key.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-') ? key : null;
+    }
+
+    private static string FormatTomlKey(string key)
+        => key.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-')
+            ? key
+            : JsonSerializer.Serialize(key);
 
     private static void VerifyWorkspaceWriteAccess(string workspaceDirectory)
     {

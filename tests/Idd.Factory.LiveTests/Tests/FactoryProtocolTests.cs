@@ -180,6 +180,30 @@ public sealed class FactoryProtocolTests
     }
 
     [Fact]
+    public void CodexRun_ConfiguredProfileDisablesEveryTopLevelUserMcpServer()
+    {
+        using var fixture = new FactoryFixture();
+        var configPath = Path.Combine(fixture.Workspace, "config.toml");
+        File.WriteAllText(configPath, """
+            [mcp_servers.playwright]
+            command = "npx"
+            [mcp_servers.playwright.env]
+            VALUE = "ignored"
+            [mcp_servers.'server.with.dots']
+            command = "server"
+            """);
+
+        var caseDirectory = Path.Combine(RepositoryRootFinder.Find(), "tests", "Idd.Factory.LiveTests", "Cases", "TwoStepCatalog");
+        var workspace = new FactoryEvalWorkspace(fixture.Workspace, fixture.Workspace, fixture.Workspace, fixture.Workspace, caseDirectory);
+        var options = new FactoryEvalOptions("model", "low", TimeSpan.FromMinutes(1), "1.0");
+        var arguments = LocalFactoryEvalEnvironment.BuildRunCodexArguments(workspace, options, "configured-workspace-write", configPath);
+
+        Assert.True(HasOption(arguments, "-c", "mcp_servers.playwright.enabled=false"));
+        Assert.True(HasOption(arguments, "-c", "mcp_servers.\"server.with.dots\".enabled=false"));
+        Assert.DoesNotContain("mcp_servers.playwright.env.enabled=false", arguments);
+    }
+
+    [Fact]
     public void LaunchProfileCommandLine_RedactsNamedSecrets()
     {
         var commandLine = CodexLaunchProfileReport.FormatCommandLine("codex", ["exec", "OPENAI_API_KEY=secret-value", "--sandbox", "workspace-write"]);
