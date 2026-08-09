@@ -7,8 +7,23 @@ on:
       - main
 
 jobs:
-  smoke:
+  tests-linux:
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Run factory tests
+        run: dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj --nologo
+
+  smoke:
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
