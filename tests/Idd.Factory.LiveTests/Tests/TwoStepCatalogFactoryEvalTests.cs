@@ -69,12 +69,14 @@ public sealed class TwoStepCatalogFactoryEvalTests
             assertions.Require(!codex.TimedOut, "Infrastructure", "Codex timeout", $"Codex exceeded the {options.Timeout.TotalMinutes} minute timeout. Partial logs are in {workspace.RunDirectory}.");
             assertions.Require(codex.ExitCode == 0 || codex.CompletionSignaled, "Infrastructure", "Codex execution", $"Codex exited with code {codex.ExitCode} before producing its final response. See {workspace.StderrPath}.");
             agentTrace = TryBuildAgentTrace(workspace, codex.TimedOut);
+            var factoryProtocol = FactoryOutcomeTraceAnalyzer.Analyze(workspace.EventsPath);
+            var executionResponse = ExecutionResponseReader.TryRead(workspace.LastMessagePath, workspace.WorkspaceDirectory);
+            AssertFactoryProtocol(assertions, factoryProtocol, executionResponse);
             metrics = CodexJsonlAnalyzer.Analyze(workspace.EventsPath, codex.Duration);
             metrics.TotalSpawnedAgentCount = agentTrace.Agents.Count == 0 ? null : agentTrace.Agents.Count - 1;
             assertions.Require(metrics.MalformedLineCount == 0, "Infrastructure", "Codex JSONL", $"Codex JSONL contains {metrics.MalformedLineCount} malformed line(s). See {workspace.EventsPath}.");
             assertions.Require(metrics.ModelEffective is null || metrics.ModelEffective == options.Model, "Infrastructure", "Effective Codex model", $"Expected Codex to use requested model '{options.Model}' without fallback, but JSONL reports '{metrics.ModelEffective}'.");
 
-            var executionResponse = ExecutionResponseReader.TryRead(workspace.LastMessagePath, workspace.WorkspaceDirectory);
             factoryResult = FactoryResultReader.TryReadSingle(workspace.WorkspaceDirectory);
             result.ExecutionResponsePassed = executionResponse.IsSuccess;
             result.FactoryOutcome = executionResponse.Response?.FactoryOutcome;
@@ -93,7 +95,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
             AssertPreservation(assertions, workspace, await GitOutputAsync(processRunner, workspace, ["diff", "--binary", "HEAD"], "git-diff.patch", cancellationToken), executionResponse.Response?.FactoryOutcome == "COMPLETED");
             AssertOrchestration(assertions, metrics);
             result.ProductPassed = !assertions.HasFailuresIn("Product");
-            result.FactoryPassed = !assertions.HasFailuresIn("Factory contract") && !assertions.HasFailuresIn("Factory execution") && !assertions.HasFailuresIn("Factory") && !assertions.HasFailuresIn("Version") && !assertions.HasFailuresIn("Orchestration failure");
+            result.FactoryPassed = !assertions.HasFailuresIn("Factory contract") && !assertions.HasFailuresIn("Factory execution") && !assertions.HasFailuresIn("Factory protocol") && !assertions.HasFailuresIn("Factory") && !assertions.HasFailuresIn("Version") && !assertions.HasFailuresIn("Orchestration failure");
             result.Outcome = FactoryPostRunDiagnostics.Outcome(result.ProductPassed, result.FactoryPassed, !assertions.HasFailuresIn("Infrastructure"));
         }
         catch (Exception exception) when (exception is not Xunit.Sdk.XunitException)
@@ -167,5 +169,27 @@ public sealed class TwoStepCatalogFactoryEvalTests
     {
         assertions.Require(metrics.RootLevelSpawnedAgentCount >= 2, "Orchestration failure", "Root-level spawned agents", $"Expected root-level spawned agents: at least 2{Environment.NewLine}Actual root-level spawned agents: {metrics.RootLevelSpawnedAgentCount}");
         assertions.Require(metrics.CompletedChildAgentCount >= 2, "Orchestration failure", "Completed subagents", $"Expected completed agents: at least 2{Environment.NewLine}Actual completed agents: {metrics.CompletedChildAgentCount}");
+    }
+
+    private static void AssertFactoryProtocol(EvalAssertionCollector assertions, FactoryOutcomeTraceAnalysis analysis, ExecutionResponseReadResult executionResponse)
+    {
+        assertions.Require(
+            analysis.PublicFactoryOutcomes.Count == 1,
+            "Factory protocol",
+            "Single terminal outcome",
+            $"Expected exactly one public Factory outcome, found {analysis.PublicFactoryOutcomes.Count}.");
+        assertions.Require(
+            analysis.ActivityAfterOutcome.Count == 0,
+            "Factory protocol",
+            "No activity after terminal outcome",
+            $"Factory performed execution after its terminal outcome: {string.Join(", ", analysis.ActivityAfterOutcome)}.");
+
+        var traceOutcome = analysis.PublicFactoryOutcomes.Count == 1 ? analysis.PublicFactoryOutcomes[0].FactoryOutcome : null;
+        var finalOutcome = executionResponse.Response?.FactoryOutcome;
+        assertions.Require(
+            traceOutcome is not null && finalOutcome is not null && traceOutcome == finalOutcome,
+            "Factory protocol",
+            "Outcome consistency",
+            $"Factory outcome in events.jsonl ('{traceOutcome ?? "unavailable"}') does not match last-message.json ('{finalOutcome ?? "unavailable"}').");
     }
 }

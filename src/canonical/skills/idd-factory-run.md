@@ -36,6 +36,15 @@ immediately before the checkpoint. Subtask completion does not automatically
 invoke independent review. A Subtask `Changes` is a compact list of focused
 checkpoint evidence.
 
+## Platform Dispatch Protocol
+
+Before the first child-agent dispatch, follow any platform-specific dispatch
+protocol packaged with the generated skill. In a Codex generated artifact,
+read `references/codex-dispatch.md` before the Bootstrap decomposer dispatch
+and follow it for every later dispatch. The platform adapter has already mapped
+the semantic child-agent capabilities to concrete runtime operations; do not
+add a capability-discovery or probing phase.
+
 ## Bootstrap
 
 Before state exists, run intent preflight and spawn a fresh generic child agent.
@@ -94,7 +103,8 @@ internal, never a Factory outcome. The step coordinator handles activation,
 Completion/Blocker records, checkpoint correction, replanning, intent
 orchestration, final review, and finalization.
 
-For Codex dispatch, read `references/codex-dispatch.md`. Every call to
+For Codex dispatch, follow the already-read `references/codex-dispatch.md`.
+Every call to
 `spawn_agent` uses only `message`; do not provide `items`, never provide both,
 and use `fork_context = false`. Dispatch means spawning a generic child agent,
 waiting for its terminal result, and validating that result against its role
@@ -136,3 +146,13 @@ never becomes approval. A persisted Blocker uses literal `Reason:`, `Verified:`,
 
 Do not emit a public Factory outcome as a progress message. Emit the final
 response object only after the Factory attempt has actually finished or stopped.
+
+Public Factory outcome is terminal for the current Factory attempt. Publish
+exactly one public Factory outcome, and only after Factory work has actually
+finished or stopped. After publishing it, the root agent must perform no more
+Factory work: do not dispatch or wait for child agents, execute repository
+commands, read or change Factory state, or publish another Factory outcome.
+Only technical runtime completion after the final response, such as
+`turn.completed`, is allowed. This is a semantic protocol invariant; do not add
+a persisted running/terminal state, a new Factory phase, or a coordinator for
+it.

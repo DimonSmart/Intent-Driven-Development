@@ -3,6 +3,11 @@
 Codex Factory roles are delivered to generic child agents through the dispatch
 message. A role is not a native custom agent type.
 
+Codex Factory dispatch uses the concrete runtime operations `spawn_agent` and
+`wait_agent`. The platform adapter has already performed capability mapping by
+the time this reference is executed; do not discover, probe, or remap dispatch
+operations at runtime.
+
 For every Factory child-agent dispatch:
 
 - provide only `message` to `spawn_agent`;
@@ -60,7 +65,16 @@ The dispatch sequence is:
 4. Validate the terminal child result before updating Factory state.
 
 If `spawn_agent` or `wait_agent` fails, preserve the work item and stop as
-`BLOCKED`. Record the exact technical reason, distinguishing invalid dispatch,
-spawn rejection, agent creation failure, wait failure, invalid child result,
-and a child-reported blocker. Do not create a synthetic result, mark work
-complete, or execute the worker scope in the coordinator.
+`BLOCKED`. Do not infer that Codex child-agent dispatch is unavailable. Before
+reporting a dispatch-related `BLOCKED`, actually invoke `spawn_agent` or
+`wait_agent`, as applicable, and preserve the observed runtime failure as the
+technical reason. Not seeing an expected capability name, not having read this
+reference yet, uncertainty about dispatch syntax, requiring a generic child
+agent, or the absence of a native custom-agent type is not evidence of dispatch
+failure.
+
+Record the exact stop category and do not conflate invalid dispatch, spawn
+rejection or agent creation failure, wait failure, invalid child result, a
+child-reported blocker, and a semantic Factory blocker. An invalid child result
+may stop Factory, but it is not a dispatch failure. Do not create a synthetic
+result, mark work complete, or execute the worker scope in the coordinator.

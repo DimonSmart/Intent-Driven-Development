@@ -248,6 +248,21 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
                 }
             }
         }
+
+        var runSkill = ReadText(Path.Combine(factoryRoot, "skills", "idd-factory-run", "SKILL.md"));
+        var dispatchProtocolPosition = runSkill.IndexOf("## Platform Dispatch Protocol", StringComparison.Ordinal);
+        var bootstrapPosition = runSkill.IndexOf("## Bootstrap", StringComparison.Ordinal);
+        if (dispatchProtocolPosition < 0 || bootstrapPosition < 0 || dispatchProtocolPosition > bootstrapPosition)
+        {
+            failures.Add("Codex idd-factory-run must read its platform dispatch protocol before Bootstrap dispatch.");
+        }
+        ExpectContains(runSkill, "Public Factory outcome is terminal for the current Factory attempt.", "Codex idd-factory-run terminal outcome invariant");
+
+        var dispatchReferencePath = Path.Combine(factoryRoot, "skills", "idd-factory-run", "references", "codex-dispatch.md");
+        ExpectFile(dispatchReferencePath);
+        var dispatchReference = ReadText(dispatchReferencePath);
+        ExpectContains(dispatchReference, "actually invoke `spawn_agent` or", "Codex concrete dispatch failure rule");
+        ExpectContains(dispatchReference, "`wait_agent`, as applicable", "Codex concrete wait failure rule");
     }
 
     CheckIddMetadata(intentRoot, [], ".idd/intent", platform, "idd-intent");

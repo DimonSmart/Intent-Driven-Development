@@ -170,8 +170,10 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
             its mapped Codex tool or operation is actually unavailable. In
             particular, use `spawn_agent` for `agent.spawn` and use `wait_agent`
             for `agent.wait`.
-            Before returning `BLOCKED`, attempt the mapped operation and preserve
-            the actual runtime error if it fails.
+            Do not infer that child-agent dispatch is unavailable. Before
+            returning a dispatch-related `BLOCKED`, call `spawn_agent` or
+            `wait_agent`, as applicable, and preserve the observed runtime error
+            if it fails.
             """,
             """
             ## Codex role delivery
