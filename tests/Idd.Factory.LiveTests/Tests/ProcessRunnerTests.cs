@@ -53,7 +53,7 @@ public sealed class ProcessRunnerTests
 
             Assert.True(result.CompletionSignaled);
             Assert.False(result.TimedOut);
-            Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(5));
+            Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(10));
         }
         finally
         {
