@@ -6,6 +6,7 @@ namespace Idd.Factory.LiveTests.Infrastructure;
 public sealed class EvalAssertionCollector
 {
     private readonly List<FactoryEvalAssertion> assertions = [];
+    public IReadOnlyList<FactoryEvalAssertion> Assertions => assertions;
     public void Require(bool condition, string category, string name, string failure) => assertions.Add(new(category, name, condition ? "PASS" : "FAIL", condition ? "Passed." : failure));
     public void Inconclusive(string category, string name, string message) => assertions.Add(new(category, name, "INCONCLUSIVE", message));
     public bool HasFailures => assertions.Any(assertion => assertion.Status == "FAIL");

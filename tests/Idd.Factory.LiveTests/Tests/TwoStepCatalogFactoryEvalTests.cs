@@ -71,7 +71,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
             agentTrace = TryBuildAgentTrace(workspace, codex.TimedOut);
             var factoryProtocol = FactoryOutcomeTraceAnalyzer.Analyze(workspace.EventsPath);
             var executionResponse = ExecutionResponseReader.TryRead(workspace.LastMessagePath, workspace.WorkspaceDirectory);
-            AssertFactoryProtocol(assertions, factoryProtocol, executionResponse);
+            FactoryProtocolAssertions.Assert(assertions, factoryProtocol, executionResponse);
             metrics = CodexJsonlAnalyzer.Analyze(workspace.EventsPath, codex.Duration);
             metrics.TotalSpawnedAgentCount = agentTrace.Agents.Count == 0 ? null : agentTrace.Agents.Count - 1;
             assertions.Require(metrics.MalformedLineCount == 0, "Infrastructure", "Codex JSONL", $"Codex JSONL contains {metrics.MalformedLineCount} malformed line(s). See {workspace.EventsPath}.");
@@ -171,25 +171,4 @@ public sealed class TwoStepCatalogFactoryEvalTests
         assertions.Require(metrics.CompletedChildAgentCount >= 2, "Orchestration failure", "Completed subagents", $"Expected completed agents: at least 2{Environment.NewLine}Actual completed agents: {metrics.CompletedChildAgentCount}");
     }
 
-    private static void AssertFactoryProtocol(EvalAssertionCollector assertions, FactoryOutcomeTraceAnalysis analysis, ExecutionResponseReadResult executionResponse)
-    {
-        assertions.Require(
-            analysis.PublicFactoryOutcomes.Count == 1,
-            "Factory protocol",
-            "Single terminal outcome",
-            $"Expected exactly one public Factory outcome, found {analysis.PublicFactoryOutcomes.Count}.");
-        assertions.Require(
-            analysis.ActivityAfterOutcome.Count == 0,
-            "Factory protocol",
-            "No activity after terminal outcome",
-            $"Factory performed execution after its terminal outcome: {string.Join(", ", analysis.ActivityAfterOutcome)}.");
-
-        var traceOutcome = analysis.PublicFactoryOutcomes.Count == 1 ? analysis.PublicFactoryOutcomes[0].FactoryOutcome : null;
-        var finalOutcome = executionResponse.Response?.FactoryOutcome;
-        assertions.Require(
-            traceOutcome is not null && finalOutcome is not null && traceOutcome == finalOutcome,
-            "Factory protocol",
-            "Outcome consistency",
-            $"Factory outcome in events.jsonl ('{traceOutcome ?? "unavailable"}') does not match last-message.json ('{finalOutcome ?? "unavailable"}').");
-    }
 }

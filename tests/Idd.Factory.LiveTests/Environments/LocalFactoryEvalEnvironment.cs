@@ -33,9 +33,23 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
 
     public Task<ProcessResult> RunCodexAsync(FactoryEvalWorkspace workspace, FactoryEvalOptions options, CancellationToken cancellationToken)
     {
-        var prompt = File.ReadAllText(Path.Combine(workspace.CaseDirectory, "task.md"));
+        var prompt = BuildRunCodexPrompt(workspace.CaseDirectory);
         var environmentOverrides = BuildCodexEnvironment(Environment.GetEnvironmentVariable("PATH") ?? string.Empty, OperatingSystem.IsWindows());
         return processRunner.RunAsync(CodexCommand.Executable, CodexCommand.PrefixArguments.Concat(BuildRunCodexArguments(workspace, options)).ToArray(), workspace.WorkspaceDirectory, workspace.EventsPath, workspace.StderrPath, options.Timeout, cancellationToken, prompt, environmentOverrides, workspace.LastMessagePath);
+    }
+
+    internal static string BuildRunCodexPrompt(string caseDirectory)
+    {
+        var task = File.ReadAllText(Path.Combine(caseDirectory, "task.md")).TrimEnd();
+        var finalResponseSchema = File.ReadAllText(Path.Combine(caseDirectory, "final-response.schema.json")).Trim();
+        return $"""
+            {task}
+
+            The JSON Schema below applies only to your final response. Intermediate progress messages must remain natural-language progress and must not use this response shape.
+
+            Final response JSON Schema:
+            {finalResponseSchema}
+            """;
     }
 
     internal static IReadOnlyList<string> BuildRunCodexArguments(FactoryEvalWorkspace workspace, FactoryEvalOptions options, string? launchProfileName = null, string? userConfigPath = null)
@@ -57,7 +71,7 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
             foreach (var serverName in FindConfiguredMcpServerNames(userConfigPath))
                 arguments.AddRange(["-c", $"mcp_servers.{FormatTomlKey(serverName)}.enabled=false"]);
         if (profile.WindowsSandbox is not null) arguments.AddRange(["-c", $"windows.sandbox=\"{profile.WindowsSandbox}\""]);
-        arguments.AddRange(["--model", options.Model, "--sandbox", "workspace-write", "--cd", workspace.WorkspaceDirectory, "--output-schema", Path.Combine(workspace.CaseDirectory, "final-response.schema.json"), "--output-last-message", workspace.LastMessagePath, "-"]);
+        arguments.AddRange(["--model", options.Model, "--sandbox", "workspace-write", "--cd", workspace.WorkspaceDirectory, "--output-last-message", workspace.LastMessagePath, "-"]);
         return arguments;
     }
 

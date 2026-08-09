@@ -114,6 +114,10 @@ public sealed class FactoryProtocolTests
 
         var arguments = LocalFactoryEvalEnvironment.BuildRunCodexArguments(workspace, options, "isolated-workspace-write");
 
+        Assert.Contains("exec", arguments);
+        Assert.Contains("--json", arguments);
+        Assert.True(HasOption(arguments, "--output-last-message", workspace.LastMessagePath));
+        Assert.DoesNotContain("--output-schema", arguments);
         Assert.Equal(["--sandbox", "workspace-write"], arguments.SkipWhile(argument => argument != "--sandbox").Take(2));
         Assert.Contains("--ignore-user-config", arguments);
         Assert.True(HasOption(arguments, "--enable", "multi_agent"));
@@ -124,6 +128,20 @@ public sealed class FactoryProtocolTests
         Assert.Contains("mcp_servers={}", arguments);
         Assert.DoesNotContain(arguments, argument => argument.StartsWith("windows.sandbox=", StringComparison.Ordinal));
         Assert.Equal("-", arguments[^1]);
+    }
+
+    [Fact]
+    public void CodexRun_PutsFinalOnlyResponseSchemaInPrompt()
+    {
+        var caseDirectory = Path.Combine(RepositoryRootFinder.Find(), "tests", "Idd.Factory.LiveTests", "Cases", "TwoStepCatalog");
+
+        var prompt = LocalFactoryEvalEnvironment.BuildRunCodexPrompt(caseDirectory);
+
+        Assert.Contains("Use $idd-factory-run", prompt, StringComparison.Ordinal);
+        Assert.Contains("applies only to your final response", prompt, StringComparison.Ordinal);
+        Assert.Contains("Intermediate progress messages must remain natural-language progress", prompt, StringComparison.Ordinal);
+        Assert.Contains("\"schemaVersion\"", prompt, StringComparison.Ordinal);
+        Assert.Contains("\"factoryOutcome\"", prompt, StringComparison.Ordinal);
     }
 
     [Theory]
