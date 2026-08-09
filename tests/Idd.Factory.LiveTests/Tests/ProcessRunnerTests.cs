@@ -15,8 +15,8 @@ public sealed class ProcessRunnerTests
         {
             var stopwatch = Stopwatch.StartNew();
             var result = await new ProcessRunner().RunAsync(
-                "cmd",
-                ["/c", "ping -n 30 127.0.0.1 > nul"],
+                "pwsh",
+                ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "Start-Sleep -Seconds 30"],
                 directory,
                 Path.Combine(directory, "stdout.log"),
                 Path.Combine(directory, "stderr.log"),
@@ -42,7 +42,7 @@ public sealed class ProcessRunnerTests
             var signal = Path.Combine(directory, "last-message.json");
             var stopwatch = Stopwatch.StartNew();
             var result = await new ProcessRunner().RunAsync(
-                "powershell.exe",
+                "pwsh",
                 ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", $"Set-Content -LiteralPath '{signal}' -Value '{{}}'; Start-Sleep -Seconds 30"],
                 directory,
                 Path.Combine(directory, "stdout.log"),

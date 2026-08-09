@@ -92,8 +92,9 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
     {
         if (!isWindows) return new Dictionary<string, string>();
 
-        var sandboxCompatiblePath = string.Join(Path.PathSeparator,
-            path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        const char windowsPathSeparator = ';';
+        var sandboxCompatiblePath = string.Join(windowsPathSeparator,
+            path.Split(windowsPathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Where(directory => !directory.Contains("WindowsApps", StringComparison.OrdinalIgnoreCase)));
         return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["PATH"] = sandboxCompatiblePath };
     }
