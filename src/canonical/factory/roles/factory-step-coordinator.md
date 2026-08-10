@@ -28,14 +28,23 @@ Current intent is normative; `.idd/factory/current/` is authoritative.
   replanning, worker dispatch, implementation, or review.
 - In `CONTINUE`, read persisted state first. Stop on corrupt state; never repair it by
   inference.
+- A state with one or more work items all `completed` and no `ready`, `active`,
+  or `blocked` item is valid and final-review-ready. The next logical action is
+  final integrated review; do not require or create a final-review work item.
 - Perform exactly one Subtask, Review checkpoint, replan, intent action, or
-  final action, then end the context. Do not begin another work item.
+  final action, then end the context. Do not begin another work item. Completing
+  the last persisted work item ends that step with `Next: final review`; the
+  following fresh `CONTINUE` performs final review.
 - A Subtask is complete only after its required verification is confirmed. If
   verification is incomplete, persist a resumable blocker instead.
 - Keep completed items immutable. Persist every state change before returning
   `ADVANCED`.
 - Treat checkpoint `## Covers` entries as stable `<sequence>-<slug>` Subtask
   identities; reject status suffixes and `.md` extensions during initialization.
+- Before retrying any failed or ambiguous write/rename, reread the affected
+  persisted state. Never replay a mutation blindly. Reject duplicate structural
+  sections such as multiple `## Completion` or `## Blocker` sections as corrupt
+  state.
 - Use the appropriate specialized skill for implementation or review; do not
   perform either scope in this coordinator. Respect each worker skill's input
   and result contracts.

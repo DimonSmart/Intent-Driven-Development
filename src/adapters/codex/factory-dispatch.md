@@ -5,6 +5,21 @@ prompt. A role is not a native custom agent type. Use the concrete runtime
 operations `spawn_agent` and `wait_agent`; the adapter has already mapped the
 canonical capabilities, so do not probe or remap them at runtime.
 
+Use these exact generated Codex role-to-skill bindings. Never derive a skill
+directory from the role name:
+
+| Role | Skill directory |
+| --- | --- |
+| `task-decomposer` | `.agents/skills/idd-factory-decompose-task` |
+| `factory-step-coordinator` | `.agents/skills/idd-factory-coordinate-step` |
+| `implementer` | `.agents/skills/idd-factory-execute-subtask` |
+| `checkpoint-reviewer` | `.agents/skills/idd-factory-review-checkpoint` |
+| `final-reviewer` | `.agents/skills/idd-factory-review-task` |
+
+For each binding, the role reference is exactly
+`<skill-directory>/references/roles/<role>.md` and the verification reference is
+exactly `<skill-directory>/references/project-verification.md`.
+
 For every Factory child-agent dispatch:
 
 - provide only `message` to `spawn_agent`;
@@ -12,9 +27,8 @@ For every Factory child-agent dispatch:
 - use `fork_context = false`;
 - pass paths to the role, skill, work item, and required references instead of
   copying their contents;
-- use the generated role path `references/roles/<role>.md`; never invent
-  aliases such as `<role>-role.md`;
-- use the `references/project-verification.md` owned by the dispatched skill;
+- use the exact binding table above; never invent aliases or substitute the role
+  name for the skill directory;
 - read the agent id returned by `spawn_agent`;
 - call `wait_agent` with that id and wait for the terminal result before
   changing Factory state or continuing;
@@ -44,9 +58,9 @@ Resume request:
 <resume-request, CONTINUE only>
 
 Read and follow:
-- <coordinate-step-skill-directory>/SKILL.md
-- <coordinate-step-skill-directory>/references/roles/factory-step-coordinator.md
-- <coordinate-step-skill-directory>/references/project-verification.md
+- .agents/skills/idd-factory-coordinate-step/SKILL.md
+- .agents/skills/idd-factory-coordinate-step/references/roles/factory-step-coordinator.md
+- .agents/skills/idd-factory-coordinate-step/references/project-verification.md
 
 Perform only the scope assigned to this role.
 Follow the result contract defined by the skill.
@@ -65,7 +79,8 @@ Pass a confirmed blocker answer or explicit cancellation request separately when
 applicable. Never add the next Subtask, checkpoint, final-review, finalization,
 or other phase hint to a `CONTINUE` dispatch.
 
-Use this shape for decomposer, implementation, and review workers:
+Use this shape for decomposer, implementation, and review workers, substituting
+only one of the exact role-to-skill bindings above:
 
 ```text
 You are executing one IDD Factory role in a separate child-agent context.
@@ -77,9 +92,9 @@ Workspace:
 <absolute-workspace-path>
 
 Read and follow:
-- <skill-directory>/SKILL.md
-- <skill-directory>/references/roles/<role>.md
-- <skill-directory>/references/project-verification.md
+- <exact-bound-skill-directory>/SKILL.md
+- <exact-bound-skill-directory>/references/roles/<role>.md
+- <exact-bound-skill-directory>/references/project-verification.md
 - <active-work-item-path when applicable>
 
 Perform only the scope assigned to this role.

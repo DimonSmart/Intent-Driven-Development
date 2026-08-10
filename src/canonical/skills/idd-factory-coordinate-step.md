@@ -50,11 +50,16 @@ transition. `INITIALIZE` is persistence, not planning.
 
 ## CONTINUE
 
-First list `current/`, read optional `run-context.md`, and read the active or
-lowest ready item. Validate filename-based state before changing it. Read
-`request.md` only for replanning, confirmed clarification, intent orchestration,
-or final integrated review. Read covered completed Subtasks only for a
-checkpoint and all completed work items only for final review.
+First list `current/`, read optional `run-context.md`, and classify the persisted
+state before selecting work. If an active item exists, read it; otherwise read
+the lowest ready item. When no `ready`, `active`, or `blocked` work item exists
+and every persisted work item is `completed`, the state is valid and
+final-review-ready. It is not `CORRUPT_FACTORY_STATE`: read `request.md` and all
+completed work items and perform the final integrated review as this step.
+
+Read `request.md` only for replanning, confirmed clarification, intent
+orchestration, or final integrated review. Read covered completed Subtasks only
+for a checkpoint and all completed work items only for final review.
 
 If a read-only command is rejected by execution policy or fails because of its
 form, make at most two alternative attempts. Each must be narrower and simpler:
@@ -73,6 +78,14 @@ exhausted and the information remains required. Persist only `Reason`, `Not veri
 - Filenames and only filenames are authoritative for `ready`, `active`,
   `completed`, and `blocked`. Stop as `CORRUPT_FACTORY_STATE` on invalid state;
   never guess repairs. Completed items are immutable.
+- The terminal pre-review state is explicit: one or more persisted work items,
+  all `completed`, with no `ready`, `active`, or `blocked` item, means the next
+  logical action is final integrated review. Do not require or create a final
+  review work-item file.
+- After completing a Subtask or Review checkpoint, persist it and re-list state
+  only to determine `Next`. If that completion leaves every work item completed,
+  return `ADVANCED` with `Next: final review`; do not start final review in the
+  same coordinator step. The following fresh `CONTINUE` performs it.
 - Activate the lowest ready item and process it in the same step. Only this
   coordinator may rename work-item files or alter their sequence.
 - For implementation, create a fresh child agent assigned the `implementer`
@@ -87,7 +100,9 @@ exhausted and the information remains required. Persist only `Reason`, `Not veri
   role. Provide the `idd-factory-review-task` skill reference, that skill's
   `references/roles/final-reviewer.md`, and that skill's
   `references/project-verification.md`; it reads current state and the actual
-  diff.
+  diff. If its valid verdict is `approved`, follow `idd-factory-finalize-run`
+  as the remainder of this same final action and return `FINISHED` only after
+  successful finalization.
 - Do not provide an `Action` field to implementer, checkpoint-reviewer, or
   final-reviewer dispatches. `Action` belongs only to the
   `factory-step-coordinator` input contract.
@@ -112,11 +127,31 @@ exhausted and the information remains required. Persist only `Reason`, `Not veri
   result, preserve the current item and return `BLOCKED` with the actual reason.
   Do not implement or review in this coordinator context.
 
+## Mutation Safety
+
+Treat every Factory-state write or rename as a state transition, not as an
+idempotent command that may be replayed blindly.
+
+- Before mutating a work item, read the current filename and relevant structural
+  sections that the mutation depends on.
+- If a write, rename, or move is rejected, interrupted, or returns an ambiguous
+  result, re-list `current/` and reread the affected file before deciding what
+  remains to do. Never repeat the same mutation until observed state proves it
+  did not already take effect.
+- After a successful transition, verify the expected source/destination filename
+  state and the resulting document structure before any later mutation.
+- A work item may contain at most one `## Completion` section and at most one
+  `## Blocker` section. A completed item must have exactly one `## Completion`
+  and no `## Blocker`; a blocked item must have exactly one `## Blocker` and no
+  `## Completion`. Duplicate structural sections are `CORRUPT_FACTORY_STATE`,
+  not something to normalize by inference.
+
 ## Persist Before Return
 
 Before `ADVANCED`, ensure Completion or Blocker, status filename, coverage,
-corrective contract, and numbering are fully written and valid. Never return a
-full worker report, file list, test log, work-item content, or prior history.
+corrective contract, numbering, and structural-section uniqueness are fully
+written and valid. Never return a full worker report, file list, test log,
+work-item content, or prior history.
 
 ## Output
 
