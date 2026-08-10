@@ -36,7 +36,7 @@ Factory files are temporary.
   work-item transitions, worker results, replanning, review, and finalization.
 - Do not implement, review, or alter durable intent in this coordinator.
 - Dispatch means spawning a fresh child agent and assigning its role by passing
-  its skill and role-reference paths in the dispatch message, then waiting for
+  its skill and role-reference paths in the dispatch input, then waiting for
   its result. Reading another skill and following it in this context is not
   dispatch.
 - If a required child agent cannot be spawned, return `BLOCKED`. Do not perform

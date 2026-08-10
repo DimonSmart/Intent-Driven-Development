@@ -92,8 +92,10 @@ public sealed class TwoStepCatalogFactoryEvalTests
             assertions.Require(Directory.GetFiles(Path.Combine(workspace.WorkspaceDirectory, "src", "MiniCatalog"), "*.cs").Any(path => File.ReadAllText(path).Contains("ProductCode", StringComparison.Ordinal)), "Product", "ProductCode type", "Expected a ProductCode production type under src/MiniCatalog/.");
             assertions.Require(!File.ReadAllText(Path.Combine(workspace.WorkspaceDirectory, "src", "MiniCatalog", "MiniCatalog.csproj")).Contains("PackageReference", StringComparison.Ordinal), "Product", "External packages", "Expected no external package to be added to the product project.");
             assertions.Require(Directory.GetFiles(workspace.WorkspaceDirectory, "*.csproj", SearchOption.AllDirectories).Length == 2, "Product", "Unexpected projects", "Expected the fixture to retain exactly its two prepared projects.");
-            AssertPreservation(assertions, workspace, await GitOutputAsync(processRunner, workspace, ["diff", "--binary", "HEAD"], "git-diff.patch", cancellationToken), executionResponse.Response?.FactoryOutcome == "COMPLETED");
-            AssertOrchestration(assertions, metrics);
+            _ = await GitOutputAsync(processRunner, workspace, ["diff", "--binary", "HEAD"], "git-diff.patch", cancellationToken);
+            var changeSet = GitChangeSet.Parse(await GitOutputAsync(processRunner, workspace, ["status", "--porcelain=v1", "-z", "--untracked-files=all"], "git-status.porcelain", cancellationToken));
+            AssertPreservation(assertions, workspace, changeSet, executionResponse.Response?.FactoryOutcome == "COMPLETED");
+            AssertOrchestration(assertions, agentTrace);
             result.ProductPassed = !assertions.HasFailuresIn("Product");
             result.FactoryPassed = !assertions.HasFailuresIn("Factory contract") && !assertions.HasFailuresIn("Factory execution") && !assertions.HasFailuresIn("Factory protocol") && !assertions.HasFailuresIn("Factory") && !assertions.HasFailuresIn("Version") && !assertions.HasFailuresIn("Orchestration failure");
             result.Outcome = FactoryPostRunDiagnostics.Outcome(result.ProductPassed, result.FactoryPassed, !assertions.HasFailuresIn("Infrastructure"));
@@ -154,10 +156,10 @@ public sealed class TwoStepCatalogFactoryEvalTests
     private static Task<ProcessResult> RunWorkspaceAsync(ProcessRunner runner, FactoryEvalWorkspace workspace, string executable, IReadOnlyList<string> arguments, string name, TimeSpan timeout, CancellationToken token) => runner.RunAsync(executable, arguments, workspace.WorkspaceDirectory, Path.Combine(workspace.VerificationDirectory, name + ".log"), Path.Combine(workspace.VerificationDirectory, name + ".stderr.log"), timeout, token);
     private static async Task<string> GitOutputAsync(ProcessRunner runner, FactoryEvalWorkspace workspace, IReadOnlyList<string> arguments, string name, CancellationToken token) { var result = await RunWorkspaceAsync(runner, workspace, "git", arguments, name, TimeSpan.FromMinutes(1), token); return await File.ReadAllTextAsync(result.StdoutPath, token); }
 
-    private static void AssertPreservation(EvalAssertionCollector assertions, FactoryEvalWorkspace workspace, string diff, bool requireFactoryCleanup)
+    private static void AssertPreservation(EvalAssertionCollector assertions, FactoryEvalWorkspace workspace, GitChangeSet changeSet, bool requireFactoryCleanup)
     {
-        var changed = diff.Split('\n').Where(line => line.StartsWith("+++ b/", StringComparison.Ordinal)).Select(line => line[6..]).Where(path => path != "/dev/null").ToArray();
-        assertions.Require(changed.All(path => path.StartsWith("src/MiniCatalog/", StringComparison.Ordinal)), "Product", "Preservation boundaries", "Expected only files under src/MiniCatalog/ to change; inspect verification/git-diff.patch.");
+        var unexpected = changeSet.Paths.Where(path => !path.StartsWith("src/MiniCatalog/", StringComparison.Ordinal)).ToArray();
+        assertions.Require(unexpected.Length == 0, "Product", "Preservation boundaries", $"Expected only files under src/MiniCatalog/ to change, but found: {string.Join(", ", unexpected)}. Inspect verification/git-status.porcelain and git-diff.patch.");
         if (requireFactoryCleanup)
         {
             var current = Path.Combine(workspace.WorkspaceDirectory, ".idd", "factory", "current");
@@ -165,10 +167,45 @@ public sealed class TwoStepCatalogFactoryEvalTests
         }
     }
 
-    internal static void AssertOrchestration(EvalAssertionCollector assertions, FactoryEvalMetrics metrics)
+    internal static void AssertOrchestration(EvalAssertionCollector assertions, AgentTrace trace)
     {
-        assertions.Require(metrics.RootLevelSpawnedAgentCount >= 2, "Orchestration failure", "Root-level spawned agents", $"Expected root-level spawned agents: at least 2{Environment.NewLine}Actual root-level spawned agents: {metrics.RootLevelSpawnedAgentCount}");
-        assertions.Require(metrics.CompletedChildAgentCount >= 2, "Orchestration failure", "Completed subagents", $"Expected completed agents: at least 2{Environment.NewLine}Actual completed agents: {metrics.CompletedChildAgentCount}");
+        if (trace.RootThreadId is null || trace.Agents.Count == 0)
+        {
+            assertions.Require(false, "Orchestration failure", "Agent trace", "Expected a complete semantic agent trace, but no root trace was available.");
+            return;
+        }
+
+        var byId = trace.Agents.ToDictionary(agent => agent.ThreadId, StringComparer.Ordinal);
+        var roleCounts = trace.Agents.GroupBy(agent => agent.Role, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+        var expectedRoleCounts = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["factory-root"] = 1,
+            ["task-decomposer"] = 1,
+            ["factory-step-coordinator"] = 5,
+            ["implementer"] = 2,
+            ["checkpoint-reviewer"] = 1,
+            ["final-reviewer"] = 1
+        };
+        assertions.Require(roleCounts.Count == expectedRoleCounts.Count && expectedRoleCounts.All(expected => roleCounts.GetValueOrDefault(expected.Key) == expected.Value), "Orchestration failure", "Semantic roles", $"Expected roles {FormatCounts(expectedRoleCounts)}; actual roles {FormatCounts(roleCounts)}.");
+
+        var rootChildren = trace.Agents.Where(agent => agent.ParentThreadId == trace.RootThreadId).ToArray();
+        assertions.Require(rootChildren.Length == 6 && rootChildren.Count(agent => agent.Role == "task-decomposer") == 1 && rootChildren.Count(agent => agent.Role == "factory-step-coordinator") == 5, "Orchestration failure", "Root topology", "Expected root to create one task-decomposer and five factory-step-coordinators, with no direct implementation or review workers.");
+
+        var coordinators = trace.Agents.Where(agent => agent.Role == "factory-step-coordinator").ToArray();
+        var initializers = coordinators.Where(agent => agent.Action == "INITIALIZE").ToArray();
+        var continuations = coordinators.Where(agent => agent.Action == "CONTINUE").ToArray();
+        assertions.Require(initializers.Length == 1 && continuations.Length == 4 && coordinators.All(agent => agent.Action is "INITIALIZE" or "CONTINUE"), "Orchestration failure", "Coordinator actions", $"Expected one INITIALIZE followed by four CONTINUE actions; actual actions: {string.Join(", ", coordinators.Select(agent => agent.Action ?? "<missing>"))}.");
+        if (initializers.Length == 1)
+            assertions.Require(initializers[0].StartedAt is not null && continuations.All(agent => agent.StartedAt is not null && agent.StartedAt >= initializers[0].StartedAt), "Orchestration failure", "Initialization order", "Expected INITIALIZE to start before every CONTINUE coordinator.");
+
+        var workers = trace.Agents.Where(agent => agent.Role is "implementer" or "checkpoint-reviewer" or "final-reviewer").ToArray();
+        assertions.Require(workers.All(agent => agent.ParentThreadId is not null && byId.TryGetValue(agent.ParentThreadId, out var parent) && parent.Role == "factory-step-coordinator"), "Orchestration failure", "Worker parents", "Expected every implementation and review worker to be a direct child of a factory-step-coordinator.");
+        var childSignatures = coordinators.Select(coordinator => string.Join("+", workers.Where(worker => worker.ParentThreadId == coordinator.ThreadId).Select(worker => worker.Role).OrderBy(role => role, StringComparer.Ordinal))).OrderBy(value => value, StringComparer.Ordinal).ToArray();
+        var expectedSignatures = new[] { "", "checkpoint-reviewer", "final-reviewer", "implementer", "implementer" };
+        assertions.Require(childSignatures.SequenceEqual(expectedSignatures), "Orchestration failure", "Coordinator topology", $"Expected coordinator child topology [{string.Join(", ", expectedSignatures.Select(value => value.Length == 0 ? "<none>" : value))}]; actual [{string.Join(", ", childSignatures.Select(value => value.Length == 0 ? "<none>" : value))}].");
+        assertions.Require(trace.Agents.Where(agent => agent.Role != "factory-root").All(agent => agent.Status == "completed"), "Orchestration failure", "Agent completion", "Expected every decomposer, coordinator, implementer, and reviewer agent to complete.");
     }
+
+    private static string FormatCounts(IReadOnlyDictionary<string, int> counts) => string.Join(", ", counts.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => $"{item.Key}={item.Value}"));
 
 }

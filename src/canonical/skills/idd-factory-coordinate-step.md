@@ -30,10 +30,13 @@ Ensure `.idd/factory/current/` is absent or empty; otherwise stop as
 `CORRUPT_FACTORY_STATE`. Install the packaged Factory `.gitignore` and create
 the Factory directories when needed. Do not repeat decomposition, read the
 decomposer skill for planning, dispatch a decomposer or any other agent,
-implement code, or run review. Mechanically materialize the supplied result as
-unchanged `request.md`, optional `run-context.md`, and contiguous Subtask and
-Review checkpoint `.ready.md` files. Record the supplied `Methodology version`
-in `request.md`, validate all resulting state invariants, and return immediately:
+implement code, or run review. Before writing, require every checkpoint
+`## Covers` entry to name an existing preceding Subtask by stable
+`<sequence>-<slug>` identity without a status suffix or `.md` extension.
+Mechanically materialize the supplied result as unchanged `request.md`, optional
+`run-context.md`, and contiguous Subtask and Review checkpoint `.ready.md`
+files. Record the supplied `Methodology version` in `request.md`, validate all
+resulting state invariants, and return immediately:
 
 ```text
 Step result: ADVANCED
@@ -42,7 +45,7 @@ Persisted state: <compact state>
 Next: <first work item>
 ```
 
-The decomposition result in the dispatch message is authoritative for this
+The decomposition result in the dispatch input is authoritative for this
 transition. `INITIALIZE` is persistence, not planning.
 
 ## CONTINUE
@@ -72,23 +75,16 @@ exhausted and the information remains required. Persist only `Reason`, `Not veri
   never guess repairs. Completed items are immutable.
 - Activate the lowest ready item and process it in the same step. Only this
   coordinator may rename work-item files or alter their sequence.
-- For implementation, spawn a fresh generic child agent and assign it the
-  `implementer` role through a dispatch message that names
-  `.agents/skills/idd-factory-execute-subtask/SKILL.md`, its implementer role
-  reference at
-  `.agents/skills/idd-factory-execute-subtask/references/roles/implementer.md`,
-  `.agents/skills/idd-factory-execute-subtask/references/project-verification.md`,
-  and the active Subtask path. For a Review checkpoint, assign
-  `checkpoint-reviewer` with
-  `.agents/skills/idd-factory-review-checkpoint/SKILL.md`,
-  `.agents/skills/idd-factory-review-checkpoint/references/roles/checkpoint-reviewer.md`,
-  `.agents/skills/idd-factory-review-checkpoint/references/project-verification.md`,
-  and the active checkpoint path. For final review, assign `final-reviewer`
-  with `.agents/skills/idd-factory-review-task/SKILL.md`,
-  `.agents/skills/idd-factory-review-task/references/roles/final-reviewer.md`,
-  and `.agents/skills/idd-factory-review-task/references/project-verification.md`;
-  it reads current state and the actual diff. Apply only a valid returned result
-  contract. Do not duplicate worker scope or perform it here.
+- For implementation, create a fresh child agent, assign it the `implementer`
+  role, and provide the execute-subtask skill reference, implementer role
+  reference, project-verification reference, and active Subtask path. For a
+  Review checkpoint, create a fresh child agent assigned the
+  `checkpoint-reviewer` role and provide its review-checkpoint skill, role,
+  project-verification, and active checkpoint references. For final review,
+  create a fresh child agent assigned the `final-reviewer` role and provide its
+  review-task skill, role, and project-verification references; it reads current
+  state and the actual diff. Apply only a valid returned result contract. Do not
+  duplicate worker scope or perform it here.
 - A Subtask becomes completed only when its required verification is confirmed.
   Otherwise persist its Blocker and return `BLOCKED`.
 - For `NEEDS_REPLAN` or `needs-replan`, verify the prerequisite belongs to the
@@ -141,11 +137,10 @@ Result: <commit-message path>
 `ADVANCED`, `STOPPED`, and `FINISHED` are internal step results, never Factory
 outcomes.
 
-For Codex dispatch, read `references/codex-dispatch.md`. Every worker dispatch
-must spawn a generic child agent using only `message`; do not provide `items`,
-never provide both, and use `fork_context = false`. Wait for its terminal
-result, validate the worker result contract, and only then change Factory
-state. Reading the worker skill and performing its instructions in this
-coordinator context is forbidden. If dispatch or wait fails, return `BLOCKED`
-with the actual technical reason and do not implement, review, simulate a
-worker result, create completed work items, or continue the Factory run.
+Before the first worker dispatch, read `references/platform-dispatch.md`.
+Create every worker in a fresh child-agent context, await its terminal result,
+validate the worker result contract, and only then change Factory state.
+Reading the worker skill and performing its instructions in this coordinator
+context is forbidden. If dispatch or wait fails, return `BLOCKED` with the
+actual technical reason and do not implement, review, simulate a worker result,
+create completed work items, or continue the Factory run.

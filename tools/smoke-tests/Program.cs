@@ -19,6 +19,7 @@ CheckCanonicalRoleReader();
 CheckFactoryRoleGeneration();
 CheckCodexFactoryMetadata();
 CheckCanonicalSkillReferences();
+CheckCanonicalFactoryNeutrality();
 CheckVerificationPolicyContract();
 CheckLiveFactorySummaryScriptWithWindowsPowerShell();
 CheckPublishedLayout();
@@ -188,6 +189,28 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-intent-change"));
     ExpectDirectory(Path.Combine(factoryRoot, "assets", "bootstrap", ".idd", "factory"));
     ExpectFile(Path.Combine(factoryRoot, "assets", "bootstrap", ".idd", "factory", ".gitignore"));
+    using (var methodology = ReadJson(Path.Combine(factoryRoot, "skills", "idd-factory-run", "references", "methodology-version.json")))
+    {
+        if (methodology is not null)
+        {
+            if (!methodology.RootElement.TryGetProperty("schemaVersion", out var schemaVersion) || schemaVersion.GetInt32() != 1)
+            {
+                failures.Add($"{platform} Factory methodology reference has an invalid schemaVersion.");
+            }
+            ExpectString(methodology.RootElement, "methodologyVersion", version, $"{platform} Factory methodology version");
+        }
+    }
+
+    foreach (var skill in new[] { "idd-factory-run", "idd-factory-coordinate-step" })
+    {
+        var dispatchReferencePath = Path.Combine(factoryRoot, "skills", skill, "references", "platform-dispatch.md");
+        ExpectFile(dispatchReferencePath);
+        var dispatchReference = ReadText(dispatchReferencePath);
+        if (platform == "claude" && new[] { "spawn_agent", "wait_agent", "fork_context", "codex-dispatch" }.Any(dispatchReference.Contains))
+        {
+            failures.Add($"Claude {skill} dispatch reference contains Codex-specific runtime instructions.");
+        }
+    }
 
     foreach (var reference in new[]
     {
@@ -258,11 +281,13 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
         }
         ExpectContains(runSkill, "Public Factory outcome is terminal for the current Factory attempt.", "Codex idd-factory-run terminal outcome invariant");
 
-        var dispatchReferencePath = Path.Combine(factoryRoot, "skills", "idd-factory-run", "references", "codex-dispatch.md");
+        var dispatchReferencePath = Path.Combine(factoryRoot, "skills", "idd-factory-run", "references", "platform-dispatch.md");
         ExpectFile(dispatchReferencePath);
         var dispatchReference = ReadText(dispatchReferencePath);
-        ExpectContains(dispatchReference, "actually invoke `spawn_agent` or", "Codex concrete dispatch failure rule");
-        ExpectContains(dispatchReference, "`wait_agent`, as applicable", "Codex concrete wait failure rule");
+        ExpectContains(dispatchReference, "`spawn_agent`", "Codex concrete spawn mapping");
+        ExpectContains(dispatchReference, "`wait_agent`", "Codex concrete wait mapping");
+        ExpectContains(dispatchReference, "Every later coordinator dispatch uses", "Codex CONTINUE-only dispatch rule");
+        ExpectContains(dispatchReference, "an active child is not a timeout failure", "Codex terminal-wait rule");
     }
 
     CheckIddMetadata(intentRoot, [], ".idd/intent", platform, "idd-intent");
@@ -330,6 +355,24 @@ void CheckIddMetadata(
     {
         failures.Add($"{platform} {pluginName} asset destinations are [{string.Join(", ", destinations)}], expected {expectedAssetDestination}.");
     }
+}
+
+void CheckCanonicalFactoryNeutrality()
+{
+    var forbidden = new[] { "Codex", "Claude", "spawn_agent", "wait_agent", "fork_context", "codex-dispatch", ".agents/skills/", "`items`", "`message`" };
+    var canonicalFiles = Directory.GetFiles(Path.Combine(repoRoot, "src", "canonical", "skills"), "idd-factory-*.md")
+        .Concat(Directory.GetFiles(Path.Combine(repoRoot, "src", "canonical", "factory"), "*.md", SearchOption.AllDirectories));
+    foreach (var file in canonicalFiles)
+    {
+        var content = File.ReadAllText(file);
+        foreach (var literal in forbidden.Where(content.Contains))
+        {
+            failures.Add($"Canonical Factory file {Relative(file)} contains platform-specific literal '{literal}'.");
+        }
+    }
+
+    var decomposition = ReadText(Path.Combine(repoRoot, "src", "canonical", "skills", "idd-factory-decompose-task.md"));
+    ExpectContains(decomposition, "stable `<sequence>-<slug>` identity", "Canonical stable checkpoint coverage identity");
 }
 
 void CheckFactoryRoleGeneration()

@@ -82,10 +82,13 @@ public sealed class CodexRolloutReader
             if (string.Equals(String(item, "tool") ?? String(item, "name"), "spawn_agent", StringComparison.OrdinalIgnoreCase))
             {
                 var prompt = String(item, "prompt") ?? String(item, "message");
+                if (!string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(prompt))
+                    analysis.SpawnPromptsByCallId[id] = prompt;
+                var effectivePrompt = prompt ?? (string.IsNullOrWhiteSpace(id) ? null : analysis.SpawnPromptsByCallId.GetValueOrDefault(id));
                 foreach (var child in Strings(item, "receiver_thread_ids"))
                 {
                     analysis.SpawnedThreadIds.Add(child);
-                    if (!string.IsNullOrWhiteSpace(prompt)) analysis.SpawnPrompts[child] = prompt;
+                    if (!string.IsNullOrWhiteSpace(effectivePrompt)) analysis.SpawnPrompts[child] = effectivePrompt;
                 }
             }
         }
@@ -164,6 +167,7 @@ public sealed class CodexRolloutAnalysis(CodexRollout rollout)
     public int AnonymousToolCallCount { get; private set; }
     public int ToolCallCount => ToolCallIds.Count + AnonymousToolCallCount;
     public Dictionary<string, string> SpawnPrompts { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, string> SpawnPromptsByCallId { get; } = new(StringComparer.Ordinal);
     public string? DispatchMessage { get; set; }
     public string? Status { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }

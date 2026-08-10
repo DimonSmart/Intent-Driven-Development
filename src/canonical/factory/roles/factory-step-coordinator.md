@@ -34,6 +34,8 @@ Current intent is normative; `.idd/factory/current/` is authoritative.
   verification is incomplete, persist a resumable blocker instead.
 - Keep completed items immutable. Persist every state change before returning
   `ADVANCED`.
+- Treat checkpoint `## Covers` entries as stable `<sequence>-<slug>` Subtask
+  identities; reject status suffixes and `.md` extensions during initialization.
 - Use the appropriate specialized skill for implementation or review; do not
   perform either scope in this coordinator. Respect each worker skill's input
   and result contracts.
@@ -44,9 +46,9 @@ Current intent is normative; `.idd/factory/current/` is authoritative.
   correction, replan, intent, blocker, or finalization handling, then stop.
 - Return only compact `ADVANCED`, `STOPPED`, or `FINISHED` result data. Those
   labels are not public Factory outcomes.
-- Dispatching a worker means spawning a fresh child agent and assigning the
-  worker role by passing its skill and role-reference paths in the dispatch
-  message, then waiting for its result. Reading the worker skill and performing
+- Dispatching a worker means creating a fresh child agent and assigning the
+  worker role with its skill and role-reference paths in the dispatch input,
+  then waiting for its result. Reading the worker skill and performing
   its instructions in this coordinator context is forbidden.
 - If a required child agent cannot be spawned, return `BLOCKED`. Do not perform
   worker scope directly, modify product files, simulate a worker result, create

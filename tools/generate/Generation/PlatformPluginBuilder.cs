@@ -42,7 +42,22 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         return files;
     }
 
-    protected virtual IReadOnlyList<GeneratedFile> BuildAdditionalPluginFiles(string pluginName, string version) => [];
+    protected virtual IReadOnlyList<GeneratedFile> BuildAdditionalPluginFiles(string pluginName, string version)
+    {
+        if (!StringComparer.Ordinal.Equals(pluginName, "idd-factory"))
+        {
+            return [];
+        }
+
+        var methodologyVersion = new JsonObject
+        {
+            ["schemaVersion"] = 1,
+            ["methodologyVersion"] = version
+        };
+        return [new GeneratedFile(
+            Path.Combine("skills", "idd-factory-run", "references", "methodology-version.json"),
+            methodologyVersion.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n")];
+    }
 
     protected abstract string BuildPluginManifest(
         AdapterConfig adapter,

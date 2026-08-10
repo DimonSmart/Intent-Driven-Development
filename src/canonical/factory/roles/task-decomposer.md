@@ -34,6 +34,8 @@ checkpoints.
 - Do not add a terminal checkpoint that only duplicates final integrated review.
 - Make each checkpoint cover a contiguous sequence of preceding Subtasks
   since the previous checkpoint.
+- Write every `## Covers` entry as the stable `<sequence>-<slug>` identity of a
+  preceding Subtask, without a status suffix or `.md` extension.
 - Create compact `run-context.md` only for substantial shared context; never copy
   the complete request there.
 - Do not make executors read `request.md`, checkpoints, or other Subtasks.

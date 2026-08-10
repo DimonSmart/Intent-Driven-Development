@@ -7,42 +7,41 @@ namespace Idd.Factory.LiveTests.Tests;
 public sealed class TwoStepCatalogFactoryOrchestrationTests
 {
     [Fact]
-    public void AssertOrchestration_PassesForTwoSuccessfulSpawnsAndCompletedAgents()
+    public void AssertOrchestration_PassesForExpectedSemanticTopology()
     {
-        var metrics = AnalyzeLines(
-            "{\"type\":\"item.completed\",\"item\":{\"id\":\"spawn_1\",\"type\":\"collab_tool_call\",\"tool\":\"spawn_agent\",\"receiver_thread_ids\":[\"child_1\"],\"status\":\"completed\"}}",
-            "{\"type\":\"item.completed\",\"item\":{\"id\":\"spawn_2\",\"type\":\"collab_tool_call\",\"tool\":\"spawn_agent\",\"receiver_thread_ids\":[\"child_2\"],\"status\":\"completed\"}}",
-            "{\"type\":\"item.completed\",\"item\":{\"id\":\"wait_1\",\"type\":\"collab_tool_call\",\"tool\":\"wait\",\"status\":\"completed\",\"agents_states\":{\"child_1\":{\"status\":\"completed\"},\"child_2\":{\"status\":\"completed\"}}}}");
-        var assertions = AssertOrchestration(metrics);
+        var assertions = AssertOrchestration(ExpectedTrace());
 
         Assert.False(assertions.HasFailuresIn("Orchestration failure"));
     }
 
     [Fact]
-    public void AssertOrchestration_FailsWhenOnlyOneChildAgentCompleted()
+    public void AssertOrchestration_FailsForPhaseSpecificAction()
     {
-        var assertions = AssertOrchestration(new FactoryEvalMetrics { RootLevelSpawnedAgentCount = 2, CompletedChildAgentCount = 1 });
+        var trace = ExpectedTrace();
+        var agents = trace.Agents.Select(agent => agent.ThreadId == "final" ? agent with { Action = "FINAL REVIEW" } : agent).ToArray();
+        var assertions = AssertOrchestration(trace with { Agents = agents });
 
         Assert.True(assertions.HasFailuresIn("Orchestration failure"));
     }
 
     [Fact]
-    public void AssertOrchestration_ReportsPrimaryFailureWithoutCascadingCompletionNoise()
+    public void AssertOrchestration_FailsWhenWorkerRunsUnderRoot()
     {
-        var assertions = AssertOrchestration(new FactoryEvalMetrics());
+        var trace = ExpectedTrace();
+        var agents = trace.Agents.Select(agent => agent.ThreadId == "impl-1" ? agent with { ParentThreadId = "root" } : agent).ToArray();
+        var assertions = AssertOrchestration(trace with { Agents = agents });
 
-        var exception = Assert.Throws<Xunit.Sdk.XunitException>(() => assertions.ThrowIfFailed("run"));
-        Assert.Contains("Actual root-level spawned agents: 0", exception.Message);
-        Assert.DoesNotContain("Actual completed agents: 0", exception.Message);
-        Assert.Contains(Path.Combine("run", "report.md"), exception.Message);
+        Assert.True(assertions.HasFailuresIn("Orchestration failure"));
     }
 
     [Fact]
-    public void AssertOrchestration_DoesNotTreatWaitCallsAsFailure()
+    public void AssertOrchestration_ReportsMissingTraceAsPrimaryFailure()
     {
-        var assertions = AssertOrchestration(new FactoryEvalMetrics { RootLevelSpawnedAgentCount = 2, CompletedChildAgentCount = 2, WaitAgentCallCount = 3 });
+        var assertions = AssertOrchestration(new AgentTrace(2, null, [], []));
 
-        Assert.False(assertions.HasFailures);
+        var exception = Assert.Throws<Xunit.Sdk.XunitException>(() => assertions.ThrowIfFailed("run"));
+        Assert.Contains("no root trace was available", exception.Message);
+        Assert.Contains(Path.Combine("run", "report.md"), exception.Message);
     }
 
     [Fact]
@@ -66,24 +65,31 @@ public sealed class TwoStepCatalogFactoryOrchestrationTests
         finally { Directory.Delete(directory, true); }
     }
 
-    private static EvalAssertionCollector AssertOrchestration(FactoryEvalMetrics metrics)
+    private static EvalAssertionCollector AssertOrchestration(AgentTrace trace)
     {
         var assertions = new EvalAssertionCollector();
-        TwoStepCatalogFactoryEvalTests.AssertOrchestration(assertions, metrics);
+        TwoStepCatalogFactoryEvalTests.AssertOrchestration(assertions, trace);
         return assertions;
     }
 
-    private static FactoryEvalMetrics AnalyzeLines(params string[] lines)
+    private static AgentTrace ExpectedTrace()
     {
-        var path = Path.GetTempFileName();
-        try
-        {
-            File.WriteAllLines(path, lines);
-            return CodexJsonlAnalyzer.Analyze(path, TimeSpan.Zero);
-        }
-        finally
-        {
-            File.Delete(path);
-        }
+        var start = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
+        return new AgentTrace(2, "root", [
+            Node("root", null, "factory-root", null, start),
+            Node("decomposer", "root", "task-decomposer", null, start),
+            Node("initialize", "root", "factory-step-coordinator", "INITIALIZE", start.AddSeconds(1)),
+            Node("implementation-1", "root", "factory-step-coordinator", "CONTINUE", start.AddSeconds(2)),
+            Node("impl-1", "implementation-1", "implementer", null, start.AddSeconds(3)),
+            Node("implementation-2", "root", "factory-step-coordinator", "CONTINUE", start.AddSeconds(4)),
+            Node("impl-2", "implementation-2", "implementer", null, start.AddSeconds(5)),
+            Node("checkpoint", "root", "factory-step-coordinator", "CONTINUE", start.AddSeconds(6)),
+            Node("checkpoint-review", "checkpoint", "checkpoint-reviewer", null, start.AddSeconds(7)),
+            Node("final", "root", "factory-step-coordinator", "CONTINUE", start.AddSeconds(8)),
+            Node("final-review", "final", "final-reviewer", null, start.AddSeconds(9))
+        ], []);
     }
+
+    private static AgentTraceNode Node(string id, string? parent, string role, string? action, DateTimeOffset startedAt) =>
+        new(id, parent, role, null, action, "completed", startedAt, startedAt.AddSeconds(1), 1000, 1, 1, null, null, null, null, null);
 }

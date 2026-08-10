@@ -42,6 +42,10 @@ state.
     review.
 - Every checkpoint must cover a contiguous sequence of preceding Subtasks
   since the previous checkpoint and must not cover another checkpoint.
+- Identify every covered Subtask by its stable `<sequence>-<slug>` identity.
+  A `## Covers` entry must never include `.ready`, `.active`, `.completed`, or
+  `.blocked`, and must not include a `.md` extension; status filenames change
+  during execution and are not stable references.
 - Produce optional compact `run-context.md` only when multiple work items share
   substantial constraints, assumptions, or references.
 - Put every Subtask-specific requirement and preservation boundary in its owning
@@ -78,5 +82,7 @@ Return `READY`, `NEEDS_CLARIFICATION`, `INTENT_REQUIRED`, `FOCUSED_HANDOFF`, or
 
 For `READY`, include relevant intent, repository areas, a work slug, optional
 `run-context.md` Markdown, and all ordered Subtask and Review checkpoint
-Markdown. Return no partial items with clarification and no statuses, timestamps,
-agents, attempts, or speculative requirements.
+Markdown. Each checkpoint `## Covers` list uses only stable
+`<sequence>-<slug>` Subtask identities. Return no partial items with
+clarification and no statuses, timestamps, agents, attempts, or speculative
+requirements.

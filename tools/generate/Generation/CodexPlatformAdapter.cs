@@ -68,29 +68,12 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
             StringComparer.Ordinal.Equals(skillName, "idd-factory-coordinate-step"))
         {
             files.Add(new GeneratedFile(
-                Path.Combine("skills", skillName, "references", "codex-dispatch.md"),
+                Path.Combine("skills", skillName, "references", "platform-dispatch.md"),
                 ContentNormalizer.NormalizeContent(RequiredFileReader.Read(
-                    "src/canonical/methodology/codex-dispatch.md"))));
+                    "src/adapters/codex/factory-dispatch.md"))));
         }
 
         return files;
-    }
-
-    protected override IReadOnlyList<GeneratedFile> BuildAdditionalPluginFiles(string pluginName, string version)
-    {
-        if (!StringComparer.Ordinal.Equals(pluginName, "idd-factory"))
-        {
-            return [];
-        }
-
-        var methodologyVersion = new JsonObject
-        {
-            ["schemaVersion"] = 1,
-            ["methodologyVersion"] = version
-        };
-        return [new GeneratedFile(
-            Path.Combine("skills", "idd-factory-run", "references", "methodology-version.json"),
-            methodologyVersion.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n")];
     }
 
     protected override string BuildIddPluginMetadata(
