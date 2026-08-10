@@ -65,7 +65,8 @@ Do not perform work owned by another Factory role.
 Return only the compact result required by the skill.
 ```
 
-Use this shape for every `factory-step-coordinator` `CONTINUE` dispatch:
+Use this shape for every `factory-step-coordinator` `CONTINUE` dispatch.
+Every later coordinator dispatch uses this complete `CONTINUE` shape:
 
 ```text
 You are executing one IDD Factory role in a separate child-agent context.
