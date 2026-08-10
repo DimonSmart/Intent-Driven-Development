@@ -50,6 +50,11 @@ state.
   substantial constraints, assumptions, or references.
 - Put every Subtask-specific requirement and preservation boundary in its owning
   Subtask. Put checkpoint-specific risks and evidence in the checkpoint.
+- When a Subtask depends on behavior established by an earlier Subtask, state
+  the concrete public contract or invariant that it may rely on and must
+  preserve. The dependent Subtask must remain self-contained and must not
+  require its worker to read the earlier work item or infer the dependency from
+  Factory history.
 - Make every Subtask understandable and implementable without reading the
   complete request or other work-item files.
 - Do not copy the complete request into `run-context.md` or repeat it across

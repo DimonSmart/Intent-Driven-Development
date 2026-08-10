@@ -26,6 +26,28 @@ public sealed class CanonicalFactoryContractTests
     }
 
     [Fact]
+    public void ExecuteSubtask_DistinguishesInheritedBaselineFromActiveDelta()
+    {
+        var content = ReadRepoFile("src", "canonical", "skills", "idd-factory-execute-subtask.md");
+
+        Assert.Contains("worktree changes already present when\n  this worker starts as inherited baseline", content);
+        Assert.Contains("do not by themselves constitute scope escape", content);
+        Assert.Contains("changes newly introduced or newly required by\n  the active Subtask", content);
+        Assert.Contains("not against the accumulated working-tree diff", content);
+    }
+
+    [Fact]
+    public void DecomposeTask_MakesDependentSubtasksSelfContained()
+    {
+        var content = ReadRepoFile("src", "canonical", "skills", "idd-factory-decompose-task.md");
+
+        Assert.Contains("depends on behavior established by an earlier Subtask", content);
+        Assert.Contains("concrete public contract or invariant", content);
+        Assert.Contains("must remain self-contained", content);
+        Assert.Contains("must not\n  require its worker to read the earlier work item", content);
+    }
+
+    [Fact]
     public void PlatformDispatchesDeclareExactRoleToSkillBindings()
     {
         var codex = ReadRepoFile("src", "adapters", "codex", "factory-dispatch.md");

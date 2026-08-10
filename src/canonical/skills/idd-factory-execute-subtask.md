@@ -11,9 +11,9 @@ do not add checks selected only for checkpoint or final contexts. A
 missing/changed referenced ID blocks the item. Confirmation refusal, user
 instructions without confirmation, and unavailable checks are `Not verified`.
 If any assigned check remains `Not verified`, return `BLOCKED`, never `DONE`,
-with `Reason`, `Verified`, `Not verified`, and `Resume when`. If actual changes
-escape the contracted verification scope, return `NEEDS_REPLAN`; do not expand
-checks yourself.
+with `Reason`, `Verified`, `Not verified`, and `Resume when`. If changes newly
+introduced or required by the active Subtask escape the contracted verification
+scope, return `NEEDS_REPLAN`; do not expand checks yourself.
 
 ## Purpose
 
@@ -34,7 +34,16 @@ local contract.
 - Confirm current intent is sufficient.
 - If the item asks to edit `.idd/intent/`, invoke an intent-changing workflow, or
   own an intent update, return `NEEDS_REPLAN`; do not perform that scope.
-- Inspect diff and evidence first; preserve completed work on resume.
+- Inspect diff and evidence first. Treat worktree changes already present when
+  this worker starts as inherited baseline. Changes belonging to completed
+  Factory work are expected and do not by themselves constitute scope escape;
+  preserve them unless the active Subtask explicitly requires a compatible
+  change.
+- Evaluate scope escape against changes newly introduced or newly required by
+  the active Subtask, not against the accumulated working-tree diff. If the
+  inherited baseline conflicts with the active Subtask contract or makes it
+  impossible to complete locally, return `NEEDS_REPLAN` and name the minimum
+  dependency or contract correction.
 - In explicit verification-only mode for an unchanged diff, preserve code and
   `Verified`, perform only `Not verified`, and leave the mode only for changed
   code or a newly revealed defect.
@@ -46,9 +55,9 @@ local contract.
   `Not verified`.
 - Return `NEEDS_REPLAN` when the task and run context are insufficient,
   contradictory, contain intent-editing scope, require adjacent work outside
-  the task, or the actual changed scope escapes the contracted verification
-  scope. Name the minimum prerequisite or contract correction; do not inspect
-  the original request or perform later tasks.
+  the task, or changes newly introduced or required by the active Subtask escape
+  the contracted verification scope. Name the minimum prerequisite or contract
+  correction; do not inspect the original request or perform later tasks.
 - Return `INTENT_REQUIRED` only for missing durable behavior discovered while
   implementing current intent.
 - Return `BLOCKED` only for an external condition, a required verification result
