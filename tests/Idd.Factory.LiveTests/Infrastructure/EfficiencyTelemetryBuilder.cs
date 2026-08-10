@@ -27,7 +27,10 @@ public static class EfficiencyTelemetryBuilder
             ToGroup("planning", trace.Agents.Where(agent => agent.Role == "task-decomposer"), input, fresh),
             ToGroup("product-work", trace.Agents.Where(agent => agent.Role is "implementer" or "checkpoint-reviewer" or "final-reviewer"), input, fresh)
         };
-        var summary = new EfficiencySummary(input, cached, fresh, Percentage(cached, input), output, reasoning, total, trace.Agents.Count, trace.Agents.Count == 0 ? Count(metrics.ModelTurnCount) : trace.Agents.Sum(agent => agent.TurnCount), trace.Agents.Count == 0 ? Count(metrics.ToolCallCount) : toolCalls.Length, toolCalls.Count(call => call.IsFailure), toolCalls.Count(call => call.IsRejected), toolCalls.Count(call => call.IsRetryOrFallback), metrics.WallTimeMs);
+        var failedToolCalls = trace.Agents.Count == 0 ? toolCalls.Count(call => call.IsFailure) : trace.Agents.Sum(agent => agent.FailedToolCallCount);
+        var rejectedToolCalls = trace.Agents.Count == 0 ? toolCalls.Count(call => call.IsRejected) : trace.Agents.Sum(agent => agent.RejectedToolCallCount);
+        var retryOrFallbackCalls = trace.Agents.Count == 0 ? toolCalls.Count(call => call.IsRetryOrFallback) : trace.Agents.Sum(agent => agent.RetryOrFallbackCallCount);
+        var summary = new EfficiencySummary(input, cached, fresh, Percentage(cached, input), output, reasoning, total, trace.Agents.Count, trace.Agents.Count == 0 ? Count(metrics.ModelTurnCount) : trace.Agents.Sum(agent => agent.TurnCount), trace.Agents.Count == 0 ? Count(metrics.ToolCallCount) : toolCalls.Length, failedToolCalls, rejectedToolCalls, retryOrFallbackCalls, metrics.WallTimeMs);
         return new(1, summary, roles, agents, toolCalls, fileAccess, groups, Hotspots(agents, toolCalls, fileAccess), diagnostics);
     }
 
@@ -43,17 +46,34 @@ public static class EfficiencyTelemetryBuilder
         var agents = source.ToArray(); var input = Sum(agents.Select(agent => agent.InputTokens)); var fresh = Sum(agents.Select(agent => agent.FreshInputTokens));
         return new(name, agents.Length, input, fresh, agents.Sum(agent => agent.ToolCallCount), agents.Sum(agent => agent.DurationMs ?? 0), Percentage(input, totalInput), Percentage(fresh, totalFresh));
     }
-    private static EfficiencyHotspots Hotspots(IReadOnlyList<EfficiencyAgent> agents, IReadOnlyList<EfficiencyToolCall> tools, IReadOnlyList<EfficiencyFileAccess> files) => new(
-        agents.Where(agent => agent.InputTokens is not null).OrderByDescending(agent => agent.InputTokens).Take(5).Select(agent => agent.ThreadId).ToArray(),
-        agents.Where(agent => agent.FreshInputTokens is not null).OrderByDescending(agent => agent.FreshInputTokens).Take(5).Select(agent => agent.ThreadId).ToArray(),
-        agents.OrderByDescending(agent => agent.ToolCallCount).Take(5).Select(agent => agent.ThreadId).ToArray(),
-        files.Where(file => file.ReadCount > 1).Take(10).Select(file => file.Path).ToArray(),
-        tools.GroupBy(tool => tool.Tool, StringComparer.OrdinalIgnoreCase).OrderByDescending(group => group.Count()).Take(10).Select(group => $"{group.Key} ({group.Count()})").ToArray(),
-        tools.Where(tool => tool.DurationMs is not null).OrderByDescending(tool => tool.DurationMs).Take(10).Select(tool => $"{tool.Tool} [{tool.ThreadId}] {tool.DurationMs} ms").ToArray(),
-        tools.Where(tool => tool.Tool is "wait" or "wait_agent").OrderByDescending(tool => tool.DurationMs).Take(10).Select(tool => $"{tool.ThreadId} → {tool.ChildThreadIds.FirstOrDefault() ?? "unknown"}: {tool.DurationMs?.ToString() ?? "unknown"} ms").ToArray(),
-        tools.Where(tool => tool.IsFailure || tool.IsRejected).Select(tool => $"{tool.Tool} [{tool.ThreadId}] → {(tool.IsRejected ? "rejected" : "failed")}").ToArray(),
-        agents.Where(agent => agent.CachedInputPercentage is not null).OrderByDescending(agent => agent.CachedInputPercentage).Take(5).Select(agent => agent.ThreadId).ToArray(),
-        agents.Where(agent => agent.InputPerToolCall is not null).OrderByDescending(agent => agent.InputPerToolCall).Take(5).Select(agent => agent.ThreadId).ToArray());
+
+    private static EfficiencyHotspots Hotspots(IReadOnlyList<EfficiencyAgent> agents, IReadOnlyList<EfficiencyToolCall> tools, IReadOnlyList<EfficiencyFileAccess> files)
+    {
+        var directFailures = tools.Where(tool => tool.IsFailure || tool.IsRejected)
+            .Select(tool => $"{tool.Tool} [{tool.ThreadId}] → {(tool.IsRejected ? "rejected" : "failed")}")
+            .ToList();
+        foreach (var agent in agents)
+        {
+            var representedFailures = tools.Count(tool => tool.ThreadId == agent.ThreadId && tool.IsFailure);
+            var representedRejections = tools.Count(tool => tool.ThreadId == agent.ThreadId && tool.IsRejected);
+            var unrepresentedFailures = Math.Max(0, agent.FailedToolCalls - representedFailures);
+            var unrepresentedRejections = Math.Max(0, agent.RejectedToolCalls - representedRejections);
+            if (unrepresentedFailures > 0 || unrepresentedRejections > 0)
+                directFailures.Add($"{agent.Role} [{agent.ThreadId}] → {unrepresentedFailures} process-log failure(s), {unrepresentedRejections} rejection(s)");
+        }
+
+        return new(
+            agents.Where(agent => agent.InputTokens is not null).OrderByDescending(agent => agent.InputTokens).Take(5).Select(agent => agent.ThreadId).ToArray(),
+            agents.Where(agent => agent.FreshInputTokens is not null).OrderByDescending(agent => agent.FreshInputTokens).Take(5).Select(agent => agent.ThreadId).ToArray(),
+            agents.OrderByDescending(agent => agent.ToolCallCount).Take(5).Select(agent => agent.ThreadId).ToArray(),
+            files.Where(file => file.ReadCount > 1).Take(10).Select(file => file.Path).ToArray(),
+            tools.GroupBy(tool => tool.Tool, StringComparer.OrdinalIgnoreCase).OrderByDescending(group => group.Count()).Take(10).Select(group => $"{group.Key} ({group.Count()})").ToArray(),
+            tools.Where(tool => tool.DurationMs is not null).OrderByDescending(tool => tool.DurationMs).Take(10).Select(tool => $"{tool.Tool} [{tool.ThreadId}] {tool.DurationMs} ms").ToArray(),
+            tools.Where(tool => tool.Tool == "wait_agent").OrderByDescending(tool => tool.DurationMs).Take(10).Select(tool => $"{tool.ThreadId} → {tool.ChildThreadIds.FirstOrDefault() ?? "unknown"}: {tool.DurationMs?.ToString() ?? "unknown"} ms").ToArray(),
+            directFailures.ToArray(),
+            agents.Where(agent => agent.CachedInputPercentage is not null).OrderByDescending(agent => agent.CachedInputPercentage).Take(5).Select(agent => agent.ThreadId).ToArray(),
+            agents.Where(agent => agent.InputPerToolCall is not null).OrderByDescending(agent => agent.InputPerToolCall).Take(5).Select(agent => agent.ThreadId).ToArray());
+    }
 
     private static long? Sum(IEnumerable<long?> values) { var array = values.ToArray(); return array.Length > 0 && array.All(value => value is not null) ? array.Sum(value => value!.Value) : null; }
     private static long? Fresh(long? input, long? cached) => input is not null && cached is not null && input >= cached && cached >= 0 ? input - cached : null;
