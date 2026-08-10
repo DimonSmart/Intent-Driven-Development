@@ -60,7 +60,12 @@ public sealed class TwoStepCatalogFactoryOrchestrationTests
             var report = await File.ReadAllTextAsync(Path.Combine(directory, "report.md"));
             Assert.Contains("Root-level spawned agents: 2", report);
             Assert.Contains("Total spawned agents: 4", report);
+            Assert.Contains("Fresh input tokens:", report);
+            Assert.Contains("Detailed efficiency diagnostics: efficiency.md / efficiency.json", report);
             Assert.DoesNotContain("Successfully spawned agents", report);
+            Assert.True(File.Exists(workspace.EfficiencyJsonPath));
+            Assert.True(File.Exists(workspace.EfficiencyMarkdownPath));
+            Assert.Contains("Token usage by role", await File.ReadAllTextAsync(workspace.EfficiencyMarkdownPath));
         }
         finally { Directory.Delete(directory, true); }
     }

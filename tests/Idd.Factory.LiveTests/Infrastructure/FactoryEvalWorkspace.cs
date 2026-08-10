@@ -7,4 +7,6 @@ public sealed record FactoryEvalWorkspace(string RunDirectory, string WorkspaceD
     public string StderrPath => Path.Combine(RunDirectory, "stderr.log");
     public string LastMessagePath => Path.Combine(RunDirectory, "last-message.json");
     public string AgentTracePath => Path.Combine(RunDirectory, "agent-trace.json");
+    public string EfficiencyJsonPath => Path.Combine(RunDirectory, "efficiency.json");
+    public string EfficiencyMarkdownPath => Path.Combine(RunDirectory, "efficiency.md");
 }

@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Text;
 using Idd.Factory.LiveTests.Models;
 
 namespace Idd.Factory.LiveTests.Infrastructure;
@@ -74,8 +75,21 @@ public sealed class AgentTraceBuilder(CodexRolloutReader? reader = null)
             status = "protocol-invalid";
         var duration = rollout.StartedAt is not null && analysis.CompletedAt is not null ? (long?)(analysis.CompletedAt.Value - rollout.StartedAt.Value).TotalMilliseconds : null;
         var tokens = analysis.TokenUsage;
-        return new(rollout.ThreadId, rollout.ThreadId == rootThreadId ? null : rollout.ParentThreadId ?? spawnParent, role, workItem, action, status, rollout.StartedAt, analysis.CompletedAt, duration, analysis.TurnCount, analysis.ToolCallCount, tokens?.InputTokens, tokens?.CachedInputTokens, tokens?.OutputTokens, tokens?.ReasoningOutputTokens, tokens?.TotalTokens);
+        var fresh = Fresh(tokens?.InputTokens, tokens?.CachedInputTokens);
+        if (tokens?.InputTokens is not null && tokens.CachedInputTokens is not null && fresh is null)
+            diagnostics.Add(new("TOKEN_COUNTER_INCONSISTENT", "warning", "Cached input tokens exceed total input tokens; fresh input is unavailable.", rollout.ThreadId, rollout.File));
+        var toolCalls = analysis.ToolCalls;
+        var readsByPath = analysis.FileReads.GroupBy(read => read.Path, StringComparer.OrdinalIgnoreCase);
+        var repeatedReads = readsByPath.Sum(group => Math.Max(0, group.Count() - 1));
+        var waitMs = toolCalls.Where(call => call.Tool is "wait" or "wait_agent").Sum(call => call.DurationMs ?? 0);
+        var dispatchText = dispatch ?? string.Empty;
+        var dispatchReferences = analysis.DispatchReferences.Concat(CodexRolloutReader.ReadDispatchReferences(spawnPrompt, rollout.WorkingDirectory)).DistinctBy(reference => reference.Path, StringComparer.OrdinalIgnoreCase).ToArray();
+        return new(rollout.ThreadId, rollout.ThreadId == rootThreadId ? null : rollout.ParentThreadId ?? spawnParent, role, workItem, action, status, rollout.StartedAt, analysis.CompletedAt, duration, analysis.TurnCount, analysis.ToolCallCount, tokens?.InputTokens, tokens?.CachedInputTokens, tokens?.OutputTokens, tokens?.ReasoningOutputTokens, tokens?.TotalTokens,
+            fresh, Percentage(tokens?.CachedInputTokens, tokens?.InputTokens), toolCalls.Count(call => call.IsFailure), toolCalls.Count(call => call.IsRejected), toolCalls.Count(call => call.IsRetryOrFallback), analysis.FileReads.Count, readsByPath.Count(), repeatedReads, analysis.FileReads.Sum(read => read.ReturnedBytes), waitMs, dispatchText.Length, Encoding.UTF8.GetByteCount(dispatchText), analysis.TokenProgression, toolCalls, analysis.FileReads, dispatchReferences);
     }
+
+    private static long? Fresh(long? input, long? cached) => input is not null && cached is not null && cached >= 0 && input >= cached ? input - cached : null;
+    private static double? Percentage(long? part, long? total) => part is not null && total is > 0 && part >= 0 && part <= total ? 100d * part.Value / total.Value : null;
 
     private static string? NormalizeRole(string? value) => value?.Trim().ToLowerInvariant() switch { "factory-root" or "task-decomposer" or "factory-step-coordinator" or "implementer" or "checkpoint-reviewer" or "final-reviewer" => value.Trim().ToLowerInvariant(), _ => null };
     private static string? Role(string? text)

@@ -18,8 +18,8 @@ public static class AgentTraceReportWriter
     public static string WriteTable(AgentTrace trace)
     {
         var ids = UniqueShortIds(trace.Agents);
-        var rows = Ordered(trace).Select(agent => $"| {ids[agent.ThreadId]} | {(agent.ParentThreadId is null ? "—" : ids.GetValueOrDefault(agent.ParentThreadId, EscapeCell(agent.ParentThreadId)))} | {EscapeCell(agent.Role)} | {EscapeCell(agent.WorkItem ?? agent.Action)} | {EscapeCell(agent.Status)} | {(agent.DurationMs is null ? "—" : Duration(agent.DurationMs.Value))} | {agent.TurnCount} | {agent.ToolCallCount} | {Number(agent.InputTokens)} | {Number(agent.CachedInputTokens)} | {Number(agent.OutputTokens)} | {Number(agent.ReasoningOutputTokens)} | {Number(agent.TotalTokens)} |");
-        return "| Agent | Parent | Role | Work item / action | Status | Duration | Turns | Tools | Input tokens | Cached input | Output tokens | Reasoning tokens | Total tokens |\n|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|\n" + string.Join('\n', rows) + "\n";
+        var rows = Ordered(trace).Select(agent => $"| {ids[agent.ThreadId]} | {(agent.ParentThreadId is null ? "—" : ids.GetValueOrDefault(agent.ParentThreadId, EscapeCell(agent.ParentThreadId)))} | {EscapeCell(agent.Role)} | {EscapeCell(agent.WorkItem ?? agent.Action)} | {EscapeCell(agent.Status)} | {(agent.DurationMs is null ? "—" : Duration(agent.DurationMs.Value))} | {agent.TurnCount} | {agent.ToolCallCount} | {Number(agent.InputTokens)} | {Number(agent.CachedInputTokens)} | {Number(agent.FreshInputTokens)} | {Percent(agent.CachedInputPercentage)} | {Number(agent.OutputTokens)} | {Number(agent.ReasoningOutputTokens)} | {Number(agent.TotalTokens)} | {agent.FailedToolCallCount} | {agent.RepeatedFileReadCount} | {Duration(agent.WaitAgentMs)} |");
+        return "| Agent | Parent | Role | Work item / action | Status | Duration | Turns | Tools | Input tokens | Cached input | Fresh input | Cache % | Output tokens | Reasoning tokens | Total tokens | Failed tools | Repeated reads | Wait time |\n|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n" + string.Join('\n', rows) + "\n";
     }
 
     private static IEnumerable<AgentTraceNode> Ordered(AgentTrace trace) => trace.Agents.OrderBy(agent => agent.StartedAt).ThenBy(agent => agent.ThreadId, StringComparer.Ordinal);
@@ -47,4 +47,5 @@ public static class AgentTraceReportWriter
         _ => (tokens / 1_000_000d).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "M tok"
     };
     private static string Number(long? value) => value?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—";
+    private static string Percent(double? value) => value?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "—";
 }
