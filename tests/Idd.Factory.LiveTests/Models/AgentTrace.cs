@@ -34,7 +34,8 @@ public sealed record AgentTraceNode(
     IReadOnlyList<TokenUsageSnapshot>? TokenProgression = null,
     IReadOnlyList<AgentToolCall>? ToolCalls = null,
     IReadOnlyList<AgentFileRead>? FileReads = null,
-    IReadOnlyList<DispatchReferenceSize>? DispatchReferences = null);
+    IReadOnlyList<DispatchReferenceSize>? DispatchReferences = null,
+    AgentTerminalResult? TerminalResult = null);
 
 public sealed record AgentTraceDiagnostic(string Code, string Severity, string Message, string? ThreadId, string? File);
 
@@ -78,3 +79,4 @@ public sealed record AgentToolCall(
 
 public sealed record AgentFileRead(string Path, int Sequence, long ReturnedBytes, int ReturnedCharacters);
 public sealed record DispatchReferenceSize(string Path, int? Characters, int? Utf8Bytes, string Kind);
+public sealed record AgentTerminalResult(string Kind, string? Detail, string? Dependency, string? Reason, string? ResumeWhen);

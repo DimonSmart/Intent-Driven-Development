@@ -84,8 +84,9 @@ public sealed class AgentTraceBuilder(CodexRolloutReader? reader = null)
         var waitMs = toolCalls.Where(call => call.Tool is "wait" or "wait_agent").Sum(call => call.DurationMs ?? 0);
         var dispatchText = dispatch ?? string.Empty;
         var dispatchReferences = analysis.DispatchReferences.Concat(CodexRolloutReader.ReadDispatchReferences(spawnPrompt, rollout.WorkingDirectory)).DistinctBy(reference => reference.Path, StringComparer.OrdinalIgnoreCase).ToArray();
+        var terminalResult = CodexWorkerResultReader.TryRead(rollout, role, diagnostics);
         return new(rollout.ThreadId, rollout.ThreadId == rootThreadId ? null : rollout.ParentThreadId ?? spawnParent, role, workItem, action, status, rollout.StartedAt, analysis.CompletedAt, duration, analysis.TurnCount, analysis.ToolCallCount, tokens?.InputTokens, tokens?.CachedInputTokens, tokens?.OutputTokens, tokens?.ReasoningOutputTokens, tokens?.TotalTokens,
-            fresh, Percentage(tokens?.CachedInputTokens, tokens?.InputTokens), toolCalls.Count(call => call.IsFailure), toolCalls.Count(call => call.IsRejected), toolCalls.Count(call => call.IsRetryOrFallback), analysis.FileReads.Count, readsByPath.Count(), repeatedReads, analysis.FileReads.Sum(read => read.ReturnedBytes), waitMs, dispatchText.Length, Encoding.UTF8.GetByteCount(dispatchText), analysis.TokenProgression, toolCalls, analysis.FileReads, dispatchReferences);
+            fresh, Percentage(tokens?.CachedInputTokens, tokens?.InputTokens), toolCalls.Count(call => call.IsFailure), toolCalls.Count(call => call.IsRejected), toolCalls.Count(call => call.IsRetryOrFallback), analysis.FileReads.Count, readsByPath.Count(), repeatedReads, analysis.FileReads.Sum(read => read.ReturnedBytes), waitMs, dispatchText.Length, Encoding.UTF8.GetByteCount(dispatchText), analysis.TokenProgression, toolCalls, analysis.FileReads, dispatchReferences, terminalResult);
     }
 
     private static long? Fresh(long? input, long? cached) => input is not null && cached is not null && cached >= 0 && input >= cached ? input - cached : null;
