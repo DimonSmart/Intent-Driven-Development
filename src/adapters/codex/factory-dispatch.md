@@ -12,6 +12,9 @@ For every Factory child-agent dispatch:
 - use `fork_context = false`;
 - pass paths to the role, skill, work item, and required references instead of
   copying their contents;
+- use the generated role path `references/roles/<role>.md`; never invent
+  aliases such as `<role>-role.md`;
+- use the `references/project-verification.md` owned by the dispatched skill;
 - read the agent id returned by `spawn_agent`;
 - call `wait_agent` with that id and wait for the terminal result before
   changing Factory state or continuing;
@@ -23,13 +26,13 @@ For every Factory child-agent dispatch:
 - do not treat reading a worker skill in the coordinator context as dispatch;
 - do not perform worker scope in the coordinator context.
 
-Use this prompt shape:
+Use this shape only for `factory-step-coordinator` dispatches:
 
 ```text
 You are executing one IDD Factory role in a separate child-agent context.
 
 Role:
-<role-name>
+factory-step-coordinator
 
 Action:
 <INITIALIZE | CONTINUE>
@@ -37,11 +40,47 @@ Action:
 Workspace:
 <absolute-workspace-path>
 
+Resume request:
+<resume-request, CONTINUE only>
+
 Read and follow:
-- <skill-path>
-- <role-reference-path>
-- <additional-required-reference-paths>
-- <active-work-item-path>
+- <coordinate-step-skill-directory>/SKILL.md
+- <coordinate-step-skill-directory>/references/roles/factory-step-coordinator.md
+- <coordinate-step-skill-directory>/references/project-verification.md
+
+Perform only the scope assigned to this role.
+Follow the result contract defined by the skill.
+Do not perform work owned by another Factory role.
+Return only the compact result required by the skill.
+```
+
+Omit `Resume request` for `INITIALIZE`. Every later coordinator dispatch uses
+`CONTINUE`. For every `CONTINUE`, use exactly:
+
+```text
+Resume request: Continue the current Factory run from persisted state and process exactly one next logical action.
+```
+
+Pass a confirmed blocker answer or explicit cancellation request separately when
+applicable. Never add the next Subtask, checkpoint, final-review, finalization,
+or other phase hint to a `CONTINUE` dispatch.
+
+Use this shape for decomposer, implementation, and review workers:
+
+```text
+You are executing one IDD Factory role in a separate child-agent context.
+
+Role:
+<task-decomposer | implementer | checkpoint-reviewer | final-reviewer>
+
+Workspace:
+<absolute-workspace-path>
+
+Read and follow:
+- <skill-directory>/SKILL.md
+- <skill-directory>/references/roles/<role>.md
+- <skill-directory>/references/project-verification.md
+- <active-work-item-path when applicable>
 
 Perform only the scope assigned to this role.
 Follow the result contract defined by the skill.
@@ -50,17 +89,11 @@ Do not create child agents unless the role explicitly allows agent.spawn.
 Return only the compact result required by the skill.
 ```
 
-Include `Action` only for `factory-step-coordinator`. Use `INITIALIZE` exactly
-once for initial state materialization. Every later coordinator dispatch uses
-`CONTINUE` and supplies no next-item, checkpoint, final-review, or other phase
-hint. Worker roles receive their role and active-work-item references without a
-coordinator action.
-
-For coordinator initialization, include the complete original Factory request,
-methodology version, confirmed clarifications when present, and complete
-validated decomposition result directly in `message`. Do not refer to a
-decomposer result absent from the fresh child context. A `CONTINUE` dispatch
-contains only the persisted-workspace inputs allowed by the canonical skill.
+Do not include `Action` for task-decomposer, implementer, checkpoint-reviewer,
+or final-reviewer. The decomposer additionally receives the complete original
+request and durable-intent path. Coordinator `INITIALIZE` additionally receives
+the complete original Factory request, methodology version, confirmed
+clarifications when present, and complete validated decomposition result.
 
 If `spawn_agent` or `wait_agent` fails terminally, preserve the work item and
 stop as `BLOCKED`. A non-terminal wait response for an active child is not a

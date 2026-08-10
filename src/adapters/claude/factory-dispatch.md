@@ -9,15 +9,25 @@ For every Factory child-agent dispatch:
 
 - start a fresh context for the selected role;
 - provide the role, skill, work item, and required reference paths;
+- use the generated role path `references/roles/<role>.md`; never invent
+  aliases such as `<role>-role.md`;
+- use the `references/project-verification.md` owned by the dispatched skill;
 - await the terminal child result before changing Factory state or continuing;
 - validate the result against the worker skill contract;
 - do not perform worker scope in the coordinator context.
 
 Include `Action` only for `factory-step-coordinator`. Use `INITIALIZE` exactly
 once for initial state materialization. Every later coordinator dispatch uses
-`CONTINUE` and supplies no next-item, checkpoint, final-review, or other phase
-hint. Worker roles receive their role and active-work-item references without a
-coordinator action.
+`CONTINUE`. For every `CONTINUE`, use exactly this resume request:
+
+```text
+Resume request: Continue the current Factory run from persisted state and process exactly one next logical action.
+```
+
+Pass a confirmed blocker answer or explicit cancellation request separately when
+applicable. Never supply a next-item, checkpoint, final-review, finalization, or
+other phase hint. Task-decomposer, implementer, checkpoint-reviewer, and
+final-reviewer receive no `Action` field.
 
 For coordinator initialization, provide the complete original Factory request,
 methodology version, confirmed clarifications when present, and complete

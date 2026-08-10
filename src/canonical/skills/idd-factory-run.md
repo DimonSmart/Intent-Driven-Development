@@ -47,8 +47,10 @@ add a capability-discovery or probing phase.
 
 Before state exists, run intent preflight and create a fresh child agent.
 Assign it the `task-decomposer` role and provide the complete request, workspace
-path, durable-intent path, decomposer skill reference, task-decomposer role
-reference, and project-verification reference required by the worker skill.
+path, durable-intent path, the `idd-factory-decompose-task` skill reference, that
+skill's `references/roles/task-decomposer.md`, and that skill's
+`references/project-verification.md`. Do not provide an `Action` field to the
+decomposer.
 
 Read `references/methodology-version.json` before initialization. Pass its
 `methodologyVersion` to the initializer, which records `Methodology version:`
@@ -64,12 +66,14 @@ to include the same value in `factory-result.json`.
 - `READY`: reject intent-changing execution scope and validate the complete
   result contract. Require every checkpoint `## Covers` entry to use a stable
   `<sequence>-<slug>` Subtask identity without status suffix or extension. Do
-  not write files. Spawn a fresh `factory-step-coordinator`
-  with `Action: INITIALIZE`, the complete original request, methodology version,
+  not write files. Spawn a fresh `factory-step-coordinator` with
+  `Action: INITIALIZE`, the complete original request, methodology version,
   confirmed clarifications when applicable, and the complete validated `READY`
-  result in its dispatch input. Require `Step result: ADVANCED` for `factory
-  initialization`, then discard that context and dispatch a different fresh
-  coordinator in `CONTINUE` mode.
+  result in its dispatch input. Provide the `idd-factory-coordinate-step` skill
+  reference, that skill's `references/roles/factory-step-coordinator.md`, and
+  that skill's `references/project-verification.md`. Require
+  `Step result: ADVANCED` for `factory initialization`, then discard that
+  context and dispatch a different fresh coordinator in `CONTINUE` mode.
 
 The fresh step coordinator appends confirmed later decisions only to
 `## Resolved Clarifications` in `request.md`. Each Subtask is self-contained with optional `run-context.md`;
@@ -81,11 +85,21 @@ terminal checkpoint that duplicates final integrated review.
 
 After successful initialization or a valid resume, create a fresh child agent
 and assign it the `factory-step-coordinator` role. Provide `Action: CONTINUE`,
-the worktree path, resume request, confirmed blocker answer when present, the
-coordinator-step skill reference, factory-step-coordinator role reference, and
-project-verification reference. Do not provide detailed parent history, worker
-reports, test logs, the next Subtask, checkpoint status, final-review status, or
-any other phase information derivable from persisted Factory state.
+the worktree path, the `idd-factory-coordinate-step` skill reference, that
+skill's `references/roles/factory-step-coordinator.md`, and that skill's
+`references/project-verification.md`.
+
+For every continuation, use exactly this resume request:
+
+```text
+Resume request: Continue the current Factory run from persisted state and process exactly one next logical action.
+```
+
+When resuming a blocker, pass the confirmed blocker answer separately. For
+cancellation, pass the explicit cancellation request separately. Do not encode
+next-item, checkpoint, final-review, finalization, or other phase information in
+the resume request. Do not provide detailed parent history, worker reports, test
+logs, or any other information derivable from persisted Factory state.
 
 - On `Step result: ADVANCED`, discard the completed step context and invoke a
   new fresh step context.
@@ -118,9 +132,10 @@ fresh step, which may use verification-only resume when implementation is
 unchanged and evidence is missing.
 
 Cancel only explicitly: warn about worktree changes, then dispatch a fresh step
-coordinator with `Action: CONTINUE` and the cancellation request. That
-coordinator clears only `current/`, preserves `results/`, and does not revert
-code or create a commit message. The read-only root does not clear files itself.
+coordinator with `Action: CONTINUE`, the neutral resume request above, and the
+cancellation request as a separate input. That coordinator clears only
+`current/`, preserves `results/`, and does not revert code or create a commit
+message. The read-only root does not clear files itself.
 
 ## Reporting and Outcomes
 

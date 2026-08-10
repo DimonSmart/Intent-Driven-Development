@@ -75,16 +75,24 @@ exhausted and the information remains required. Persist only `Reason`, `Not veri
   never guess repairs. Completed items are immutable.
 - Activate the lowest ready item and process it in the same step. Only this
   coordinator may rename work-item files or alter their sequence.
-- For implementation, create a fresh child agent, assign it the `implementer`
-  role, and provide the execute-subtask skill reference, implementer role
-  reference, project-verification reference, and active Subtask path. For a
-  Review checkpoint, create a fresh child agent assigned the
-  `checkpoint-reviewer` role and provide its review-checkpoint skill, role,
-  project-verification, and active checkpoint references. For final review,
-  create a fresh child agent assigned the `final-reviewer` role and provide its
-  review-task skill, role, and project-verification references; it reads current
-  state and the actual diff. Apply only a valid returned result contract. Do not
-  duplicate worker scope or perform it here.
+- For implementation, create a fresh child agent assigned the `implementer`
+  role. Provide the `idd-factory-execute-subtask` skill reference, that skill's
+  `references/roles/implementer.md`, that skill's
+  `references/project-verification.md`, and the active Subtask path.
+- For a Review checkpoint, create a fresh child agent assigned the
+  `checkpoint-reviewer` role. Provide the `idd-factory-review-checkpoint` skill
+  reference, that skill's `references/roles/checkpoint-reviewer.md`, that
+  skill's `references/project-verification.md`, and the active checkpoint path.
+- For final review, create a fresh child agent assigned the `final-reviewer`
+  role. Provide the `idd-factory-review-task` skill reference, that skill's
+  `references/roles/final-reviewer.md`, and that skill's
+  `references/project-verification.md`; it reads current state and the actual
+  diff.
+- Do not provide an `Action` field to implementer, checkpoint-reviewer, or
+  final-reviewer dispatches. `Action` belongs only to the
+  `factory-step-coordinator` input contract.
+- Apply only a valid returned worker result contract. Do not duplicate worker
+  scope or perform it here.
 - A Subtask becomes completed only when its required verification is confirmed.
   Otherwise persist its Blocker and return `BLOCKED`.
 - For `NEEDS_REPLAN` or `needs-replan`, verify the prerequisite belongs to the

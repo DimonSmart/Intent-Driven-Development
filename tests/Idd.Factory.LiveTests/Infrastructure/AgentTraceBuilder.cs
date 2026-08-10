@@ -7,7 +7,6 @@ public sealed class AgentTraceBuilder(CodexRolloutReader? reader = null)
 {
     private static readonly Regex RolePattern = new("(?im)^\\s*Role:[ \\t]*(?:\\r?\\n[ \\t]*)?(?<role>[^\\r\\n]+)", RegexOptions.Compiled);
     private static readonly Regex RoleReferencePattern = new("(?i)references[/\\\\]roles[/\\\\](?<role>[a-z0-9-]+)\\.md", RegexOptions.Compiled);
-    private static readonly Regex ActionPattern = new("(?im)^\\s*Action:[ \\t]*(?:\\r?\\n[ \\t]*)?(?<action>[^\\r\\n]+)", RegexOptions.Compiled);
     private static readonly Regex WorkItemFieldPattern = new("(?im)^\\s*Work item:[ \\t]*(?:\\r?\\n[ \\t]*)?(?<item>[^\\r\\n]+)", RegexOptions.Compiled);
     private static readonly Regex WorkItemPattern = new("(?im)(?<path>\\.idd/factory/current/[^\\s`]+\\.active\\.md)", RegexOptions.Compiled);
 
@@ -64,10 +63,15 @@ public sealed class AgentTraceBuilder(CodexRolloutReader? reader = null)
         var role = rollout.ThreadId == rootThreadId ? "factory-root" : NormalizeRole(rollout.MetadataRole) ?? Role(spawnPrompt) ?? Role(analysis.DispatchMessage) ?? "unknown";
         if (role == "unknown") diagnostics.Add(new("TRACE_ROLE_UNKNOWN", "info", "The Factory role could not be determined from rollout metadata or dispatch message.", rollout.ThreadId, rollout.File));
         var dispatch = spawnPrompt ?? analysis.DispatchMessage;
-        var action = role == "factory-step-coordinator" ? Action(dispatch) : null;
+        var action = FactoryDispatchContract.ReadAction(dispatch);
         var workItem = WorkItem(dispatch);
         if (action == "INITIALIZE") workItem = null;
         var status = analysis.Status ?? (interrupted ? "interrupted" : "unknown");
+        var violations = FactoryDispatchContract.Validate(role, dispatch);
+        foreach (var violation in violations)
+            diagnostics.Add(new(violation.Code, "warning", violation.Message, rollout.ThreadId, rollout.File));
+        if (violations.Count > 0)
+            status = "protocol-invalid";
         var duration = rollout.StartedAt is not null && analysis.CompletedAt is not null ? (long?)(analysis.CompletedAt.Value - rollout.StartedAt.Value).TotalMilliseconds : null;
         var tokens = analysis.TokenUsage;
         return new(rollout.ThreadId, rollout.ThreadId == rootThreadId ? null : rollout.ParentThreadId ?? spawnParent, role, workItem, action, status, rollout.StartedAt, analysis.CompletedAt, duration, analysis.TurnCount, analysis.ToolCallCount, tokens?.InputTokens, tokens?.CachedInputTokens, tokens?.OutputTokens, tokens?.ReasoningOutputTokens, tokens?.TotalTokens);
@@ -80,7 +84,6 @@ public sealed class AgentTraceBuilder(CodexRolloutReader? reader = null)
         return NormalizeRole(RolePattern.Match(text).Groups["role"].Value) ??
                NormalizeRole(RoleReferencePattern.Match(text).Groups["role"].Value);
     }
-    private static string? Action(string? text) { var value = ActionPattern.Match(text ?? string.Empty).Groups["action"].Value.Trim(); return value.Length == 0 ? null : value.ToUpperInvariant(); }
     private static string? WorkItem(string? text)
     {
         var field = WorkItemFieldPattern.Match(text ?? string.Empty).Groups["item"].Value.Trim();
