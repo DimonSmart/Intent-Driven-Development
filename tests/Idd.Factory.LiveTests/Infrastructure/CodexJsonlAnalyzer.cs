@@ -22,7 +22,7 @@ public static class CodexJsonlAnalyzer
         return null;
     }
 
-    public static FactoryEvalMetrics Analyze(string eventsPath, TimeSpan wallTime)
+    public static FactoryEvalMetrics Analyze(string eventsPath, TimeSpan wallTime, CodexHomeLocator? codexHomeLocator = null)
     {
         var metrics = new FactoryEvalMetrics { WallTimeMs = (long)wallTime.TotalMilliseconds };
         var calls = new Dictionary<string, ToolCall>(StringComparer.Ordinal);
@@ -40,7 +40,6 @@ public static class CodexJsonlAnalyzer
                 if (type == "thread.started") metrics.RootThreadId ??= FindString(root, "thread_id");
 
                 if (type == "turn.completed") metrics.ModelTurnCount++;
-                metrics.ModelEffective ??= FindString(root, "model");
                 metrics.ReasoningEffortEffective ??= FindString(root, "reasoning_effort") ?? FindString(root, "reasoningEffort");
                 metrics.SessionId ??= FindString(root, "session_id") ?? FindString(root, "sessionId") ?? FindString(root, "thread_id");
 
@@ -66,6 +65,12 @@ public static class CodexJsonlAnalyzer
         var spawnedChildIds = calls.Values.Where(call => call.IsSpawn && call.Completed && !call.Failed).SelectMany(call => call.CreatedAgentIds).ToHashSet(StringComparer.Ordinal);
         var completedChildIds = calls.Values.Where(call => call.IsWait && call.Completed && !call.Failed).SelectMany(call => call.CompletedAgentIds).ToHashSet(StringComparer.Ordinal);
         metrics.CompletedChildAgentCount = spawnedChildIds.Intersect(completedChildIds, StringComparer.Ordinal).LongCount();
+
+        var rootRuntime = CodexRootRuntimeTelemetryReader.TryRead(
+            (codexHomeLocator ?? new CodexHomeLocator()).FindSessionsDirectory(),
+            metrics.RootThreadId);
+        metrics.ModelEffective = rootRuntime.Model ?? "unavailable";
+
         return metrics;
     }
 
