@@ -77,8 +77,13 @@ public static class EfficiencyReportWriter
         List(text, "Important failures", data.Hotspots.FailedOrRejectedCalls);
 
         text.AppendLine("\n## Wait-agent telemetry\n");
-        text.AppendLine("| Agent | Child | Duration | Terminal | Repeated wait number |"); text.AppendLine("|---|---|---:|---|---:|");
-        foreach (var call in data.ToolCalls.Where(call => call.Tool is "wait" or "wait_agent")) text.AppendLine($"| {Short(call.ThreadId)} | {Cell(string.Join(", ", call.ChildThreadIds))} | {Duration(call.DurationMs)} | {Bool(call.IsTerminalWait)} | {call.RepeatedWaitNumber} |");
+        var waitAgentCalls = data.ToolCalls.Where(call => call.Tool == "wait_agent").ToArray();
+        if (waitAgentCalls.Length == 0) text.AppendLine("No structured `wait_agent` calls were observed in per-thread rollout telemetry.");
+        else
+        {
+            text.AppendLine("| Agent | Child | Duration | Terminal | Repeated wait number |"); text.AppendLine("|---|---|---:|---|---:|");
+            foreach (var call in waitAgentCalls) text.AppendLine($"| {Short(call.ThreadId)} | {Cell(string.Join(", ", call.ChildThreadIds))} | {Duration(call.DurationMs)} | {Bool(call.IsTerminalWait)} | {call.RepeatedWaitNumber} |");
+        }
 
         text.AppendLine("\n## Diagnostics\n");
         if (data.Diagnostics.Count == 0) text.AppendLine("None."); else foreach (var diagnostic in data.Diagnostics) text.AppendLine($"- `{diagnostic.Code}` ({diagnostic.Severity}): {diagnostic.Message}");
