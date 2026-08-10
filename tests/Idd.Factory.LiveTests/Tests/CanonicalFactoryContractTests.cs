@@ -12,7 +12,7 @@ public sealed class CanonicalFactoryContractTests
         Assert.Contains("the state is valid and\nfinal-review-ready", content);
         Assert.Contains("return `ADVANCED` with `Next: final review`", content);
         Assert.Contains("The following fresh `CONTINUE` performs it.", content);
-        Assert.Contains("do not require or create a final\n  review work-item file", content);
+        Assert.Contains("Do not require or create a final\n  review work-item file", content);
     }
 
     [Fact]
@@ -34,15 +34,15 @@ public sealed class CanonicalFactoryContractTests
         foreach (var content in new[] { codex, claude })
         {
             Assert.Contains("`task-decomposer`", content);
-            Assert.Contains("`idd-factory-decompose-task`", content);
+            Assert.Contains("idd-factory-decompose-task", content);
             Assert.Contains("`factory-step-coordinator`", content);
-            Assert.Contains("`idd-factory-coordinate-step`", content);
+            Assert.Contains("idd-factory-coordinate-step", content);
             Assert.Contains("`implementer`", content);
-            Assert.Contains("`idd-factory-execute-subtask`", content);
+            Assert.Contains("idd-factory-execute-subtask", content);
             Assert.Contains("`checkpoint-reviewer`", content);
-            Assert.Contains("`idd-factory-review-checkpoint`", content);
+            Assert.Contains("idd-factory-review-checkpoint", content);
             Assert.Contains("`final-reviewer`", content);
-            Assert.Contains("`idd-factory-review-task`", content);
+            Assert.Contains("idd-factory-review-task", content);
         }
 
         Assert.Contains(".agents/skills/idd-factory-coordinate-step", codex);
