@@ -49,6 +49,19 @@ public sealed class CanonicalFactoryContractTests
         Assert.DoesNotContain(".agents/skills/factory-step-coordinator", codex);
     }
 
+    [Fact]
+    public void CodexDispatch_DefinesUnambiguousContinueResumeRequest()
+    {
+        var content = ReadRepoFile("src", "adapters", "codex", "factory-dispatch.md");
+        const string resumeRequest = "Resume request: Continue the current Factory run from persisted state and process exactly one next logical action.";
+
+        Assert.Contains("Use this shape for `factory-step-coordinator` `INITIALIZE` dispatches", content);
+        Assert.Contains("Use this shape for every `factory-step-coordinator` `CONTINUE` dispatch", content);
+        Assert.Contains(resumeRequest, content);
+        Assert.DoesNotContain("<resume-request", content, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Resume request:\n<", content, StringComparison.Ordinal);
+    }
+
     private static string ReadRepoFile(params string[] parts)
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)

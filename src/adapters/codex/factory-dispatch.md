@@ -40,7 +40,7 @@ For every Factory child-agent dispatch:
 - do not treat reading a worker skill in the coordinator context as dispatch;
 - do not perform worker scope in the coordinator context.
 
-Use this shape only for `factory-step-coordinator` dispatches:
+Use this shape for `factory-step-coordinator` `INITIALIZE` dispatches:
 
 ```text
 You are executing one IDD Factory role in a separate child-agent context.
@@ -49,13 +49,10 @@ Role:
 factory-step-coordinator
 
 Action:
-<INITIALIZE | CONTINUE>
+INITIALIZE
 
 Workspace:
 <absolute-workspace-path>
-
-Resume request:
-<resume-request, CONTINUE only>
 
 Read and follow:
 - .agents/skills/idd-factory-coordinate-step/SKILL.md
@@ -68,12 +65,35 @@ Do not perform work owned by another Factory role.
 Return only the compact result required by the skill.
 ```
 
-Omit `Resume request` for `INITIALIZE`. Every later coordinator dispatch uses
-`CONTINUE`. For every `CONTINUE`, use exactly:
+Use this shape for every `factory-step-coordinator` `CONTINUE` dispatch:
 
 ```text
+You are executing one IDD Factory role in a separate child-agent context.
+
+Role:
+factory-step-coordinator
+
+Action:
+CONTINUE
+
+Workspace:
+<absolute-workspace-path>
+
 Resume request: Continue the current Factory run from persisted state and process exactly one next logical action.
+
+Read and follow:
+- .agents/skills/idd-factory-coordinate-step/SKILL.md
+- .agents/skills/idd-factory-coordinate-step/references/roles/factory-step-coordinator.md
+- .agents/skills/idd-factory-coordinate-step/references/project-verification.md
+
+Perform only the scope assigned to this role.
+Follow the result contract defined by the skill.
+Do not perform work owned by another Factory role.
+Return only the compact result required by the skill.
 ```
+
+The `Resume request:` line above is the complete field. Do not prepend another
+`Resume request:` label or wrap the literal value in another field.
 
 Pass a confirmed blocker answer or explicit cancellation request separately when
 applicable. Never add the next Subtask, checkpoint, final-review, finalization,
