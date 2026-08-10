@@ -54,6 +54,7 @@ public sealed class AgentTraceBuilder(CodexRolloutReader? reader = null)
         }
 
         var nodes = included.Values.Select(rollout => ToNode(rollout, GetAnalysis(rollout), rootThreadId, spawnParents.GetValueOrDefault(rollout.ThreadId), spawnPrompts.GetValueOrDefault(rollout.ThreadId), processInterrupted, diagnostics)).ToArray();
+        ApplyProcessToolFailureFallback(nodes, root, rootThreadId, diagnostics);
         return new(2, rootThreadId, nodes, diagnostics);
 
         CodexRolloutAnalysis GetAnalysis(CodexRollout rollout) => analyses.TryGetValue(rollout.ThreadId, out var analysis) ? analysis : analyses[rollout.ThreadId] = (reader ?? new CodexRolloutReader()).Analyze(rollout, diagnostics);
@@ -79,14 +80,61 @@ public sealed class AgentTraceBuilder(CodexRolloutReader? reader = null)
         if (tokens?.InputTokens is not null && tokens.CachedInputTokens is not null && fresh is null)
             diagnostics.Add(new("TOKEN_COUNTER_INCONSISTENT", "warning", "Cached input tokens exceed total input tokens; fresh input is unavailable.", rollout.ThreadId, rollout.File));
         var toolCalls = analysis.ToolCalls;
-        var readsByPath = analysis.FileReads.GroupBy(read => read.Path, StringComparer.OrdinalIgnoreCase);
+        var codeMode = CodexCodeModeTelemetryReader.Read(rollout, diagnostics);
+        var fileReads = analysis.FileReads.Concat(codeMode.FileReads).ToArray();
+        var readsByPath = fileReads.GroupBy(read => read.Path, StringComparer.OrdinalIgnoreCase);
         var repeatedReads = readsByPath.Sum(group => Math.Max(0, group.Count() - 1));
-        var waitMs = toolCalls.Where(call => call.Tool is "wait" or "wait_agent").Sum(call => call.DurationMs ?? 0);
+        var waitMs = toolCalls.Where(call => call.Tool == "wait_agent").Sum(call => call.DurationMs ?? 0);
+        var turnCount = analysis.TurnCount > 0 ? analysis.TurnCount : codeMode.ModelTurns;
         var dispatchText = dispatch ?? string.Empty;
         var dispatchReferences = analysis.DispatchReferences.Concat(CodexRolloutReader.ReadDispatchReferences(spawnPrompt, rollout.WorkingDirectory)).DistinctBy(reference => reference.Path, StringComparer.OrdinalIgnoreCase).ToArray();
         var terminalResult = CodexWorkerResultReader.TryRead(rollout, role, diagnostics);
-        return new(rollout.ThreadId, rollout.ThreadId == rootThreadId ? null : rollout.ParentThreadId ?? spawnParent, role, workItem, action, status, rollout.StartedAt, analysis.CompletedAt, duration, analysis.TurnCount, analysis.ToolCallCount, tokens?.InputTokens, tokens?.CachedInputTokens, tokens?.OutputTokens, tokens?.ReasoningOutputTokens, tokens?.TotalTokens,
-            fresh, Percentage(tokens?.CachedInputTokens, tokens?.InputTokens), toolCalls.Count(call => call.IsFailure), toolCalls.Count(call => call.IsRejected), toolCalls.Count(call => call.IsRetryOrFallback), analysis.FileReads.Count, readsByPath.Count(), repeatedReads, analysis.FileReads.Sum(read => read.ReturnedBytes), waitMs, dispatchText.Length, Encoding.UTF8.GetByteCount(dispatchText), analysis.TokenProgression, toolCalls, analysis.FileReads, dispatchReferences, terminalResult);
+        return new(rollout.ThreadId, rollout.ThreadId == rootThreadId ? null : rollout.ParentThreadId ?? spawnParent, role, workItem, action, status, rollout.StartedAt, analysis.CompletedAt, duration, turnCount, analysis.ToolCallCount, tokens?.InputTokens, tokens?.CachedInputTokens, tokens?.OutputTokens, tokens?.ReasoningOutputTokens, tokens?.TotalTokens,
+            fresh, Percentage(tokens?.CachedInputTokens, tokens?.InputTokens), toolCalls.Count(call => call.IsFailure), toolCalls.Count(call => call.IsRejected), toolCalls.Count(call => call.IsRetryOrFallback), fileReads.Length, readsByPath.Count(), repeatedReads, fileReads.Sum(read => read.ReturnedBytes), waitMs, dispatchText.Length, Encoding.UTF8.GetByteCount(dispatchText), analysis.TokenProgression, toolCalls, fileReads, dispatchReferences, terminalResult);
+    }
+
+    private static void ApplyProcessToolFailureFallback(AgentTraceNode[] nodes, CodexRollout root, string rootThreadId, ICollection<AgentTraceDiagnostic> diagnostics)
+    {
+        var stderrPath = FindEvalProcessStderr(root);
+        var processFailures = CodexProcessToolFailureReader.Read(stderrPath, rootThreadId, diagnostics);
+        if (processFailures is null || nodes.Length == 0) return;
+
+        var observedFailed = nodes.Sum(node => node.FailedToolCallCount);
+        var observedRejected = nodes.Sum(node => node.RejectedToolCallCount);
+        var missingFailed = Math.Max(0, processFailures.FailedToolCalls - observedFailed);
+        var missingRejected = Math.Max(0, processFailures.RejectedToolCalls - observedRejected);
+        if (missingFailed == 0 && missingRejected == 0) return;
+
+        var rootIndex = Array.FindIndex(nodes, node => node.ThreadId == rootThreadId);
+        if (rootIndex < 0) return;
+        nodes[rootIndex] = nodes[rootIndex] with
+        {
+            FailedToolCallCount = nodes[rootIndex].FailedToolCallCount + missingFailed,
+            RejectedToolCallCount = nodes[rootIndex].RejectedToolCallCount + missingRejected
+        };
+        diagnostics.Add(new(
+            "PROCESS_TOOL_FAILURE_FALLBACK",
+            "info",
+            $"Process stderr supplied {missingFailed} nested tool failure(s) and {missingRejected} rejection(s) not represented as structured rollout tool results.",
+            rootThreadId,
+            stderrPath));
+    }
+
+    private static string? FindEvalProcessStderr(CodexRollout root)
+    {
+        if (string.IsNullOrWhiteSpace(root.WorkingDirectory)) return null;
+        try
+        {
+            var workspace = new DirectoryInfo(root.WorkingDirectory);
+            var runDirectory = workspace.Parent;
+            if (runDirectory is null || !File.Exists(Path.Combine(runDirectory.FullName, "run-manifest.json"))) return null;
+            var stderr = Path.Combine(runDirectory.FullName, "stderr.log");
+            return File.Exists(stderr) ? stderr : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     private static long? Fresh(long? input, long? cached) => input is not null && cached is not null && cached >= 0 && input >= cached ? input - cached : null;
