@@ -11,6 +11,11 @@ Use this skill to check whether the current implementation satisfies current
 This skill compares implementation evidence with current specifications and
 classifies differences. It does not silently change specifications or code.
 
+## Required Reference
+
+Read `references/project-verification.md` before resolving verification checks
+or repository/platform fallback.
+
 ## Required Input
 
 The request must provide at least one concrete check focus:
@@ -158,7 +163,7 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
    - create a spike if the correct intent requires research.
 
 9. Do not apply fixes unless the user explicitly asks for them.
-10. When repository commands are needed, resolve `.idd/verification.md` with
+10. When repository commands are needed, resolve `.idd/verification.yaml` with
     context `direct` for the focused changed paths. Run only assigned automatic
     checks; request confirmation when required; and keep user instructions
     `Not verified` until confirmed. If no policy exists, report the

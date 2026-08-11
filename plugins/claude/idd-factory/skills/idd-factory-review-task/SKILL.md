@@ -3,10 +3,15 @@ name: idd-factory-review-task
 description: Independently review the complete result of the Factory Task.
 context: fork
 agent: Explore
-allowed-tools: Read Glob Grep Bash
+allowed-tools: [Read, Glob, Grep, Bash]
 ---
 
 # idd-factory-review-task
+
+## Required Reference
+
+Read `references/project-verification.md` before resolving assigned checks or
+repository/platform fallback.
 
 The final reviewer owns verification for context `final` over the complete
 Factory diff. Before producing a verdict, resolve the current final-policy
@@ -32,7 +37,7 @@ active, or blocked item exists. If the state violates these conditions, return
 
 ## Final Verification Procedure
 
-1. Resolve checks selected by the current `.idd/verification.md` for context
+1. Resolve checks selected by the current `.idd/verification.yaml` for context
    `final` and the complete Factory diff.
 2. Reuse existing evidence only when it is conclusive and still applies to the
    current check definition and complete diff.

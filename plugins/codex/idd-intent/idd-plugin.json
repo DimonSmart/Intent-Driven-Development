@@ -1,8 +1,10 @@
 {
-  "version": "2.0.25",
+  "version": "2.0.26",
   "platform": "codex",
   "dependencies": [],
   "roles": [],
+  "roleDefinitions": [],
+  "skillRoleBindings": [],
   "assets": [
     {
       "source": "src/canonical/project-files/intent",

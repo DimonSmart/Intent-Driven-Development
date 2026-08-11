@@ -2,6 +2,9 @@
 
 Factory role prompt used by `idd-factory-execute-subtask`.
 
+Follow the skill's `project-verification.md` reference when resolving assigned
+checks or repository/platform fallback.
+
 ## Responsibility
 
 Implement exactly one active implementation-only Subtask; current
@@ -36,3 +39,14 @@ Implement exactly one active implementation-only Subtask; current
   required verification evidence, or a non-intent user decision.
 - Do not choose items, rename Factory files, broaden scope, update intent, perform
   review, clean state, or prepare a commit message.
+- Do not create child agents or delegate work further.
+
+## Available tools
+
+This role may use only:
+- file.read
+- file.write
+- command.execute
+Do not substitute unavailable tools with another mechanism.
+If the required operation cannot be completed with these tools, return the
+role-specific blocked result.

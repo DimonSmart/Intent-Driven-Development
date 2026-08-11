@@ -4,13 +4,18 @@ description: Independently review one active Review checkpoint across its covere
 context: fork
 agent: Explore
 argument-hint: "[active review-checkpoint path]"
-allowed-tools: Read Glob Grep Bash
+allowed-tools: [Read, Glob, Grep, Bash]
 ---
 
 # idd-factory-review-checkpoint
 
+## Required Reference
+
+Read `references/project-verification.md` before resolving assigned checks or
+repository/platform fallback.
+
 For the active checkpoint, resolve its recorded IDs from current
-`.idd/verification.md` using context `checkpoint` and the aggregate `Covers`
+`.idd/verification.yaml` using context `checkpoint` and the aggregate `Covers`
 scope. Required unverified checks prevent approval. Do not run final checks.
 
 ## Purpose

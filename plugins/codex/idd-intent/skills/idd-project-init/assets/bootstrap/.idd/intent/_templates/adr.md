@@ -6,7 +6,8 @@ Proposed | Accepted | Superseded | Rejected
 
 ## Context
 
-Describe the decision context.
+Describe the decision context. Include known future intent only when it
+materially affects this decision.
 
 ## Decision
 
@@ -18,7 +19,8 @@ List alternatives and why they were not chosen.
 
 ## Consequences
 
-Describe accepted tradeoffs and follow-up constraints.
+Describe accepted tradeoffs, follow-up constraints, and important future options
+that this decision keeps open or closes.
 
 ## Supersedes
 

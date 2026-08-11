@@ -82,7 +82,7 @@ Classification:
 ```
 
 Use `verification-configuration` when the user asks to create or deliberately
-update project-owned `.idd/verification.md` rules. Do not use it for running
+update project-owned `.idd/verification.yaml` rules. Do not use it for running
 checks, fixing tests, or changing product acceptance criteria.
 
 Use `intent-bootstrap` when the repository already contains implementation but

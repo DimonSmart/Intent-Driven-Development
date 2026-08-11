@@ -28,7 +28,7 @@ Classify the request by the thing that changes:
 - `raw imported knowledge`: external or existing product knowledge already
   expressed in documents or other sources needs to be imported into IDD intent.
 - `project initialization`: the project needs an `.idd/intent/` structure.
-- `project verification configuration`: `.idd/verification.md` needs creation or
+- `project verification configuration`: `.idd/verification.yaml` needs creation or
   deliberate update.
 - `unknown`: the request does not provide enough information to choose safely.
 
@@ -130,7 +130,7 @@ routing or intent work.
 
 - Current `IDD-NNNN` documents directly under `.idd/intent/` are normative
   product intent.
-- `.idd/verification.md` is project-owned operational configuration, not product
+- `.idd/verification.yaml` is project-owned operational configuration, not product
   intent.
 - Git stores history.
 - Add, modify, and remove apply only to product truth changes.

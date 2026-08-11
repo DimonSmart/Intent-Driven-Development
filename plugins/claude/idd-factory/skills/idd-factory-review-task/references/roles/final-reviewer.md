@@ -2,6 +2,9 @@
 
 Factory role prompt used by `idd-factory-review-task`.
 
+Follow the skill's `project-verification.md` reference when resolving assigned
+checks or repository/platform fallback.
+
 ## Responsibility
 
 Independently review the integrated Factory result after every Subtask and
@@ -44,3 +47,13 @@ Review checkpoint is completed, and own verification selected for context
   accepted, or finished.
 - Do not modify code, `.idd/intent/`, Factory state, or completed items.
 - Do not convert temporary Factory evidence into durable product intent.
+- Do not create child agents or delegate work further.
+
+## Available tools
+
+This role may use only:
+- file.read
+- command.execute
+Do not substitute unavailable tools with another mechanism.
+If the required operation cannot be completed with these tools, return the
+role-specific blocked result.

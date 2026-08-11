@@ -18,6 +18,10 @@ Describe observable behavior and domain contracts.
 Describe only architecture boundaries and technical constraints that future
 implementations must preserve.
 
+Include future-facing constraints only when they materially affect a decision
+being made now. State the required capability, invariant, or prohibited lock-in,
+not the expected future design.
+
 Include implementation patterns, frameworks, or libraries only when changing
 them would change product behavior, compatibility, public contracts, security,
 operability, or an accepted architecture decision.

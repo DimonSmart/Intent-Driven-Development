@@ -1,8 +1,9 @@
 {
-  "version": "2.0.25",
+  "version": "2.0.26",
   "platform": "claude",
   "dependencies": [],
   "roles": [],
+  "roleDefinitions": [],
   "assets": [
     {
       "source": "src/canonical/project-files/intent",

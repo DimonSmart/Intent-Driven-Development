@@ -5,6 +5,11 @@ description: Decompose one Factory Task into ordered Subtasks and Review checkpo
 
 # idd-factory-decompose-task
 
+## Required Reference
+
+Read `references/project-verification.md` before resolving policy checks or
+repository/platform fallback.
+
 ## Purpose
 
 Produce the smallest safe ordered decomposition for one Factory Task defined by
@@ -26,6 +31,20 @@ state.
   decompose the complete original request again.
 - Never create a Subtask or Review checkpoint for editing, linting, auditing, or
   otherwise changing `.idd/intent/`.
+- Treat explicit execution structure in the original Factory Task as authoritative
+  execution constraints. If the request explicitly defines stages, ordering,
+  dependencies, or review/approval boundaries, preserve them in the ordered work
+  items.
+- The decomposer may refine work inside explicit execution boundaries, but must
+  not reorder, merge, remove, or move work across them. If an explicit structure
+  conflicts with a safety or methodology invariant, do not silently rewrite it;
+  return the applicable clarification or blocker result.
+- An explicitly required Review checkpoint before a later Subtask is an execution
+  gate: place that checkpoint before the later Subtask in the work-item sequence,
+  and never schedule dependent work ahead of the gate.
+- Apply decomposition heuristics such as minimizing or grouping Review checkpoints
+  only where the original request leaves that execution choice open. Those
+  heuristics never override an explicit execution boundary.
 - Order independently executable outcomes, not files. Each Subtask must
   be completable and locally verifiable without implementation from later tasks.
 - Keep Subtasks small enough for one bounded worker context.
@@ -42,10 +61,19 @@ state.
     review.
 - Every checkpoint must cover a contiguous sequence of preceding Subtasks
   since the previous checkpoint and must not cover another checkpoint.
+- Identify every covered Subtask by its stable `<sequence>-<slug>` identity.
+  A `## Covers` entry must never include `.ready`, `.active`, `.completed`, or
+  `.blocked`, and must not include a `.md` extension; status filenames change
+  during execution and are not stable references.
 - Produce optional compact `run-context.md` only when multiple work items share
   substantial constraints, assumptions, or references.
 - Put every Subtask-specific requirement and preservation boundary in its owning
   Subtask. Put checkpoint-specific risks and evidence in the checkpoint.
+- When a Subtask depends on behavior established by an earlier Subtask, state
+  the concrete public contract or invariant that it may rely on and must
+  preserve. The dependent Subtask must remain self-contained and must not
+  require its worker to read the earlier work item or infer the dependency from
+  Factory history.
 - Make every Subtask understandable and implementable without reading the
   complete request or other work-item files.
 - Do not copy the complete request into `run-context.md` or repeat it across
@@ -56,12 +84,20 @@ state.
 - Use the Subtask, Review checkpoint, and run-context formats from
   `idd-factory-run`.
 - Do not create Factory state, product intent, code, or tests.
-- Read `.idd/verification.md` when present before producing items. Resolve
+- Read `.idd/verification.yaml` when present before producing items. Resolve
   `subtask` checks for each Subtask and `checkpoint` checks for each
   Review checkpoint from its complete scope; record stable check IDs only, never
   commands, timeout, or instructions. Put shared costly checks at checkpoint or
-  final instead of every subtask. Policy errors required by the run block
-  planning before Factory state exists.
+  final instead of every subtask. Invalid or unresolved verification-policy
+  entries from `.idd/verification.yaml` block planning before Factory state is
+  created.
+- If a read-only command is rejected by execution policy or fails because of its
+  form, make at most two narrower, simpler alternatives: split a compound
+  command, remove recursion or wildcards, then read a specific directory or
+  file. An equivalent read-only tool is allowed. Do not repeat a command,
+  elevate permissions, change approval or sandbox policy, or write. Return
+  `BLOCKED` only after required information remains unavailable after those
+  alternatives; record only `Reason`, `Not verified`, and `Resume when`.
 
 ## Results
 
@@ -70,5 +106,7 @@ Return `READY`, `NEEDS_CLARIFICATION`, `INTENT_REQUIRED`, `FOCUSED_HANDOFF`, or
 
 For `READY`, include relevant intent, repository areas, a work slug, optional
 `run-context.md` Markdown, and all ordered Subtask and Review checkpoint
-Markdown. Return no partial items with clarification and no statuses, timestamps,
-agents, attempts, or speculative requirements.
+Markdown. Each checkpoint `## Covers` list uses only stable
+`<sequence>-<slug>` Subtask identities. Return no partial items with
+clarification and no statuses, timestamps, agents, attempts, or speculative
+requirements.

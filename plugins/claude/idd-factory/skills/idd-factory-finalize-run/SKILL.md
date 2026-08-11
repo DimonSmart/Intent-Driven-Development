@@ -1,9 +1,15 @@
 ---
 name: idd-factory-finalize-run
 description: Create the commit-message handoff for an approved Task result and safely finalize the current Factory run.
+allowed-tools: [Read, Glob, Grep, Edit, Write, Task, TaskOutput]
 ---
 
 # idd-factory-finalize-run
+
+## Required Reference
+
+Read `references/project-verification.md` before interpreting Factory
+verification evidence during finalization.
 
 ## Purpose
 
@@ -29,10 +35,22 @@ UTC time once at finalization in `yyyy-MM-dd_HH-mm-ssZ` format and write:
 .idd/factory/results/<work-slug>_<timestamp>/commit-message.md
 ```
 
+Write `factory-result.json` beside the commit message. It must be a valid flat
+JSON object containing `schemaVersion`, `methodologyVersion`, `factoryOutcome`,
+`subtaskCount`, `completedSubtaskCount`, `reviewCheckpointCount`,
+`completedReviewCheckpointCount`, `correctiveSubtaskCount`, `blockedItemCount`,
+`incompleteItemCount`, `finalReviewVerdict`, `verificationStatus`, and
+`commitMessagePath`. Take the methodology version from the `Methodology version:`
+field in `current/request.md`.
+
+For a successfully verified completed Factory run, `verificationStatus` must be
+exactly `"passed"`. If successful verification cannot be confirmed, do not
+create `factoryOutcome: COMPLETED`.
+
 Never overwrite a result directory. If the complete timestamped name exists,
 append `-2`, then `-3`, and so on.
 
-The result directory contains only `commit-message.md`. Do not copy the request,
+The result directory contains only `commit-message.md` and `factory-result.json`. Do not copy the request,
 Subtasks, checkpoints, reviews, or other state into `results/`.
 
 ## Commit Message
@@ -66,11 +84,13 @@ claims not supported by the diff.
 
 1. Create the collision-safe result directory.
 2. Write and verify `commit-message.md` completely.
-3. Only after the result exists and is readable, clear the contents of
+3. Write and parse `factory-result.json`, including its repository-relative
+   `commitMessagePath`; stop without cleanup if either result file is invalid.
+4. Only after both result files exist and are readable, clear the contents of
    `.idd/factory/current/`.
-4. Leave the empty `current/`, all of `results/`, and `.idd/factory/.gitignore`
+5. Leave the empty `current/`, all of `results/`, and `.idd/factory/.gitignore`
    in place.
-5. Report the exact commit-message path and that current state was cleared.
+6. Report the exact result directory and that current state was cleared.
 
 If result creation fails, leave `current/` unchanged so the run can resume.
 Factory never commits, pushes, creates a pull request, or deletes results.
