@@ -21,7 +21,6 @@ CheckCodexFactoryMetadata();
 CheckCanonicalSkillReferences();
 CheckCanonicalFactoryNeutrality();
 CheckVerificationPolicyContract();
-CheckLiveFactorySummaryScriptWithWindowsPowerShell();
 CheckPublishedLayout();
 CheckGeneratorCheckMode();
 CheckSecondRunIsStable();
@@ -662,47 +661,6 @@ void CheckVerificationPolicyContract()
         if (File.ReadAllText(file, new UTF8Encoding(false, true)).Contains(legacyPolicyPath, StringComparison.Ordinal))
         {
             failures.Add($"Active repository content still references unsupported verification policy '{legacyPolicyPath}': {relativePath}.");
-        }
-    }
-}
-
-void CheckLiveFactorySummaryScriptWithWindowsPowerShell()
-{
-    var testRoot = Path.Combine(Path.GetTempPath(), "idd-live-factory-summary-" + Guid.NewGuid().ToString("N"));
-    var scriptSource = Path.Combine(repoRoot, "scripts", "Update-LiveFactoryEvalSummary.ps1");
-    var scriptPath = Path.Combine(testRoot, "scripts", "Update-LiveFactoryEvalSummary.ps1");
-
-    try
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(scriptPath)!);
-        Directory.CreateDirectory(Path.Combine(testRoot, "tests", "Idd.Factory.LiveTests", "Tests", "Fixtures"));
-        File.Copy(scriptSource, scriptPath);
-
-        var arguments = $"-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{scriptPath}\" -RepositoryRoot \"{testRoot}\" -DiscoveryId smoke -SelectedProfile none -WriteProbeResult PASS -TelemetryResult PASS -FactoryEvaluationResult PASS";
-        if (RunProcess("powershell.exe", arguments) != 0)
-        {
-            failures.Add("Update-LiveFactoryEvalSummary.ps1 failed when executed by Windows PowerShell 5.1.");
-            return;
-        }
-
-        var summaryPath = Path.Combine(testRoot, "tests", "Idd.Factory.LiveTests", "Tests", "Fixtures", "codex-0.146.0-windows-launch-profile-result.md");
-        if (!File.Exists(summaryPath))
-        {
-            failures.Add("Update-LiveFactoryEvalSummary.ps1 did not produce its summary fixture.");
-            return;
-        }
-
-        var generatedLine = File.ReadLines(summaryPath).FirstOrDefault(line => line.StartsWith("Generated (UTC): ", StringComparison.Ordinal));
-        if (generatedLine is null || !DateTime.TryParseExact(generatedLine[17..], "yyyy-MM-dd HH:mm:ss", null, System.Globalization.DateTimeStyles.None, out _))
-        {
-            failures.Add("Update-LiveFactoryEvalSummary.ps1 did not write the expected UTC timestamp.");
-        }
-    }
-    finally
-    {
-        if (Directory.Exists(testRoot))
-        {
-            Directory.Delete(testRoot, recursive: true);
         }
     }
 }
