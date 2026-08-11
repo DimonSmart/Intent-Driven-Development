@@ -17,8 +17,4 @@
     <Compile Remove="Cases/**/*.cs" />
     <None Include="Cases/**/*" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="..\..\tools\CodexLaunchExperiment\ExperimentPrimitives.cs" Link="CodexLaunchExperiment\ExperimentPrimitives.cs" />
-    <Compile Include="..\..\tools\CodexLaunchExperiment\CodexDiscovery.cs" Link="CodexLaunchExperiment\CodexDiscovery.cs" />
-  </ItemGroup>
 </Project>
