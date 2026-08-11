@@ -30,10 +30,12 @@ For every Factory child-agent dispatch:
 - use the exact binding table above; never invent aliases or substitute the role
   name for the skill directory;
 - read the agent id returned by `spawn_agent`;
-- call `wait_agent` with that id and wait for the terminal result before
-  changing Factory state or continuing;
-- if a wait returns while the child is still active, call `wait_agent` again;
-  an active child is not a timeout failure or terminal result;
+- call `wait_agent` with that id and `timeout_ms = 3600000`, and wait for the
+  terminal result before changing Factory state or continuing;
+- use the long runtime wait instead of short polling intervals;
+- if a wait returns while the child is still active, call `wait_agent` again
+  with the same child id and timeout; an active child is not a timeout failure or
+  terminal result;
 - do not impose a coordinator-local wait deadline; only an external cancellation
   or the enclosing Factory-attempt deadline may interrupt an active child;
 - validate the returned result against the worker skill contract;

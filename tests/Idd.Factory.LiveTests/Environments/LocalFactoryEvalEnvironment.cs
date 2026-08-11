@@ -65,7 +65,9 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
             "--ignore-rules",
             "--enable", "multi_agent", "--disable", "multi_agent_v2",
             "--disable", "plugins", "--disable", "apps", "--disable", "browser_use", "--disable", "code_mode_host",
-            "-c", "agents.max_depth=2", "-c", "agents.max_threads=10", "-c", "mcp_servers={}", "-c", "approval_policy=never", "-c", $"model_reasoning_effort={options.ReasoningEffort}"
+            "-c", "agents.max_depth=2", "-c", "agents.max_threads=10",
+            "-c", "features.code_mode.direct_only_tool_namespaces=[\"multi_agent_v1\"]",
+            "-c", "mcp_servers={}", "-c", "approval_policy=never", "-c", $"model_reasoning_effort={options.ReasoningEffort}"
         ]);
         if (!profile.IgnoreUserConfig)
             foreach (var serverName in FindConfiguredMcpServerNames(userConfigPath))
