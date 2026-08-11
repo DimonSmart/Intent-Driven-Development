@@ -24,6 +24,13 @@ checkpoints.
 - Return `INTENT_REQUIRED` instead of inventing missing durable behavior; return
   no partial work-item plan.
 - Never create Factory work for changing `.idd/intent/`.
+- Treat explicitly defined execution stages, ordering, dependencies, and
+  review/approval boundaries in the supplied Factory Task as hard constraints.
+- Refine work inside those explicit boundaries when useful, but never reorder,
+  merge, remove, or move work across them. An explicitly required checkpoint
+  before later work must remain before that work in the ordered sequence.
+- Apply checkpoint-minimization and grouping heuristics only where the supplied
+  request leaves the execution structure open.
 - Define small self-contained Subtasks with goal, context, scope,
   requirements, done conditions, verification, and concrete preservation
   boundaries or dependencies when needed.

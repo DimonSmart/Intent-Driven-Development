@@ -26,6 +26,20 @@ state.
   decompose the complete original request again.
 - Never create a Subtask or Review checkpoint for editing, linting, auditing, or
   otherwise changing `.idd/intent/`.
+- Treat explicit execution structure in the original Factory Task as authoritative
+  execution constraints. If the request explicitly defines stages, ordering,
+  dependencies, or review/approval boundaries, preserve them in the ordered work
+  items.
+- The decomposer may refine work inside explicit execution boundaries, but must
+  not reorder, merge, remove, or move work across them. If an explicit structure
+  conflicts with a safety or methodology invariant, do not silently rewrite it;
+  return the applicable clarification or blocker result.
+- An explicitly required Review checkpoint before a later Subtask is an execution
+  gate: place that checkpoint before the later Subtask in the work-item sequence,
+  and never schedule dependent work ahead of the gate.
+- Apply decomposition heuristics such as minimizing or grouping Review checkpoints
+  only where the original request leaves that execution choice open. Those
+  heuristics never override an explicit execution boundary.
 - Order independently executable outcomes, not files. Each Subtask must
   be completable and locally verifiable without implementation from later tasks.
 - Keep Subtasks small enough for one bounded worker context.
