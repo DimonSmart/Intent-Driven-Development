@@ -5,16 +5,30 @@ prompt. A role is not a native custom agent type. Use the concrete runtime
 operations `spawn_agent` and `wait_agent`; the adapter has already mapped the
 canonical capabilities, so do not probe or remap them at runtime.
 
+Resolve Factory role skills relative to the Factory skill that is currently
+executing. Let `<factory-skills-root>` be the parent directory of that skill's
+directory: for example, if the loaded skill is
+`<factory-skills-root>/idd-factory-run/SKILL.md` or
+`<factory-skills-root>/idd-factory-coordinate-step/SKILL.md`, use that exact
+`<factory-skills-root>` for all role bindings below.
+
+Resolve the role skill and its required static references to absolute filesystem
+paths before dispatching the child agent. Do not resolve them relative to the
+workspace or repository root, and do not assume a fixed project-local
+`.agents/skills` location. The same rule applies when generated skills are copied
+into a project-local test workspace: their actual loaded skill location naturally
+becomes the Factory skills root.
+
 Use these exact generated Codex role-to-skill bindings. Never derive a skill
 directory from the role name:
 
 | Role | Skill directory |
 | --- | --- |
-| `task-decomposer` | `.agents/skills/idd-factory-decompose-task` |
-| `factory-step-coordinator` | `.agents/skills/idd-factory-coordinate-step` |
-| `implementer` | `.agents/skills/idd-factory-execute-subtask` |
-| `checkpoint-reviewer` | `.agents/skills/idd-factory-review-checkpoint` |
-| `final-reviewer` | `.agents/skills/idd-factory-review-task` |
+| `task-decomposer` | `<factory-skills-root>/idd-factory-decompose-task` |
+| `factory-step-coordinator` | `<factory-skills-root>/idd-factory-coordinate-step` |
+| `implementer` | `<factory-skills-root>/idd-factory-execute-subtask` |
+| `checkpoint-reviewer` | `<factory-skills-root>/idd-factory-review-checkpoint` |
+| `final-reviewer` | `<factory-skills-root>/idd-factory-review-task` |
 
 For each binding, the role reference is exactly
 `<skill-directory>/references/roles/<role>.md` and the verification reference is
@@ -57,9 +71,9 @@ Workspace:
 <absolute-workspace-path>
 
 Read and follow:
-- .agents/skills/idd-factory-coordinate-step/SKILL.md
-- .agents/skills/idd-factory-coordinate-step/references/roles/factory-step-coordinator.md
-- .agents/skills/idd-factory-coordinate-step/references/project-verification.md
+- <factory-skills-root>/idd-factory-coordinate-step/SKILL.md
+- <factory-skills-root>/idd-factory-coordinate-step/references/roles/factory-step-coordinator.md
+- <factory-skills-root>/idd-factory-coordinate-step/references/project-verification.md
 
 Perform only the scope assigned to this role.
 Follow the result contract defined by the skill.
@@ -85,15 +99,18 @@ Workspace:
 Resume request: Continue the current Factory run from persisted state and process exactly one next logical action.
 
 Read and follow:
-- .agents/skills/idd-factory-coordinate-step/SKILL.md
-- .agents/skills/idd-factory-coordinate-step/references/roles/factory-step-coordinator.md
-- .agents/skills/idd-factory-coordinate-step/references/project-verification.md
+- <factory-skills-root>/idd-factory-coordinate-step/SKILL.md
+- <factory-skills-root>/idd-factory-coordinate-step/references/roles/factory-step-coordinator.md
+- <factory-skills-root>/idd-factory-coordinate-step/references/project-verification.md
 
 Perform only the scope assigned to this role.
 Follow the result contract defined by the skill.
 Do not perform work owned by another Factory role.
 Return only the compact result required by the skill.
 ```
+
+The `<factory-skills-root>` entries in dispatch messages are placeholders for
+resolved absolute paths. Never pass the literal placeholder to a child agent.
 
 The `Resume request:` line above is the complete field. Do not prepend another
 `Resume request:` label or wrap the literal value in another field.
