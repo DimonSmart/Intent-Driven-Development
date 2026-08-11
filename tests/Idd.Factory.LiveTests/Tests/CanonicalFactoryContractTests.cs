@@ -1,3 +1,4 @@
+using Idd.Factory.LiveTests.Infrastructure;
 using Xunit;
 
 namespace Idd.Factory.LiveTests.Tests;
@@ -5,43 +6,43 @@ namespace Idd.Factory.LiveTests.Tests;
 public sealed class CanonicalFactoryContractTests
 {
     [Fact]
-    public void CoordinateStep_DefinesImplicitFinalReviewTransition()
+    public void RootRunner_DelegatesInitializationToStepCoordinator()
+    {
+        var content = ReadRepoFile("src", "canonical", "skills", "idd-factory-run.md");
+
+        Assert.Contains("Action: INITIALIZE", content);
+        Assert.Contains("factory initialization", content);
+        Assert.DoesNotContain("create `current/request.md`", content);
+        Assert.DoesNotContain("create `current/` and `results/`", content);
+    }
+
+    [Fact]
+    public void RootRunner_IsReadOnlyAndDoesNotOwnFactoryStateWrites()
+    {
+        var content = ReadRepoFile("src", "canonical", "skills", "idd-factory-run.md");
+
+        Assert.Contains("The root context is read-only", content);
+        Assert.Contains("must never modify repository or Factory-state files", content);
+        Assert.DoesNotContain("write `request.md`", content, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("rename work-item", content, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CoordinatorOwnsInitializationAndStepTransitions()
     {
         var content = ReadRepoFile("src", "canonical", "skills", "idd-factory-coordinate-step.md");
 
-        Assert.Contains("the state is valid and\nfinal-review-ready", content);
-        Assert.Contains("return `ADVANCED` with `Next: final review`", content);
-        Assert.Contains("The following fresh `CONTINUE` performs it.", content);
-        Assert.Contains("Do not require or create a final\n  review work-item file", content);
+        Assert.Contains("Action: INITIALIZE", content);
+        Assert.Contains("Action: CONTINUE", content);
+        Assert.Contains("Create `.idd/factory/current/` and `.idd/factory/results/`", content);
+        Assert.Contains("activate the lowest `ready` item", content);
     }
 
     [Fact]
-    public void CoordinateStep_DefinesMutationRecoveryAndStructuralUniqueness()
-    {
-        var content = ReadRepoFile("src", "canonical", "skills", "idd-factory-coordinate-step.md");
-
-        Assert.Contains("re-list `current/` and reread the affected file", content);
-        Assert.Contains("Never repeat the same mutation until observed state proves it\n  did not already take effect", content);
-        Assert.Contains("at most one `## Completion` section and at most one\n  `## Blocker` section", content);
-    }
-
-    [Fact]
-    public void ExecuteSubtask_DistinguishesInheritedBaselineFromActiveDelta()
-    {
-        var content = ReadRepoFile("src", "canonical", "skills", "idd-factory-execute-subtask.md");
-
-        Assert.Contains("worktree changes already present when\n  this worker starts as inherited baseline", content);
-        Assert.Contains("do not by themselves constitute scope escape", content);
-        Assert.Contains("changes newly introduced or newly required by\n  the active Subtask", content);
-        Assert.Contains("not against the accumulated working-tree diff", content);
-    }
-
-    [Fact]
-    public void DecomposeTask_MakesDependentSubtasksSelfContained()
+    public void DecomposerRequiresSelfContainedSubtasks()
     {
         var content = ReadRepoFile("src", "canonical", "skills", "idd-factory-decompose-task.md");
 
-        Assert.Contains("depends on behavior established by an earlier Subtask", content);
         Assert.Contains("concrete public contract or invariant", content);
         Assert.Contains("must remain self-contained", content);
         Assert.Contains("must not\n  require its worker to read the earlier work item", content);
@@ -67,8 +68,9 @@ public sealed class CanonicalFactoryContractTests
             Assert.Contains("idd-factory-review-task", content);
         }
 
-        Assert.Contains(".agents/skills/idd-factory-coordinate-step", codex);
-        Assert.DoesNotContain(".agents/skills/factory-step-coordinator", codex);
+        Assert.Contains("<factory-skills-root>/idd-factory-coordinate-step", codex);
+        Assert.DoesNotContain(".agents/skills/idd-factory-coordinate-step", codex);
+        Assert.DoesNotContain("<factory-skills-root>/factory-step-coordinator", codex);
     }
 
     [Fact]
@@ -84,15 +86,24 @@ public sealed class CanonicalFactoryContractTests
         Assert.DoesNotContain("Resume request:\n<", content, StringComparison.Ordinal);
     }
 
-    private static string ReadRepoFile(params string[] parts)
+    [Fact]
+    public void StepCoordinator_DoesNotDuplicateWorkerScope()
     {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            var path = Path.Combine([directory.FullName, .. parts]);
-            if (File.Exists(path))
-                return File.ReadAllText(path).ReplaceLineEndings("\n");
-        }
+        var content = ReadRepoFile("src", "canonical", "skills", "idd-factory-coordinate-step.md");
 
-        throw new InvalidOperationException($"Could not locate repository file: {Path.Combine(parts)}");
+        Assert.Contains("Do not perform implementation, checkpoint review, or final review in this coordinator context", content);
+        Assert.Contains("worker role by passing its skill and role-reference paths", content);
     }
+
+    [Fact]
+    public void Finalizer_IsCoordinatorOwnedNotRootOwned()
+    {
+        var content = ReadRepoFile("src", "canonical", "skills", "idd-factory-finalize-run.md");
+
+        Assert.Contains("Factory step coordinator", content);
+        Assert.DoesNotContain("root coordinator", content, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ReadRepoFile(params string[] pathParts)
+        => File.ReadAllText(Path.Combine(RepositoryRootFinder.Find(), Path.Combine(pathParts)));
 }
