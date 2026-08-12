@@ -17,17 +17,7 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
         string skillName,
         IReadOnlyDictionary<string, SkillDescription> skillDescriptions)
     {
-        var files = base.BuildSkillFiles(adapter, plugin, roleDefinitions, skillName, skillDescriptions).ToList();
-        if (StringComparer.Ordinal.Equals(skillName, "idd-factory-run") ||
-            StringComparer.Ordinal.Equals(skillName, "idd-factory-coordinate-step"))
-        {
-            files.Add(new GeneratedFile(
-                Path.Combine("skills", skillName, "references", "platform-dispatch.md"),
-                ContentNormalizer.NormalizeContent(RequiredFileReader.Read(
-                    "src/adapters/claude/factory-dispatch.md"))));
-        }
-
-        return files;
+        return base.BuildSkillFiles(adapter, plugin, roleDefinitions, skillName, skillDescriptions);
     }
 
     protected override string BuildPluginManifest(

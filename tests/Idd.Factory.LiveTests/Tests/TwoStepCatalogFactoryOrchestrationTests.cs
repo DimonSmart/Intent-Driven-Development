@@ -15,20 +15,20 @@ public sealed class TwoStepCatalogFactoryOrchestrationTests
     }
 
     [Fact]
-    public void AssertOrchestration_FailsForPhaseSpecificAction()
+    public void AssertOrchestration_FailsForUnexpectedReplanner()
     {
         var trace = ExpectedTrace();
-        var agents = trace.Agents.Select(agent => agent.ThreadId == "final" ? agent with { Action = "FINAL REVIEW" } : agent).ToArray();
+        var agents = trace.Agents.Append(Node("replan", "root", "factory-replanner", null, DateTimeOffset.Parse("2026-01-01T00:00:10Z"))).ToArray();
         var assertions = AssertOrchestration(trace with { Agents = agents });
 
         Assert.True(assertions.HasFailuresIn("Orchestration failure"));
     }
 
     [Fact]
-    public void AssertOrchestration_FailsWhenWorkerRunsUnderRoot()
+    public void AssertOrchestration_FailsWhenWorkerIsNested()
     {
         var trace = ExpectedTrace();
-        var agents = trace.Agents.Select(agent => agent.ThreadId == "impl-1" ? agent with { ParentThreadId = "root" } : agent).ToArray();
+        var agents = trace.Agents.Select(agent => agent.ThreadId == "impl-1" ? agent with { ParentThreadId = "decomposer" } : agent).ToArray();
         var assertions = AssertOrchestration(trace with { Agents = agents });
 
         Assert.True(assertions.HasFailuresIn("Orchestration failure"));
@@ -58,8 +58,8 @@ public sealed class TwoStepCatalogFactoryOrchestrationTests
             await new EvalAssertionCollector().WriteAsync(workspace, result, metrics, new(null, "not expected"), new(2, null, [], []));
 
             var report = await File.ReadAllTextAsync(Path.Combine(directory, "report.md"));
-            Assert.Contains("Root-level spawned agents: 2", report);
-            Assert.Contains("Total spawned agents: 4", report);
+            Assert.Contains("Semantic subprocess workers: 4", report);
+            Assert.Contains("Coordinator collaboration spawns:", report);
             Assert.Contains("Fresh input tokens:", report);
             Assert.Contains("Detailed efficiency diagnostics: efficiency.md / efficiency.json", report);
             Assert.DoesNotContain("Successfully spawned agents", report);
@@ -83,15 +83,10 @@ public sealed class TwoStepCatalogFactoryOrchestrationTests
         return new AgentTrace(2, "root", [
             Node("root", null, "factory-root", null, start),
             Node("decomposer", "root", "task-decomposer", null, start),
-            Node("initialize", "root", "factory-step-coordinator", "INITIALIZE", start.AddSeconds(1)),
-            Node("implementation-1", "root", "factory-step-coordinator", "CONTINUE", start.AddSeconds(2)),
-            Node("impl-1", "implementation-1", "implementer", null, start.AddSeconds(3)),
-            Node("implementation-2", "root", "factory-step-coordinator", "CONTINUE", start.AddSeconds(4)),
-            Node("impl-2", "implementation-2", "implementer", null, start.AddSeconds(5)),
-            Node("checkpoint", "root", "factory-step-coordinator", "CONTINUE", start.AddSeconds(6)),
-            Node("checkpoint-review", "checkpoint", "checkpoint-reviewer", null, start.AddSeconds(7)),
-            Node("final", "root", "factory-step-coordinator", "CONTINUE", start.AddSeconds(8)),
-            Node("final-review", "final", "final-reviewer", null, start.AddSeconds(9))
+            Node("impl-1", "root", "implementer", null, start.AddSeconds(1)),
+            Node("impl-2", "root", "implementer", null, start.AddSeconds(2)),
+            Node("checkpoint-review", "root", "checkpoint-reviewer", null, start.AddSeconds(3)),
+            Node("final-review", "root", "final-reviewer", null, start.AddSeconds(4))
         ], []);
     }
 

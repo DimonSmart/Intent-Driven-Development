@@ -118,6 +118,8 @@ Release-specific migration instructions are maintained on the dedicated [Updates
 - [Verify Installation](docs/verify-installation.md)
 - [Updating IDD](docs/updating-idd.md)
 - [Updates and Breaking Changes](docs/updates-and-breaking-changes.md)
+- [Factory Workflow](docs/factory-workflow.md)
+- [Factory Workflow Configuration](docs/factory-workflow-configuration.md)
 - [Existing Project Guide](docs/existing-project.md)
 - [New Project Guide](docs/new-project.md)
 - [Methodology](docs/methodology.md)

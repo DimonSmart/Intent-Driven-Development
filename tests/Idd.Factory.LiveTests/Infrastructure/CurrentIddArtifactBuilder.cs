@@ -15,6 +15,7 @@ public sealed class CurrentIddArtifactBuilder(ProcessRunner processRunner)
         var intent = Path.Combine(workspace.GeneratedMarketplaceDirectory, "plugins", "codex", "idd-intent");
         CopySkills(factory, workspace.WorkspaceDirectory);
         CopySkills(intent, workspace.WorkspaceDirectory);
+        CopyRuntime(factory, workspace.WorkspaceDirectory);
         MergeBootstrap(Path.Combine(factory, "assets", "bootstrap"), workspace.WorkspaceDirectory);
         var reference = Path.Combine(workspace.WorkspaceDirectory, ".agents", "skills", "idd-factory-run", "references", "methodology-version.json");
         var generated = JsonDocument.Parse(File.ReadAllText(reference)).RootElement.GetProperty("methodologyVersion").GetString();
@@ -26,6 +27,13 @@ public sealed class CurrentIddArtifactBuilder(ProcessRunner processRunner)
         var source = Path.Combine(plugin, "skills");
         if (!Directory.Exists(source)) throw new DirectoryNotFoundException($"Generated skills are missing: {source}");
         CopyDirectory(source, Path.Combine(workspace, ".agents", "skills"), allowExisting: false);
+    }
+
+    private static void CopyRuntime(string plugin, string workspace)
+    {
+        var source = Path.Combine(plugin, "runtime");
+        if (!Directory.Exists(source)) throw new DirectoryNotFoundException($"Generated Factory runtime is missing: {source}");
+        CopyDirectory(source, Path.Combine(workspace, ".agents", "runtime"), allowExisting: false);
     }
 
     private static void MergeBootstrap(string source, string workspace)

@@ -268,9 +268,10 @@ public sealed class FactoryProtocolTests
         const char windowsPathSeparator = ';';
         var path = string.Join(windowsPathSeparator, @"C:\Tools", @"C:\Program Files\WindowsApps\PowerShell", @"C:\Windows\System32\WindowsPowerShell\v1.0");
 
-        var environment = LocalFactoryEvalEnvironment.BuildCodexEnvironment(path, isWindows: true);
+        var environment = LocalFactoryEvalEnvironment.BuildCodexEnvironment(path, isWindows: true, @"C:\Tools\codex.exe");
 
         Assert.Equal(string.Join(windowsPathSeparator, @"C:\Tools", @"C:\Windows\System32\WindowsPowerShell\v1.0"), environment["PATH"]);
+        Assert.Equal(@"C:\Tools\codex.exe", environment["IDD_FACTORY_CODEX_EXECUTABLE"]);
     }
 
     private const string ValidFactoryResult = "{\"methodologyVersion\":\"1.0\",\"factoryOutcome\":\"COMPLETED\",\"subtaskCount\":2,\"completedSubtaskCount\":2,\"reviewCheckpointCount\":1,\"completedReviewCheckpointCount\":1,\"correctiveSubtaskCount\":0,\"blockedItemCount\":0,\"incompleteItemCount\":0,\"finalReviewVerdict\":\"approved\",\"verificationStatus\":\"passed\",\"commitMessagePath\":\"notes/commit-message.md\"}";

@@ -1,0 +1,110 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace Idd.Factory.Domain;
+
+[JsonConverter(typeof(JsonStringEnumConverter<FactoryRunStatus>))]
+public enum FactoryRunStatus { Running, Blocked, Completed, Cancelled, Failed }
+
+[JsonConverter(typeof(JsonStringEnumConverter<WorkItemKind>))]
+public enum WorkItemKind { Subtask, ReviewCheckpoint, CorrectiveSubtask }
+
+[JsonConverter(typeof(JsonStringEnumConverter<WorkItemStatus>))]
+public enum WorkItemStatus
+{
+    Planned, Ready, Dispatching, Running, AwaitingVerification, Completed,
+    Blocked, Failed, Superseded, Cancelled
+}
+
+public sealed record FactoryState
+{
+    public const int CurrentSchemaVersion = 1;
+    public int SchemaVersion { get; init; } = CurrentSchemaVersion;
+    public required string MethodologyVersion { get; init; }
+    public required string RuntimeVersion { get; init; }
+    public required string RunId { get; init; }
+    public long Revision { get; set; }
+    public FactoryRunStatus RunStatus { get; set; } = FactoryRunStatus.Running;
+    public required string CurrentWorkflowStep { get; set; }
+    public required string WorkflowName { get; init; }
+    public required string WorkflowHash { get; init; }
+    public required string RequestPath { get; init; }
+    public required string BaselineRevision { get; init; }
+    public List<WorkItemState> WorkItems { get; init; } = [];
+    public string? CurrentAttemptId { get; set; }
+    public int AttemptSequence { get; set; }
+    public int ReplanCount { get; set; }
+    public int CorrectiveCycleCount { get; set; }
+    public FactoryBlocker? Blocker { get; set; }
+    public FinalReviewState? FinalReview { get; set; }
+    public List<string> VerificationEvidenceRefs { get; init; } = [];
+    public string? IntentSnapshotHash { get; set; }
+    public List<string> ClarificationRefs { get; init; } = [];
+}
+
+public sealed record WorkItemState
+{
+    public required string Id { get; init; }
+    public required int Sequence { get; set; }
+    public required WorkItemKind Kind { get; init; }
+    public WorkItemStatus Status { get; set; } = WorkItemStatus.Planned;
+    public required string ContractPath { get; init; }
+    public List<string> Dependencies { get; init; } = [];
+    public List<string> CoveredWorkItems { get; init; } = [];
+    public int AttemptCount { get; set; }
+    public string? CurrentAttemptId { get; set; }
+    public List<string> VerificationCheckIds { get; init; } = [];
+    public List<string> VerificationEvidenceRefs { get; init; } = [];
+    public string? LastResultRef { get; set; }
+}
+
+public sealed record FactoryBlocker(string Code, string Reason, string ResumeWhen);
+public sealed record FinalReviewState(string Verdict, string? ResultRef, int AttemptCount);
+
+public sealed record AgentInvocation
+{
+    public const int CurrentProtocolVersion = 1;
+    public int ProtocolVersion { get; init; } = CurrentProtocolVersion;
+    public required string RunId { get; init; }
+    public required string AttemptId { get; init; }
+    public required string Role { get; init; }
+    public string? WorkItemId { get; init; }
+    public required string Workspace { get; init; }
+    public required string ResultPath { get; init; }
+    public required string Prompt { get; init; }
+    public required DateTimeOffset StartedAt { get; init; }
+    public required string WorkspaceFingerprint { get; init; }
+    public IReadOnlyList<string> SkillReferences { get; init; } = [];
+}
+
+public sealed record AgentResultEnvelope
+{
+    public int ProtocolVersion { get; init; }
+    public required string RunId { get; init; }
+    public required string AttemptId { get; init; }
+    public required string Role { get; init; }
+    public required string Outcome { get; init; }
+    public string? Reason { get; init; }
+    public JsonElement? Payload { get; init; }
+    public JsonElement? Metrics { get; init; }
+}
+
+public sealed record AgentRunHandle(string AttemptId, int ProcessId, string BackendHandle);
+public sealed record AgentProcessResult(int ExitCode, string Stdout, string Stderr, bool WasCancelled);
+
+public sealed record FactoryCliOutcome(
+    string FactoryOutcome,
+    string RunId,
+    string? Reason = null,
+    string? ResumeWhen = null,
+    string? ResultDirectory = null);
+
+public static class FactoryJson
+{
+    public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true,
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter() }
+    };
+}

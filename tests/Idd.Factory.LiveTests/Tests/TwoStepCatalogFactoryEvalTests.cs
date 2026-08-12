@@ -47,6 +47,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
             await new CurrentIddArtifactBuilder(processRunner).BuildAsync(repositoryRoot, workspace, version.Value, cancellationToken);
             await LogProgressAsync(workspace, "Generated current IDD artifacts.", cancellationToken);
             assertions.Require(Directory.Exists(Path.Combine(workspace.WorkspaceDirectory, ".agents", "skills", "idd-factory-run")), "Infrastructure", "Local Factory skills", "Generated Factory skills were not copied into the project-local .agents/skills directory.");
+            assertions.Require(File.Exists(Path.Combine(workspace.WorkspaceDirectory, ".agents", "runtime", "idd-factory.dll")), "Infrastructure", "Local Factory runtime", "Packaged Factory runtime was not copied beside the local skills.");
             assertions.Require(File.Exists(Path.Combine(workspace.WorkspaceDirectory, ".agents", "skills", "idd-factory-run", "references", "methodology-version.json")), "Version", "Methodology reference", "The generated idd-factory-run methodology version reference is missing.");
 
             await InitializeGitAsync(processRunner, workspace, cancellationToken);
@@ -125,6 +126,9 @@ public sealed class TwoStepCatalogFactoryEvalTests
         if (rootThreadId is null)
             return new(2, null, [], [new("ROOT_THREAD_ID_NOT_FOUND", "warning", "Root thread ID was not found in events.jsonl.", null, "events.jsonl")]);
 
+        var runtimeTrace = FactoryRuntimeTraceReader.TryRead(workspace.WorkspaceDirectory, rootThreadId);
+        if (runtimeTrace is not null) return runtimeTrace;
+
         var sessions = new CodexHomeLocator().FindSessionsDirectory();
         if (sessions is null)
         {
@@ -181,7 +185,6 @@ public sealed class TwoStepCatalogFactoryEvalTests
         {
             ["factory-root"] = 1,
             ["task-decomposer"] = 1,
-            ["factory-step-coordinator"] = 5,
             ["implementer"] = 2,
             ["checkpoint-reviewer"] = 1,
             ["final-reviewer"] = 1
@@ -189,21 +192,10 @@ public sealed class TwoStepCatalogFactoryEvalTests
         assertions.Require(roleCounts.Count == expectedRoleCounts.Count && expectedRoleCounts.All(expected => roleCounts.GetValueOrDefault(expected.Key) == expected.Value), "Orchestration failure", "Semantic roles", $"Expected roles {FormatCounts(expectedRoleCounts)}; actual roles {FormatCounts(roleCounts)}.");
 
         var rootChildren = trace.Agents.Where(agent => agent.ParentThreadId == trace.RootThreadId).ToArray();
-        assertions.Require(rootChildren.Length == 6 && rootChildren.Count(agent => agent.Role == "task-decomposer") == 1 && rootChildren.Count(agent => agent.Role == "factory-step-coordinator") == 5, "Orchestration failure", "Root topology", "Expected root to create one task-decomposer and five factory-step-coordinators, with no direct implementation or review workers.");
-
-        var coordinators = trace.Agents.Where(agent => agent.Role == "factory-step-coordinator").ToArray();
-        var initializers = coordinators.Where(agent => agent.Action == "INITIALIZE").ToArray();
-        var continuations = coordinators.Where(agent => agent.Action == "CONTINUE").ToArray();
-        assertions.Require(initializers.Length == 1 && continuations.Length == 4 && coordinators.All(agent => agent.Action is "INITIALIZE" or "CONTINUE"), "Orchestration failure", "Coordinator actions", $"Expected one INITIALIZE followed by four CONTINUE actions; actual actions: {string.Join(", ", coordinators.Select(agent => agent.Action ?? "<missing>"))}.");
-        if (initializers.Length == 1)
-            assertions.Require(initializers[0].StartedAt is not null && continuations.All(agent => agent.StartedAt is not null && agent.StartedAt >= initializers[0].StartedAt), "Orchestration failure", "Initialization order", "Expected INITIALIZE to start before every CONTINUE coordinator.");
-
-        var workers = trace.Agents.Where(agent => agent.Role is "implementer" or "checkpoint-reviewer" or "final-reviewer").ToArray();
-        assertions.Require(workers.All(agent => agent.ParentThreadId is not null && byId.TryGetValue(agent.ParentThreadId, out var parent) && parent.Role == "factory-step-coordinator"), "Orchestration failure", "Worker parents", "Expected every implementation and review worker to be a direct child of a factory-step-coordinator.");
-        var childSignatures = coordinators.Select(coordinator => string.Join("+", workers.Where(worker => worker.ParentThreadId == coordinator.ThreadId).Select(worker => worker.Role).OrderBy(role => role, StringComparer.Ordinal))).OrderBy(value => value, StringComparer.Ordinal).ToArray();
-        var expectedSignatures = new[] { "", "checkpoint-reviewer", "final-reviewer", "implementer", "implementer" };
-        assertions.Require(childSignatures.SequenceEqual(expectedSignatures), "Orchestration failure", "Coordinator topology", $"Expected coordinator child topology [{string.Join(", ", expectedSignatures.Select(value => value.Length == 0 ? "<none>" : value))}]; actual [{string.Join(", ", childSignatures.Select(value => value.Length == 0 ? "<none>" : value))}].");
-        assertions.Require(trace.Agents.Where(agent => agent.Role != "factory-root").All(agent => agent.Status == "completed"), "Orchestration failure", "Agent completion", "Expected every decomposer, coordinator, implementer, and reviewer agent to complete.");
+        assertions.Require(rootChildren.Length == 5 && rootChildren.Count(agent => agent.Role == "task-decomposer") == 1 && rootChildren.Count(agent => agent.Role == "implementer") == 2 && rootChildren.Count(agent => agent.Role == "checkpoint-reviewer") == 1 && rootChildren.Count(agent => agent.Role == "final-reviewer") == 1, "Orchestration failure", "Runtime topology", "Expected five direct semantic subprocess workers and no coordinator agents.");
+        assertions.Require(!trace.Agents.Any(agent => agent.Role == "factory-step-coordinator"), "Orchestration failure", "Coordinator absence", "Expected factory-step-coordinator count to be zero.");
+        assertions.Require(!trace.Agents.Any(agent => agent.Role == "factory-replanner"), "Orchestration failure", "Happy-path replan absence", "Expected factory-replanner count to be zero on the happy path.");
+        assertions.Require(trace.Agents.Where(agent => agent.Role != "factory-root").All(agent => agent.Status == "completed"), "Orchestration failure", "Agent completion", "Expected every semantic subprocess worker to complete.");
     }
 
     private static string FormatCounts(IReadOnlyDictionary<string, int> counts) => string.Join(", ", counts.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => $"{item.Key}={item.Value}"));

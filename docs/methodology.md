@@ -135,10 +135,10 @@ idd-factory   temporary implementation organization
 
 `idd-intent` owns the durable side of the methodology. It initializes and maintains `.idd/intent/`, imports or changes current product truth, optionally builds the project glossary, implements from intent, and checks implementation against intent.
 
-`idd-factory` owns temporary execution orchestration. Its `idd-factory-run`
-entry point decomposes a request, coordinates sequential tasks, performs
-independent task and final reviews, supports session-independent resume, and
-prepares a commit-message handoff under `.idd/factory/`.
+`idd-factory` owns temporary execution orchestration. Its packaged .NET runtime
+deterministically coordinates sequential work, verification, selective reviews,
+bounded correction and replanning, resume, and finalization. `idd-factory-run`
+is only the public launcher.
 
 The separation is visible to the user because the responsibilities have different lifecycles:
 
@@ -150,14 +150,14 @@ The separation is visible to the user because the responsibilities have differen
   `.idd/factory/results/` holds compact commit-message handoffs;
 - both directories are ignored by default and are never durable product intent.
 
-The current workspace contains `request.md` and a flat, gap-free sequence of
-task files. A task filename is `<sequence>-<slug>.<status>.md`; its suffix is the
-only status source. The supported states are `ready`, `active`, `completed`,
-and `blocked`, with at most one active or blocked task. This filesystem state,
-not conversation history, lets a later session validate and resume safely.
+The current workspace contains immutable `request.md`, authoritative
+`state.json`, stable work-item contracts, attempt artifacts, verification
+evidence, and an append-only event audit. Explicit state status and revision,
+not filenames or conversation history, support validation and safe resume.
 
-Each completed task passes an independent review. Final review findings create
-a new corrective task instead of reopening completed history. Only after final
+Selective checkpoints protect later dependent work; they are not mandatory
+after every Subtask. Review findings create a new corrective task instead of
+reopening completed history. Only after final
 approval does Factory create
 `.idd/factory/results/<work-slug>/commit-message.md`; it then clears the
 contents of `current/` and leaves prior results intact.

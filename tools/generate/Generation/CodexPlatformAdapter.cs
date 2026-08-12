@@ -64,15 +64,6 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                 """.ReplaceLineEndings("\n") + "\n"));
         }
 
-        if (StringComparer.Ordinal.Equals(skillName, "idd-factory-run") ||
-            StringComparer.Ordinal.Equals(skillName, "idd-factory-coordinate-step"))
-        {
-            files.Add(new GeneratedFile(
-                Path.Combine("skills", skillName, "references", "platform-dispatch.md"),
-                ContentNormalizer.NormalizeContent(RequiredFileReader.Read(
-                    "src/adapters/codex/factory-dispatch.md"))));
-        }
-
         return files;
     }
 

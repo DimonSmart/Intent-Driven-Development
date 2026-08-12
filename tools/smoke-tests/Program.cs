@@ -166,12 +166,11 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     foreach (var skill in new[]
     {
         "idd-factory-run",
-        "idd-factory-coordinate-step",
         "idd-factory-decompose-task",
         "idd-factory-execute-subtask",
         "idd-factory-review-checkpoint",
         "idd-factory-review-task",
-        "idd-factory-finalize-run"
+        "idd-factory-replan"
     })
     {
         ExpectFile(Path.Combine(factoryRoot, "skills", skill, "SKILL.md"));
@@ -186,6 +185,10 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-factory-finish-work"));
     ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-project-init"));
     ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-intent-change"));
+    ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-factory-coordinate-step"));
+    ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-factory-finalize-run"));
+    ExpectFile(Path.Combine(factoryRoot, "runtime", "idd-factory.dll"));
+    ExpectFile(Path.Combine(factoryRoot, "runtime", "factory-workflow.yaml"));
     ExpectDirectory(Path.Combine(factoryRoot, "assets", "bootstrap", ".idd", "factory"));
     ExpectFile(Path.Combine(factoryRoot, "assets", "bootstrap", ".idd", "factory", ".gitignore"));
     using (var methodology = ReadJson(Path.Combine(factoryRoot, "skills", "idd-factory-run", "references", "methodology-version.json")))
@@ -200,26 +203,13 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
         }
     }
 
-    foreach (var skill in new[] { "idd-factory-run", "idd-factory-coordinate-step" })
-    {
-        var dispatchReferencePath = Path.Combine(factoryRoot, "skills", skill, "references", "platform-dispatch.md");
-        ExpectFile(dispatchReferencePath);
-        var dispatchReference = ReadText(dispatchReferencePath);
-        if (platform == "claude" && new[] { "spawn_agent", "wait_agent", "fork_context", "codex-dispatch" }.Any(dispatchReference.Contains))
-        {
-            failures.Add($"Claude {skill} dispatch reference contains Codex-specific runtime instructions.");
-        }
-    }
-
     foreach (var reference in new[]
     {
-        (Skill: "idd-factory-run", Role: "factory-coordinator"),
-        (Skill: "idd-factory-coordinate-step", Role: "factory-step-coordinator"),
         (Skill: "idd-factory-decompose-task", Role: "task-decomposer"),
         (Skill: "idd-factory-execute-subtask", Role: "implementer"),
         (Skill: "idd-factory-review-checkpoint", Role: "checkpoint-reviewer"),
         (Skill: "idd-factory-review-task", Role: "final-reviewer"),
-        (Skill: "idd-factory-finalize-run", Role: "factory-step-coordinator")
+        (Skill: "idd-factory-replan", Role: "factory-replanner")
     })
     {
         ExpectFile(Path.Combine(
@@ -235,10 +225,10 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     var workerSkills = new[]
     {
         "idd-factory-decompose-task",
-        "idd-factory-coordinate-step",
         "idd-factory-execute-subtask",
         "idd-factory-review-checkpoint",
-        "idd-factory-review-task"
+        "idd-factory-review-task",
+        "idd-factory-replan"
     };
 
     if (platform == "claude")
@@ -254,12 +244,10 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
             ExpectContains(workerFrontMatter, "context: fork", $"Claude {skill} isolation metadata");
         }
 
-        var coordinateStepFrontMatter = ReadFrontMatter(ReadText(Path.Combine(factoryRoot, "skills", "idd-factory-coordinate-step", "SKILL.md")));
-        ExpectContains(coordinateStepFrontMatter, "background: false", "Claude idd-factory-coordinate-step synchronous metadata");
     }
     else
     {
-        foreach (var skill in workerSkills.Prepend("idd-factory-run").Append("idd-factory-finalize-run"))
+        foreach (var skill in workerSkills.Prepend("idd-factory-run"))
         {
             var skillFrontMatter = ReadFrontMatter(ReadText(Path.Combine(factoryRoot, "skills", skill, "SKILL.md")));
             foreach (var claudeField in new[] { "context:", "agent:", "allowed-tools:", "argument-hint:" })
@@ -272,21 +260,8 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
         }
 
         var runSkill = ReadText(Path.Combine(factoryRoot, "skills", "idd-factory-run", "SKILL.md"));
-        var dispatchProtocolPosition = runSkill.IndexOf("## Platform Dispatch Protocol", StringComparison.Ordinal);
-        var bootstrapPosition = runSkill.IndexOf("## Bootstrap", StringComparison.Ordinal);
-        if (dispatchProtocolPosition < 0 || bootstrapPosition < 0 || dispatchProtocolPosition > bootstrapPosition)
-        {
-            failures.Add("Codex idd-factory-run must read its platform dispatch protocol before Bootstrap dispatch.");
-        }
-        ExpectContains(runSkill, "Public Factory outcome is terminal for the current Factory attempt.", "Codex idd-factory-run terminal outcome invariant");
-
-        var dispatchReferencePath = Path.Combine(factoryRoot, "skills", "idd-factory-run", "references", "platform-dispatch.md");
-        ExpectFile(dispatchReferencePath);
-        var dispatchReference = ReadText(dispatchReferencePath);
-        ExpectContains(dispatchReference, "`spawn_agent`", "Codex concrete spawn mapping");
-        ExpectContains(dispatchReference, "`wait_agent`", "Codex concrete wait mapping");
-        ExpectContains(dispatchReference, "Every later coordinator dispatch uses", "Codex CONTINUE-only dispatch rule");
-        ExpectContains(dispatchReference, "an active child is not a timeout failure", "Codex terminal-wait rule");
+        ExpectContains(runSkill, "runtime/idd-factory.dll", "Codex packaged runtime launcher");
+        ExpectContains(runSkill, "Do not spawn semantic or coordinator agents", "Codex coordinator removal invariant");
     }
 
     CheckIddMetadata(intentRoot, [], ".idd/intent", platform, "idd-intent");
@@ -371,19 +346,18 @@ void CheckCanonicalFactoryNeutrality()
     }
 
     var decomposition = ReadText(Path.Combine(repoRoot, "src", "canonical", "skills", "idd-factory-decompose-task.md"));
-    ExpectContains(decomposition, "stable `<sequence>-<slug>` identity", "Canonical stable checkpoint coverage identity");
+    ExpectContains(decomposition, "self-contained contract", "Canonical self-contained decomposition contract");
 }
 
 void CheckFactoryRoleGeneration()
 {
     var expectedTools = new Dictionary<string, string[]>(StringComparer.Ordinal)
     {
-        ["factory-coordinator"] = ["file.read", "agent.spawn", "agent.wait"],
-        ["factory-step-coordinator"] = ["file.read", "file.write", "agent.spawn", "agent.wait"],
         ["task-decomposer"] = ["file.read"],
         ["implementer"] = ["file.read", "file.write", "command.execute"],
         ["checkpoint-reviewer"] = ["file.read", "command.execute"],
-        ["final-reviewer"] = ["file.read", "command.execute"]
+        ["final-reviewer"] = ["file.read", "command.execute"],
+        ["factory-replanner"] = ["file.read"]
     };
 
     foreach (var platform in new[] { "claude", "codex" })
@@ -423,13 +397,11 @@ void CheckFactoryRoleGeneration()
 
     foreach (var (skill, role) in new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        ["idd-factory-run"] = "factory-coordinator",
-        ["idd-factory-coordinate-step"] = "factory-step-coordinator",
         ["idd-factory-decompose-task"] = "task-decomposer",
         ["idd-factory-execute-subtask"] = "implementer",
         ["idd-factory-review-checkpoint"] = "checkpoint-reviewer",
         ["idd-factory-review-task"] = "final-reviewer",
-        ["idd-factory-finalize-run"] = "factory-step-coordinator"
+        ["idd-factory-replan"] = "factory-replanner"
     })
     {
         foreach (var platform in new[] { "claude", "codex" })
@@ -452,12 +424,11 @@ void CheckCodexFactoryMetadata()
     var root = Path.Combine(marketplaceRoot, "plugins", "codex", "idd-factory");
     var expectedRoles = new[]
     {
-        "factory-coordinator",
-        "factory-step-coordinator",
         "task-decomposer",
         "implementer",
         "checkpoint-reviewer",
-        "final-reviewer"
+        "final-reviewer",
+        "factory-replanner"
     };
 
     using var metadata = ReadJson(Path.Combine(root, "idd-plugin.json"));

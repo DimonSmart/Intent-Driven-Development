@@ -1,166 +1,87 @@
 # idd-factory-run
 
-## Required Reference
-
-Read `references/project-verification.md` before Factory planning, execution,
-review, or verification fallback.
-
 ## Purpose
 
-The sole public entry point for starting, resuming, or cancelling one Factory
-run. It bootstraps persisted state, then acts as a thin dispatcher of fresh
-`idd-factory-coordinate-step` contexts. The original user request defines the
-Factory Task. `.idd/factory/current/`, not the parent coordinator transcript,
-is the authoritative memory between steps.
+Launch or resume the packaged deterministic IDD Factory Runtime. The runtime,
+not this skill or an LLM coordinator, owns workflow state and transitions.
 
-## Workspace and State
+## Runtime discovery
 
-On first explicit use, require `.idd/intent/` and verify that the packaged
-Factory assets are available. The initializer coordinator installs the Factory
-`.gitignore` and creates `current/` and `results/` when needed. Only one run may
-exist. A new request requires absent or empty `current/`; otherwise summarize it
-and require continue or cancel.
+Resolve the installed plugin root as exactly two parent directories above this
+`SKILL.md` (`skills/idd-factory-run/SKILL.md` → plugin root). The packaged runtime is
+under `<plugin-root>/runtime/` and its entry assembly is
+`idd-factory.dll`. Do not look for a project-local runtime and do not build the
+runtime in the user's workspace.
 
-`current/` contains `request.md`, optional `run-context.md`, and contiguous
-`<sequence>-<slug>.<status>.md` work items. A work item is a Subtask, identified
-by a `## Goal` section, or a Review checkpoint, identified by a `## Review
-Checkpoint` section. Valid statuses are `ready`, `active`, `completed`, and
-`blocked`; filenames are authoritative. Require at most one active or blocked
-item, never both, completed items before it, and ready items after it. Stop
-invalid state as `CORRUPT_FACTORY_STATE`; never guess repairs. Completed items
-are immutable.
+V1 requires the .NET 10 runtime and an executable production agent backend
+available to the runtime. `IDD_FACTORY_CODEX_EXECUTABLE` may name the exact
+native executable for the bundled backend. On Windows, launch the trusted
+runtime outside the parent agent OS sandbox;
+the runtime applies a fresh role-appropriate sandbox to every semantic worker.
+If the launcher cannot provide that boundary, return `BLOCKED` instead of
+starting a nested CLI whose network control plane is trapped in the parent
+sandbox.
 
-The coordinator-step contract preserves the allowed transition `active
-review-checkpoint -> ready` only when it atomically inserts a correction
-immediately before the checkpoint. Subtask completion does not automatically
-invoke independent review. A Subtask `Changes` is a compact list of focused
-checkpoint evidence.
+## New run
 
-## Platform Dispatch Protocol
+1. Resolve the workspace and preserve the complete user request unchanged as
+   standard input to the runtime. Do not create a launcher-owned request file.
+2. Invoke:
 
-Before the first child-agent dispatch, read `references/platform-dispatch.md`
-and follow it for every later dispatch. The platform adapter has already mapped
-the semantic child-agent capabilities to concrete runtime operations; do not
-add a capability-discovery or probing phase.
+   ```text
+   dotnet <plugin-root>/runtime/idd-factory.dll run
+     --workspace <workspace>
+     --request-stdin true
+     --plugin-root <plugin-root>
+   ```
 
-## Bootstrap
+   Pipe the complete request to this process through standard input.
+3. Wait for the process to exit and parse its single structured JSON outcome.
+4. Report the compact Factory outcome, reason/resume condition, and result
+   directory when supplied.
 
-Before state exists, run intent preflight and create a fresh child agent.
-Assign it the `task-decomposer` role and provide the complete request, workspace
-path, durable-intent path, the `idd-factory-decompose-task` skill reference, that
-skill's `references/roles/task-decomposer.md`, and that skill's
-`references/project-verification.md`. Do not provide an `Action` field to the
-decomposer.
+## Continue and cancel
 
-Read `references/methodology-version.json` before initialization. Pass its
-`methodologyVersion` to the initializer, which records `Methodology version:`
-in `current/request.md`; carry it through finalization and require the finalizer
-to include the same value in `factory-result.json`.
-
-- `NEEDS_CLARIFICATION`: ask all questions together; create no partial state.
-- `INTENT_REQUIRED`: create no state, run the intent workflow, reread intent,
-  and decompose the complete original request again.
-- `FOCUSED_HANDOFF`: use one `idd-code-implement` when Factory was implicit; an
-  explicit Factory request may use one bounded Subtask.
-- `BLOCKED`: report the planning blocker; create no state.
-- `READY`: reject intent-changing execution scope and validate the complete
-  result contract. Require every checkpoint `## Covers` entry to use a stable
-  `<sequence>-<slug>` Subtask identity without status suffix or extension. Do
-  not write files. Spawn a fresh `factory-step-coordinator` with
-  `Action: INITIALIZE`, the complete original request, methodology version,
-  confirmed clarifications when applicable, and the complete validated `READY`
-  result in its dispatch input. Provide the `idd-factory-coordinate-step` skill
-  reference, that skill's `references/roles/factory-step-coordinator.md`, and
-  that skill's `references/project-verification.md`. Require
-  `Step result: ADVANCED` for `factory initialization`, then discard that
-  context and dispatch a different fresh coordinator in `CONTINUE` mode.
-
-The fresh step coordinator appends confirmed later decisions only to
-`## Resolved Clarifications` in `request.md`. Each Subtask is self-contained with optional `run-context.md`;
-workers do not need the original request. A Review checkpoint contains its
-contiguous `Covers`, review scope, and focused verification. Do not add a
-terminal checkpoint that duplicates final integrated review.
-
-## Dispatch
-
-After successful initialization or a valid resume, create a fresh child agent
-and assign it the `factory-step-coordinator` role. Provide `Action: CONTINUE`,
-the worktree path, the `idd-factory-coordinate-step` skill reference, that
-skill's `references/roles/factory-step-coordinator.md`, and that skill's
-`references/project-verification.md`.
-
-For every continuation, use exactly this resume request:
+For an existing run invoke the same assembly with:
 
 ```text
-Resume request: Continue the current Factory run from persisted state and process exactly one next logical action.
+continue --workspace <workspace> --plugin-root <plugin-root>
+cancel --workspace <workspace> --plugin-root <plugin-root>
 ```
 
-When resuming a blocker, pass the confirmed blocker answer separately. For
-cancellation, pass the explicit cancellation request separately. Do not encode
-next-item, checkpoint, final-review, finalization, or other phase information in
-the resume request. Do not provide detailed parent history, worker reports, test
-logs, or any other information derivable from persisted Factory state.
+When the runtime returns `NEEDS_CLARIFICATION`, collect the user's answer in a
+temporary file and resume with `continue --answer-file <file>`. When it returns
+`INTENT_REQUIRED`, run the existing IDD intent workflow outside Factory; after
+the durable intent changes, `continue` detects the new intent hash and resumes
+decomposition or bounded replanning. Intent changes never become Subtasks.
 
-- On `Step result: ADVANCED`, discard the completed step context and invoke a
-  new fresh step context.
-- On `Step result: STOPPED`, report its allowed Factory outcome and compact
-  reason/resume condition.
-- On `Step result: FINISHED`, report the commit-message path and completion.
+Cancellation is explicit. Warn that product changes are preserved; do not
+delete Factory state or revert code in the launcher.
 
-Resume of an existing run always uses `CONTINUE`; never initialize it again.
-Do not directly own a monolithic work loop, execute a worker, inspect each
-completed step's diff, or retain corrective-cycle detail. `NEEDS_REPLAN` is
-internal, never a Factory outcome. The step coordinator handles activation,
-Completion/Blocker records, checkpoint correction, replanning, intent
-orchestration, final review, and finalization.
+## Boundaries
 
-Dispatch means creating a fresh child agent, waiting for its terminal result,
-and validating that result against its role contract before changing Factory
-state. Reading another skill and following it in the root context is not
-dispatch. The Factory runner must not execute coordinator, implementation,
-review, or finalization work in its own context. The root context is read-only
-and must never modify repository or Factory-state files. If a required child
-agent cannot be created or awaited, stop the attempt as `BLOCKED` with the
-actual technical reason; never fall back to self-execution.
+- Do not select work items, inspect status filenames, route checkpoints, apply
+  retries, create corrections, choose final review, or finalize files.
+- Do not spawn semantic or coordinator agents. The packaged backend creates
+  fresh semantic subprocess contexts through the runtime.
+- Do not weaken the worker sandbox to compensate for a sandboxed launcher.
+- Do not mutate `.idd/factory/current/` or `.idd/intent/`.
+- Do not interpret stdout from semantic workers. Only the runtime outcome is the
+  public machine result.
+- `WORKFLOW_CHANGED`, `LEGACY_FACTORY_STATE`, `CORRUPT_FACTORY_STATE`, and lock
+  outcomes are terminal for the current launcher attempt and must be reported
+  exactly.
 
-## Resume and Cancel
+## Reporting
 
-For a blocked state without a new answer, report the saved exact `Resume when`.
-When the answer satisfies it, dispatch it to one fresh step; no separate
-continue command is required. An interrupted active Subtask is resumed by a
-fresh step, which may use verification-only resume when implementation is
-unchanged and evidence is missing.
-
-Cancel only explicitly: warn about worktree changes, then dispatch a fresh step
-coordinator with `Action: CONTINUE`, the neutral resume request above, and the
-cancellation request as a separate input. That coordinator clears only
-`current/`, preserves `results/`, and does not revert code or create a commit
-message. The read-only root does not clear files itself.
-
-## Reporting and Outcomes
-
-Every stop or finish reports separately:
+Report separately:
 
 ```text
 Factory outcome: <outcome>
-Implementation assessment: <assessment>
-Verification assessment: <assessment>
+Reason: <reason when present>
+Resume when: <condition when present>
+Result directory: <path when present>
 ```
 
-Allowed outcomes are `COMPLETED`, `FOCUSED_HANDOFF`, `NEEDS_CLARIFICATION`,
-`INTENT_REQUIRED`, `BLOCKED`, and `CORRUPT_FACTORY_STATE`. Missing verification
-never becomes approval. A persisted Blocker uses literal `Reason:`, `Verified:`,
-`Not verified:`, and `Resume when:` fields.
-
-Do not emit a public Factory outcome as a progress message. Emit the final
-response object only after the Factory attempt has actually finished or stopped.
-
-Public Factory outcome is terminal for the current Factory attempt. Publish
-exactly one public Factory outcome, and only after Factory work has actually
-finished or stopped. After publishing it, the root agent must perform no more
-Factory work: do not dispatch or wait for child agents, execute repository
-commands, read or change Factory state, or publish another Factory outcome.
-Only technical runtime completion after the final response, such as
-`turn.completed`, is allowed. This is a semantic protocol invariant; do not add
-a persisted running/terminal state, a new Factory phase, or a coordinator for
-it.
+After reporting the structured runtime outcome, do not perform more Factory
+work in the same launcher attempt.

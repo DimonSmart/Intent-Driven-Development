@@ -19,7 +19,7 @@ internal static class GeneratedOutputChecker
     public static IReadOnlyList<string> CheckFiles(string outputRoot, IReadOnlyList<GeneratedFile> expectedFiles)
     {
         var errors = new List<string>();
-        var expectedByPath = expectedFiles.ToDictionary(file => PathNormalizer.Normalize(file.RelativePath), file => file.Content);
+        var expectedByPath = expectedFiles.ToDictionary(file => PathNormalizer.Normalize(file.RelativePath), file => file);
 
         foreach (var expected in expectedByPath)
         {
@@ -30,8 +30,10 @@ internal static class GeneratedOutputChecker
                 continue;
             }
 
-            var actual = File.ReadAllText(fullPath);
-            if (!StringComparer.Ordinal.Equals(actual, expected.Value))
+            var matches = expected.Value.BinaryContent is not null
+                ? File.ReadAllBytes(fullPath).SequenceEqual(expected.Value.BinaryContent)
+                : StringComparer.Ordinal.Equals(File.ReadAllText(fullPath), expected.Value.Content);
+            if (!matches)
             {
                 errors.Add($"Outdated generated file: {Path.GetRelativePath(Directory.GetCurrentDirectory(), fullPath)}");
             }

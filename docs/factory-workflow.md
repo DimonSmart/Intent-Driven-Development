@@ -1,239 +1,75 @@
-# IDD Factory Workflow
+# Factory workflow
 
-IDD Factory is the optional execution layer for implementation work that
-benefits from coordinated stages, explicit review boundaries, or safe
-continuation after interruption.
+## Runtime boundary
 
-Factory remains temporary. It may read `.idd/intent/`, but it does not create
-product truth and does not turn execution state into permanent specifications.
+The packaged .NET 10 runtime is a trusted orchestrator process. It needs an
+available native Codex CLI (`IDD_FACTORY_CODEX_EXECUTABLE` can select it) and,
+on Windows, must not itself run inside a parent Codex OS sandbox. Each semantic
+subprocess is independently launched with `approval_policy=never`; implementers
+receive `workspace-write`, while decomposition and review roles receive
+`read-only`. This keeps model-driven tool activity sandboxed without trapping
+the child CLI network control plane inside another Windows sandbox.
 
-## Factory Vocabulary
+For file-based Codex authentication, the backend creates an attempt-local
+private `CODEX_HOME`, copies only the credential cache, and removes that private
+directory after completion or cancellation. Startup recovery deletes a stale
+private directory left by an interrupted process. Credential material is never
+part of immutable attempt evidence or final Factory results.
 
-Request
-: The original user instruction that defines a Factory Task.
-
-Task
-: The complete unit of work accepted by Factory.
-
-Subtask
-: One bounded executable part produced by decomposing the Task.
-
-Review checkpoint
-: An independent review boundary covering completed Subtasks.
-
-Work item
-: A persisted Subtask or Review checkpoint.
-
-Factory run
-: One resumable execution instance of a Task.
-
-## When to Use Factory
-
-Use Factory when the work involves one or more of the following:
-
-- several independently verifiable implementation outcomes;
-- an ordered migration or compatibility transition;
-- changes spanning multiple subsystems;
-- high regression risk;
-- a need for independent implementation and review contexts;
-- a final integration review across all stages.
-
-Use `idd-code-implement` instead when one bounded implementation pass is enough.
-
-## Install Factory
-
-Claude Code:
-
-```bash
-claude plugin install idd-factory@intent-driven-development
-```
-
-Codex:
-
-```bash
-codex plugin add idd-factory@intent-driven-development
-```
-
-`idd-factory` depends on `idd-intent`.
-
-When present, `.idd/verification.yaml` assigns checks to execution `subtask`, review `checkpoint`, and integrated `final` contexts. Factory stores only check IDs in contracts and resolves their current commands at execution time.
-
-## Run a Complete Factory Task
-
-Give Factory the complete task once:
+IDD Factory coordinates multi-stage implementation while current `.idd/intent/`
+remains normative. Factory Runtime manages the workflow deterministically; LLM
+agents perform bounded semantic work inside it.
 
 ```text
-Use idd-factory-run to implement the task described in ./ui-audit.md.
+user / idd-factory-run
+        |
+        v
+packaged .NET 10 Factory Runtime
+        |
+        +-- task-decomposer
+        +-- implementer
+        +-- checkpoint-reviewer
+        +-- factory-replanner (only when needed)
+        +-- final-reviewer
 ```
 
-Or provide the request directly:
+There is no semantic step coordinator on the happy path. The runtime chooses the
+next item, validates dependencies and results, runs authoritative verification,
+applies retry and correction budgets, routes reviews, persists state, recovers,
+and finalizes the result.
 
-```text
-Use idd-factory-run to migrate the storage subsystem, update all consumers,
-preserve saved-data compatibility, and verify the integrated result.
-```
+## Execution model
 
-Under normal conditions, this single invocation carries the requested work
-through to completion.
+The complete request is saved unchanged in `request.md`. The decomposer receives
+it and returns ordered self-contained contracts. An implementer receives only
+its active contract, optional shared run context, relevant intent, repository
+evidence, and retry evidence. Every semantic invocation is a fresh subprocess
+context.
 
-Factory first checks whether current intent is sufficient. It then decomposes
-implementation into small Subtasks and places independent review
-checkpoints only where early review protects later work. After all work items
-complete, Factory performs one final integrated review and prepares a concise
-commit-message handoff.
+Review checkpoints are selective. A checkpoint covers a contiguous group whose
+early independent review protects later work. Final integrated review is always
+required. A `needs-fix` result inserts a new corrective Subtask; completed work
+is immutable. A semantic decomposition defect invokes the bounded replanner,
+whose proposal is validated before runtime state changes.
 
-After decomposition, the read-only root dispatches a fresh step coordinator in
-`INITIALIZE` mode to materialize `.idd/factory/current/`; the root does not
-write Factory state itself. Factory then uses that directory as its persisted memory.
-Each Subtask, checkpoint, replanning action, and final-review action is handled
-by a new one-step coordinator context. The public `idd-factory-run` dispatcher
-receives only a compact result, starts the next fresh step automatically, and
-does not retain the detailed history of previous steps.
+## State and recovery
 
-The user normally does not invoke internal worker skills separately.
+The authoritative state is `.idd/factory/current/state.json`. Stable work-item
+contract filenames never encode status. Each mutation increments `revision` and
+uses compare-and-swap atomic persistence. Attempt identity and invocation data
+are written before agent launch. `events.jsonl` is an audit stream, not replayed
+state.
 
-## Intent Preflight
+Legacy `.ready.md`, `.active.md`, `.completed.md`, and `.blocked.md` runs are not
+migrated. Finish them with the prior Factory version or cancel and restart.
 
-Intent changes are not Factory tasks.
+## Outcomes
 
-Before writing `.idd/factory/current/`, Factory analyzes the complete request
-against current `.idd/intent/`. When durable behavior is missing or
-contradictory, decomposition returns `INTENT_REQUIRED` without a partial plan.
-Factory runs the appropriate intent workflow, rereads current intent, and
-decomposes the original request again.
+The CLI emits one structured outcome and deterministic exit code. Successful
+finalization creates a collision-safe directory under `.idd/factory/results/`,
+validates `commit-message.md` and `factory-result.json`, preserves the execution
+event log and verification evidence there, then clears `current/`. If result
+creation fails, current state remains resumable.
 
-Only after intent is sufficient does Factory create implementation work. An
-Subtask must not edit `.idd/intent/`, invoke an intent-changing workflow,
-or use an intent update as its goal, dependency, or completion condition.
-
-If missing intent is discovered during execution or checkpoint review, the
-coordinator handles it outside the work-item list and updates affected
-implementation contracts before resuming.
-
-## Subtasks and Review Checkpoints
-
-Execution and review boundaries are separate.
-
-A Subtask is a small self-contained implementation contract. Successful
-execution records its result, changed areas, focused verification, and concerns,
-then completes without automatically starting an independent reviewer.
-
-A Review checkpoint is a separate ordered work item. It reviews one contiguous
-group of preceding completed Subtasks. Several mechanical or closely
-related tasks may share one checkpoint.
-
-Factory uses checkpoints when early independent review protects dependent later
-work, for example after:
-
-- a new foundation or abstraction;
-- a public contract change;
-- a persisted-data or compatibility boundary;
-- a security or concurrency boundary;
-- a risky migration group.
-
-Factory does not create a terminal checkpoint that merely duplicates the
-mandatory final integrated review.
-
-When checkpoint review finds a material problem, Factory creates a new
-corrective Subtask immediately before that checkpoint. Completed tasks
-remain immutable. After correction, the same checkpoint reviews the covered
-group again.
-
-`idd-factory-review-checkpoint` reviews active Review checkpoints; final Task
-review is performed by `idd-factory-review-task`.
-
-## Self-Contained Contracts
-
-Factory preserves the complete original request in `request.md`, but execution
-workers and checkpoint reviewers do not reread it.
-
-Subtasks contain the local context, requirements, boundaries, completion
-conditions, and verification needed for implementation. Review checkpoints
-contain their covered task list, review scope, and checkpoint-level
-verification.
-
-When several work items share substantial constraints or references, Factory may
-create a compact `run-context.md`. It contains only genuinely shared context.
-Factory does not copy the complete request into this file or repeat the entire
-request across tasks.
-
-The original request remains available to the coordinator for clarification and
-replanning and to the final reviewer for checking that decomposition did not
-lose any requirement.
-
-## Clarification and Intent Boundaries
-
-Factory may pause when:
-
-- the task is materially ambiguous;
-- a product decision has not been made;
-- current intent conflicts with the request;
-- an external condition prevents safe work.
-
-Questions are limited to information required for safe execution.
-
-After a clarification or mid-run intent change, Factory updates affected active
-and ready Subtasks, checkpoints, and shared run context before resuming.
-
-## Continue an Interrupted Run
-
-If the Coding Agent closes, context ends, execution is cancelled, or a tool
-fails, continue the existing run with:
-
-```text
-Continue the current IDD Factory work.
-```
-
-Each Factory step runs in a fresh coordinator context; persisted state is its
-only memory. Factory validates saved state before a new one-step coordinator decides whether
-to resume a Subtask, review an active checkpoint, activate the next item,
-perform final review, or finish the result. An interruption never requires the
-previous coordinator context: persisted state and repository evidence suffice.
-
-Do not start a different Factory request while unfinished work exists.
-
-If Factory cannot dispatch the required specialized worker, it preserves the
-current item and reports a resumable `BLOCKED` outcome.
-
-## Cancel a Run
-
-To discard only Factory orchestration state:
-
-```text
-Cancel the current IDD Factory work.
-```
-
-Cancellation does not revert implementation changes and does not delete previous
-Factory results.
-
-## Result
-
-After successful completion, Factory writes:
-
-```text
-.idd/factory/results/<work-slug>_<yyyy-MM-dd_HH-mm-ssZ>/commit-message.md
-```
-
-The UTC timestamp distinguishes repeated runs while the work slug keeps the
-result recognizable. The file contains a concise Git-compatible explanation of
-why the change was made and what was implemented.
-
-Factory itself does not commit, push, or create a pull request.
-
-## Temporary State
-
-Factory keeps local temporary state under:
-
-```text
-.idd/factory/
-  current/
-    request.md
-    run-context.md        # optional
-    001-*.ready.md        # Subtask or Review checkpoint
-  results/
-```
-
-These directories are ignored by default. They are not product intent.
-
-For exact formats, statuses, worker boundaries, and advanced manual invocation,
-see the [Factory Skills Reference](factory-skills.md).
+See [Factory workflow configuration](factory-workflow-configuration.md) for the
+supported YAML composition.

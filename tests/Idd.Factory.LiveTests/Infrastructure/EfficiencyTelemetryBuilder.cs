@@ -23,9 +23,12 @@ public static class EfficiencyTelemetryBuilder
         var roles = trace.Agents.GroupBy(agent => agent.Role, StringComparer.Ordinal).Select(group => ToRole(group.Key, group, input, fresh, toolCalls.Length)).OrderBy(role => role.Role, StringComparer.Ordinal).ToArray();
         var groups = new[]
         {
-            ToGroup("orchestration", trace.Agents.Where(agent => agent.Role is "factory-root" or "factory-step-coordinator"), input, fresh),
-            ToGroup("planning", trace.Agents.Where(agent => agent.Role == "task-decomposer"), input, fresh),
-            ToGroup("product-work", trace.Agents.Where(agent => agent.Role is "implementer" or "checkpoint-reviewer" or "final-reviewer"), input, fresh)
+            ToGroup("orchestration", trace.Agents.Where(agent => agent.Role == "factory-root"), input, fresh),
+            ToGroup("decomposition", trace.Agents.Where(agent => agent.Role == "task-decomposer"), input, fresh),
+            ToGroup("implementation", trace.Agents.Where(agent => agent.Role == "implementer"), input, fresh),
+            ToGroup("checkpoint-review", trace.Agents.Where(agent => agent.Role == "checkpoint-reviewer"), input, fresh),
+            ToGroup("final-review", trace.Agents.Where(agent => agent.Role == "final-reviewer"), input, fresh),
+            ToGroup("replan", trace.Agents.Where(agent => agent.Role == "factory-replanner"), input, fresh)
         };
         var failedToolCalls = trace.Agents.Count == 0 ? toolCalls.Count(call => call.IsFailure) : trace.Agents.Sum(agent => agent.FailedToolCallCount);
         var rejectedToolCalls = trace.Agents.Count == 0 ? toolCalls.Count(call => call.IsRejected) : trace.Agents.Sum(agent => agent.RejectedToolCallCount);

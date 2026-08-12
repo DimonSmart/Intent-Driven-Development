@@ -10,6 +10,7 @@ internal sealed class Generator(RepositoryLayout layout)
         }
 
         var errors = new List<string>();
+        EnsureFactoryRuntimePublished();
         var adapterReader = new AdapterReader();
         var adapterDefinitions = Directory
             .GetDirectories(layout.AdaptersRoot)
@@ -41,6 +42,24 @@ internal sealed class Generator(RepositoryLayout layout)
         return errors;
     }
 
+    private void EnsureFactoryRuntimePublished()
+    {
+        var project = Path.Combine(layout.RepoRoot, "src", "runtime", "Idd.Factory", "Idd.Factory.csproj");
+        var output = Path.Combine(layout.RepoRoot, "artifacts", "runtime-package");
+        var start = new System.Diagnostics.ProcessStartInfo("dotnet")
+        {
+            WorkingDirectory = layout.RepoRoot,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        foreach (var argument in new[] { "publish", project, "-c", "Release", "--nologo", "-o", output }) start.ArgumentList.Add(argument);
+        using var process = System.Diagnostics.Process.Start(start) ?? throw new InvalidOperationException("Could not start Factory runtime publication.");
+        var stdout = process.StandardOutput.ReadToEnd(); var stderr = process.StandardError.ReadToEnd(); process.WaitForExit();
+        if (process.ExitCode != 0) throw new InvalidOperationException($"Factory runtime publication failed.\n{stdout}\n{stderr}");
+    }
+
     private IReadOnlyDictionary<string, RoleDefinition> ReadRoleDefinitions(PluginManifest manifest)
     {
         var reader = new CanonicalRoleReader();
@@ -68,7 +87,7 @@ internal sealed class Generator(RepositoryLayout layout)
         {
             foreach (var file in platformAdapter.BuildPluginFiles(adapterDefinition, pluginManifest, pluginName, plugin, roleDefinitions, skillDescriptions, version))
             {
-                files.Add(new GeneratedFile(Path.Combine("plugins", platformAdapter.Platform, pluginName, file.RelativePath), file.Content));
+                files.Add(new GeneratedFile(Path.Combine("plugins", platformAdapter.Platform, pluginName, file.RelativePath), file.Content, file.BinaryContent));
             }
         }
 

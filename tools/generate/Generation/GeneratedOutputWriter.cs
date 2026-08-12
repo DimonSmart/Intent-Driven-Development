@@ -10,7 +10,8 @@ internal static class GeneratedOutputWriter
         {
             var fullPath = Path.Combine(outputRoot, file.RelativePath);
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-            File.WriteAllText(fullPath, file.Content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            if (file.BinaryContent is not null) File.WriteAllBytes(fullPath, file.BinaryContent);
+            else File.WriteAllText(fullPath, file.Content!, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         }
     }
 

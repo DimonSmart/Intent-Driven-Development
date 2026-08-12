@@ -10,6 +10,7 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
 
     public static IReadOnlyList<string> LaunchProfileDiscoveryOrder { get; } =
     [
+        "unrestricted-runtime-launch",
         "isolated-workspace-write",
         "configured-workspace-write",
         "windows-unelevated-workspace-write",
@@ -34,8 +35,20 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
     public Task<ProcessResult> RunCodexAsync(FactoryEvalWorkspace workspace, FactoryEvalOptions options, CancellationToken cancellationToken)
     {
         var prompt = BuildRunCodexPrompt(workspace.CaseDirectory);
-        var environmentOverrides = BuildCodexEnvironment(Environment.GetEnvironmentVariable("PATH") ?? string.Empty, OperatingSystem.IsWindows());
+        var factoryCodexExecutable = PrepareSandboxFactoryCodexExecutable(workspace);
+        var environmentOverrides = BuildCodexEnvironment(
+            Environment.GetEnvironmentVariable("PATH") ?? string.Empty,
+            OperatingSystem.IsWindows(),
+            factoryCodexExecutable);
         return processRunner.RunAsync(CodexCommand.Executable, CodexCommand.PrefixArguments.Concat(BuildRunCodexArguments(workspace, options)).ToArray(), workspace.WorkspaceDirectory, workspace.EventsPath, workspace.StderrPath, options.Timeout, cancellationToken, prompt, environmentOverrides, workspace.LastMessagePath);
+    }
+
+    private string? PrepareSandboxFactoryCodexExecutable(FactoryEvalWorkspace workspace)
+    {
+        if (CodexCommand.PrefixArguments.Count != 0) return null;
+        var target = Path.Combine(workspace.WorkspaceDirectory, ".agents", "runtime", "idd-factory-codex.exe");
+        if (!File.Exists(target)) File.Copy(CodexCommand.Executable, target);
+        return target;
     }
 
     internal static string BuildRunCodexPrompt(string caseDirectory)
@@ -73,7 +86,7 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
             foreach (var serverName in FindConfiguredMcpServerNames(userConfigPath))
                 arguments.AddRange(["-c", $"mcp_servers.{FormatTomlKey(serverName)}.enabled=false"]);
         if (profile.WindowsSandbox is not null) arguments.AddRange(["-c", $"windows.sandbox=\"{profile.WindowsSandbox}\""]);
-        arguments.AddRange(["--model", options.Model, "--sandbox", "workspace-write", "--cd", workspace.WorkspaceDirectory, "--output-last-message", workspace.LastMessagePath, "-"]);
+        arguments.AddRange(["--model", options.Model, "--sandbox", profile.SandboxMode, "--cd", workspace.WorkspaceDirectory, "--output-last-message", workspace.LastMessagePath, "-"]);
         return arguments;
     }
 
@@ -82,23 +95,28 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
         var effectiveName = string.IsNullOrWhiteSpace(name) ? LaunchProfileDiscoveryOrder[0] : name;
         return effectiveName switch
         {
-            "isolated-workspace-write" => new(effectiveName, IgnoreUserConfig: true, WindowsSandbox: null),
-            "configured-workspace-write" => new(effectiveName, IgnoreUserConfig: false, WindowsSandbox: null),
-            "windows-unelevated-workspace-write" => new(effectiveName, IgnoreUserConfig: false, WindowsSandbox: "unelevated"),
-            "windows-elevated-workspace-write" => new(effectiveName, IgnoreUserConfig: false, WindowsSandbox: "elevated"),
+            "unrestricted-runtime-launch" => new(effectiveName, IgnoreUserConfig: false, SandboxMode: "danger-full-access", WindowsSandbox: null),
+            "isolated-workspace-write" => new(effectiveName, IgnoreUserConfig: true, SandboxMode: "workspace-write", WindowsSandbox: null),
+            "configured-workspace-write" => new(effectiveName, IgnoreUserConfig: false, SandboxMode: "workspace-write", WindowsSandbox: null),
+            "windows-unelevated-workspace-write" => new(effectiveName, IgnoreUserConfig: false, SandboxMode: "workspace-write", WindowsSandbox: "unelevated"),
+            "windows-elevated-workspace-write" => new(effectiveName, IgnoreUserConfig: false, SandboxMode: "workspace-write", WindowsSandbox: "elevated"),
             _ => throw new InvalidOperationException($"Unknown Codex launch profile '{effectiveName}'. Expected one of: {string.Join(", ", LaunchProfileDiscoveryOrder)}.")
         };
     }
 
-    internal static IReadOnlyDictionary<string, string> BuildCodexEnvironment(string path, bool isWindows)
+    internal static IReadOnlyDictionary<string, string> BuildCodexEnvironment(string path, bool isWindows, string? factoryCodexExecutable = null)
     {
-        if (!isWindows) return new Dictionary<string, string>();
+        var environment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(factoryCodexExecutable))
+            environment["IDD_FACTORY_CODEX_EXECUTABLE"] = factoryCodexExecutable;
+        if (!isWindows) return environment;
 
         const char windowsPathSeparator = ';';
         var sandboxCompatiblePath = string.Join(windowsPathSeparator,
             path.Split(windowsPathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Where(directory => !directory.Contains("WindowsApps", StringComparison.OrdinalIgnoreCase)));
-        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["PATH"] = sandboxCompatiblePath };
+        environment["PATH"] = sandboxCompatiblePath;
+        return environment;
     }
 
     internal static IReadOnlyList<string> FindConfiguredMcpServerNames(string? configPath = null)
@@ -155,4 +173,4 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
     }
 }
 
-internal sealed record CodexLaunchProfile(string Name, bool IgnoreUserConfig, string? WindowsSandbox);
+internal sealed record CodexLaunchProfile(string Name, bool IgnoreUserConfig, string SandboxMode, string? WindowsSandbox);

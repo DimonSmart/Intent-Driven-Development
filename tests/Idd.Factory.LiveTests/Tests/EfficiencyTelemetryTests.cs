@@ -117,7 +117,8 @@ public sealed class EfficiencyTelemetryTests
         Assert.Equal(190, telemetry.Summary.FreshInputTokens);
         Assert.Equal(2, telemetry.Roles.Count);
         Assert.Equal(100, telemetry.Groups.Single(group => group.Group == "orchestration").InputTokens);
-        Assert.Equal(200, telemetry.Groups.Single(group => group.Group == "product-work").InputTokens);
+        Assert.Equal(200, telemetry.Groups.Single(group => group.Group == "implementation").InputTokens);
+        Assert.Equal(0, telemetry.Groups.Single(group => group.Group == "replan").Agents);
         var file = Assert.Single(telemetry.FileAccess);
         Assert.Equal(3, file.ReadCount);
         Assert.Equal(2, file.DistinctAgentCount);

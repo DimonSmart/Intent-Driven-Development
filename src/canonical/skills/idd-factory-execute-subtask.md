@@ -1,99 +1,28 @@
 # idd-factory-execute-subtask
 
-## Required Reference
-
-Read `references/project-verification.md` before resolving assigned checks or
-repository/platform fallback.
-
-Resolve verification checks using context `subtask` for the active Subtask. Run
-exactly its recorded IDs;
-do not add checks selected only for checkpoint or final contexts. A
-missing/changed referenced ID blocks the item. Confirmation refusal, user
-instructions without confirmation, and unavailable checks are `Not verified`.
-If any assigned check remains `Not verified`, return `BLOCKED`, never `DONE`,
-with `Reason`, `Verified`, `Not verified`, and `Resume when`. If changes newly
-introduced or required by the active Subtask escape the contracted verification
-scope, return `NEEDS_REPLAN`; do not expand checks yourself.
-
 ## Purpose
 
-Implement one explicit active Subtask in an isolated worker context.
+Implement exactly one self-contained active Subtask in a fresh context. Current
+`.idd/intent/` remains normative.
 
-## Inputs
+## Inputs and boundaries
 
-Read the active Subtask (including resumed `Blocker`), optional
-`run-context.md`, relevant intent, current diff, and focused repository evidence.
-Use project skills normally. Do not read `request.md`, checkpoints, or other
-Subtasks; the coordinator owns decomposition and must provide a sufficient
-local contract.
+Read the supplied Subtask, optional run context, relevant intent, current diff,
+focused repository evidence, and retry/verification-failure evidence. Do not
+read the full request, unrelated Subtasks, checkpoints, or previous transcripts.
 
-## Rules
+Make the smallest coherent implementation change. Do not select work, mutate
+Factory state, change intent, perform review or finalization, broaden scope, or
+delegate. Runtime verification is authoritative; worker verification claims are
+diagnostic only.
 
-- Confirm the supplied item is the only active item and is a Subtask, not
-  a Review checkpoint.
-- Confirm current intent is sufficient.
-- If the item asks to edit `.idd/intent/`, invoke an intent-changing workflow, or
-  own an intent update, return `NEEDS_REPLAN`; do not perform that scope.
-- Inspect diff and evidence first. Treat worktree changes already present when
-  this worker starts as inherited baseline. Changes belonging to completed
-  Factory work are expected and do not by themselves constitute scope escape;
-  preserve them unless the active Subtask explicitly requires a compatible
-  change.
-- Evaluate scope escape against changes newly introduced or newly required by
-  the active Subtask, not against the accumulated working-tree diff. If the
-  inherited baseline conflicts with the active Subtask contract or makes it
-  impossible to complete locally, return `NEEDS_REPLAN` and name the minimum
-  dependency or contract correction.
-- In explicit verification-only mode for an unchanged diff, preserve code and
-  `Verified`, perform only `Not verified`, and leave the mode only for changed
-  code or a newly revealed defect.
-- Make the smallest coherent change, preserve named boundaries, add only affected
-  tests, and run exactly the check IDs assigned to the Subtask.
-- Do not add checks selected only for checkpoint or final contexts, even when a
-  broader command appears useful.
-- Return `BLOCKED`, not `DONE`, whenever any assigned verification check remains
-  `Not verified`.
-- Return `NEEDS_REPLAN` when the task and run context are insufficient,
-  contradictory, contain intent-editing scope, require adjacent work outside
-  the task, or changes newly introduced or required by the active Subtask escape
-  the contracted verification scope. Name the minimum prerequisite or contract
-  correction; do not inspect the original request or perform later tasks.
-- Return `INTENT_REQUIRED` only for missing durable behavior discovered while
-  implementing current intent.
-- Return `BLOCKED` only for an external condition, a required verification result
-  that is not yet available, or a non-intent user decision.
-- Do not select or rename items, create Factory work, update intent, run a review
-  checkpoint or final review, clean state, or prepare a commit message.
+## Structured result
 
-## Output
+Return worker protocol version 1 with role `implementer` and one outcome:
+`completed`, `needs-replan`, `blocked`, or `intent-required`.
 
-Return `DONE`, `NEEDS_REPLAN`, `BLOCKED`, or `INTENT_REQUIRED`.
-
-Return `DONE` only when implementation is complete and every assigned check has
-conclusive evidence. For `DONE`, return compact sections:
-
-```text
-Implementation:
-Changes:
-Verification:
-Concerns:
-```
-
-`Changes` lists only paths, public symbols, contracts, or other evidence needed
-to focus a later Review checkpoint.
-
-For `NEEDS_REPLAN`, append `Dependency`.
-
-For `BLOCKED`, append:
-
-```text
-Reason:
-Verified:
-Not verified:
-Resume when:
-```
-
-For `INTENT_REQUIRED`, append `Reason` and `Resume when`; when a user decision is
-needed, make `Resume when` the exact question.
-
-The coordinator owns item contents, status, `Completion`, and `Blocker`.
+For `completed`, payload contains a concise `summary`, `declaredChanges[]`,
+`concerns[]`, and optional `verificationClaims[]`. Use `needs-replan` when the
+contract, ordering, repository reality, or assigned verification scope is
+insufficient. Use `intent-required` only for missing durable product meaning and
+`blocked` for an external or human-decision condition.

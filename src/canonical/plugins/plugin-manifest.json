@@ -103,28 +103,20 @@
       ],
       "skills": [
         "idd-factory-run",
-        "idd-factory-coordinate-step",
         "idd-factory-decompose-task",
         "idd-factory-execute-subtask",
         "idd-factory-review-checkpoint",
         "idd-factory-review-task",
-        "idd-factory-finalize-run"
+        "idd-factory-replan"
       ],
       "roles": [
-        "factory-coordinator",
-        "factory-step-coordinator",
         "task-decomposer",
         "implementer",
         "checkpoint-reviewer",
-        "final-reviewer"
+        "final-reviewer",
+        "factory-replanner"
       ],
       "skillRoleReferences": {
-        "idd-factory-run": [
-          "factory-coordinator"
-        ],
-        "idd-factory-coordinate-step": [
-          "factory-step-coordinator"
-        ],
         "idd-factory-decompose-task": [
           "task-decomposer"
         ],
@@ -137,18 +129,13 @@
         "idd-factory-review-task": [
           "final-reviewer"
         ],
-        "idd-factory-finalize-run": [
-          "factory-step-coordinator"
+        "idd-factory-replan": [
+          "factory-replanner"
         ]
       },
       "skillReferences": [
         {
           "skill": "idd-factory-run",
-          "source": "src/canonical/methodology/project-verification.md",
-          "destination": "project-verification.md"
-        },
-        {
-          "skill": "idd-factory-coordinate-step",
           "source": "src/canonical/methodology/project-verification.md",
           "destination": "project-verification.md"
         },
@@ -173,7 +160,7 @@
           "destination": "project-verification.md"
         },
         {
-          "skill": "idd-factory-finalize-run",
+          "skill": "idd-factory-replan",
           "source": "src/canonical/methodology/project-verification.md",
           "destination": "project-verification.md"
         }

@@ -58,8 +58,8 @@ Review checkpoints, or coordinated execution is required; Factory may be
 selected automatically and never becomes product intent.
 
 Factory keeps at most one resumable run in `.idd/factory/current/`. Its work
-items are a flat numbered sequence of small Subtasks and optional review
-checkpoints; the filename suffix is the only status source. Successful execution
+items are a numbered sequence of stable Subtask and optional Review checkpoint
+contracts; runtime-owned `state.json` is the only status source. Successful execution
 tasks complete without automatic independent review. `idd-factory-review-checkpoint`
 runs only for an explicit checkpoint covering one contiguous group of completed
 Subtasks. After all work items complete, Factory performs a mandatory
@@ -71,9 +71,9 @@ When Factory decomposition discovers missing durable intent, it creates no task
 state. Resolve intent first, then decompose the original request again. Intent
 changes never become Factory Subtasks.
 
-When a user asks to continue current Factory work, validate and resume saved
-state instead of reconstructing work from conversation history. A new request
-must not replace a nonempty current run.
+When a user asks to continue current Factory work, the packaged runtime validates
+and reconciles saved state instead of reconstructing work from conversation
+history. A new request must not replace a nonempty current run.
 
 When a request concerns IDD but does not explicitly name a skill, classify it
 through the `idd-route` routing model before selecting an intent,

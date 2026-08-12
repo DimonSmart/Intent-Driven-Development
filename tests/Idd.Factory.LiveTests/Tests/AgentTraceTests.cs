@@ -44,7 +44,7 @@ public sealed class AgentTraceTests
             Assert.Equal(["root", "coordinator", "implementer"], trace.Agents.Select(agent => agent.ThreadId));
             Assert.Equal("factory-step-coordinator", trace.Agents.Single(agent => agent.ThreadId == "coordinator").Role);
             Assert.Equal("INITIALIZE", trace.Agents.Single(agent => agent.ThreadId == "coordinator").Action);
-            Assert.Equal("completed", trace.Agents.Single(agent => agent.ThreadId == "coordinator").Status);
+            Assert.Equal("protocol-invalid", trace.Agents.Single(agent => agent.ThreadId == "coordinator").Status);
             Assert.Equal("001-code", trace.Agents.Single(agent => agent.ThreadId == "implementer").WorkItem);
             Assert.Null(trace.Agents.Single(agent => agent.ThreadId == "implementer").TotalTokens);
         }

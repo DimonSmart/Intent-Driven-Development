@@ -4,6 +4,18 @@ This page records IDD changes that require action in repositories that already u
 
 Updating the installed plugins and migrating project-owned files are separate operations. Follow [Updating IDD](updating-idd.md) to refresh `idd-intent` and `idd-factory`. Then apply any relevant migration instructions below. Plugin updates do not automatically rewrite a repository's `.idd/intent/` directory.
 
+## 2026-08-11 — Programmatic Factory Runtime
+
+Factory orchestration is now owned by the packaged .NET 10 runtime. Active runs
+use authoritative `.idd/factory/current/state.json`, stable work-item filenames,
+versioned worker results, and a pinned workflow hash. The former LLM step
+coordinator and LLM finalizer are removed.
+
+Legacy active runs containing `.ready.md`, `.active.md`, `.completed.md`, or
+`.blocked.md` work items are not migrated. Finish such a run with the previous
+Factory version, or cancel it and start a new run after updating the plugin.
+Existing `.idd/factory/results/` directories remain valid and are not changed.
+
 ## 2026-07-31 — Factory Task and Subtask terminology
 
 Factory now reserves `Task` for the complete user-requested unit of work and

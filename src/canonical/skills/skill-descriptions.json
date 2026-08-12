@@ -124,20 +124,7 @@
     "description": "Update `.idd/intent/` product intent from confirmed implementation behavior."
   },
   "idd-factory-run": {
-    "description": "Run or resume one Factory run through bootstrap and fresh one-step coordinator dispatch until a terminal outcome."
-  },
-  "idd-factory-coordinate-step": {
-    "description": "Internal Factory worker that initializes or restores persisted state and atomically coordinates exactly one logical step in a fresh isolated context.",
-    "adapters": {
-      "claude": {
-        "frontmatter": {
-          "context": "fork",
-          "agent": "general-purpose",
-          "background": false,
-          "argument-hint": "[repository path and current Factory run]"
-        }
-      }
-    }
+    "description": "Run, resume, or cancel a deterministic IDD Factory Runtime execution."
   },
   "idd-factory-decompose-task": {
     "description": "Decompose one Factory Task into ordered Subtasks and Review checkpoints.",
@@ -186,7 +173,15 @@
       }
     }
   },
-  "idd-factory-finalize-run": {
-    "description": "Create the commit-message handoff for an approved Task result and safely finalize the current Factory run."
+  "idd-factory-replan": {
+    "description": "Propose bounded semantic changes to remaining Factory work without mutating runtime state.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore"
+        }
+      }
+    }
   }
 }
