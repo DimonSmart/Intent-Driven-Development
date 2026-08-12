@@ -62,7 +62,9 @@ public sealed class TwoStepCatalogFactoryOrchestrationTests
             Assert.Contains("Programmatic worker dispatches:", report);
             Assert.Contains("Completed semantic workers:", report);
             Assert.Contains("Platform collaboration spawns:", report);
-            Assert.Contains("Fresh input tokens:", report);
+            Assert.Contains("Root launcher input:", report);
+            Assert.Contains("Semantic workers input:", report);
+            Assert.Contains("Total Factory tokens:", report);
             Assert.Contains("Detailed efficiency diagnostics: efficiency.md / efficiency.json", report);
             Assert.DoesNotContain("Successfully spawned agents", report);
             Assert.True(File.Exists(workspace.EfficiencyJsonPath));

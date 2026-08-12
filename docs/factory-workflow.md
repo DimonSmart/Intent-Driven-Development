@@ -12,10 +12,13 @@ exposes and explicitly activates the runtime-selected Factory skill. This keeps 
 the child CLI network control plane inside another Windows sandbox.
 
 For file-based Codex authentication, the backend creates an attempt-local
-private `CODEX_HOME`, copies only the credential cache, and removes that private
-directory after completion or cancellation. Startup recovery deletes a stale
-private directory left by an interrupted process. Credential material is never
-part of immutable attempt evidence or final Factory results.
+private `CODEX_HOME`, copies the credential cache, applies the configured
+user-skill inheritance policy, and then exposes the runtime-selected Factory
+skill from the exact plugin instance. A same-name project skill is rejected as
+`FACTORY_SKILL_COLLISION`; a same-name user skill is not inherited. Release eval
+uses a controlled profile with no user-global skill inheritance. The private
+directory is removed after completion or cancellation, and credential material
+is never part of immutable attempt evidence or final Factory results.
 
 IDD Factory coordinates multi-stage implementation while current `.idd/intent/`
 remains normative. Factory Runtime manages the workflow deterministically; LLM
@@ -59,11 +62,20 @@ required. A `needs-fix` result inserts a new corrective Subtask; completed work
 is immutable. A semantic decomposition defect invokes the bounded replanner,
 whose proposal is validated before runtime state changes.
 
-Runtime verification precedes checkpoint and final review. A normal failed
-check is persisted as evidence and may trigger the existing implementer skill in
-`verification-fix` mode. The same gate is rerun, with the per-gate attempt count
-bounded by workflow configuration. Diagnostics run by workers never replace
-Runtime-owned authoritative evidence.
+For every Subtask, the implementer performs semantic implementation and the
+runtime then executes authoritative subtask verification. A checkpoint
+verification gate must pass before its checkpoint reviewer is dispatched, and
+the final verification gate must pass before the final reviewer is dispatched.
+Reviewers consume runtime verification evidence but are not responsible for
+running mandatory checks. A normal failed check is persisted as evidence and
+may trigger the existing implementer skill in runtime-owned
+`verification-fix` mode. The same gate is rerun within its deterministic budget.
+Diagnostics run by workers never replace Runtime-owned authoritative evidence.
+
+Every attempt records requested and effective execution configuration when the
+backend can determine it, capability profile and skill source, and explicit
+process termination metadata. `ForcedAfterResult` may preserve a valid semantic
+result but remains an unclean attempt; release happy paths require `CleanExit`.
 
 ## State and recovery
 

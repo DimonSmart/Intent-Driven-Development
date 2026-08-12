@@ -30,13 +30,13 @@ public sealed class TwoStepCatalogFactoryEvalTests
         try
         {
             await LogProgressAsync(workspace, "Workspace created; resolving methodology and tool versions.", cancellationToken);
-            var version = await MethodologyVersionResolver.ResolveAsync(repositoryRoot, cancellationToken);
+            var version = await MethodologyVersionResolver.ResolveAsync(repositoryRoot, cancellationToken, FactoryEvalOptions.ReleaseCertificationRequested);
             var options = FactoryEvalOptions.FromEnvironment(version.Value) with { PersistSessionRollouts = true };
             var codexCommand = CodexExecutableResolver.Resolve();
             var codexVersion = await RequireVersionAsync(processRunner, codexCommand.Executable, codexCommand.PrefixArguments.Concat(["--version"]).ToArray(), repositoryRoot, workspace, "codex-version", cancellationToken);
             var dotnetVersion = await RequireVersionAsync(processRunner, "dotnet", ["--version"], repositoryRoot, workspace, "dotnet-version", cancellationToken);
             await RequireVersionAsync(processRunner, "git", ["--version"], repositoryRoot, workspace, "git-version", cancellationToken);
-            await File.WriteAllTextAsync(Path.Combine(workspace.RunDirectory, "run-manifest.json"), JsonSerializer.Serialize(new FactoryEvalRunManifest(1, "two-step-catalog", options.Model, options.ReasoningEffort, version.Value, version.SourceRevision, version.SourceDirty, codexVersion, dotnetVersion, DateTimeOffset.UtcNow), new JsonSerializerOptions { WriteIndented = true }) + "\n", cancellationToken);
+            await File.WriteAllTextAsync(Path.Combine(workspace.RunDirectory, "run-manifest.json"), JsonSerializer.Serialize(new FactoryEvalRunManifest(2, "two-step-catalog", options.Model, options.ReasoningEffort, version.Value, version.SourceRevision, version.SourceDirty, options.ReleaseCertification, codexVersion, dotnetVersion, DateTimeOffset.UtcNow), new JsonSerializerOptions { WriteIndented = true }) + "\n", cancellationToken);
             await LogProgressAsync(workspace, $"Prerequisites ready; model={options.Model}, reasoning={options.ReasoningEffort}, Codex timeout={options.Timeout.TotalMinutes:0} minutes.", cancellationToken);
             assertions.Require(dotnetVersion.StartsWith("10.", StringComparison.Ordinal), "Infrastructure", "NET 10 SDK", $"Expected a .NET 10 SDK, but dotnet --version reported '{dotnetVersion}'.");
 
@@ -44,11 +44,14 @@ public sealed class TwoStepCatalogFactoryEvalTests
             assertions.Require(buildGenerator.ExitCode == 0, "Infrastructure", "Generator build", $"Could not build the current generator. See {buildGenerator.StderrPath}.");
             if (buildGenerator.ExitCode != 0) throw new InvalidOperationException("Generator build failed.");
 
-            await new CurrentIddArtifactBuilder(processRunner).BuildAsync(repositoryRoot, workspace, version.Value, cancellationToken);
-            await LogProgressAsync(workspace, "Generated current IDD artifacts.", cancellationToken);
-            assertions.Require(Directory.Exists(Path.Combine(workspace.WorkspaceDirectory, ".agents", "skills", "idd-factory-run")), "Infrastructure", "Local Factory skills", "Generated Factory skills were not copied into the project-local .agents/skills directory.");
-            assertions.Require(File.Exists(Path.Combine(workspace.WorkspaceDirectory, ".agents", "runtime", "idd-factory.dll")), "Infrastructure", "Local Factory runtime", "Packaged Factory runtime was not copied beside the local skills.");
-            assertions.Require(File.Exists(Path.Combine(workspace.WorkspaceDirectory, ".agents", "skills", "idd-factory-run", "references", "methodology-version.json")), "Version", "Methodology reference", "The generated idd-factory-run methodology version reference is missing.");
+            if (options.ReleaseCertification && string.IsNullOrWhiteSpace(options.PreviousFactoryVersion))
+                throw new InvalidOperationException("Release certification requires IDD_FACTORY_PREVIOUS_VERSION for the plugin reinstall lifecycle check.");
+            var installed = await new CurrentIddArtifactBuilder(processRunner).BuildAsync(repositoryRoot, workspace, version.Value, cancellationToken, options.PreviousFactoryVersion);
+            await LogProgressAsync(workspace, $"Generated and installed current IDD Factory plugin at {installed.InstalledPath}.", cancellationToken);
+            assertions.Require(!Directory.Exists(Path.Combine(workspace.WorkspaceDirectory, ".agents", "skills", "idd-factory-run")), "Infrastructure", "No simulated Factory skills", "Factory skills must not be copied into the fixture workspace.");
+            assertions.Require(!Directory.Exists(Path.Combine(workspace.WorkspaceDirectory, ".agents", "runtime")), "Infrastructure", "No simulated Factory runtime", "Factory runtime must not be copied into the fixture workspace.");
+            assertions.Require(File.Exists(Path.Combine(installed.InstalledPath, "skills", "idd-factory-run", "references", "methodology-version.json")), "Version", "Installed methodology reference", "The installed idd-factory-run methodology version reference is missing.");
+            if (options.ReleaseCertification) assertions.Require(installed.PreviousInstalledPath is not null, "Version", "Plugin reinstall lifecycle", "Release certification did not install and replace a previous Factory version.");
 
             await InitializeGitAsync(processRunner, workspace, cancellationToken);
             await LogProgressAsync(workspace, "Initialized fixture repository; restoring and checking its baseline.", cancellationToken);
@@ -73,10 +76,13 @@ public sealed class TwoStepCatalogFactoryEvalTests
             var factoryProtocol = FactoryOutcomeTraceAnalyzer.Analyze(workspace.EventsPath);
             var executionResponse = ExecutionResponseReader.TryRead(workspace.LastMessagePath, workspace.WorkspaceDirectory);
             FactoryProtocolAssertions.Assert(assertions, factoryProtocol, executionResponse);
-            metrics = CodexJsonlAnalyzer.Analyze(workspace.EventsPath, codex.Duration);
+            metrics = CodexJsonlAnalyzer.Analyze(workspace.EventsPath, codex.Duration, new CodexHomeLocator(() => workspace.CodexHomeDirectory, () => workspace.CodexHomeDirectory));
             metrics.TotalSpawnedAgentCount = agentTrace.Agents.Count == 0 ? null : agentTrace.Agents.Count - 1;
             assertions.Require(metrics.MalformedLineCount == 0, "Infrastructure", "Codex JSONL", $"Codex JSONL contains {metrics.MalformedLineCount} malformed line(s). See {workspace.EventsPath}.");
-            assertions.Require(metrics.ModelEffective is null || metrics.ModelEffective == options.Model, "Infrastructure", "Effective Codex model", $"Expected Codex to use requested model '{options.Model}' without fallback, but JSONL reports '{metrics.ModelEffective}'.");
+            if (metrics.ModelEffective is null) assertions.Inconclusive("Infrastructure", "Effective outer Codex model", "Outer Codex JSONL did not expose an effective model; requested model cannot be independently confirmed.");
+            else assertions.Require(metrics.ModelEffective == options.Model, "Infrastructure", "Effective outer Codex model", $"Expected Codex to use requested model '{options.Model}' without fallback, but JSONL reports '{metrics.ModelEffective}'.");
+            if (metrics.ReasoningEffortEffective is null) assertions.Inconclusive("Infrastructure", "Effective outer Codex reasoning", "Outer Codex telemetry did not expose effective reasoning effort; requested reasoning cannot be independently confirmed.");
+            else assertions.Require(metrics.ReasoningEffortEffective == options.ReasoningEffort, "Infrastructure", "Effective outer Codex reasoning", $"Expected reasoning effort '{options.ReasoningEffort}', but telemetry reports '{metrics.ReasoningEffortEffective}'.");
 
             factoryResult = FactoryResultReader.TryReadSingle(workspace.WorkspaceDirectory);
             result.ExecutionResponsePassed = executionResponse.IsSuccess;
@@ -84,6 +90,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
             metrics.FactoryOutcome = result.FactoryOutcome;
             result.FactoryResultExpected = executionResponse.Response?.FactoryOutcome == "COMPLETED";
             FactoryPostRunDiagnostics.Assert(assertions, executionResponse, factoryResult, options.MethodologyVersion);
+            FactoryWorkerExecutionAssertions.Assert(assertions, workspace, options, installed.InstalledPath);
             var (finalBuild, finalTests) = await FinalProductVerification.RunAsync(environment, workspace, cancellationToken);
             await LogProgressAsync(workspace, $"Final product verification finished; build={finalBuild.ExitCode}, tests={finalTests.ExitCode}.", cancellationToken);
             result.FinalBuildPassed = finalBuild.ExitCode == 0;

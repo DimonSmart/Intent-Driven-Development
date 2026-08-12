@@ -122,8 +122,48 @@ public sealed record AgentResultEnvelope
 }
 
 public sealed record AgentRunHandle(string AttemptId, int ProcessId, string BackendHandle);
-public sealed record AgentProcessResult(int ExitCode, string Stdout, string Stderr, bool WasCancelled);
-public sealed record AgentAttemptTelemetry(string Role, string SkillName, string Backend, AgentExecutionProfile ExecutionProfile, string SkillInvocationMode, int InputChars);
+
+[JsonConverter(typeof(JsonStringEnumConverter<AgentTerminationKind>))]
+public enum AgentTerminationKind { CleanExit, ForcedAfterResult, Cancelled, TransportFailure }
+
+public sealed record AgentProcessResult(
+    int? ExitCode,
+    string Stdout,
+    string Stderr,
+    bool CompleteResultObserved,
+    bool KillRequired,
+    AgentTerminationKind TerminationKind);
+
+public sealed record AgentExecutionConfiguration(string? Model = null, string? ReasoningEffort = null)
+{
+    public string RequestedModel => string.IsNullOrWhiteSpace(Model) ? "default/unpinned" : Model;
+    public string RequestedReasoningEffort => string.IsNullOrWhiteSpace(ReasoningEffort) ? "default/unpinned" : ReasoningEffort;
+}
+
+public sealed record AgentCapabilityPolicy(bool InheritUserSkills, string Profile)
+{
+    public static AgentCapabilityPolicy ProductionDefault { get; } = new(true, "production-default");
+}
+
+public sealed record AgentAttemptTelemetry(
+    string Role,
+    string SkillName,
+    string Backend,
+    AgentExecutionProfile ExecutionProfile,
+    string SkillInvocationMode,
+    int InputChars,
+    string RequestedModel,
+    string RequestedReasoningEffort,
+    string EffectiveModel,
+    string EffectiveReasoningEffort,
+    string SkillSource,
+    string SkillSourceVersion,
+    string UserSkillInheritancePolicy,
+    int ProjectLocalSkillCount,
+    int InheritedUserSkillCount,
+    string CapabilityProfile);
+
+public sealed record AgentExecutionResult(AgentResultEnvelope Result, AgentProcessResult Process);
 
 public sealed record FactoryCliOutcome(
     string FactoryOutcome,

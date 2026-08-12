@@ -69,7 +69,7 @@ public static class CodexJsonlAnalyzer
         var rootRuntime = CodexRootRuntimeTelemetryReader.TryRead(
             (codexHomeLocator ?? new CodexHomeLocator()).FindSessionsDirectory(),
             metrics.RootThreadId);
-        metrics.ModelEffective = rootRuntime.Model ?? "unavailable";
+        metrics.ModelEffective = rootRuntime.Model;
 
         return metrics;
     }

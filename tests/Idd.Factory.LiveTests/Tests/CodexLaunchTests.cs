@@ -42,4 +42,17 @@ public sealed class CodexLaunchTests
             Directory.Delete(root, recursive: true);
         }
     }
+
+    [Fact]
+    public void EvalEnvironment_PropagatesWorkerExecutionConfigurationAndControlledCapabilities()
+    {
+        var options = new FactoryEvalOptions("gpt-test", "high", TimeSpan.FromMinutes(1), "version");
+        var environment = LocalFactoryEvalEnvironment.BuildCodexEnvironment("path", isWindows: false, codexHome: "isolated", options: options);
+
+        Assert.Equal("isolated", environment["CODEX_HOME"]);
+        Assert.Equal("gpt-test", environment["IDD_FACTORY_MODEL"]);
+        Assert.Equal("high", environment["IDD_FACTORY_REASONING_EFFORT"]);
+        Assert.Equal("false", environment["IDD_FACTORY_INHERIT_USER_SKILLS"]);
+        Assert.Equal("release-eval-controlled", environment["IDD_FACTORY_CAPABILITY_PROFILE"]);
+    }
 }

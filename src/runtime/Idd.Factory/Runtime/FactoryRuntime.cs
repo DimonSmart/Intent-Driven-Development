@@ -175,6 +175,7 @@ public sealed class FactoryRuntime(
     {
         while (true)
         {
+            await events.WriteAsync(state.RunId, "verification-started", new { verificationContext = context, workItemId = item.Id, verificationFixAttempt = item.VerificationFixAttemptCount }, cancellationToken);
             var result = context == "subtask"
                 ? await verification.RunAsync(item.VerificationCheckIds, cancellationToken)
                 : await verification.RunContextAsync(context, cancellationToken);
@@ -200,6 +201,7 @@ public sealed class FactoryRuntime(
     {
         while (true)
         {
+            await events.WriteAsync(state.RunId, "verification-started", new { verificationContext = "final", verificationFixAttempt = state.FinalVerificationFixAttemptCount }, cancellationToken);
             var result = await verification.RunContextAsync("final", cancellationToken);
             RecordEvidence(state, null, result.Evidence);
             await events.WriteAsync(state.RunId, "verification-completed", new { verificationContext = "final", verificationStatus = result.Status.ToString(), verificationFixAttempt = state.FinalVerificationFixAttemptCount }, cancellationToken);
@@ -309,9 +311,24 @@ public sealed class FactoryRuntime(
             WorkspaceFingerprint = fingerprinter.Compute(workspace)
         };
         await events.WriteAsync(state.RunId, "agent-dispatching", new { attemptId, role, workItemId = item?.Id }, cancellationToken);
-        var result = await agentExecutor.ExecuteAsync(invocation, cancellationToken);
+        var execution = await agentExecutor.ExecuteAsync(invocation, cancellationToken);
+        var result = execution.Result;
         state.CurrentAttemptId = null; await SaveAsync(state, cancellationToken);
-        await events.WriteAsync(state.RunId, "agent-completed", new { attemptId, role, result.Outcome, metrics = result.Metrics }, cancellationToken); return result;
+        await events.WriteAsync(state.RunId, "agent-completed", new
+        {
+            attemptId,
+            role,
+            result.Outcome,
+            metrics = result.Metrics,
+            termination = new
+            {
+                execution.Process.TerminationKind,
+                execution.Process.CompleteResultObserved,
+                execution.Process.KillRequired,
+                execution.Process.ExitCode
+            }
+        }, cancellationToken);
+        return result;
     }
 
     private void AddWorkItem(FactoryState state, JsonElement node)

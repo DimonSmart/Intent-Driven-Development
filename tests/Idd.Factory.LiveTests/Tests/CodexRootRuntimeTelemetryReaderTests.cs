@@ -90,7 +90,7 @@ public sealed class CodexRootRuntimeTelemetryReaderTests
                 TimeSpan.Zero,
                 new CodexHomeLocator(() => root, () => "ignored"));
 
-            Assert.Equal("unavailable", metrics.ModelEffective);
+            Assert.Null(metrics.ModelEffective);
         }
         finally { Directory.Delete(root, true); }
     }

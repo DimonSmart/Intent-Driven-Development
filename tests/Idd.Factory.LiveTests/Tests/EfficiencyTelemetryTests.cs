@@ -115,6 +115,9 @@ public sealed class EfficiencyTelemetryTests
         Assert.Equal(300, telemetry.Summary.InputTokens);
         Assert.Equal(110, telemetry.Summary.CachedInputTokens);
         Assert.Equal(190, telemetry.Summary.FreshInputTokens);
+        Assert.Equal(100, telemetry.RootLauncher.InputTokens);
+        Assert.Equal(200, telemetry.SemanticWorkers.InputTokens);
+        Assert.Equal(300, telemetry.EndToEndFactory.InputTokens);
         Assert.Equal(2, telemetry.Roles.Count);
         Assert.Equal(100, telemetry.Groups.Single(group => group.Group == "orchestration").InputTokens);
         Assert.Equal(200, telemetry.Groups.Single(group => group.Group == "implementation").InputTokens);
@@ -125,8 +128,21 @@ public sealed class EfficiencyTelemetryTests
         Assert.Equal("worker", telemetry.Hotspots.TopAgentsByInput[0]);
 
         var markdown = EfficiencyReportWriter.Write(telemetry);
-        foreach (var heading in new[] { "Token usage by role", "Token usage by agent", "Token progression", "Tool-call hotspots", "Repeated file reads", "Dispatch/reference sizes", "Failures and retries", "Wait-agent telemetry", "Diagnostics" }) Assert.Contains(heading, markdown);
+        foreach (var heading in new[] { "Factory token scopes", "Root launcher", "Semantic workers", "End-to-end Factory", "Total Factory tokens", "Token usage by role", "Token usage by agent", "Token progression", "Tool-call hotspots", "Repeated file reads", "Dispatch/reference sizes", "Failures and retries", "Wait-agent telemetry", "Diagnostics" }) Assert.Contains(heading, markdown);
         Assert.DoesNotContain(Path.GetTempPath(), markdown, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SyntheticRootUsesOuterMetricsForEndToEndTotals()
+    {
+        var root = new AgentTraceNode("root", null, "factory-root", null, null, "completed", null, null, null, 0, 0, null, null, null, null, null);
+        var worker = Node("worker", "implementer", 200, 50, 4, reads: []);
+        var telemetry = EfficiencyTelemetryBuilder.Build(new(2, "root", [root, worker], []), new() { InputTokens = 100, CachedInputTokens = 60, OutputTokens = 20, ReasoningOutputTokens = 5, TotalTokens = 120 });
+
+        Assert.Equal(100, telemetry.RootLauncher.InputTokens);
+        Assert.Equal(200, telemetry.SemanticWorkers.InputTokens);
+        Assert.Equal(300, telemetry.EndToEndFactory.InputTokens);
+        Assert.Equal(340, telemetry.EndToEndFactory.TotalTokens);
     }
 
     [Theory]

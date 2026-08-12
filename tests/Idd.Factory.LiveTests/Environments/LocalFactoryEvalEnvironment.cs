@@ -39,10 +39,24 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
         var environmentOverrides = BuildCodexEnvironment(
             Environment.GetEnvironmentVariable("PATH") ?? string.Empty,
             OperatingSystem.IsWindows(),
-            factoryCodexExecutable);
+            factoryCodexExecutable,
+            workspace.CodexHomeDirectory,
+            options);
         try
         {
-            return await processRunner.RunAsync(CodexCommand.Executable, CodexCommand.PrefixArguments.Concat(BuildRunCodexArguments(workspace, options)).ToArray(), workspace.WorkspaceDirectory, workspace.EventsPath, workspace.StderrPath, options.Timeout, cancellationToken, prompt, environmentOverrides, workspace.LastMessagePath);
+            using var monitorStop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var monitor = new FactoryProgressMonitor(workspace);
+            var monitorTask = monitor.RunAsync(monitorStop.Token);
+            try
+            {
+                return await processRunner.RunAsync(CodexCommand.Executable, CodexCommand.PrefixArguments.Concat(BuildRunCodexArguments(workspace, options, userConfigPath: Path.Combine(workspace.CodexHomeDirectory, "config.toml"))).ToArray(), workspace.WorkspaceDirectory, workspace.EventsPath, workspace.StderrPath, options.Timeout, cancellationToken, prompt, environmentOverrides, workspace.LastMessagePath);
+            }
+            finally
+            {
+                monitorStop.Cancel();
+                try { await monitorTask; } catch (OperationCanceledException) { }
+                await monitor.ProjectChangesAsync(CancellationToken.None);
+            }
         }
         finally
         {
@@ -54,6 +68,7 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
     {
         if (CodexCommand.PrefixArguments.Count != 0) return null;
         var target = Path.Combine(workspace.WorkspaceDirectory, ".agents", "runtime", "idd-factory-codex.exe");
+        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
         if (!File.Exists(target)) File.Copy(CodexCommand.Executable, target);
         return target;
     }
@@ -84,7 +99,7 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
         arguments.AddRange([
             "--ignore-rules",
             "--enable", "multi_agent", "--disable", "multi_agent_v2",
-            "--disable", "plugins", "--disable", "apps", "--disable", "browser_use", "--disable", "code_mode_host",
+            "--disable", "apps", "--disable", "browser_use", "--disable", "code_mode_host",
             "-c", "agents.max_depth=2", "-c", "agents.max_threads=10",
             "-c", "features.code_mode.direct_only_tool_namespaces=[\"multi_agent_v1\"]",
             "-c", "mcp_servers={}", "-c", "approval_policy=never", "-c", $"model_reasoning_effort={options.ReasoningEffort}"
@@ -111,11 +126,24 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
         };
     }
 
-    internal static IReadOnlyDictionary<string, string> BuildCodexEnvironment(string path, bool isWindows, string? factoryCodexExecutable = null)
+    internal static IReadOnlyDictionary<string, string> BuildCodexEnvironment(
+        string path,
+        bool isWindows,
+        string? factoryCodexExecutable = null,
+        string? codexHome = null,
+        FactoryEvalOptions? options = null)
     {
         var environment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (!string.IsNullOrWhiteSpace(factoryCodexExecutable))
             environment["IDD_FACTORY_CODEX_EXECUTABLE"] = factoryCodexExecutable;
+        if (!string.IsNullOrWhiteSpace(codexHome)) environment["CODEX_HOME"] = codexHome;
+        if (options is not null)
+        {
+            environment["IDD_FACTORY_MODEL"] = options.Model;
+            environment["IDD_FACTORY_REASONING_EFFORT"] = options.ReasoningEffort;
+            environment["IDD_FACTORY_INHERIT_USER_SKILLS"] = "false";
+            environment["IDD_FACTORY_CAPABILITY_PROFILE"] = "release-eval-controlled";
+        }
         if (!isWindows) return environment;
 
         const char windowsPathSeparator = ';';

@@ -72,6 +72,49 @@ public sealed class AgentProtocolTests
         Assert.Equal("implementer", telemetry.Role); Assert.Equal("idd-factory-execute-subtask", telemetry.SkillName);
         Assert.Equal("codex-cli", telemetry.Backend); Assert.Equal(AgentExecutionProfile.WorkspaceWrite, telemetry.ExecutionProfile);
         Assert.Equal("bootstrap", telemetry.SkillInvocationMode); Assert.Equal("input".Length, telemetry.InputChars);
+        Assert.Equal("default/unpinned", telemetry.RequestedModel);
+        Assert.Equal("default/unpinned", telemetry.RequestedReasoningEffort);
+        Assert.Equal("unknown", telemetry.EffectiveModel);
+        Assert.Equal("unknown", telemetry.EffectiveReasoningEffort);
+    }
+
+    [Fact] public void CodexAdapterMapsPinnedExecutionConfigurationToCommandLine()
+    {
+        var arguments = CodexCliBackend.BuildArguments(Invocation(), new("gpt-test", "high"), isWindows: false);
+        Assert.Contains("--model", arguments);
+        Assert.Equal("gpt-test", arguments[arguments.ToList().IndexOf("--model") + 1]);
+        Assert.Contains("model_reasoning_effort=high", arguments);
+    }
+
+    [Fact] public void CodexAdapterOmitsUnpinnedExecutionConfiguration()
+    {
+        var arguments = CodexCliBackend.BuildArguments(Invocation(), new(), isWindows: false);
+        Assert.DoesNotContain("--model", arguments);
+        Assert.DoesNotContain(arguments, value => value.StartsWith("model_reasoning_effort=", StringComparison.Ordinal));
+    }
+
+    [Fact] public void SelectedFactorySkillIsNeverInheritedFromUserHome()
+    {
+        Assert.False(CodexCliBackend.ShouldInheritSkill("idd-factory-execute-subtask", "idd-factory-execute-subtask"));
+        Assert.True(CodexCliBackend.ShouldInheritSkill("domain-skill", "idd-factory-execute-subtask"));
+    }
+
+    [Fact] public void ProjectSkillCollisionFailsExplicitly()
+    {
+        using var temp = new TestWorkspace();
+        var plugin = temp.Write("plugin/skills/idd-factory-execute-subtask/SKILL.md", "factory");
+        temp.Write("workspace/.agents/skills/idd-factory-execute-subtask/SKILL.md", "collision");
+        var invocation = Invocation() with { Workspace = Path.Combine(temp.Path, "workspace") };
+        var exception = Assert.Throws<AgentProtocolException>(() => CodexCliBackend.ValidateSkillIdentity(Path.GetFullPath(Path.Combine(temp.Path, "plugin")), invocation));
+        Assert.Equal("FACTORY_SKILL_COLLISION", exception.Code);
+    }
+
+    [Fact] public void ControlledCapabilityTelemetryReportsNoUserSkillInheritance()
+    {
+        var telemetry = CodexCliBackend.BuildTelemetry(Invocation(), new("model", "low"), new(false, "release-eval-controlled"));
+        Assert.Equal("isolated", telemetry.UserSkillInheritancePolicy);
+        Assert.Equal(0, telemetry.InheritedUserSkillCount);
+        Assert.Equal("release-eval-controlled", telemetry.CapabilityProfile);
     }
 
     [Fact] public async Task WorkerCannotChangeRunnerOwnedState()
@@ -84,6 +127,34 @@ public sealed class AgentProtocolTests
         Assert.Equal("WORKER_CHANGED_RUNNER_STATE", exception.Code);
     }
 
+    [Theory]
+    [InlineData(AgentTerminationKind.CleanExit, 0, false)]
+    [InlineData(AgentTerminationKind.ForcedAfterResult, -1, true)]
+    public async Task CompleteResultIsAcceptedWithExplicitTermination(AgentTerminationKind kind, int exitCode, bool killed)
+    {
+        using var temp = new TestWorkspace();
+        var invocation = PreparedInvocation(temp);
+        var execution = await new AgentExecutor(new ResultBackend(invocation, new(exitCode, "", "", true, killed, kind), produceResult: true), new AgentResultValidator()).ExecuteAsync(invocation, default);
+        Assert.Equal(kind, execution.Process.TerminationKind);
+        Assert.Equal(exitCode, execution.Process.ExitCode);
+        Assert.Equal(killed, execution.Process.KillRequired);
+    }
+
+    [Fact] public async Task NonZeroExitBeforeResultIsTransportFailure()
+    {
+        using var temp = new TestWorkspace();
+        var invocation = PreparedInvocation(temp);
+        var exception = await Assert.ThrowsAsync<AgentProtocolException>(() => new AgentExecutor(new ResultBackend(invocation, new(17, "", "failure", false, false, AgentTerminationKind.TransportFailure), produceResult: false), new AgentResultValidator()).ExecuteAsync(invocation, default));
+        Assert.Equal("AGENT_TRANSPORT_FAILURE", exception.Code);
+    }
+
+    [Fact] public async Task CancelledProcessPropagatesCancellation()
+    {
+        using var temp = new TestWorkspace();
+        var invocation = PreparedInvocation(temp);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new AgentExecutor(new ResultBackend(invocation, new(-1, "", "", false, true, AgentTerminationKind.Cancelled), produceResult: false), new AgentResultValidator()).ExecuteAsync(invocation, new CancellationToken(canceled: true)));
+    }
+
     [Fact] public void CodexResolverPrefersPackagedNativeExecutableOnWindows()
     {
         using var temp = new TestWorkspace(); var native = temp.Write("node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/bin/codex.exe", "");
@@ -91,12 +162,30 @@ public sealed class AgentProtocolTests
     }
 
     private static AgentInvocation Invocation() => new() { RunId = "run", AttemptId = "A000001", Role = "implementer", Workspace = "w", ResultPath = "r", SkillName = "idd-factory-execute-subtask", ExecutionProfile = AgentExecutionProfile.WorkspaceWrite, Input = "input", StartedAt = DateTimeOffset.UnixEpoch, WorkspaceFingerprint = "f" };
+    private static AgentInvocation PreparedInvocation(TestWorkspace temp)
+    {
+        temp.Write(".idd/factory/current/state.json", "state");
+        temp.Write(".idd/factory/current/request.md", "request");
+        var placeholder = temp.Write(".idd/factory/current/attempts/A000001/placeholder", "x");
+        return Invocation() with { Workspace = temp.Path, ResultPath = Path.Combine(Path.GetDirectoryName(placeholder)!, "result.json") };
+    }
     private static AgentResultEnvelope Result() => new() { ProtocolVersion = 1, RunId = "run", AttemptId = "A000001", Role = "implementer", Outcome = "completed" };
 
     private sealed class MutatingBackend(AgentInvocation invocation, string statePath) : IAgentBackend
     {
         public Task<AgentRunHandle> StartAsync(AgentInvocation _, CancellationToken cancellationToken) { File.WriteAllText(statePath, "changed"); File.WriteAllText(invocation.ResultPath, System.Text.Json.JsonSerializer.Serialize(Result(), FactoryJson.Options)); return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId)); }
-        public Task<AgentProcessResult> WaitAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.FromResult(new AgentProcessResult(0, "", "", false));
+        public Task<AgentProcessResult> WaitAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.FromResult(new AgentProcessResult(0, "", "", true, false, AgentTerminationKind.CleanExit));
+        public Task CancelAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class ResultBackend(AgentInvocation invocation, AgentProcessResult process, bool produceResult) : IAgentBackend
+    {
+        public Task<AgentRunHandle> StartAsync(AgentInvocation _, CancellationToken cancellationToken)
+        {
+            if (produceResult) File.WriteAllText(invocation.ResultPath, JsonSerializer.Serialize(Result(), FactoryJson.Options));
+            return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId));
+        }
+        public Task<AgentProcessResult> WaitAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.FromResult(process);
         public Task CancelAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

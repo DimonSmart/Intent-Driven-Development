@@ -123,7 +123,7 @@ public sealed class FactoryProtocolTests
         Assert.True(HasOption(arguments, "--enable", "multi_agent"));
         Assert.True(HasOption(arguments, "--disable", "multi_agent_v2"));
         Assert.True(HasOption(arguments, "-c", "agents.max_threads=10"));
-        Assert.True(HasOption(arguments, "--disable", "plugins"));
+        Assert.False(HasOption(arguments, "--disable", "plugins"));
         Assert.True(HasOption(arguments, "--disable", "apps"));
         Assert.Contains("mcp_servers={}", arguments);
         Assert.DoesNotContain(arguments, argument => argument.StartsWith("windows.sandbox=", StringComparison.Ordinal));
@@ -142,6 +142,20 @@ public sealed class FactoryProtocolTests
         Assert.Contains("Intermediate progress messages must remain natural-language progress", prompt, StringComparison.Ordinal);
         Assert.Contains("\"schemaVersion\"", prompt, StringComparison.Ordinal);
         Assert.Contains("\"factoryOutcome\"", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InstalledPluginLaunchDoesNotProjectGlobalMcpServersIntoIsolatedConfig()
+    {
+        using var fixture = new FactoryFixture();
+        var caseDirectory = Path.Combine(RepositoryRootFinder.Find(), "tests", "Idd.Factory.LiveTests", "Cases", "TwoStepCatalog");
+        var workspace = new FactoryEvalWorkspace(fixture.Workspace, fixture.Workspace, fixture.Workspace, fixture.Workspace, caseDirectory);
+        var isolatedConfig = Path.Combine(fixture.Workspace, "isolated-config.toml");
+        File.WriteAllText(isolatedConfig, "[plugins.\"idd-factory@intent-driven-development\"]\nenabled = true\n");
+
+        var arguments = LocalFactoryEvalEnvironment.BuildRunCodexArguments(workspace, new("model", "low", TimeSpan.FromMinutes(1), "1.0"), "unrestricted-runtime-launch", isolatedConfig);
+
+        Assert.DoesNotContain(arguments, argument => argument.StartsWith("mcp_servers.browsercommander", StringComparison.Ordinal));
     }
 
     [Theory]

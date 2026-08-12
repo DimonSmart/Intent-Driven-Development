@@ -27,11 +27,13 @@ Factory state, change intent, perform review or finalization, broaden scope, or
 delegate. Runtime verification is authoritative; worker verification claims are
 diagnostic only.
 
-Focused diagnostic commands, repository evidence, and relevant project or
-domain skills may be used normally. Do not resolve or run mandatory Factory
-check IDs on behalf of the runtime, and do not claim that diagnostics passed an
-authoritative gate. The runtime owns orchestration, retries, machine protocol
-validation, authoritative verification, and the next semantic capability.
+Use lightweight repository inspection needed for implementation, but do not run
+build, test, lint, or other potentially long-lived diagnostic commands. The
+runtime executes the applicable authoritative verification gate immediately
+after this result. Do not resolve or run mandatory Factory check IDs, and never
+leave a tool process active when returning the structured result. The runtime
+owns orchestration, retries, machine protocol validation, authoritative
+verification, and the next semantic capability.
 
 ## Structured result
 

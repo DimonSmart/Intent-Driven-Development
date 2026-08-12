@@ -151,7 +151,7 @@ public sealed class FactoryRuntimeTests
         public Queue<Func<AgentInvocation, AgentResultEnvelope>> Results { get; } = new(); public List<string> Roles { get; } = [];
         public List<AgentInvocation> Invocations { get; } = [];
         public Task<AgentRunHandle> StartAsync(AgentInvocation invocation, CancellationToken cancellationToken) { Roles.Add(invocation.Role); Invocations.Add(invocation); var result = Results.Dequeue()(invocation); Directory.CreateDirectory(System.IO.Path.GetDirectoryName(invocation.ResultPath)!); File.WriteAllText(invocation.ResultPath, JsonSerializer.Serialize(result, FactoryJson.Options)); return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId)); }
-        public Task<AgentProcessResult> WaitAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.FromResult(new AgentProcessResult(0, "", "", false));
+        public Task<AgentProcessResult> WaitAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.FromResult(new AgentProcessResult(0, "", "", true, false, AgentTerminationKind.CleanExit));
         public Task CancelAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.CompletedTask;
     }
     private sealed class FakeClock : IClock { public DateTimeOffset UtcNow => DateTimeOffset.Parse("2026-01-01T00:00:00Z"); }

@@ -8,19 +8,23 @@ public static class EfficiencyTelemetryBuilder
     {
         var diagnostics = trace.Diagnostics.ToList();
         var agents = trace.Agents.Select(ToAgent).ToArray();
-        var rootHasCounters = trace.Agents.Any(agent => agent.Role == "factory-root" && agent.InputTokens is not null);
-        var measuredAgents = (rootHasCounters ? trace.Agents : trace.Agents.Where(agent => agent.Role != "factory-root")).ToArray();
-        if (measuredAgents.Length == 0) measuredAgents = trace.Agents.ToArray();
-        if (measuredAgents.Length > 0 && measuredAgents.Any(agent => agent.InputTokens is null)) diagnostics.Add(new("EFFICIENCY_INPUT_INCOMPLETE", "info", "At least one semantic worker has no input-token counter; aggregate input totals are unavailable.", null, null));
-        if (measuredAgents.Length > 0 && measuredAgents.Any(agent => agent.CachedInputTokens is null)) diagnostics.Add(new("EFFICIENCY_CACHED_INPUT_INCOMPLETE", "info", "At least one semantic worker has no cached-input counter; aggregate cached and fresh input totals are unavailable.", null, null));
+        var rootAgents = trace.Agents.Where(agent => agent.Role == "factory-root").ToArray();
+        var workerAgents = trace.Agents.Where(agent => agent.Role != "factory-root").ToArray();
+        if (workerAgents.Length > 0 && workerAgents.Any(agent => agent.InputTokens is null)) diagnostics.Add(new("EFFICIENCY_INPUT_INCOMPLETE", "info", "At least one semantic worker has no input-token counter; semantic-worker and end-to-end totals are unavailable.", null, null));
+        if (workerAgents.Length > 0 && workerAgents.Any(agent => agent.CachedInputTokens is null)) diagnostics.Add(new("EFFICIENCY_CACHED_INPUT_INCOMPLETE", "info", "At least one semantic worker has no cached-input counter; semantic-worker cached and fresh totals are unavailable.", null, null));
 
-        var input = measuredAgents.Length == 0 ? metrics.InputTokens : Sum(measuredAgents.Select(agent => agent.InputTokens));
-        var cached = measuredAgents.Length == 0 ? metrics.CachedInputTokens : Sum(measuredAgents.Select(agent => agent.CachedInputTokens));
+        var root = rootAgents.Length == 0 || rootAgents.Any(agent => agent.InputTokens is null)
+            ? FromMetrics(metrics)
+            : FromAgents(rootAgents);
+        var workers = FromAgents(workerAgents);
+        var endToEnd = Add(root, workers);
+        var input = endToEnd.InputTokens;
+        var cached = endToEnd.CachedInputTokens;
         var fresh = Fresh(input, cached);
         if (input is not null && cached is not null && fresh is null) diagnostics.Add(new("EFFICIENCY_TOKEN_COUNTER_INCONSISTENT", "warning", "Cached input exceeds input; aggregate fresh input is unavailable.", null, null));
-        var output = measuredAgents.Length == 0 ? metrics.OutputTokens : Sum(measuredAgents.Select(agent => agent.OutputTokens));
-        var reasoning = measuredAgents.Length == 0 ? metrics.ReasoningOutputTokens : Sum(measuredAgents.Select(agent => agent.ReasoningOutputTokens));
-        var total = measuredAgents.Length == 0 ? metrics.TotalTokens : Sum(measuredAgents.Select(agent => agent.TotalTokens));
+        var output = endToEnd.OutputTokens;
+        var reasoning = endToEnd.ReasoningOutputTokens;
+        var total = endToEnd.TotalTokens;
         var toolCalls = trace.Agents.SelectMany(agent => (agent.ToolCalls ?? []).Select(call => (Agent: agent, Call: call))).Select(item => new EfficiencyToolCall(item.Call.Sequence, item.Agent.ThreadId, item.Agent.Role, item.Call.CallId, item.Call.Tool, item.Call.StartedAt, item.Call.CompletedAt, item.Call.DurationMs, item.Call.Status, item.Call.IsFailure, item.Call.IsRejected, item.Call.IsRetryOrFallback, item.Call.Operation, item.Call.CommandSummary, item.Call.ExitCode, item.Call.ResultBytes, item.Call.ChildThreadIds, item.Call.IsTerminalWait, item.Call.RepeatedWaitNumber, item.Call.ChildRole, item.Call.DispatchCharacters, item.Call.DispatchUtf8Bytes)).OrderBy(call => call.StartedAt).ThenBy(call => call.ThreadId, StringComparer.Ordinal).ThenBy(call => call.Sequence).ToArray();
         var fileAccess = trace.Agents.SelectMany(agent => (agent.FileReads ?? []).Select(read => (agent.ThreadId, Read: read))).GroupBy(item => item.Read.Path, StringComparer.OrdinalIgnoreCase).Select(group => new EfficiencyFileAccess(CodexRolloutReader.NormalizePath(group.First().Read.Path), group.Count(), group.Select(item => item.ThreadId).Distinct(StringComparer.Ordinal).Count(), group.Sum(item => item.Read.ReturnedBytes), group.Select(item => item.ThreadId).Distinct(StringComparer.Ordinal).OrderBy(id => id, StringComparer.Ordinal).ToArray())).OrderByDescending(file => file.ReadCount).ThenBy(file => file.Path, StringComparer.OrdinalIgnoreCase).ToArray();
         var roles = trace.Agents.GroupBy(agent => agent.Role, StringComparer.Ordinal).Select(group => ToRole(group.Key, group, input, fresh, toolCalls.Length)).OrderBy(role => role.Role, StringComparer.Ordinal).ToArray();
@@ -37,8 +41,24 @@ public static class EfficiencyTelemetryBuilder
         var rejectedToolCalls = trace.Agents.Count == 0 ? toolCalls.Count(call => call.IsRejected) : trace.Agents.Sum(agent => agent.RejectedToolCallCount);
         var retryOrFallbackCalls = trace.Agents.Count == 0 ? toolCalls.Count(call => call.IsRetryOrFallback) : trace.Agents.Sum(agent => agent.RetryOrFallbackCallCount);
         var summary = new EfficiencySummary(input, cached, fresh, Percentage(cached, input), output, reasoning, total, trace.Agents.Count, trace.Agents.Count == 0 ? Count(metrics.ModelTurnCount) : trace.Agents.Sum(agent => agent.TurnCount), trace.Agents.Count == 0 ? Count(metrics.ToolCallCount) : toolCalls.Length, failedToolCalls, rejectedToolCalls, retryOrFallbackCalls, metrics.WallTimeMs);
-        return new(1, summary, roles, agents, toolCalls, fileAccess, groups, Hotspots(agents, toolCalls, fileAccess), diagnostics);
+        return new(2, summary, root, workers, endToEnd, roles, agents, toolCalls, fileAccess, groups, Hotspots(agents, toolCalls, fileAccess), diagnostics);
     }
+
+    private static EfficiencyTokenBreakdown FromMetrics(FactoryEvalMetrics metrics) =>
+        new(metrics.InputTokens, metrics.CachedInputTokens, Fresh(metrics.InputTokens, metrics.CachedInputTokens), metrics.OutputTokens, metrics.ReasoningOutputTokens, metrics.TotalTokens);
+
+    private static EfficiencyTokenBreakdown FromAgents(IReadOnlyList<AgentTraceNode> agents)
+    {
+        if (agents.Count == 0) return new(0, 0, 0, 0, 0, 0);
+        var input = Sum(agents.Select(agent => agent.InputTokens));
+        var cached = Sum(agents.Select(agent => agent.CachedInputTokens));
+        return new(input, cached, Fresh(input, cached), Sum(agents.Select(agent => agent.OutputTokens)), Sum(agents.Select(agent => agent.ReasoningOutputTokens)), Sum(agents.Select(agent => agent.TotalTokens)));
+    }
+
+    private static EfficiencyTokenBreakdown Add(EfficiencyTokenBreakdown left, EfficiencyTokenBreakdown right) =>
+        new(Add(left.InputTokens, right.InputTokens), Add(left.CachedInputTokens, right.CachedInputTokens), Add(left.FreshInputTokens, right.FreshInputTokens), Add(left.OutputTokens, right.OutputTokens), Add(left.ReasoningOutputTokens, right.ReasoningOutputTokens), Add(left.TotalTokens, right.TotalTokens));
+
+    private static long? Add(long? left, long? right) => left is not null && right is not null ? left + right : null;
 
     private static EfficiencyAgent ToAgent(AgentTraceNode agent) => new(agent.ThreadId, agent.ParentThreadId, agent.Role, agent.WorkItem, agent.Action, agent.DurationMs, agent.TurnCount, agent.ToolCallCount, agent.InputTokens, agent.CachedInputTokens, agent.FreshInputTokens, agent.CachedInputPercentage, agent.OutputTokens, agent.ReasoningOutputTokens, agent.TotalTokens, agent.DispatchCharacters, agent.DispatchUtf8Bytes, agent.FailedToolCallCount, agent.RejectedToolCallCount, agent.RetryOrFallbackCallCount, agent.FileReadCount, agent.UniqueFileReadCount, agent.RepeatedFileReadCount, agent.FileReadBytes, agent.WaitAgentMs, agent.ToolCallCount == 0 || agent.InputTokens is null ? null : (double)agent.InputTokens.Value / agent.ToolCallCount, agent.TokenProgression ?? [], agent.DispatchReferences ?? [], agent.TerminalResult);
     private static EfficiencyRole ToRole(string role, IEnumerable<AgentTraceNode> source, long? totalInput, long? totalFresh, int totalTools)

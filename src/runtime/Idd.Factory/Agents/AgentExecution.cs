@@ -17,19 +17,28 @@ public sealed class CodexCliBackend : IAgentBackend
 {
     private readonly CodexCommand command;
     private readonly string pluginRoot;
+    private readonly AgentExecutionConfiguration executionConfiguration;
+    private readonly AgentCapabilityPolicy capabilityPolicy;
     private readonly Dictionary<string, RunningProcess> processes = new(StringComparer.Ordinal);
 
-    public CodexCliBackend(string pluginRoot, string? executable = null)
+    public CodexCliBackend(
+        string pluginRoot,
+        string? executable = null,
+        AgentExecutionConfiguration? executionConfiguration = null,
+        AgentCapabilityPolicy? capabilityPolicy = null)
     {
         this.pluginRoot = Path.GetFullPath(pluginRoot);
+        this.executionConfiguration = executionConfiguration ?? new();
+        this.capabilityPolicy = capabilityPolicy ?? AgentCapabilityPolicy.ProductionDefault;
         command = executable is null ? CodexExecutableResolver.Resolve() : new(executable, []);
     }
 
     public async Task<AgentRunHandle> StartAsync(AgentInvocation invocation, CancellationToken cancellationToken)
     {
         var attemptDirectory = Path.GetDirectoryName(invocation.ResultPath)!;
-        var codexHome = PreparePrivateHome(invocation.RunId, invocation.AttemptId);
-        try { ExposeSkill(codexHome, invocation.SkillName); }
+        var privateHome = PreparePrivateHome(invocation.RunId, invocation.AttemptId, invocation.SkillName);
+        var codexHome = privateHome.Path;
+        try { ExposeSkill(codexHome, invocation); }
         catch { CleanupPrivateHome(codexHome); throw; }
         var stdoutPath = Path.Combine(attemptDirectory, "stdout.log");
         var stderrPath = Path.Combine(attemptDirectory, "stderr.log");
@@ -50,14 +59,8 @@ public sealed class CodexCliBackend : IAgentBackend
         start.Environment["TEMP"] = Path.Combine(codexHome, "tmp");
         start.Environment["TMP"] = Path.Combine(codexHome, "tmp");
         Directory.CreateDirectory(start.Environment["TEMP"]!);
-        foreach (var prefix in command.PrefixArguments) start.ArgumentList.Add(prefix);
-        start.ArgumentList.Add("exec"); start.ArgumentList.Add("--json"); start.ArgumentList.Add("--ephemeral"); start.ArgumentList.Add("--ignore-user-config");
-        start.ArgumentList.Add("--sandbox"); start.ArgumentList.Add(Sandbox(invocation.ExecutionProfile));
-        start.ArgumentList.Add("-c"); start.ArgumentList.Add("approval_policy=\"never\"");
-        start.ArgumentList.Add("-c"); start.ArgumentList.Add("mcp_servers={}");
-        if (OperatingSystem.IsWindows()) { start.ArgumentList.Add("-c"); start.ArgumentList.Add("windows.sandbox=\"unelevated\""); }
-        start.ArgumentList.Add("--skip-git-repo-check"); start.ArgumentList.Add("-C"); start.ArgumentList.Add(invocation.Workspace);
-        start.ArgumentList.Add("--output-last-message"); start.ArgumentList.Add(invocation.ResultPath); start.ArgumentList.Add("-");
+        foreach (var argument in BuildArguments(invocation, executionConfiguration, command.PrefixArguments, OperatingSystem.IsWindows()))
+            start.ArgumentList.Add(argument);
         var process = new Process { StartInfo = start, EnableRaisingEvents = true };
         try { if (!process.Start()) throw new AgentProtocolException("AGENT_BACKEND_UNAVAILABLE", "Codex CLI did not start."); }
         catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or FileNotFoundException)
@@ -65,7 +68,7 @@ public sealed class CodexCliBackend : IAgentBackend
         var stdout = CaptureAsync(process.StandardOutput, stdoutPath, cancellationToken);
         var stderr = CaptureAsync(process.StandardError, stderrPath, cancellationToken);
         var prompt = BuildBootstrapPrompt(invocation);
-        await File.WriteAllTextAsync(Path.Combine(attemptDirectory, "attempt-telemetry.json"), JsonSerializer.Serialize(BuildTelemetry(invocation), FactoryJson.Options), cancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(attemptDirectory, "attempt-telemetry.json"), JsonSerializer.Serialize(BuildTelemetry(invocation, executionConfiguration, capabilityPolicy, privateHome.InheritedSkillCount, ReadSkillSourceVersion(), pluginRoot), FactoryJson.Options), cancellationToken);
         await process.StandardInput.WriteAsync(prompt.AsMemory(), cancellationToken);
         await process.StandardInput.FlushAsync(cancellationToken); process.StandardInput.Close();
         processes.Add(invocation.AttemptId, new(process, stdout, stderr, invocation.ResultPath));
@@ -75,7 +78,7 @@ public sealed class CodexCliBackend : IAgentBackend
     public async Task<AgentProcessResult> WaitAsync(AgentRunHandle handle, CancellationToken cancellationToken)
     {
         if (!processes.Remove(handle.BackendHandle, out var running))
-            return new(-1, "", "The backend handle is not active in this runtime process.", false);
+            return new(-1, "", "The backend handle is not active in this runtime process.", false, false, AgentTerminationKind.TransportFailure);
         try
         {
             using var resultWatcherCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -83,24 +86,40 @@ public sealed class CodexCliBackend : IAgentBackend
             var resultReady = WaitForCompleteResultAsync(running.ResultPath, resultWatcherCancellation.Token);
             var first = await Task.WhenAny(processExit, resultReady);
             var completedResultWasObserved = first == resultReady && await resultReady;
+            if (!completedResultWasObserved && first == processExit)
+            {
+                await processExit;
+                completedResultWasObserved = IsCompleteResult(running.ResultPath);
+            }
             resultWatcherCancellation.Cancel();
 
+            var killRequired = false;
             if (completedResultWasObserved && !running.Process.HasExited)
             {
                 using var gracefulExit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 gracefulExit.CancelAfter(TimeSpan.FromSeconds(5));
                 try { await running.Process.WaitForExitAsync(gracefulExit.Token); }
                 catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-                { await CancelProcessAsync(running.Process); }
+                { killRequired = true; await CancelProcessAsync(running.Process); }
             }
             else
             {
                 await processExit;
             }
             var stdout = await running.Stdout; var stderr = await running.Stderr;
-            return new AgentProcessResult(completedResultWasObserved ? 0 : running.Process.ExitCode, stdout, stderr, false);
+            int? exitCode = running.Process.HasExited ? running.Process.ExitCode : null;
+            var termination = killRequired
+                ? AgentTerminationKind.ForcedAfterResult
+                : exitCode == 0 ? AgentTerminationKind.CleanExit : AgentTerminationKind.TransportFailure;
+            return new AgentProcessResult(exitCode, stdout, stderr, completedResultWasObserved, killRequired, termination);
         }
-        catch (OperationCanceledException) { await CancelProcessAsync(running.Process); await Task.WhenAll(running.Stdout, running.Stderr); throw; }
+        catch (OperationCanceledException)
+        {
+            await CancelProcessAsync(running.Process);
+            string stdout = ""; string stderr = "";
+            try { stdout = await running.Stdout; stderr = await running.Stderr; } catch (OperationCanceledException) { }
+            return new(running.Process.HasExited ? running.Process.ExitCode : null, stdout, stderr, IsCompleteResult(running.ResultPath), true, AgentTerminationKind.Cancelled);
+        }
         finally { CleanupPrivateHome(running.Process.StartInfo.Environment["CODEX_HOME"]!); running.Process.Dispose(); }
     }
 
@@ -111,7 +130,7 @@ public sealed class CodexCliBackend : IAgentBackend
         finally { CleanupPrivateHome(running.Process.StartInfo.Environment["CODEX_HOME"]!); running.Process.Dispose(); }
     }
 
-    private static string PreparePrivateHome(string runId, string attemptId)
+    private PrivateHome PreparePrivateHome(string runId, string attemptId, string selectedSkill)
     {
         var home = Path.Combine(Path.GetTempPath(), "idd-factory", "codex-private", runId, attemptId);
         CleanupPrivateHome(home);
@@ -122,19 +141,42 @@ public sealed class CodexCliBackend : IAgentBackend
             : configuredHome;
         var sourceAuth = Path.Combine(sourceHome, "auth.json");
         if (File.Exists(sourceAuth)) File.Copy(sourceAuth, Path.Combine(home, "auth.json"), overwrite: true);
+        var inheritedSkillCount = 0;
         var sourceSkills = Path.Combine(sourceHome, "skills");
-        if (Directory.Exists(sourceSkills)) CopyDirectory(sourceSkills, Path.Combine(home, "skills"));
-        return home;
+        if (capabilityPolicy.InheritUserSkills && Directory.Exists(sourceSkills))
+        {
+            foreach (var sourceSkill in Directory.EnumerateDirectories(sourceSkills))
+            {
+                if (!ShouldInheritSkill(Path.GetFileName(sourceSkill), selectedSkill)) continue;
+                CopyDirectory(sourceSkill, Path.Combine(home, "skills", Path.GetFileName(sourceSkill)));
+                inheritedSkillCount++;
+            }
+        }
+        return new(home, inheritedSkillCount);
     }
 
-    private void ExposeSkill(string codexHome, string skillName)
+    private void ExposeSkill(string codexHome, AgentInvocation invocation)
     {
+        var skillName = invocation.SkillName;
+        var source = Path.GetFullPath(Path.Combine(pluginRoot, "skills", skillName));
+        ValidateSkillIdentity(pluginRoot, invocation);
+        CopyDirectory(source, Path.Combine(codexHome, "skills", skillName));
+    }
+
+    internal static void ValidateSkillIdentity(string pluginRoot, AgentInvocation invocation)
+    {
+        var skillName = invocation.SkillName;
         var source = Path.GetFullPath(Path.Combine(pluginRoot, "skills", skillName));
         var skillsRoot = Path.GetFullPath(Path.Combine(pluginRoot, "skills")) + Path.DirectorySeparatorChar;
         if (!source.StartsWith(skillsRoot, StringComparison.OrdinalIgnoreCase) || !File.Exists(Path.Combine(source, "SKILL.md")))
             throw new AgentProtocolException("FACTORY_SKILL_UNAVAILABLE", $"Factory skill {skillName} is not available in the configured plugin.");
-        CopyDirectory(source, Path.Combine(codexHome, "skills", skillName));
+        var projectSkill = Path.Combine(invocation.Workspace, ".agents", "skills", skillName, "SKILL.md");
+        if (File.Exists(projectSkill))
+            throw new AgentProtocolException("FACTORY_SKILL_COLLISION", $"Project-local skill {skillName} conflicts with the runtime-selected Factory skill.");
     }
+
+    internal static bool ShouldInheritSkill(string candidateSkill, string selectedFactorySkill) =>
+        !string.Equals(candidateSkill, selectedFactorySkill, StringComparison.OrdinalIgnoreCase);
 
     private static void CopyDirectory(string source, string destination)
     {
@@ -150,14 +192,61 @@ public sealed class CodexCliBackend : IAgentBackend
         _ => throw new ArgumentOutOfRangeException(nameof(profile), profile, null)
     };
 
+    internal static IReadOnlyList<string> BuildArguments(
+        AgentInvocation invocation,
+        AgentExecutionConfiguration configuration,
+        IReadOnlyList<string>? prefixArguments = null,
+        bool? isWindows = null)
+    {
+        var arguments = new List<string>();
+        if (prefixArguments is not null) arguments.AddRange(prefixArguments);
+        arguments.AddRange(["exec", "--json", "--ephemeral", "--ignore-user-config"]);
+        if (!string.IsNullOrWhiteSpace(configuration.Model)) arguments.AddRange(["--model", configuration.Model]);
+        if (!string.IsNullOrWhiteSpace(configuration.ReasoningEffort)) arguments.AddRange(["-c", $"model_reasoning_effort={configuration.ReasoningEffort}"]);
+        arguments.AddRange(["--sandbox", Sandbox(invocation.ExecutionProfile), "-c", "approval_policy=\"never\"", "-c", "mcp_servers={}"]);
+        if (isWindows ?? OperatingSystem.IsWindows()) arguments.AddRange(["-c", "windows.sandbox=\"unelevated\""]);
+        arguments.AddRange(["--skip-git-repo-check", "-C", invocation.Workspace, "--output-last-message", invocation.ResultPath, "-"]);
+        return arguments;
+    }
+
     internal static string BuildBootstrapPrompt(AgentInvocation invocation) =>
         $"Use ${invocation.SkillName}.\n\n{invocation.Input}\n\n" +
         $"Return only one JSON object as your final response. The backend captures it as {invocation.ResultPath}; do not create or edit that file yourself. " +
         $"Required envelope: protocolVersion={AgentInvocation.CurrentProtocolVersion}, runId={invocation.RunId}, attemptId={invocation.AttemptId}, role={invocation.Role}, outcome=<allowed semantic outcome>, reason=<optional>, payload=<role data>. " +
         "Do not mutate .idd/factory/current or .idd/intent. stdout is diagnostic only.";
 
-    internal static AgentAttemptTelemetry BuildTelemetry(AgentInvocation invocation) =>
-        new(invocation.Role, invocation.SkillName, "codex-cli", invocation.ExecutionProfile, "bootstrap", invocation.Input.Length);
+    internal static AgentAttemptTelemetry BuildTelemetry(
+        AgentInvocation invocation,
+        AgentExecutionConfiguration? configuration = null,
+        AgentCapabilityPolicy? capabilityPolicy = null,
+        int inheritedUserSkillCount = 0,
+        string skillSourceVersion = "unknown",
+        string skillSource = "unknown")
+    {
+        configuration ??= new();
+        capabilityPolicy ??= AgentCapabilityPolicy.ProductionDefault;
+        return new(invocation.Role, invocation.SkillName, "codex-cli", invocation.ExecutionProfile, "bootstrap", invocation.Input.Length,
+            configuration.RequestedModel, configuration.RequestedReasoningEffort, "unknown", "unknown", skillSource, skillSourceVersion,
+            capabilityPolicy.InheritUserSkills ? "inherit" : "isolated", CountProjectSkills(invocation.Workspace), inheritedUserSkillCount, capabilityPolicy.Profile);
+    }
+
+    private string ReadSkillSourceVersion()
+    {
+        var path = Path.Combine(pluginRoot, "skills", "idd-factory-run", "references", "methodology-version.json");
+        if (!File.Exists(path)) return "unknown";
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            return document.RootElement.TryGetProperty("methodologyVersion", out var value) ? value.GetString() ?? "unknown" : "unknown";
+        }
+        catch (JsonException) { return "unknown"; }
+    }
+
+    private static int CountProjectSkills(string workspace)
+    {
+        var root = Path.Combine(workspace, ".agents", "skills");
+        return Directory.Exists(root) ? Directory.EnumerateDirectories(root).Count(path => File.Exists(Path.Combine(path, "SKILL.md"))) : 0;
+    }
 
     private static void CleanupPrivateHome(string home)
     {
@@ -184,9 +273,16 @@ public sealed class CodexCliBackend : IAgentBackend
         }
         return false;
     }
+    private static bool IsCompleteResult(string path)
+    {
+        if (!File.Exists(path)) return false;
+        try { using var document = JsonDocument.Parse(File.ReadAllText(path)); return document.RootElement.ValueKind == JsonValueKind.Object; }
+        catch (Exception exception) when (exception is JsonException or IOException) { return false; }
+    }
     private static async Task CancelProcessAsync(Process process)
     { if (process.HasExited) return; try { process.CloseMainWindow(); await Task.Delay(1500); } catch { } if (!process.HasExited) process.Kill(true); await process.WaitForExitAsync(); }
     private sealed record RunningProcess(Process Process, Task<string> Stdout, Task<string> Stderr, string ResultPath);
+    private sealed record PrivateHome(string Path, int InheritedSkillCount);
 }
 
 public sealed record CodexCommand(string Executable, IReadOnlyList<string> PrefixArguments);
@@ -250,7 +346,7 @@ public static class CodexExecutableResolver
 
 public sealed class AgentExecutor(IAgentBackend backend, AgentResultValidator validator)
 {
-    public async Task<AgentResultEnvelope> ExecuteAsync(AgentInvocation invocation, CancellationToken cancellationToken)
+    public async Task<AgentExecutionResult> ExecuteAsync(AgentInvocation invocation, CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(invocation.ResultPath)!);
         var invocationPath = Path.Combine(Path.GetDirectoryName(invocation.ResultPath)!, "invocation.json");
@@ -258,14 +354,18 @@ public sealed class AgentExecutor(IAgentBackend backend, AgentResultValidator va
         var protectedArtifacts = ProtectedArtifactSnapshot.Capture(invocation);
         var handle = await backend.StartAsync(invocation, cancellationToken);
         var process = await backend.WaitAsync(handle, cancellationToken);
-        if (process.ExitCode != 0) throw new AgentProtocolException("AGENT_TRANSPORT_FAILURE", $"Agent exited with {process.ExitCode}: {process.Stderr}");
+        await File.WriteAllTextAsync(Path.Combine(Path.GetDirectoryName(invocation.ResultPath)!, "process-telemetry.json"), JsonSerializer.Serialize(process, FactoryJson.Options), CancellationToken.None);
+        if (process.TerminationKind == AgentTerminationKind.Cancelled) throw new OperationCanceledException(cancellationToken);
+        if (process.TerminationKind == AgentTerminationKind.TransportFailure && !process.CompleteResultObserved)
+            throw new AgentProtocolException("AGENT_TRANSPORT_FAILURE", $"Agent exited with {process.ExitCode?.ToString() ?? "unknown"}: {process.Stderr}");
         protectedArtifacts.ValidateUnchanged();
         if (!File.Exists(invocation.ResultPath)) throw new AgentProtocolException("MISSING_AGENT_RESULT", "Agent did not produce result.json.");
         AgentResultEnvelope? result;
         try { result = JsonSerializer.Deserialize<AgentResultEnvelope>(await File.ReadAllTextAsync(invocation.ResultPath, cancellationToken), FactoryJson.Options); }
         catch (JsonException exception) { throw new AgentProtocolException("MALFORMED_AGENT_RESULT", exception.Message); }
         var validated = validator.Validate(invocation, result);
-        return validated.Metrics is null && TryReadUsage(process.Stdout) is { } usage ? validated with { Metrics = usage } : validated;
+        validated = validated.Metrics is null && TryReadUsage(process.Stdout) is { } usage ? validated with { Metrics = usage } : validated;
+        return new(validated, process);
     }
 
     private static JsonElement? TryReadUsage(string stdout)

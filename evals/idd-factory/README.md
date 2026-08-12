@@ -27,9 +27,13 @@ dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj `
 ```
 
 Each invocation writes an immutable artifact directory under
-`artifacts/factory-evals/<run-id>/`. It includes the generated local skills,
-fixture workspace, Codex JSONL event stream, process logs, metrics, assertions,
-and `report.md`.
+`artifacts/factory-evals/<run-id>/`. The evaluator creates an isolated
+`CODEX_HOME`, adds the generated marketplace with `codex plugin marketplace
+add`, installs `idd-factory` with `codex plugin add`, and launches the installed
+`idd-factory-run`. The fixture does not receive copied Factory skills or a
+project-local runtime. Artifacts include the generated marketplace, isolated
+plugin cache, fixture workspace, Codex JSONL event stream, live `progress.log`,
+process logs, metrics, assertions, and `report.md`.
 
 The test requests `gpt-5.6-luna` with low reasoning effort by default. Override
 it without fallback using `IDD_FACTORY_EVAL_MODEL` and
@@ -41,3 +45,17 @@ artifacts.
 The evaluator intentionally distinguishes product success from Factory-contract
 success: `Product PASS / Factory FAIL` is a valuable baseline result, not a
 reason to weaken assertions.
+
+## Release certification
+
+Developer live evals may run from a dirty tree. Release certification may not:
+
+```powershell
+.\certify-release.ps1 -Version 1.2.3
+```
+
+Certification requires clean `HEAD` at the exact `v1.2.3` tag, records the full
+commit SHA, runs deterministic checks, performs the real installed-plugin live
+eval, and reports unavailable effective worker model/reasoning telemetry as
+`INCONCLUSIVE` rather than `PASS`. The release tag is pushed by
+`publish-next-version.ps1` only after certification passes.

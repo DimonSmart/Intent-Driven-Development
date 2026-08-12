@@ -14,6 +14,13 @@ verification IDs. The project verification policy may be inspected only to
 select existing stable IDs; the worker does not execute mandatory checks. Do
 not read previous runs, write code or state, edit intent, or delegate.
 
+Every `verificationCheckIds[]` value must be copied exactly from a top-level key
+under `checks:` in `.idd/verification.yaml`. Never put test class names, test
+method names, commands, filters, descriptions, or invented identifiers in this
+field. If no configured check ID covers a required property, return
+`needs-clarification` or `blocked`; do not fabricate one. Human-readable test
+properties belong only in contract Markdown.
+
 Return `intent-required` instead of inventing durable behavior. Preserve any
 explicit ordering, staging, dependency, and review boundaries from the request.
 Order independently verifiable outcomes rather than files. Every Subtask is a

@@ -9,15 +9,23 @@ public static class EfficiencyReportWriter
     public static string Write(EfficiencyTelemetry data)
     {
         var text = new StringBuilder("# IDD Factory Efficiency Diagnostics\n\n");
-        text.AppendLine($"- Total input: {Number(data.Summary.InputTokens)}");
-        text.AppendLine($"- Cached input: {Number(data.Summary.CachedInputTokens)}");
-        text.AppendLine($"- Fresh input: {Number(data.Summary.FreshInputTokens)}");
+        text.AppendLine($"- Total Factory tokens: {Number(data.EndToEndFactory.TotalTokens)}");
+        text.AppendLine($"- End-to-end input: {Number(data.EndToEndFactory.InputTokens)}");
+        text.AppendLine($"- Cached input: {Number(data.EndToEndFactory.CachedInputTokens)}");
+        text.AppendLine($"- Fresh input: {Number(data.EndToEndFactory.FreshInputTokens)}");
         text.AppendLine($"- Cache %: {Percent(data.Summary.CachedInputPercentage)}");
         text.AppendLine($"- Total output: {Number(data.Summary.OutputTokens)}");
         text.AppendLine($"- Wall time: {Duration(data.Summary.WallTimeMs)}");
         text.AppendLine($"- Agent count: {data.Summary.AgentThreads}");
         text.AppendLine($"- Tool calls: {data.Summary.ToolCalls}");
         text.AppendLine($"- Failed/rejected calls: {data.Summary.FailedToolCalls}/{data.Summary.RejectedToolCalls}\n");
+
+        text.AppendLine("## Factory token scopes\n");
+        text.AppendLine("| Scope | Input | Cached | Fresh | Output | Reasoning output | Total |");
+        text.AppendLine("|---|---:|---:|---:|---:|---:|---:|");
+        WriteScope(text, "Root launcher", data.RootLauncher);
+        WriteScope(text, "Semantic workers", data.SemanticWorkers);
+        WriteScope(text, "End-to-end Factory", data.EndToEndFactory);
 
         text.AppendLine("## Token usage by role\n");
         text.AppendLine("| Role | Agents | Input | Cached | Fresh | Output | Tools | Duration | Input share | Fresh share | Mandatory refs chars | Mandatory refs bytes |");
@@ -89,6 +97,9 @@ public static class EfficiencyReportWriter
         if (data.Diagnostics.Count == 0) text.AppendLine("None."); else foreach (var diagnostic in data.Diagnostics) text.AppendLine($"- `{diagnostic.Code}` ({diagnostic.Severity}): {diagnostic.Message}");
         return text.ToString();
     }
+
+    private static void WriteScope(StringBuilder text, string name, EfficiencyTokenBreakdown value) =>
+        text.AppendLine($"| {name} | {Number(value.InputTokens)} | {Number(value.CachedInputTokens)} | {Number(value.FreshInputTokens)} | {Number(value.OutputTokens)} | {Number(value.ReasoningOutputTokens)} | {Number(value.TotalTokens)} |");
 
     private static void List(StringBuilder text, string title, IEnumerable<string> values) { var items = values.ToArray(); text.AppendLine($"\n### {title}\n"); if (items.Length == 0) text.AppendLine("None."); else foreach (var item in items) text.AppendLine($"- {item}"); }
     private static string Number(long? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "—";

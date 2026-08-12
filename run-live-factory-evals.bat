@@ -11,11 +11,13 @@ set "TEST_DLL=%CD%\tests\Idd.Factory.LiveTests\bin\%CONFIGURATION%\%FRAMEWORK%\I
 
 set "IDD_RUN_LIVE_FACTORY_EVALS=1"
 set "IDD_CODEX_LAUNCH_PROFILE=unrestricted-runtime-launch"
+if /i "%~1"=="--release-certification" set "IDD_FACTORY_RELEASE_CERTIFICATION=1"
 if not defined IDD_FACTORY_EVAL_TIMEOUT_MINUTES set "IDD_FACTORY_EVAL_TIMEOUT_MINUTES=20"
 
 echo [%DATE% %TIME%] Starting IDD Factory live eval.
 echo Launch profile: %IDD_CODEX_LAUNCH_PROFILE%
 echo Codex timeout: %IDD_FACTORY_EVAL_TIMEOUT_MINUTES% minutes
+if defined IDD_FACTORY_RELEASE_CERTIFICATION echo Mode: release certification
 echo Live artifacts: %CD%\artifacts\factory-evals
 echo Current phase is recorded in the newest artifacts\factory-evals\*\progress.log.
 

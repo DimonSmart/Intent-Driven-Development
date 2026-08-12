@@ -3,6 +3,9 @@ namespace Idd.Factory.LiveTests.Models;
 public sealed record EfficiencyTelemetry(
     int SchemaVersion,
     EfficiencySummary Summary,
+    EfficiencyTokenBreakdown RootLauncher,
+    EfficiencyTokenBreakdown SemanticWorkers,
+    EfficiencyTokenBreakdown EndToEndFactory,
     IReadOnlyList<EfficiencyRole> Roles,
     IReadOnlyList<EfficiencyAgent> Agents,
     IReadOnlyList<EfficiencyToolCall> ToolCalls,
@@ -10,6 +13,8 @@ public sealed record EfficiencyTelemetry(
     IReadOnlyList<EfficiencyGroup> Groups,
     EfficiencyHotspots Hotspots,
     IReadOnlyList<AgentTraceDiagnostic> Diagnostics);
+
+public sealed record EfficiencyTokenBreakdown(long? InputTokens, long? CachedInputTokens, long? FreshInputTokens, long? OutputTokens, long? ReasoningOutputTokens, long? TotalTokens);
 
 public sealed record EfficiencySummary(long? InputTokens, long? CachedInputTokens, long? FreshInputTokens, double? CachedInputPercentage, long? OutputTokens, long? ReasoningOutputTokens, long? TotalTokens, int AgentThreads, int ModelTurns, int ToolCalls, int FailedToolCalls, int RejectedToolCalls, int RetryOrFallbackCalls, long? WallTimeMs);
 public sealed record EfficiencyRole(string Role, int Agents, long? InputTokens, long? CachedInputTokens, long? FreshInputTokens, double? CachedInputPercentage, long? OutputTokens, long? TotalTokens, int ToolCalls, long DurationMs, double? InputSharePercentage, double? FreshInputSharePercentage, double? ToolCallSharePercentage, int? MandatoryReferenceCharacters, int? MandatoryReferenceUtf8Bytes);

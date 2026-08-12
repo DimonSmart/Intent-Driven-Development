@@ -8,6 +8,7 @@ public sealed record FactoryEvalRunManifest(
     string MethodologyVersion,
     string SourceRevision,
     bool SourceDirty,
+    bool ReleaseCertification,
     string CodexVersion,
     string DotnetVersion,
     DateTimeOffset StartedAtUtc);
