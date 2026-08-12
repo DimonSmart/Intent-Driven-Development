@@ -11,6 +11,13 @@ public sealed record VerificationEvidence(
     string WorkspaceFingerprint, DateTimeOffset StartedAt, DateTimeOffset FinishedAt,
     int ExitCode, string Status, string Output);
 
+public enum VerificationStatus { Passed, Failed, RequiresUserAction, InfrastructureFailure }
+
+public sealed record VerificationResult(VerificationStatus Status, IReadOnlyList<VerificationEvidence> Evidence)
+{
+    public bool Passed => Status == VerificationStatus.Passed;
+}
+
 public sealed class WorkspaceFingerprinter
 {
     public string Compute(string workspace)
@@ -48,7 +55,7 @@ public sealed class VerificationEngine(string workspace, string currentDirectory
         if (unknown.Length > 0) throw new VerificationException("UNKNOWN_VERIFICATION_CHECK", $"Unknown check IDs: {string.Join(", ", unknown)}.");
     }
 
-    public async Task<IReadOnlyList<VerificationEvidence>> RunContextAsync(string context, CancellationToken cancellationToken)
+    public async Task<VerificationResult> RunContextAsync(string context, CancellationToken cancellationToken)
     {
         var policyPath = Path.Combine(workspace, ".idd", "verification.yaml");
         if (File.Exists(policyPath))
@@ -58,42 +65,68 @@ public sealed class VerificationEngine(string workspace, string currentDirectory
             return await RunAsync(ids, cancellationToken);
         }
         var fallback = RepositoryFallback();
-        return fallback is null ? [] : [await RunCheckAsync("repository-fallback", fallback, cancellationToken)];
+        return fallback is null ? new(VerificationStatus.Passed, []) : await RunChecksAsync([new("repository-fallback", fallback)], cancellationToken);
     }
 
-    public async Task<IReadOnlyList<VerificationEvidence>> RunAsync(IEnumerable<string> checkIds, CancellationToken cancellationToken)
+    public async Task<VerificationResult> RunAsync(IEnumerable<string> checkIds, CancellationToken cancellationToken)
     {
         var policyPath = Path.Combine(workspace, ".idd", "verification.yaml");
-        if (!File.Exists(policyPath)) return [];
+        if (!File.Exists(policyPath)) return new(VerificationStatus.Passed, []);
         var checks = VerificationPolicyParser.Parse(await File.ReadAllTextAsync(policyPath, cancellationToken));
-        var evidence = new List<VerificationEvidence>();
+        var selected = new List<(string Id, VerificationCheck Check)>();
         foreach (var id in checkIds.Distinct(StringComparer.Ordinal))
         {
             if (!checks.TryGetValue(id, out var check)) throw new VerificationException("UNKNOWN_VERIFICATION_CHECK", $"Unknown check ID {id}.");
-            if (check.Instructions is not null) throw new VerificationException("VERIFICATION_NOT_CONFIRMED", $"Check {id} requires user confirmation: {check.Instructions}");
-            evidence.Add(await RunCheckAsync(id, check, cancellationToken));
+            selected.Add((id, check));
         }
-        return evidence;
+        return await RunChecksAsync(selected, cancellationToken);
+    }
+
+    private async Task<VerificationResult> RunChecksAsync(IEnumerable<(string Id, VerificationCheck Check)> checks, CancellationToken cancellationToken)
+    {
+        var evidence = new List<VerificationEvidence>();
+        foreach (var (id, check) in checks) evidence.Add(await RunCheckAsync(id, check, cancellationToken));
+        var status = evidence.Any(x => x.Status == "infrastructure-failure") ? VerificationStatus.InfrastructureFailure
+            : evidence.Any(x => x.Status == "requires-user-action") ? VerificationStatus.RequiresUserAction
+            : evidence.Any(x => x.Status == "failed") ? VerificationStatus.Failed
+            : VerificationStatus.Passed;
+        return new(status, evidence);
     }
 
     private async Task<VerificationEvidence> RunCheckAsync(string id, VerificationCheck check, CancellationToken cancellationToken)
     {
         var before = fingerprinter.Compute(workspace); var started = DateTimeOffset.UtcNow;
+        if (check.Instructions is not null)
+            return await PersistAsync(id, check.Instructions, before, started, -1, "requires-user-action", check.Instructions, cancellationToken);
         var shell = OperatingSystem.IsWindows() ? "powershell" : "/bin/sh";
         var info = new ProcessStartInfo(shell) { WorkingDirectory = workspace, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
         if (OperatingSystem.IsWindows()) { info.ArgumentList.Add("-NoProfile"); info.ArgumentList.Add("-Command"); info.ArgumentList.Add(check.Run!); }
         else { info.ArgumentList.Add("-c"); info.ArgumentList.Add(check.Run!); }
-        using var process = Process.Start(info) ?? throw new VerificationException("VERIFICATION_START_FAILED", $"Could not start check {id}.");
+        Process? startedProcess;
+        try { startedProcess = Process.Start(info); }
+        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or InvalidOperationException)
+        { return await PersistAsync(id, check.Run!, before, started, -1, "infrastructure-failure", exception.Message, cancellationToken); }
+        if (startedProcess is null) return await PersistAsync(id, check.Run!, before, started, -1, "infrastructure-failure", $"Could not start check {id}.", cancellationToken);
+        using var process = startedProcess;
         var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken); timeout.CancelAfter(check.Timeout);
-        try { await process.WaitForExitAsync(timeout.Token); } catch (OperationCanceledException) { if (!process.HasExited) process.Kill(true); throw new VerificationException("VERIFICATION_TIMEOUT", $"Check {id} timed out."); }
+        try { await process.WaitForExitAsync(timeout.Token); }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            if (!process.HasExited) process.Kill(true);
+            return await PersistAsync(id, check.Run!, before, started, -1, "infrastructure-failure", $"Check {id} timed out.", CancellationToken.None);
+        }
         var output = (await stdoutTask) + (await stderrTask);
-        var definitionHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(check.Run!))).ToLowerInvariant();
-        var result = new VerificationEvidence(1, $"V{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}", id, definitionHash, before, started, DateTimeOffset.UtcNow, process.ExitCode, process.ExitCode == 0 ? "passed" : "failed", output);
+        return await PersistAsync(id, check.Run!, before, started, process.ExitCode, process.ExitCode == 0 ? "passed" : "failed", output, cancellationToken);
+    }
+
+    private async Task<VerificationEvidence> PersistAsync(string id, string definition, string before, DateTimeOffset started, int exitCode, string status, string output, CancellationToken cancellationToken)
+    {
+        var definitionHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(definition))).ToLowerInvariant();
+        var result = new VerificationEvidence(1, $"V{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}"[..36], id, definitionHash, before, started, DateTimeOffset.UtcNow, exitCode, status, output);
         var directory = Path.Combine(currentDirectory, "verification"); Directory.CreateDirectory(directory);
         await File.WriteAllTextAsync(Path.Combine(directory, result.EvidenceId + ".json"), JsonSerializer.Serialize(result, FactoryJson.Options), cancellationToken);
-        if (process.ExitCode != 0) throw new VerificationException("VERIFICATION_FAILED", $"Check {id} failed with exit code {process.ExitCode}.");
         return result;
     }
 

@@ -28,8 +28,8 @@ internal static class FactoryCli
             var workflow = new WorkflowDefinitionLoader().Load(workspace, packagedWorkflow);
             var current = Path.Combine(workspace, ".idd", "factory", "current"); var clock = new SystemClock(); var validator = new FactoryStateValidator();
             var store = new FileFactoryStateStore(current, validator); var fingerprinter = new WorkspaceFingerprinter();
-            var backend = new CodexCliBackend(options.GetValueOrDefault("codex"));
-            var runtime = new FactoryRuntime(workspace, pluginRoot, workflow, store, new AgentExecutor(backend, new AgentResultValidator()), new VerificationEngine(workspace, current, fingerprinter), fingerprinter, new FactoryEventWriter(current, clock), clock);
+            var backend = new CodexCliBackend(pluginRoot, options.GetValueOrDefault("codex"));
+            var runtime = new FactoryRuntime(workspace, workflow, store, new AgentExecutor(backend, new AgentResultValidator()), new VerificationEngine(workspace, current, fingerprinter), fingerprinter, new FactoryEventWriter(current, clock), clock);
             var factoryDirectory = Path.Combine(workspace, ".idd", "factory"); Directory.CreateDirectory(factoryDirectory);
             var cancellationMarker = Path.Combine(factoryDirectory, "cancellation.requested");
             FileStream runLock;

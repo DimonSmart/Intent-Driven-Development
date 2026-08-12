@@ -62,7 +62,7 @@ public sealed class FactoryStateValidator
         left == right || (left.Id == right.Id && left.Sequence == right.Sequence && left.Kind == right.Kind &&
         left.Status == right.Status && left.ContractPath == right.ContractPath &&
         left.Dependencies.SequenceEqual(right.Dependencies) && left.CoveredWorkItems.SequenceEqual(right.CoveredWorkItems) &&
-        left.AttemptCount == right.AttemptCount && left.LastResultRef == right.LastResultRef &&
+        left.AttemptCount == right.AttemptCount && left.VerificationFixAttemptCount == right.VerificationFixAttemptCount && left.LastResultRef == right.LastResultRef &&
         left.VerificationCheckIds.SequenceEqual(right.VerificationCheckIds) &&
         left.VerificationEvidenceRefs.SequenceEqual(right.VerificationEvidenceRefs));
 }

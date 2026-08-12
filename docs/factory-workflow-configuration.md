@@ -8,8 +8,9 @@ returns `WORKFLOW_CHANGED`; restore the original workflow or cancel and restart.
 ## Schema version 1
 
 The root contains `schemaVersion`, `name`, `limits`, and ordered `steps`.
-Supported limits are `maxAgentAttempts`, `maxReplans`, and
-`maxCorrectiveCycles`. Runtime safety ceilings still apply.
+Supported limits are `maxAgentAttempts`, `maxReplans`,
+`maxCorrectiveCycles`, and per-gate `maxVerificationFixAttempts` (default `1`).
+Runtime safety ceilings still apply.
 
 Each step has an `id`, a registered `uses`, optional semantic `agent`, optional
 known `handlers`, and typed outcome transitions under `on`.
@@ -48,6 +49,7 @@ limits:
   maxAgentAttempts: 2
   maxReplans: 2
   maxCorrectiveCycles: 2
+  maxVerificationFixAttempts: 1
 
 steps:
   - id: decompose

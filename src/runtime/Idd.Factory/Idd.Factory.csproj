@@ -9,5 +9,6 @@
   </PropertyGroup>
   <ItemGroup>
     <None Include="factory-workflow.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <InternalsVisibleTo Include="Idd.Factory.Tests" />
   </ItemGroup>
 </Project>

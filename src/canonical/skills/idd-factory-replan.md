@@ -4,13 +4,14 @@
 
 Propose bounded semantic changes to remaining Factory work when repository
 reality proves the current decomposition incorrect. The runtime validates and
-applies the proposal.
+applies the proposal. This skill is the complete semantic contract for the
+`factory-replanner` role.
 
 ## Inputs
 
 Read only the supplied original request, relevant current intent, run context,
 triggering work item and reason, mutable ready/planned contracts, minimal
-completed-work context, and verification-policy references.
+completed-work context, and supplied verification evidence when relevant.
 
 ## Result protocol
 
@@ -42,3 +43,7 @@ verification check IDs as applicable.
 - Do not perform implementation or review.
 - Do not create child agents or use conversation history as Factory memory.
 - Prefer the smallest proposal that repairs the demonstrated semantic defect.
+- The runtime owns machine validation, state mutation, workflow routing,
+  authoritative verification, and selection of the next role or skill.
+- Focused repository reads and relevant project or domain skills may be used for
+  semantic diagnosis.

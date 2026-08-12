@@ -26,7 +26,7 @@ release tag               shared marketplace plugin version
 src/canonical/            canonical methodology, project intent assets, skills, and plugin model
 src/canonical/plugins/    canonical public plugin composition
 src/canonical/skills/     platform-neutral skill bodies and metadata
-src/canonical/factory/    platform-neutral Factory role prompts
+src/runtime/Idd.Factory/  deterministic runtime and backend adapters
 src/adapters/claude/      Claude adapter configuration
 src/adapters/codex/       Codex adapter configuration
 tools/generate/           canonical model to native marketplace generator
@@ -42,8 +42,6 @@ scripts/Check.ps1         local validation entry point
 
 ```text
 skills
-roles
-skill role references
 skill document references
 dependencies
 bootstrap assets
@@ -55,7 +53,7 @@ Canonical skills must remain platform-neutral. Adapter-specific behavior belongs
 Ownership rules:
 
 - `idd-intent` owns initialization, intent workflows, code-to-intent workflows, and `.idd/intent` bootstrap assets;
-- `idd-factory` owns Factory workflows, Factory roles, role references, and `.idd/factory` assets;
+- `idd-factory` owns Factory workflows, self-contained semantic skills, runtime assets, and `.idd/factory` assets;
 - Factory depends on Intent;
 - Intent must not depend on Factory.
 
@@ -67,8 +65,10 @@ The canonical Factory skill set is `idd-factory-run`,
 Do not reintroduce the obsolete single `work-plan.md` create/execute workflow.
 
 The generator publishes the .NET 10 Factory Runtime into each Factory plugin.
-`idd-factory-run` only launches that runtime. Platform adapters may describe
-semantic worker capabilities, but must not contain a coordinator dispatch loop.
+`idd-factory-run` only launches that runtime. Each Factory skill is the sole
+semantic contract for its logical role; separate generated role references are
+not part of worker invocation. Platform adapters may describe backend-specific
+skill metadata, but must not contain a coordinator dispatch loop.
 Each semantic worker receives a fresh backend context and persisted state is
 owned only by the runtime. Codex output must remain free of Claude-specific
 front matter.

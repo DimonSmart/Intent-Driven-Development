@@ -3,7 +3,18 @@
 ## Purpose
 
 Implement exactly one self-contained active Subtask in a fresh context. Current
-`.idd/intent/` remains normative.
+`.idd/intent/` remains normative. This skill is the complete semantic contract
+for the `implementer` role.
+
+## Modes
+
+- `normal`: implement the supplied Subtask contract.
+- `verification-fix`: make only the implementation changes needed for the
+  supplied failed authoritative verification gate and textual scope.
+
+Both modes use the same role and outcomes. In `verification-fix`, `completed`
+means only that the repair attempt ended; the runtime must rerun the same gate
+and only a runtime `Passed` result can complete it.
 
 ## Inputs and boundaries
 
@@ -15,6 +26,12 @@ Make the smallest coherent implementation change. Do not select work, mutate
 Factory state, change intent, perform review or finalization, broaden scope, or
 delegate. Runtime verification is authoritative; worker verification claims are
 diagnostic only.
+
+Focused diagnostic commands, repository evidence, and relevant project or
+domain skills may be used normally. Do not resolve or run mandatory Factory
+check IDs on behalf of the runtime, and do not claim that diagnostics passed an
+authoritative gate. The runtime owns orchestration, retries, machine protocol
+validation, authoritative verification, and the next semantic capability.
 
 ## Structured result
 

@@ -109,58 +109,11 @@
         "idd-factory-review-task",
         "idd-factory-replan"
       ],
-      "roles": [
-        "task-decomposer",
-        "implementer",
-        "checkpoint-reviewer",
-        "final-reviewer",
-        "factory-replanner"
-      ],
-      "skillRoleReferences": {
-        "idd-factory-decompose-task": [
-          "task-decomposer"
-        ],
-        "idd-factory-execute-subtask": [
-          "implementer"
-        ],
-        "idd-factory-review-checkpoint": [
-          "checkpoint-reviewer"
-        ],
-        "idd-factory-review-task": [
-          "final-reviewer"
-        ],
-        "idd-factory-replan": [
-          "factory-replanner"
-        ]
-      },
+      "roles": [],
+      "skillRoleReferences": {},
       "skillReferences": [
         {
           "skill": "idd-factory-run",
-          "source": "src/canonical/methodology/project-verification.md",
-          "destination": "project-verification.md"
-        },
-        {
-          "skill": "idd-factory-decompose-task",
-          "source": "src/canonical/methodology/project-verification.md",
-          "destination": "project-verification.md"
-        },
-        {
-          "skill": "idd-factory-execute-subtask",
-          "source": "src/canonical/methodology/project-verification.md",
-          "destination": "project-verification.md"
-        },
-        {
-          "skill": "idd-factory-review-checkpoint",
-          "source": "src/canonical/methodology/project-verification.md",
-          "destination": "project-verification.md"
-        },
-        {
-          "skill": "idd-factory-review-task",
-          "source": "src/canonical/methodology/project-verification.md",
-          "destination": "project-verification.md"
-        },
-        {
-          "skill": "idd-factory-replan",
           "source": "src/canonical/methodology/project-verification.md",
           "destination": "project-verification.md"
         }

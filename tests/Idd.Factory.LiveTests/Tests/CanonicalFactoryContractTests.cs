@@ -33,6 +33,7 @@ public sealed class CanonicalFactoryContractTests
         var implementation = ReadRepoFile("src", "canonical", "skills", "idd-factory-execute-subtask.md");
         Assert.Contains("Do not\n+read the full request".Replace("\n+", "\n"), implementation);
         Assert.Contains("Runtime verification is authoritative", implementation);
+        Assert.Contains("verification-fix", implementation);
         Assert.Contains("`completed`, `needs-replan`, `blocked`, or `intent-required`", implementation);
     }
 
@@ -50,8 +51,32 @@ public sealed class CanonicalFactoryContractTests
     {
         var content = ReadRepoFile("src", "runtime", "Idd.Factory", "factory-workflow.yaml");
         foreach (var role in new[] { "task-decomposer", "implementer", "checkpoint-reviewer", "final-reviewer", "factory-replanner" }) Assert.Contains(role, content);
-        Assert.Contains("maxAgentAttempts: 3", content); Assert.Contains("maxReplans: 3", content); Assert.Contains("maxCorrectiveCycles: 5", content);
+        Assert.Contains("maxAgentAttempts: 3", content); Assert.Contains("maxReplans: 3", content); Assert.Contains("maxCorrectiveCycles: 5", content); Assert.Contains("maxVerificationFixAttempts: 1", content);
         Assert.DoesNotContain("factory-step-coordinator", content);
+    }
+
+    [Fact]
+    public void FactoryWorkersHaveNoSeparateRoleOrVerificationContract()
+    {
+        foreach (var role in new[] { "task-decomposer.md", "implementer.md", "checkpoint-reviewer.md", "final-reviewer.md", "factory-replanner.md" })
+            Assert.False(RepoFileExists("src", "canonical", "factory", "roles", role));
+        foreach (var skill in new[] { "idd-factory-decompose-task.md", "idd-factory-execute-subtask.md", "idd-factory-review-checkpoint.md", "idd-factory-review-task.md", "idd-factory-replan.md" })
+            Assert.DoesNotContain("references/project-verification.md", ReadRepoFile("src", "canonical", "skills", skill));
+    }
+
+    [Fact]
+    public void RuntimeAndAdapterOwnTheirSeparateInvocationResponsibilities()
+    {
+        var runtime = ReadRepoFile("src", "runtime", "Idd.Factory", "Runtime", "FactoryRuntime.cs");
+        Assert.Contains("FactoryAgentCatalog.Resolve(role)", runtime);
+        Assert.Contains("verificationContext", runtime);
+        Assert.DoesNotContain("RoleReferences", runtime);
+        Assert.DoesNotContain("project-verification.md", runtime);
+        Assert.DoesNotContain("$idd-factory-", runtime);
+        var adapter = ReadRepoFile("src", "runtime", "Idd.Factory", "Agents", "AgentExecution.cs");
+        Assert.Contains("Use ${invocation.SkillName}", adapter);
+        Assert.Contains("BuildTelemetry", adapter);
+        Assert.Contains("\"bootstrap\"", adapter);
     }
 
     private static bool RepoFileExists(params string[] parts)

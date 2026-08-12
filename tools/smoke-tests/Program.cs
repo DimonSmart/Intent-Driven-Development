@@ -174,7 +174,8 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     })
     {
         ExpectFile(Path.Combine(factoryRoot, "skills", skill, "SKILL.md"));
-        ExpectFile(Path.Combine(factoryRoot, "skills", skill, "references", "project-verification.md"));
+        if (skill == "idd-factory-run") ExpectFile(Path.Combine(factoryRoot, "skills", skill, "references", "project-verification.md"));
+        else ExpectMissing(Path.Combine(factoryRoot, "skills", skill, "references", "project-verification.md"));
     }
 
     ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-factory-create-work-plan"));
@@ -212,7 +213,7 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
         (Skill: "idd-factory-replan", Role: "factory-replanner")
     })
     {
-        ExpectFile(Path.Combine(
+        ExpectMissing(Path.Combine(
             factoryRoot,
             "skills",
             reference.Skill,
@@ -351,15 +352,6 @@ void CheckCanonicalFactoryNeutrality()
 
 void CheckFactoryRoleGeneration()
 {
-    var expectedTools = new Dictionary<string, string[]>(StringComparer.Ordinal)
-    {
-        ["task-decomposer"] = ["file.read"],
-        ["implementer"] = ["file.read", "file.write", "command.execute"],
-        ["checkpoint-reviewer"] = ["file.read", "command.execute"],
-        ["final-reviewer"] = ["file.read", "command.execute"],
-        ["factory-replanner"] = ["file.read"]
-    };
-
     foreach (var platform in new[] { "claude", "codex" })
     {
         var root = Path.Combine(marketplaceRoot, "plugins", platform, "idd-factory");
@@ -369,30 +361,8 @@ void CheckFactoryRoleGeneration()
             continue;
         }
 
-        if (!metadata.RootElement.TryGetProperty("roleDefinitions", out var roleDefinitions))
-        {
-            failures.Add($"{platform} Factory metadata is missing roleDefinitions.");
-            continue;
-        }
-
-        var definitionsByName = roleDefinitions.EnumerateArray()
-            .ToDictionary(item => item.GetProperty("name").GetString() ?? "", StringComparer.Ordinal);
-        foreach (var (roleName, tools) in expectedTools)
-        {
-            if (!definitionsByName.TryGetValue(roleName, out var definition))
-            {
-                failures.Add($"{platform} Factory metadata is missing role '{roleName}'.");
-                continue;
-            }
-
-            var actualTools = definition.GetProperty("tools").EnumerateArray()
-                .Select(tool => tool.GetString() ?? "")
-                .ToArray();
-            if (!actualTools.SequenceEqual(tools))
-            {
-                failures.Add($"{platform} role '{roleName}' tools are [{string.Join(", ", actualTools)}].");
-            }
-        }
+        if (metadata.RootElement.TryGetProperty("roleDefinitions", out var roleDefinitions) && roleDefinitions.GetArrayLength() != 0)
+            failures.Add($"{platform} Factory metadata still contains obsolete roleDefinitions.");
     }
 
     foreach (var (skill, role) in new Dictionary<string, string>(StringComparer.Ordinal)
@@ -407,7 +377,7 @@ void CheckFactoryRoleGeneration()
         foreach (var platform in new[] { "claude", "codex" })
         {
             var rolePath = Path.Combine(marketplaceRoot, "plugins", platform, "idd-factory", "skills", skill, "references", "roles", role + ".md");
-            ExpectFile(rolePath);
+            ExpectMissing(rolePath);
         }
     }
 
@@ -422,54 +392,20 @@ void CheckFactoryRoleGeneration()
 void CheckCodexFactoryMetadata()
 {
     var root = Path.Combine(marketplaceRoot, "plugins", "codex", "idd-factory");
-    var expectedRoles = new[]
-    {
-        "task-decomposer",
-        "implementer",
-        "checkpoint-reviewer",
-        "final-reviewer",
-        "factory-replanner"
-    };
-
     using var metadata = ReadJson(Path.Combine(root, "idd-plugin.json"));
     if (metadata is null)
     {
         return;
     }
 
-    var definitions = metadata.RootElement.GetProperty("roleDefinitions")
-        .EnumerateArray()
-        .ToDictionary(item => item.GetProperty("name").GetString() ?? "", StringComparer.Ordinal);
-    foreach (var role in expectedRoles)
-    {
-        if (!definitions.TryGetValue(role, out var definition))
-        {
-            failures.Add($"Codex metadata has no definition for {role}.");
-            continue;
-        }
-
-        ExpectString(definition, "dispatchMode", "generic-subagent", $"Codex {role} dispatch mode");
-        ExpectString(definition, "roleDelivery", "prompt-reference", $"Codex {role} role delivery");
-        ExpectString(definition, "toolsEnforcement", "prompt-only", $"Codex {role} tool enforcement");
-        if (definition.TryGetProperty("agentType", out _))
-        {
-            failures.Add($"Codex {role} metadata claims a native agent type.");
-        }
-    }
+    if (metadata.RootElement.GetProperty("roleDefinitions").GetArrayLength() != 0)
+        failures.Add("Codex Factory metadata still contains obsolete role definitions.");
 
     ExpectMissing(Path.Combine(root, "agents"));
     ExpectMissing(Path.Combine(marketplaceRoot, "plugins", "codex", "idd-intent", "agents"));
 
     var bindings = metadata.RootElement.GetProperty("skillRoleBindings").EnumerateArray().ToArray();
-    foreach (var binding in bindings)
-    {
-        var role = binding.GetProperty("role").GetString() ?? "";
-        ExpectString(binding, "dispatchMode", "generic-subagent", $"Codex skill dispatch mode for {binding.GetProperty("skill").GetString()}");
-        if (binding.TryGetProperty("agentType", out _))
-        {
-            failures.Add($"Codex skill binding for {role} claims a native agent type.");
-        }
-    }
+    if (bindings.Length != 0) failures.Add("Codex Factory metadata still contains obsolete skill-role bindings.");
 
 }
 

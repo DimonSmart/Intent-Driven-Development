@@ -42,6 +42,7 @@ public sealed class WorkflowTests
         using var temp = new TestWorkspace(); var path = temp.Write("workflow.yaml", Valid); var loader = new WorkflowDefinitionLoader();
         var one = loader.Load(temp.Path, path); var two = loader.Load(temp.Path, path);
         Assert.Equal("test", one.Name); Assert.Equal(one.Hash, two.Hash); Assert.Equal(4, one.Steps.Count);
+        Assert.Equal(1, one.Limits.MaxVerificationFixAttempts);
     }
 
     [Theory]

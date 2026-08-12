@@ -16,14 +16,21 @@ public interface IAgentBackend
 public sealed class CodexCliBackend : IAgentBackend
 {
     private readonly CodexCommand command;
+    private readonly string pluginRoot;
     private readonly Dictionary<string, RunningProcess> processes = new(StringComparer.Ordinal);
 
-    public CodexCliBackend(string? executable = null) => command = executable is null ? CodexExecutableResolver.Resolve() : new(executable, []);
+    public CodexCliBackend(string pluginRoot, string? executable = null)
+    {
+        this.pluginRoot = Path.GetFullPath(pluginRoot);
+        command = executable is null ? CodexExecutableResolver.Resolve() : new(executable, []);
+    }
 
     public async Task<AgentRunHandle> StartAsync(AgentInvocation invocation, CancellationToken cancellationToken)
     {
         var attemptDirectory = Path.GetDirectoryName(invocation.ResultPath)!;
         var codexHome = PreparePrivateHome(invocation.RunId, invocation.AttemptId);
+        try { ExposeSkill(codexHome, invocation.SkillName); }
+        catch { CleanupPrivateHome(codexHome); throw; }
         var stdoutPath = Path.Combine(attemptDirectory, "stdout.log");
         var stderrPath = Path.Combine(attemptDirectory, "stderr.log");
         var sqliteDirectory = Path.Combine(codexHome, "state");
@@ -45,7 +52,7 @@ public sealed class CodexCliBackend : IAgentBackend
         Directory.CreateDirectory(start.Environment["TEMP"]!);
         foreach (var prefix in command.PrefixArguments) start.ArgumentList.Add(prefix);
         start.ArgumentList.Add("exec"); start.ArgumentList.Add("--json"); start.ArgumentList.Add("--ephemeral"); start.ArgumentList.Add("--ignore-user-config");
-        start.ArgumentList.Add("--sandbox"); start.ArgumentList.Add(invocation.Role == "implementer" ? "workspace-write" : "read-only");
+        start.ArgumentList.Add("--sandbox"); start.ArgumentList.Add(Sandbox(invocation.ExecutionProfile));
         start.ArgumentList.Add("-c"); start.ArgumentList.Add("approval_policy=\"never\"");
         start.ArgumentList.Add("-c"); start.ArgumentList.Add("mcp_servers={}");
         if (OperatingSystem.IsWindows()) { start.ArgumentList.Add("-c"); start.ArgumentList.Add("windows.sandbox=\"unelevated\""); }
@@ -57,7 +64,9 @@ public sealed class CodexCliBackend : IAgentBackend
         { CleanupPrivateHome(codexHome); throw new AgentProtocolException("AGENT_BACKEND_UNAVAILABLE", $"Codex CLI could not start: {exception.Message}"); }
         var stdout = CaptureAsync(process.StandardOutput, stdoutPath, cancellationToken);
         var stderr = CaptureAsync(process.StandardError, stderrPath, cancellationToken);
-        await process.StandardInput.WriteAsync(invocation.Prompt.AsMemory(), cancellationToken);
+        var prompt = BuildBootstrapPrompt(invocation);
+        await File.WriteAllTextAsync(Path.Combine(attemptDirectory, "attempt-telemetry.json"), JsonSerializer.Serialize(BuildTelemetry(invocation), FactoryJson.Options), cancellationToken);
+        await process.StandardInput.WriteAsync(prompt.AsMemory(), cancellationToken);
         await process.StandardInput.FlushAsync(cancellationToken); process.StandardInput.Close();
         processes.Add(invocation.AttemptId, new(process, stdout, stderr, invocation.ResultPath));
         return new(invocation.AttemptId, process.Id, invocation.AttemptId);
@@ -113,8 +122,42 @@ public sealed class CodexCliBackend : IAgentBackend
             : configuredHome;
         var sourceAuth = Path.Combine(sourceHome, "auth.json");
         if (File.Exists(sourceAuth)) File.Copy(sourceAuth, Path.Combine(home, "auth.json"), overwrite: true);
+        var sourceSkills = Path.Combine(sourceHome, "skills");
+        if (Directory.Exists(sourceSkills)) CopyDirectory(sourceSkills, Path.Combine(home, "skills"));
         return home;
     }
+
+    private void ExposeSkill(string codexHome, string skillName)
+    {
+        var source = Path.GetFullPath(Path.Combine(pluginRoot, "skills", skillName));
+        var skillsRoot = Path.GetFullPath(Path.Combine(pluginRoot, "skills")) + Path.DirectorySeparatorChar;
+        if (!source.StartsWith(skillsRoot, StringComparison.OrdinalIgnoreCase) || !File.Exists(Path.Combine(source, "SKILL.md")))
+            throw new AgentProtocolException("FACTORY_SKILL_UNAVAILABLE", $"Factory skill {skillName} is not available in the configured plugin.");
+        CopyDirectory(source, Path.Combine(codexHome, "skills", skillName));
+    }
+
+    private static void CopyDirectory(string source, string destination)
+    {
+        Directory.CreateDirectory(destination);
+        foreach (var file in Directory.EnumerateFiles(source)) File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), true);
+        foreach (var directory in Directory.EnumerateDirectories(source)) CopyDirectory(directory, Path.Combine(destination, Path.GetFileName(directory)));
+    }
+
+    internal static string Sandbox(AgentExecutionProfile profile) => profile switch
+    {
+        AgentExecutionProfile.ReadOnly => "read-only",
+        AgentExecutionProfile.WorkspaceWrite => "workspace-write",
+        _ => throw new ArgumentOutOfRangeException(nameof(profile), profile, null)
+    };
+
+    internal static string BuildBootstrapPrompt(AgentInvocation invocation) =>
+        $"Use ${invocation.SkillName}.\n\n{invocation.Input}\n\n" +
+        $"Return only one JSON object as your final response. The backend captures it as {invocation.ResultPath}; do not create or edit that file yourself. " +
+        $"Required envelope: protocolVersion={AgentInvocation.CurrentProtocolVersion}, runId={invocation.RunId}, attemptId={invocation.AttemptId}, role={invocation.Role}, outcome=<allowed semantic outcome>, reason=<optional>, payload=<role data>. " +
+        "Do not mutate .idd/factory/current or .idd/intent. stdout is diagnostic only.";
+
+    internal static AgentAttemptTelemetry BuildTelemetry(AgentInvocation invocation) =>
+        new(invocation.Role, invocation.SkillName, "codex-cli", invocation.ExecutionProfile, "bootstrap", invocation.Input.Length);
 
     private static void CleanupPrivateHome(string home)
     {
@@ -254,7 +297,7 @@ internal sealed class ProtectedArtifactSnapshot
         var attemptDirectory = Path.GetDirectoryName(invocation.ResultPath)!;
         var current = Directory.GetParent(Directory.GetParent(attemptDirectory)!.FullName)!.FullName;
         var roots = new[] { Path.Combine(current, "state.json"), Path.Combine(current, "request.md"), Path.Combine(current, "run-context.md"), Path.Combine(current, "work-items"), Path.Combine(current, "clarifications"), Path.Combine(invocation.Workspace, ".idd", "intent"), Path.Combine(invocation.Workspace, ".idd", "verification.yaml") };
-        var workspaceHash = invocation.Role == "implementer" ? null : new WorkspaceFingerprinter().Compute(invocation.Workspace);
+        var workspaceHash = invocation.ExecutionProfile == AgentExecutionProfile.WorkspaceWrite ? null : new WorkspaceFingerprinter().Compute(invocation.Workspace);
         return new(Enumerate(roots).ToDictionary(path => path, Hash, StringComparer.OrdinalIgnoreCase), invocation.Workspace, workspaceHash);
     }
 

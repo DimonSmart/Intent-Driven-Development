@@ -7,7 +7,8 @@ available native Codex CLI (`IDD_FACTORY_CODEX_EXECUTABLE` can select it) and,
 on Windows, must not itself run inside a parent Codex OS sandbox. Each semantic
 subprocess is independently launched with `approval_policy=never`; implementers
 receive `workspace-write`, while decomposition and review roles receive
-`read-only`. This keeps model-driven tool activity sandboxed without trapping
+`read-only` through a backend-neutral execution profile. The Codex adapter
+exposes and explicitly activates the runtime-selected Factory skill. This keeps model-driven tool activity sandboxed without trapping
 the child CLI network control plane inside another Windows sandbox.
 
 For file-based Codex authentication, the backend creates an attempt-local
@@ -38,6 +39,12 @@ next item, validates dependencies and results, runs authoritative verification,
 applies retry and correction budgets, routes reviews, persists state, recovers,
 and finalizes the result.
 
+Each invocation carries `Role`, `SkillName`, `ExecutionProfile`, and dynamic
+input. Factory Core neither reads installed `SKILL.md` or role-prompt files nor
+contains Codex skill/sandbox syntax. The selected Factory skill is the sole
+semantic contract; backend activation is adapter-owned, and project/domain
+skills remain available to workers.
+
 ## Execution model
 
 The complete request is saved unchanged in `request.md`. The decomposer receives
@@ -51,6 +58,12 @@ early independent review protects later work. Final integrated review is always
 required. A `needs-fix` result inserts a new corrective Subtask; completed work
 is immutable. A semantic decomposition defect invokes the bounded replanner,
 whose proposal is validated before runtime state changes.
+
+Runtime verification precedes checkpoint and final review. A normal failed
+check is persisted as evidence and may trigger the existing implementer skill in
+`verification-fix` mode. The same gate is rerun, with the per-gate attempt count
+bounded by workflow configuration. Diagnostics run by workers never replace
+Runtime-owned authoritative evidence.
 
 ## State and recovery
 

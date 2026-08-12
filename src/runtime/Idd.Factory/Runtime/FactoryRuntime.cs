@@ -12,7 +12,6 @@ namespace Idd.Factory.Runtime;
 
 public sealed class FactoryRuntime(
     string workspace,
-    string pluginRoot,
     WorkflowDefinition workflow,
     IFactoryStateStore stateStore,
     AgentExecutor agentExecutor,
@@ -122,17 +121,26 @@ public sealed class FactoryRuntime(
         var role = item.Kind == WorkItemKind.ReviewCheckpoint ? step.Handlers["review-checkpoint"] : step.Handlers["subtask"];
         item.Status = WorkItemStatus.Dispatching; await SaveAsync(state, cancellationToken); item.Status = WorkItemStatus.Running; await SaveAsync(state, cancellationToken);
         var contract = await File.ReadAllTextAsync(Path.Combine(currentDirectory, item.ContractPath), cancellationToken);
-        var assignedVerification = JsonSerializer.Serialize(item.VerificationCheckIds);
-        var result = await InvokeAsync(state, role, item,
-            $"Work item contract:\n{contract}\n\nAssigned verification check IDs:\n{assignedVerification}\n\nResolve these IDs in .idd/verification.yaml and run exactly these assigned checks. Do not substitute a broader repository or solution-wide command.",
-            cancellationToken);
+        if (item.Kind == WorkItemKind.ReviewCheckpoint)
+        {
+            var gateOutcome = await VerifyWorkItemGateAsync(state, item, "checkpoint", contract, cancellationToken);
+            if (gateOutcome != "passed") return gateOutcome;
+        }
+        var evidenceRefs = item.VerificationEvidenceRefs.Count == 0 ? "none" : string.Join("\n", item.VerificationEvidenceRefs);
+        var result = await InvokeAsync(state, role, item, item.Kind == WorkItemKind.ReviewCheckpoint
+            ? $"Work item contract:\n{contract}\n\nAuthoritative Runtime verification evidence references:\n{evidenceRefs}"
+            : $"Work item contract:\n{contract}", cancellationToken);
         item.LastResultRef = Path.GetRelativePath(currentDirectory, Path.Combine(currentDirectory, "attempts", item.CurrentAttemptId!, "result.json")).Replace('\\', '/');
         if (result.Outcome is "needs-replan" or "intent-required" or "blocked") { item.Status = result.Outcome == "blocked" ? WorkItemStatus.Blocked : WorkItemStatus.Ready; await SaveAsync(state, cancellationToken); return result.Outcome; }
         if (result.Outcome == "needs-fix") { InsertCorrection(state, item, result.Payload); await SaveAsync(state, cancellationToken); return "advanced"; }
         if (result.Outcome is not "completed" and not "approved") throw new AgentProtocolException("UNSUPPORTED_AGENT_OUTCOME", result.Outcome);
-        item.Status = WorkItemStatus.AwaitingVerification; await SaveAsync(state, cancellationToken);
-        var evidence = await verification.RunAsync(item.VerificationCheckIds, cancellationToken);
-        foreach (var record in evidence) { var path = $"verification/{record.EvidenceId}.json"; item.VerificationEvidenceRefs.Add(path); state.VerificationEvidenceRefs.Add(path); }
+        if (item.Kind != WorkItemKind.ReviewCheckpoint)
+        {
+            item.Status = WorkItemStatus.AwaitingVerification; await SaveAsync(state, cancellationToken);
+            var gateOutcome = await VerifyWorkItemGateAsync(state, item, "subtask", contract, cancellationToken);
+            if (gateOutcome != "passed") return gateOutcome;
+        }
+        else { item.Status = WorkItemStatus.AwaitingVerification; await SaveAsync(state, cancellationToken); }
         item.Status = WorkItemStatus.Completed; item.CurrentAttemptId = null; await SaveAsync(state, cancellationToken); PromoteReady(state); await SaveAsync(state, cancellationToken);
         return "advanced";
     }
@@ -149,15 +157,10 @@ public sealed class FactoryRuntime(
 
     private async Task<string> FinalReviewAsync(FactoryState state, WorkflowStepDefinition step, CancellationToken cancellationToken)
     {
-        var evidence = await verification.RunContextAsync("final", cancellationToken);
-        foreach (var record in evidence)
-        {
-            var path = $"verification/{record.EvidenceId}.json";
-            if (!state.VerificationEvidenceRefs.Contains(path, StringComparer.Ordinal)) state.VerificationEvidenceRefs.Add(path);
-        }
-        await SaveAsync(state, cancellationToken);
+        var gateOutcome = await VerifyFinalGateAsync(state, cancellationToken);
+        if (gateOutcome != "passed") return gateOutcome;
         var request = await File.ReadAllTextAsync(Path.Combine(currentDirectory, state.RequestPath), cancellationToken);
-        var result = await InvokeAsync(state, step.Agent!, null, $"Original request:\n{request}\n\nCompleted work:\n{JsonSerializer.Serialize(state.WorkItems.Select(x => new { x.Id, x.Kind, x.ContractPath, x.LastResultRef }))}\n\nAuthoritative final verification evidence:\n{JsonSerializer.Serialize(evidence)}", cancellationToken);
+        var result = await InvokeAsync(state, step.Agent!, null, $"Original request:\n{request}\n\nCompleted work:\n{JsonSerializer.Serialize(state.WorkItems.Select(x => new { x.Id, x.Kind, x.ContractPath, x.LastResultRef }))}\n\nAuthoritative final verification evidence references:\n{string.Join("\n", state.VerificationEvidenceRefs)}", cancellationToken);
         state.FinalReview = new(result.Outcome, $"attempts/{result.AttemptId}/result.json", (state.FinalReview?.AttemptCount ?? 0) + 1);
         if (result.Outcome == "needs-fix")
         {
@@ -166,6 +169,91 @@ public sealed class FactoryRuntime(
         }
         else await SaveAsync(state, cancellationToken);
         return result.Outcome;
+    }
+
+    private async Task<string> VerifyWorkItemGateAsync(FactoryState state, WorkItemState item, string context, string contract, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            var result = context == "subtask"
+                ? await verification.RunAsync(item.VerificationCheckIds, cancellationToken)
+                : await verification.RunContextAsync(context, cancellationToken);
+            RecordEvidence(state, item, result.Evidence);
+            await events.WriteAsync(state.RunId, "verification-completed", new { verificationContext = context, verificationStatus = result.Status.ToString(), verificationFixAttempt = item.VerificationFixAttemptCount }, cancellationToken);
+            await SaveAsync(state, cancellationToken);
+            if (result.Passed) return "passed";
+            if (result.Status != VerificationStatus.Failed)
+                return await BlockForVerificationAsync(state, item, context, result, cancellationToken);
+            if (item.VerificationFixAttemptCount >= workflow.Limits.MaxVerificationFixAttempts)
+                return await BlockForVerificationAsync(state, item, context, result, cancellationToken);
+            item.VerificationFixAttemptCount++; await SaveAsync(state, cancellationToken);
+            var failed = FailureSummary(result);
+            var scope = context == "subtask"
+                ? $"work item {item.Id}\n{contract}"
+                : $"checkpoint {item.Id}\ncovered work items: {string.Join(", ", item.CoveredWorkItems)}\nFix only problems preventing this checkpoint verification from passing.";
+            var repair = await InvokeAsync(state, "implementer", item, $"Mode:\nverification-fix\n\nScope:\n{scope}\n\nFailed authoritative checks:\n{failed}", cancellationToken);
+            if (repair.Outcome != "completed") { var outcome = PrepareRepairOutcome(item, repair.Outcome); await SaveAsync(state, cancellationToken); return outcome; }
+        }
+    }
+
+    private async Task<string> VerifyFinalGateAsync(FactoryState state, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            var result = await verification.RunContextAsync("final", cancellationToken);
+            RecordEvidence(state, null, result.Evidence);
+            await events.WriteAsync(state.RunId, "verification-completed", new { verificationContext = "final", verificationStatus = result.Status.ToString(), verificationFixAttempt = state.FinalVerificationFixAttemptCount }, cancellationToken);
+            await SaveAsync(state, cancellationToken);
+            if (result.Passed) return "passed";
+            if (result.Status != VerificationStatus.Failed || state.FinalVerificationFixAttemptCount >= workflow.Limits.MaxVerificationFixAttempts)
+                return await BlockForVerificationAsync(state, null, "final", result, cancellationToken);
+            state.FinalVerificationFixAttemptCount++; await SaveAsync(state, cancellationToken);
+            var repair = await InvokeAsync(state, "implementer", null,
+                $"Mode:\nverification-fix\n\nScope:\nfinal Factory run verification.\nFix only implementation defects required for the failed final checks.\nDo not introduce new product behavior or change durable intent.\n\nFailed authoritative checks:\n{FailureSummary(result)}", cancellationToken);
+            if (repair.Outcome != "completed") return repair.Outcome;
+        }
+    }
+
+    private void RecordEvidence(FactoryState state, WorkItemState? item, IEnumerable<VerificationEvidence> evidence)
+    {
+        foreach (var record in evidence)
+        {
+            var path = $"verification/{record.EvidenceId}.json";
+            if (item is not null && !item.VerificationEvidenceRefs.Contains(path, StringComparer.Ordinal)) item.VerificationEvidenceRefs.Add(path);
+            if (!state.VerificationEvidenceRefs.Contains(path, StringComparer.Ordinal)) state.VerificationEvidenceRefs.Add(path);
+        }
+    }
+
+    private static string PrepareRepairOutcome(WorkItemState item, string outcome)
+    {
+        item.Status = outcome == "blocked" ? WorkItemStatus.Blocked : WorkItemStatus.Ready;
+        item.CurrentAttemptId = null;
+        return outcome;
+    }
+
+    private async Task<string> BlockForVerificationAsync(FactoryState state, WorkItemState? item, string context, VerificationResult result, CancellationToken cancellationToken)
+    {
+        var code = result.Status switch
+        {
+            VerificationStatus.RequiresUserAction => "VERIFICATION_REQUIRES_USER_ACTION",
+            VerificationStatus.InfrastructureFailure => "VERIFICATION_INFRASTRUCTURE_FAILURE",
+            _ => "VERIFICATION_FIX_BUDGET_EXHAUSTED"
+        };
+        var reason = $"{context} verification ended as {result.Status}: {FailureSummary(result)}";
+        state.Blocker = new(code, reason, "Resolve the reported verification condition, then continue.");
+        if (item is not null) item.Status = WorkItemStatus.Blocked;
+        await SaveAsync(state, cancellationToken);
+        return "blocked";
+    }
+
+    private static string FailureSummary(VerificationResult result) => string.Join("\n", result.Evidence.Where(x => x.Status != "passed").Select(x =>
+        $"- {x.CheckId}: status={x.Status}, exitCode={x.ExitCode}, evidence=verification/{x.EvidenceId}.json\n  {Bounded(x.Output)}"));
+
+    private static string Bounded(string value)
+    {
+        const int limit = 2000;
+        var normalized = value.Replace("\r\n", "\n").Trim();
+        return normalized.Length <= limit ? normalized : normalized[..limit] + "\n[truncated; read full evidence artifact]";
     }
 
     private async Task<string> IntentGateAsync(FactoryState state, CancellationToken cancellationToken)
@@ -205,24 +293,25 @@ public sealed class FactoryRuntime(
         await SaveAsync(state, cancellationToken);
         var attemptDirectory = Path.Combine(currentDirectory, "attempts", attemptId); Directory.CreateDirectory(attemptDirectory);
         var resultPath = Path.Combine(attemptDirectory, "result.json");
-        var prompt = BuildPrompt(role, state, attemptId, resultPath, input);
-        var invocation = new AgentInvocation { RunId = state.RunId, AttemptId = attemptId, Role = role, WorkItemId = item?.Id, Workspace = workspace, ResultPath = resultPath, Prompt = prompt, StartedAt = clock.UtcNow, WorkspaceFingerprint = fingerprinter.Compute(workspace), SkillReferences = RoleReferences(role) };
+        var agentContract = FactoryAgentCatalog.Resolve(role);
+        var invocation = new AgentInvocation
+        {
+            RunId = state.RunId,
+            AttemptId = attemptId,
+            Role = agentContract.Role,
+            WorkItemId = item?.Id,
+            Workspace = workspace,
+            ResultPath = resultPath,
+            SkillName = agentContract.SkillName,
+            ExecutionProfile = agentContract.ExecutionProfile,
+            Input = input,
+            StartedAt = clock.UtcNow,
+            WorkspaceFingerprint = fingerprinter.Compute(workspace)
+        };
         await events.WriteAsync(state.RunId, "agent-dispatching", new { attemptId, role, workItemId = item?.Id }, cancellationToken);
         var result = await agentExecutor.ExecuteAsync(invocation, cancellationToken);
         state.CurrentAttemptId = null; await SaveAsync(state, cancellationToken);
         await events.WriteAsync(state.RunId, "agent-completed", new { attemptId, role, result.Outcome, metrics = result.Metrics }, cancellationToken); return result;
-    }
-
-    private string BuildPrompt(string role, FactoryState state, string attemptId, string resultPath, string input)
-    {
-        var references = RoleReferences(role).Where(File.Exists).Select(File.ReadAllText);
-        return $"You are the IDD Factory semantic role `{role}` in a fresh isolated context.\n\n{string.Join("\n\n", references)}\n\n{input}\n\nReturn only one JSON object as your final response. The backend captures that response as {resultPath}; do not create or edit that file yourself. Required envelope: protocolVersion=1, runId={state.RunId}, attemptId={attemptId}, role={role}, outcome=<role outcome>, reason=<optional>, payload=<role data>. Do not mutate .idd/factory/current or .idd/intent. stdout is diagnostic only.";
-    }
-
-    private IReadOnlyList<string> RoleReferences(string role)
-    {
-        var skill = role switch { "task-decomposer" => "idd-factory-decompose-task", "implementer" => "idd-factory-execute-subtask", "checkpoint-reviewer" => "idd-factory-review-checkpoint", "final-reviewer" => "idd-factory-review-task", "factory-replanner" => "idd-factory-replan", _ => throw new InvalidOperationException(role) };
-        return [Path.Combine(pluginRoot, "skills", skill, "SKILL.md"), Path.Combine(pluginRoot, "skills", skill, "references", "roles", role + ".md")];
     }
 
     private void AddWorkItem(FactoryState state, JsonElement node)
@@ -272,7 +361,8 @@ public sealed class FactoryRuntime(
         var dependencies = review?.CoveredWorkItems.ToList() ?? state.WorkItems.Where(x => x.Status == WorkItemStatus.Completed).Select(x => x.Id).ToList();
         var item = new WorkItemState { Id = id, Sequence = max + 1, Kind = WorkItemKind.CorrectiveSubtask, Status = WorkItemStatus.Ready, ContractPath = relative, Dependencies = dependencies, VerificationCheckIds = Strings(correction, "verificationCheckIds") };
         state.WorkItems.Add(item); state.CorrectiveCycleCount++;
-        if (review is not null) { review.Status = WorkItemStatus.Planned; review.Dependencies.Add(id); review.CoveredWorkItems.Add(id); }
+        if (review is not null) { review.Status = WorkItemStatus.Planned; review.VerificationFixAttemptCount = 0; review.Dependencies.Add(id); review.CoveredWorkItems.Add(id); }
+        else state.FinalVerificationFixAttemptCount = 0;
     }
 
     private void ApplyReplan(FactoryState state, JsonElement? payload)

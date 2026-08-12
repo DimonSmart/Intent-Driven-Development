@@ -133,7 +133,8 @@
         "frontmatter": {
           "context": "fork",
           "agent": "Explore",
-          "argument-hint": "[request text or file contents]"
+          "argument-hint": "[request text or file contents]",
+          "allowed-tools": ["Read", "Glob", "Grep"]
         }
       }
     }
@@ -145,7 +146,8 @@
         "frontmatter": {
           "context": "fork",
           "agent": "general-purpose",
-          "argument-hint": "[active subtask path]"
+          "argument-hint": "[active subtask path]",
+          "allowed-tools": ["Read", "Glob", "Grep", "Edit", "Write", "Bash"]
         }
       }
     }
@@ -157,7 +159,8 @@
         "frontmatter": {
           "context": "fork",
           "agent": "Explore",
-          "argument-hint": "[active review-checkpoint path]"
+          "argument-hint": "[active review-checkpoint path]",
+          "allowed-tools": ["Read", "Glob", "Grep", "Bash"]
         }
       }
     }
@@ -168,7 +171,8 @@
       "claude": {
         "frontmatter": {
           "context": "fork",
-          "agent": "Explore"
+          "agent": "Explore",
+          "allowed-tools": ["Read", "Glob", "Grep", "Bash"]
         }
       }
     }
@@ -179,7 +183,8 @@
       "claude": {
         "frontmatter": {
           "context": "fork",
-          "agent": "Explore"
+          "agent": "Explore",
+          "allowed-tools": ["Read", "Glob", "Grep"]
         }
       }
     }

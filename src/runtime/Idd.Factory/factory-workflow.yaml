@@ -5,6 +5,7 @@ limits:
   maxAgentAttempts: 3
   maxReplans: 3
   maxCorrectiveCycles: 5
+  maxVerificationFixAttempts: 1
 
 steps:
   - id: decompose

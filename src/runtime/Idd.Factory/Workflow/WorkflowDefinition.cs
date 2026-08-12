@@ -11,7 +11,7 @@ public sealed record WorkflowDefinition(
     string SourcePath,
     string Hash);
 
-public sealed record WorkflowLimits(int MaxAgentAttempts, int MaxReplans, int MaxCorrectiveCycles);
+public sealed record WorkflowLimits(int MaxAgentAttempts, int MaxReplans, int MaxCorrectiveCycles, int MaxVerificationFixAttempts);
 
 public sealed record WorkflowStepDefinition(
     string Id,
@@ -45,7 +45,7 @@ public sealed class WorkflowValidator
     {
         if (workflow.SchemaVersion != 1) throw new WorkflowException("UNSUPPORTED_WORKFLOW_SCHEMA", $"Unsupported workflow schema {workflow.SchemaVersion}.");
         if (string.IsNullOrWhiteSpace(workflow.Name)) throw new WorkflowException("INVALID_WORKFLOW", "Workflow name is required.");
-        if (workflow.Limits.MaxAgentAttempts is < 1 or > 10 || workflow.Limits.MaxReplans is < 0 or > 10 || workflow.Limits.MaxCorrectiveCycles is < 0 or > 20)
+        if (workflow.Limits.MaxAgentAttempts is < 1 or > 10 || workflow.Limits.MaxReplans is < 0 or > 10 || workflow.Limits.MaxCorrectiveCycles is < 0 or > 20 || workflow.Limits.MaxVerificationFixAttempts is < 0 or > 10)
             throw new WorkflowException("INVALID_WORKFLOW_LIMITS", "Workflow limits exceed runtime safety ceilings.");
         if (workflow.Steps.Count == 0 || workflow.Steps[0].Uses != "factory.decompose")
             throw new WorkflowException("INVALID_WORKFLOW", "The first step must use factory.decompose.");
@@ -87,7 +87,7 @@ internal static class RestrictedWorkflowYaml
 {
     public static WorkflowDefinition Parse(string yaml, string sourcePath)
     {
-        int? schema = null; string? name = null; int attempts = 0, replans = 0, corrections = 0;
+        int? schema = null; string? name = null; int attempts = 0, replans = 0, corrections = 0, verificationFixes = 1;
         var steps = new List<MutableStep>(); MutableStep? step = null; string section = ""; string stepSection = "";
         foreach (var raw in yaml.Split('\n'))
         {
@@ -105,7 +105,7 @@ internal static class RestrictedWorkflowYaml
             }
             if (section == "limits" && indent == 2 && TryPair(text, out var limit, out var limitValue))
             {
-                switch (limit) { case "maxAgentAttempts": attempts = Number(limitValue, limit); break; case "maxReplans": replans = Number(limitValue, limit); break; case "maxCorrectiveCycles": corrections = Number(limitValue, limit); break; default: throw new WorkflowException("INVALID_WORKFLOW_YAML", $"Unknown limit {limit}."); }
+                switch (limit) { case "maxAgentAttempts": attempts = Number(limitValue, limit); break; case "maxReplans": replans = Number(limitValue, limit); break; case "maxCorrectiveCycles": corrections = Number(limitValue, limit); break; case "maxVerificationFixAttempts": verificationFixes = Number(limitValue, limit); break; default: throw new WorkflowException("INVALID_WORKFLOW_YAML", $"Unknown limit {limit}."); }
                 continue;
             }
             if (section != "steps") throw new WorkflowException("INVALID_WORKFLOW_YAML", $"Unexpected entry: {text}");
@@ -120,7 +120,7 @@ internal static class RestrictedWorkflowYaml
             { (stepSection == "on" ? step.Transitions : step.Handlers).Add(mapKey, Scalar(mapValue)); continue; }
             throw new WorkflowException("INVALID_WORKFLOW_YAML", $"Unsupported YAML structure: {text}");
         }
-        return new WorkflowDefinition(schema ?? 0, name ?? "", new(attempts, replans, corrections),
+        return new WorkflowDefinition(schema ?? 0, name ?? "", new(attempts, replans, corrections, verificationFixes),
             steps.Select(x => new WorkflowStepDefinition(x.Id, x.Uses, x.Agent, x.Handlers, x.Transitions)).ToArray(), sourcePath, "");
     }
 

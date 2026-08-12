@@ -18,12 +18,12 @@ public sealed class FinalizeHandler(string workspace)
             ?? throw new InvalidOperationException("Final review invocation is invalid.");
         if (finalInvocation.WorkspaceFingerprint != new WorkspaceFingerprinter().Compute(workspace))
             throw new InvalidOperationException("Workspace changed after final review.");
+        var evidence = new List<VerificationEvidence>();
         foreach (var evidenceRef in state.VerificationEvidenceRefs)
-        {
-            var evidence = JsonSerializer.Deserialize<VerificationEvidence>(await File.ReadAllTextAsync(Path.Combine(current, evidenceRef), cancellationToken), FactoryJson.Options)
-                ?? throw new InvalidOperationException($"Verification evidence is invalid: {evidenceRef}");
-            if (evidence.Status != "passed") throw new InvalidOperationException($"Verification did not pass: {evidence.CheckId}");
-        }
+            evidence.Add(JsonSerializer.Deserialize<VerificationEvidence>(await File.ReadAllTextAsync(Path.Combine(current, evidenceRef), cancellationToken), FactoryJson.Options)
+                ?? throw new InvalidOperationException($"Verification evidence is invalid: {evidenceRef}"));
+        foreach (var latest in evidence.GroupBy(x => x.CheckId, StringComparer.Ordinal).Select(group => group.OrderBy(x => x.FinishedAt).Last()))
+            if (latest.Status != "passed") throw new InvalidOperationException($"Latest verification did not pass: {latest.CheckId}");
         var results = Path.Combine(workspace, ".idd", "factory", "results"); Directory.CreateDirectory(results);
         var request = await File.ReadAllTextAsync(Path.Combine(current, state.RequestPath), cancellationToken);
         var slug = Slug(request.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "factory-result");

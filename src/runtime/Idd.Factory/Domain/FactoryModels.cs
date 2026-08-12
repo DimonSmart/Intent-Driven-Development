@@ -35,6 +35,7 @@ public sealed record FactoryState
     public int AttemptSequence { get; set; }
     public int ReplanCount { get; set; }
     public int CorrectiveCycleCount { get; set; }
+    public int FinalVerificationFixAttemptCount { get; set; }
     public FactoryBlocker? Blocker { get; set; }
     public FinalReviewState? FinalReview { get; set; }
     public List<string> VerificationEvidenceRefs { get; init; } = [];
@@ -55,11 +56,41 @@ public sealed record WorkItemState
     public string? CurrentAttemptId { get; set; }
     public List<string> VerificationCheckIds { get; init; } = [];
     public List<string> VerificationEvidenceRefs { get; init; } = [];
+    public int VerificationFixAttemptCount { get; set; }
     public string? LastResultRef { get; set; }
 }
 
 public sealed record FactoryBlocker(string Code, string Reason, string ResumeWhen);
 public sealed record FinalReviewState(string Verdict, string? ResultRef, int AttemptCount);
+
+[JsonConverter(typeof(JsonStringEnumConverter<AgentExecutionProfile>))]
+public enum AgentExecutionProfile
+{
+    [JsonStringEnumMemberName("read-only")]
+    ReadOnly,
+    [JsonStringEnumMemberName("workspace-write")]
+    WorkspaceWrite
+}
+
+public sealed record FactoryAgentContract(string Role, string SkillName, AgentExecutionProfile ExecutionProfile);
+
+public static class FactoryAgentCatalog
+{
+    private static readonly IReadOnlyDictionary<string, FactoryAgentContract> Contracts =
+        new[]
+        {
+            new FactoryAgentContract("task-decomposer", "idd-factory-decompose-task", AgentExecutionProfile.ReadOnly),
+            new FactoryAgentContract("implementer", "idd-factory-execute-subtask", AgentExecutionProfile.WorkspaceWrite),
+            new FactoryAgentContract("checkpoint-reviewer", "idd-factory-review-checkpoint", AgentExecutionProfile.ReadOnly),
+            new FactoryAgentContract("final-reviewer", "idd-factory-review-task", AgentExecutionProfile.ReadOnly),
+            new FactoryAgentContract("factory-replanner", "idd-factory-replan", AgentExecutionProfile.ReadOnly)
+        }.ToDictionary(contract => contract.Role, StringComparer.Ordinal);
+
+    public static FactoryAgentContract Resolve(string role) =>
+        Contracts.TryGetValue(role, out var contract)
+            ? contract
+            : throw new ArgumentOutOfRangeException(nameof(role), role, "Unknown Factory agent role.");
+}
 
 public sealed record AgentInvocation
 {
@@ -71,10 +102,11 @@ public sealed record AgentInvocation
     public string? WorkItemId { get; init; }
     public required string Workspace { get; init; }
     public required string ResultPath { get; init; }
-    public required string Prompt { get; init; }
+    public required string SkillName { get; init; }
+    public required AgentExecutionProfile ExecutionProfile { get; init; }
+    public required string Input { get; init; }
     public required DateTimeOffset StartedAt { get; init; }
     public required string WorkspaceFingerprint { get; init; }
-    public IReadOnlyList<string> SkillReferences { get; init; } = [];
 }
 
 public sealed record AgentResultEnvelope
@@ -91,6 +123,7 @@ public sealed record AgentResultEnvelope
 
 public sealed record AgentRunHandle(string AttemptId, int ProcessId, string BackendHandle);
 public sealed record AgentProcessResult(int ExitCode, string Stdout, string Stderr, bool WasCancelled);
+public sealed record AgentAttemptTelemetry(string Role, string SkillName, string Backend, AgentExecutionProfile ExecutionProfile, string SkillInvocationMode, int InputChars);
 
 public sealed record FactoryCliOutcome(
     string FactoryOutcome,

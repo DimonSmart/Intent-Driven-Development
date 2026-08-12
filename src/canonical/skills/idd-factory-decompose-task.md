@@ -3,14 +3,16 @@
 ## Purpose
 
 Produce the smallest safe ordered decomposition for one complete Factory
-request. Read `references/project-verification.md` before assigning checks.
+request. This skill is the complete semantic contract for the
+`task-decomposer` role.
 
 ## Inputs and boundaries
 
 Read the complete request, relevant current intent, and only repository evidence
 needed for task boundaries, dependencies, checkpoint placement, and stable
-verification IDs. Do not read previous runs, write code or state, edit intent,
-or delegate.
+verification IDs. The project verification policy may be inspected only to
+select existing stable IDs; the worker does not execute mandatory checks. Do
+not read previous runs, write code or state, edit intent, or delegate.
 
 Return `intent-required` instead of inventing durable behavior. Preserve any
 explicit ordering, staging, dependency, and review boundaries from the request.
@@ -47,4 +49,7 @@ contract contains coverage, review scope, and focused verification. Do not
 include commands; use stable verification IDs.
 
 The runtime validates identity, order, dependencies, coverage, intent boundary,
-and verification IDs before creating state. The worker never creates files.
+and verification IDs before creating state. The runtime owns workflow routing,
+machine protocol validation, persisted state, and authoritative verification.
+The worker never creates files or chooses the next role or skill. Relevant
+project and domain skills may be used normally for focused semantic analysis.
