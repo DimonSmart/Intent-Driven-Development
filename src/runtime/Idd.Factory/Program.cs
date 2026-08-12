@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Idd.Factory.Agents;
 using Idd.Factory.Domain;
@@ -17,6 +18,7 @@ internal static class FactoryCli
         FactoryCliOutcome outcome;
         try
         {
+            Console.InputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
             if (args.Length == 0 || args[0] is "-h" or "--help") { Console.WriteLine("idd-factory run --workspace <path> (--request-file <path> | --request-stdin true)\nidd-factory continue --workspace <path> [--answer-file <path>]\nidd-factory cancel --workspace <path>"); return 0; }
             var command = args[0]; var options = Parse(args.Skip(1).ToArray());
             var workspace = Path.GetFullPath(Required(options, "workspace"));

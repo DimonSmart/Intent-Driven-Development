@@ -23,8 +23,7 @@ public sealed class CodexCliBackend : IAgentBackend
     public async Task<AgentRunHandle> StartAsync(AgentInvocation invocation, CancellationToken cancellationToken)
     {
         var attemptDirectory = Path.GetDirectoryName(invocation.ResultPath)!;
-        CleanupStalePrivateHomes(invocation.Workspace);
-        var codexHome = PreparePrivateHome(attemptDirectory);
+        var codexHome = PreparePrivateHome(invocation.RunId, invocation.AttemptId);
         var stdoutPath = Path.Combine(attemptDirectory, "stdout.log");
         var stderrPath = Path.Combine(attemptDirectory, "stderr.log");
         var sqliteDirectory = Path.Combine(codexHome, "state");
@@ -35,6 +34,7 @@ public sealed class CodexCliBackend : IAgentBackend
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            StandardInputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
             UseShellExecute = false,
             CreateNoWindow = true
         };
@@ -102,9 +102,10 @@ public sealed class CodexCliBackend : IAgentBackend
         finally { CleanupPrivateHome(running.Process.StartInfo.Environment["CODEX_HOME"]!); running.Process.Dispose(); }
     }
 
-    private static string PreparePrivateHome(string attemptDirectory)
+    private static string PreparePrivateHome(string runId, string attemptId)
     {
-        var home = Path.Combine(attemptDirectory, "codex-private");
+        var home = Path.Combine(Path.GetTempPath(), "idd-factory", "codex-private", runId, attemptId);
+        CleanupPrivateHome(home);
         Directory.CreateDirectory(home);
         var configuredHome = Environment.GetEnvironmentVariable("CODEX_HOME");
         var sourceHome = string.IsNullOrWhiteSpace(configuredHome)
@@ -113,14 +114,6 @@ public sealed class CodexCliBackend : IAgentBackend
         var sourceAuth = Path.Combine(sourceHome, "auth.json");
         if (File.Exists(sourceAuth)) File.Copy(sourceAuth, Path.Combine(home, "auth.json"), overwrite: true);
         return home;
-    }
-
-    private static void CleanupStalePrivateHomes(string workspace)
-    {
-        var attempts = Path.Combine(workspace, ".idd", "factory", "current", "attempts");
-        if (!Directory.Exists(attempts)) return;
-        foreach (var home in Directory.EnumerateDirectories(attempts, "codex-private", SearchOption.AllDirectories).ToArray())
-            Directory.Delete(home, recursive: true);
     }
 
     private static void CleanupPrivateHome(string home)
