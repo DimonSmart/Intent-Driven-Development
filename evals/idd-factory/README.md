@@ -7,10 +7,22 @@ Codex CLI, Git, and a .NET 10 SDK.
 It does not run during normal `dotnet test` or `scripts/Check.ps1`. Run the one
 available case explicitly:
 
+```bat
+run-live-factory-evals.bat
+```
+
+The batch launcher selects `unrestricted-runtime-launch`. On Windows the
+trusted Factory Runtime must run outside the parent Codex OS sandbox; the
+runtime itself applies `workspace-write` to implementers and `read-only` to
+decomposition and review workers, always with approvals disabled.
+
+The equivalent direct invocation is:
+
 ```powershell
 $env:IDD_RUN_LIVE_FACTORY_EVALS = "1"
+$env:IDD_CODEX_LAUNCH_PROFILE = "unrestricted-runtime-launch"
 dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj `
-  --filter "Category=LiveFactoryEval" `
+  --filter "FullyQualifiedName~TwoStepCatalogFactoryEvalTests" `
   --logger "console;verbosity=detailed"
 ```
 

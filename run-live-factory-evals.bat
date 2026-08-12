@@ -10,7 +10,7 @@ set "FRAMEWORK=net10.0"
 set "TEST_DLL=%CD%\tests\Idd.Factory.LiveTests\bin\%CONFIGURATION%\%FRAMEWORK%\Idd.Factory.LiveTests.dll"
 
 set "IDD_RUN_LIVE_FACTORY_EVALS=1"
-set "IDD_CODEX_LAUNCH_PROFILE=configured-workspace-write"
+set "IDD_CODEX_LAUNCH_PROFILE=unrestricted-runtime-launch"
 if not defined IDD_FACTORY_EVAL_TIMEOUT_MINUTES set "IDD_FACTORY_EVAL_TIMEOUT_MINUTES=20"
 
 echo [%DATE% %TIME%] Starting IDD Factory live eval.
