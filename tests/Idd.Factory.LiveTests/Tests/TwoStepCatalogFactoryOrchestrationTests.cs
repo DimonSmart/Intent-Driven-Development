@@ -59,7 +59,9 @@ public sealed class TwoStepCatalogFactoryOrchestrationTests
 
             var report = await File.ReadAllTextAsync(Path.Combine(directory, "report.md"));
             Assert.Contains("Semantic subprocess workers: 4", report);
-            Assert.Contains("Coordinator collaboration spawns:", report);
+            Assert.Contains("Programmatic worker dispatches:", report);
+            Assert.Contains("Completed semantic workers:", report);
+            Assert.Contains("Platform collaboration spawns:", report);
             Assert.Contains("Fresh input tokens:", report);
             Assert.Contains("Detailed efficiency diagnostics: efficiency.md / efficiency.json", report);
             Assert.DoesNotContain("Successfully spawned agents", report);

@@ -59,7 +59,7 @@ public sealed class CodexCliBackend : IAgentBackend
         var stderr = CaptureAsync(process.StandardError, stderrPath, cancellationToken);
         await process.StandardInput.WriteAsync(invocation.Prompt.AsMemory(), cancellationToken);
         await process.StandardInput.FlushAsync(cancellationToken); process.StandardInput.Close();
-        processes.Add(invocation.AttemptId, new(process, stdout, stderr));
+        processes.Add(invocation.AttemptId, new(process, stdout, stderr, invocation.ResultPath));
         return new(invocation.AttemptId, process.Id, invocation.AttemptId);
     }
 
@@ -69,9 +69,27 @@ public sealed class CodexCliBackend : IAgentBackend
             return new(-1, "", "The backend handle is not active in this runtime process.", false);
         try
         {
-            await running.Process.WaitForExitAsync(cancellationToken);
+            using var resultWatcherCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var processExit = running.Process.WaitForExitAsync(cancellationToken);
+            var resultReady = WaitForCompleteResultAsync(running.ResultPath, resultWatcherCancellation.Token);
+            var first = await Task.WhenAny(processExit, resultReady);
+            var completedResultWasObserved = first == resultReady && await resultReady;
+            resultWatcherCancellation.Cancel();
+
+            if (completedResultWasObserved && !running.Process.HasExited)
+            {
+                using var gracefulExit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                gracefulExit.CancelAfter(TimeSpan.FromSeconds(5));
+                try { await running.Process.WaitForExitAsync(gracefulExit.Token); }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                { await CancelProcessAsync(running.Process); }
+            }
+            else
+            {
+                await processExit;
+            }
             var stdout = await running.Stdout; var stderr = await running.Stderr;
-            return new AgentProcessResult(running.Process.ExitCode, stdout, stderr, false);
+            return new AgentProcessResult(completedResultWasObserved ? 0 : running.Process.ExitCode, stdout, stderr, false);
         }
         catch (OperationCanceledException) { await CancelProcessAsync(running.Process); await Task.WhenAll(running.Stdout, running.Stderr); throw; }
         finally { CleanupPrivateHome(running.Process.StartInfo.Environment["CODEX_HOME"]!); running.Process.Dispose(); }
@@ -112,9 +130,27 @@ public sealed class CodexCliBackend : IAgentBackend
 
     private static async Task<string> CaptureAsync(StreamReader reader, string path, CancellationToken cancellationToken)
     { var text = await reader.ReadToEndAsync(cancellationToken); await File.WriteAllTextAsync(path, text, cancellationToken); return text; }
+    private static async Task<bool> WaitForCompleteResultAsync(string path, CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            if (File.Exists(path))
+            {
+                try
+                {
+                    using var document = JsonDocument.Parse(await File.ReadAllTextAsync(path, cancellationToken));
+                    if (document.RootElement.ValueKind == JsonValueKind.Object) return true;
+                }
+                catch (JsonException) { }
+                catch (IOException) { }
+            }
+            await Task.Delay(100, cancellationToken);
+        }
+        return false;
+    }
     private static async Task CancelProcessAsync(Process process)
     { if (process.HasExited) return; try { process.CloseMainWindow(); await Task.Delay(1500); } catch { } if (!process.HasExited) process.Kill(true); await process.WaitForExitAsync(); }
-    private sealed record RunningProcess(Process Process, Task<string> Stdout, Task<string> Stderr);
+    private sealed record RunningProcess(Process Process, Task<string> Stdout, Task<string> Stderr, string ResultPath);
 }
 
 public sealed record CodexCommand(string Executable, IReadOnlyList<string> PrefixArguments);

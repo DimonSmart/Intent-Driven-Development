@@ -122,7 +122,10 @@ public sealed class FactoryRuntime(
         var role = item.Kind == WorkItemKind.ReviewCheckpoint ? step.Handlers["review-checkpoint"] : step.Handlers["subtask"];
         item.Status = WorkItemStatus.Dispatching; await SaveAsync(state, cancellationToken); item.Status = WorkItemStatus.Running; await SaveAsync(state, cancellationToken);
         var contract = await File.ReadAllTextAsync(Path.Combine(currentDirectory, item.ContractPath), cancellationToken);
-        var result = await InvokeAsync(state, role, item, $"Work item contract:\n{contract}", cancellationToken);
+        var assignedVerification = JsonSerializer.Serialize(item.VerificationCheckIds);
+        var result = await InvokeAsync(state, role, item,
+            $"Work item contract:\n{contract}\n\nAssigned verification check IDs:\n{assignedVerification}\n\nResolve these IDs in .idd/verification.yaml and run exactly these assigned checks. Do not substitute a broader repository or solution-wide command.",
+            cancellationToken);
         item.LastResultRef = Path.GetRelativePath(currentDirectory, Path.Combine(currentDirectory, "attempts", item.CurrentAttemptId!, "result.json")).Replace('\\', '/');
         if (result.Outcome is "needs-replan" or "intent-required" or "blocked") { item.Status = result.Outcome == "blocked" ? WorkItemStatus.Blocked : WorkItemStatus.Ready; await SaveAsync(state, cancellationToken); return result.Outcome; }
         if (result.Outcome == "needs-fix") { InsertCorrection(state, item, result.Payload); await SaveAsync(state, cancellationToken); return "advanced"; }

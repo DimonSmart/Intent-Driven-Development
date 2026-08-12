@@ -87,6 +87,21 @@ public sealed class AgentTraceTests
     }
 
     [Fact]
+    public void ReportWriter_ShowsProgrammaticRuntimeSequence()
+    {
+        var start = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
+        var trace = new AgentTrace(2, "root", [
+            new("root", null, "factory-root", null, null, "completed", start, null, null, 0, 0, null, null, null, null, null),
+            new("A000001", "root", "task-decomposer", null, null, "completed", start.AddSeconds(1), null, null, 1, 0, null, null, null, null, null),
+            new("A000002", "root", "implementer", "catalog", null, "completed", start.AddSeconds(2), null, null, 1, 0, null, null, null, null, null)
+        ], []);
+
+        var mermaid = AgentTraceReportWriter.WriteMermaid(trace);
+
+        Assert.Contains("n1 -. next .-> n2", mermaid);
+    }
+
+    [Fact]
     public void Builder_UsesLatestCumulativeTokensCompletedTurnsAndDistinctToolCalls()
     {
         var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")); Directory.CreateDirectory(directory);

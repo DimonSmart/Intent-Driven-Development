@@ -126,7 +126,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
         if (rootThreadId is null)
             return new(2, null, [], [new("ROOT_THREAD_ID_NOT_FOUND", "warning", "Root thread ID was not found in events.jsonl.", null, "events.jsonl")]);
 
-        var runtimeTrace = FactoryRuntimeTraceReader.TryRead(workspace.WorkspaceDirectory, rootThreadId);
+        var runtimeTrace = FactoryRuntimeTraceReader.TryRead(workspace.WorkspaceDirectory, rootThreadId, processInterrupted);
         if (runtimeTrace is not null) return runtimeTrace;
 
         var sessions = new CodexHomeLocator().FindSessionsDirectory();

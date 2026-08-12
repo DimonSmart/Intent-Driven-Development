@@ -12,6 +12,9 @@ public static class AgentTraceReportWriter
         var text = new StringBuilder("```mermaid\nflowchart TD\n");
         foreach (var agent in agents) text.Append("    ").Append(ids[agent.ThreadId]).Append("[\"").Append(Label(agent)).Append("\"]\n");
         foreach (var agent in agents.Where(agent => agent.ParentThreadId is not null && ids.ContainsKey(agent.ParentThreadId))) text.Append("    ").Append(ids[agent.ParentThreadId!]).Append(" --> ").Append(ids[agent.ThreadId]).Append('\n');
+        var runtimeAttempts = agents.Where(agent => IsRuntimeAttempt(agent.ThreadId)).OrderBy(agent => agent.StartedAt).ThenBy(agent => agent.ThreadId, StringComparer.Ordinal).ToArray();
+        for (var index = 1; index < runtimeAttempts.Length; index++)
+            text.Append("    ").Append(ids[runtimeAttempts[index - 1].ThreadId]).Append(" -. next .-> ").Append(ids[runtimeAttempts[index].ThreadId]).Append('\n');
         return text.Append("```\n").ToString();
     }
 
@@ -23,6 +26,7 @@ public static class AgentTraceReportWriter
     }
 
     private static IEnumerable<AgentTraceNode> Ordered(AgentTrace trace) => trace.Agents.OrderBy(agent => agent.StartedAt).ThenBy(agent => agent.ThreadId, StringComparer.Ordinal);
+    private static bool IsRuntimeAttempt(string id) => id.Length == 7 && id[0] == 'A' && id[1..].All(char.IsAsciiDigit);
     private static string Label(AgentTraceNode agent)
     {
         var lines = new List<string> { agent.Role };
