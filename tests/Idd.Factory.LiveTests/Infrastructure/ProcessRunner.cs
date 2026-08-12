@@ -80,15 +80,15 @@ public sealed class ProcessRunner
         {
             if (!process.HasExited) process.Kill(entireProcessTree: true);
             await processExit;
-            outputCancellation.Cancel();
         }
         try { await Task.WhenAll(stdoutTask, stderrTask).WaitAsync(OutputDrainTimeout); }
         catch (TimeoutException)
         {
             outputCancellation.Cancel();
             try { await Task.WhenAll(stdoutTask, stderrTask); }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
         }
+        cancellationToken.ThrowIfCancellationRequested();
         await stdinTask;
         return new ProcessResult(process.ExitCode, startedAt, DateTimeOffset.UtcNow, timedOut, stdoutPath, stderrPath, completionSignaled);
     }

@@ -33,6 +33,29 @@ public sealed class ProcessRunnerTests
     }
 
     [Fact]
+    public async Task RunAsync_PropagatesCallerCancellation()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "idd-process-runner-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new ProcessRunner().RunAsync(
+                "pwsh",
+                ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "Start-Sleep -Seconds 30"],
+                directory,
+                Path.Combine(directory, "stdout.log"),
+                Path.Combine(directory, "stderr.log"),
+                TimeSpan.FromSeconds(30),
+                cancellation.Token));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task RunAsync_ReturnsAfterStableCompletionSignal()
     {
         var directory = Path.Combine(Path.GetTempPath(), "idd-process-runner-tests", Guid.NewGuid().ToString("N"));
