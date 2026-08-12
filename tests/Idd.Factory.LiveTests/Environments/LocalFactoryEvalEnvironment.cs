@@ -32,7 +32,7 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
             Path.Combine(workspace.VerificationDirectory, name + ".stderr.log"), TimeSpan.FromMinutes(2), cancellationToken);
     }
 
-    public Task<ProcessResult> RunCodexAsync(FactoryEvalWorkspace workspace, FactoryEvalOptions options, CancellationToken cancellationToken)
+    public async Task<ProcessResult> RunCodexAsync(FactoryEvalWorkspace workspace, FactoryEvalOptions options, CancellationToken cancellationToken)
     {
         var prompt = BuildRunCodexPrompt(workspace.CaseDirectory);
         var factoryCodexExecutable = PrepareSandboxFactoryCodexExecutable(workspace);
@@ -40,7 +40,14 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
             Environment.GetEnvironmentVariable("PATH") ?? string.Empty,
             OperatingSystem.IsWindows(),
             factoryCodexExecutable);
-        return processRunner.RunAsync(CodexCommand.Executable, CodexCommand.PrefixArguments.Concat(BuildRunCodexArguments(workspace, options)).ToArray(), workspace.WorkspaceDirectory, workspace.EventsPath, workspace.StderrPath, options.Timeout, cancellationToken, prompt, environmentOverrides, workspace.LastMessagePath);
+        try
+        {
+            return await processRunner.RunAsync(CodexCommand.Executable, CodexCommand.PrefixArguments.Concat(BuildRunCodexArguments(workspace, options)).ToArray(), workspace.WorkspaceDirectory, workspace.EventsPath, workspace.StderrPath, options.Timeout, cancellationToken, prompt, environmentOverrides, workspace.LastMessagePath);
+        }
+        finally
+        {
+            if (factoryCodexExecutable is not null && File.Exists(factoryCodexExecutable)) File.Delete(factoryCodexExecutable);
+        }
     }
 
     private string? PrepareSandboxFactoryCodexExecutable(FactoryEvalWorkspace workspace)

@@ -23,6 +23,15 @@ public sealed class FactoryRuntimeTraceReaderTests
             ]);
             File.WriteAllText(Path.Combine(current, "attempts", "A000002", "result.json"),
                 JsonSerializer.Serialize(new { outcome = "blocked" }));
+            File.WriteAllLines(Path.Combine(current, "attempts", "A000002", "stdout.log"),
+            [
+                "{\"type\":\"turn.started\"}",
+                "{\"type\":\"item.started\",\"item\":{\"id\":\"tool-1\",\"type\":\"command_execution\",\"command\":\"Get-Content 'src/Catalog.cs'\",\"status\":\"in_progress\"}}",
+                "{\"type\":\"item.completed\",\"item\":{\"id\":\"tool-1\",\"type\":\"command_execution\",\"command\":\"Get-Content 'src/Catalog.cs'\",\"aggregated_output\":\"source\",\"exit_code\":0,\"status\":\"completed\"}}",
+                "{\"type\":\"item.started\",\"item\":{\"id\":\"tool-2\",\"type\":\"file_change\",\"status\":\"in_progress\"}}",
+                "{\"type\":\"item.completed\",\"item\":{\"id\":\"tool-2\",\"type\":\"file_change\",\"status\":\"completed\"}}",
+                "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":100,\"cached_input_tokens\":40,\"output_tokens\":20,\"reasoning_output_tokens\":5}}"
+            ]);
 
             var trace = FactoryRuntimeTraceReader.TryRead(workspace, "root", processInterrupted: true)!;
 
@@ -33,6 +42,12 @@ public sealed class FactoryRuntimeTraceReaderTests
             Assert.Equal("catalog", incomplete.WorkItem);
             Assert.Equal("result-produced", incomplete.Status);
             Assert.Equal("blocked", incomplete.TerminalResult!.Kind);
+            Assert.Equal(2, incomplete.ToolCallCount);
+            Assert.Equal(1, incomplete.FileReadCount);
+            Assert.Equal(1, incomplete.UniqueFileReadCount);
+            Assert.Equal(0, incomplete.RepeatedFileReadCount);
+            Assert.Equal(["shell", "apply_patch"], incomplete.ToolCalls!.Select(call => call.Tool));
+            Assert.Single(incomplete.TokenProgression!);
             Assert.Contains(trace.Diagnostics, diagnostic => diagnostic.Code == "RUNTIME_RESULT_NOT_RECORDED");
         }
         finally { if (Directory.Exists(workspace)) Directory.Delete(workspace, true); }

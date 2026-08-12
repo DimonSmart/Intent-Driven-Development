@@ -50,6 +50,9 @@ public sealed class CodexRolloutReader
         return analysis;
     }
 
+    public CodexRolloutAnalysis AnalyzeJsonl(string path, string threadId, string role, DateTimeOffset? startedAt, string workingDirectory, ICollection<AgentTraceDiagnostic> diagnostics)
+        => Analyze(new(path, Path.GetFileName(path), threadId, null, role, startedAt, workingDirectory), diagnostics);
+
     public static IReadOnlyList<DispatchReferenceSize> ReadDispatchReferences(string? dispatch, string? workingDirectory)
     {
         var result = new List<DispatchReferenceSize>();
@@ -142,7 +145,13 @@ public sealed class CodexRolloutReader
     private static void ReadToolCall(string? eventType, JsonElement item, int sequence, DateTimeOffset? timestamp, CodexRolloutAnalysis analysis)
     {
         var id = String(item, "id") ?? String(item, "call_id");
-        var tool = String(item, "tool") ?? String(item, "name") ?? (String(item, "type") == "local_shell_call" ? "shell" : "unknown");
+        var itemKind = String(item, "type");
+        var tool = String(item, "tool") ?? String(item, "name") ?? itemKind switch
+        {
+            "local_shell_call" or "command_execution" => "shell",
+            "file_change" => "apply_patch",
+            _ => "unknown"
+        };
         var status = String(item, "status") ?? (eventType?.Contains("completed", StringComparison.OrdinalIgnoreCase) == true ? "completed" : "started");
         var command = DetailString(item, "command") ?? DetailString(item, "cmd");
         var output = DetailString(item, "aggregated_output") ?? DetailString(item, "output") ?? DetailString(item, "result");
@@ -165,10 +174,12 @@ public sealed class CodexRolloutReader
                 if (!string.IsNullOrWhiteSpace(effectivePrompt)) analysis.SpawnPrompts[child] = effectivePrompt;
             }
         }
-        foreach (Match match in ReadCommandPattern.Matches(command ?? string.Empty))
+        var terminal = status is "completed" or "failed" or "error" or "rejected" or "cancelled" || eventType?.Contains("completed", StringComparison.OrdinalIgnoreCase) == true;
+        foreach (Match match in terminal ? ReadCommandPattern.Matches(command ?? string.Empty).Cast<Match>() : [])
         {
             var raw = new[] { "sq", "dq", "plain", "sq2", "dq2", "plain2" }.Select(name => match.Groups[name].Value).FirstOrDefault(value => value.Length > 0);
-            if (raw is not null) analysis.FileReads.Add(new(NormalizePath(raw), sequence, output is null ? 0 : Encoding.UTF8.GetByteCount(output), output?.Length ?? 0));
+            var path = raw is null ? null : NormalizePath(raw);
+            if (!string.IsNullOrWhiteSpace(path) && !path.StartsWith('$')) analysis.FileReads.Add(new(path, sequence, output is null ? 0 : Encoding.UTF8.GetByteCount(output), output?.Length ?? 0));
         }
     }
 
@@ -209,7 +220,7 @@ public sealed class CodexRolloutReader
         return normalized;
     }
 
-    private static bool IsToolCall(string? type) => type is "function_call" or "custom_tool_call" or "local_shell_call" or "collab_tool_call";
+    private static bool IsToolCall(string? type) => type is "function_call" or "custom_tool_call" or "local_shell_call" or "collab_tool_call" or "command_execution" or "file_change";
     private static bool IsToolResult(string? type) => type is "function_call_output" or "custom_tool_call_output" or "local_shell_call_output" or "collab_tool_call_output";
     private static JsonElement? Object(JsonElement value, string name) => value.ValueKind == JsonValueKind.Object && value.TryGetProperty(name, out var result) && result.ValueKind == JsonValueKind.Object ? result : null;
     private static string? String(JsonElement value, string name) => value.ValueKind == JsonValueKind.Object && value.TryGetProperty(name, out var result) && result.ValueKind == JsonValueKind.String ? result.GetString() : null;

@@ -46,6 +46,8 @@ public sealed class FinalizeHandler(string workspace)
         }
         var verificationResultDirectory = Path.Combine(directory, "verification");
         if (Directory.Exists(Path.Combine(current, "verification"))) CopyDirectory(Path.Combine(current, "verification"), verificationResultDirectory);
+        var attemptsResultDirectory = Path.Combine(directory, "attempts");
+        if (Directory.Exists(Path.Combine(current, "attempts"))) CopyDirectory(Path.Combine(current, "attempts"), attemptsResultDirectory);
         var result = new
         {
             schemaVersion = 1, state.MethodologyVersion, runtimeVersion = state.RuntimeVersion, workerProtocolVersion = AgentInvocation.CurrentProtocolVersion,
@@ -57,7 +59,8 @@ public sealed class FinalizeHandler(string workspace)
             finalReviewVerdict = "approved", verificationStatus = "passed", workflowName = state.WorkflowName, workflowHash = state.WorkflowHash,
             commitMessagePath = Path.GetRelativePath(workspace, commitPath).Replace('\\', '/'),
             eventLogPath = File.Exists(eventsPath) ? Path.GetRelativePath(workspace, eventsPath).Replace('\\', '/') : null,
-            verificationEvidencePath = Directory.Exists(verificationResultDirectory) ? Path.GetRelativePath(workspace, verificationResultDirectory).Replace('\\', '/') : null
+            verificationEvidencePath = Directory.Exists(verificationResultDirectory) ? Path.GetRelativePath(workspace, verificationResultDirectory).Replace('\\', '/') : null,
+            agentAttemptsPath = Directory.Exists(attemptsResultDirectory) ? Path.GetRelativePath(workspace, attemptsResultDirectory).Replace('\\', '/') : null
         };
         var resultPath = Path.Combine(directory, "factory-result.json"); await File.WriteAllTextAsync(resultPath, JsonSerializer.Serialize(result, FactoryJson.Options), cancellationToken);
         _ = JsonDocument.Parse(await File.ReadAllTextAsync(resultPath, cancellationToken));
