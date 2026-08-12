@@ -25,7 +25,8 @@ sandbox.
 ## New run
 
 1. Resolve the workspace and preserve the complete user request unchanged as
-   standard input to the runtime. Do not create a launcher-owned request file.
+   UTF-8 standard input to the runtime. Do not create a launcher-owned request
+   file.
 2. Invoke:
 
    ```text
@@ -35,7 +36,18 @@ sandbox.
      --plugin-root <plugin-root>
    ```
 
-   Pipe the complete request to this process through standard input.
+   Pipe the complete request to this process through standard input encoded as
+   UTF-8. On Windows PowerShell, set the native-pipeline output encoding before
+   piping the request:
+
+   ```powershell
+   $utf8 = [System.Text.UTF8Encoding]::new($false)
+   $OutputEncoding = $utf8
+   [Console]::OutputEncoding = $utf8
+   ```
+
+   Do not rely on the Windows PowerShell legacy native-pipeline encoding because
+   it can replace non-ASCII request text before the runtime receives it.
 3. Wait for the process to exit and parse its single structured JSON outcome.
 4. Report the compact Factory outcome, reason/resume condition, and result
    directory when supplied.
