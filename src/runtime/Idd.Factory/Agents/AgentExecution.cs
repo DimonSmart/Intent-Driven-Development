@@ -15,7 +15,7 @@ public interface IAgentBackend
 
 public sealed class CodexCliBackend : IAgentBackend
 {
-    private readonly CodexCommand command;
+    private readonly Lazy<CodexCommand> command;
     private readonly string pluginRoot;
     private readonly AgentExecutionConfiguration executionConfiguration;
     private readonly AgentCapabilityPolicy capabilityPolicy;
@@ -30,11 +30,16 @@ public sealed class CodexCliBackend : IAgentBackend
         this.pluginRoot = Path.GetFullPath(pluginRoot);
         this.executionConfiguration = executionConfiguration ?? new();
         this.capabilityPolicy = capabilityPolicy ?? AgentCapabilityPolicy.ProductionDefault;
-        command = executable is null ? CodexExecutableResolver.Resolve() : new(executable, []);
+        command = new Lazy<CodexCommand>(() => executable is null ? CodexExecutableResolver.Resolve() : new(executable, []));
     }
 
     public async Task<AgentRunHandle> StartAsync(AgentInvocation invocation, CancellationToken cancellationToken)
     {
+        CodexCommand resolvedCommand;
+        try { resolvedCommand = command.Value; }
+        catch (FileNotFoundException exception)
+        { throw new AgentProtocolException("AGENT_BACKEND_UNAVAILABLE", $"Codex CLI could not be located: {exception.Message}"); }
+
         var attemptDirectory = Path.GetDirectoryName(invocation.ResultPath)!;
         var privateHome = PreparePrivateHome(invocation.RunId, invocation.AttemptId, invocation.SkillName);
         var codexHome = privateHome.Path;
@@ -44,7 +49,7 @@ public sealed class CodexCliBackend : IAgentBackend
         var stderrPath = Path.Combine(attemptDirectory, "stderr.log");
         var sqliteDirectory = Path.Combine(codexHome, "state");
         Directory.CreateDirectory(sqliteDirectory);
-        var start = new ProcessStartInfo(command.Executable)
+        var start = new ProcessStartInfo(resolvedCommand.Executable)
         {
             WorkingDirectory = invocation.Workspace,
             RedirectStandardInput = true,
@@ -64,7 +69,7 @@ public sealed class CodexCliBackend : IAgentBackend
         if (OperatingSystem.IsWindows())
             start.Environment["PATH"] = pathPreparation.Path;
         Directory.CreateDirectory(start.Environment["TEMP"]!);
-        foreach (var argument in BuildArguments(invocation, executionConfiguration, command.PrefixArguments, OperatingSystem.IsWindows()))
+        foreach (var argument in BuildArguments(invocation, executionConfiguration, resolvedCommand.PrefixArguments, OperatingSystem.IsWindows()))
             start.ArgumentList.Add(argument);
         await File.WriteAllTextAsync(
             Path.Combine(attemptDirectory, "attempt-telemetry.json"),
