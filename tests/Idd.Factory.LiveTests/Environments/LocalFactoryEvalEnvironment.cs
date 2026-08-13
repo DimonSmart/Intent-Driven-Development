@@ -11,8 +11,8 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
     public static IReadOnlyList<string> LaunchProfileDiscoveryOrder { get; } =
     [
         "unrestricted-runtime-launch",
-        "isolated-workspace-write",
         "configured-workspace-write",
+        "isolated-workspace-write",
         "windows-unelevated-workspace-write",
         "windows-elevated-workspace-write"
     ];
@@ -60,7 +60,7 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
         }
         finally
         {
-            if (factoryCodexExecutable is not null && File.Exists(factoryCodexExecutable)) File.Delete(factoryCodexExecutable);
+            DeleteSandboxFactoryCodexFiles(factoryCodexExecutable);
         }
     }
 
@@ -70,7 +70,24 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
         var target = Path.Combine(workspace.WorkspaceDirectory, ".agents", "runtime", "idd-factory-codex.exe");
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
         if (!File.Exists(target)) File.Copy(CodexCommand.Executable, target);
+
+        var sourceCodeModeHost = Path.Combine(Path.GetDirectoryName(CodexCommand.Executable)!, "codex-code-mode-host.exe");
+        if (File.Exists(sourceCodeModeHost))
+        {
+            var targetCodeModeHost = Path.Combine(Path.GetDirectoryName(target)!, "codex-code-mode-host.exe");
+            if (!File.Exists(targetCodeModeHost)) File.Copy(sourceCodeModeHost, targetCodeModeHost);
+        }
+
         return target;
+    }
+
+    private static void DeleteSandboxFactoryCodexFiles(string? factoryCodexExecutable)
+    {
+        if (factoryCodexExecutable is null) return;
+        if (File.Exists(factoryCodexExecutable)) File.Delete(factoryCodexExecutable);
+
+        var codeModeHost = Path.Combine(Path.GetDirectoryName(factoryCodexExecutable)!, "codex-code-mode-host.exe");
+        if (File.Exists(codeModeHost)) File.Delete(codeModeHost);
     }
 
     internal static string BuildRunCodexPrompt(string caseDirectory)
@@ -101,7 +118,6 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
             "--enable", "multi_agent", "--disable", "multi_agent_v2",
             "--disable", "apps", "--disable", "browser_use", "--disable", "code_mode_host",
             "-c", "agents.max_depth=2", "-c", "agents.max_threads=10",
-            "-c", "features.code_mode.direct_only_tool_namespaces=[\"multi_agent_v1\"]",
             "-c", "mcp_servers={}", "-c", "approval_policy=never", "-c", $"model_reasoning_effort={options.ReasoningEffort}"
         ]);
         if (!profile.IgnoreUserConfig)
@@ -146,11 +162,7 @@ public sealed class LocalFactoryEvalEnvironment(ProcessRunner processRunner) : I
         }
         if (!isWindows) return environment;
 
-        const char windowsPathSeparator = ';';
-        var sandboxCompatiblePath = string.Join(windowsPathSeparator,
-            path.Split(windowsPathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Where(directory => !directory.Contains("WindowsApps", StringComparison.OrdinalIgnoreCase)));
-        environment["PATH"] = sandboxCompatiblePath;
+        environment["PATH"] = Idd.Factory.Agents.CodexProcessEnvironment.PrepareSandboxCompatiblePath(path, isWindows: true).Path;
         return environment;
     }
 

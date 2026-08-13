@@ -161,7 +161,9 @@ public sealed record AgentAttemptTelemetry(
     string UserSkillInheritancePolicy,
     int ProjectLocalSkillCount,
     int InheritedUserSkillCount,
-    string CapabilityProfile);
+    string CapabilityProfile,
+    string? WindowsSandbox,
+    int WindowsAppsPathEntriesRemoved);
 
 public sealed record AgentExecutionResult(AgentResultEnvelope Result, AgentProcessResult Process);
 

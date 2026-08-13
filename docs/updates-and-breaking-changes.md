@@ -4,6 +4,20 @@ This page records IDD changes that require action in repositories that already u
 
 Updating the installed plugins and migrating project-owned files are separate operations. Follow [Updating IDD](updating-idd.md) to refresh `idd-intent` and `idd-factory`. Then apply any relevant migration instructions below. Plugin updates do not automatically rewrite a repository's `.idd/intent/` directory.
 
+## 2026-08-13 — Codex Factory Bundled MCP Launcher
+
+The Codex `idd-factory` plugin now exposes a bundled blocking MCP transport for
+explicit Factory run, continue, and cancel operations. The generated Codex
+launcher no longer starts `idd-factory.dll` through a shell and has no shell
+fallback. Existing CLI commands and Factory state remain compatible, including
+continuation across CLI and MCP transports. Claude retains its packaged CLI
+launcher.
+
+Release certification requires a Codex host that proves process-tree cleanup
+for normal interruption and hard termination. Codex 0.147.0 is not supported
+for this launcher; a later minimum version will be named only after an official
+release passes the lifecycle probe.
+
 ## 2026-08-11 — Programmatic Factory Runtime
 
 Factory orchestration is now owned by the packaged .NET 10 runtime. Active runs

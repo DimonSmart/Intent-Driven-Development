@@ -153,7 +153,7 @@ public sealed class FactoryProtocolTests
         var isolatedConfig = Path.Combine(fixture.Workspace, "isolated-config.toml");
         File.WriteAllText(isolatedConfig, "[plugins.\"idd-factory@intent-driven-development\"]\nenabled = true\n");
 
-        var arguments = LocalFactoryEvalEnvironment.BuildRunCodexArguments(workspace, new("model", "low", TimeSpan.FromMinutes(1), "1.0"), "unrestricted-runtime-launch", isolatedConfig);
+        var arguments = LocalFactoryEvalEnvironment.BuildRunCodexArguments(workspace, new("model", "low", TimeSpan.FromMinutes(1), "1.0"), "configured-workspace-write", isolatedConfig);
 
         Assert.DoesNotContain(arguments, argument => argument.StartsWith("mcp_servers.browsercommander", StringComparison.Ordinal));
     }

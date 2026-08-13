@@ -46,6 +46,8 @@ public sealed class TwoStepCatalogFactoryEvalTests
 
             if (options.ReleaseCertification && string.IsNullOrWhiteSpace(options.PreviousFactoryVersion))
                 throw new InvalidOperationException("Release certification requires IDD_FACTORY_PREVIOUS_VERSION for the plugin reinstall lifecycle check.");
+            if (options.ReleaseCertification)
+                _ = CodexHostLifecycleCertification.RequireFromEnvironment();
             var installed = await new CurrentIddArtifactBuilder(processRunner).BuildAsync(repositoryRoot, workspace, version.Value, cancellationToken, options.PreviousFactoryVersion);
             await LogProgressAsync(workspace, $"Generated and installed current IDD Factory plugin at {installed.InstalledPath}.", cancellationToken);
             assertions.Require(!Directory.Exists(Path.Combine(workspace.WorkspaceDirectory, ".agents", "skills", "idd-factory-run")), "Infrastructure", "No simulated Factory skills", "Factory skills must not be copied into the fixture workspace.");
@@ -78,6 +80,14 @@ public sealed class TwoStepCatalogFactoryEvalTests
             FactoryProtocolAssertions.Assert(assertions, factoryProtocol, executionResponse);
             metrics = CodexJsonlAnalyzer.Analyze(workspace.EventsPath, codex.Duration, new CodexHomeLocator(() => workspace.CodexHomeDirectory, () => workspace.CodexHomeDirectory));
             metrics.TotalSpawnedAgentCount = agentTrace.Agents.Count == 0 ? null : agentTrace.Agents.Count - 1;
+            assertions.Require(metrics.FactoryRunCallCount == 1, "Factory transport", "Single blocking Factory call", $"Expected exactly one factory_run MCP call, observed {metrics.FactoryRunCallCount}.");
+            assertions.Require(metrics.FactoryMcpCallCount == 1, "Factory transport", "Minimal Factory MCP use", $"Expected exactly one Factory namespace MCP call on the happy path, observed {metrics.FactoryMcpCallCount}.");
+            assertions.Require(metrics.ToolSearchCallCount == 0, "Factory transport", "Direct Factory visibility", $"Expected no tool_search calls, observed {metrics.ToolSearchCallCount}.");
+            assertions.Require(metrics.CommandExecutionCallCount == 0, "Factory transport", "No launcher shell", $"Expected no root launcher command executions, observed {metrics.CommandExecutionCallCount}.");
+            assertions.Require(metrics.LauncherWaitCallCount == 0, "Factory transport", "No launcher wait", $"Expected no launcher wait calls, observed {metrics.LauncherWaitCallCount}.");
+            assertions.Require(metrics.WriteStdinCallCount == 0, "Factory transport", "No launcher write_stdin", $"Expected no write_stdin calls, observed {metrics.WriteStdinCallCount}.");
+            assertions.Require(metrics.StatusPollingCallCount == 0, "Factory transport", "No launcher status polling", $"Expected no status polling, observed {metrics.StatusPollingCallCount}.");
+            assertions.Require(metrics.ModelIterationsDuringFactoryRun == 0, "Factory transport", "Blocking call model silence", $"Expected no model iterations during factory_run, observed {metrics.ModelIterationsDuringFactoryRun}.");
             assertions.Require(metrics.MalformedLineCount == 0, "Infrastructure", "Codex JSONL", $"Codex JSONL contains {metrics.MalformedLineCount} malformed line(s). See {workspace.EventsPath}.");
             if (metrics.ModelEffective is null) assertions.Inconclusive("Infrastructure", "Effective outer Codex model", "Outer Codex JSONL did not expose an effective model; requested model cannot be independently confirmed.");
             else assertions.Require(metrics.ModelEffective == options.Model, "Infrastructure", "Effective outer Codex model", $"Expected Codex to use requested model '{options.Model}' without fallback, but JSONL reports '{metrics.ModelEffective}'.");

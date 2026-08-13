@@ -91,6 +91,7 @@ public sealed class CurrentIddArtifactBuilder(ProcessRunner processRunner)
         var required = new[]
         {
             Path.Combine(".codex-plugin", "plugin.json"),
+            ".mcp.json",
             Path.Combine("skills", "idd-factory-run", "SKILL.md"),
             Path.Combine("skills", "idd-factory-decompose-task", "SKILL.md"),
             Path.Combine("skills", "idd-factory-execute-subtask", "SKILL.md"),

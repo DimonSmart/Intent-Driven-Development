@@ -9,7 +9,15 @@ using Idd.Factory.Telemetry;
 using Idd.Factory.Verification;
 using Idd.Factory.Workflow;
 
-return await FactoryCli.RunAsync(args);
+return await FactoryProgram.RunAsync(args);
+
+internal static class FactoryProgram
+{
+    internal static Task<int> RunAsync(string[] args, Func<Task<int>>? runMcp = null) =>
+        args is ["mcp"]
+            ? (runMcp ?? (() => FactoryMcpServer.RunAsync()))()
+            : FactoryCli.RunAsync(args);
+}
 
 internal static class FactoryCli
 {

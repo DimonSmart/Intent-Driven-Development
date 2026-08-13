@@ -41,8 +41,44 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                 ["shortDescription"] = plugin.Description
             }
         };
+        if (StringComparer.Ordinal.Equals(pluginName, "idd-factory"))
+        {
+            pluginJson["mcpServers"] = "./.mcp.json";
+        }
 
         return pluginJson.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n";
+    }
+
+    protected override IReadOnlyList<GeneratedFile> BuildAdditionalPluginFiles(string pluginName, string version)
+    {
+        var files = base.BuildAdditionalPluginFiles(pluginName, version).ToList();
+        if (!StringComparer.Ordinal.Equals(pluginName, "idd-factory"))
+        {
+            return files;
+        }
+
+        var mcp = new JsonObject
+        {
+            ["mcpServers"] = new JsonObject
+            {
+                ["factory"] = new JsonObject
+                {
+                    ["command"] = "dotnet",
+                    ["args"] = new JsonArray("runtime/idd-factory.dll", "mcp"),
+                    ["cwd"] = ".",
+                    ["tool_timeout_sec"] = 1800,
+                    ["env_vars"] = new JsonArray(
+                        "IDD_FACTORY_CODEX_EXECUTABLE",
+                        "IDD_FACTORY_MODEL",
+                        "IDD_FACTORY_REASONING_EFFORT",
+                        "IDD_FACTORY_INHERIT_USER_SKILLS",
+                        "IDD_FACTORY_CAPABILITY_PROFILE"),
+                    ["omit_tools_from"] = new JsonArray("deferred", "code_mode")
+                }
+            }
+        };
+        files.Add(new GeneratedFile(".mcp.json", mcp.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n"));
+        return files;
     }
 
     protected override IReadOnlyList<GeneratedFile> BuildSkillFiles(
@@ -53,6 +89,36 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
         IReadOnlyDictionary<string, SkillDescription> skillDescriptions)
     {
         var files = base.BuildSkillFiles(adapter, plugin, roleDefinitions, skillName, skillDescriptions).ToList();
+        if (StringComparer.Ordinal.Equals(skillName, "idd-factory-run"))
+        {
+            var skill = files.Single(file => StringComparer.Ordinal.Equals(
+                file.RelativePath,
+                Path.Combine("skills", skillName, "SKILL.md")));
+            files[files.IndexOf(skill)] = skill with
+            {
+                Content = ContentNormalizer.NormalizeContent(ContentNormalizer.JoinBlocks(
+                    skill.Content!,
+                    """
+                    ## Codex launcher
+
+                    Use the bundled direct `mcp__factory` tools:
+
+                    - new run: `factory_run`
+                    - continue without or with a clarification answer: `factory_continue`
+                    - explicit cancellation: `factory_cancel`
+
+                    Do not start `idd-factory.dll` through a shell. Do not use a
+                    command execution, wait, write-stdin, or status-polling loop as
+                    the Factory launcher. Do not use tool search for Factory tools
+                    and do not enable Code Mode.
+
+                    If the bundled Factory tools are unavailable, report that the
+                    installed Codex host does not expose the bundled IDD Factory MCP
+                    transport and that a supported Codex version is required. Do not
+                    fall back to the shell launcher.
+                    """))
+            };
+        }
         if (skillDescriptions.TryGetValue(skillName, out var skillDescription) &&
             skillDescription.Invocation == SkillInvocation.Manual)
         {

@@ -2,14 +2,25 @@
 
 ## Runtime boundary
 
-The packaged .NET 10 runtime is a trusted orchestrator process. It needs an
-available native Codex CLI (`IDD_FACTORY_CODEX_EXECUTABLE` can select it) and,
-on Windows, must not itself run inside a parent Codex OS sandbox. Each semantic
-subprocess is independently launched with `approval_policy=never`; implementers
+The packaged .NET 10 runtime is a trusted orchestrator process. Codex reaches it
+through the Factory plugin's bundled blocking MCP adapter; Claude and direct
+operators retain the packaged CLI. Both transports start the same runtime from
+the same installed plugin instance and use the same persisted state. MCP owns
+transport only and never dispatches semantic workers or decides workflow
+transitions.
+
+The runtime needs an available native Codex CLI
+(`IDD_FACTORY_CODEX_EXECUTABLE` can select it). Each semantic subprocess is
+independently launched with `approval_policy=never`; implementers
 receive `workspace-write`, while decomposition and review roles receive
 `read-only` through a backend-neutral execution profile. The Codex adapter
 exposes and explicitly activates the runtime-selected Factory skill. This keeps model-driven tool activity sandboxed without trapping
 the child CLI network control plane inside another Windows sandbox.
+
+On Windows the semantic backend removes `WindowsApps` entries from its child
+PATH before launching sandboxed workers and retains `windows.sandbox =
+"unelevated"`. It records only the sandbox selection and number of removed PATH
+entries, never the full PATH.
 
 For file-based Codex authentication, the backend creates an attempt-local
 private `CODEX_HOME`, copies the credential cache, applies the configured
@@ -26,6 +37,9 @@ agents perform bounded semantic work inside it.
 
 ```text
 user / idd-factory-run
+        |
+        v
+Codex bundled MCP or platform CLI
         |
         v
 packaged .NET 10 Factory Runtime
@@ -95,6 +109,15 @@ finalization creates a collision-safe directory under `.idd/factory/results/`,
 validates `commit-message.md` and `factory-result.json`, preserves the execution
 event log and verification evidence there, then clears `current/`. If result
 creation fails, current state remains resumable.
+
+The MCP adapter returns that same structured outcome even when the CLI exit code
+is non-zero for a legitimate Factory result. Interrupting an MCP request stops
+the owned runtime process tree without synthesizing explicit Factory
+cancellation; persisted state remains resumable. Release certification must
+prove descendant cleanup for both normal interruption and hard host
+termination. Codex 0.147.0 does not satisfy that lifecycle contract; no later
+minimum version is claimed until an official release containing the required
+cleanup behavior passes the compatibility probe.
 
 See [Factory workflow configuration](factory-workflow-configuration.md) for the
 supported YAML composition.

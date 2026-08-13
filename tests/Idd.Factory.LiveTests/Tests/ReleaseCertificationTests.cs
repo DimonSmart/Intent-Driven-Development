@@ -34,4 +34,19 @@ public sealed class ReleaseCertificationTests
     {
         Assert.Throws<InvalidOperationException>(() => ReleaseCertification.Validate(false, revision, tag, version));
     }
+
+    [Fact]
+    public void HostLifecycleGateRequiresRealPassingBehaviorReport()
+    {
+        Assert.Throws<InvalidOperationException>(() => CodexHostLifecycleCertification.Validate(null));
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, "{\"schemaVersion\":1,\"probeKind\":\"process-tree-lifecycle\",\"hostBuild\":\"source-9daa491f\",\"normalInterruptNoDescendants\":true,\"hardKillNoDescendants\":false,\"factoryStateResumable\":true}");
+            Assert.Throws<InvalidOperationException>(() => CodexHostLifecycleCertification.Validate(path));
+            File.WriteAllText(path, "{\"schemaVersion\":1,\"probeKind\":\"process-tree-lifecycle\",\"hostBuild\":\"source-9daa491f\",\"normalInterruptNoDescendants\":true,\"hardKillNoDescendants\":true,\"factoryStateResumable\":true}");
+            Assert.Equal("source-9daa491f", CodexHostLifecycleCertification.Validate(path).HostBuild);
+        }
+        finally { File.Delete(path); }
+    }
 }

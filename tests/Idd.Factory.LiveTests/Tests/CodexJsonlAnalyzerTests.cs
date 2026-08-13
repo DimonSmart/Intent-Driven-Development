@@ -79,7 +79,8 @@ public sealed class CodexJsonlAnalyzerTests
         var metrics = AnalyzeLines(
             "{\"type\":\"item.completed\",\"item\":{\"id\":\"command_1\",\"type\":\"command_execution\",\"command\":\"Get-Content references/codex-dispatch.md\",\"aggregated_output\":\"Use spawn_agent with message only.\",\"status\":\"completed\"}}");
 
-        Assert.Equal(0, metrics.ToolCallCount);
+        Assert.Equal(1, metrics.ToolCallCount);
+        Assert.Equal(1, metrics.CommandExecutionCallCount);
         Assert.Equal(0, metrics.SpawnAgentCallCount);
         Assert.Equal(0, metrics.RootLevelSpawnedAgentCount);
     }
@@ -133,6 +134,27 @@ public sealed class CodexJsonlAnalyzerTests
             "{\"type\":\"item.completed\",\"item\":{\"call_id\":\"custom\",\"type\":\"custom_tool_call_output\",\"status\":\"completed\"}}");
 
         Assert.Equal(2, metrics.ToolCallCount);
+    }
+
+    [Fact]
+    public void Analyze_CountsDirectFactoryTransportAndLauncherRegressions()
+    {
+        var metrics = AnalyzeLines(
+            "{\"type\":\"item.started\",\"item\":{\"id\":\"run\",\"type\":\"mcp_tool_call\",\"server\":\"factory\",\"tool\":\"factory_run\",\"status\":\"in_progress\"}}",
+            "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":10}}",
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"run\",\"type\":\"mcp_tool_call\",\"server\":\"factory\",\"tool\":\"factory_run\",\"status\":\"completed\"}}",
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"search\",\"type\":\"function_call\",\"name\":\"tool_search\",\"status\":\"completed\"}}",
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"stdin\",\"type\":\"function_call\",\"name\":\"write_stdin\",\"status\":\"completed\"}}",
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"poll\",\"type\":\"command_execution\",\"command\":\"Get-Process idd-factory\",\"status\":\"completed\"}}");
+
+        Assert.Equal(1, metrics.McpFunctionCallCount);
+        Assert.Equal(1, metrics.FactoryMcpCallCount);
+        Assert.Equal(1, metrics.FactoryRunCallCount);
+        Assert.Equal(1, metrics.ToolSearchCallCount);
+        Assert.Equal(1, metrics.WriteStdinCallCount);
+        Assert.Equal(1, metrics.CommandExecutionCallCount);
+        Assert.Equal(1, metrics.StatusPollingCallCount);
+        Assert.Equal(1, metrics.ModelIterationsDuringFactoryRun);
     }
 
     private static FactoryEvalMetrics AnalyzeLines(params string[] lines)

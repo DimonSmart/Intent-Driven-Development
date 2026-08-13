@@ -78,6 +78,47 @@ public sealed class AgentProtocolTests
         Assert.Equal("unknown", telemetry.EffectiveReasoningEffort);
     }
 
+    [Fact] public void CodexAdapterReportsSafeWindowsSandboxTelemetry()
+    {
+        var telemetry = CodexCliBackend.BuildTelemetry(Invocation(), windowsSandbox: "unelevated", windowsAppsPathEntriesRemoved: 2);
+        Assert.Equal("unelevated", telemetry.WindowsSandbox);
+        Assert.Equal(2, telemetry.WindowsAppsPathEntriesRemoved);
+    }
+
+    [Fact]
+    public void WindowsSandboxPathRemovesAppExecutionAliasDirectories()
+    {
+        var path = string.Join(';',
+            @"C:\Program Files\Git\cmd",
+            " ",
+            @" C:\Users\u\AppData\Local\Microsoft\WindowsApps ",
+            @"C:\PROGRAM FILES\WINDOWSAPPS\PowerShell",
+            @"C:\Program Files\dotnet");
+
+        var result = CodexProcessEnvironment.PrepareSandboxCompatiblePath(path, isWindows: true);
+
+        Assert.Equal(string.Join(';', @"C:\Program Files\Git\cmd", @"C:\Program Files\dotnet"), result.Path);
+        Assert.Equal(2, result.WindowsAppsPathEntriesRemoved);
+    }
+
+    [Fact]
+    public void WindowsSandboxPathPreservesOrderWhenNoAliasDirectoryExists()
+    {
+        var path = string.Join(';', @"C:\Program Files\Git\cmd", @"C:\Program Files\dotnet");
+        var result = CodexProcessEnvironment.PrepareSandboxCompatiblePath(path, isWindows: true);
+        Assert.Equal(path, result.Path);
+        Assert.Equal(0, result.WindowsAppsPathEntriesRemoved);
+    }
+
+    [Fact]
+    public void NonWindowsPathIsUnchanged()
+    {
+        const string path = "/usr/bin:/opt/WindowsApps/bin:: /custom/bin ";
+        var result = CodexProcessEnvironment.PrepareSandboxCompatiblePath(path, isWindows: false);
+        Assert.Equal(path, result.Path);
+        Assert.Equal(0, result.WindowsAppsPathEntriesRemoved);
+    }
+
     [Fact] public void CodexAdapterMapsPinnedExecutionConfigurationToCommandLine()
     {
         var arguments = CodexCliBackend.BuildArguments(Invocation(), new("gpt-test", "high"), isWindows: false);

@@ -2,9 +2,16 @@
 
 ## Public entry point
 
-`idd-factory-run` is a small launcher. It locates the runtime packaged beside the
-installed plugin and invokes `run`, `continue`, or `cancel`. It does not contain
-the state-transition algorithm and does not dispatch agents itself.
+`idd-factory-run` is a transport-neutral launcher contract. The generated Codex
+skill uses the plugin's directly visible bundled `factory_run`,
+`factory_continue`, and `factory_cancel` MCP tools. The generated Claude skill
+uses the packaged CLI launcher. Neither form contains the state-transition
+algorithm or dispatches agents itself.
+
+The Codex launcher makes one blocking MCP call and never falls back to launching
+the runtime through a shell. If the installed Codex host does not expose the
+bundled Factory tools, update to a supported host instead of using a polling
+loop.
 
 Example:
 

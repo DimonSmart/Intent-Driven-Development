@@ -58,9 +58,28 @@ public sealed class CodexCliBackend : IAgentBackend
         start.Environment["CODEX_SQLITE_HOME"] = sqliteDirectory;
         start.Environment["TEMP"] = Path.Combine(codexHome, "tmp");
         start.Environment["TMP"] = Path.Combine(codexHome, "tmp");
+        var pathPreparation = CodexProcessEnvironment.PrepareSandboxCompatiblePath(
+            start.Environment["PATH"] ?? string.Empty,
+            OperatingSystem.IsWindows());
+        if (OperatingSystem.IsWindows())
+            start.Environment["PATH"] = pathPreparation.Path;
         Directory.CreateDirectory(start.Environment["TEMP"]!);
         foreach (var argument in BuildArguments(invocation, executionConfiguration, command.PrefixArguments, OperatingSystem.IsWindows()))
             start.ArgumentList.Add(argument);
+        await File.WriteAllTextAsync(
+            Path.Combine(attemptDirectory, "attempt-telemetry.json"),
+            JsonSerializer.Serialize(
+                BuildTelemetry(
+                    invocation,
+                    executionConfiguration,
+                    capabilityPolicy,
+                    privateHome.InheritedSkillCount,
+                    ReadSkillSourceVersion(),
+                    pluginRoot,
+                    OperatingSystem.IsWindows() ? "unelevated" : null,
+                    pathPreparation.WindowsAppsPathEntriesRemoved),
+                FactoryJson.Options),
+            cancellationToken);
         var process = new Process { StartInfo = start, EnableRaisingEvents = true };
         try { if (!process.Start()) throw new AgentProtocolException("AGENT_BACKEND_UNAVAILABLE", "Codex CLI did not start."); }
         catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or FileNotFoundException)
@@ -68,7 +87,6 @@ public sealed class CodexCliBackend : IAgentBackend
         var stdout = CaptureAsync(process.StandardOutput, stdoutPath, cancellationToken);
         var stderr = CaptureAsync(process.StandardError, stderrPath, cancellationToken);
         var prompt = BuildBootstrapPrompt(invocation);
-        await File.WriteAllTextAsync(Path.Combine(attemptDirectory, "attempt-telemetry.json"), JsonSerializer.Serialize(BuildTelemetry(invocation, executionConfiguration, capabilityPolicy, privateHome.InheritedSkillCount, ReadSkillSourceVersion(), pluginRoot), FactoryJson.Options), cancellationToken);
         await process.StandardInput.WriteAsync(prompt.AsMemory(), cancellationToken);
         await process.StandardInput.FlushAsync(cancellationToken); process.StandardInput.Close();
         processes.Add(invocation.AttemptId, new(process, stdout, stderr, invocation.ResultPath));
@@ -221,13 +239,16 @@ public sealed class CodexCliBackend : IAgentBackend
         AgentCapabilityPolicy? capabilityPolicy = null,
         int inheritedUserSkillCount = 0,
         string skillSourceVersion = "unknown",
-        string skillSource = "unknown")
+        string skillSource = "unknown",
+        string? windowsSandbox = null,
+        int windowsAppsPathEntriesRemoved = 0)
     {
         configuration ??= new();
         capabilityPolicy ??= AgentCapabilityPolicy.ProductionDefault;
         return new(invocation.Role, invocation.SkillName, "codex-cli", invocation.ExecutionProfile, "bootstrap", invocation.Input.Length,
             configuration.RequestedModel, configuration.RequestedReasoningEffort, "unknown", "unknown", skillSource, skillSourceVersion,
-            capabilityPolicy.InheritUserSkills ? "inherit" : "isolated", CountProjectSkills(invocation.Workspace), inheritedUserSkillCount, capabilityPolicy.Profile);
+            capabilityPolicy.InheritUserSkills ? "inherit" : "isolated", CountProjectSkills(invocation.Workspace), inheritedUserSkillCount, capabilityPolicy.Profile,
+            windowsSandbox, windowsAppsPathEntriesRemoved);
     }
 
     private string ReadSkillSourceVersion()

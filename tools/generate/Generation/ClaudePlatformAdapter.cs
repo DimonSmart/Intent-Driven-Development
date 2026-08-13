@@ -17,7 +17,38 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
         string skillName,
         IReadOnlyDictionary<string, SkillDescription> skillDescriptions)
     {
-        return base.BuildSkillFiles(adapter, plugin, roleDefinitions, skillName, skillDescriptions);
+        var files = base.BuildSkillFiles(adapter, plugin, roleDefinitions, skillName, skillDescriptions).ToList();
+        if (!StringComparer.Ordinal.Equals(skillName, "idd-factory-run")) return files;
+
+        var skill = files.Single(file => StringComparer.Ordinal.Equals(
+            file.RelativePath,
+            Path.Combine("skills", skillName, "SKILL.md")));
+        files[files.IndexOf(skill)] = skill with
+        {
+            Content = ContentNormalizer.NormalizeContent(ContentNormalizer.JoinBlocks(
+                skill.Content!,
+                """
+                ## Claude launcher
+
+                Resolve the installed plugin root as two parent directories above
+                this `SKILL.md`. Invoke the packaged runtime with the platform shell:
+
+                ```text
+                dotnet <plugin-root>/runtime/idd-factory.dll run
+                  --workspace <absolute-workspace>
+                  --request-stdin true
+                  --plugin-root <plugin-root>
+                ```
+
+                Pipe the exact request as UTF-8 standard input, wait for process
+                exit, and parse the single structured outcome. Use `continue` with
+                the same workspace and plugin root; when supplying an answer, write
+                it to a temporary UTF-8 file and pass `--answer-file`. Use `cancel`
+                for explicit cancellation. Always remove launcher-owned temporary
+                files. Do not search for a repository-local runtime.
+                """))
+        };
+        return files;
     }
 
     protected override string BuildPluginManifest(

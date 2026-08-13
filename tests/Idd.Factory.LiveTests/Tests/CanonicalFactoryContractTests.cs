@@ -5,10 +5,12 @@ namespace Idd.Factory.LiveTests.Tests;
 public sealed class CanonicalFactoryContractTests
 {
     [Fact]
-    public void RunSkillLaunchesPackagedRuntimeWithoutCoordinatorLoop()
+    public void RunSkillIsTransportNeutralAndPreservesRuntimeBoundaries()
     {
         var content = ReadRepoFile("src", "canonical", "skills", "idd-factory-run.md");
-        Assert.Contains("runtime/idd-factory.dll", content);
+        Assert.DoesNotContain("runtime/idd-factory.dll", content);
+        Assert.DoesNotContain("mcp__factory", content);
+        Assert.DoesNotContain("PowerShell", content);
         Assert.Contains("Do not select work items", content);
         Assert.Contains("Do not spawn semantic or coordinator agents", content);
         Assert.DoesNotContain("factory-step-coordinator", content);

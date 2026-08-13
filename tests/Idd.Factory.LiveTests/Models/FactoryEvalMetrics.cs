@@ -16,6 +16,15 @@ public sealed class FactoryEvalMetrics
     public long? TotalSpawnedAgentCount { get; set; }
     public long FailedSpawnAgentCallCount { get; set; }
     public long WaitAgentCallCount { get; set; }
+    public long McpFunctionCallCount { get; set; }
+    public long FactoryMcpCallCount { get; set; }
+    public long FactoryRunCallCount { get; set; }
+    public long CommandExecutionCallCount { get; set; }
+    public long LauncherWaitCallCount { get; set; }
+    public long WriteStdinCallCount { get; set; }
+    public long StatusPollingCallCount { get; set; }
+    public long ToolSearchCallCount { get; set; }
+    public long ModelIterationsDuringFactoryRun { get; set; }
     public long CompletedChildAgentCount { get; set; }
     public long? InputTokens { get; set; }
     public long? CachedInputTokens { get; set; }

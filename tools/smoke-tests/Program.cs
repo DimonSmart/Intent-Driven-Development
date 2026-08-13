@@ -18,6 +18,7 @@ CheckPlatformPlugins("codex", ".codex-plugin");
 CheckCanonicalRoleReader();
 CheckFactoryRoleGeneration();
 CheckCodexFactoryMetadata();
+CheckFactoryTransportGeneration();
 CheckCanonicalSkillReferences();
 CheckCanonicalFactoryNeutrality();
 CheckVerificationPolicyContract();
@@ -261,7 +262,12 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
         }
 
         var runSkill = ReadText(Path.Combine(factoryRoot, "skills", "idd-factory-run", "SKILL.md"));
-        ExpectContains(runSkill, "runtime/idd-factory.dll", "Codex packaged runtime launcher");
+        ExpectContains(runSkill, "mcp__factory", "Codex direct MCP launcher");
+        ExpectContains(runSkill, "factory_run", "Codex Factory run tool");
+        ExpectContains(runSkill, "factory_continue", "Codex Factory continue tool");
+        ExpectContains(runSkill, "factory_cancel", "Codex Factory cancel tool");
+        if (runSkill.Contains("runtime/idd-factory.dll", StringComparison.Ordinal)) failures.Add("Codex run skill still instructs shell-launching idd-factory.dll.");
+        if (runSkill.Contains("write_stdin", StringComparison.Ordinal)) failures.Add("Codex run skill still instructs launcher write_stdin polling.");
         ExpectContains(runSkill, "Do not spawn semantic or coordinator agents", "Codex coordinator removal invariant");
     }
 
@@ -334,7 +340,7 @@ void CheckIddMetadata(
 
 void CheckCanonicalFactoryNeutrality()
 {
-    var forbidden = new[] { "Codex", "Claude", "spawn_agent", "wait_agent", "fork_context", "codex-dispatch", ".agents/skills/", "`items`", "`message`" };
+    var forbidden = new[] { "Codex", "Claude", "spawn_agent", "wait_agent", "fork_context", "codex-dispatch", ".agents/skills/", "mcp__factory", "runtime/idd-factory.dll", "PowerShell", "`items`", "`message`" };
     var canonicalFiles = Directory.GetFiles(Path.Combine(repoRoot, "src", "canonical", "skills"), "idd-factory-*.md")
         .Concat(Directory.GetFiles(Path.Combine(repoRoot, "src", "canonical", "factory"), "*.md", SearchOption.AllDirectories));
     foreach (var file in canonicalFiles)
@@ -407,6 +413,51 @@ void CheckCodexFactoryMetadata()
     var bindings = metadata.RootElement.GetProperty("skillRoleBindings").EnumerateArray().ToArray();
     if (bindings.Length != 0) failures.Add("Codex Factory metadata still contains obsolete skill-role bindings.");
 
+}
+
+void CheckFactoryTransportGeneration()
+{
+    var codexIntent = Path.Combine(marketplaceRoot, "plugins", "codex", "idd-intent");
+    var codexFactory = Path.Combine(marketplaceRoot, "plugins", "codex", "idd-factory");
+    var claudeFactory = Path.Combine(marketplaceRoot, "plugins", "claude", "idd-factory");
+
+    using (var manifest = ReadJson(Path.Combine(codexFactory, ".codex-plugin", "plugin.json")))
+    {
+        if (manifest is not null) ExpectString(manifest.RootElement, "mcpServers", "./.mcp.json", "Codex Factory bundled MCP manifest binding");
+    }
+    using (var intentManifest = ReadJson(Path.Combine(codexIntent, ".codex-plugin", "plugin.json")))
+    {
+        if (intentManifest is not null && intentManifest.RootElement.TryGetProperty("mcpServers", out _))
+            failures.Add("Codex idd-intent must not bind the Factory MCP server.");
+    }
+    ExpectMissing(Path.Combine(codexIntent, ".mcp.json"));
+    ExpectMissing(Path.Combine(claudeFactory, ".mcp.json"));
+
+    using (var mcp = ReadJson(Path.Combine(codexFactory, ".mcp.json")))
+    {
+        if (mcp is not null)
+        {
+            var factory = mcp.RootElement.GetProperty("mcpServers").GetProperty("factory");
+            ExpectString(factory, "command", "dotnet", "Codex Factory MCP command");
+            ExpectString(factory, "cwd", ".", "Codex Factory MCP cwd");
+            if (factory.GetProperty("tool_timeout_sec").GetInt32() != 1800) failures.Add("Codex Factory MCP timeout must equal 1800 seconds.");
+            var arguments = factory.GetProperty("args").EnumerateArray().Select(value => value.GetString()).ToArray();
+            if (!arguments.SequenceEqual(new[] { "runtime/idd-factory.dll", "mcp" })) failures.Add("Codex Factory MCP args are not exact.");
+            var omitted = factory.GetProperty("omit_tools_from").EnumerateArray().Select(value => value.GetString()).ToArray();
+            if (!omitted.SequenceEqual(new[] { "deferred", "code_mode" })) failures.Add("Codex Factory MCP omit_tools_from is not exact.");
+            var inheritedEnvironment = factory.GetProperty("env_vars").EnumerateArray().Select(value => value.GetString()).ToArray();
+            if (!inheritedEnvironment.SequenceEqual(new[] { "IDD_FACTORY_CODEX_EXECUTABLE", "IDD_FACTORY_MODEL", "IDD_FACTORY_REASONING_EFFORT", "IDD_FACTORY_INHERIT_USER_SKILLS", "IDD_FACTORY_CAPABILITY_PROFILE" }))
+                failures.Add("Codex Factory MCP env_vars allowlist is not exact.");
+        }
+    }
+
+    var claudeSkill = ReadText(Path.Combine(claudeFactory, "skills", "idd-factory-run", "SKILL.md"));
+    ExpectContains(claudeSkill, "runtime/idd-factory.dll", "Claude packaged CLI launcher");
+    if (claudeSkill.Contains("mcp__factory", StringComparison.Ordinal)) failures.Add("Claude run skill contains Codex MCP mechanics.");
+
+    var canonical = ReadText(Path.Combine(repoRoot, "src", "canonical", "skills", "idd-factory-run.md"));
+    foreach (var literal in new[] { "mcp__factory", "factory_run", "runtime/idd-factory.dll", "PowerShell", "write_stdin" })
+        if (canonical.Contains(literal, StringComparison.Ordinal)) failures.Add($"Canonical Factory run skill contains transport mechanic '{literal}'.");
 }
 
 void CheckCanonicalRoleReader()

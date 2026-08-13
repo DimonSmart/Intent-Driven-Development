@@ -14,6 +14,9 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\runtime\Idd.Factory\Idd.Factory.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Remove="Cases/**/*.cs" />
     <None Include="Cases/**/*" />
   </ItemGroup>
