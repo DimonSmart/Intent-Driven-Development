@@ -341,8 +341,9 @@ void CheckIddMetadata(
 void CheckCanonicalFactoryNeutrality()
 {
     var forbidden = new[] { "Codex", "Claude", "spawn_agent", "wait_agent", "fork_context", "codex-dispatch", ".agents/skills/", "mcp__factory", "runtime/idd-factory.dll", "PowerShell", "`items`", "`message`" };
-    var canonicalFiles = Directory.GetFiles(Path.Combine(repoRoot, "src", "canonical", "skills"), "idd-factory-*.md")
-        .Concat(Directory.GetFiles(Path.Combine(repoRoot, "src", "canonical", "factory"), "*.md", SearchOption.AllDirectories));
+    var legacyFactoryRoot = Path.Combine(repoRoot, "src", "canonical", "factory");
+    ExpectMissing(legacyFactoryRoot);
+    var canonicalFiles = Directory.GetFiles(Path.Combine(repoRoot, "src", "canonical", "skills"), "idd-factory-*.md");
     foreach (var file in canonicalFiles)
     {
         var content = File.ReadAllText(file);
