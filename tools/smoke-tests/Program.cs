@@ -851,7 +851,7 @@ void ExpectString(JsonElement element, string propertyName, string expected, str
 
 void ExpectContains(string text, string expected, string context)
 {
-    if (!text.Contains(expected, StringComparison.Ordinal))
+    if (!text.ReplaceLineEndings("\n").Contains(expected.ReplaceLineEndings("\n"), StringComparison.Ordinal))
     {
         failures.Add($"{context} does not contain '{expected}'.");
     }
