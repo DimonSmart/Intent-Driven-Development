@@ -46,6 +46,22 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
                 it to a temporary UTF-8 file and pass `--answer-file`. Use `cancel`
                 for explicit cancellation. Always remove launcher-owned temporary
                 files. Do not search for a repository-local runtime.
+
+                On Windows, launch this trusted packaged Factory Runtime outside
+                the parent agent OS sandbox. The runtime applies a fresh,
+                role-appropriate sandbox to every semantic worker. If that launcher
+                boundary cannot be provided, report `BLOCKED` instead of starting
+                the nested runtime inside the parent sandbox. Do not weaken semantic
+                worker sandboxing.
+
+                In Windows PowerShell, configure the native pipeline for BOM-less
+                UTF-8 before piping the exact request to `dotnet`:
+
+                ```powershell
+                $utf8 = [System.Text.UTF8Encoding]::new($false)
+                $OutputEncoding = $utf8
+                [Console]::OutputEncoding = $utf8
+                ```
                 """))
         };
         return files;

@@ -453,10 +453,15 @@ void CheckFactoryTransportGeneration()
 
     var claudeSkill = ReadText(Path.Combine(claudeFactory, "skills", "idd-factory-run", "SKILL.md"));
     ExpectContains(claudeSkill, "runtime/idd-factory.dll", "Claude packaged CLI launcher");
-    if (claudeSkill.Contains("mcp__factory", StringComparison.Ordinal)) failures.Add("Claude run skill contains Codex MCP mechanics.");
+    ExpectContains(claudeSkill, "--request-stdin true", "Claude exact-request stdin launcher");
+    ExpectContains(claudeSkill, "Factory Runtime outside\nthe parent agent OS sandbox", "Claude Windows parent sandbox boundary");
+    ExpectContains(claudeSkill, "$OutputEncoding", "Claude Windows PowerShell UTF-8 output encoding");
+    ExpectContains(claudeSkill, "[Console]::OutputEncoding", "Claude Windows PowerShell console encoding");
+    foreach (var literal in new[] { "mcp__factory", "factory_run", "omit_tools_from", "Code Mode" })
+        if (claudeSkill.Contains(literal, StringComparison.Ordinal)) failures.Add($"Claude run skill contains Codex-only mechanic '{literal}'.");
 
     var canonical = ReadText(Path.Combine(repoRoot, "src", "canonical", "skills", "idd-factory-run.md"));
-    foreach (var literal in new[] { "mcp__factory", "factory_run", "runtime/idd-factory.dll", "PowerShell", "write_stdin" })
+    foreach (var literal in new[] { "mcp__factory", "factory_run", "runtime/idd-factory.dll", "PowerShell", "write_stdin", "wait" })
         if (canonical.Contains(literal, StringComparison.Ordinal)) failures.Add($"Canonical Factory run skill contains transport mechanic '{literal}'.");
 }
 

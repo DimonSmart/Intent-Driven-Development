@@ -5,7 +5,9 @@ using Idd.Factory.Domain;
 
 internal enum FactoryRuntimeCommand { Run, Continue, Cancel }
 
-internal sealed class FactoryRuntimeProcessRunner(IFactoryProcessInvoker processInvoker)
+internal sealed class FactoryRuntimeProcessRunner(
+    IFactoryProcessInvoker processInvoker,
+    Action<string>? deleteTemporaryFile = null)
 {
     private const int DiagnosticTailLimit = 2048;
 
@@ -69,7 +71,21 @@ internal sealed class FactoryRuntimeProcessRunner(IFactoryProcessInvoker process
         finally
         {
             if (answerFile is not null)
-                File.Delete(answerFile);
+                TryDeleteTemporaryFile(answerFile);
+        }
+    }
+
+    private void TryDeleteTemporaryFile(string path)
+    {
+        try
+        {
+            (deleteTemporaryFile ?? File.Delete)(path);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
         }
     }
 

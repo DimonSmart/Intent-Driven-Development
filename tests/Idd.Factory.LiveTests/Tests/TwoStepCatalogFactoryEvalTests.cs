@@ -34,6 +34,8 @@ public sealed class TwoStepCatalogFactoryEvalTests
             var options = FactoryEvalOptions.FromEnvironment(version.Value) with { PersistSessionRollouts = true };
             var codexCommand = CodexExecutableResolver.Resolve();
             var codexVersion = await RequireVersionAsync(processRunner, codexCommand.Executable, codexCommand.PrefixArguments.Concat(["--version"]).ToArray(), repositoryRoot, workspace, "codex-version", cancellationToken);
+            if (options.ReleaseCertification)
+                _ = CodexHostLifecycleCertification.RequireFromEnvironment(codexCommand, codexVersion);
             var dotnetVersion = await RequireVersionAsync(processRunner, "dotnet", ["--version"], repositoryRoot, workspace, "dotnet-version", cancellationToken);
             await RequireVersionAsync(processRunner, "git", ["--version"], repositoryRoot, workspace, "git-version", cancellationToken);
             await File.WriteAllTextAsync(Path.Combine(workspace.RunDirectory, "run-manifest.json"), JsonSerializer.Serialize(new FactoryEvalRunManifest(2, "two-step-catalog", options.Model, options.ReasoningEffort, version.Value, version.SourceRevision, version.SourceDirty, options.ReleaseCertification, codexVersion, dotnetVersion, DateTimeOffset.UtcNow), new JsonSerializerOptions { WriteIndented = true }) + "\n", cancellationToken);
@@ -46,8 +48,6 @@ public sealed class TwoStepCatalogFactoryEvalTests
 
             if (options.ReleaseCertification && string.IsNullOrWhiteSpace(options.PreviousFactoryVersion))
                 throw new InvalidOperationException("Release certification requires IDD_FACTORY_PREVIOUS_VERSION for the plugin reinstall lifecycle check.");
-            if (options.ReleaseCertification)
-                _ = CodexHostLifecycleCertification.RequireFromEnvironment();
             var installed = await new CurrentIddArtifactBuilder(processRunner).BuildAsync(repositoryRoot, workspace, version.Value, cancellationToken, options.PreviousFactoryVersion);
             await LogProgressAsync(workspace, $"Generated and installed current IDD Factory plugin at {installed.InstalledPath}.", cancellationToken);
             assertions.Require(!Directory.Exists(Path.Combine(workspace.WorkspaceDirectory, ".agents", "skills", "idd-factory-run")), "Infrastructure", "No simulated Factory skills", "Factory skills must not be copied into the fixture workspace.");

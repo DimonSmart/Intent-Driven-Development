@@ -10,7 +10,10 @@ public sealed class CanonicalFactoryContractTests
         var content = ReadRepoFile("src", "canonical", "skills", "idd-factory-run.md");
         Assert.DoesNotContain("runtime/idd-factory.dll", content);
         Assert.DoesNotContain("mcp__factory", content);
+        Assert.DoesNotContain("factory_run", content);
         Assert.DoesNotContain("PowerShell", content);
+        Assert.DoesNotContain("write_stdin", content);
+        Assert.DoesNotContain("wait", content);
         Assert.Contains("Do not select work items", content);
         Assert.Contains("Do not spawn semantic or coordinator agents", content);
         Assert.DoesNotContain("factory-step-coordinator", content);

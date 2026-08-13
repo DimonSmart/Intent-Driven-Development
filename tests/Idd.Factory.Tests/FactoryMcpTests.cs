@@ -75,6 +75,22 @@ public sealed class FactoryMcpTests
     }
 
     [Fact]
+    public async Task TemporaryAnswerCleanupFailureCannotMaskValidFactoryResult()
+    {
+        using var workspace = new TemporaryDirectory();
+        foreach (var cleanupFailure in new Exception[] { new IOException("locked"), new UnauthorizedAccessException("denied") })
+        {
+            var runner = new FactoryRuntimeProcessRunner(
+                new RecordingInvoker(Outcome()),
+                _ => throw cleanupFailure);
+
+            var result = await runner.RunAsync(FactoryRuntimeCommand.Continue, workspace.Path, null, "answer", CancellationToken.None);
+
+            Assert.Equal("COMPLETED", result.FactoryOutcome);
+        }
+    }
+
+    [Fact]
     public async Task FactoryCancelUsesCliCancelVerb()
     {
         using var workspace = new TemporaryDirectory();
