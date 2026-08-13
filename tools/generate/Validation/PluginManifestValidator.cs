@@ -16,9 +16,11 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
         var knownSkills = Directory.GetFiles(layout.SkillsRoot, "*.md")
             .Select(Path.GetFileNameWithoutExtension)
             .ToHashSet(StringComparer.Ordinal);
-        var knownRoles = Directory.GetFiles(layout.FactoryRolesRoot, "*.md")
-            .Select(Path.GetFileNameWithoutExtension)
-            .ToHashSet(StringComparer.Ordinal);
+        var knownRoles = Directory.Exists(layout.FactoryRolesRoot)
+            ? Directory.GetFiles(layout.FactoryRolesRoot, "*.md")
+                .Select(Path.GetFileNameWithoutExtension)
+                .ToHashSet(StringComparer.Ordinal)
+            : new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var (pluginName, plugin) in manifest.Plugins)
         {
