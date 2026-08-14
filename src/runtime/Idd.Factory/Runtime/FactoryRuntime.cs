@@ -177,7 +177,7 @@ public sealed class FactoryRuntime(
         {
             await events.WriteAsync(state.RunId, "verification-started", new { verificationContext = context, workItemId = item.Id, verificationFixAttempt = item.VerificationFixAttemptCount }, cancellationToken);
             var result = context == "subtask"
-                ? await verification.RunAsync(item.VerificationCheckIds, cancellationToken)
+                ? await verification.RunSubtaskAsync(item.VerificationCheckIds, cancellationToken)
                 : await verification.RunContextAsync(context, cancellationToken);
             RecordEvidence(state, item, result.Evidence);
             await events.WriteAsync(state.RunId, "verification-completed", new { verificationContext = context, verificationStatus = result.Status.ToString(), verificationFixAttempt = item.VerificationFixAttemptCount }, cancellationToken);

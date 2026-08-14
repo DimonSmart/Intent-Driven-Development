@@ -117,6 +117,84 @@ public sealed class FactoryRuntimeTests
         Assert.Equal(new[] { "task-decomposer", "implementer", "implementer", "final-reviewer" }, backend.Roles);
     }
 
+    [Fact] public async Task MissingPolicySubtaskUsesRepositoryFallback()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write("scripts/Check.ps1", """
+            $countPath = 'fallback-count.txt'
+            $count = if (Test-Path -LiteralPath $countPath) { [int](Get-Content -Raw -LiteralPath $countPath) } else { 0 }
+            $count++
+            Set-Content -LiteralPath $countPath -Value $count
+            if ($count -eq 1) {
+                $state = Get-Content -Raw -LiteralPath '.idd/factory/current/state.json' | ConvertFrom-Json
+                Set-Content -LiteralPath 'first-fallback-status.txt' -Value $state.workItems[0].status
+            }
+            """);
+        var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem([])));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        backend.Results.Enqueue(invocation =>
+        {
+            var state = JsonSerializer.Deserialize<FactoryState>(File.ReadAllText(System.IO.Path.Combine(current, "state.json")), FactoryJson.Options)!;
+            Assert.Contains(state.WorkItems[0].VerificationEvidenceRefs, path => ReadEvidence(current, path).CheckId == "repository-fallback");
+            return Envelope(invocation, "approved");
+        });
+
+        var outcome = await Create(temp.Path, workflow, current, backend).RunAsync(request, "test", default);
+
+        Assert.Equal("COMPLETED", outcome.FactoryOutcome);
+        Assert.Equal("AwaitingVerification", File.ReadAllText(System.IO.Path.Combine(temp.Path, "first-fallback-status.txt")).Trim());
+        var evidence = Directory.GetFiles(System.IO.Path.Combine(outcome.ResultDirectory!, "verification"), "*.json").Select(ReadEvidence).ToArray();
+        Assert.Contains(evidence, item => item.CheckId == "repository-fallback" && item.Status == "passed");
+    }
+
+    [Fact] public async Task MissingPolicyFailedSubtaskFallbackUsesVerificationFix()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write("scripts/Check.ps1", """
+            $countPath = 'fallback-count.txt'
+            $count = if (Test-Path -LiteralPath $countPath) { [int](Get-Content -Raw -LiteralPath $countPath) } else { 0 }
+            $count++
+            Set-Content -LiteralPath $countPath -Value $count
+            if (-not (Test-Path -LiteralPath 'fallback-fixed.txt')) { exit 7 }
+            """);
+        var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem([])));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        backend.Results.Enqueue(invocation =>
+        {
+            Assert.Equal("implementer", invocation.Role); Assert.Contains("verification-fix", invocation.Input);
+            temp.Write("fallback-fixed.txt", "yes"); return Envelope(invocation, "completed");
+        });
+        backend.Results.Enqueue(invocation =>
+        {
+            var state = JsonSerializer.Deserialize<FactoryState>(File.ReadAllText(System.IO.Path.Combine(current, "state.json")), FactoryJson.Options)!;
+            Assert.Equal(WorkItemStatus.Completed, state.WorkItems[0].Status); return Envelope(invocation, "approved");
+        });
+
+        var outcome = await Create(temp.Path, workflow, current, backend).RunAsync(request, "test", default);
+
+        Assert.Equal("COMPLETED", outcome.FactoryOutcome);
+        Assert.Equal(new[] { "task-decomposer", "implementer", "implementer", "final-reviewer" }, backend.Roles);
+        Assert.True(int.Parse(File.ReadAllText(System.IO.Path.Combine(temp.Path, "fallback-count.txt"))) >= 3);
+        var evidence = Directory.GetFiles(System.IO.Path.Combine(outcome.ResultDirectory!, "verification"), "*.json").Select(ReadEvidence).Where(item => item.CheckId == "repository-fallback").ToArray();
+        Assert.Contains(evidence, item => item.Status == "failed"); Assert.Contains(evidence, item => item.Status == "passed");
+    }
+
+    [Fact] public async Task ExistingMalformedPolicyDoesNotFallback()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write(".idd/verification.yaml", "version: 2\nchecks: {}\ndefault:\n  use: []\n");
+        temp.Write("scripts/Check.ps1", "Set-Content -LiteralPath fallback-ran.txt -Value yes\n");
+        var backend = new FakeAgentBackend(); backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem([])));
+
+        var outcome = await Create(temp.Path, workflow, current, backend).RunAsync(request, "test", default);
+
+        Assert.Equal("INVALID_VERIFICATION_POLICY", outcome.FactoryOutcome);
+        Assert.Equal(["task-decomposer"], backend.Roles);
+        Assert.False(File.Exists(System.IO.Path.Combine(temp.Path, "fallback-ran.txt")));
+    }
+
     [Fact] public async Task RepeatedVerificationFailureBlocksWithoutHiddenAgentRetry()
     {
         using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current");
@@ -167,6 +245,8 @@ public sealed class FactoryRuntimeTests
         backend.Results.Enqueue(invocation => Envelope(invocation, "completed")); backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
     }
     private static object OneItem(string[] checks) => new { workItems = new[] { new { id = "one", sequence = 1, kind = "subtask", contractMarkdown = "# One", dependencies = Array.Empty<string>(), coveredWorkItems = Array.Empty<string>(), verificationCheckIds = checks } } };
+    private static VerificationEvidence ReadEvidence(string current, string relative) => ReadEvidence(System.IO.Path.Combine(current, relative));
+    private static VerificationEvidence ReadEvidence(string path) => JsonSerializer.Deserialize<VerificationEvidence>(File.ReadAllText(path), FactoryJson.Options)!;
 
     private sealed class FakeAgentBackend : IAgentBackend
     {

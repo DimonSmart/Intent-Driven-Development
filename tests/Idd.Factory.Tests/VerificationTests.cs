@@ -61,4 +61,33 @@ public sealed class VerificationTests
         var result = await new VerificationEngine(temp.Path, System.IO.Path.Combine(temp.Path, ".idd", "factory", "current"), new WorkspaceFingerprinter()).RunAsync(["timeout"], default);
         Assert.Equal(VerificationStatus.InfrastructureFailure, result.Status); Assert.Equal("infrastructure-failure", Assert.Single(result.Evidence).Status);
     }
+
+    [Theory]
+    [InlineData("version: 2\nchecks: {}\ndefault:\n  use: []\n")]
+    [InlineData("checks: {}\ndefault:\n  use: []\n")]
+    [InlineData("version: 1\nchecks: {}\ndefault: {}\n")]
+    [InlineData("version: 1\nchecks:\n  broken: command\ndefault:\n  use: []\n")]
+    [InlineData("```yaml\nversion: 1\nchecks: {}\ndefault:\n  use: []\n```\n")]
+    [InlineData("version: 1\nchecks: [\n")]
+    public async Task ExistingMalformedPolicyDoesNotFallback(string policy)
+    {
+        using var temp = new TestWorkspace(); temp.Write(".idd/verification.yaml", policy);
+        temp.Write("scripts/Check.ps1", "Set-Content -LiteralPath fallback-ran.txt -Value yes\n");
+        var engine = new VerificationEngine(temp.Path, System.IO.Path.Combine(temp.Path, ".idd", "factory", "current"), new WorkspaceFingerprinter());
+
+        var exception = await Assert.ThrowsAsync<VerificationException>(() => engine.RunContextAsync("final", default));
+
+        Assert.Equal("INVALID_VERIFICATION_POLICY", exception.Code);
+        Assert.False(File.Exists(System.IO.Path.Combine(temp.Path, "fallback-ran.txt")));
+    }
+
+    [Fact] public async Task ExistingPolicyIsValidatedEvenWithNoExplicitIds()
+    {
+        using var temp = new TestWorkspace(); temp.Write(".idd/verification.yaml", "version: 1\nchecks: {}\n");
+        var engine = new VerificationEngine(temp.Path, System.IO.Path.Combine(temp.Path, ".idd", "factory", "current"), new WorkspaceFingerprinter());
+
+        var exception = await Assert.ThrowsAsync<VerificationException>(() => engine.RunSubtaskAsync([], default));
+
+        Assert.Equal("INVALID_VERIFICATION_POLICY", exception.Code);
+    }
 }
