@@ -36,6 +36,7 @@ function Invoke-CheckedNative {
 
 Invoke-CheckedNative dotnet build tools/generate/Generate.csproj --nologo
 Invoke-CheckedNative dotnet build tools/smoke-tests/SmokeTests.csproj --nologo
+Invoke-CheckedNative dotnet build tools/factory-token-analysis/FactoryTokenAnalysis.csproj --nologo
 Invoke-CheckedNative dotnet build src/runtime/Idd.Factory/Idd.Factory.csproj --nologo
 Invoke-CheckedNative dotnet test tests/Idd.Factory.Tests/Idd.Factory.Tests.csproj --nologo
 Invoke-CheckedNative dotnet build tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj --nologo
