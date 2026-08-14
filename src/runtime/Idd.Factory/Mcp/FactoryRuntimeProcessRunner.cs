@@ -66,7 +66,7 @@ internal sealed class FactoryRuntimeProcessRunner(
             if (outcome is null)
                 throw ProtocolError(processResult, "The packaged Factory Runtime returned no structured outcome.");
 
-            return new(outcome.FactoryOutcome, outcome.RunId, outcome.Reason, outcome.ResumeWhen, outcome.ResultDirectory);
+            return new(outcome.FactoryOutcome, outcome.RunId, outcome.Reason, outcome.ResumeWhen, outcome.ResultDirectory, outcome.Payload);
         }
         finally
         {

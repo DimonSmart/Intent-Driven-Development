@@ -1,6 +1,7 @@
 using Idd.Factory.Domain;
 using Idd.Factory.Persistence;
 using Idd.Factory.State;
+using System.Text.Json.Nodes;
 
 namespace Idd.Factory.Tests;
 
@@ -21,6 +22,18 @@ public sealed class StateStoreTests
         state.WorkItems.Add(new WorkItemState { Id = "one", Sequence = 1, Kind = WorkItemKind.Subtask, Status = WorkItemStatus.Completed, ContractPath = "work-items/one.md", LastResultRef = "attempts/A/result.json" });
         await store.CreateAsync(state, default); state.WorkItems[0].LastResultRef = "attempts/changed/result.json";
         Assert.Equal("COMPLETED_ITEM_MUTATED", (await Assert.ThrowsAsync<FactoryStateException>(() => store.SaveAsync(state, 0, default))).Code);
+    }
+
+    [Fact] public async Task ExistingBlockerWithoutPayloadRemainsReadable()
+    {
+        using var temp = new TestWorkspace(); var state = State(); state.Blocker = new("NEEDS_CLARIFICATION", "Choose one.", "Continue with an answer.");
+        var json = JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(state, FactoryJson.Options))!.AsObject();
+        json["blocker"]!.AsObject().Remove("payload");
+        await File.WriteAllTextAsync(System.IO.Path.Combine(temp.Path, "state.json"), json.ToJsonString(FactoryJson.Options));
+
+        var loaded = await new FileFactoryStateStore(temp.Path, new FactoryStateValidator()).LoadAsync(default);
+
+        Assert.NotNull(loaded); Assert.Equal("Choose one.", loaded.Blocker!.Reason); Assert.Null(loaded.Blocker.Payload);
     }
 
     [Fact] public void UnknownDependencyAndInvalidTransitionAreRejected()

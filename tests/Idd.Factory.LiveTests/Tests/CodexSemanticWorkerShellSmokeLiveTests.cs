@@ -11,6 +11,48 @@ public sealed class CodexSemanticWorkerShellSmokeLiveTests
 {
     [LiveFactoryEvalFact]
     [Trait("Category", "LiveFactoryEval")]
+    public async Task DecomposerWithoutVerificationPolicyUsesEmptyStableCheckIds()
+    {
+        var pluginRoot = RequiredEnvironment("IDD_FACTORY_SMOKE_PLUGIN_ROOT");
+        var outputDirectory = Path.GetFullPath(RequiredEnvironment("IDD_FACTORY_SMOKE_OUTPUT"));
+        var codexExecutable = RequiredEnvironment("IDD_FACTORY_SMOKE_CODEX_EXECUTABLE");
+        var workspace = Path.Combine(outputDirectory, "missing-verification-policy-workspace");
+        var intentDirectory = Path.Combine(workspace, ".idd", "intent");
+        var attemptDirectory = Path.Combine(workspace, ".idd", "factory", "current", "attempts", "NOPOLICY01");
+        Directory.CreateDirectory(intentDirectory);
+        Directory.CreateDirectory(attemptDirectory);
+        await File.WriteAllTextAsync(Path.Combine(intentDirectory, "IDD-0001.spec.md"), "# Catalog intent\n\nThe catalog supports durable file storage and automated behavioral verification.\n");
+        var resultPath = Path.Combine(attemptDirectory, "result.json");
+        var invocation = new AgentInvocation
+        {
+            RunId = "missing-policy-smoke",
+            AttemptId = "NOPOLICY01",
+            Role = "task-decomposer",
+            Workspace = workspace,
+            ResultPath = resultPath,
+            SkillName = "idd-factory-decompose-task",
+            ExecutionProfile = AgentExecutionProfile.ReadOnly,
+            Input = "Decompose this Factory request: implement durable file-backed catalog storage, add automated behavioral tests, and require successful repository build and test verification. The workspace intentionally has no .idd/verification.yaml. Do not create one and do not implement the task.",
+            StartedAt = DateTimeOffset.UtcNow,
+            WorkspaceFingerprint = "missing-policy-smoke"
+        };
+        var backend = CreateBackend(pluginRoot, codexExecutable, "missing-policy-smoke");
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+        var handle = await backend.StartAsync(invocation, timeout.Token);
+        var processResult = await backend.WaitAsync(handle, timeout.Token);
+        var result = JsonSerializer.Deserialize<AgentResultEnvelope>(await File.ReadAllTextAsync(resultPath, timeout.Token), FactoryJson.Options);
+
+        Assert.Equal(0, processResult.ExitCode);
+        Assert.NotNull(result);
+        Assert.Equal("ready", result.Outcome);
+        var workItems = result.Payload!.Value.GetProperty("workItems").EnumerateArray().ToArray();
+        Assert.NotEmpty(workItems);
+        Assert.All(workItems, item => Assert.Empty(item.GetProperty("verificationCheckIds").EnumerateArray()));
+    }
+
+    [LiveFactoryEvalFact]
+    [Trait("Category", "LiveFactoryEval")]
     public async Task CodexCliBackend_CanLaunchARealSandboxedShellCommand()
     {
         var pluginRoot = RequiredEnvironment("IDD_FACTORY_SMOKE_PLUGIN_ROOT");
@@ -33,13 +75,7 @@ public sealed class CodexSemanticWorkerShellSmokeLiveTests
             StartedAt = DateTimeOffset.UtcNow,
             WorkspaceFingerprint = "sandbox-smoke"
         };
-        var backend = new CodexCliBackend(
-            pluginRoot,
-            codexExecutable,
-            new(
-                Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_MODEL") ?? "gpt-5.6-sol",
-                Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_REASONING_EFFORT") ?? "low"),
-            new(false, "sandbox-smoke"));
+        var backend = CreateBackend(pluginRoot, codexExecutable, "sandbox-smoke");
 
         AgentProcessResult? processResult = null;
         Exception? failure = null;
@@ -94,6 +130,15 @@ public sealed class CodexSemanticWorkerShellSmokeLiveTests
     private static string RequiredEnvironment(string name) =>
         Environment.GetEnvironmentVariable(name)
         ?? throw new InvalidOperationException($"{name} must be configured for the semantic-worker smoke test.");
+
+    private static CodexCliBackend CreateBackend(string pluginRoot, string codexExecutable, string profile) =>
+        new(
+            pluginRoot,
+            codexExecutable,
+            new(
+                Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_MODEL") ?? "gpt-5.6-sol",
+                Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_REASONING_EFFORT") ?? "low"),
+            new(false, profile));
 
     private static string? TryReadResolvedShell(string stdout)
     {

@@ -75,11 +75,31 @@ public sealed class FactoryRuntimeTests
     [Fact] public async Task ClarificationRequiresAndPersistsAnswer()
     {
         using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current"); var backend = new FakeAgentBackend();
-        backend.Results.Enqueue(invocation => Envelope(invocation, "needs-clarification")); var runtime = Create(temp.Path, workflow, current, backend);
-        Assert.Equal("NEEDS_CLARIFICATION", (await runtime.RunAsync(request, "test", default)).FactoryOutcome); var count = backend.Roles.Count;
-        Assert.Equal("NEEDS_CLARIFICATION", (await runtime.ContinueAsync(default)).FactoryOutcome); Assert.Equal(count, backend.Roles.Count);
+        var details = new { question = "Which storage mode should be used?", options = new[] { "memory", "file" } };
+        backend.Results.Enqueue(invocation => Envelope(invocation, "needs-clarification", details, "Choose storage mode.")); var runtime = Create(temp.Path, workflow, current, backend);
+        var first = await runtime.RunAsync(request, "test", default);
+        Assert.Equal("NEEDS_CLARIFICATION", first.FactoryOutcome); Assert.Equal("Choose storage mode.", first.Reason); AssertClarificationPayload(first.Payload);
+        var persisted = await new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default);
+        Assert.NotNull(persisted); Assert.Equal("NEEDS_CLARIFICATION", persisted.Blocker!.Code); Assert.Equal(first.Reason, persisted.Blocker.Reason); AssertClarificationPayload(persisted.Blocker.Payload);
+        var count = backend.Roles.Count; var repeated = await runtime.ContinueAsync(default);
+        Assert.Equal("NEEDS_CLARIFICATION", repeated.FactoryOutcome); Assert.Equal(first.Reason, repeated.Reason); Assert.Equal(first.ResumeWhen, repeated.ResumeWhen); AssertClarificationPayload(repeated.Payload); Assert.Equal(count, backend.Roles.Count);
         EnqueueHappyPath(backend); var answer = temp.Write("answer.md", "Use option A.");
-        Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default, answer)).FactoryOutcome);
+        var completed = await runtime.ContinueAsync(default, answer);
+        Assert.Equal("COMPLETED", completed.FactoryOutcome); Assert.Equal(first.RunId, completed.RunId);
+    }
+
+    [Fact] public async Task ImplementerBlockedPreservesSemanticReasonAndPayload()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current"); var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem([])));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "blocked", new { dependency = "storage-service" }, "Storage service is unavailable."));
+
+        var outcome = await Create(temp.Path, workflow, current, backend).RunAsync(request, "test", default);
+
+        Assert.Equal("BLOCKED", outcome.FactoryOutcome); Assert.Equal("Storage service is unavailable.", outcome.Reason);
+        Assert.Equal("storage-service", outcome.Payload!.Value.GetProperty("dependency").GetString());
+        var persisted = await new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default);
+        Assert.Equal("storage-service", persisted!.Blocker!.Payload!.Value.GetProperty("dependency").GetString());
     }
 
     [Fact] public async Task FailedVerificationUsesOneImplementerFixAndReverifies()
@@ -133,8 +153,10 @@ public sealed class FactoryRuntimeTests
 
     private static FactoryRuntime Create(string workspace, WorkflowDefinition workflow, string current, IAgentBackend backend)
     { var validator = new FactoryStateValidator(); var fingerprint = new WorkspaceFingerprinter(); var clock = new FakeClock(); return new(workspace, workflow, new FileFactoryStateStore(current, validator), new AgentExecutor(backend, new AgentResultValidator()), new VerificationEngine(workspace, current, fingerprint), fingerprint, new FactoryEventWriter(current, clock), clock); }
-    private static AgentResultEnvelope Envelope(AgentInvocation invocation, string outcome, object? payload = null)
-    { JsonElement? element = payload is null ? null : JsonSerializer.SerializeToElement(payload, FactoryJson.Options); return new() { ProtocolVersion = 1, RunId = invocation.RunId, AttemptId = invocation.AttemptId, Role = invocation.Role, Outcome = outcome, Payload = element }; }
+    private static AgentResultEnvelope Envelope(AgentInvocation invocation, string outcome, object? payload = null, string? reason = null)
+    { JsonElement? element = payload is null ? null : JsonSerializer.SerializeToElement(payload, FactoryJson.Options); return new() { ProtocolVersion = 1, RunId = invocation.RunId, AttemptId = invocation.AttemptId, Role = invocation.Role, Outcome = outcome, Reason = reason, Payload = element }; }
+    private static void AssertClarificationPayload(JsonElement? payload)
+    { Assert.Equal("Which storage mode should be used?", payload!.Value.GetProperty("question").GetString()); Assert.Equal(new[] { "memory", "file" }, payload.Value.GetProperty("options").EnumerateArray().Select(x => x.GetString())); }
     private static void AssertInvocation(AgentInvocation invocation, string role, string skillName, AgentExecutionProfile executionProfile)
     { Assert.Equal(role, invocation.Role); Assert.Equal(skillName, invocation.SkillName); Assert.Equal(executionProfile, invocation.ExecutionProfile); Assert.False(string.IsNullOrWhiteSpace(invocation.Input)); }
     private static WorkflowDefinition DefaultWorkflow(TestWorkspace temp)

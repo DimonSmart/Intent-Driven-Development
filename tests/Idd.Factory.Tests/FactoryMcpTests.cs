@@ -114,6 +114,20 @@ public sealed class FactoryMcpTests
         Assert.Equal("BLOCKED", result.FactoryOutcome);
     }
 
+    [Fact]
+    public async Task SemanticPayloadIsPreservedFromCliOutcome()
+    {
+        using var workspace = new TemporaryDirectory();
+        var payload = JsonSerializer.SerializeToElement(new { question = "Exact question" }, FactoryJson.Options);
+        var cliOutcome = new FactoryCliOutcome("NEEDS_CLARIFICATION", "run-1", "Exact reason", "Provide an answer.", Payload: payload);
+        var process = new FactoryProcessResult(2, JsonSerializer.Serialize(cliOutcome, FactoryJson.Options), "diagnostic");
+
+        var result = await new FactoryRuntimeProcessRunner(new RecordingInvoker(process)).RunAsync(FactoryRuntimeCommand.Run, workspace.Path, "Task", null, CancellationToken.None);
+
+        Assert.Equal("Exact reason", result.Reason);
+        Assert.Equal("Exact question", result.Payload!.Value.GetProperty("question").GetString());
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("not-json")]

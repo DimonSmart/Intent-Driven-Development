@@ -14,12 +14,20 @@ verification IDs. The project verification policy may be inspected only to
 select existing stable IDs; the worker does not execute mandatory checks. Do
 not read previous runs, write code or state, edit intent, or delegate.
 
-Every `verificationCheckIds[]` value must be copied exactly from a top-level key
-under `checks:` in `.idd/verification.yaml`. Never put test class names, test
-method names, commands, filters, descriptions, or invented identifiers in this
-field. If no configured check ID covers a required property, return
-`needs-clarification` or `blocked`; do not fabricate one. Human-readable test
-properties belong only in contract Markdown.
+When `.idd/verification.yaml` exists, every `verificationCheckIds[]` value must
+be copied exactly from a top-level key under `checks:`. Never put test class
+names, test method names, commands, filters, descriptions, or invented
+identifiers in this field. If an existing valid policy has no configured check
+ID covering a required property, return `needs-clarification` or `blocked`; do
+not fabricate one. An existing malformed policy is a blocking policy error and
+must not be treated as missing or replaced with fallback.
+
+When `.idd/verification.yaml` is absent, continue normally. Use
+`verificationCheckIds: []` for every work item, preserve the required
+verification properties in human-readable contract Markdown, and let the
+deterministic Runtime apply repository/platform fallback at its verification
+gates. Absence alone is never `needs-clarification` or `blocked`: do not ask the
+user to create a policy, create one, or invent stable IDs.
 
 Return `intent-required` instead of inventing durable behavior. Preserve any
 explicit ordering, staging, dependency, and review boundaries from the request.

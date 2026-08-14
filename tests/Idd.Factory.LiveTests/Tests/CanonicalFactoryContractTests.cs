@@ -35,6 +35,9 @@ public sealed class CanonicalFactoryContractTests
         Assert.Contains("self-contained contract", decomposition);
         Assert.Contains("payload.workItems", decomposition);
         Assert.Contains("verificationCheckIds[]", decomposition);
+        Assert.Contains("When `.idd/verification.yaml` is absent, continue normally", decomposition);
+        Assert.Contains("`verificationCheckIds: []`", decomposition);
+        Assert.Contains("Absence alone is never `needs-clarification` or `blocked`", decomposition);
         var implementation = ReadRepoFile("src", "canonical", "skills", "idd-factory-execute-subtask.md");
         Assert.Contains("Do not\n+read the full request".Replace("\n+", "\n"), implementation);
         Assert.Contains("Runtime verification is authoritative", implementation);
@@ -49,6 +52,9 @@ public sealed class CanonicalFactoryContractTests
         Assert.Contains("Do not modify completed work", content);
         Assert.Contains("Do not change operational status", content);
         Assert.Contains("payload.operations", content);
+        Assert.Contains("When the file is absent, every inserted or", content);
+        Assert.Contains("`verificationCheckIds: []`", content);
+        Assert.Contains("Missing policy alone is not a clarification or blocker", content);
     }
 
     [Fact]

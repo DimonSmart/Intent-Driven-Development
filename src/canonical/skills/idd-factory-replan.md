@@ -34,6 +34,15 @@ Every inserted or replaced work item is a self-contained structured contract
 with stable ID, kind, sequence, contract Markdown, dependencies, coverage, and
 verification check IDs as applicable.
 
+When `.idd/verification.yaml` exists, use only real top-level stable check IDs
+from the valid policy; never invent IDs, and never silently replace a malformed
+existing policy with fallback. When the file is absent, every inserted or
+replaced work item uses `verificationCheckIds: []`, keeps required verification
+properties in its human-readable contract Markdown, and leaves
+repository/platform fallback verification to the deterministic Runtime.
+Missing policy alone is not a clarification or blocker and must not cause the
+worker to create or request a policy.
+
 ## Boundaries
 
 - Do not modify completed work or results.

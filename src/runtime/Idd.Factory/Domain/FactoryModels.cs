@@ -60,7 +60,7 @@ public sealed record WorkItemState
     public string? LastResultRef { get; set; }
 }
 
-public sealed record FactoryBlocker(string Code, string Reason, string ResumeWhen);
+public sealed record FactoryBlocker(string Code, string Reason, string ResumeWhen, JsonElement? Payload = null);
 public sealed record FinalReviewState(string Verdict, string? ResultRef, int AttemptCount);
 
 [JsonConverter(typeof(JsonStringEnumConverter<AgentExecutionProfile>))]
@@ -172,7 +172,8 @@ public sealed record FactoryCliOutcome(
     string RunId,
     string? Reason = null,
     string? ResumeWhen = null,
-    string? ResultDirectory = null);
+    string? ResultDirectory = null,
+    JsonElement? Payload = null);
 
 public static class FactoryJson
 {

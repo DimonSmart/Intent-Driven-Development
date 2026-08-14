@@ -52,7 +52,7 @@ public sealed class FactoryRuntime(
         if (state.RunStatus == FactoryRunStatus.Cancelled) return new("CANCELLED", state.RunId);
         await ReconcileAsync(state, cancellationToken);
         if (state.Blocker?.Code == "NEEDS_CLARIFICATION" && answerPath is null)
-            return new("NEEDS_CLARIFICATION", state.RunId, state.Blocker.Reason, state.Blocker.ResumeWhen);
+            return new("NEEDS_CLARIFICATION", state.RunId, state.Blocker.Reason, state.Blocker.ResumeWhen, Payload: state.Blocker.Payload);
         if (answerPath is not null) await RecordClarificationAsync(state, answerPath, cancellationToken);
         state.RunStatus = FactoryRunStatus.Running; await SaveAsync(state, cancellationToken);
         return await ExecuteLoopAsync(state, cancellationToken);
@@ -285,7 +285,7 @@ public sealed class FactoryRuntime(
                     throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Attempt {persistedAttempt} does not belong to the current semantic operation.");
                 var persistedResult = JsonSerializer.Deserialize<AgentResultEnvelope>(await File.ReadAllTextAsync(persistedResultPath, cancellationToken), FactoryJson.Options);
                 var validated = new AgentResultValidator().Validate(persistedInvocation, persistedResult);
-                state.CurrentAttemptId = null; await SaveAsync(state, cancellationToken);
+                CaptureSemanticStop(state, validated); state.CurrentAttemptId = null; await SaveAsync(state, cancellationToken);
                 await events.WriteAsync(state.RunId, "agent-result-reused", new { attemptId = persistedAttempt, role }, cancellationToken);
                 return validated;
             }
@@ -313,7 +313,7 @@ public sealed class FactoryRuntime(
         await events.WriteAsync(state.RunId, "agent-dispatching", new { attemptId, role, workItemId = item?.Id }, cancellationToken);
         var execution = await agentExecutor.ExecuteAsync(invocation, cancellationToken);
         var result = execution.Result;
-        state.CurrentAttemptId = null; await SaveAsync(state, cancellationToken);
+        CaptureSemanticStop(state, result); state.CurrentAttemptId = null; await SaveAsync(state, cancellationToken);
         await events.WriteAsync(state.RunId, "agent-completed", new
         {
             attemptId,
@@ -329,6 +329,17 @@ public sealed class FactoryRuntime(
             }
         }, cancellationToken);
         return result;
+    }
+
+    private static void CaptureSemanticStop(FactoryState state, AgentResultEnvelope result)
+    {
+        if (result.Outcome is not ("needs-clarification" or "focused-handoff" or "blocked")) return;
+        var code = result.Outcome.ToUpperInvariant().Replace('-', '_');
+        var reason = string.IsNullOrWhiteSpace(result.Reason) ? $"Workflow stopped with {result.Outcome}." : result.Reason;
+        var resumeWhen = result.Outcome == "needs-clarification"
+            ? "Provide the requested clarification and continue."
+            : "Resolve the reported condition and continue.";
+        state.Blocker = new(code, reason, resumeWhen, result.Payload?.Clone());
     }
 
     private void AddWorkItem(FactoryState state, JsonElement node)
@@ -430,8 +441,8 @@ public sealed class FactoryRuntime(
         if (item is not null) { item.CurrentAttemptId = null; if (item.Status is WorkItemStatus.Dispatching or WorkItemStatus.Running) item.Status = WorkItemStatus.Ready; }
         await SaveAsync(state, token); await events.WriteAsync(state.RunId, "agent-attempt-interrupted", new { attemptId }, token);
     }
-    private async Task<FactoryCliOutcome> StopForOutcomeAsync(FactoryState state, string outcome, CancellationToken token) => await StopAsync(state, state.Blocker?.Code ?? outcome.ToUpperInvariant().Replace('-', '_'), state.Blocker?.Reason ?? $"Workflow stopped with {outcome}.", state.Blocker?.ResumeWhen ?? "Resolve the reported condition and continue.", token);
-    private async Task<FactoryCliOutcome> StopAsync(FactoryState state, string code, string reason, string resume, CancellationToken token) { state.RunStatus = FactoryRunStatus.Blocked; state.Blocker = new(code, reason, resume); await SaveAsync(state, token); await events.WriteAsync(state.RunId, "run-blocked", new { code, reason, resume }, token); return new(code, state.RunId, reason, resume); }
+    private async Task<FactoryCliOutcome> StopForOutcomeAsync(FactoryState state, string outcome, CancellationToken token) => await StopAsync(state, state.Blocker?.Code ?? outcome.ToUpperInvariant().Replace('-', '_'), state.Blocker?.Reason ?? $"Workflow stopped with {outcome}.", state.Blocker?.ResumeWhen ?? "Resolve the reported condition and continue.", token, state.Blocker?.Payload);
+    private async Task<FactoryCliOutcome> StopAsync(FactoryState state, string code, string reason, string resume, CancellationToken token, JsonElement? payload = null) { state.RunStatus = FactoryRunStatus.Blocked; state.Blocker = new(code, reason, resume, payload); await SaveAsync(state, token); await events.WriteAsync(state.RunId, "run-blocked", new { code, reason, resume, payload }, token); return new(code, state.RunId, reason, resume, Payload: payload); }
     private void DetectLegacyState() { if (!Directory.Exists(currentDirectory)) return; if (Directory.EnumerateFiles(currentDirectory, "*.ready.md").Concat(Directory.EnumerateFiles(currentDirectory, "*.active.md")).Concat(Directory.EnumerateFiles(currentDirectory, "*.completed.md")).Concat(Directory.EnumerateFiles(currentDirectory, "*.blocked.md")).Any()) throw new FactoryStateException("LEGACY_FACTORY_STATE", "Finish with the previous Factory version or cancel/restart with the new runtime."); }
     private async Task RecordClarificationAsync(FactoryState state, string sourcePath, CancellationToken token)
     {

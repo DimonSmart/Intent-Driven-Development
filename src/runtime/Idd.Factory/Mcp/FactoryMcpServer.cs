@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Reflection;
+using System.Text.Json;
 using Idd.Factory.Domain;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -60,4 +61,5 @@ internal sealed record FactoryMcpResult(
     string RunId,
     string? Reason,
     string? ResumeWhen,
-    string? ResultDirectory);
+    string? ResultDirectory,
+    JsonElement? Payload = null);
