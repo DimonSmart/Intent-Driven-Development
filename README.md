@@ -125,6 +125,8 @@ Release-specific migration instructions are maintained on the dedicated [Updates
 - [Methodology](docs/methodology.md)
 - [Factory Workflow](docs/factory-workflow.md)
 - [Factory Skills Reference](docs/factory-skills.md)
+- [Factory Token Efficiency](docs/factory-token-efficiency.md)
+- [Factory Benchmarking](docs/factory-benchmarking.md)
 
 ## License
 

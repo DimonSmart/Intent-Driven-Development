@@ -3,10 +3,12 @@
     <Project Path="src/runtime/Idd.Factory/Idd.Factory.csproj" />
   </Folder>
   <Folder Name="/tools/">
+    <Project Path="tools/factory-benchmark/FactoryBenchmark.csproj" />
     <Project Path="tools/generate/Generate.csproj" />
     <Project Path="tools/smoke-tests/SmokeTests.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/FactoryBenchmark.Tests/FactoryBenchmark.Tests.csproj" />
     <Project Path="tests/Idd.Factory.Tests/Idd.Factory.Tests.csproj" />
     <Project Path="tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj" />
   </Folder>

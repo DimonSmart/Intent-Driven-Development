@@ -25,6 +25,11 @@ public sealed class FactoryRuntimeTests
             invocation => AssertInvocation(invocation, "implementer", "idd-factory-execute-subtask", AgentExecutionProfile.WorkspaceWrite),
             invocation => AssertInvocation(invocation, "final-reviewer", "idd-factory-review-task", AgentExecutionProfile.ReadOnly));
         Assert.Empty(Directory.EnumerateFileSystemEntries(current)); Assert.True(File.Exists(System.IO.Path.Combine(outcome.ResultDirectory!, "factory-result.json")));
+        Assert.True(File.Exists(System.IO.Path.Combine(outcome.ResultDirectory!, "decomposition", "decomposition.json")));
+        Assert.Equal("# One\n\nImplement one.", File.ReadAllText(System.IO.Path.Combine(outcome.ResultDirectory!, "decomposition", "contracts", "001-one.md")));
+        using var decomposition = JsonDocument.Parse(File.ReadAllText(System.IO.Path.Combine(outcome.ResultDirectory!, "decomposition", "decomposition.json")));
+        var retainedItem = Assert.Single(decomposition.RootElement.GetProperty("workItems").EnumerateArray());
+        Assert.Equal("one", retainedItem.GetProperty("id").GetString()); Assert.Equal("subtask", retainedItem.GetProperty("kind").GetString());
     }
 
     [Fact] public async Task WorkflowChangeDuringRunIsDetected()

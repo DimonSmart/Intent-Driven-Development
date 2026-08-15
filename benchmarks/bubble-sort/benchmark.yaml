@@ -1,0 +1,32 @@
+name: bubble-sort
+description: Small deterministic .NET task used to measure Factory orchestration overhead.
+
+model: gpt-5.6-luna
+
+reasoning:
+  effort: high
+
+repeat: 3
+timeoutMinutes: 20
+windowsSandbox: elevated
+task: task.md
+
+idealWorkItems:
+  - work-items/001-implementation.md
+  - work-items/002-tests.md
+
+acceptance:
+  command: powershell
+  arguments:
+    - -NoProfile
+    - -ExecutionPolicy
+    - Bypass
+    - -File
+    - acceptance.ps1
+
+modes:
+  - direct
+  - structured-single
+  - manual-isolated
+  - factory-split-replay
+  - factory

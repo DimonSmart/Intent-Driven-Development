@@ -134,6 +134,23 @@ public sealed class AgentProtocolTests
         Assert.DoesNotContain(arguments, value => value.StartsWith("model_reasoning_effort=", StringComparison.Ordinal));
     }
 
+    [Fact] public void CodexAdapterMapsConfiguredWindowsSandbox()
+    {
+        var arguments = CodexCliBackend.BuildArguments(Invocation(), new(WindowsSandbox: "elevated"), isWindows: true);
+        Assert.Contains("windows.sandbox=\"elevated\"", arguments);
+    }
+
+    [Fact] public void CodexAdapterDoesNotInventWindowsSandbox()
+    {
+        var arguments = CodexCliBackend.BuildArguments(Invocation(), new(), isWindows: true);
+        Assert.DoesNotContain(arguments, value => value.StartsWith("windows.sandbox=", StringComparison.Ordinal));
+    }
+
+    [Fact] public void CodexAdapterRejectsUnknownWindowsSandbox()
+    {
+        Assert.Throws<ArgumentException>(() => CodexCliBackend.BuildArguments(Invocation(), new(WindowsSandbox: "invalid"), isWindows: true));
+    }
+
     [Fact] public void SelectedFactorySkillIsNeverInheritedFromUserHome()
     {
         Assert.False(CodexCliBackend.ShouldInheritSkill("idd-factory-execute-subtask", "idd-factory-execute-subtask"));

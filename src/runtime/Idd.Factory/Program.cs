@@ -41,7 +41,8 @@ internal static class FactoryCli
                 options.GetValueOrDefault("codex"),
                 new AgentExecutionConfiguration(
                     Environment.GetEnvironmentVariable("IDD_FACTORY_MODEL"),
-                    Environment.GetEnvironmentVariable("IDD_FACTORY_REASONING_EFFORT")),
+                    Environment.GetEnvironmentVariable("IDD_FACTORY_REASONING_EFFORT"),
+                    Environment.GetEnvironmentVariable("IDD_FACTORY_WINDOWS_SANDBOX")),
                 new AgentCapabilityPolicy(
                     !string.Equals(Environment.GetEnvironmentVariable("IDD_FACTORY_INHERIT_USER_SKILLS"), "false", StringComparison.OrdinalIgnoreCase),
                     Environment.GetEnvironmentVariable("IDD_FACTORY_CAPABILITY_PROFILE") ?? "production-default"));

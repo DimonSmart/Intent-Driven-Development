@@ -134,7 +134,7 @@ public sealed record AgentProcessResult(
     bool KillRequired,
     AgentTerminationKind TerminationKind);
 
-public sealed record AgentExecutionConfiguration(string? Model = null, string? ReasoningEffort = null)
+public sealed record AgentExecutionConfiguration(string? Model = null, string? ReasoningEffort = null, string? WindowsSandbox = null)
 {
     public string RequestedModel => string.IsNullOrWhiteSpace(Model) ? "default/unpinned" : Model;
     public string RequestedReasoningEffort => string.IsNullOrWhiteSpace(ReasoningEffort) ? "default/unpinned" : ReasoningEffort;

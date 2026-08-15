@@ -48,6 +48,32 @@ public sealed class FinalizeHandler(string workspace)
         if (Directory.Exists(Path.Combine(current, "verification"))) CopyDirectory(Path.Combine(current, "verification"), verificationResultDirectory);
         var attemptsResultDirectory = Path.Combine(directory, "attempts");
         if (Directory.Exists(Path.Combine(current, "attempts"))) CopyDirectory(Path.Combine(current, "attempts"), attemptsResultDirectory);
+        var decompositionResultDirectory = Path.Combine(directory, "decomposition");
+        var contractsResultDirectory = Path.Combine(decompositionResultDirectory, "contracts");
+        if (Directory.Exists(Path.Combine(current, "work-items"))) CopyDirectory(Path.Combine(current, "work-items"), contractsResultDirectory);
+        var decompositionPath = Path.Combine(decompositionResultDirectory, "decomposition.json");
+        Directory.CreateDirectory(decompositionResultDirectory);
+        await File.WriteAllTextAsync(decompositionPath, JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            workItems = state.WorkItems.OrderBy(x => x.Sequence).Select(x => new
+            {
+                x.Id,
+                x.Sequence,
+                kind = x.Kind switch
+                {
+                    WorkItemKind.Subtask => "subtask",
+                    WorkItemKind.ReviewCheckpoint => "review-checkpoint",
+                    WorkItemKind.CorrectiveSubtask => "corrective-subtask",
+                    _ => throw new InvalidOperationException($"Unknown work-item kind {x.Kind}.")
+                },
+                status = x.Status.ToString(),
+                contractPath = $"contracts/{Path.GetFileName(x.ContractPath)}",
+                x.Dependencies,
+                x.CoveredWorkItems,
+                x.VerificationCheckIds
+            })
+        }, FactoryJson.Options), cancellationToken);
         var result = new
         {
             schemaVersion = 1, state.MethodologyVersion, runtimeVersion = state.RuntimeVersion, workerProtocolVersion = AgentInvocation.CurrentProtocolVersion,
@@ -60,7 +86,8 @@ public sealed class FinalizeHandler(string workspace)
             commitMessagePath = Path.GetRelativePath(workspace, commitPath).Replace('\\', '/'),
             eventLogPath = File.Exists(eventsPath) ? Path.GetRelativePath(workspace, eventsPath).Replace('\\', '/') : null,
             verificationEvidencePath = Directory.Exists(verificationResultDirectory) ? Path.GetRelativePath(workspace, verificationResultDirectory).Replace('\\', '/') : null,
-            agentAttemptsPath = Directory.Exists(attemptsResultDirectory) ? Path.GetRelativePath(workspace, attemptsResultDirectory).Replace('\\', '/') : null
+            agentAttemptsPath = Directory.Exists(attemptsResultDirectory) ? Path.GetRelativePath(workspace, attemptsResultDirectory).Replace('\\', '/') : null,
+            decompositionPath = Path.GetRelativePath(workspace, decompositionPath).Replace('\\', '/')
         };
         var resultPath = Path.Combine(directory, "factory-result.json"); await File.WriteAllTextAsync(resultPath, JsonSerializer.Serialize(result, FactoryJson.Options), cancellationToken);
         _ = JsonDocument.Parse(await File.ReadAllTextAsync(resultPath, cancellationToken));

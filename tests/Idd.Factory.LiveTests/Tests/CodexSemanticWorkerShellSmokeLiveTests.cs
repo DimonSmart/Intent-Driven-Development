@@ -137,7 +137,8 @@ public sealed class CodexSemanticWorkerShellSmokeLiveTests
             codexExecutable,
             new(
                 Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_MODEL") ?? "gpt-5.6-sol",
-                Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_REASONING_EFFORT") ?? "low"),
+                Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_REASONING_EFFORT") ?? "low",
+                "unelevated"),
             new(false, profile));
 
     private static string? TryReadResolvedShell(string stdout)

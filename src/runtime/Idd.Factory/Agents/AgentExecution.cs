@@ -81,7 +81,7 @@ public sealed class CodexCliBackend : IAgentBackend
                     privateHome.InheritedSkillCount,
                     ReadSkillSourceVersion(),
                     pluginRoot,
-                    OperatingSystem.IsWindows() ? "unelevated" : null,
+                    OperatingSystem.IsWindows() ? executionConfiguration.WindowsSandbox : null,
                     pathPreparation.WindowsAppsPathEntriesRemoved),
                 FactoryJson.Options),
             cancellationToken);
@@ -143,14 +143,14 @@ public sealed class CodexCliBackend : IAgentBackend
             try { stdout = await running.Stdout; stderr = await running.Stderr; } catch (OperationCanceledException) { }
             return new(running.Process.HasExited ? running.Process.ExitCode : null, stdout, stderr, IsCompleteResult(running.ResultPath), true, AgentTerminationKind.Cancelled);
         }
-        finally { CleanupPrivateHome(running.Process.StartInfo.Environment["CODEX_HOME"]!); running.Process.Dispose(); }
+        finally { TryCleanupPrivateHome(running.Process.StartInfo.Environment["CODEX_HOME"]!); running.Process.Dispose(); }
     }
 
     public async Task CancelAsync(AgentRunHandle handle, CancellationToken cancellationToken)
     {
         if (!processes.Remove(handle.BackendHandle, out var running)) return;
         try { await CancelProcessAsync(running.Process); await Task.WhenAll(running.Stdout, running.Stderr); }
-        finally { CleanupPrivateHome(running.Process.StartInfo.Environment["CODEX_HOME"]!); running.Process.Dispose(); }
+        finally { TryCleanupPrivateHome(running.Process.StartInfo.Environment["CODEX_HOME"]!); running.Process.Dispose(); }
     }
 
     private PrivateHome PreparePrivateHome(string runId, string attemptId, string selectedSkill)
@@ -221,13 +221,16 @@ public sealed class CodexCliBackend : IAgentBackend
         IReadOnlyList<string>? prefixArguments = null,
         bool? isWindows = null)
     {
+        if (!string.IsNullOrWhiteSpace(configuration.WindowsSandbox) && configuration.WindowsSandbox is not ("elevated" or "unelevated"))
+            throw new ArgumentException("WindowsSandbox must be 'elevated' or 'unelevated'.", nameof(configuration));
         var arguments = new List<string>();
         if (prefixArguments is not null) arguments.AddRange(prefixArguments);
         arguments.AddRange(["exec", "--json", "--ephemeral", "--ignore-user-config"]);
         if (!string.IsNullOrWhiteSpace(configuration.Model)) arguments.AddRange(["--model", configuration.Model]);
         if (!string.IsNullOrWhiteSpace(configuration.ReasoningEffort)) arguments.AddRange(["-c", $"model_reasoning_effort={configuration.ReasoningEffort}"]);
         arguments.AddRange(["--sandbox", Sandbox(invocation.ExecutionProfile), "-c", "approval_policy=\"never\"", "-c", "mcp_servers={}"]);
-        if (isWindows ?? OperatingSystem.IsWindows()) arguments.AddRange(["-c", "windows.sandbox=\"unelevated\""]);
+        if ((isWindows ?? OperatingSystem.IsWindows()) && !string.IsNullOrWhiteSpace(configuration.WindowsSandbox))
+            arguments.AddRange(["-c", $"windows.sandbox=\"{configuration.WindowsSandbox}\""]);
         arguments.AddRange(["--skip-git-repo-check", "-C", invocation.Workspace, "--output-last-message", invocation.ResultPath, "-"]);
         return arguments;
     }
@@ -277,6 +280,12 @@ public sealed class CodexCliBackend : IAgentBackend
     private static void CleanupPrivateHome(string home)
     {
         if (Directory.Exists(home)) Directory.Delete(home, recursive: true);
+    }
+
+    private static void TryCleanupPrivateHome(string home)
+    {
+        try { CleanupPrivateHome(home); }
+        catch (Exception exception) when (exception is UnauthorizedAccessException or IOException) { }
     }
 
     private static async Task<string> CaptureAsync(StreamReader reader, string path, CancellationToken cancellationToken)
