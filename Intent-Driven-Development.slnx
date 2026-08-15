@@ -4,6 +4,7 @@
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/factory-benchmark/FactoryBenchmark.csproj" />
+    <Project Path="tools/factory-token-analysis/FactoryTokenAnalysis.csproj" />
     <Project Path="tools/generate/Generate.csproj" />
     <Project Path="tools/smoke-tests/SmokeTests.csproj" />
   </Folder>
