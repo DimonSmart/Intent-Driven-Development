@@ -4,6 +4,34 @@ This page records IDD changes that require action in repositories that already u
 
 Updating the installed plugins and migrating project-owned files are separate operations. Follow [Updating IDD](updating-idd.md) to refresh `idd-intent` and `idd-factory`. Then apply any relevant migration instructions below. Plugin updates do not automatically rewrite a repository's `.idd/intent/` directory.
 
+## 2026-08-23 — Codex 0.149 certification target and event-driven agent waiting
+
+Codex Multi-Agent V2 now exposes `wait_agent` as an event-driven wait for
+mailbox activity and allows long wait timeouts. Codex-specific IDD adapters must
+not model this as a wait for one explicit child id and should prefer a single
+long wait when a native subagent result is on the critical path instead of a
+short-timeout polling loop that repeatedly wakes the parent model.
+
+This does not change Factory orchestration. Factory semantic workers remain
+fresh `codex exec` subprocesses owned by the deterministic .NET runtime, and the
+parent Codex session continues to enter that runtime through the bundled
+blocking MCP transport. Returning orchestration to model-driven native
+subagents would weaken the deterministic runtime boundary and is not part of
+this update.
+
+Codex skills can also declare MCP dependencies in `agents/openai.yaml`. IDD may
+use that metadata for representable external dependencies, but it does not
+replace the bundled Factory `.mcp.json`: the packaged Factory stdio launch
+requires command arguments and a plugin-relative working directory. Tool
+metadata also does not grant permissions or require the model to call a tool.
+
+OpenAI's process-tree cleanup fix from codex PR #37366 was released starting
+with Codex 0.148.0. IDD now uses Codex 0.149.0 as the next release-certification
+target. This is not a version-only allowlist: release certification still
+requires a lifecycle report for the exact Codex binary/fingerprint proving
+normal-interrupt cleanup, hard-kill descendant cleanup, and resumable Factory
+state. Until that probe passes, publication remains fail-closed.
+
 ## 2026-08-13 — Codex Factory Bundled MCP Launcher
 
 The Codex `idd-factory` plugin now exposes a bundled blocking MCP transport for
@@ -15,8 +43,9 @@ launcher.
 
 Release certification requires a Codex host that proves process-tree cleanup
 for normal interruption and hard termination. Codex 0.147.0 is not supported
-for this launcher; a later minimum version will be named only after an official
-release passes the lifecycle probe.
+for this launcher. The first upstream release containing the required cleanup
+fix is 0.148.0; IDD still requires its own lifecycle probe for the exact host
+used to certify a release.
 
 ## 2026-08-11 — Programmatic Factory Runtime
 

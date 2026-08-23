@@ -210,8 +210,11 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
             its mapped Codex tool or operation is actually unavailable. In
             particular, use `spawn_agent` for `agent.spawn` and use `wait_agent`
             for `agent.wait`.
-            Do not infer that child-agent dispatch is unavailable. Before
-            returning a dispatch-related `BLOCKED`, call `spawn_agent` or
+            Codex Multi-Agent V2 `wait_agent` is an event-driven wait for mailbox
+            activity from any live agent; it does not take a child agent id. When a
+            child result is on the critical path, prefer one long wait allowed by
+            the host instead of repeated short waits or another status-polling loop.
+            Before returning a dispatch-related `BLOCKED`, call `spawn_agent` or
             `wait_agent`, as applicable, and preserve the observed runtime error
             if it fails.
             """,
@@ -234,7 +237,7 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
         RoleTool.AgentSpawn =>
             "Call the Codex `spawn_agent` collaboration tool.",
         RoleTool.AgentWait =>
-            "Call the Codex `wait_agent` collaboration tool with the spawned agent id and wait for the child result.",
+            "Call the Codex `wait_agent` collaboration tool. In Multi-Agent V2 it waits for mailbox activity from any live agent and does not take an agent id; prefer a long event-driven wait over short polling loops.",
         _ => throw new ArgumentOutOfRangeException(nameof(tool), tool, "Unknown role capability.")
     };
 

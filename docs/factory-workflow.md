@@ -9,6 +9,17 @@ the same installed plugin instance and use the same persisted state. MCP owns
 transport only and never dispatches semantic workers or decides workflow
 transitions.
 
+Codex skill metadata can now declare MCP tool dependencies through
+`agents/openai.yaml`. IDD does not use that mechanism as a replacement for the
+bundled Factory transport: the packaged stdio server requires command arguments
+and a plugin-relative working directory (`dotnet runtime/idd-factory.dll mcp`),
+while the current skill dependency metadata is not a complete representation of
+that launch contract. The generated plugin `.mcp.json` therefore remains the
+authoritative Codex binding for the Factory runtime. Skill tool dependencies may
+still be used for external MCP dependencies that can be represented by Codex
+skill metadata; they are dependency metadata, not a permission boundary or a
+requirement that the model invoke a particular tool.
+
 The runtime needs an available native Codex CLI
 (`IDD_FACTORY_CODEX_EXECUTABLE` can select it). Each semantic subprocess is
 independently launched with `approval_policy=never`; implementers
@@ -55,6 +66,15 @@ There is no semantic step coordinator on the happy path. The runtime chooses the
 next item, validates dependencies and results, runs authoritative verification,
 applies retry and correction budgets, routes reviews, persists state, recovers,
 and finalizes the result.
+
+Codex native subagents are not the Factory orchestration transport. Semantic
+workers are fresh `codex exec` subprocesses owned and awaited by the deterministic
+runtime. If a Codex-specific workflow outside that runtime uses native subagents,
+Multi-Agent V2 `wait_agent` should be treated as an event-driven wait for mailbox
+activity: prefer one long wait allowed by the host when a child result is on the
+critical path, rather than repeatedly waking the parent model with short timeout
+polling. This capability does not remove the blocking MCP boundary between the
+parent Codex session and Factory Runtime.
 
 Each invocation carries `Role`, `SkillName`, `ExecutionProfile`, and dynamic
 input. Factory Core neither reads installed `SKILL.md` or role-prompt files nor
@@ -115,9 +135,14 @@ is non-zero for a legitimate Factory result. Interrupting an MCP request stops
 the owned runtime process tree without synthesizing explicit Factory
 cancellation; persisted state remains resumable. Release certification must
 prove descendant cleanup for both normal interruption and hard host
-termination. Codex 0.147.0 does not satisfy that lifecycle contract; no later
-minimum version is claimed until an official release containing the required
-cleanup behavior passes the compatibility probe.
+termination. Codex 0.147.0 does not satisfy that lifecycle contract. OpenAI's
+process-tree cleanup fix (codex PR #37366) was released starting with Codex
+0.148.0, and Codex 0.149.0 is the next IDD certification target. Upstream
+availability is not sufficient for an IDD release: the exact Codex host binary
+and fingerprint used for certification must still pass the process-tree
+lifecycle probe, including normal interruption, hard-kill descendant cleanup,
+and resumable Factory state. Release certification remains fail-closed until
+that report exists for the host being used.
 
 See [Factory workflow configuration](factory-workflow-configuration.md) for the
 supported YAML composition.
