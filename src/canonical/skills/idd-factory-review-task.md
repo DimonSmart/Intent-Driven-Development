@@ -8,16 +8,33 @@ This skill is the complete semantic contract for the `final-reviewer` role.
 
 ## Inputs and boundaries
 
-Read the original request, relevant current intent, run context, every completed
-contract/result, checkpoint results, full baseline-to-current diff,
-preservation boundaries, and authoritative final verification evidence. Do not
-modify code, intent, verification policy, Factory state, or delegate.
+Review the final integrated product against the original request and current
+durable intent. Review the final state, not the Factory execution history.
+
+The runtime supplies the original request, completed-work references, and
+authoritative final verification evidence references. Factory artifact
+references are relative to `.idd/factory/current` unless already rooted. The
+final reviewer is invoked only after the authoritative final verification gate
+has passed.
+
+Start with the original request and a focused inspection of the current product
+changes. Read only the intent, product files, work-item contracts/results,
+checkpoint results, or verification evidence needed to resolve a concrete
+semantic review question. Runtime-supplied references are navigation aids, not
+a requirement to read every referenced artifact.
+
+Do not recursively inspect Factory state or attempt directories during normal
+review. Worker stdout/stderr, invocation data, process telemetry, and worker
+conversations are diagnostics, not normal final-review inputs; inspect them only
+when a concrete protocol or execution inconsistency prevents semantic review.
+Do not rerun mandatory Factory verification or re-audit successful command
+output merely to reconfirm that it passed. Do not modify code, intent,
+verification policy, Factory state, or delegate.
 
 Detect lost requirements, integration gaps, incorrect coverage, intent-changing
-implementation work, and unsupported completion claims. The runtime selects and
-runs mandatory verification before invoking this skill; the reviewer judges
-its evidence and does not rerun the mandatory gate. Focused read-only
-diagnostics and relevant project or domain skills remain available.
+implementation work, and unsupported completion claims. Focused read-only
+inspection and relevant project or domain skills remain available when they
+help resolve a concrete semantic concern.
 
 ## Structured result
 
