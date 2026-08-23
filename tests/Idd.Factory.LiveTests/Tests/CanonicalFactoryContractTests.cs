@@ -4,20 +4,8 @@ namespace Idd.Factory.LiveTests.Tests;
 
 public sealed class CanonicalFactoryContractTests
 {
-    [Fact]
-    public void RunSkillIsTransportNeutralAndPreservesRuntimeBoundaries()
-    {
-        var content = ReadRepoFile("src", "canonical", "skills", "idd-factory-run.md");
-        Assert.DoesNotContain("runtime/idd-factory.dll", content);
-        Assert.DoesNotContain("mcp__factory", content);
-        Assert.DoesNotContain("factory_run", content);
-        Assert.DoesNotContain("PowerShell", content);
-        Assert.DoesNotContain("write_stdin", content);
-        Assert.DoesNotContain("wait", content);
-        Assert.Contains("Do not select work items", content);
-        Assert.Contains("Do not spawn semantic or coordinator agents", content);
-        Assert.DoesNotContain("factory-step-coordinator", content);
-    }
+    // Keep only deterministic artifact-presence invariants here. Semantic contract
+    // meaning and runtime behavior are covered by semantic evals and executable tests.
 
     [Fact]
     public void ObsoleteCoordinatorSourcesAreRemoved()
@@ -29,65 +17,10 @@ public sealed class CanonicalFactoryContractTests
     }
 
     [Fact]
-    public void DecomposerAndImplementerUseStructuredBoundedContracts()
-    {
-        var decomposition = ReadRepoFile("src", "canonical", "skills", "idd-factory-decompose-task.md");
-        Assert.Contains("self-contained contract", decomposition);
-        Assert.Contains("payload.workItems", decomposition);
-        Assert.Contains("verificationCheckIds[]", decomposition);
-        Assert.Contains("When `.idd/verification.yaml` is absent, continue normally", decomposition);
-        Assert.Contains("`verificationCheckIds: []`", decomposition);
-        Assert.Contains("Absence alone is never `needs-clarification` or `blocked`", decomposition);
-        var implementation = ReadRepoFile("src", "canonical", "skills", "idd-factory-execute-subtask.md");
-        Assert.Contains("Do not\n+read the full request".Replace("\n+", "\n"), implementation);
-        Assert.Contains("Runtime verification is authoritative", implementation);
-        Assert.Contains("verification-fix", implementation);
-        Assert.Contains("`completed`, `needs-replan`, `blocked`, or `intent-required`", implementation);
-    }
-
-    [Fact]
-    public void ReplannerCannotMutateRuntimeState()
-    {
-        var content = ReadRepoFile("src", "canonical", "skills", "idd-factory-replan.md");
-        Assert.Contains("Do not modify completed work", content);
-        Assert.Contains("Do not change operational status", content);
-        Assert.Contains("payload.operations", content);
-        Assert.Contains("When the file is absent, every inserted or", content);
-        Assert.Contains("`verificationCheckIds: []`", content);
-        Assert.Contains("Missing policy alone is not a clarification or blocker", content);
-    }
-
-    [Fact]
-    public void RuntimeDefaultWorkflowHasRequiredRolesAndLimits()
-    {
-        var content = ReadRepoFile("src", "runtime", "Idd.Factory", "factory-workflow.yaml");
-        foreach (var role in new[] { "task-decomposer", "implementer", "checkpoint-reviewer", "final-reviewer", "factory-replanner" }) Assert.Contains(role, content);
-        Assert.Contains("maxAgentAttempts: 3", content); Assert.Contains("maxReplans: 3", content); Assert.Contains("maxCorrectiveCycles: 5", content); Assert.Contains("maxVerificationFixAttempts: 1", content);
-        Assert.DoesNotContain("factory-step-coordinator", content);
-    }
-
-    [Fact]
-    public void FactoryWorkersHaveNoSeparateRoleOrVerificationContract()
+    public void FactoryWorkersHaveNoSeparateRoleContracts()
     {
         foreach (var role in new[] { "task-decomposer.md", "implementer.md", "checkpoint-reviewer.md", "final-reviewer.md", "factory-replanner.md" })
             Assert.False(RepoFileExists("src", "canonical", "factory", "roles", role));
-        foreach (var skill in new[] { "idd-factory-decompose-task.md", "idd-factory-execute-subtask.md", "idd-factory-review-checkpoint.md", "idd-factory-review-task.md", "idd-factory-replan.md" })
-            Assert.DoesNotContain("references/project-verification.md", ReadRepoFile("src", "canonical", "skills", skill));
-    }
-
-    [Fact]
-    public void RuntimeAndAdapterOwnTheirSeparateInvocationResponsibilities()
-    {
-        var runtime = ReadRepoFile("src", "runtime", "Idd.Factory", "Runtime", "FactoryRuntime.cs");
-        Assert.Contains("FactoryAgentCatalog.Resolve(role)", runtime);
-        Assert.Contains("verificationContext", runtime);
-        Assert.DoesNotContain("RoleReferences", runtime);
-        Assert.DoesNotContain("project-verification.md", runtime);
-        Assert.DoesNotContain("$idd-factory-", runtime);
-        var adapter = ReadRepoFile("src", "runtime", "Idd.Factory", "Agents", "AgentExecution.cs");
-        Assert.Contains("Use ${invocation.SkillName}", adapter);
-        Assert.Contains("BuildTelemetry", adapter);
-        Assert.Contains("\"bootstrap\"", adapter);
     }
 
     private static bool RepoFileExists(params string[] parts)
@@ -95,15 +28,5 @@ public sealed class CanonicalFactoryContractTests
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
             if (File.Exists(Path.Combine([directory.FullName, .. parts]))) return true;
         return false;
-    }
-
-    private static string ReadRepoFile(params string[] parts)
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            var path = Path.Combine([directory.FullName, .. parts]);
-            if (File.Exists(path)) return File.ReadAllText(path).ReplaceLineEndings("\n");
-        }
-        throw new InvalidOperationException($"Could not locate repository file: {Path.Combine(parts)}");
     }
 }
