@@ -43,7 +43,8 @@ public sealed class CodexCliBackend : IAgentBackend
         var attemptDirectory = Path.GetDirectoryName(invocation.ResultPath)!;
         var privateHome = PreparePrivateHome(invocation.RunId, invocation.AttemptId, invocation.SkillName);
         var codexHome = privateHome.Path;
-        try { ExposeSkill(codexHome, invocation); }
+        string skillInstructions;
+        try { skillInstructions = ReadSkillInstructions(pluginRoot, invocation); }
         catch { CleanupPrivateHome(codexHome); throw; }
         var stdoutPath = Path.Combine(attemptDirectory, "stdout.log");
         var stderrPath = Path.Combine(attemptDirectory, "stderr.log");
@@ -91,7 +92,7 @@ public sealed class CodexCliBackend : IAgentBackend
         { CleanupPrivateHome(codexHome); throw new AgentProtocolException("AGENT_BACKEND_UNAVAILABLE", $"Codex CLI could not start: {exception.Message}"); }
         var stdout = CaptureAsync(process.StandardOutput, stdoutPath, cancellationToken);
         var stderr = CaptureAsync(process.StandardError, stderrPath, cancellationToken);
-        var prompt = BuildBootstrapPrompt(invocation);
+        var prompt = BuildBootstrapPrompt(invocation, skillInstructions);
         await process.StandardInput.WriteAsync(prompt.AsMemory(), cancellationToken);
         await process.StandardInput.FlushAsync(cancellationToken); process.StandardInput.Close();
         processes.Add(invocation.AttemptId, new(process, stdout, stderr, invocation.ResultPath));
@@ -178,12 +179,14 @@ public sealed class CodexCliBackend : IAgentBackend
         return new(home, inheritedSkillCount);
     }
 
-    private void ExposeSkill(string codexHome, AgentInvocation invocation)
+    internal static string ReadSkillInstructions(string pluginRoot, AgentInvocation invocation)
     {
-        var skillName = invocation.SkillName;
-        var source = Path.GetFullPath(Path.Combine(pluginRoot, "skills", skillName));
         ValidateSkillIdentity(pluginRoot, invocation);
-        CopyDirectory(source, Path.Combine(codexHome, "skills", skillName));
+        var path = Path.Combine(Path.GetFullPath(pluginRoot), "skills", invocation.SkillName, "SKILL.md");
+        var instructions = File.ReadAllText(path).Trim();
+        if (instructions.Length == 0)
+            throw new AgentProtocolException("FACTORY_SKILL_UNAVAILABLE", $"Factory skill {invocation.SkillName} is empty in the configured plugin.");
+        return instructions;
     }
 
     internal static void ValidateSkillIdentity(string pluginRoot, AgentInvocation invocation)
@@ -235,11 +238,15 @@ public sealed class CodexCliBackend : IAgentBackend
         return arguments;
     }
 
-    internal static string BuildBootstrapPrompt(AgentInvocation invocation) =>
-        $"Use ${invocation.SkillName}.\n\n{invocation.Input}\n\n" +
-        $"Return only one JSON object as your final response. The backend captures it as {invocation.ResultPath}; do not create or edit that file yourself. " +
-        $"Required envelope: protocolVersion={AgentInvocation.CurrentProtocolVersion}, runId={invocation.RunId}, attemptId={invocation.AttemptId}, role={invocation.Role}, outcome=<allowed semantic outcome>, reason=<optional>, payload=<role data>. " +
-        "Do not mutate .idd/factory/current or .idd/intent. stdout is diagnostic only.";
+    internal static string BuildBootstrapPrompt(AgentInvocation invocation, string skillInstructions)
+    {
+        if (string.IsNullOrWhiteSpace(skillInstructions))
+            throw new ArgumentException("Factory-selected skill instructions cannot be empty.", nameof(skillInstructions));
+        return $"Factory-selected role instructions ({invocation.SkillName}):\n\n{skillInstructions.Trim()}\n\nAssigned Factory work:\n\n{invocation.Input}\n\n" +
+            $"Return only one JSON object as your final response. The backend captures it as {invocation.ResultPath}; do not create or edit that file yourself. " +
+            $"Required envelope: protocolVersion={AgentInvocation.CurrentProtocolVersion}, runId={invocation.RunId}, attemptId={invocation.AttemptId}, role={invocation.Role}, outcome=<allowed semantic outcome>, reason=<optional>, payload=<role data>. " +
+            "Do not mutate .idd/factory/current or .idd/intent. stdout is diagnostic only.";
+    }
 
     internal static AgentAttemptTelemetry BuildTelemetry(
         AgentInvocation invocation,
@@ -253,7 +260,7 @@ public sealed class CodexCliBackend : IAgentBackend
     {
         configuration ??= new();
         capabilityPolicy ??= AgentCapabilityPolicy.ProductionDefault;
-        return new(invocation.Role, invocation.SkillName, "codex-cli", invocation.ExecutionProfile, "bootstrap", invocation.Input.Length,
+        return new(invocation.Role, invocation.SkillName, "codex-cli", invocation.ExecutionProfile, "inline-skill", invocation.Input.Length,
             configuration.RequestedModel, configuration.RequestedReasoningEffort, "unknown", "unknown", skillSource, skillSourceVersion,
             capabilityPolicy.InheritUserSkills ? "inherit" : "isolated", CountProjectSkills(invocation.Workspace), inheritedUserSkillCount, capabilityPolicy.Profile,
             windowsSandbox, windowsAppsPathEntriesRemoved);

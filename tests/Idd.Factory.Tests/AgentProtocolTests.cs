@@ -58,12 +58,27 @@ public sealed class AgentProtocolTests
         Assert.Equal("workspace-write", CodexCliBackend.Sandbox(AgentExecutionProfile.WorkspaceWrite));
     }
 
-    [Fact] public void CodexAdapterOwnsExplicitSkillBootstrap()
+    [Fact] public void CodexAdapterBuildsSelfContainedSkillPrompt()
     {
-        var prompt = CodexCliBackend.BuildBootstrapPrompt(Invocation());
-        Assert.StartsWith("Use $idd-factory-execute-subtask.", prompt);
-        Assert.Contains("input", prompt);
+        const string skillInstructions = "# Implementer\n\nImplement exactly one assigned subtask.";
+        var prompt = CodexCliBackend.BuildBootstrapPrompt(Invocation(), skillInstructions);
+
+        Assert.StartsWith("Factory-selected role instructions (idd-factory-execute-subtask):", prompt);
+        Assert.Contains(skillInstructions, prompt);
+        Assert.Contains("Assigned Factory work:\n\ninput", prompt);
+        Assert.DoesNotContain("Use $", prompt, StringComparison.Ordinal);
         Assert.Contains("protocolVersion=1", prompt);
+    }
+
+    [Fact] public void CodexAdapterReadsPackagedSkillInstructions()
+    {
+        using var temp = new TestWorkspace();
+        temp.Write("plugin/skills/idd-factory-execute-subtask/SKILL.md", "  factory instructions  \n");
+        var invocation = Invocation() with { Workspace = Path.Combine(temp.Path, "workspace") };
+
+        var instructions = CodexCliBackend.ReadSkillInstructions(Path.Combine(temp.Path, "plugin"), invocation);
+
+        Assert.Equal("factory instructions", instructions);
     }
 
     [Fact] public void CodexAdapterReportsRequiredAttemptTelemetry()
@@ -71,7 +86,7 @@ public sealed class AgentProtocolTests
         var telemetry = CodexCliBackend.BuildTelemetry(Invocation());
         Assert.Equal("implementer", telemetry.Role); Assert.Equal("idd-factory-execute-subtask", telemetry.SkillName);
         Assert.Equal("codex-cli", telemetry.Backend); Assert.Equal(AgentExecutionProfile.WorkspaceWrite, telemetry.ExecutionProfile);
-        Assert.Equal("bootstrap", telemetry.SkillInvocationMode); Assert.Equal("input".Length, telemetry.InputChars);
+        Assert.Equal("inline-skill", telemetry.SkillInvocationMode); Assert.Equal("input".Length, telemetry.InputChars);
         Assert.Equal("default/unpinned", telemetry.RequestedModel);
         Assert.Equal("default/unpinned", telemetry.RequestedReasoningEffort);
         Assert.Equal("unknown", telemetry.EffectiveModel);

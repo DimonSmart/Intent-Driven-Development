@@ -64,13 +64,15 @@ A new sequential model/tool round can therefore add roughly another full base ag
 The analysis also found costs that were not inherent to the base Codex worker:
 
 - A redundant verification-only work item created an entire extra semantic attempt.
-- Several workers re-read their already activated `SKILL.md`.
+- Workers had to load their Factory-selected `SKILL.md` through an initial tool round because the runtime sent only `Use $skill`; the runtime now reads that installed skill itself and inlines its instructions into the self-contained worker prompt.
 - Broad workspace inventories included `.idd/factory`, previous attempt logs, `bin`, and `obj`.
 - Workers tried Git commands in a workspace without `.git`.
 - Failed `git diff` calls emitted large help/error output that became context for later model rounds.
 - The final reviewer accumulated many tool results over several sequential batches.
 
 In the observed run, failed shell commands alone produced roughly 61 KB of text. This matters because tool output is not paid only once: it remains in the conversation and can be re-sent on later rounds.
+
+The selected Factory worker skill is intentionally not exposed to that worker through its private `CODEX_HOME`. The runtime validates the packaged skill, reads its `SKILL.md`, and places the instructions directly in the worker packet. User skills may still be inherited according to the configured capability policy, but a user skill with the selected Factory skill name is excluded. A worker reading its own Factory `SKILL.md` is therefore a regression signal rather than expected bootstrap behavior.
 
 ## Metrics to watch
 
@@ -128,7 +130,7 @@ attempts/*/stdout.log
 
 It also flags common context-pollution patterns such as:
 
-- a worker reading its own active `SKILL.md`;
+- a worker reading its own Factory `SKILL.md` even though the runtime inlines the selected skill instructions;
 - broad recursive workspace inventory;
 - Git failures caused by a non-Git workspace;
 - failed commands producing at least 10,000 characters;
