@@ -23,6 +23,11 @@ checkpoint results, or verification evidence needed to resolve a concrete
 semantic review question. Runtime-supplied references are navigation aids, not
 a requirement to read every referenced artifact.
 
+Do not begin final review with a broad or recursive workspace inventory. Do not
+enumerate the whole workspace, `.idd/factory`, `bin`, or `obj`. Use the original
+request and known paths first. Discover additional files only with focused
+searches needed to answer a concrete semantic question.
+
 Do not recursively inspect Factory state or attempt directories during normal
 review. Worker stdout/stderr, invocation data, process telemetry, and worker
 conversations are diagnostics, not normal final-review inputs; inspect them only
