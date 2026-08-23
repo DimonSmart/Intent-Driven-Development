@@ -36,13 +36,16 @@ internal static class FactoryCli
             var workflow = new WorkflowDefinitionLoader().Load(workspace, packagedWorkflow);
             var current = Path.Combine(workspace, ".idd", "factory", "current"); var clock = new SystemClock(); var validator = new FactoryStateValidator();
             var store = new FileFactoryStateStore(current, validator); var fingerprinter = new WorkspaceFingerprinter();
+            var windowsSandbox = ResolveWindowsSandbox(
+                Environment.GetEnvironmentVariable("IDD_FACTORY_WINDOWS_SANDBOX"),
+                OperatingSystem.IsWindows());
             var backend = new CodexCliBackend(
                 pluginRoot,
                 options.GetValueOrDefault("codex"),
                 new AgentExecutionConfiguration(
                     Environment.GetEnvironmentVariable("IDD_FACTORY_MODEL"),
                     Environment.GetEnvironmentVariable("IDD_FACTORY_REASONING_EFFORT"),
-                    Environment.GetEnvironmentVariable("IDD_FACTORY_WINDOWS_SANDBOX")),
+                    windowsSandbox),
                 new AgentCapabilityPolicy(
                     !string.Equals(Environment.GetEnvironmentVariable("IDD_FACTORY_INHERIT_USER_SKILLS"), "false", StringComparison.OrdinalIgnoreCase),
                     Environment.GetEnvironmentVariable("IDD_FACTORY_CAPABILITY_PROFILE") ?? "production-default"));
@@ -89,6 +92,17 @@ internal static class FactoryCli
         catch (Exception exception) { outcome = new("RUNTIME_ERROR", "unknown", exception.Message); }
         Console.WriteLine(JsonSerializer.Serialize(outcome, FactoryJson.Options));
         return ExitCode(outcome.FactoryOutcome);
+    }
+
+    internal static string? ResolveWindowsSandbox(string? configured, bool isWindows)
+    {
+        if (!isWindows) return null;
+        if (string.IsNullOrWhiteSpace(configured)) return "unelevated";
+        var normalized = configured.Trim().ToLowerInvariant();
+        if (normalized is "unelevated" or "elevated") return normalized;
+        throw new AgentProtocolException(
+            "INVALID_WINDOWS_SANDBOX",
+            $"IDD_FACTORY_WINDOWS_SANDBOX must be 'unelevated' or 'elevated' on Windows, but was '{configured}'.");
     }
 
     private static Dictionary<string, string> Parse(string[] args)

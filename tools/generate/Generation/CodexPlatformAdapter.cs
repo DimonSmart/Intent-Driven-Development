@@ -67,6 +67,10 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                     ["args"] = new JsonArray("runtime/idd-factory.dll", "mcp"),
                     ["cwd"] = ".",
                     ["tool_timeout_sec"] = 1800,
+                    ["env"] = new JsonObject
+                    {
+                        ["IDD_FACTORY_WINDOWS_SANDBOX"] = "unelevated"
+                    },
                     ["env_vars"] = new JsonArray(
                         "IDD_FACTORY_CODEX_EXECUTABLE",
                         "IDD_FACTORY_MODEL",
