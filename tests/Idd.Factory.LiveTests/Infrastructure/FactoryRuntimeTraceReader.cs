@@ -159,7 +159,10 @@ public static class FactoryRuntimeTraceReader
             FileReadCount = FileReads.Count;
             UniqueFileReadCount = FileReads.Select(read => read.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count();
             RepeatedFileReadCount = FileReadCount - UniqueFileReadCount;
-            FileReadBytes = FileReads.Sum(read => read.ReturnedBytes);
+            // One shell result can contain several Get-Content/cat reads. The rollout
+            // parser attaches that same result size to every detected path, so count
+            // each tool-call sequence only once when measuring total read output.
+            FileReadBytes = FileReads.GroupBy(read => read.Sequence).Sum(group => group.Max(read => read.ReturnedBytes));
             WaitAgentMs = ToolCalls.Where(call => call.Tool is "wait" or "wait_agent").Sum(call => call.DurationMs ?? 0);
             TokenProgression = analysis.TokenProgression;
         }

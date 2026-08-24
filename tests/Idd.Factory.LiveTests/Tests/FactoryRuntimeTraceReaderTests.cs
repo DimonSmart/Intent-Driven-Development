@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Idd.Factory.LiveTests.Infrastructure;
 using Xunit;
@@ -49,6 +50,46 @@ public sealed class FactoryRuntimeTraceReaderTests
             Assert.Equal(["shell", "apply_patch"], incomplete.ToolCalls!.Select(call => call.Tool));
             Assert.Single(incomplete.TokenProgression!);
             Assert.Contains(trace.Diagnostics, diagnostic => diagnostic.Code == "RUNTIME_RESULT_NOT_RECORDED");
+        }
+        finally { if (Directory.Exists(workspace)) Directory.Delete(workspace, true); }
+    }
+
+    [Fact]
+    public void TryRead_CountsBatchedReadOutputOnce()
+    {
+        var workspace = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var current = Path.Combine(workspace, ".idd", "factory", "current");
+        const string output = "alpha\nbeta";
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(current, "attempts", "A000001"));
+            File.WriteAllLines(Path.Combine(current, "events.jsonl"),
+            [
+                Event("agent-dispatching", "A000001", "checkpoint-reviewer", null, "2026-01-01T00:00:00Z"),
+                Event("agent-completed", "A000001", "checkpoint-reviewer", null, "2026-01-01T00:00:01Z", "approved")
+            ]);
+            File.WriteAllLines(Path.Combine(current, "attempts", "A000001", "stdout.log"),
+            [
+                JsonSerializer.Serialize(new
+                {
+                    type = "item.completed",
+                    item = new
+                    {
+                        id = "tool-1",
+                        type = "command_execution",
+                        command = "Get-Content 'a.md'; Get-Content 'b.md'",
+                        aggregated_output = output,
+                        exit_code = 0,
+                        status = "completed"
+                    }
+                })
+            ]);
+
+            var trace = FactoryRuntimeTraceReader.TryRead(workspace, "root")!;
+            var reviewer = trace.Agents.Single(agent => agent.ThreadId == "A000001");
+
+            Assert.Equal(2, reviewer.FileReadCount);
+            Assert.Equal(Encoding.UTF8.GetByteCount(output), reviewer.FileReadBytes);
         }
         finally { if (Directory.Exists(workspace)) Directory.Delete(workspace, true); }
     }
