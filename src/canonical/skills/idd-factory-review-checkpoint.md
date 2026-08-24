@@ -15,6 +15,13 @@ read the full request, unrelated or later work, or worker conversations. Do not
 modify code, intent, verification policy, Factory state, or delegate.
 The runtime runs the checkpoint gate before invoking this skill. Review the
 supplied authoritative evidence; do not rerun mandatory Factory verification.
+
+Do not begin checkpoint review with a broad or recursive workspace inventory.
+Do not enumerate the whole workspace, `.idd/factory`, `bin`, or `obj`. Use the
+checkpoint contract and runtime-supplied references first. Discover additional
+files only with focused searches needed to resolve a concrete semantic review
+question.
+
 Focused read-only diagnostics and relevant project or domain skills remain
 available when they help semantic review.
 
