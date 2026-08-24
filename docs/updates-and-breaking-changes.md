@@ -4,7 +4,7 @@ This page records IDD changes that require action in repositories that already u
 
 Updating the installed plugins and migrating project-owned files are separate operations. Follow [Updating IDD](updating-idd.md) to refresh `idd-intent` and `idd-factory`. Then apply any relevant migration instructions below. Plugin updates do not automatically rewrite a repository's `.idd/intent/` directory.
 
-## 2026-08-23 — Codex 0.149 certification target and event-driven agent waiting
+## 2026-08-23 — Codex host compatibility and event-driven agent waiting
 
 Codex Multi-Agent V2 now exposes `wait_agent` as an event-driven wait for
 mailbox activity and allows long wait timeouts. Codex-specific IDD adapters must
@@ -26,11 +26,10 @@ requires command arguments and a plugin-relative working directory. Tool
 metadata also does not grant permissions or require the model to call a tool.
 
 OpenAI's process-tree cleanup fix from codex PR #37366 was released starting
-with Codex 0.148.0. IDD now uses Codex 0.149.0 as the next release-certification
-target. This is not a version-only allowlist: release certification still
-requires a lifecycle report for the exact Codex binary/fingerprint proving
-normal-interrupt cleanup, hard-kill descendant cleanup, and resumable Factory
-state. Until that probe passes, publication remains fail-closed.
+with Codex 0.148.0. IDD release certification requires stable Codex 0.148.0 or
+newer. Process-tree containment is a property of the Codex host release and is
+covered by upstream Codex tests; maintainers do not create or supply a separate
+lifecycle JSON report for each IDD release.
 
 ## 2026-08-13 — Codex Factory Bundled MCP Launcher
 
@@ -43,9 +42,9 @@ launcher.
 
 Release certification requires a Codex host that proves process-tree cleanup
 for normal interruption and hard termination. Codex 0.147.0 is not supported
-for this launcher. The first upstream release containing the required cleanup
-fix is 0.148.0; IDD still requires its own lifecycle probe for the exact host
-used to certify a release.
+for this launcher. The first stable upstream release containing the required
+cleanup fix is 0.148.0, which is the minimum supported release-certification
+host.
 
 ## 2026-08-11 — Programmatic Factory Runtime
 

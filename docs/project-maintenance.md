@@ -143,6 +143,13 @@ pwsh ./scripts/Check.ps1
 ./publish-next-version.bat
 ```
 
+The publish command is self-contained. It requires Git, .NET 10, and an
+authenticated stable Codex CLI 0.148.0 or newer; it does not require a manually
+prepared release artifact or environment variable. The command creates the next
+local patch tag, runs deterministic checks and the installed-plugin live release
+evaluation, pushes the tag only after certification succeeds, and deletes the
+local tag when certification fails.
+
 Tag publication runs `.github/workflows/publish-marketplace.yml`.
 
 The workflow:

@@ -59,3 +59,7 @@ commit SHA, runs deterministic checks, performs the real installed-plugin live
 eval, and reports unavailable effective worker model/reasoning telemetry as
 `INCONCLUSIVE` rather than `PASS`. The release tag is pushed by
 `publish-next-version.ps1` only after certification passes.
+
+Release certification requires an authenticated stable Codex CLI 0.148.0 or
+newer. It does not require a separately generated lifecycle report, executable
+fingerprint, or hidden environment variable.

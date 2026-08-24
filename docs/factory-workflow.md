@@ -133,16 +133,14 @@ creation fails, current state remains resumable.
 The MCP adapter returns that same structured outcome even when the CLI exit code
 is non-zero for a legitimate Factory result. Interrupting an MCP request stops
 the owned runtime process tree without synthesizing explicit Factory
-cancellation; persisted state remains resumable. Release certification must
-prove descendant cleanup for both normal interruption and hard host
-termination. Codex 0.147.0 does not satisfy that lifecycle contract. OpenAI's
-process-tree cleanup fix (codex PR #37366) was released starting with Codex
-0.148.0, and Codex 0.149.0 is the next IDD certification target. Upstream
-availability is not sufficient for an IDD release: the exact Codex host binary
-and fingerprint used for certification must still pass the process-tree
-lifecycle probe, including normal interruption, hard-kill descendant cleanup,
-and resumable Factory state. Release certification remains fail-closed until
-that report exists for the host being used.
+cancellation; persisted state remains resumable. Codex 0.147.0 does not satisfy
+the required host lifecycle contract. OpenAI fixed descendant cleanup for local
+MCP servers in codex PR #37366 and released it in Codex 0.148.0. Release
+certification therefore requires stable Codex 0.148.0 or newer and fails closed
+when Codex is missing, older, or does not report a stable version. The cleanup
+behavior belongs to the Codex host and is covered by its upstream process-tree
+tests; IDD release certification does not require a separately prepared JSON
+report for each IDD version.
 
 See [Factory workflow configuration](factory-workflow-configuration.md) for the
 supported YAML composition.

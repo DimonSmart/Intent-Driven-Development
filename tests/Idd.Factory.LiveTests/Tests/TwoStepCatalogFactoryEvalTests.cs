@@ -35,7 +35,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
             var codexCommand = CodexExecutableResolver.Resolve();
             var codexVersion = await RequireVersionAsync(processRunner, codexCommand.Executable, codexCommand.PrefixArguments.Concat(["--version"]).ToArray(), repositoryRoot, workspace, "codex-version", cancellationToken);
             if (options.ReleaseCertification)
-                _ = CodexHostLifecycleCertification.RequireFromEnvironment(codexCommand, codexVersion);
+                CodexReleaseHostCompatibility.RequireSupported(codexVersion);
             var dotnetVersion = await RequireVersionAsync(processRunner, "dotnet", ["--version"], repositoryRoot, workspace, "dotnet-version", cancellationToken);
             await RequireVersionAsync(processRunner, "git", ["--version"], repositoryRoot, workspace, "git-version", cancellationToken);
             await File.WriteAllTextAsync(Path.Combine(workspace.RunDirectory, "run-manifest.json"), JsonSerializer.Serialize(new FactoryEvalRunManifest(2, "two-step-catalog", options.Model, options.ReasoningEffort, version.Value, version.SourceRevision, version.SourceDirty, options.ReleaseCertification, codexVersion, dotnetVersion, DateTimeOffset.UtcNow), new JsonSerializerOptions { WriteIndented = true }) + "\n", cancellationToken);

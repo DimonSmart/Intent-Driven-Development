@@ -44,6 +44,15 @@ public sealed class CodexLaunchTests
     }
 
     [Fact]
+    public void ReleaseEvalWithoutCodexFailsWithAConcretePrerequisiteError()
+    {
+        var exception = Assert.Throws<FileNotFoundException>(() =>
+            CodexExecutableResolver.ResolveFromPath(string.Empty, isWindows: true));
+
+        Assert.Contains("Could not locate the npm Codex CLI", exception.Message);
+    }
+
+    [Fact]
     public void EvalEnvironment_PropagatesWorkerExecutionConfigurationAndControlledCapabilities()
     {
         var options = new FactoryEvalOptions("gpt-test", "high", TimeSpan.FromMinutes(1), "version");

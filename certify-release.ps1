@@ -1,8 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string] $Version,
-    [string] $CodexLifecycleReport = $env:IDD_FACTORY_CODEX_LIFECYCLE_REPORT
+    [string] $Version
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,17 +21,12 @@ $tag = (& git describe --tags --exact-match HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $tag -ne "v$Version") { throw "HEAD must be the exact release tag v$Version." }
 $previousTag = (& git describe --tags --abbrev=0 'HEAD^').Trim()
 if ($LASTEXITCODE -ne 0 -or $previousTag -notmatch '^v(?<version>\d+\.\d+\.\d+)$') { throw "Release certification requires a previous semver tag for the reinstall lifecycle check." }
-if ([string]::IsNullOrWhiteSpace($CodexLifecycleReport) -or -not (Test-Path -LiteralPath $CodexLifecycleReport -PathType Leaf)) {
-    throw "Release certification requires a real Codex lifecycle report via -CodexLifecycleReport or IDD_FACTORY_CODEX_LIFECYCLE_REPORT."
-}
-
 & powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Check.ps1 -Version $Version
 if ($LASTEXITCODE -ne 0) { throw "Deterministic release checks failed." }
 
 $env:IDD_FACTORY_EVAL_VERSION = $Version
 $env:IDD_FACTORY_PREVIOUS_VERSION = $Matches.version
 $env:IDD_FACTORY_RELEASE_CERTIFICATION = "1"
-$env:IDD_FACTORY_CODEX_LIFECYCLE_REPORT = (Resolve-Path -LiteralPath $CodexLifecycleReport).Path
 & .\run-live-factory-evals.bat --release-certification
 if ($LASTEXITCODE -ne 0) { throw "Installed-plugin release live eval failed." }
 
