@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  tests-linux:
+  check-linux:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,8 +19,9 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Run factory tests
-        run: dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj --nologo
+      - name: Run check
+        shell: pwsh
+        run: pwsh ./scripts/Check.ps1 -Version 0.0.0
 
   smoke:
     runs-on: windows-latest
