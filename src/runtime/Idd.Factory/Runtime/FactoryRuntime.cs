@@ -263,7 +263,12 @@ public sealed class FactoryRuntime(
         if (state.IntentSnapshotHash is null)
         {
             state.IntentSnapshotHash = currentHash;
-            state.Blocker = new("INTENT_REQUIRED", "Factory requires the existing IDD intent workflow before semantic work can continue.", "Update the required durable intent, then run continue.");
+            var semanticBlocker = state.Blocker?.Code == "INTENT_REQUIRED" ? state.Blocker : null;
+            state.Blocker = new(
+                "INTENT_REQUIRED",
+                semanticBlocker?.Reason ?? "Factory requires durable intent decisions before semantic work can continue.",
+                "Update the listed durable intent decisions in .idd/intent, then run continue.",
+                semanticBlocker?.Payload);
             await SaveAsync(state, cancellationToken); return "blocked";
         }
         if (state.IntentSnapshotHash == currentHash) return "blocked";
@@ -331,12 +336,20 @@ public sealed class FactoryRuntime(
 
     private static void CaptureSemanticStop(FactoryState state, AgentResultEnvelope result)
     {
-        if (result.Outcome is not ("needs-clarification" or "focused-handoff" or "blocked")) return;
+        if (result.Outcome is not ("needs-clarification" or "focused-handoff" or "blocked" or "intent-required")) return;
+        if (result.Outcome == "intent-required") IntentRequiredPayload.Validate(result.Payload);
         var code = result.Outcome.ToUpperInvariant().Replace('-', '_');
-        var reason = string.IsNullOrWhiteSpace(result.Reason) ? $"Workflow stopped with {result.Outcome}." : result.Reason;
-        var resumeWhen = result.Outcome == "needs-clarification"
-            ? "Provide the requested clarification and continue."
-            : "Resolve the reported condition and continue.";
+        var reason = string.IsNullOrWhiteSpace(result.Reason)
+            ? result.Outcome == "intent-required"
+                ? "Durable product intent is missing decisions required for semantic work."
+                : $"Workflow stopped with {result.Outcome}."
+            : result.Reason;
+        var resumeWhen = result.Outcome switch
+        {
+            "needs-clarification" => "Provide the requested clarification and continue.",
+            "intent-required" => "Update the listed durable intent decisions in .idd/intent, then run continue.",
+            _ => "Resolve the reported condition and continue."
+        };
         state.Blocker = new(code, reason, resumeWhen, result.Payload?.Clone());
     }
 
