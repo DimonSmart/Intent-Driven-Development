@@ -39,6 +39,26 @@ Every inserted or replaced work item is a self-contained structured contract
 with stable ID, kind, sequence, contract Markdown, dependencies, coverage, and
 verification check IDs as applicable.
 
+For `intent-required`, `payload.missingIntentDecisions` is a non-empty array.
+Each item contains:
+
+```text
+area
+whyBlocking
+requiredDecisions[]
+intentReferences[]
+recommendedNextWorkflow?  # e.g. idd-intent-change or idd-intent-new-document: ADR
+```
+
+`area` is a short domain or contract area name. `whyBlocking` explains why a
+safe replan cannot be produced. `requiredDecisions[]` names the concrete durable
+decisions that must be recorded under `.idd/intent`. `intentReferences[]` names
+related IDD document IDs or paths; use an empty array only when no existing
+intent document applies. `recommendedNextWorkflow` is optional and must name an
+available intent workflow when a useful next step is known. Keep the list
+concise and decision-oriented; do not substitute logs, implementation guesses,
+or vague requests to "clarify intent".
+
 When `.idd/verification.yaml` exists, use only real top-level stable check IDs
 from the valid policy; never invent IDs, and never silently replace a malformed
 existing policy with fallback. When the file is absent, every inserted or

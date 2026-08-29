@@ -67,6 +67,26 @@ verificationCheckIds[]
 intentReferences[]
 ```
 
+For `intent-required`, `payload.missingIntentDecisions` is a non-empty array.
+Each item contains:
+
+```text
+area
+whyBlocking
+requiredDecisions[]
+intentReferences[]
+recommendedNextWorkflow?  # e.g. idd-intent-change or idd-intent-new-document: ADR
+```
+
+`area` is a short domain or contract area name. `whyBlocking` explains why safe
+decomposition cannot continue. `requiredDecisions[]` names the concrete durable
+decisions that must be recorded under `.idd/intent`. `intentReferences[]` names
+related IDD document IDs or paths; use an empty array only when no existing
+intent document applies. `recommendedNextWorkflow` is optional and must name an
+available intent workflow when a useful next step is known. Keep the list
+concise and decision-oriented; do not substitute logs, implementation guesses,
+or vague requests to "clarify intent".
+
 Subtask contract Markdown contains goal, context, scope, requirements, done
 conditions, verification properties, and preservation boundaries. A checkpoint
 contract contains coverage, review scope, and focused verification. Do not

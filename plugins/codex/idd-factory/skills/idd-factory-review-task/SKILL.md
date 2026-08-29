@@ -57,5 +57,27 @@ Return worker protocol version 1 with role `final-reviewer` and one outcome:
 `payload.correctiveSubtask`; final review itself is the next gate. Keep
 implementation and verification assessments separate. Never describe blocked
 or unverified work as approved.
+
+For `intent-required`, `payload.missingIntentDecisions` is a non-empty array.
+Each item contains:
+
+```text
+area
+whyBlocking
+requiredDecisions[]
+intentReferences[]
+recommendedNextWorkflow?  # e.g. idd-intent-change or idd-intent-new-document: ADR
+```
+
+`area` is a short domain or contract area name. `whyBlocking` explains why the
+integrated result cannot be approved safely against durable product meaning.
+`requiredDecisions[]` names the concrete durable decisions that must be recorded
+under `.idd/intent`. `intentReferences[]` names related IDD document IDs or
+paths; use an empty array only when no existing intent document applies.
+`recommendedNextWorkflow` is optional and must name an available intent workflow
+when a useful next step is known. Keep the list concise and decision-oriented;
+do not substitute logs, implementation guesses, or vague requests to "clarify
+intent".
+
 The runtime owns machine validation, completion policy, workflow transitions,
 and selection of any next semantic capability.
