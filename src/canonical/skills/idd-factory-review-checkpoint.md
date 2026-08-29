@@ -36,5 +36,27 @@ contract with ID, contract Markdown, dependencies, and verification check IDs.
 Do not reopen or rewrite completed work. Use `needs-replan` for invalid coverage,
 ordering, or remaining contracts. Separate implementation assessment from
 verification assessment and report only material current findings.
+
+For `intent-required`, `payload.missingIntentDecisions` is a non-empty array.
+Each item contains:
+
+```text
+area
+whyBlocking
+requiredDecisions[]
+intentReferences[]
+recommendedNextWorkflow?  # e.g. idd-intent-change or idd-intent-new-document: ADR
+```
+
+`area` is a short domain or contract area name. `whyBlocking` explains why the
+checkpoint cannot be assessed safely against durable product meaning.
+`requiredDecisions[]` names the concrete durable decisions that must be recorded
+under `.idd/intent`. `intentReferences[]` names related IDD document IDs or
+paths; use an empty array only when no existing intent document applies.
+`recommendedNextWorkflow` is optional and must name an available intent workflow
+when a useful next step is known. Keep the list concise and decision-oriented;
+do not substitute logs, implementation guesses, or vague requests to "clarify
+intent".
+
 The runtime owns machine validation, workflow transitions, corrections, and the
 next role or skill.
