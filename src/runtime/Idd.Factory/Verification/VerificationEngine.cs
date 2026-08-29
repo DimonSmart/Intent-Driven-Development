@@ -143,7 +143,13 @@ public sealed class VerificationEngine(string workspace, string currentDirectory
 
     private VerificationCheck? RepositoryFallback()
     {
-        if (File.Exists(Path.Combine(workspace, "scripts", "Check.ps1"))) return new("& './scripts/Check.ps1'", null, TimeSpan.FromMinutes(30));
+        if (File.Exists(Path.Combine(workspace, "scripts", "Check.ps1")))
+        {
+            var run = OperatingSystem.IsWindows()
+                ? "& './scripts/Check.ps1'"
+                : "pwsh -NoProfile -File './scripts/Check.ps1'";
+            return new(run, null, TimeSpan.FromMinutes(30));
+        }
         var solution = Directory.GetFiles(workspace, "*.sln").OrderBy(x => x, StringComparer.Ordinal).FirstOrDefault();
         if (solution is not null) return new($"dotnet test '{Path.GetFileName(solution)}'", null, TimeSpan.FromMinutes(30));
         return null;
@@ -268,7 +274,7 @@ internal static class VerificationPolicyParser
     private static YamlMappingNode AsMapping(YamlNode node, string location) => node as YamlMappingNode ?? throw new VerificationException("INVALID_VERIFICATION_POLICY", $"{location} must be a mapping.");
     private static YamlSequenceNode AsSequence(YamlNode node, string location) => node as YamlSequenceNode ?? throw new VerificationException("INVALID_VERIFICATION_POLICY", $"{location} must be a sequence.");
     private static string Scalar(YamlNode node, string location) => node is YamlScalarNode { Value: not null } scalar ? scalar.Value : throw new VerificationException("INVALID_VERIFICATION_POLICY", $"{location} must be a scalar.");
-    private static IReadOnlyList<string> Scalars(YamlSequenceNode node, string location) => node.Children.Select((value, index) => Scalar(value, $"{location}[{index}]")).ToArray();
+    private static IReadOnlyList<string> Scalars(YamlSequenceNode node, string location) => node.Children.Select((value, index) => Scalar(value, $"{location}[{index}]" )).ToArray();
     private static TimeSpan ParseTimeout(string value)
     {
         if (value.Length < 2) Invalid($"Invalid timeout {value}.");
