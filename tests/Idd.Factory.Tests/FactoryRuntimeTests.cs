@@ -79,13 +79,47 @@ public sealed class FactoryRuntimeTests
         Assert.Equal("UNKNOWN_ATTEMPT", (await Assert.ThrowsAsync<AgentProtocolException>(() => Create(temp.Path, workflow, current, new FakeAgentBackend()).ContinueAsync(default))).Code);
     }
 
-    [Fact] public async Task IntentGateResumesAfterDurableIntentChanges()
+    [Fact] public async Task IntentGatePreservesMissingIntentDecisionsAndResumesAfterDurableIntentChanges()
     {
         using var temp = new TestWorkspace(); temp.Write(".idd/intent/spec.md", "before"); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current"); var backend = new FakeAgentBackend();
-        backend.Results.Enqueue(invocation => Envelope(invocation, "intent-required"));
-        Assert.Equal("INTENT_REQUIRED", (await Create(temp.Path, workflow, current, backend).RunAsync(request, "test", default)).FactoryOutcome);
+        var details = new
+        {
+            missingIntentDecisions = new[]
+            {
+                new
+                {
+                    area = "Staged registration",
+                    whyBlocking = "The decomposition cannot define safe stage boundaries without durable registration semantics.",
+                    requiredDecisions = new[] { "Define the staged registration contract.", "Define idempotency and lost-response recovery rules." },
+                    intentReferences = new[] { "IDD-0002", "IDD-0006" },
+                    recommendedNextWorkflow = "idd-intent-change"
+                }
+            }
+        };
+        backend.Results.Enqueue(invocation => Envelope(invocation, "intent-required", details, "Registration semantics are incomplete."));
+        var runtime = Create(temp.Path, workflow, current, backend);
+
+        var first = await runtime.RunAsync(request, "test", default);
+
+        Assert.Equal("INTENT_REQUIRED", first.FactoryOutcome); Assert.Equal("Registration semantics are incomplete.", first.Reason);
+        Assert.Equal("Update the listed durable intent decisions in .idd/intent, then run continue.", first.ResumeWhen); AssertIntentRequiredPayload(first.Payload);
+        var persisted = await new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default);
+        Assert.NotNull(persisted); Assert.Equal("INTENT_REQUIRED", persisted.Blocker!.Code); AssertIntentRequiredPayload(persisted.Blocker.Payload);
+        var count = backend.Roles.Count; var repeated = await runtime.ContinueAsync(default);
+        Assert.Equal("INTENT_REQUIRED", repeated.FactoryOutcome); AssertIntentRequiredPayload(repeated.Payload); Assert.Equal(count, backend.Roles.Count);
+
         temp.Write(".idd/intent/spec.md", "after"); EnqueueHappyPath(backend);
-        Assert.Equal("COMPLETED", (await Create(temp.Path, workflow, current, backend).ContinueAsync(default)).FactoryOutcome);
+        Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default)).FactoryOutcome);
+    }
+
+    [Fact] public async Task IntentRequiredWithoutStructuredDecisionsIsRejected()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current"); var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "intent-required", new { missingIntentDecisions = Array.Empty<object>() }));
+
+        var outcome = await Create(temp.Path, workflow, current, backend).RunAsync(request, "test", default);
+
+        Assert.Equal("MALFORMED_AGENT_RESULT", outcome.FactoryOutcome); Assert.Contains("non-empty payload.missingIntentDecisions", outcome.Reason);
     }
 
     [Fact] public async Task ClarificationRequiresAndPersistsAnswer()
@@ -251,6 +285,15 @@ public sealed class FactoryRuntimeTests
     { JsonElement? element = payload is null ? null : JsonSerializer.SerializeToElement(payload, FactoryJson.Options); return new() { ProtocolVersion = AgentInvocation.CurrentProtocolVersion, RunId = invocation.RunId, AttemptId = invocation.AttemptId, Role = invocation.Role, Outcome = outcome, Reason = reason, Payload = element }; }
     private static void AssertClarificationPayload(JsonElement? payload)
     { Assert.Equal("Which storage mode should be used?", payload!.Value.GetProperty("question").GetString()); Assert.Equal(new[] { "memory", "file" }, payload.Value.GetProperty("options").EnumerateArray().Select(x => x.GetString())); }
+    private static void AssertIntentRequiredPayload(JsonElement? payload)
+    {
+        var decision = Assert.Single(payload!.Value.GetProperty("missingIntentDecisions").EnumerateArray());
+        Assert.Equal("Staged registration", decision.GetProperty("area").GetString());
+        Assert.Contains("stage boundaries", decision.GetProperty("whyBlocking").GetString());
+        Assert.Equal(new[] { "Define the staged registration contract.", "Define idempotency and lost-response recovery rules." }, decision.GetProperty("requiredDecisions").EnumerateArray().Select(x => x.GetString()));
+        Assert.Equal(new[] { "IDD-0002", "IDD-0006" }, decision.GetProperty("intentReferences").EnumerateArray().Select(x => x.GetString()));
+        Assert.Equal("idd-intent-change", decision.GetProperty("recommendedNextWorkflow").GetString());
+    }
     private static void AssertInvocation(AgentInvocation invocation, string role, string skillName, AgentExecutionProfile executionProfile)
     { Assert.Equal(role, invocation.Role); Assert.Equal(skillName, invocation.SkillName); Assert.Equal(executionProfile, invocation.ExecutionProfile); Assert.False(string.IsNullOrWhiteSpace(invocation.Input)); }
     private static WorkflowDefinition DefaultWorkflow(TestWorkspace temp)
