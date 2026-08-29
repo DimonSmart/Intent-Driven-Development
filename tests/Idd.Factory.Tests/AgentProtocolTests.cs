@@ -23,7 +23,7 @@ public sealed class AgentProtocolTests
     }
 
     [Fact] public void ProtocolVersionIsValidated()
-    { Assert.Equal("UNSUPPORTED_AGENT_PROTOCOL", Assert.Throws<AgentProtocolException>(() => new AgentResultValidator().Validate(Invocation(), Result() with { ProtocolVersion = 2 })).Code); }
+    { Assert.Equal("UNSUPPORTED_AGENT_PROTOCOL", Assert.Throws<AgentProtocolException>(() => new AgentResultValidator().Validate(Invocation(), Result() with { ProtocolVersion = AgentInvocation.CurrentProtocolVersion - 1 })).Code); }
 
     [Theory]
     [InlineData("task-decomposer", "idd-factory-decompose-task", AgentExecutionProfile.ReadOnly)]
@@ -46,6 +46,7 @@ public sealed class AgentProtocolTests
         Assert.Equal("idd-factory-execute-subtask", root.GetProperty("skillName").GetString());
         Assert.Equal("workspace-write", root.GetProperty("executionProfile").GetString());
         Assert.Equal("input", root.GetProperty("input").GetString());
+        Assert.False(root.TryGetProperty("workspaceFingerprint", out _));
         Assert.False(root.TryGetProperty("skillReferences", out _));
         Assert.False(root.TryGetProperty("prompt", out _));
 
@@ -67,7 +68,7 @@ public sealed class AgentProtocolTests
         Assert.Contains(skillInstructions, prompt);
         Assert.Contains("Assigned Factory work:\n\ninput", prompt);
         Assert.DoesNotContain("Use $", prompt, StringComparison.Ordinal);
-        Assert.Contains("protocolVersion=1", prompt);
+        Assert.Contains($"protocolVersion={AgentInvocation.CurrentProtocolVersion}", prompt);
     }
 
     [Fact] public void CodexAdapterReadsPackagedSkillInstructions()
@@ -201,6 +202,31 @@ public sealed class AgentProtocolTests
     }
 
     [Theory]
+    [InlineData(".idd/intent/changed.md")]
+    [InlineData(".idd/verification.yaml")]
+    public async Task WorkerCannotChangeProtectedProductArtifacts(string path)
+    {
+        using var temp = new TestWorkspace(); temp.Write(".idd/intent/current.md", "before"); temp.Write(".idd/verification.yaml", "version: 1");
+        var invocation = PreparedInvocation(temp);
+        var backend = new MutatingBackend(invocation, Path.Combine(temp.Path, path));
+
+        var exception = await Assert.ThrowsAsync<AgentProtocolException>(() => new AgentExecutor(backend, new AgentResultValidator()).ExecuteAsync(invocation, default));
+
+        Assert.Equal("WORKER_CHANGED_PRODUCT_INTENT", exception.Code);
+    }
+
+    [Fact] public async Task WorkerCannotDeleteProtectedArtifact()
+    {
+        using var temp = new TestWorkspace(); var verification = temp.Write(".idd/verification.yaml", "version: 1");
+        var invocation = PreparedInvocation(temp);
+        var backend = new DeletingBackend(invocation, verification);
+
+        var exception = await Assert.ThrowsAsync<AgentProtocolException>(() => new AgentExecutor(backend, new AgentResultValidator()).ExecuteAsync(invocation, default));
+
+        Assert.Equal("WORKER_CHANGED_PRODUCT_INTENT", exception.Code);
+    }
+
+    [Theory]
     [InlineData(AgentTerminationKind.CleanExit, 0, false)]
     [InlineData(AgentTerminationKind.ForcedAfterResult, -1, true)]
     public async Task CompleteResultIsAcceptedWithExplicitTermination(AgentTerminationKind kind, int exitCode, bool killed)
@@ -234,7 +260,7 @@ public sealed class AgentProtocolTests
         Assert.Equal(native.Replace('/', Path.DirectorySeparatorChar), CodexExecutableResolver.ResolveFromPath(temp.Path, true).Executable);
     }
 
-    private static AgentInvocation Invocation() => new() { RunId = "run", AttemptId = "A000001", Role = "implementer", Workspace = "w", ResultPath = "r", SkillName = "idd-factory-execute-subtask", ExecutionProfile = AgentExecutionProfile.WorkspaceWrite, Input = "input", StartedAt = DateTimeOffset.UnixEpoch, WorkspaceFingerprint = "f" };
+    private static AgentInvocation Invocation() => new() { RunId = "run", AttemptId = "A000001", Role = "implementer", Workspace = "w", ResultPath = "r", SkillName = "idd-factory-execute-subtask", ExecutionProfile = AgentExecutionProfile.WorkspaceWrite, Input = "input", StartedAt = DateTimeOffset.UnixEpoch };
     private static AgentInvocation PreparedInvocation(TestWorkspace temp)
     {
         temp.Write(".idd/factory/current/state.json", "state");
@@ -242,11 +268,11 @@ public sealed class AgentProtocolTests
         var placeholder = temp.Write(".idd/factory/current/attempts/A000001/placeholder", "x");
         return Invocation() with { Workspace = temp.Path, ResultPath = Path.Combine(Path.GetDirectoryName(placeholder)!, "result.json") };
     }
-    private static AgentResultEnvelope Result() => new() { ProtocolVersion = 1, RunId = "run", AttemptId = "A000001", Role = "implementer", Outcome = "completed" };
+    private static AgentResultEnvelope Result() => new() { ProtocolVersion = AgentInvocation.CurrentProtocolVersion, RunId = "run", AttemptId = "A000001", Role = "implementer", Outcome = "completed" };
 
-    private sealed class MutatingBackend(AgentInvocation invocation, string statePath) : IAgentBackend
+    private sealed class MutatingBackend(AgentInvocation invocation, string path) : IAgentBackend
     {
-        public Task<AgentRunHandle> StartAsync(AgentInvocation _, CancellationToken cancellationToken) { File.WriteAllText(statePath, "changed"); File.WriteAllText(invocation.ResultPath, System.Text.Json.JsonSerializer.Serialize(Result(), FactoryJson.Options)); return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId)); }
+        public Task<AgentRunHandle> StartAsync(AgentInvocation _, CancellationToken cancellationToken) { Directory.CreateDirectory(Path.GetDirectoryName(path)!); File.WriteAllText(path, "changed"); File.WriteAllText(invocation.ResultPath, System.Text.Json.JsonSerializer.Serialize(Result(), FactoryJson.Options)); return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId)); }
         public Task<AgentProcessResult> WaitAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.FromResult(new AgentProcessResult(0, "", "", true, false, AgentTerminationKind.CleanExit));
         public Task CancelAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.CompletedTask;
     }
@@ -259,6 +285,12 @@ public sealed class AgentProtocolTests
             return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId));
         }
         public Task<AgentProcessResult> WaitAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.FromResult(process);
+        public Task CancelAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+    private sealed class DeletingBackend(AgentInvocation invocation, string path) : IAgentBackend
+    {
+        public Task<AgentRunHandle> StartAsync(AgentInvocation _, CancellationToken cancellationToken) { File.Delete(path); File.WriteAllText(invocation.ResultPath, JsonSerializer.Serialize(Result(), FactoryJson.Options)); return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId)); }
+        public Task<AgentProcessResult> WaitAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.FromResult(new AgentProcessResult(0, "", "", true, false, AgentTerminationKind.CleanExit));
         public Task CancelAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

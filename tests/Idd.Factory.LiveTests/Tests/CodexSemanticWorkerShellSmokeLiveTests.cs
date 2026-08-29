@@ -34,7 +34,6 @@ public sealed class CodexSemanticWorkerShellSmokeLiveTests
             ExecutionProfile = AgentExecutionProfile.ReadOnly,
             Input = "Decompose this Factory request: implement durable file-backed catalog storage, add automated behavioral tests, and require successful repository build and test verification. The workspace intentionally has no .idd/verification.yaml. Do not create one and do not implement the task.",
             StartedAt = DateTimeOffset.UtcNow,
-            WorkspaceFingerprint = "missing-policy-smoke"
         };
         var backend = CreateBackend(pluginRoot, codexExecutable, "missing-policy-smoke");
 
@@ -73,7 +72,6 @@ public sealed class CodexSemanticWorkerShellSmokeLiveTests
             ExecutionProfile = AgentExecutionProfile.ReadOnly,
             Input = "This is an isolated transport smoke test. Execute the real shell command `Write-Output IDD_SANDBOX_OK`. Do not modify files. After it succeeds, return a valid task-decomposer JSON envelope; the decomposition payload may be empty because no Factory run will consume it.",
             StartedAt = DateTimeOffset.UtcNow,
-            WorkspaceFingerprint = "sandbox-smoke"
         };
         var backend = CreateBackend(pluginRoot, codexExecutable, "sandbox-smoke");
 

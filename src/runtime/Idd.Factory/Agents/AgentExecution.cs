@@ -393,7 +393,7 @@ public sealed class AgentExecutor(IAgentBackend backend, AgentResultValidator va
         Directory.CreateDirectory(Path.GetDirectoryName(invocation.ResultPath)!);
         var invocationPath = Path.Combine(Path.GetDirectoryName(invocation.ResultPath)!, "invocation.json");
         await File.WriteAllTextAsync(invocationPath, JsonSerializer.Serialize(invocation, FactoryJson.Options), cancellationToken);
-        var protectedArtifacts = ProtectedArtifactSnapshot.Capture(invocation);
+        var protectedArtifacts = ProtectedArtifactGuard.Capture(invocation);
         var handle = await backend.StartAsync(invocation, cancellationToken);
         var process = await backend.WaitAsync(handle, cancellationToken);
         await File.WriteAllTextAsync(Path.Combine(Path.GetDirectoryName(invocation.ResultPath)!, "process-telemetry.json"), JsonSerializer.Serialize(process, FactoryJson.Options), CancellationToken.None);
@@ -427,38 +427,38 @@ public sealed class AgentExecutor(IAgentBackend backend, AgentResultValidator va
     }
 }
 
-internal sealed class ProtectedArtifactSnapshot
+internal sealed class ProtectedArtifactGuard
 {
     private readonly IReadOnlyDictionary<string, string> hashes;
-    private readonly string? readOnlyWorkspaceHash;
-    private readonly string workspace;
-    private ProtectedArtifactSnapshot(IReadOnlyDictionary<string, string> hashes, string workspace, string? readOnlyWorkspaceHash) { this.hashes = hashes; this.workspace = workspace; this.readOnlyWorkspaceHash = readOnlyWorkspaceHash; }
+    private readonly IReadOnlyList<string> roots;
 
-    public static ProtectedArtifactSnapshot Capture(AgentInvocation invocation)
+    private ProtectedArtifactGuard(IReadOnlyDictionary<string, string> hashes, IReadOnlyList<string> roots)
+    {
+        this.hashes = hashes;
+        this.roots = roots;
+    }
+
+    public static ProtectedArtifactGuard Capture(AgentInvocation invocation)
     {
         var attemptDirectory = Path.GetDirectoryName(invocation.ResultPath)!;
         var current = Directory.GetParent(Directory.GetParent(attemptDirectory)!.FullName)!.FullName;
         var roots = new[] { Path.Combine(current, "state.json"), Path.Combine(current, "request.md"), Path.Combine(current, "run-context.md"), Path.Combine(current, "work-items"), Path.Combine(current, "clarifications"), Path.Combine(invocation.Workspace, ".idd", "intent"), Path.Combine(invocation.Workspace, ".idd", "verification.yaml") };
-        var workspaceHash = invocation.ExecutionProfile == AgentExecutionProfile.WorkspaceWrite ? null : new WorkspaceFingerprinter().Compute(invocation.Workspace);
-        return new(Enumerate(roots).ToDictionary(path => path, Hash, StringComparer.OrdinalIgnoreCase), invocation.Workspace, workspaceHash);
+        return new(Enumerate(roots).ToDictionary(path => path, Hash, StringComparer.OrdinalIgnoreCase), roots);
     }
 
     public void ValidateUnchanged()
     {
-        if (readOnlyWorkspaceHash is not null && new WorkspaceFingerprinter().Compute(workspace) != readOnlyWorkspaceHash)
-            throw new AgentProtocolException("READ_ONLY_WORKER_CHANGED_WORKSPACE", "A read-only semantic worker changed the product workspace.");
-        var roots = hashes.Keys.Select(path => File.Exists(path) ? path : Directory.Exists(path) ? path : path).ToArray();
-        foreach (var (path, hash) in hashes)
-            if (!File.Exists(path) || Hash(path) != hash) throw new AgentProtocolException(path.Contains($"{Path.DirectorySeparatorChar}intent{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) || path.EndsWith("verification.yaml", StringComparison.OrdinalIgnoreCase) ? "WORKER_CHANGED_PRODUCT_INTENT" : "WORKER_CHANGED_RUNNER_STATE", $"Worker changed protected artifact {path}.");
-        // Detect new protected files, especially work-item or intent additions.
-        var parents = hashes.Keys.Select(Path.GetDirectoryName).Where(x => x is not null).Distinct(StringComparer.OrdinalIgnoreCase);
-        foreach (var parent in parents)
-            if (Directory.Exists(parent!) && Directory.EnumerateFiles(parent!, "*", SearchOption.TopDirectoryOnly).Any(path => !hashes.ContainsKey(path) && (parent!.EndsWith("work-items", StringComparison.OrdinalIgnoreCase) || parent.EndsWith("intent", StringComparison.OrdinalIgnoreCase))))
-                throw new AgentProtocolException(parent!.EndsWith("intent", StringComparison.OrdinalIgnoreCase) ? "WORKER_CHANGED_PRODUCT_INTENT" : "WORKER_CHANGED_RUNNER_STATE", $"Worker added a protected artifact under {parent}.");
+        var current = Enumerate(roots).ToDictionary(path => path, Hash, StringComparer.OrdinalIgnoreCase);
+        foreach (var path in hashes.Keys.Union(current.Keys, StringComparer.OrdinalIgnoreCase))
+        {
+            if (hashes.TryGetValue(path, out var before) && current.TryGetValue(path, out var after) && before == after) continue;
+            throw new AgentProtocolException(IsProductArtifact(path) ? "WORKER_CHANGED_PRODUCT_INTENT" : "WORKER_CHANGED_RUNNER_STATE", $"Worker changed protected artifact {path}.");
+        }
     }
 
     private static IEnumerable<string> Enumerate(IEnumerable<string> roots) => roots.SelectMany(root => File.Exists(root) ? [root] : Directory.Exists(root) ? Directory.GetFiles(root, "*", SearchOption.AllDirectories) : []);
     private static string Hash(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
+    private static bool IsProductArtifact(string path) => path.Contains($"{Path.DirectorySeparatorChar}intent{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) || path.EndsWith("verification.yaml", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed class AgentResultValidator

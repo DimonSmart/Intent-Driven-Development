@@ -12,12 +12,6 @@ public sealed class FinalizeHandler(string workspace)
         if (state.FinalReview?.Verdict != "approved" || state.WorkItems.Any(x => x.Status is not WorkItemStatus.Completed and not WorkItemStatus.Superseded))
             throw new InvalidOperationException("Finalization requires approved final review and no incomplete work items.");
         var current = Path.Combine(workspace, ".idd", "factory", "current");
-        var finalAttemptId = state.FinalReview.ResultRef?.Split('/', StringSplitOptions.RemoveEmptyEntries).SkipWhile(x => x != "attempts").Skip(1).FirstOrDefault()
-            ?? throw new InvalidOperationException("Final review attempt identity is missing.");
-        var finalInvocation = JsonSerializer.Deserialize<AgentInvocation>(await File.ReadAllTextAsync(Path.Combine(current, "attempts", finalAttemptId, "invocation.json"), cancellationToken), FactoryJson.Options)
-            ?? throw new InvalidOperationException("Final review invocation is invalid.");
-        if (finalInvocation.WorkspaceFingerprint != new WorkspaceFingerprinter().Compute(workspace))
-            throw new InvalidOperationException("Workspace changed after final review.");
         var evidence = new List<VerificationEvidence>();
         foreach (var evidenceRef in state.VerificationEvidenceRefs)
             evidence.Add(JsonSerializer.Deserialize<VerificationEvidence>(await File.ReadAllTextAsync(Path.Combine(current, evidenceRef), cancellationToken), FactoryJson.Options)

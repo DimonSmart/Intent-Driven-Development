@@ -41,8 +41,8 @@ public sealed class FactoryStateValidator
     {
         Validate(next);
         if (previous.RunId != next.RunId || previous.WorkflowHash != next.WorkflowHash || previous.WorkflowName != next.WorkflowName || previous.RequestPath != next.RequestPath ||
-            previous.MethodologyVersion != next.MethodologyVersion || previous.RuntimeVersion != next.RuntimeVersion || previous.BaselineRevision != next.BaselineRevision)
-            throw new FactoryStateException("IMMUTABLE_STATE_CHANGED", "Run identity, versions, baseline, request, and workflow provenance are immutable.");
+            previous.MethodologyVersion != next.MethodologyVersion || previous.RuntimeVersion != next.RuntimeVersion)
+            throw new FactoryStateException("IMMUTABLE_STATE_CHANGED", "Run identity, versions, request, and workflow provenance are immutable.");
         foreach (var completed in previous.WorkItems.Where(x => x.Status == WorkItemStatus.Completed))
         {
             var candidate = next.WorkItems.SingleOrDefault(x => x.Id == completed.Id)

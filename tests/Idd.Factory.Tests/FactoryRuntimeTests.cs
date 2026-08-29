@@ -32,6 +32,17 @@ public sealed class FactoryRuntimeTests
         Assert.Equal("one", retainedItem.GetProperty("id").GetString()); Assert.Equal("subtask", retainedItem.GetProperty("kind").GetString());
     }
 
+    [Fact] public async Task LockedIdeArtifactDoesNotBlockRunStartup()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Implement the specified behavior."); var workflow = DefaultWorkflow(temp); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current");
+        var index = temp.Write(".vs/test/FileContentIndex/index.vsidx", "locked"); using var held = new FileStream(index, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        var backend = new FakeAgentBackend(); EnqueueHappyPath(backend);
+
+        var outcome = await Create(temp.Path, workflow, current, backend).RunAsync(request, "test", default);
+
+        Assert.Equal("COMPLETED", outcome.FactoryOutcome);
+    }
+
     [Fact] public async Task WorkflowChangeDuringRunIsDetected()
     {
         using var temp = new TestWorkspace(); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current"); Directory.CreateDirectory(current);
@@ -54,7 +65,7 @@ public sealed class FactoryRuntimeTests
         var state = StateStoreTests.State() with { WorkflowHash = workflow.Hash, CurrentWorkflowStep = "execute", CurrentAttemptId = "A000001", AttemptSequence = 1 };
         state.WorkItems.Add(new WorkItemState { Id = "one", Sequence = 1, Kind = WorkItemKind.Subtask, Status = WorkItemStatus.Running, ContractPath = "work-items/001-one.md", CurrentAttemptId = "A000001", AttemptCount = 1 });
         await new FileFactoryStateStore(current, new FactoryStateValidator()).CreateAsync(state, default);
-        var invocation = new AgentInvocation { RunId = state.RunId, AttemptId = "A000001", Role = "implementer", WorkItemId = "one", Workspace = temp.Path, ResultPath = System.IO.Path.Combine(current, "attempts", "A000001", "result.json"), SkillName = "idd-factory-execute-subtask", ExecutionProfile = AgentExecutionProfile.WorkspaceWrite, Input = "input", StartedAt = DateTimeOffset.UnixEpoch, WorkspaceFingerprint = "f" };
+        var invocation = new AgentInvocation { RunId = state.RunId, AttemptId = "A000001", Role = "implementer", WorkItemId = "one", Workspace = temp.Path, ResultPath = System.IO.Path.Combine(current, "attempts", "A000001", "result.json"), SkillName = "idd-factory-execute-subtask", ExecutionProfile = AgentExecutionProfile.WorkspaceWrite, Input = "input", StartedAt = DateTimeOffset.UnixEpoch };
         temp.Write(".idd/factory/current/attempts/A000001/invocation.json", JsonSerializer.Serialize(invocation, FactoryJson.Options)); temp.Write(".idd/factory/current/attempts/A000001/result.json", JsonSerializer.Serialize(Envelope(invocation, "completed"), FactoryJson.Options));
         var backend = new FakeAgentBackend(); backend.Results.Enqueue(next => Envelope(next, "approved"));
         var outcome = await Create(temp.Path, workflow, current, backend).ContinueAsync(default);
@@ -235,9 +246,9 @@ public sealed class FactoryRuntimeTests
     }
 
     private static FactoryRuntime Create(string workspace, WorkflowDefinition workflow, string current, IAgentBackend backend)
-    { var validator = new FactoryStateValidator(); var fingerprint = new WorkspaceFingerprinter(); var clock = new FakeClock(); return new(workspace, workflow, new FileFactoryStateStore(current, validator), new AgentExecutor(backend, new AgentResultValidator()), new VerificationEngine(workspace, current, fingerprint), fingerprint, new FactoryEventWriter(current, clock), clock); }
+    { var validator = new FactoryStateValidator(); var clock = new FakeClock(); return new(workspace, workflow, new FileFactoryStateStore(current, validator), new AgentExecutor(backend, new AgentResultValidator()), new VerificationEngine(workspace, current), new FactoryEventWriter(current, clock), clock); }
     private static AgentResultEnvelope Envelope(AgentInvocation invocation, string outcome, object? payload = null, string? reason = null)
-    { JsonElement? element = payload is null ? null : JsonSerializer.SerializeToElement(payload, FactoryJson.Options); return new() { ProtocolVersion = 1, RunId = invocation.RunId, AttemptId = invocation.AttemptId, Role = invocation.Role, Outcome = outcome, Reason = reason, Payload = element }; }
+    { JsonElement? element = payload is null ? null : JsonSerializer.SerializeToElement(payload, FactoryJson.Options); return new() { ProtocolVersion = AgentInvocation.CurrentProtocolVersion, RunId = invocation.RunId, AttemptId = invocation.AttemptId, Role = invocation.Role, Outcome = outcome, Reason = reason, Payload = element }; }
     private static void AssertClarificationPayload(JsonElement? payload)
     { Assert.Equal("Which storage mode should be used?", payload!.Value.GetProperty("question").GetString()); Assert.Equal(new[] { "memory", "file" }, payload.Value.GetProperty("options").EnumerateArray().Select(x => x.GetString())); }
     private static void AssertInvocation(AgentInvocation invocation, string role, string skillName, AgentExecutionProfile executionProfile)

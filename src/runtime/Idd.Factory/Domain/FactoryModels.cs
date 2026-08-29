@@ -18,7 +18,7 @@ public enum WorkItemStatus
 
 public sealed record FactoryState
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     public required string MethodologyVersion { get; init; }
     public required string RuntimeVersion { get; init; }
@@ -29,7 +29,6 @@ public sealed record FactoryState
     public required string WorkflowName { get; init; }
     public required string WorkflowHash { get; init; }
     public required string RequestPath { get; init; }
-    public required string BaselineRevision { get; init; }
     public List<WorkItemState> WorkItems { get; init; } = [];
     public string? CurrentAttemptId { get; set; }
     public int AttemptSequence { get; set; }
@@ -94,7 +93,7 @@ public static class FactoryAgentCatalog
 
 public sealed record AgentInvocation
 {
-    public const int CurrentProtocolVersion = 1;
+    public const int CurrentProtocolVersion = 2;
     public int ProtocolVersion { get; init; } = CurrentProtocolVersion;
     public required string RunId { get; init; }
     public required string AttemptId { get; init; }
@@ -106,7 +105,6 @@ public sealed record AgentInvocation
     public required AgentExecutionProfile ExecutionProfile { get; init; }
     public required string Input { get; init; }
     public required DateTimeOffset StartedAt { get; init; }
-    public required string WorkspaceFingerprint { get; init; }
 }
 
 public sealed record AgentResultEnvelope

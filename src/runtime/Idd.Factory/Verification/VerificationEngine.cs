@@ -11,7 +11,7 @@ namespace Idd.Factory.Verification;
 
 public sealed record VerificationEvidence(
     int SchemaVersion, string EvidenceId, string CheckId, string CheckDefinitionHash,
-    string WorkspaceFingerprint, DateTimeOffset StartedAt, DateTimeOffset FinishedAt,
+    DateTimeOffset StartedAt, DateTimeOffset FinishedAt,
     int ExitCode, string Status, string Output);
 
 public enum VerificationStatus { Passed, Failed, RequiresUserAction, InfrastructureFailure }
@@ -21,32 +21,7 @@ public sealed record VerificationResult(VerificationStatus Status, IReadOnlyList
     public bool Passed => Status == VerificationStatus.Passed;
 }
 
-public sealed class WorkspaceFingerprinter
-{
-    public string Compute(string workspace)
-    {
-        using var incremental = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        foreach (var path in Directory.EnumerateFiles(workspace, "*", SearchOption.AllDirectories)
-            .Where(path => !Excluded(workspace, path)).OrderBy(path => Path.GetRelativePath(workspace, path), StringComparer.Ordinal))
-        {
-            var relative = Path.GetRelativePath(workspace, path).Replace('\\', '/');
-            incremental.AppendData(Encoding.UTF8.GetBytes(relative + "\0"));
-            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            var buffer = new byte[81920]; int count; while ((count = stream.Read(buffer)) > 0) incremental.AppendData(buffer, 0, count);
-        }
-        return Convert.ToHexString(incremental.GetHashAndReset()).ToLowerInvariant();
-    }
-
-    private static bool Excluded(string root, string path)
-    {
-        var relative = Path.GetRelativePath(root, path).Replace('\\', '/');
-        return relative.StartsWith(".git/", StringComparison.Ordinal) || relative.StartsWith(".idd/factory/", StringComparison.Ordinal) ||
-            relative.StartsWith(".agents/", StringComparison.Ordinal) || relative.StartsWith(".codex/", StringComparison.Ordinal) ||
-            relative.Contains("/bin/", StringComparison.Ordinal) || relative.Contains("/obj/", StringComparison.Ordinal) || relative.StartsWith("artifacts/", StringComparison.Ordinal);
-    }
-}
-
-public sealed class VerificationEngine(string workspace, string currentDirectory, WorkspaceFingerprinter fingerprinter)
+public sealed class VerificationEngine(string workspace, string currentDirectory)
 {
     public void ValidateCheckIds(IEnumerable<string> checkIds)
     {
@@ -131,9 +106,9 @@ public sealed class VerificationEngine(string workspace, string currentDirectory
 
     private async Task<VerificationEvidence> RunCheckAsync(string id, VerificationCheck check, CancellationToken cancellationToken)
     {
-        var before = fingerprinter.Compute(workspace); var started = DateTimeOffset.UtcNow;
+        var started = DateTimeOffset.UtcNow;
         if (check.Instructions is not null)
-            return await PersistAsync(id, check.Instructions, before, started, -1, "requires-user-action", check.Instructions, cancellationToken);
+            return await PersistAsync(id, check.Instructions, started, -1, "requires-user-action", check.Instructions, cancellationToken);
         var shell = OperatingSystem.IsWindows() ? "powershell" : "/bin/sh";
         var info = new ProcessStartInfo(shell) { WorkingDirectory = workspace, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
         if (OperatingSystem.IsWindows()) { info.ArgumentList.Add("-NoProfile"); info.ArgumentList.Add("-Command"); info.ArgumentList.Add(check.Run!); }
@@ -141,8 +116,8 @@ public sealed class VerificationEngine(string workspace, string currentDirectory
         Process? startedProcess;
         try { startedProcess = Process.Start(info); }
         catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or InvalidOperationException)
-        { return await PersistAsync(id, check.Run!, before, started, -1, "infrastructure-failure", exception.Message, cancellationToken); }
-        if (startedProcess is null) return await PersistAsync(id, check.Run!, before, started, -1, "infrastructure-failure", $"Could not start check {id}.", cancellationToken);
+        { return await PersistAsync(id, check.Run!, started, -1, "infrastructure-failure", exception.Message, cancellationToken); }
+        if (startedProcess is null) return await PersistAsync(id, check.Run!, started, -1, "infrastructure-failure", $"Could not start check {id}.", cancellationToken);
         using var process = startedProcess;
         var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
@@ -151,16 +126,16 @@ public sealed class VerificationEngine(string workspace, string currentDirectory
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             if (!process.HasExited) process.Kill(true);
-            return await PersistAsync(id, check.Run!, before, started, -1, "infrastructure-failure", $"Check {id} timed out.", CancellationToken.None);
+            return await PersistAsync(id, check.Run!, started, -1, "infrastructure-failure", $"Check {id} timed out.", CancellationToken.None);
         }
         var output = (await stdoutTask) + (await stderrTask);
-        return await PersistAsync(id, check.Run!, before, started, process.ExitCode, process.ExitCode == 0 ? "passed" : "failed", output, cancellationToken);
+        return await PersistAsync(id, check.Run!, started, process.ExitCode, process.ExitCode == 0 ? "passed" : "failed", output, cancellationToken);
     }
 
-    private async Task<VerificationEvidence> PersistAsync(string id, string definition, string before, DateTimeOffset started, int exitCode, string status, string output, CancellationToken cancellationToken)
+    private async Task<VerificationEvidence> PersistAsync(string id, string definition, DateTimeOffset started, int exitCode, string status, string output, CancellationToken cancellationToken)
     {
         var definitionHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(definition))).ToLowerInvariant();
-        var result = new VerificationEvidence(1, $"V{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}"[..36], id, definitionHash, before, started, DateTimeOffset.UtcNow, exitCode, status, output);
+        var result = new VerificationEvidence(2, $"V{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}"[..36], id, definitionHash, started, DateTimeOffset.UtcNow, exitCode, status, output);
         var directory = Path.Combine(currentDirectory, "verification"); Directory.CreateDirectory(directory);
         await File.WriteAllTextAsync(Path.Combine(directory, result.EvidenceId + ".json"), JsonSerializer.Serialize(result, FactoryJson.Options), cancellationToken);
         return result;

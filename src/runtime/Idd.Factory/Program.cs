@@ -35,7 +35,7 @@ internal static class FactoryCli
             var packagedWorkflow = options.TryGetValue("workflow", out var workflowPath) ? Path.GetFullPath(workflowPath) : Path.Combine(baseDirectory, "factory-workflow.yaml");
             var workflow = new WorkflowDefinitionLoader().Load(workspace, packagedWorkflow);
             var current = Path.Combine(workspace, ".idd", "factory", "current"); var clock = new SystemClock(); var validator = new FactoryStateValidator();
-            var store = new FileFactoryStateStore(current, validator); var fingerprinter = new WorkspaceFingerprinter();
+            var store = new FileFactoryStateStore(current, validator);
             var windowsSandbox = ResolveWindowsSandbox(
                 Environment.GetEnvironmentVariable("IDD_FACTORY_WINDOWS_SANDBOX"),
                 OperatingSystem.IsWindows());
@@ -49,7 +49,7 @@ internal static class FactoryCli
                 new AgentCapabilityPolicy(
                     !string.Equals(Environment.GetEnvironmentVariable("IDD_FACTORY_INHERIT_USER_SKILLS"), "false", StringComparison.OrdinalIgnoreCase),
                     Environment.GetEnvironmentVariable("IDD_FACTORY_CAPABILITY_PROFILE") ?? "production-default"));
-            var runtime = new FactoryRuntime(workspace, workflow, store, new AgentExecutor(backend, new AgentResultValidator()), new VerificationEngine(workspace, current, fingerprinter), fingerprinter, new FactoryEventWriter(current, clock), clock);
+            var runtime = new FactoryRuntime(workspace, workflow, store, new AgentExecutor(backend, new AgentResultValidator()), new VerificationEngine(workspace, current), new FactoryEventWriter(current, clock), clock);
             var factoryDirectory = Path.Combine(workspace, ".idd", "factory"); Directory.CreateDirectory(factoryDirectory);
             var cancellationMarker = Path.Combine(factoryDirectory, "cancellation.requested");
             FileStream runLock;

@@ -16,7 +16,6 @@ public sealed class FactoryRuntime(
     IFactoryStateStore stateStore,
     AgentExecutor agentExecutor,
     VerificationEngine verification,
-    WorkspaceFingerprinter fingerprinter,
     FactoryEventWriter events,
     IClock clock)
 {
@@ -38,7 +37,7 @@ public sealed class FactoryRuntime(
         {
             MethodologyVersion = methodologyVersion, RuntimeVersion = Version(), RunId = Guid.NewGuid().ToString("N"), Revision = 0,
             CurrentWorkflowStep = workflow.Steps[0].Id, WorkflowName = workflow.Name, WorkflowHash = workflow.Hash,
-            RequestPath = "request.md", BaselineRevision = fingerprinter.Compute(workspace)
+            RequestPath = "request.md"
         };
         await stateStore.CreateAsync(state, cancellationToken); await events.WriteAsync(state.RunId, "run-created", new { workflow.Name, workflow.Hash }, cancellationToken);
         return await ExecuteLoopAsync(state, cancellationToken);
@@ -307,8 +306,7 @@ public sealed class FactoryRuntime(
             SkillName = agentContract.SkillName,
             ExecutionProfile = agentContract.ExecutionProfile,
             Input = input,
-            StartedAt = clock.UtcNow,
-            WorkspaceFingerprint = fingerprinter.Compute(workspace)
+            StartedAt = clock.UtcNow
         };
         await events.WriteAsync(state.RunId, "agent-dispatching", new { attemptId, role, workItemId = item?.Id }, cancellationToken);
         var execution = await agentExecutor.ExecuteAsync(invocation, cancellationToken);

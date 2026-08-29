@@ -44,6 +44,20 @@ public sealed class StateStoreTests
         Assert.Equal("INVALID_STATE_TRANSITION", Assert.Throws<FactoryStateException>(() => validator.ValidateMutation(state, next)).Code);
     }
 
-    internal static FactoryState State() => new() { MethodologyVersion = "1", RuntimeVersion = "1", RunId = "run", Revision = 0, CurrentWorkflowStep = "decompose", WorkflowName = "test", WorkflowHash = "hash", RequestPath = "request.md", BaselineRevision = "baseline" };
+    [Fact] public void PriorStateSchemaIsRejected()
+    {
+        var state = State() with { SchemaVersion = FactoryState.CurrentSchemaVersion - 1 };
+
+        Assert.Equal("UNSUPPORTED_STATE_SCHEMA", Assert.Throws<FactoryStateException>(() => new FactoryStateValidator().Validate(state)).Code);
+    }
+
+    [Fact] public void StateSerializationDoesNotContainBaselineRevision()
+    {
+        using var document = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(State(), FactoryJson.Options));
+
+        Assert.False(document.RootElement.TryGetProperty("baselineRevision", out _));
+    }
+
+    internal static FactoryState State() => new() { MethodologyVersion = "1", RuntimeVersion = "1", RunId = "run", Revision = 0, CurrentWorkflowStep = "decompose", WorkflowName = "test", WorkflowHash = "hash", RequestPath = "request.md" };
     private static FactoryState Clone(FactoryState state) => System.Text.Json.JsonSerializer.Deserialize<FactoryState>(System.Text.Json.JsonSerializer.Serialize(state, FactoryJson.Options), FactoryJson.Options)!;
 }
