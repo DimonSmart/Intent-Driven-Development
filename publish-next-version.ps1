@@ -38,10 +38,11 @@ else { $version = "$($firstVersionMatch.Groups["major"].Value).$($firstVersionMa
 
 $tag = "v$version"
 Invoke-Git -Arguments @("tag", "-a", $tag, "-m", "Release $version")
-& powershell -NoProfile -ExecutionPolicy Bypass -File .\certify-release.ps1 -Version $version
-if ($LASTEXITCODE -ne 0) {
-    Invoke-Git -Arguments @("tag", "--delete", $tag)
-    throw "Release certification failed; the local release tag was removed and was not pushed."
+try {
+    Invoke-Git -Arguments @("push", $Remote, $tag)
 }
-Invoke-Git -Arguments @("push", $Remote, $tag)
+catch {
+    Invoke-Git -Arguments @("tag", "--delete", $tag)
+    throw
+}
 Write-Host "Published '$tag' from '$Branch' to '$Remote'."

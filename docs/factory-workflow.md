@@ -37,10 +37,11 @@ For file-based Codex authentication, the backend creates an attempt-local
 private `CODEX_HOME`, copies the credential cache, applies the configured
 user-skill inheritance policy, and then exposes the runtime-selected Factory
 skill from the exact plugin instance. A same-name project skill is rejected as
-`FACTORY_SKILL_COLLISION`; a same-name user skill is not inherited. Release eval
-uses a controlled profile with no user-global skill inheritance. The private
-directory is removed after completion or cancellation, and credential material
-is never part of immutable attempt evidence or final Factory results.
+`FACTORY_SKILL_COLLISION`; a same-name user skill is not inherited. Controlled
+installed-plugin evaluation uses a profile with no user-global skill
+inheritance. The private directory is removed after completion or cancellation,
+and credential material is never part of immutable attempt evidence or final
+Factory results.
 
 IDD Factory coordinates multi-stage implementation while current `.idd/intent/`
 remains normative. Factory Runtime manages the workflow deterministically; LLM
@@ -109,7 +110,8 @@ Diagnostics run by workers never replace Runtime-owned authoritative evidence.
 Every attempt records requested and effective execution configuration when the
 backend can determine it, capability profile and skill source, and explicit
 process termination metadata. `ForcedAfterResult` may preserve a valid semantic
-result but remains an unclean attempt; release happy paths require `CleanExit`.
+result but remains an unclean attempt; strict live-evaluation happy paths require
+`CleanExit`.
 
 ## State and recovery
 
@@ -134,13 +136,13 @@ The MCP adapter returns that same structured outcome even when the CLI exit code
 is non-zero for a legitimate Factory result. Interrupting an MCP request stops
 the owned runtime process tree without synthesizing explicit Factory
 cancellation; persisted state remains resumable. Codex 0.147.0 does not satisfy
-the required host lifecycle contract. OpenAI fixed descendant cleanup for local
-MCP servers in codex PR #37366 and released it in Codex 0.148.0. Release
-certification therefore requires stable Codex 0.148.0 or newer and fails closed
-when Codex is missing, older, or does not report a stable version. The cleanup
-behavior belongs to the Codex host and is covered by its upstream process-tree
-tests; IDD release certification does not require a separately prepared JSON
-report for each IDD version.
+the host lifecycle contract needed by the strict installed-plugin lifecycle
+evaluation. OpenAI fixed descendant cleanup for local MCP servers in codex PR
+#37366 and released it in Codex 0.148.0. Host-lifecycle compatibility is
+therefore evaluation evidence and not a prerequisite for publishing an IDD
+release. The cleanup behavior belongs to the Codex host and is covered by its
+upstream process-tree tests; IDD release publication does not recreate that
+evidence for every version.
 
 See [Factory workflow configuration](factory-workflow-configuration.md) for the
 supported YAML composition.

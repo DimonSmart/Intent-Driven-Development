@@ -9,7 +9,6 @@ function Invoke-GitChecked {
         [Parameter(Mandatory = $true)][string] $WorkingDirectory,
         [Parameter(Mandatory = $true)][string[]] $Arguments
     )
-
     & git -C $WorkingDirectory @Arguments | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "git $($Arguments -join ' ') failed." }
 }
@@ -25,12 +24,6 @@ function New-ReleaseFixture {
     if ($LASTEXITCODE -ne 0) { throw "Could not create test worktree." }
 
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "publish-next-version.ps1") -Destination $work
-    Set-Content -LiteralPath (Join-Path $work "certify-release.ps1") -Encoding utf8 -Value @'
-param([Parameter(Mandatory = $true)][string] $Version)
-if ($env:IDD_FACTORY_CODEX_LIFECYCLE_REPORT) { exit 23 }
-if ($env:RELEASE_TEST_CERTIFY_RESULT -eq "fail") { exit 17 }
-exit 0
-'@
     Set-Content -LiteralPath (Join-Path $work "README.md") -Encoding utf8 -Value "release fixture"
     Invoke-GitChecked $work @("config", "user.name", "Release Script Test")
     Invoke-GitChecked $work @("config", "user.email", "release-script-test@local")
@@ -67,49 +60,43 @@ function Invoke-PublishFixture {
     Push-Location $WorkingDirectory
     try {
         & powershell -NoProfile -ExecutionPolicy Bypass -File ".\publish-next-version.ps1" -Remote origin -Branch main | Out-Host
-        $exitCode = $LASTEXITCODE
-        return $exitCode
+        return $LASTEXITCODE
     }
     finally { Pop-Location }
 }
 
-$certificationText = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot "certify-release.ps1")
-if ($certificationText -match "IDD_FACTORY_CODEX_LIFECYCLE_REPORT|CodexLifecycleReport") {
-    throw "Release certification still contains the removed external lifecycle-report contract."
+$publishText = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot "publish-next-version.ps1")
+$forbiddenReleaseWork = @(
+    "certify-release",
+    "run-live-factory-evals",
+    "scripts[\\/]Check\.ps1",
+    "dotnet"
+)
+foreach ($pattern in $forbiddenReleaseWork) {
+    if ($publishText -match $pattern) {
+        throw "publish-next-version.ps1 must be publication-only, but matched forbidden release work '$pattern'."
+    }
 }
 
-$previousLifecycleReport = $env:IDD_FACTORY_CODEX_LIFECYCLE_REPORT
-$previousCertifyResult = $env:RELEASE_TEST_CERTIFY_RESULT
+$success = $null
 try {
-    Remove-Item Env:IDD_FACTORY_CODEX_LIFECYCLE_REPORT -ErrorAction SilentlyContinue
-
-    $success = $null
-    try {
-        $success = New-ReleaseFixture
-        $env:RELEASE_TEST_CERTIFY_RESULT = "pass"
-        $publishExitCode = Invoke-PublishFixture $success.Work
-        if ($publishExitCode -ne 0) { throw "Successful publish fixture failed with exit code $publishExitCode." }
-        Assert-TagExists $success.Work "v1.0.1" $true
-        Assert-TagExists $success.Remote "v1.0.1" $true
-    }
-    finally { if ($null -ne $success) { Remove-ReleaseFixture $success } }
-
-    $failure = $null
-    try {
-        $failure = New-ReleaseFixture
-        $env:RELEASE_TEST_CERTIFY_RESULT = "fail"
-        $publishExitCode = Invoke-PublishFixture $failure.Work
-        if ($publishExitCode -eq 0) { throw "Failed certification unexpectedly published a release." }
-        Assert-TagExists $failure.Work "v1.0.1" $false
-        Assert-TagExists $failure.Remote "v1.0.1" $false
-    }
-    finally { if ($null -ne $failure) { Remove-ReleaseFixture $failure } }
+    $success = New-ReleaseFixture
+    $publishExitCode = Invoke-PublishFixture $success.Work
+    if ($publishExitCode -ne 0) { throw "Successful publish fixture failed with exit code $publishExitCode." }
+    Assert-TagExists $success.Work "v1.0.1" $true
+    Assert-TagExists $success.Remote "v1.0.1" $true
 }
-finally {
-    if ($null -eq $previousLifecycleReport) { Remove-Item Env:IDD_FACTORY_CODEX_LIFECYCLE_REPORT -ErrorAction SilentlyContinue }
-    else { $env:IDD_FACTORY_CODEX_LIFECYCLE_REPORT = $previousLifecycleReport }
-    if ($null -eq $previousCertifyResult) { Remove-Item Env:RELEASE_TEST_CERTIFY_RESULT -ErrorAction SilentlyContinue }
-    else { $env:RELEASE_TEST_CERTIFY_RESULT = $previousCertifyResult }
+finally { if ($null -ne $success) { Remove-ReleaseFixture $success } }
+
+$dirty = $null
+try {
+    $dirty = New-ReleaseFixture
+    Add-Content -LiteralPath (Join-Path $dirty.Work "README.md") -Value "dirty"
+    $publishExitCode = Invoke-PublishFixture $dirty.Work
+    if ($publishExitCode -eq 0) { throw "Dirty working tree unexpectedly published a release." }
+    Assert-TagExists $dirty.Work "v1.0.1" $false
+    Assert-TagExists $dirty.Remote "v1.0.1" $false
 }
+finally { if ($null -ne $dirty) { Remove-ReleaseFixture $dirty } }
 
 Write-Host "Release script tests completed."

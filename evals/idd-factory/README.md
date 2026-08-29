@@ -4,8 +4,11 @@ This opt-in test measures a real IDD Factory run against a deterministic,
 minimal .NET project. It consumes Codex usage and requires an authenticated
 Codex CLI, Git, and a .NET 10 SDK.
 
-It does not run during normal `dotnet test` or `scripts/Check.ps1`. Run the one
-available case explicitly:
+It is deliberately separate from deterministic repository checks and release
+publication. It does not run during normal `dotnet test`, `scripts/Check.ps1`,
+or `publish-next-version.ps1`.
+
+Run the available real-model case explicitly:
 
 ```bat
 run-live-factory-evals.bat
@@ -43,23 +46,7 @@ methodology version. Re-run the same case with the same values to compare its
 artifacts.
 
 The evaluator intentionally distinguishes product success from Factory-contract
-success: `Product PASS / Factory FAIL` is a valuable baseline result, not a
-reason to weaken assertions.
-
-## Release certification
-
-Developer live evals may run from a dirty tree. Release certification may not:
-
-```powershell
-.\certify-release.ps1 -Version 1.2.3
-```
-
-Certification requires clean `HEAD` at the exact `v1.2.3` tag, records the full
-commit SHA, runs deterministic checks, performs the real installed-plugin live
-eval, and reports unavailable effective worker model/reasoning telemetry as
-`INCONCLUSIVE` rather than `PASS`. The release tag is pushed by
-`publish-next-version.ps1` only after certification passes.
-
-Release certification requires an authenticated stable Codex CLI 0.148.0 or
-newer. It does not require a separately generated lifecycle report, executable
-fingerprint, or hidden environment variable.
+success: `Product PASS / Factory FAIL` is valuable evaluation evidence, not a
+release-publication failure. Exact semantic-role topology, retry behavior,
+worker configuration, token usage, and other real-model properties belong here
+rather than in the deterministic release path.

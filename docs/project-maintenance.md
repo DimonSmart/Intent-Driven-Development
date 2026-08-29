@@ -114,15 +114,7 @@ Run:
 pwsh ./scripts/Check.ps1
 ```
 
-The check:
-
-1. Builds the generator.
-2. Builds smoke tests.
-3. Generates Claude marketplace output.
-4. Generates Codex marketplace output.
-5. Verifies generator check mode.
-6. Runs smoke tests.
-7. Confirms the generated output is stable across repeated generation.
+The check is deterministic and may be broad. It builds the repository tooling and runtime, runs the deterministic test suites, generates both marketplaces, verifies generator check mode, runs smoke tests, and verifies the release-publication script behavior. It never launches a real LLM Factory execution.
 
 When Claude CLI is available, also validate:
 
@@ -136,23 +128,49 @@ claude plugin validate artifacts/marketplace/plugins/claude/idd-factory
 
 The release tag is the only release version source. Tags use `vMAJOR.MINOR.PATCH`.
 
-To publish the next patch release:
+The maintenance flow deliberately separates CHECK, RELEASE, and EVAL:
+
+```text
+CHECK    deterministic repository validation
+RELEASE  deterministic artifact validation and publication
+EVAL     explicit real-LLM Factory evaluation
+```
+
+Before publishing, run the deterministic local check:
 
 ```powershell
 pwsh ./scripts/Check.ps1
+```
+
+Then publish the next patch tag:
+
+```powershell
 ./publish-next-version.bat
 ```
 
-The publish command is self-contained. It requires Git, .NET 10, and an
-authenticated stable Codex CLI 0.148.0 or newer; it does not require a manually
-prepared release artifact or environment variable. The command creates the next
-local patch tag, runs deterministic checks and the installed-plugin live release
-evaluation, pushes the tag only after certification succeeds, and deletes the
-local tag when certification fails.
+`publish-next-version.ps1` is publication-only. It requires a clean working tree,
+synchronizes the configured branch with its remote, computes the next patch
+version, creates the annotated tag, and pushes it. It does not build the
+repository, run tests, install plugins, invoke Codex, or run a live Factory
+evaluation. If tag push fails, the temporary local tag is removed.
 
-Tag publication runs `.github/workflows/publish-marketplace.yml`.
+Tag publication runs `.github/workflows/publish-marketplace.yml`. That workflow
+is the deterministic RELEASE gate for the exact tagged revision: it runs
+`scripts/Check.ps1 -Version <tag version>`, validates the generated plugin
+layouts, builds the publish root, publishes the `marketplace` branch, and creates
+the GitHub release only after those checks succeed.
 
-The workflow:
+Real-model behavior is evaluated separately and never gates publication:
+
+```bat
+run-live-factory-evals.bat
+```
+
+The live eval consumes Codex usage and checks installed-plugin execution,
+semantic orchestration, worker behavior, and evaluation telemetry. See
+[`evals/idd-factory/README.md`](../evals/idd-factory/README.md).
+
+The publish workflow is:
 
 ```text
 Checkout
