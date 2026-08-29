@@ -1,6 +1,6 @@
 {
   "name": "idd-factory",
-  "version": "2.0.26",
+  "version": "2.0.29",
   "description": "Temporary implementation organization for Intent-Driven Development.",
   "skills": "./skills/",
   "author": {
@@ -11,5 +11,6 @@
   "interface": {
     "displayName": "IDD Factory",
     "shortDescription": "Temporary implementation organization for Intent-Driven Development."
-  }
+  },
+  "mcpServers": "./.mcp.json"
 }

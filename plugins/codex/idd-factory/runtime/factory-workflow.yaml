@@ -1,0 +1,61 @@
+schemaVersion: 1
+name: idd-default
+
+limits:
+  maxAgentAttempts: 3
+  maxReplans: 3
+  maxCorrectiveCycles: 5
+  maxVerificationFixAttempts: 1
+
+steps:
+  - id: decompose
+    uses: factory.decompose
+    agent: task-decomposer
+    on:
+      ready: execute
+      intent-required: bootstrap-intent
+      needs-clarification: $stop
+      focused-handoff: $stop
+      blocked: $stop
+  - id: bootstrap-intent
+    uses: factory.intent
+    on:
+      completed: decompose
+      needs-clarification: $stop
+      blocked: $stop
+  - id: execute
+    uses: factory.execute
+    handlers:
+      subtask: implementer
+      review-checkpoint: checkpoint-reviewer
+    on:
+      advanced: execute
+      exhausted: final-review
+      needs-replan: replan
+      intent-required: runtime-intent
+      blocked: $stop
+  - id: runtime-intent
+    uses: factory.intent
+    on:
+      completed: replan
+      needs-clarification: $stop
+      blocked: $stop
+  - id: replan
+    uses: factory.replan
+    agent: factory-replanner
+    on:
+      applied: execute
+      intent-required: runtime-intent
+      needs-clarification: $stop
+      blocked: $stop
+  - id: final-review
+    uses: factory.final-review
+    agent: final-reviewer
+    on:
+      approved: finalize
+      needs-fix: execute
+      needs-replan: replan
+      intent-required: runtime-intent
+      blocked: $stop
+  - id: finalize
+    uses: factory.finalize

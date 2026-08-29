@@ -8,125 +8,57 @@ allowed-tools: [Read, Glob, Grep, Bash]
 
 # idd-factory-review-task
 
-## Required Reference
-
-Read `references/project-verification.md` before resolving assigned checks or
-repository/platform fallback.
-
-The final reviewer owns verification for context `final` over the complete
-Factory diff. Before producing a verdict, resolve the current final-policy
-checks, reuse only conclusive evidence that still applies to the current check
-definition and complete diff, and run every assigned automatic check that lacks
-such evidence. Ask before `confirmation: required`. Present `instructions`
-checks to the user and obtain the actual result. Read-only review forbids code,
-intent, and Factory-state changes; it does not prohibit verification commands.
-Any assigned final check that remains `Not verified` requires `blocked`, never
-`approved`.
-
 ## Purpose
 
-Independently review the complete result of the Factory Task. This worker is
-read-only with respect to implementation, intent, and Factory state.
+Independently review the complete integrated Factory result after all work items
+and checkpoints complete.
+This skill is the complete semantic contract for the `final-reviewer` role.
 
-## Preconditions
+## Inputs and boundaries
 
-Run only when `current/` contains `request.md`, optional `run-context.md`, and
-one or more valid work items, all work items are `.completed.md`, and no ready,
-active, or blocked item exists. If the state violates these conditions, return
-`blocked` without guessing.
+Review the final integrated product against the original request and current
+durable intent. Review the final state, not the Factory execution history.
 
-## Final Verification Procedure
+The runtime supplies the original request, completed-work references, and
+authoritative final verification evidence references. Factory artifact
+references are relative to `.idd/factory/current` unless already rooted. The
+final reviewer is invoked only after the authoritative final verification gate
+has passed.
 
-1. Resolve checks selected by the current `.idd/verification.yaml` for context
-   `final` and the complete Factory diff.
-2. Reuse existing evidence only when it is conclusive and still applies to the
-   current check definition and complete diff.
-3. Run every assigned automatic check that does not have reusable conclusive
-   evidence.
-4. Before a check with `confirmation: required`, ask the exact user decision and
-   wait for the answer.
-5. For a check with `instructions`, present the instructions and wait for the
-   user's actual result; do not infer success.
-6. Record confirmation refusal, unavailable execution, and unconfirmed user
-   instructions as `Not verified` with the precise reason and resumption
-   condition.
-7. Return `blocked` while any assigned final check remains `Not verified`.
-8. A conclusive failed check is evidence of a defect or blocker; classify the
-   resulting verdict according to whether bounded implementation work can fix it.
+Start with the original request and a focused inspection of the current product
+changes. Read only the intent, product files, work-item contracts/results,
+checkpoint results, or verification evidence needed to resolve a concrete
+semantic review question. Runtime-supplied references are navigation aids, not
+a requirement to read every referenced artifact.
 
-## Review
+Do not begin final review with a broad or recursive workspace inventory. Do not
+enumerate the whole workspace, `.idd/factory`, `bin`, or `obj`. Use the original
+request and known paths first. Discover additional files only with focused
+searches needed to answer a concrete semantic question.
 
-Read the original request that defines the Factory Task, optional run context,
-all completed Subtask contracts and completions, all completed Review checkpoints and completions,
-only relevant current intent, the full actual diff, and available verification.
-Check:
+Do not recursively inspect Factory state or attempt directories during normal
+review. Worker stdout/stderr, invocation data, process telemetry, and worker
+conversations are diagnostics, not normal final-review inputs; inspect them only
+when a concrete protocol or execution inconsistency prevents semantic review.
+Do not rerun mandatory Factory verification or re-audit successful command
+output merely to reconfirm that it passed. Do not modify code, intent,
+verification policy, Factory state, or delegate.
 
-- complete satisfaction of the original request and every Subtask goal;
-- consistency between the original request, shared context, execution contracts,
-  and checkpoint results;
-- compliance with relevant intent and preservation boundaries;
-- integration and consistency across all execution results;
-- public contracts, maintainability, and sufficient integrated verification;
-- whether checkpoints covered the risky boundaries they claimed to protect;
-- absence of incomplete changes hidden by grouped checkpoint reviews;
-- absence of intent-changing work recorded as a Factory Subtask;
-- that Factory artifacts did not become product documentation.
+Detect lost requirements, integration gaps, incorrect coverage, intent-changing
+implementation work, and unsupported completion claims. Focused read-only
+inspection and relevant project or domain skills remain available when they
+help resolve a concrete semantic concern.
 
-Assess implementation and verification independently. A favorable integrated
-implementation assessment does not compensate for missing required verification.
-Final verification sufficiency is defined by the assigned `final` checks, not by
-an assumption that every repository test must run.
+## Structured result
 
-Do not modify code, intent, Factory files, or work-item statuses. Do not reopen
-completed items. Running assigned verification commands is part of final review
-and is not a modification of implementation or Factory state.
+Return worker protocol version 1 with role `final-reviewer` and one outcome:
+`approved`, `needs-fix`, `needs-replan`, `blocked`, or `intent-required`.
 
-## Verdicts
-
-- `approved`: the integrated implementation has no material findings and all
-  assigned final verification has conclusive evidence; the result is ready for
-  `idd-factory-finalize-run`.
-- `needs-fix`: return a bounded self-contained implementation-only corrective
-  Subtask suitable for the coordinator to append after completed items.
-  The mandatory next final review is the review gate; do not add a terminal
-  checkpoint solely for this correction.
-- `blocked`: identify the concrete blocking condition, including any assigned
-  final check that remains `Not verified`.
-- `intent-required`: identify missing or conflicting durable intent and the
-  applicable intent handoff. Do not define a corrective task until intent is
-  resolved outside the work-item list.
-
-## Output
-
-Return the verdict first, then keep the assessments separate:
-
-```text
-Verdict: <approved | needs-fix | blocked | intent-required>
-
-Implementation assessment:
-<integrated implementation result and material findings>
-
-Verification assessment:
-<conclusive evidence and required evidence that remains incomplete>
-```
-
-For `needs-fix`, append only the complete corrective Subtask contract.
-For `blocked` or `intent-required`, append only this structured blocker:
-
-```text
-Blocker:
-Reason:
-<one concrete blocking condition>
-
-Verified:
-<only conclusive evidence already established, or none>
-
-Not verified:
-<required work or evidence that remains incomplete>
-
-Resume when:
-<one concrete condition that makes continuation safe>
-```
-
-Do not describe a blocked result as approved, review passed, completed,
-accepted, or finished. The coordinator owns the Factory outcome.
+`approved` supplies semantic commit-message material under
+`payload.commitMessage` with `subject`, `why[]`, and `result[]`.
+`needs-fix` supplies one bounded self-contained implementation-only
+`payload.correctiveSubtask`; final review itself is the next gate. Keep
+implementation and verification assessments separate. Never describe blocked
+or unverified work as approved.
+The runtime owns machine validation, completion policy, workflow transitions,
+and selection of any next semantic capability.

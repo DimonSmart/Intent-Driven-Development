@@ -1,119 +1,12 @@
 {
-  "version": "2.0.26",
+  "version": "2.0.29",
   "platform": "codex",
   "dependencies": [
     "idd-intent"
   ],
-  "roles": [
-    "factory-coordinator",
-    "factory-step-coordinator",
-    "task-decomposer",
-    "implementer",
-    "checkpoint-reviewer",
-    "final-reviewer"
-  ],
-  "roleDefinitions": [
-    {
-      "name": "factory-coordinator",
-      "tools": [
-        "file.read",
-        "agent.spawn",
-        "agent.wait"
-      ],
-      "dispatchMode": "generic-subagent",
-      "roleDelivery": "prompt-reference",
-      "toolsEnforcement": "prompt-only"
-    },
-    {
-      "name": "factory-step-coordinator",
-      "tools": [
-        "file.read",
-        "file.write",
-        "agent.spawn",
-        "agent.wait"
-      ],
-      "dispatchMode": "generic-subagent",
-      "roleDelivery": "prompt-reference",
-      "toolsEnforcement": "prompt-only"
-    },
-    {
-      "name": "task-decomposer",
-      "tools": [
-        "file.read"
-      ],
-      "dispatchMode": "generic-subagent",
-      "roleDelivery": "prompt-reference",
-      "toolsEnforcement": "prompt-only"
-    },
-    {
-      "name": "implementer",
-      "tools": [
-        "file.read",
-        "file.write",
-        "command.execute"
-      ],
-      "dispatchMode": "generic-subagent",
-      "roleDelivery": "prompt-reference",
-      "toolsEnforcement": "prompt-only"
-    },
-    {
-      "name": "checkpoint-reviewer",
-      "tools": [
-        "file.read",
-        "command.execute"
-      ],
-      "dispatchMode": "generic-subagent",
-      "roleDelivery": "prompt-reference",
-      "toolsEnforcement": "prompt-only"
-    },
-    {
-      "name": "final-reviewer",
-      "tools": [
-        "file.read",
-        "command.execute"
-      ],
-      "dispatchMode": "generic-subagent",
-      "roleDelivery": "prompt-reference",
-      "toolsEnforcement": "prompt-only"
-    }
-  ],
-  "skillRoleBindings": [
-    {
-      "skill": "idd-factory-coordinate-step",
-      "role": "factory-step-coordinator",
-      "dispatchMode": "generic-subagent"
-    },
-    {
-      "skill": "idd-factory-decompose-task",
-      "role": "task-decomposer",
-      "dispatchMode": "generic-subagent"
-    },
-    {
-      "skill": "idd-factory-execute-subtask",
-      "role": "implementer",
-      "dispatchMode": "generic-subagent"
-    },
-    {
-      "skill": "idd-factory-finalize-run",
-      "role": "factory-step-coordinator",
-      "dispatchMode": "generic-subagent"
-    },
-    {
-      "skill": "idd-factory-review-checkpoint",
-      "role": "checkpoint-reviewer",
-      "dispatchMode": "generic-subagent"
-    },
-    {
-      "skill": "idd-factory-review-task",
-      "role": "final-reviewer",
-      "dispatchMode": "generic-subagent"
-    },
-    {
-      "skill": "idd-factory-run",
-      "role": "factory-coordinator",
-      "dispatchMode": "generic-subagent"
-    }
-  ],
+  "roles": [],
+  "roleDefinitions": [],
+  "skillRoleBindings": [],
   "assets": [
     {
       "source": "src/canonical/project-files/factory",

@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "factory": {
+      "command": "dotnet",
+      "args": [
+        "runtime/idd-factory.dll",
+        "mcp"
+      ],
+      "cwd": ".",
+      "tool_timeout_sec": 1800,
+      "env": {
+        "IDD_FACTORY_WINDOWS_SANDBOX": "unelevated"
+      },
+      "env_vars": [
+        "IDD_FACTORY_CODEX_EXECUTABLE",
+        "IDD_FACTORY_MODEL",
+        "IDD_FACTORY_REASONING_EFFORT",
+        "IDD_FACTORY_INHERIT_USER_SKILLS",
+        "IDD_FACTORY_CAPABILITY_PROFILE"
+      ],
+      "omit_tools_from": [
+        "deferred",
+        "code_mode"
+      ]
+    }
+  }
+}

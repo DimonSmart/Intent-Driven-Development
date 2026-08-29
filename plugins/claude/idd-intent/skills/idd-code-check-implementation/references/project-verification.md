@@ -30,6 +30,13 @@ If `.idd/verification.yaml` is missing, continue with the repository/platform fa
 
 Run only automated checks assigned to the context. Ask before a required confirmation check; a refusal is `Not verified` and cannot approve the context. Policy does not grant permissions or override sandbox, secret, network, destructive-command, or external-action restrictions. Record an unavailable check as `Not verified` with the precise reason and resumption condition.
 
-A Subtask may return `DONE` only when every assigned `subtask` check has conclusive evidence. If any assigned check remains `Not verified`, return `BLOCKED` with `Reason`, `Verified`, `Not verified`, and `Resume when`; never complete the Subtask by recording missing evidence only.
+For direct non-Factory implementation, completion requires conclusive evidence
+for every assigned check. Missing user action remains `Not verified` and blocks
+approval.
 
-The final reviewer owns execution of checks selected for context `final`. Before its verdict, reuse only conclusive evidence applicable to the current check definition and complete Factory diff, run every assigned automatic check that lacks such evidence, ask before `confirmation: required`, and present `instructions` checks to the user for an actual result. Read-only final review forbids implementation and state changes, not verification commands. Any assigned final check that remains `Not verified` requires a `blocked` verdict rather than approval.
+For Factory execution, the deterministic Runtime owns mandatory `subtask`,
+`checkpoint`, and `final` verification. Semantic workers may run focused
+diagnostic commands, but those commands are not authoritative Factory evidence.
+The Runtime records every gate result, distinguishes ordinary failed checks from
+required user action and runner infrastructure failure, and invokes reviewers
+only after the corresponding mandatory gate passes.

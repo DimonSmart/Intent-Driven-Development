@@ -407,12 +407,14 @@ preservation boundaries. Factory remains optional and must not become a
 dependency of `idd-intent`.
 
 The original user request defines the Factory Task and is stored unchanged in
-`request.md`. Factory stores one resumable run under `.idd/factory/current/`:
-`request.md` and a flat sequence of Work item files whose `ready`, `active`,
-`completed`, or `blocked` filename suffix is the only status source. It performs
-independent Review checkpoint reviews and a final Task review, then writes a compact commit-message
-handoff under `.idd/factory/results/` before clearing `current/`. Neither
-directory is product intent, and both are ignored by default.
+`request.md`. The packaged .NET Factory Runtime owns one resumable run under
+`.idd/factory/current/`; `state.json` is authoritative and stable work-item
+filenames do not encode status. Fresh semantic workers perform decomposition,
+implementation, selective checkpoint reviews, bounded replanning, and final
+review. Programmatic orchestration runs verification and writes a compact
+commit-message handoff under `.idd/factory/results/` before safely clearing
+`current/`. Neither directory is product intent, and both are ignored by
+default.
 
 Do not start or resume Factory work when requested scope is `route-only` or
 `intent-only`. For `implementation-only`, Factory may be used only when current

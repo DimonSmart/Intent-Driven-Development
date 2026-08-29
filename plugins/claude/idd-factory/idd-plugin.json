@@ -1,64 +1,11 @@
 {
-  "version": "2.0.26",
+  "version": "2.0.29",
   "platform": "claude",
   "dependencies": [
     "idd-intent"
   ],
-  "roles": [
-    "factory-coordinator",
-    "factory-step-coordinator",
-    "task-decomposer",
-    "implementer",
-    "checkpoint-reviewer",
-    "final-reviewer"
-  ],
-  "roleDefinitions": [
-    {
-      "name": "factory-coordinator",
-      "tools": [
-        "file.read",
-        "agent.spawn",
-        "agent.wait"
-      ]
-    },
-    {
-      "name": "factory-step-coordinator",
-      "tools": [
-        "file.read",
-        "file.write",
-        "agent.spawn",
-        "agent.wait"
-      ]
-    },
-    {
-      "name": "task-decomposer",
-      "tools": [
-        "file.read"
-      ]
-    },
-    {
-      "name": "implementer",
-      "tools": [
-        "file.read",
-        "file.write",
-        "command.execute"
-      ]
-    },
-    {
-      "name": "checkpoint-reviewer",
-      "tools": [
-        "file.read",
-        "command.execute"
-      ]
-    },
-    {
-      "name": "final-reviewer",
-      "tools": [
-        "file.read",
-        "command.execute"
-      ]
-    }
-  ],
+  "roles": [],
+  "roleDefinitions": [],
   "assets": [
     {
       "source": "src/canonical/project-files/factory",
