@@ -59,7 +59,7 @@ function Invoke-PublishFixture {
     param([Parameter(Mandatory = $true)][string] $WorkingDirectory)
     Push-Location $WorkingDirectory
     try {
-        & powershell -NoProfile -ExecutionPolicy Bypass -File ".\publish-next-version.ps1" -Remote origin -Branch main | Out-Host
+        & pwsh -NoProfile -ExecutionPolicy Bypass -File ".\publish-next-version.ps1" -Remote origin -Branch main | Out-Host
         return $LASTEXITCODE
     }
     finally { Pop-Location }
