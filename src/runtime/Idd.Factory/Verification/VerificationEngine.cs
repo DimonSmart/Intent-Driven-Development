@@ -14,9 +14,10 @@ public sealed record VerificationEvidence(
     DateTimeOffset StartedAt, DateTimeOffset FinishedAt,
     int ExitCode, string Status, string Output);
 
-public enum VerificationStatus { Passed, Failed, RequiresUserAction, InfrastructureFailure }
+public enum VerificationStatus { Passed, Failed, ConfirmationRequired, ResultRequired, InfrastructureFailure, NoChecks }
 
-public sealed record VerificationResult(VerificationStatus Status, IReadOnlyList<VerificationEvidence> Evidence)
+public sealed record VerificationResult(VerificationStatus Status, IReadOnlyList<VerificationEvidence> Evidence,
+    string? PendingCheckId = null, string? PendingCommand = null, string? PendingInstructions = null)
 {
     public bool Passed => Status == VerificationStatus.Passed;
 }
@@ -37,11 +38,14 @@ public class VerificationEngine(string workspace, string currentDirectory)
     }
 
     public virtual async Task<VerificationResult> RunContextAsync(string context, CancellationToken cancellationToken)
+        => await RunContextAsync(context, [], cancellationToken);
+
+    public virtual async Task<VerificationResult> RunContextAsync(string context, IEnumerable<string> changedPaths, CancellationToken cancellationToken)
     {
         var policy = await LoadPolicyAsync(cancellationToken);
-        return policy is null
+            return policy is null
             ? await RunRepositoryFallbackAsync(cancellationToken)
-            : await RunPolicyChecksAsync(policy, policy.ResolveContext(context), cancellationToken);
+            : await RunPolicyChecksAsync(policy, policy.ResolveContext(context, changedPaths), cancellationToken);
     }
 
     public virtual async Task<VerificationResult> RunSubtaskAsync(IEnumerable<string> explicitCheckIds, CancellationToken cancellationToken)
@@ -56,10 +60,10 @@ public class VerificationEngine(string workspace, string currentDirectory)
     {
         var ids = checkIds.Distinct(StringComparer.Ordinal).ToArray();
         var policy = await LoadPolicyAsync(cancellationToken);
-        if (policy is null)
+            if (policy is null)
         {
             if (ids.Length > 0) throw new VerificationException("UNKNOWN_VERIFICATION_CHECK", "Explicit verification IDs require .idd/verification.yaml.");
-            return new(VerificationStatus.Passed, []);
+            return new(VerificationStatus.NoChecks, []);
         }
         return await RunPolicyChecksAsync(policy, ids, cancellationToken);
     }
@@ -93,22 +97,40 @@ public class VerificationEngine(string workspace, string currentDirectory)
         return fallback is null ? new(VerificationStatus.Passed, []) : await RunChecksAsync([new("repository-fallback", fallback)], cancellationToken);
     }
 
+    public async Task<VerificationResult> RunCheckAsync(string checkId, bool confirmed, bool? manualPassed, CancellationToken cancellationToken)
+    {
+        var policy = await LoadPolicyAsync(cancellationToken) ?? throw new VerificationException("UNKNOWN_VERIFICATION_CHECK", "Explicit verification IDs require .idd/verification.yaml.");
+        if (!policy.Checks.TryGetValue(checkId, out var check)) throw new VerificationException("UNKNOWN_VERIFICATION_CHECK", $"Unknown check ID {checkId}.");
+        return await RunChecksAsync([(checkId, check)], confirmed, manualPassed, cancellationToken);
+    }
+
     private async Task<VerificationResult> RunChecksAsync(IEnumerable<(string Id, VerificationCheck Check)> checks, CancellationToken cancellationToken)
+        => await RunChecksAsync(checks, confirmed: false, manualPassed: null, cancellationToken);
+
+    private async Task<VerificationResult> RunChecksAsync(IEnumerable<(string Id, VerificationCheck Check)> checks, bool confirmed, bool? manualPassed, CancellationToken cancellationToken)
     {
         var evidence = new List<VerificationEvidence>();
-        foreach (var (id, check) in checks) evidence.Add(await RunCheckAsync(id, check, cancellationToken));
+        foreach (var (id, check) in checks)
+        {
+            if (check.ConfirmationRequired && !confirmed)
+                return new(VerificationStatus.ConfirmationRequired, evidence, id, check.Run, null);
+            if (check.Instructions is not null && manualPassed is null)
+                return new(VerificationStatus.ResultRequired, evidence, id, null, check.Instructions);
+            evidence.Add(check.Instructions is not null
+                ? await PersistAsync(id, check.Instructions, DateTimeOffset.UtcNow, manualPassed.Value ? 0 : 1, manualPassed.Value ? "passed" : "failed", check.Instructions, cancellationToken)
+                : await ExecuteCheckAsync(id, check, cancellationToken));
+            confirmed = false;
+            manualPassed = null;
+        }
         var status = evidence.Any(x => x.Status == "infrastructure-failure") ? VerificationStatus.InfrastructureFailure
-            : evidence.Any(x => x.Status == "requires-user-action") ? VerificationStatus.RequiresUserAction
             : evidence.Any(x => x.Status == "failed") ? VerificationStatus.Failed
-            : VerificationStatus.Passed;
+            : evidence.Count == 0 ? VerificationStatus.NoChecks : VerificationStatus.Passed;
         return new(status, evidence);
     }
 
-    private async Task<VerificationEvidence> RunCheckAsync(string id, VerificationCheck check, CancellationToken cancellationToken)
+    private async Task<VerificationEvidence> ExecuteCheckAsync(string id, VerificationCheck check, CancellationToken cancellationToken)
     {
         var started = DateTimeOffset.UtcNow;
-        if (check.Instructions is not null)
-            return await PersistAsync(id, check.Instructions, started, -1, "requires-user-action", check.Instructions, cancellationToken);
         var shell = OperatingSystem.IsWindows() ? "powershell" : "/bin/sh";
         var info = new ProcessStartInfo(shell) { WorkingDirectory = workspace, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
         if (OperatingSystem.IsWindows()) { info.ArgumentList.Add("-NoProfile"); info.ArgumentList.Add("-Command"); info.ArgumentList.Add(check.Run!); }
@@ -150,13 +172,16 @@ public class VerificationEngine(string workspace, string currentDirectory)
                 : "pwsh -NoProfile -File './scripts/Check.ps1'";
             return new(run, null, TimeSpan.FromMinutes(30));
         }
-        var solution = Directory.GetFiles(workspace, "*.sln").OrderBy(x => x, StringComparer.Ordinal).FirstOrDefault();
+        if (File.Exists(Path.Combine(workspace, "scripts", "check.sh"))) return new("./scripts/check.sh", null, TimeSpan.FromMinutes(30), false);
+        var solution = Directory.GetFiles(workspace, "*.slnx").Concat(Directory.GetFiles(workspace, "*.sln")).OrderBy(x => x, StringComparer.Ordinal).FirstOrDefault();
         if (solution is not null) return new($"dotnet test '{Path.GetFileName(solution)}'", null, TimeSpan.FromMinutes(30));
+        var project = Directory.GetFiles(workspace, "*.csproj", SearchOption.TopDirectoryOnly).OrderBy(x => x, StringComparer.Ordinal).FirstOrDefault();
+        if (project is not null) return new($"dotnet test '{Path.GetRelativePath(workspace, project).Replace('\\', '/')}'", null, TimeSpan.FromMinutes(30));
         return null;
     }
 }
 
-public sealed record VerificationCheck(string? Run, string? Instructions, TimeSpan Timeout);
+public sealed record VerificationCheck(string? Run, string? Instructions, TimeSpan Timeout, bool ConfirmationRequired = false);
 
 internal static class VerificationPolicyParser
 {
@@ -187,15 +212,17 @@ internal static class VerificationPolicyParser
                 if ((run is null) == (instructions is null)) Invalid($"Check {id} must have exactly one of run or instructions.");
                 if (run is not null && string.IsNullOrWhiteSpace(run) || instructions is not null && string.IsNullOrWhiteSpace(instructions)) Invalid($"Check {id} has an empty definition.");
                 var timeout = definition.TryGetValue("timeout", out var timeoutNode) ? ParseTimeout(Scalar(timeoutNode, $"check {id}.timeout")) : TimeSpan.FromMinutes(10);
+                var confirmationRequired = false;
                 if (instructions is not null && definition.ContainsKey("timeout")) Invalid($"Check {id} cannot set timeout without run.");
                 if (definition.TryGetValue("confirmation", out var confirmationNode))
                 {
                     if (run is null || Scalar(confirmationNode, $"check {id}.confirmation") != "required") Invalid($"Check {id} confirmation must be 'required' on a run check.");
+                    confirmationRequired = true;
                 }
-                checks.Add(id, new(run, instructions, timeout));
+                checks.Add(id, new(run, instructions, timeout, confirmationRequired));
             }
 
-            var contexts = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+            var contexts = new Dictionary<string, VerificationContext>(StringComparer.Ordinal)
             {
                 ["default"] = ParseContext(RequiredMapping(rootValues, "default", "policy"), "default", checks, allowRules: false)
             };
@@ -212,33 +239,40 @@ internal static class VerificationPolicyParser
 
     internal static bool IsKnownContext(string context) => ContextNames.Contains(context);
 
-    private static IReadOnlyList<string> ParseContext(YamlMappingNode node, string name, IReadOnlyDictionary<string, VerificationCheck> checks, bool allowRules)
+    private static VerificationContext ParseContext(YamlMappingNode node, string name, IReadOnlyDictionary<string, VerificationCheck> checks, bool allowRules)
     {
         var values = Mapping(node, name); RejectUnknown(values, allowRules ? ["use", "rules"] : ["use"], name);
         if (values.ContainsKey("use") == values.ContainsKey("rules")) Invalid($"Context {name} must have exactly one of use or rules.");
-        if (values.TryGetValue("use", out var use)) return ParseIds(use, $"{name}.use", checks);
+        if (values.TryGetValue("use", out var use)) return new(ParseIds(use, $"{name}.use", checks), []);
         var rules = AsSequence(values["rules"], $"{name}.rules");
+        var parsedRules = new List<VerificationRule>();
         var fallbackSeen = false;
         foreach (var (ruleNode, index) in rules.Children.Select((value, index) => (value, index)))
         {
             var ruleName = $"{name}.rules[{index}]"; var rule = Mapping(AsMapping(ruleNode, ruleName), ruleName);
-            RejectUnknown(rule, ["paths", "use"], ruleName);
+            RejectUnknown(rule, ["paths", "fallback", "use"], ruleName);
             if (!rule.TryGetValue("use", out var ruleUse)) Invalid($"{ruleName} must define use.");
             ParseIds(ruleUse, $"{ruleName}.use", checks);
             var hasPaths = rule.TryGetValue("paths", out var paths);
+            var fallback = rule.TryGetValue("fallback", out var fallbackNode);
+            if (fallback && Scalar(fallbackNode!, $"{ruleName}.fallback") != "true") Invalid($"{ruleName}.fallback must be true.");
+            if (fallback == hasPaths) Invalid($"{ruleName} must define exactly one of paths or fallback: true.");
             if (hasPaths)
             {
                 if (fallbackSeen) Invalid($"{ruleName} appears after a pathless fallback rule.");
                 var pathValues = Scalars(AsSequence(paths!, $"{ruleName}.paths"), $"{ruleName}.paths");
                 if (pathValues.Count == 0 || pathValues.Any(string.IsNullOrWhiteSpace)) Invalid($"{ruleName}.paths must contain non-empty paths.");
+                parsedRules.Add(new(pathValues, ParseIds(ruleUse, $"{ruleName}.use", checks), false));
             }
             else
             {
                 if (fallbackSeen) Invalid($"{ruleName} is a second pathless fallback rule.");
                 fallbackSeen = true;
+                parsedRules.Add(new([], ParseIds(ruleUse, $"{ruleName}.use", checks), true));
             }
         }
-        return [];
+        if (parsedRules.Count == 0) Invalid($"{name}.rules must not be empty.");
+        return new([], parsedRules);
     }
 
     private static IReadOnlyList<string> ParseIds(YamlNode node, string location, IReadOnlyDictionary<string, VerificationCheck> checks)
@@ -284,15 +318,31 @@ internal static class VerificationPolicyParser
     [DoesNotReturn] private static void Invalid(string message) => throw new VerificationException("INVALID_VERIFICATION_POLICY", message);
 }
 
+internal sealed record VerificationRule(IReadOnlyList<string> Paths, IReadOnlyList<string> Use, bool Fallback);
+internal sealed record VerificationContext(IReadOnlyList<string> Use, IReadOnlyList<VerificationRule> Rules);
+
 internal sealed record VerificationPolicy(
     IReadOnlyDictionary<string, VerificationCheck> Checks,
-    IReadOnlyDictionary<string, IReadOnlyList<string>> Contexts)
+    IReadOnlyDictionary<string, VerificationContext> Contexts)
 {
-    public IReadOnlyList<string> ResolveContext(string context)
+    public IReadOnlyList<string> ResolveContext(string context, IEnumerable<string> changedPaths)
     {
         if (context != "default" && !VerificationPolicyParser.IsKnownContext(context))
             throw new VerificationException("INVALID_VERIFICATION_POLICY", $"Unknown verification context {context}.");
-        return Contexts.TryGetValue(context, out var ids) && ids.Count > 0 ? ids : Contexts["default"];
+        var selected = Contexts.TryGetValue(context, out var value) ? value : Contexts["default"];
+        if (selected.Use.Count > 0) return selected.Use;
+        var paths = changedPaths.Select(path => path.Replace('\\', '/').TrimStart('/')).Distinct(StringComparer.Ordinal).ToArray();
+        foreach (var rule in selected.Rules)
+            if (rule.Fallback || (paths.Length > 0 && rule.Paths.Any(pattern => paths.All(path => Glob(pattern, path)))))
+                return rule.Use;
+        return Contexts["default"].Use;
+    }
+
+    private static bool Glob(string pattern, string path)
+    {
+        var expression = "^" + System.Text.RegularExpressions.Regex.Escape(pattern.Replace('\\', '/'))
+            .Replace("\\*\\*", ".*").Replace("\\*", "[^/]*").Replace("\\?", "[^/]") + "$";
+        return System.Text.RegularExpressions.Regex.IsMatch(path, expression, System.Text.RegularExpressions.RegexOptions.CultureInvariant);
     }
 }
 

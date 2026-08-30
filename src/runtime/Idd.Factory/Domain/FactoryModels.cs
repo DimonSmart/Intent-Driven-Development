@@ -18,7 +18,7 @@ public enum WorkItemStatus
 
 public sealed record FactoryState
 {
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     public required string MethodologyVersion { get; init; }
     public required string RuntimeVersion { get; init; }
@@ -64,11 +64,16 @@ public sealed record WorkItemState
 
 public sealed record FactoryBlocker(string Code, string Reason, string ResumeWhen, JsonElement? Payload = null);
 public sealed record PendingContinuation(ContinuationKind Kind, string WorkflowStep, string? WorkItemId, string? VerificationContext, string Code, bool IsResumable,
-    SemanticOperationKind Operation = SemanticOperationKind.None, string? OperationInput = null);
+    SemanticOperationKind Operation = SemanticOperationKind.None, string? OperationInput = null,
+    string? VerificationCheckId = null, VerificationContinuationStage VerificationStage = VerificationContinuationStage.ExecuteCheck,
+    List<string>? CompletedVerificationCheckIds = null);
 public sealed record PendingReplanTrigger(string SourceRole, string? SourceWorkItemId, string ResultRef, string? Reason, JsonElement? Payload, List<string> EvidenceRefs);
 
 [JsonConverter(typeof(JsonStringEnumConverter<ContinuationKind>))]
 public enum ContinuationKind { SemanticInvocation, VerificationGate, IntentGate, Clarification, Terminal }
+
+[JsonConverter(typeof(JsonStringEnumConverter<VerificationContinuationStage>))]
+public enum VerificationContinuationStage { ExecuteCheck, AwaitingConfirmation, AwaitingManualResult }
 
 [JsonConverter(typeof(JsonStringEnumConverter<SemanticOperationKind>))]
 public enum SemanticOperationKind

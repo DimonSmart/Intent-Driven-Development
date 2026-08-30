@@ -27,7 +27,7 @@ internal static class FactoryCli
         try
         {
             Console.InputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
-            if (args.Length == 0 || args[0] is "-h" or "--help") { Console.WriteLine("idd-factory run --workspace <path> (--request-file <path> | --request-stdin true)\nidd-factory continue --workspace <path> [--answer-file <path>]\nidd-factory cancel --workspace <path>"); return 0; }
+            if (args.Length == 0 || args[0] is "-h" or "--help") { Console.WriteLine("idd-factory run --workspace <path> (--request-file <path> | --request-stdin true)\nidd-factory continue --workspace <path> [--answer-file <path>] [--confirm true] [--verification-result passed|failed]\nidd-factory cancel --workspace <path>"); return 0; }
             var command = args[0]; var options = Parse(args.Skip(1).ToArray());
             var workspace = Path.GetFullPath(Required(options, "workspace"));
             var baseDirectory = AppContext.BaseDirectory;
@@ -73,7 +73,8 @@ internal static class FactoryCli
                     "run" when options.ContainsKey("request-file") => await runtime.RunAsync(Path.GetFullPath(Required(options, "request-file")), ReadMethodologyVersion(pluginRoot), cancellation.Token),
                     "run" when options.GetValueOrDefault("request-stdin") == "true" => await runtime.RunRequestAsync(await Console.In.ReadToEndAsync(cancellation.Token), ReadMethodologyVersion(pluginRoot), cancellation.Token),
                     "run" => throw new ArgumentException("run requires exactly one request input: --request-file <path> or --request-stdin true."),
-                    "continue" => await runtime.ContinueAsync(cancellation.Token, options.TryGetValue("answer-file", out var answer) ? Path.GetFullPath(answer) : null),
+                    "continue" => await runtime.ContinueAsync(cancellation.Token, options.TryGetValue("answer-file", out var answer) ? Path.GetFullPath(answer) : null,
+                        options.GetValueOrDefault("confirm") == "true", options.TryGetValue("verification-result", out var verificationResult) ? verificationResult switch { "passed" => true, "failed" => false, _ => throw new ArgumentException("--verification-result must be passed or failed.") } : null),
                     "cancel" => await runtime.CancelAsync(cancellation.Token),
                     _ => throw new ArgumentException($"Unknown command '{command}'.")
                 };

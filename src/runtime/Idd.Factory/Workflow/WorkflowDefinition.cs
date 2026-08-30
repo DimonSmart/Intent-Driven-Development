@@ -58,8 +58,14 @@ public sealed class WorkflowValidator
             if (!Handlers.Contains(step.Uses)) throw new WorkflowException("UNKNOWN_WORKFLOW_HANDLER", $"Unknown handler {step.Uses}.");
             if (step.Agent is not null && !Roles.Contains(step.Agent)) throw new WorkflowException("UNKNOWN_AGENT_ROLE", $"Unknown role {step.Agent}.");
             if (step.Handlers.Values.Any(role => !Roles.Contains(role))) throw new WorkflowException("UNKNOWN_AGENT_ROLE", $"Step {step.Id} has an unknown role.");
+            ValidatePrimitive(step);
+            var outcomes = Outcomes(step.Uses);
+            if (step.Transitions.Keys.Any(outcome => !outcomes.Contains(outcome)))
+                throw new WorkflowException("INVALID_WORKFLOW", $"Step {step.Id} routes an outcome its primitive cannot return.");
             foreach (var target in step.Transitions.Values.Where(x => !x.StartsWith('$')))
                 if (!idSet.Contains(target)) throw new WorkflowException("MISSING_TRANSITION_TARGET", $"Step {step.Id} targets missing step {target}.");
+            if (step.Transitions.Values.Any(x => x.StartsWith('$') && x != "$stop"))
+                throw new WorkflowException("MISSING_TRANSITION_TARGET", $"Step {step.Id} uses an unsupported special target.");
         }
         var reachable = Reachable(workflow.Steps[0].Id, workflow.Steps.ToDictionary(x => x.Id, StringComparer.Ordinal));
         if (!workflow.Steps.Where(x => x.Uses == "factory.finalize").Any(x => reachable.Contains(x.Id)))
@@ -69,6 +75,33 @@ public sealed class WorkflowValidator
         foreach (var step in workflow.Steps.Where(x => x.Transitions.Count == 1 && x.Transitions.Values.Single() == x.Id))
             throw new WorkflowException("UNBOUNDED_WORKFLOW", $"Step {step.Id} has an unconditional self-cycle.");
     }
+
+    private static void ValidatePrimitive(WorkflowStepDefinition step)
+    {
+        var expectedAgent = step.Uses switch
+        {
+            "factory.decompose" => "task-decomposer",
+            "factory.replan" => "factory-replanner",
+            "factory.final-review" => "final-reviewer",
+            _ => null
+        };
+        if (expectedAgent is not null && step.Agent != expectedAgent)
+            throw new WorkflowException("INVALID_WORKFLOW", $"Step {step.Id} must use agent {expectedAgent}.");
+        if (step.Uses == "factory.execute" && (step.Handlers.GetValueOrDefault("subtask") != "implementer" || step.Handlers.GetValueOrDefault("review-checkpoint") != "checkpoint-reviewer"))
+            throw new WorkflowException("INVALID_WORKFLOW", $"Step {step.Id} requires subtask and review-checkpoint handlers with supported roles.");
+        if (step.Uses is "factory.intent" or "factory.finalize" && (step.Agent is not null || step.Handlers.Count != 0))
+            throw new WorkflowException("INVALID_WORKFLOW", $"Step {step.Id} does not accept an agent or handlers.");
+    }
+
+    private static HashSet<string> Outcomes(string primitive) => primitive switch
+    {
+        "factory.decompose" => ["ready", "blocked", "needs-clarification", "focused-handoff", "needs-replan", "intent-required"],
+        "factory.intent" => ["completed", "blocked", "needs-clarification"],
+        "factory.execute" => ["advanced", "exhausted", "blocked", "needs-replan", "intent-required", "needs-clarification", "focused-handoff"],
+        "factory.replan" => ["applied", "blocked", "needs-clarification", "intent-required"],
+        "factory.final-review" => ["approved", "needs-fix", "blocked", "needs-replan", "intent-required", "needs-clarification", "focused-handoff"],
+        "factory.finalize" => ["finalized"], _ => []
+    };
 
     private static HashSet<string> Reachable(string start, IReadOnlyDictionary<string, WorkflowStepDefinition> steps)
     {

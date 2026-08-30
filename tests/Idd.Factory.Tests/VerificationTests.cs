@@ -26,6 +26,23 @@ public sealed class VerificationTests
         Assert.Equal(VerificationStatus.Passed, evidence.Status); Assert.Single(evidence.Evidence); Assert.Equal("final-check", evidence.Evidence[0].CheckId);
     }
 
+    [Fact] public async Task PathRulesSelectFirstMatchingRule()
+    {
+        using var temp = new TestWorkspace(); temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  backend:\n    run: exit 0\n  default-check:\n    run: exit 1\ndefault:\n  use:\n    - default-check\nsubtask:\n  rules:\n    - paths:\n        - src/backend/**\n      use:\n        - backend\n    - fallback: true\n      use:\n        - default-check\n");
+        var result = await new VerificationEngine(temp.Path, Path.Combine(temp.Path, ".idd", "factory", "current")).RunContextAsync("subtask", ["src\\backend\\A.cs"], default);
+        Assert.Equal(VerificationStatus.Passed, result.Status); Assert.Equal("backend", Assert.Single(result.Evidence).CheckId);
+    }
+
+    [Fact] public async Task ConfirmedCheckNeverRunsBeforeExplicitConfirmation()
+    {
+        using var temp = new TestWorkspace(); temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  expensive:\n    run: exit 0\n    confirmation: required\ndefault:\n  use:\n    - expensive\n");
+        var engine = new VerificationEngine(temp.Path, Path.Combine(temp.Path, ".idd", "factory", "current"));
+        var pending = await engine.RunAsync(["expensive"], default);
+        Assert.Equal(VerificationStatus.ConfirmationRequired, pending.Status); Assert.Empty(pending.Evidence);
+        var completed = await engine.RunCheckAsync("expensive", confirmed: true, manualPassed: null, default);
+        Assert.Equal(VerificationStatus.Passed, completed.Status);
+    }
+
     [Fact] public async Task FailedCheckReturnsStructuredResultAndPersistsEvidence()
     {
         using var temp = new TestWorkspace(); temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  fail:\n    run: exit 7\ndefault:\n  use:\n    - fail\n");
@@ -35,11 +52,11 @@ public sealed class VerificationTests
         Assert.True(File.Exists(System.IO.Path.Combine(current, "verification", result.Evidence[0].EvidenceId + ".json")));
     }
 
-    [Fact] public async Task ManualCheckRequiresUserActionWithoutThrowing()
+    [Fact] public async Task ManualCheckRequiresExplicitResultWithoutRunning()
     {
         using var temp = new TestWorkspace(); temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  manual:\n    instructions: Confirm behavior\ndefault:\n  use:\n    - manual\n");
         var result = await new VerificationEngine(temp.Path, System.IO.Path.Combine(temp.Path, ".idd", "factory", "current")).RunAsync(["manual"], default);
-        Assert.Equal(VerificationStatus.RequiresUserAction, result.Status); Assert.Equal("requires-user-action", Assert.Single(result.Evidence).Status);
+        Assert.Equal(VerificationStatus.ResultRequired, result.Status); Assert.Empty(result.Evidence); Assert.Equal("manual", result.PendingCheckId);
     }
 
     [Fact] public async Task RunnerTimeoutIsInfrastructureFailure()

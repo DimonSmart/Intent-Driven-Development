@@ -43,7 +43,7 @@ public sealed class FactoryRuntime(
         return await ExecuteLoopAsync(state, cancellationToken);
     }
 
-    public async Task<FactoryCliOutcome> ContinueAsync(CancellationToken cancellationToken, string? answerPath = null)
+    public async Task<FactoryCliOutcome> ContinueAsync(CancellationToken cancellationToken, string? answerPath = null, bool confirm = false, bool? verificationPassed = null)
     {
         DetectLegacyState();
         var state = await stateStore.LoadAsync(cancellationToken) ?? throw new FactoryStateException("MISSING_FACTORY_STATE", "No Factory run exists.");
@@ -54,6 +54,26 @@ public sealed class FactoryRuntime(
             state.CurrentWorkflowStep = persistedContinuation.WorkflowStep;
         if (state.PendingContinuation is { IsResumable: false })
             return new(state.Blocker?.Code ?? "TERMINAL_STOP", state.RunId, state.Blocker?.Reason, state.Blocker?.ResumeWhen, Payload: state.Blocker?.Payload);
+        if (state.PendingContinuation is { VerificationStage: VerificationContinuationStage.AwaitingConfirmation or VerificationContinuationStage.AwaitingManualResult } pending)
+        {
+            if (pending.VerificationStage == VerificationContinuationStage.AwaitingConfirmation && !confirm)
+                return new("VERIFICATION_CONFIRMATION_REQUIRED", state.RunId, state.Blocker?.Reason, state.Blocker?.ResumeWhen, Payload: state.Blocker?.Payload);
+            if (pending.VerificationStage == VerificationContinuationStage.AwaitingManualResult && verificationPassed is null)
+                return new("VERIFICATION_RESULT_REQUIRED", state.RunId, state.Blocker?.Reason, state.Blocker?.ResumeWhen, Payload: state.Blocker?.Payload);
+            var resolved = await verification.RunCheckAsync(pending.VerificationCheckId!, confirm, verificationPassed, cancellationToken);
+            RecordEvidence(state, pending.WorkItemId is null ? null : state.WorkItems.Single(x => x.Id == pending.WorkItemId), resolved.Evidence);
+            if (resolved.Status == VerificationStatus.Failed)
+            {
+                state.PendingContinuation = pending with { VerificationStage = VerificationContinuationStage.ExecuteCheck };
+                await SaveAsync(state, cancellationToken);
+            }
+            else
+            {
+                state.PendingContinuation = pending with { VerificationStage = VerificationContinuationStage.ExecuteCheck };
+                state.Blocker = null;
+                await SaveAsync(state, cancellationToken);
+            }
+        }
         if (state.Blocker?.Code == "NEEDS_CLARIFICATION" && answerPath is null)
             return new("NEEDS_CLARIFICATION", state.RunId, state.Blocker.Reason, state.Blocker.ResumeWhen, Payload: state.Blocker.Payload);
         if (answerPath is not null) await RecordClarificationAsync(state, answerPath, cancellationToken);
@@ -255,7 +275,7 @@ public sealed class FactoryRuntime(
             RecordEvidence(state, item, result.Evidence);
             await events.WriteAsync(state.RunId, "verification-completed", new { verificationContext = context, verificationStatus = result.Status.ToString(), verificationFixAttempt = item.VerificationFixAttemptCount }, cancellationToken);
             await SaveAsync(state, cancellationToken);
-            if (result.Passed)
+            if (result.Passed || result.Status == VerificationStatus.NoChecks)
             {
                 state.PendingContinuation = null;
                 state.Blocker = null;
@@ -302,7 +322,7 @@ public sealed class FactoryRuntime(
             RecordEvidence(state, null, result.Evidence);
             await events.WriteAsync(state.RunId, "verification-completed", new { verificationContext = "final", verificationStatus = result.Status.ToString(), verificationFixAttempt = state.FinalVerificationFixAttemptCount }, cancellationToken);
             await SaveAsync(state, cancellationToken);
-            if (result.Passed)
+            if (result.Passed || result.Status == VerificationStatus.NoChecks)
             {
                 state.PendingContinuation = null;
                 state.Blocker = null;
@@ -350,16 +370,27 @@ public sealed class FactoryRuntime(
     {
         var code = result.Status switch
         {
-            VerificationStatus.RequiresUserAction => "VERIFICATION_REQUIRES_USER_ACTION",
+            VerificationStatus.ConfirmationRequired => "VERIFICATION_CONFIRMATION_REQUIRED",
+            VerificationStatus.ResultRequired => "VERIFICATION_RESULT_REQUIRED",
             VerificationStatus.InfrastructureFailure => "VERIFICATION_INFRASTRUCTURE_FAILURE",
             _ => "VERIFICATION_FIX_BUDGET_EXHAUSTED"
         };
-        var reason = $"{context} verification ended as {result.Status}: {FailureSummary(result)}";
+        var reason = result.Status switch
+        {
+            VerificationStatus.ConfirmationRequired => $"Check {result.PendingCheckId} in {context} requires explicit confirmation before running: {result.PendingCommand}",
+            VerificationStatus.ResultRequired => $"Manual check {result.PendingCheckId} in {context} requires a passed or failed result: {result.PendingInstructions}",
+            _ => $"{context} verification ended as {result.Status}: {FailureSummary(result)}"
+        };
         var terminal = code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal);
         state.Blocker = new(code, reason, terminal
             ? "The configured budget is exhausted. Cancel and restart with a workflow that provides sufficient budget; continue cannot add budget to the current run."
+            : result.Status == VerificationStatus.ConfirmationRequired ? "Run continue with --confirm true to execute this exact check."
+            : result.Status == VerificationStatus.ResultRequired ? "Run continue with --verification-result passed or failed for this exact check."
             : "Resolve the reported verification condition, then continue.");
-        state.PendingContinuation = new(terminal ? ContinuationKind.Terminal : ContinuationKind.VerificationGate, state.CurrentWorkflowStep, item?.Id, context, code, !terminal);
+        var stage = result.Status == VerificationStatus.ConfirmationRequired ? VerificationContinuationStage.AwaitingConfirmation
+            : result.Status == VerificationStatus.ResultRequired ? VerificationContinuationStage.AwaitingManualResult : VerificationContinuationStage.ExecuteCheck;
+        state.PendingContinuation = new(terminal ? ContinuationKind.Terminal : ContinuationKind.VerificationGate, state.CurrentWorkflowStep, item?.Id, context, code, !terminal,
+            VerificationCheckId: result.PendingCheckId, VerificationStage: stage);
         if (item is not null) item.Status = WorkItemStatus.Blocked;
         await SaveAsync(state, cancellationToken);
         return "blocked";
@@ -457,14 +488,15 @@ public sealed class FactoryRuntime(
                 return validated;
             }
         }
-        if (item is not null && item.Kind != WorkItemKind.ReviewCheckpoint && item.AttemptCount >= workflow.Limits.MaxAgentAttempts)
+        var isVerificationFix = continuationOperation is SemanticOperationKind.SubtaskVerificationFix or SemanticOperationKind.CheckpointVerificationFix or SemanticOperationKind.FinalVerificationFix;
+        if (!isVerificationFix && item is not null && item.Kind != WorkItemKind.ReviewCheckpoint && item.AttemptCount >= workflow.Limits.MaxAgentAttempts)
         {
             item.Status = WorkItemStatus.Blocked;
             item.CurrentAttemptId = null;
             throw new AgentProtocolException("RETRY_BUDGET_EXHAUSTED", $"{item.Id} exhausted its agent attempt budget.");
         }
         var attemptId = $"A{++state.AttemptSequence:000000}"; state.CurrentAttemptId = attemptId;
-        if (item is not null) { item.CurrentAttemptId = attemptId; item.AttemptCount++; }
+        if (item is not null) { item.CurrentAttemptId = attemptId; if (!isVerificationFix) item.AttemptCount++; }
         await SaveAsync(state, cancellationToken);
         var attemptDirectory = Path.Combine(currentDirectory, "attempts", attemptId); Directory.CreateDirectory(attemptDirectory);
         var resultPath = Path.Combine(attemptDirectory, "result.json");
@@ -662,21 +694,31 @@ public sealed class FactoryRuntime(
     {
         if (state.CorrectiveCycleCount >= workflow.Limits.MaxCorrectiveCycles) throw new AgentProtocolException("CORRECTIVE_BUDGET_EXHAUSTED", "Corrective cycle budget exhausted.");
         if (payload is not { } data || !data.TryGetProperty("correctiveSubtask", out var correction)) throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "needs-fix requires payload.correctiveSubtask.");
-        var max = state.WorkItems.Count == 0 ? 0 : state.WorkItems.Max(x => x.Sequence); var id = correction.TryGetProperty("id", out var idNode) ? idNode.GetString()! : $"correction-{state.CorrectiveCycleCount + 1}";
-        var contract = correction.GetProperty("contractMarkdown").GetString() ?? throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Correction contract missing.");
-        var relative = $"work-items/{max + 1:000}-{Slug(id)}.md"; File.WriteAllText(Path.Combine(currentDirectory, relative), contract);
-        var dependencies = review?.CoveredWorkItems.ToList() ?? state.WorkItems.Where(x => x.Status == WorkItemStatus.Completed).Select(x => x.Id).ToList();
+        var candidate = CloneState(state);
+        var max = candidate.WorkItems.Count == 0 ? 0 : candidate.WorkItems.Max(x => x.Sequence); var id = correction.TryGetProperty("id", out var idNode) ? idNode.GetString() : $"correction-{state.CorrectiveCycleCount + 1}";
+        if (string.IsNullOrWhiteSpace(id) || candidate.WorkItems.Any(x => x.Id == id)) throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Correction ID must be non-empty and unique.");
+        var contract = correction.TryGetProperty("contractMarkdown", out var contractNode) ? contractNode.GetString() : null;
+        if (string.IsNullOrWhiteSpace(contract)) throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Correction contract missing.");
+        var relative = $"work-items/{max + 1:000}-{Slug(id)}.md";
+        var dependencies = review?.CoveredWorkItems.ToList() ?? candidate.WorkItems.Where(x => x.Status == WorkItemStatus.Completed).Select(x => x.Id).ToList();
         var item = new WorkItemState { Id = id, Sequence = max + 1, Kind = WorkItemKind.CorrectiveSubtask, Status = WorkItemStatus.Ready, ContractPath = relative, Dependencies = dependencies, VerificationCheckIds = Strings(correction, "verificationCheckIds") };
-        state.WorkItems.Add(item); state.CorrectiveCycleCount++;
-        if (review is not null)
+        candidate.WorkItems.Add(item); candidate.CorrectiveCycleCount++;
+        var candidateReview = review is null ? null : candidate.WorkItems.Single(x => x.Id == review.Id);
+        if (candidateReview is not null)
         {
-            review.Status = WorkItemStatus.Planned;
-            review.CurrentAttemptId = null;
-            review.VerificationFixAttemptCount = 0;
-            review.Dependencies.Add(id);
-            review.CoveredWorkItems.Add(id);
+            candidateReview.Status = WorkItemStatus.Planned;
+            candidateReview.CurrentAttemptId = null;
+            candidateReview.VerificationFixAttemptCount = 0;
+            candidateReview.Dependencies.Add(id);
+            candidateReview.CoveredWorkItems.Add(id);
         }
-        else { state.FinalVerificationFixAttemptCount = 0; state.FinalVerificationPassed = false; }
+        else { candidate.FinalVerificationFixAttemptCount = 0; candidate.FinalVerificationPassed = false; }
+        ValidateRuntimeGraph(candidate);
+        ApplyCandidate(state, candidate);
+        state.CorrectiveCycleCount = candidate.CorrectiveCycleCount;
+        state.FinalVerificationFixAttemptCount = candidate.FinalVerificationFixAttemptCount;
+        state.FinalVerificationPassed = candidate.FinalVerificationPassed;
+        File.WriteAllText(Path.Combine(currentDirectory, relative), contract);
     }
 
     private void ApplyReplan(FactoryState state, JsonElement? payload)

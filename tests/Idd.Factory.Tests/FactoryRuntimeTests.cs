@@ -171,10 +171,10 @@ public sealed class FactoryRuntimeTests
         var workflow = DefaultWorkflow(temp); var backend = new FakeAgentBackend();
         backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem(["gate"]))); backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
         var runtime = Create(temp.Path, workflow, current, backend);
-        Assert.Equal("VERIFICATION_REQUIRES_USER_ACTION", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        Assert.Equal("VERIFICATION_RESULT_REQUIRED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
         temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  gate:\n    run: dotnet build gate.csproj --nologo\ndefault:\n  use:\n    - gate\n");
         backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
-        Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default)).FactoryOutcome);
+        Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default, verificationPassed: true)).FactoryOutcome);
         Assert.Equal(1, backend.Roles.Count(role => role == "implementer"));
     }
 
@@ -409,7 +409,7 @@ public sealed class FactoryRuntimeTests
         Assert.Contains("factory-replanner", backend.Roles);
     }
 
-    [Fact] public async Task VerificationFixResumeBudgetExhaustionPersistsTerminalStop()
+    [Fact] public async Task VerificationFixResumeUsesIndependentBudget()
     {
         using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var baseWorkflow = DefaultWorkflow(temp); var workflow = baseWorkflow with { Limits = baseWorkflow.Limits with { MaxAgentAttempts = 2 } }; var current = Path.Combine(temp.Path, ".idd", "factory", "current");
         temp.Write("gate.csproj", "<Project"); temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  gate:\n    run: dotnet build gate.csproj --nologo\ndefault:\n  use:\n    - gate\n");
@@ -418,12 +418,10 @@ public sealed class FactoryRuntimeTests
         var runtime = Create(temp.Path, workflow, current, backend);
 
         Assert.Equal("BLOCKED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
-        var exhausted = await runtime.ContinueAsync(default);
-        Assert.Equal("RETRY_BUDGET_EXHAUSTED", exhausted.FactoryOutcome);
-        var state = await new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default);
-        Assert.Equal(FactoryRunStatus.Blocked, state!.RunStatus); Assert.Equal(ContinuationKind.Terminal, state.PendingContinuation!.Kind); Assert.False(state.PendingContinuation.IsResumable);
-        var calls = backend.Roles.Count;
-        Assert.Equal("RETRY_BUDGET_EXHAUSTED", (await Create(temp.Path, workflow, current, backend).ContinueAsync(default)).FactoryOutcome); Assert.Equal(calls, backend.Roles.Count);
+        backend.Results.Enqueue(invocation => { temp.Write("gate.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"); return Envelope(invocation, "completed"); });
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+        Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default)).FactoryOutcome);
+        Assert.Equal(2, backend.Roles.Count(role => role == "implementer"));
     }
 
     [Fact] public async Task RestartBeforeResumedVerificationFixDispatchKeepsVerificationFixAuthoritative()

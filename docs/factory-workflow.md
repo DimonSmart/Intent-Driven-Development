@@ -105,6 +105,16 @@ Reviewers consume runtime verification evidence but are not responsible for
 running mandatory checks. A normal failed check is persisted as evidence and
 may trigger the existing implementer skill in runtime-owned
 `verification-fix` mode. The same gate is rerun within its deterministic budget.
+
+Verification policy path rules are evaluated in order against persisted,
+repository-relative changed paths (`/` separators); the first rule covering the
+scope wins and a `fallback: true` rule applies only when no earlier rule does.
+Checks marked `confirmation: required` stop before their command starts and
+require `factory continue --confirm true`. Instruction checks stop with a
+manual-result request and require `factory continue --verification-result
+passed|failed`. Missing policy and fallback are reported as not configured,
+never as a successful empty check set. Verification-fix attempts have their own
+budget and do not consume primary implementation attempts.
 Diagnostics run by workers never replace Runtime-owned authoritative evidence.
 
 Every attempt records requested and effective execution configuration when the
