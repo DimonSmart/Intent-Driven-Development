@@ -70,8 +70,15 @@ public sealed class FactoryRuntime(
         }
         if (state.PendingContinuation is { Kind: ContinuationKind.SemanticInvocation } semantic)
         {
-            var resumed = await ResumeSemanticOperationAsync(state, semantic, cancellationToken);
-            if (resumed is not null) return resumed;
+            try
+            {
+                var resumed = await ResumeSemanticOperationAsync(state, semantic, cancellationToken);
+                if (resumed is not null) return resumed;
+            }
+            catch (AgentProtocolException exception)
+            {
+                return await StopForAgentProtocolExceptionAsync(state, exception, cancellationToken);
+            }
         }
         state.PendingContinuation = null;
         state.Blocker = null;
@@ -453,6 +460,11 @@ public sealed class FactoryRuntime(
             var evidence = item?.VerificationEvidenceRefs ?? state.VerificationEvidenceRefs;
             state.PendingReplanTrigger = new(role, item?.Id, $"attempts/{result.AttemptId}/result.json", result.Reason, result.Payload?.Clone(), evidence.ToList());
         }
+        else if (result.Outcome == "intent-required" && state.PendingReplanTrigger is null && IntentRequiredLeadsToReplan(state))
+        {
+            var evidence = item?.VerificationEvidenceRefs ?? state.VerificationEvidenceRefs;
+            state.PendingReplanTrigger = new(role, item?.Id, $"attempts/{result.AttemptId}/result.json", result.Reason, result.Payload?.Clone(), evidence.ToList());
+        }
         if (result.Outcome is not ("needs-clarification" or "focused-handoff" or "blocked" or "intent-required")) return;
         if (result.Outcome == "intent-required") IntentRequiredPayload.Validate(result.Payload);
         var code = result.Outcome.ToUpperInvariant().Replace('-', '_');
@@ -486,6 +498,14 @@ public sealed class FactoryRuntime(
         return step.Transitions.TryGetValue(outcome, out var target) && target != "$stop"
             ? target
             : throw new WorkflowException("UNROUTED_WORKFLOW_OUTCOME", $"Step {step.Id} does not route {outcome} to a resumable intent gate.");
+    }
+
+    private bool IntentRequiredLeadsToReplan(FactoryState state)
+    {
+        var source = steps[state.CurrentWorkflowStep];
+        if (!source.Transitions.TryGetValue("intent-required", out var intentStepId) || !steps.TryGetValue(intentStepId, out var intentStep)) return false;
+        return intentStep.Uses == "factory.intent" && intentStep.Transitions.TryGetValue("completed", out var target) &&
+            steps.TryGetValue(target, out var targetStep) && targetStep.Uses == "factory.replan";
     }
 
     private SemanticOperationKind SemanticOperationForStep(string workflowStep) =>
@@ -570,7 +590,17 @@ public sealed class FactoryRuntime(
         verification.ValidateCheckIds(state.WorkItems.SelectMany(x => x.VerificationCheckIds));
         if (state.WorkItems.Any(x => x.Status is WorkItemStatus.Dispatching or WorkItemStatus.Running && x.CurrentAttemptId is null))
             throw new AgentProtocolException("INVALID_RUNTIME_GRAPH", "Active work items require an attempt identity.");
+        var items = state.WorkItems.ToDictionary(x => x.Id, StringComparer.Ordinal);
+        foreach (var item in state.WorkItems.Where(IsRemainingWork))
+        foreach (var dependencyId in item.Dependencies)
+        {
+            var dependency = items[dependencyId];
+            if (dependency.Status is WorkItemStatus.Superseded or WorkItemStatus.Cancelled or WorkItemStatus.Failed)
+                throw new AgentProtocolException("INVALID_RUNTIME_GRAPH", $"Remaining work item {item.Id} depends on {dependencyId}, which can no longer complete.");
+        }
     }
+
+    private static bool IsRemainingWork(WorkItemState item) => item.Status is not (WorkItemStatus.Completed or WorkItemStatus.Superseded or WorkItemStatus.Cancelled or WorkItemStatus.Failed);
 
     private void PromoteReady(FactoryState state)
     {
@@ -604,8 +634,8 @@ public sealed class FactoryRuntime(
         var contracts = new Dictionary<string, string>(StringComparer.Ordinal);
         string? runContext = null;
         ApplyReplanOperations(candidate, payload, contracts, ref runContext);
-        ValidateRuntimeGraph(candidate);
         PromoteReady(candidate);
+        ValidateRuntimeGraph(candidate);
         ApplyCandidate(state, candidate);
         WriteContracts(contracts);
         if (runContext is not null) File.WriteAllText(Path.Combine(currentDirectory, "run-context.md"), runContext);
@@ -669,6 +699,10 @@ public sealed class FactoryRuntime(
         if (string.IsNullOrWhiteSpace(continuation.OperationInput))
             throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification-fix continuation requires its operation input.");
         var item = continuation.WorkItemId is null ? null : state.WorkItems.Single(x => x.Id == continuation.WorkItemId);
+        state.PendingContinuation = null;
+        state.Blocker = null;
+        state.RunStatus = FactoryRunStatus.Running;
+        await SaveAsync(state, token);
         var repair = await InvokeAsync(state, "implementer", item, continuation.OperationInput, token,
             continuation.Operation, continuation.OperationInput);
         if (repair.Outcome != "completed")
@@ -676,7 +710,7 @@ public sealed class FactoryRuntime(
             if (item is not null) PrepareRepairOutcome(item, repair.Outcome);
             PersistVerificationFixContinuation(state, item, continuation.VerificationContext!, repair.Outcome, continuation.OperationInput);
             await SaveAsync(state, token);
-            return await StopForOutcomeAsync(state, repair.Outcome, token);
+            return await RouteResumedOutcomeAsync(state, continuation.WorkflowStep, repair.Outcome, token);
         }
         var gateOutcome = continuation.VerificationContext == "final"
             ? await VerifyFinalGateAsync(state, token)
@@ -685,6 +719,17 @@ public sealed class FactoryRuntime(
         if (gateOutcome != "passed") return await StopForOutcomeAsync(state, gateOutcome, token);
         await PrepareAndCompleteResumedVerificationAsync(state, continuation, token);
         return null;
+    }
+
+    private async Task<FactoryCliOutcome?> RouteResumedOutcomeAsync(FactoryState state, string workflowStep, string outcome, CancellationToken token)
+    {
+        var step = steps[workflowStep];
+        if (!step.Transitions.TryGetValue(outcome, out var target))
+            throw new WorkflowException("UNROUTED_WORKFLOW_OUTCOME", $"Step {step.Id} does not route {outcome}.");
+        if (target == "$stop") return await StopForOutcomeAsync(state, outcome, token);
+        state.CurrentWorkflowStep = target;
+        await SaveAsync(state, token);
+        return await ExecuteLoopAsync(state, token);
     }
 
     private async Task PrepareAndCompleteResumedVerificationAsync(FactoryState state, PendingContinuation continuation, CancellationToken token)
@@ -766,6 +811,13 @@ public sealed class FactoryRuntime(
         await SaveAsync(state, token); await events.WriteAsync(state.RunId, "agent-attempt-interrupted", new { attemptId }, token);
     }
     private async Task<FactoryCliOutcome> StopForOutcomeAsync(FactoryState state, string outcome, CancellationToken token) => await StopAsync(state, state.Blocker?.Code ?? outcome.ToUpperInvariant().Replace('-', '_'), state.Blocker?.Reason ?? $"Workflow stopped with {outcome}.", state.Blocker?.ResumeWhen ?? "Resolve the reported condition and continue.", token, state.Blocker?.Payload);
+    private async Task<FactoryCliOutcome> StopForAgentProtocolExceptionAsync(FactoryState state, AgentProtocolException exception, CancellationToken token)
+    {
+        var resume = exception.Code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal)
+            ? "The configured budget is exhausted. Cancel and restart with a workflow that provides sufficient budget; continue cannot add budget to the current run."
+            : "Continue to retry within the configured attempt budget.";
+        return await StopAsync(state, exception.Code, exception.Message, resume, token);
+    }
     private async Task<FactoryCliOutcome> StopAsync(FactoryState state, string code, string reason, string resume, CancellationToken token, JsonElement? payload = null)
     {
         state.RunStatus = FactoryRunStatus.Blocked;

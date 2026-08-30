@@ -329,6 +329,103 @@ public sealed class FactoryRuntimeTests
         Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default)).FactoryOutcome);
     }
 
+    [Fact] public async Task ExecuteIntentRequiredPersistsTriggerForReplan()
+    {
+        using var temp = new TestWorkspace(); temp.Write(".idd/intent/spec.md", "before"); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current"); var backend = new FakeAgentBackend();
+        var details = new { missingIntentDecisions = new[] { new { area = "Execution", whyBlocking = "Implementation needs a durable choice.", requiredDecisions = new[] { "Choose the constraint." }, intentReferences = new[] { "IDD-0001" }, recommendedNextWorkflow = "idd-intent-change" } } };
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem([])));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "intent-required", details, "Implementation requires intent."));
+        var runtime = Create(temp.Path, workflow, current, backend);
+
+        Assert.Equal("INTENT_REQUIRED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        temp.Write(".idd/intent/spec.md", "after");
+        backend.Results.Enqueue(invocation => { Assert.Equal("factory-replanner", invocation.Role); Assert.Contains("Implementation requires intent.", invocation.Input); Assert.Contains("Execution", invocation.Input); return Envelope(invocation, "replan-proposed", new { operations = Array.Empty<object>() }); });
+        backend.Results.Enqueue(invocation => Envelope(invocation, "completed")); backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+
+        Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default)).FactoryOutcome);
+    }
+
+    [Fact] public async Task ReplanCannotSupersedePrerequisiteOfRemainingWork()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current"); var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", new { workItems = new object[]
+        {
+            new { id = "a", sequence = 1, kind = "subtask", contractMarkdown = "# A", dependencies = Array.Empty<string>(), coveredWorkItems = Array.Empty<string>(), verificationCheckIds = Array.Empty<string>() },
+            new { id = "b", sequence = 2, kind = "subtask", contractMarkdown = "# B", dependencies = new[] { "a" }, coveredWorkItems = Array.Empty<string>(), verificationCheckIds = Array.Empty<string>() }
+        } }));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "needs-replan", new { defect = "replace A" }, "A is obsolete."));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "replan-proposed", new { operations = new[] { new { kind = "supersede-ready-subtask", id = "a" } } }));
+
+        var outcome = await Create(temp.Path, workflow, current, backend).RunAsync(request, "test", default);
+
+        Assert.Equal("INVALID_RUNTIME_GRAPH", outcome.FactoryOutcome);
+        var state = await new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default);
+        Assert.Equal(0, state!.ReplanCount); Assert.Equal(WorkItemStatus.Ready, state.WorkItems.Single(x => x.Id == "a").Status); Assert.Equal(WorkItemStatus.Planned, state.WorkItems.Single(x => x.Id == "b").Status); Assert.NotNull(state.PendingReplanTrigger);
+    }
+
+    [Fact] public async Task ReplanCannotReplacePrerequisiteWithoutRewiringDependents()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current"); var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", new { workItems = new object[]
+        {
+            new { id = "a", sequence = 1, kind = "subtask", contractMarkdown = "# A", dependencies = Array.Empty<string>(), coveredWorkItems = Array.Empty<string>(), verificationCheckIds = Array.Empty<string>() },
+            new { id = "b", sequence = 2, kind = "subtask", contractMarkdown = "# B", dependencies = new[] { "a" }, coveredWorkItems = Array.Empty<string>(), verificationCheckIds = Array.Empty<string>() }
+        } }));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "needs-replan", new { defect = "replace A" }, "A is obsolete."));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "replan-proposed", new
+        {
+            operations = new object[]
+            {
+                new
+                {
+                    kind = "replace-ready-subtask",
+                    id = "a",
+                    subtask = new { id = "replacement", sequence = 3, kind = "subtask", contractMarkdown = "# Replacement", dependencies = Array.Empty<string>(), coveredWorkItems = Array.Empty<string>(), verificationCheckIds = Array.Empty<string>() }
+                }
+            }
+        }));
+
+        var outcome = await Create(temp.Path, workflow, current, backend).RunAsync(request, "test", default);
+
+        Assert.Equal("INVALID_RUNTIME_GRAPH", outcome.FactoryOutcome);
+        var state = await new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default);
+        Assert.Equal(0, state!.ReplanCount); Assert.DoesNotContain(state.WorkItems, x => x.Id == "replacement"); Assert.Equal(WorkItemStatus.Ready, state.WorkItems.Single(x => x.Id == "a").Status); Assert.NotNull(state.PendingReplanTrigger);
+    }
+
+    [Fact] public async Task ResumedVerificationFixNeedsReplanUsesExecuteTransition()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write("gate.csproj", "<Project"); temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  gate:\n    run: dotnet build gate.csproj --nologo\ndefault:\n  use:\n    - gate\n");
+        var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem(["gate"]))); backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "blocked", reason: "Repair is paused."));
+        var runtime = Create(temp.Path, workflow, current, backend);
+        Assert.Equal("BLOCKED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        backend.Results.Enqueue(invocation => { temp.Write("gate.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"); return Envelope(invocation, "needs-replan", new { defect = "repair scope" }, "Repair requires replanning."); });
+        backend.Results.Enqueue(invocation => { Assert.Equal("factory-replanner", invocation.Role); Assert.Contains("Repair requires replanning.", invocation.Input); return Envelope(invocation, "replan-proposed", new { operations = new[] { new { kind = "supersede-ready-subtask", id = "one" } } }); });
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+
+        Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default)).FactoryOutcome);
+        Assert.Contains("factory-replanner", backend.Roles);
+    }
+
+    [Fact] public async Task VerificationFixResumeBudgetExhaustionPersistsTerminalStop()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var baseWorkflow = DefaultWorkflow(temp); var workflow = baseWorkflow with { Limits = baseWorkflow.Limits with { MaxAgentAttempts = 2 } }; var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write("gate.csproj", "<Project"); temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  gate:\n    run: dotnet build gate.csproj --nologo\ndefault:\n  use:\n    - gate\n");
+        var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem(["gate"]))); backend.Results.Enqueue(invocation => Envelope(invocation, "completed")); backend.Results.Enqueue(invocation => Envelope(invocation, "blocked", reason: "Repair is paused."));
+        var runtime = Create(temp.Path, workflow, current, backend);
+
+        Assert.Equal("BLOCKED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        var exhausted = await runtime.ContinueAsync(default);
+        Assert.Equal("RETRY_BUDGET_EXHAUSTED", exhausted.FactoryOutcome);
+        var state = await new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default);
+        Assert.Equal(FactoryRunStatus.Blocked, state!.RunStatus); Assert.Equal(ContinuationKind.Terminal, state.PendingContinuation!.Kind); Assert.False(state.PendingContinuation.IsResumable);
+        var calls = backend.Roles.Count;
+        Assert.Equal("RETRY_BUDGET_EXHAUSTED", (await runtime.ContinueAsync(default)).FactoryOutcome); Assert.Equal(calls, backend.Roles.Count);
+    }
+
     [Fact] public async Task FailedVerificationUsesOneImplementerFixAndReverifies()
     {
         using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current");
