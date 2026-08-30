@@ -22,6 +22,8 @@ public sealed record VerificationResult(VerificationStatus Status, IReadOnlyList
     public bool Passed => Status == VerificationStatus.Passed;
 }
 
+public sealed record ResolvedVerificationSelection(IReadOnlyList<string> CheckIds, string PolicyHash);
+
 public class VerificationEngine(string workspace, string currentDirectory)
 {
     public void ValidateCheckIds(IEnumerable<string> checkIds)
@@ -94,7 +96,7 @@ public class VerificationEngine(string workspace, string currentDirectory)
     private async Task<VerificationResult> RunRepositoryFallbackAsync(CancellationToken cancellationToken)
     {
         var fallback = RepositoryFallback();
-        return fallback is null ? new(VerificationStatus.Passed, []) : await RunChecksAsync([new("repository-fallback", fallback)], cancellationToken);
+        return fallback is null ? new(VerificationStatus.NoChecks, []) : await RunChecksAsync([new("repository-fallback", fallback)], cancellationToken);
     }
 
     public async Task<VerificationResult> RunCheckAsync(string checkId, bool confirmed, bool? manualPassed, CancellationToken cancellationToken)
@@ -102,6 +104,29 @@ public class VerificationEngine(string workspace, string currentDirectory)
         var policy = await LoadPolicyAsync(cancellationToken) ?? throw new VerificationException("UNKNOWN_VERIFICATION_CHECK", "Explicit verification IDs require .idd/verification.yaml.");
         if (!policy.Checks.TryGetValue(checkId, out var check)) throw new VerificationException("UNKNOWN_VERIFICATION_CHECK", $"Unknown check ID {checkId}.");
         return await RunChecksAsync([(checkId, check)], confirmed, manualPassed, cancellationToken);
+    }
+
+    public async Task<VerificationResult> RunCheckAsync(string checkId, bool confirmed, bool? manualPassed, string? expectedDefinitionHash, string? expectedPolicyHash, CancellationToken cancellationToken)
+    {
+        var policy = await LoadPolicyAsync(cancellationToken) ?? throw new VerificationException("VERIFICATION_POLICY_CHANGED", "Verification policy is no longer available.");
+        if (expectedPolicyHash is not null && !string.Equals(expectedPolicyHash, PolicyHash(policy), StringComparison.Ordinal))
+            throw new VerificationException("VERIFICATION_POLICY_CHANGED", "Verification policy changed while user action was pending.");
+        if (!policy.Checks.TryGetValue(checkId, out var check) || expectedDefinitionHash is not null && !string.Equals(expectedDefinitionHash, DefinitionHash(check), StringComparison.Ordinal))
+            throw new VerificationException("VERIFICATION_POLICY_CHANGED", $"Verification check {checkId} changed while user action was pending.");
+        return await RunChecksAsync([(checkId, check)], confirmed, manualPassed, cancellationToken);
+    }
+
+    public async Task<ResolvedVerificationSelection> ResolveContextAsync(string context, IEnumerable<string> changedPaths, CancellationToken cancellationToken)
+    {
+        var policy = await LoadPolicyAsync(cancellationToken);
+        return policy is null ? new([], "not-configured") : new(policy.ResolveContext(context, changedPaths), PolicyHash(policy));
+    }
+
+    public async Task<string> GetCheckDefinitionHashAsync(string checkId, CancellationToken cancellationToken)
+    {
+        var policy = await LoadPolicyAsync(cancellationToken) ?? throw new VerificationException("VERIFICATION_POLICY_CHANGED", "Verification policy is no longer available.");
+        if (!policy.Checks.TryGetValue(checkId, out var check)) throw new VerificationException("VERIFICATION_POLICY_CHANGED", $"Verification check {checkId} no longer exists.");
+        return DefinitionHash(check);
     }
 
     private async Task<VerificationResult> RunChecksAsync(IEnumerable<(string Id, VerificationCheck Check)> checks, CancellationToken cancellationToken)
@@ -156,12 +181,16 @@ public class VerificationEngine(string workspace, string currentDirectory)
 
     private async Task<VerificationEvidence> PersistAsync(string id, string definition, DateTimeOffset started, int exitCode, string status, string output, CancellationToken cancellationToken)
     {
-        var definitionHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(definition))).ToLowerInvariant();
+        var definitionHash = Hash(definition);
         var result = new VerificationEvidence(2, $"V{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}"[..36], id, definitionHash, started, DateTimeOffset.UtcNow, exitCode, status, output);
         var directory = Path.Combine(currentDirectory, "verification"); Directory.CreateDirectory(directory);
         await File.WriteAllTextAsync(Path.Combine(directory, result.EvidenceId + ".json"), JsonSerializer.Serialize(result, FactoryJson.Options), cancellationToken);
         return result;
     }
+
+    private static string DefinitionHash(VerificationCheck check) => Hash($"run={check.Run}\ninstructions={check.Instructions}\ntimeout={check.Timeout:c}\nconfirmation={check.ConfirmationRequired}");
+    private static string PolicyHash(VerificationPolicy policy) => Hash(string.Join("\n", policy.Checks.OrderBy(x => x.Key, StringComparer.Ordinal).Select(x => $"{x.Key}:{DefinitionHash(x.Value)}")));
+    private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
 
     private VerificationCheck? RepositoryFallback()
     {
@@ -243,7 +272,7 @@ internal static class VerificationPolicyParser
     {
         var values = Mapping(node, name); RejectUnknown(values, allowRules ? ["use", "rules"] : ["use"], name);
         if (values.ContainsKey("use") == values.ContainsKey("rules")) Invalid($"Context {name} must have exactly one of use or rules.");
-        if (values.TryGetValue("use", out var use)) return new(ParseIds(use, $"{name}.use", checks), []);
+        if (values.TryGetValue("use", out var use)) return new(ParseIds(use, $"{name}.use", checks), [], true);
         var rules = AsSequence(values["rules"], $"{name}.rules");
         var parsedRules = new List<VerificationRule>();
         var fallbackSeen = false;
@@ -272,7 +301,7 @@ internal static class VerificationPolicyParser
             }
         }
         if (parsedRules.Count == 0) Invalid($"{name}.rules must not be empty.");
-        return new([], parsedRules);
+        return new([], parsedRules, false);
     }
 
     private static IReadOnlyList<string> ParseIds(YamlNode node, string location, IReadOnlyDictionary<string, VerificationCheck> checks)
@@ -319,7 +348,7 @@ internal static class VerificationPolicyParser
 }
 
 internal sealed record VerificationRule(IReadOnlyList<string> Paths, IReadOnlyList<string> Use, bool Fallback);
-internal sealed record VerificationContext(IReadOnlyList<string> Use, IReadOnlyList<VerificationRule> Rules);
+internal sealed record VerificationContext(IReadOnlyList<string> Use, IReadOnlyList<VerificationRule> Rules, bool HasUse);
 
 internal sealed record VerificationPolicy(
     IReadOnlyDictionary<string, VerificationCheck> Checks,
@@ -330,10 +359,10 @@ internal sealed record VerificationPolicy(
         if (context != "default" && !VerificationPolicyParser.IsKnownContext(context))
             throw new VerificationException("INVALID_VERIFICATION_POLICY", $"Unknown verification context {context}.");
         var selected = Contexts.TryGetValue(context, out var value) ? value : Contexts["default"];
-        if (selected.Use.Count > 0) return selected.Use;
+        if (selected.HasUse) return selected.Use;
         var paths = changedPaths.Select(path => path.Replace('\\', '/').TrimStart('/')).Distinct(StringComparer.Ordinal).ToArray();
         foreach (var rule in selected.Rules)
-            if (rule.Fallback || (paths.Length > 0 && rule.Paths.Any(pattern => paths.All(path => Glob(pattern, path)))))
+            if (rule.Fallback || (paths.Length > 0 && paths.All(path => rule.Paths.Any(pattern => Glob(pattern, path)))))
                 return rule.Use;
         return Contexts["default"].Use;
     }

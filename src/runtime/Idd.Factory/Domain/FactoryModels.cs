@@ -18,7 +18,7 @@ public enum WorkItemStatus
 
 public sealed record FactoryState
 {
-    public const int CurrentSchemaVersion = 6;
+    public const int CurrentSchemaVersion = 7;
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     public required string MethodologyVersion { get; init; }
     public required string RuntimeVersion { get; init; }
@@ -38,11 +38,13 @@ public sealed record FactoryState
     public bool FinalVerificationPassed { get; set; }
     public FactoryBlocker? Blocker { get; set; }
     public PendingContinuation? PendingContinuation { get; set; }
+    public PendingVerificationSession? PendingVerificationSession { get; set; }
     public PendingReplanTrigger? PendingReplanTrigger { get; set; }
     public FinalReviewState? FinalReview { get; set; }
     public List<string> VerificationEvidenceRefs { get; init; } = [];
     public string? IntentSnapshotHash { get; set; }
     public List<string> ClarificationRefs { get; init; } = [];
+    public List<string> FactoryRunChangedPaths { get; init; } = [];
 }
 
 public sealed record WorkItemState
@@ -60,13 +62,16 @@ public sealed record WorkItemState
     public List<string> VerificationEvidenceRefs { get; init; } = [];
     public int VerificationFixAttemptCount { get; set; }
     public string? LastResultRef { get; set; }
+    public List<string> ChangedPaths { get; init; } = [];
 }
 
 public sealed record FactoryBlocker(string Code, string Reason, string ResumeWhen, JsonElement? Payload = null);
 public sealed record PendingContinuation(ContinuationKind Kind, string WorkflowStep, string? WorkItemId, string? VerificationContext, string Code, bool IsResumable,
     SemanticOperationKind Operation = SemanticOperationKind.None, string? OperationInput = null,
-    string? VerificationCheckId = null, VerificationContinuationStage VerificationStage = VerificationContinuationStage.ExecuteCheck,
-    List<string>? CompletedVerificationCheckIds = null);
+    string? VerificationCheckId = null, VerificationContinuationStage VerificationStage = VerificationContinuationStage.ExecuteCheck);
+public sealed record PendingVerificationSession(string Context, string? WorkItemId, List<string> CheckIds,
+    List<string> ChangedPaths, int NextCheckIndex, List<string> CompletedCheckIds, List<string> EvidenceRefs,
+    string? PendingCheckId, string? PendingCheckDefinitionHash, string PolicyHash, VerificationContinuationStage Stage);
 public sealed record PendingReplanTrigger(string SourceRole, string? SourceWorkItemId, string ResultRef, string? Reason, JsonElement? Payload, List<string> EvidenceRefs);
 
 [JsonConverter(typeof(JsonStringEnumConverter<ContinuationKind>))]
