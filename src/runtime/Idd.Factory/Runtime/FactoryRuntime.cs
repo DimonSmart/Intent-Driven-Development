@@ -280,11 +280,10 @@ public sealed class FactoryRuntime(
             if (repair.Outcome != "completed")
             {
                 var outcome = PrepareRepairOutcome(item, repair.Outcome);
-                PersistVerificationFixContinuation(state, item, context, repair.Outcome,
-                    repairInput);
+                HandleVerificationFixOutcomeContinuation(state, item, context, repair, repairInput);
                 await SaveAsync(state, cancellationToken); return outcome;
             }
-            PersistVerificationGateContinuation(state, item, context);
+            HandleVerificationFixOutcomeContinuation(state, item, context, repair, repairInput);
             await SaveAsync(state, cancellationToken);
         }
     }
@@ -321,11 +320,11 @@ public sealed class FactoryRuntime(
                 SemanticOperationKind.FinalVerificationFix, repairInput);
             if (repair.Outcome != "completed")
             {
-                PersistVerificationFixContinuation(state, null, "final", repair.Outcome, repairInput);
+                HandleVerificationFixOutcomeContinuation(state, null, "final", repair, repairInput);
                 await SaveAsync(state, cancellationToken);
                 return repair.Outcome;
             }
-            PersistVerificationGateContinuation(state, null, "final");
+            HandleVerificationFixOutcomeContinuation(state, null, "final", repair, repairInput);
             await SaveAsync(state, cancellationToken);
         }
     }
@@ -377,6 +376,24 @@ public sealed class FactoryRuntime(
         };
         state.PendingContinuation = new(ContinuationKind.SemanticInvocation, state.CurrentWorkflowStep, item?.Id, context,
             outcome.ToUpperInvariant().Replace('-', '_'), true, operation, input);
+    }
+
+    private void HandleVerificationFixOutcomeContinuation(FactoryState state, WorkItemState? item, string context, AgentResultEnvelope repair, string input)
+    {
+        switch (repair.Outcome)
+        {
+            case "completed":
+                PersistVerificationGateContinuation(state, item, context);
+                return;
+            case "needs-replan":
+                PersistReplanContinuation(state, state.CurrentWorkflowStep);
+                return;
+            case "intent-required":
+                return;
+            default:
+                PersistVerificationFixContinuation(state, item, context, repair.Outcome, input);
+                return;
+        }
     }
 
     private void PersistVerificationGateContinuation(FactoryState state, WorkItemState? item, string context) =>
@@ -741,13 +758,11 @@ public sealed class FactoryRuntime(
         if (repair.Outcome != "completed")
         {
             if (item is not null) PrepareRepairOutcome(item, repair.Outcome);
-            PersistVerificationFixContinuation(state, item, continuation.VerificationContext!, repair.Outcome, continuation.OperationInput);
-            if (repair.Outcome == "needs-replan")
-                PersistReplanContinuation(state, continuation.WorkflowStep);
+            HandleVerificationFixOutcomeContinuation(state, item, continuation.VerificationContext!, repair, continuation.OperationInput);
             await SaveAsync(state, token);
             return await RouteResumedOutcomeAsync(state, continuation.WorkflowStep, repair.Outcome, token);
         }
-        PersistVerificationGateContinuation(state, item, continuation.VerificationContext!);
+        HandleVerificationFixOutcomeContinuation(state, item, continuation.VerificationContext!, repair, continuation.OperationInput);
         await SaveAsync(state, token);
         var gateOutcome = continuation.VerificationContext == "final"
             ? await VerifyFinalGateAsync(state, token)

@@ -493,6 +493,26 @@ public sealed class FactoryRuntimeTests
         Assert.DoesNotContain(backend.Roles, x => x == "implementer");
     }
 
+    [Fact] public async Task RestartAfterResumedVerificationFixIntentRequiredRestoresIntentGate()
+    {
+        using var temp = new TestWorkspace(); temp.Write(".idd/intent/spec.md", "before"); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        var state = await SeedVerificationFixContinuationAsync(temp, workflow, current);
+        await WritePersistedAttemptAsync(temp, current, state, "A000007", "intent-required", IntentRequiredDetails(), "Recovered verification repair needs intent.");
+        var backend = new FakeAgentBackend(); var runtime = Create(temp.Path, workflow, current, backend);
+
+        Assert.Equal("INTENT_REQUIRED", (await runtime.ContinueAsync(default)).FactoryOutcome);
+        var persisted = await new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default);
+        Assert.Equal(ContinuationKind.IntentGate, persisted!.PendingContinuation!.Kind);
+        Assert.Equal("runtime-intent", persisted.PendingContinuation.WorkflowStep);
+        Assert.Equal("Recovered verification repair needs intent.", persisted.Blocker!.Reason);
+        Assert.NotNull(persisted.PendingReplanTrigger); Assert.Equal("implementer", persisted.PendingReplanTrigger!.SourceRole); Assert.Equal("one", persisted.PendingReplanTrigger.SourceWorkItemId);
+        Assert.Equal("attempts/A000007/result.json", persisted.PendingReplanTrigger.ResultRef);
+        Assert.Empty(backend.Invocations);
+
+        Assert.Equal("INTENT_REQUIRED", (await runtime.ContinueAsync(default)).FactoryOutcome);
+        Assert.Empty(backend.Invocations);
+    }
+
     [Fact] public async Task FailedVerificationUsesOneImplementerFixAndReverifies()
     {
         using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current");
@@ -530,6 +550,43 @@ public sealed class FactoryRuntimeTests
         Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default)).FactoryOutcome);
         Assert.Equal(1, backend.Invocations.Count(x => x.Role == "implementer" && !x.Input.Contains("verification-fix")));
         Assert.Equal(2, backend.Invocations.Count(x => x.Role == "implementer" && x.Input.Contains("verification-fix")));
+    }
+
+    [Fact] public async Task VerificationFixIntentRequiredWaitsForIntentThenReplansWithoutRepeatingTheFix()
+    {
+        using var temp = new TestWorkspace(); temp.Write(".idd/intent/spec.md", "before"); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write("gate.csproj", "<Project");
+        temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  gate:\n    run: dotnet build gate.csproj --nologo\ndefault:\n  use:\n    - gate\n");
+        var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem(["gate"])));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "intent-required", IntentRequiredDetails(), "Verification repair needs a durable decision."));
+        var runtime = Create(temp.Path, workflow, current, backend);
+
+        Assert.Equal("INTENT_REQUIRED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        var persisted = await new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default);
+        Assert.Equal(ContinuationKind.IntentGate, persisted!.PendingContinuation!.Kind);
+        Assert.Equal("runtime-intent", persisted.PendingContinuation.WorkflowStep);
+        Assert.Equal("INTENT_REQUIRED", persisted.Blocker!.Code); AssertIntentRequiredPayload(persisted.Blocker.Payload);
+        Assert.NotNull(persisted.PendingReplanTrigger); Assert.Equal("implementer", persisted.PendingReplanTrigger!.SourceRole); Assert.Equal("one", persisted.PendingReplanTrigger.SourceWorkItemId);
+        Assert.Equal("Verification repair needs a durable decision.", persisted.PendingReplanTrigger.Reason); AssertIntentRequiredPayload(persisted.PendingReplanTrigger.Payload); Assert.NotEmpty(persisted.PendingReplanTrigger.EvidenceRefs);
+
+        var callsBeforeUnchangedContinue = backend.Roles.Count;
+        Assert.Equal("INTENT_REQUIRED", (await runtime.ContinueAsync(default)).FactoryOutcome);
+        Assert.Equal(callsBeforeUnchangedContinue, backend.Roles.Count);
+
+        temp.Write(".idd/intent/spec.md", "after"); temp.Write("gate.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
+        backend.Results.Enqueue(invocation =>
+        {
+            Assert.Equal("factory-replanner", invocation.Role);
+            Assert.Contains("Verification repair needs a durable decision.", invocation.Input);
+            return Envelope(invocation, "replan-proposed", new { operations = new[] { new { kind = "supersede-ready-subtask", id = "one" } } });
+        });
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+
+        Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default)).FactoryOutcome);
+        Assert.Equal(1, backend.Roles.Count(x => x == "factory-replanner"));
+        Assert.Equal(1, backend.Invocations.Count(x => x.Role == "implementer" && x.Input.Contains("verification-fix")));
     }
 
     [Fact] public async Task InvalidDecompositionVerificationDoesNotPartiallyApplyWork()
@@ -726,6 +783,20 @@ public sealed class FactoryRuntimeTests
         await new FileFactoryStateStore(current, new FactoryStateValidator()).CreateAsync(state, default);
         return state;
     }
+    private static object IntentRequiredDetails() => new
+    {
+        missingIntentDecisions = new[]
+        {
+            new
+            {
+                area = "Staged registration",
+                whyBlocking = "The decomposition cannot define safe stage boundaries without durable registration semantics.",
+                requiredDecisions = new[] { "Define the staged registration contract.", "Define idempotency and lost-response recovery rules." },
+                intentReferences = new[] { "IDD-0002", "IDD-0006" },
+                recommendedNextWorkflow = "idd-intent-change"
+            }
+        }
+    };
     private static async Task WritePersistedAttemptAsync(TestWorkspace temp, string current, FactoryState state, string attemptId, string? result, object? payload = null, string? reason = null)
     {
         state.CurrentAttemptId = attemptId; state.AttemptSequence = int.Parse(attemptId[1..]); state.WorkItems.Single().CurrentAttemptId = attemptId;
