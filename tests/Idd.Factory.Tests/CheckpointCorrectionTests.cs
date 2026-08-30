@@ -49,6 +49,85 @@ public sealed class CheckpointCorrectionTests
     }
 
     [Fact]
+    public async Task CheckpointReviewCanUseFullCorrectiveCycleBudget()
+    {
+        using var temp = new TestWorkspace();
+        var request = temp.Write("task.md", "Task");
+        var workflow = DefaultWorkflow(temp);
+        var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        var backend = new FakeAgentBackend();
+
+        Assert.Equal(3, workflow.Limits.MaxAgentAttempts);
+        Assert.Equal(5, workflow.Limits.MaxCorrectiveCycles);
+
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", Decomposition()));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        for (var cycle = 1; cycle <= workflow.Limits.MaxCorrectiveCycles; cycle++)
+        {
+            var correctionId = $"fix-review-{cycle}";
+            backend.Results.Enqueue(invocation =>
+            {
+                Assert.Equal("checkpoint-reviewer", invocation.Role);
+                return Envelope(invocation, "needs-fix", Correction(correctionId));
+            });
+            backend.Results.Enqueue(invocation =>
+            {
+                Assert.Equal("implementer", invocation.Role);
+                return Envelope(invocation, "completed");
+            });
+        }
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+
+        var outcome = await Create(temp.Path, workflow, current, backend).RunAsync(request, "test", default);
+
+        Assert.Equal("COMPLETED", outcome.FactoryOutcome);
+        Assert.Equal(workflow.Limits.MaxCorrectiveCycles + 1, backend.Roles.Count(x => x == "checkpoint-reviewer"));
+    }
+
+    [Fact]
+    public async Task ExhaustedSubtaskBudgetDoesNotCreatePhantomAttempt()
+    {
+        using var temp = new TestWorkspace();
+        var workflow = DefaultWorkflow(temp);
+        var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write(".idd/factory/current/request.md", "Resume task");
+        temp.Write(".idd/factory/current/work-items/001-one.md", "# One");
+
+        var state = StateStoreTests.State() with
+        {
+            WorkflowHash = workflow.Hash,
+            CurrentWorkflowStep = "execute",
+            AttemptSequence = 7
+        };
+        state.WorkItems.Add(new WorkItemState
+        {
+            Id = "one",
+            Sequence = 1,
+            Kind = WorkItemKind.Subtask,
+            Status = WorkItemStatus.Ready,
+            ContractPath = "work-items/001-one.md",
+            AttemptCount = workflow.Limits.MaxAgentAttempts
+        });
+        await new FileFactoryStateStore(current, new FactoryStateValidator()).CreateAsync(state, default);
+        var backend = new FakeAgentBackend();
+
+        var outcome = await Create(temp.Path, workflow, current, backend).ContinueAsync(default);
+
+        Assert.Equal("RETRY_BUDGET_EXHAUSTED", outcome.FactoryOutcome);
+        Assert.Contains("continue cannot add budget", outcome.ResumeWhen);
+        var persisted = ReadState(current);
+        var item = Assert.Single(persisted.WorkItems);
+        Assert.Equal(7, persisted.AttemptSequence);
+        Assert.Null(persisted.CurrentAttemptId);
+        Assert.Equal(workflow.Limits.MaxAgentAttempts, item.AttemptCount);
+        Assert.Null(item.CurrentAttemptId);
+        Assert.Equal(WorkItemStatus.Blocked, item.Status);
+        Assert.False(Directory.Exists(Path.Combine(current, "attempts", "A000008")));
+        Assert.Empty(backend.Roles);
+    }
+
+    [Fact]
     public async Task ContinueRecoversCompletedNeedsFixFromWorkItemAttempt()
     {
         using var temp = new TestWorkspace();
@@ -184,11 +263,11 @@ public sealed class CheckpointCorrectionTests
         }
     };
 
-    private static object Correction() => new
+    private static object Correction(string id = "fix-review") => new
     {
         correctiveSubtask = new
         {
-            id = "fix-review",
+            id,
             contractMarkdown = "# Fix review",
             verificationCheckIds = Array.Empty<string>()
         }

@@ -84,7 +84,13 @@ public sealed class FactoryRuntime(
                 "factory.finalize" => "finalized",
                 _ => throw new WorkflowException("UNKNOWN_WORKFLOW_HANDLER", step.Uses)
             }; }
-            catch (AgentProtocolException exception) { return await StopAsync(state, exception.Code, exception.Message, "Continue to retry within the configured attempt budget.", cancellationToken); }
+            catch (AgentProtocolException exception)
+            {
+                var resume = exception.Code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal)
+                    ? "The configured budget is exhausted. Cancel and restart with a workflow that provides sufficient budget; continue cannot add budget to the current run."
+                    : "Continue to retry within the configured attempt budget.";
+                return await StopAsync(state, exception.Code, exception.Message, resume, cancellationToken);
+            }
             catch (VerificationException exception) { return await StopAsync(state, exception.Code, exception.Message, "Fix the verification failure, then continue.", cancellationToken); }
 
             if (step.Uses == "factory.finalize")
@@ -163,7 +169,6 @@ public sealed class FactoryRuntime(
         state.FinalReview = new(result.Outcome, $"attempts/{result.AttemptId}/result.json", (state.FinalReview?.AttemptCount ?? 0) + 1);
         if (result.Outcome == "needs-fix")
         {
-            if (state.CorrectiveCycleCount >= workflow.Limits.MaxCorrectiveCycles) return "blocked";
             InsertCorrection(state, null, result.Payload); await SaveAsync(state, cancellationToken);
         }
         else await SaveAsync(state, cancellationToken);
@@ -294,8 +299,14 @@ public sealed class FactoryRuntime(
                 return validated;
             }
         }
+        if (item is not null && item.Kind != WorkItemKind.ReviewCheckpoint && item.AttemptCount >= workflow.Limits.MaxAgentAttempts)
+        {
+            item.Status = WorkItemStatus.Blocked;
+            item.CurrentAttemptId = null;
+            throw new AgentProtocolException("RETRY_BUDGET_EXHAUSTED", $"{item.Id} exhausted its agent attempt budget.");
+        }
         var attemptId = $"A{++state.AttemptSequence:000000}"; state.CurrentAttemptId = attemptId;
-        if (item is not null) { item.CurrentAttemptId = attemptId; item.AttemptCount++; if (item.AttemptCount > workflow.Limits.MaxAgentAttempts) throw new AgentProtocolException("RETRY_BUDGET_EXHAUSTED", $"{item.Id} exhausted its agent attempt budget."); }
+        if (item is not null) { item.CurrentAttemptId = attemptId; item.AttemptCount++; }
         await SaveAsync(state, cancellationToken);
         var attemptDirectory = Path.Combine(currentDirectory, "attempts", attemptId); Directory.CreateDirectory(attemptDirectory);
         var resultPath = Path.Combine(attemptDirectory, "result.json");

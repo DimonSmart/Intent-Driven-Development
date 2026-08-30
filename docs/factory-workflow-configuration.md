@@ -12,6 +12,19 @@ Supported limits are `maxAgentAttempts`, `maxReplans`,
 `maxCorrectiveCycles`, and per-gate `maxVerificationFixAttempts` (default `1`).
 Runtime safety ceilings still apply.
 
+`maxAgentAttempts` bounds repeated semantic attempts for mutable non-review work
+items. A checkpoint review repeated after `needs-fix` is not additionally capped
+by `maxAgentAttempts`: the review/correction loop is bounded by
+`maxCorrectiveCycles`, while authoritative verification repair remains bounded by
+`maxVerificationFixAttempts`. This keeps checkpoint review semantics aligned with
+final review instead of allowing the generic work-item attempt budget to truncate
+a valid corrective cycle early.
+
+Exhausting a pinned run budget is terminal for that workflow instance. `continue`
+does not add budget, and changing `.idd/factory.yaml` changes the workflow hash;
+cancel and restart with a different workflow budget when a larger budget is
+required.
+
 Each step has an `id`, a registered `uses`, optional semantic `agent`, optional
 known `handlers`, and typed outcome transitions under `on`.
 
