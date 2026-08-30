@@ -129,7 +129,7 @@ public sealed class FactoryRuntime(
         var result = await InvokeAsync(state, role, item, item.Kind == WorkItemKind.ReviewCheckpoint
             ? $"Work item contract:\n{contract}\n\nAuthoritative Runtime verification evidence references:\n{evidenceRefs}"
             : $"Work item contract:\n{contract}", cancellationToken);
-        item.LastResultRef = Path.GetRelativePath(currentDirectory, Path.Combine(currentDirectory, "attempts", item.CurrentAttemptId!, "result.json")).Replace('\\', '/');
+        item.LastResultRef = $"attempts/{result.AttemptId}/result.json";
         if (result.Outcome is "needs-replan" or "intent-required" or "blocked") { item.Status = result.Outcome == "blocked" ? WorkItemStatus.Blocked : WorkItemStatus.Ready; await SaveAsync(state, cancellationToken); return result.Outcome; }
         if (result.Outcome == "needs-fix") { InsertCorrection(state, item, result.Payload); await SaveAsync(state, cancellationToken); return "advanced"; }
         if (result.Outcome is not "completed" and not "approved") throw new AgentProtocolException("UNSUPPORTED_AGENT_OUTCOME", result.Outcome);
@@ -400,7 +400,14 @@ public sealed class FactoryRuntime(
         var dependencies = review?.CoveredWorkItems.ToList() ?? state.WorkItems.Where(x => x.Status == WorkItemStatus.Completed).Select(x => x.Id).ToList();
         var item = new WorkItemState { Id = id, Sequence = max + 1, Kind = WorkItemKind.CorrectiveSubtask, Status = WorkItemStatus.Ready, ContractPath = relative, Dependencies = dependencies, VerificationCheckIds = Strings(correction, "verificationCheckIds") };
         state.WorkItems.Add(item); state.CorrectiveCycleCount++;
-        if (review is not null) { review.Status = WorkItemStatus.Planned; review.VerificationFixAttemptCount = 0; review.Dependencies.Add(id); review.CoveredWorkItems.Add(id); }
+        if (review is not null)
+        {
+            review.Status = WorkItemStatus.Planned;
+            review.CurrentAttemptId = null;
+            review.VerificationFixAttemptCount = 0;
+            review.Dependencies.Add(id);
+            review.CoveredWorkItems.Add(id);
+        }
         else state.FinalVerificationFixAttemptCount = 0;
     }
 
@@ -435,7 +442,20 @@ public sealed class FactoryRuntime(
     private async Task SaveAsync(FactoryState state, CancellationToken token) { var revision = state.Revision; await stateStore.SaveAsync(state, revision, token); }
     private async Task ReconcileAsync(FactoryState state, CancellationToken token)
     {
-        if (state.CurrentAttemptId is not { } attemptId) return;
+        var attemptId = state.CurrentAttemptId;
+        if (attemptId is null)
+        {
+            var activeItemAttempts = state.WorkItems
+                .Where(x => x.Status is WorkItemStatus.Dispatching or WorkItemStatus.Running && x.CurrentAttemptId is not null)
+                .Select(x => x.CurrentAttemptId!)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            if (activeItemAttempts.Length == 0) return;
+            if (activeItemAttempts.Length > 1)
+                throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Multiple active work-item attempts cannot be reconciled deterministically.");
+            attemptId = activeItemAttempts[0];
+        }
+
         var directory = Path.Combine(currentDirectory, "attempts", attemptId); var invocationPath = Path.Combine(directory, "invocation.json");
         if (!File.Exists(invocationPath)) throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Persisted attempt {attemptId} has no invocation artifact.");
         var invocation = JsonSerializer.Deserialize<AgentInvocation>(await File.ReadAllTextAsync(invocationPath, token), FactoryJson.Options)
@@ -443,8 +463,24 @@ public sealed class FactoryRuntime(
         if (invocation.RunId != state.RunId || invocation.AttemptId != attemptId) throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Persisted attempt {attemptId} identity is invalid.");
         var item = invocation.WorkItemId is null ? null : state.WorkItems.SingleOrDefault(x => x.Id == invocation.WorkItemId)
             ?? throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Attempt {attemptId} references unknown work.");
-        if (File.Exists(Path.Combine(directory, "result.json")))
+        var resultPath = Path.Combine(directory, "result.json");
+        if (File.Exists(resultPath))
         {
+            AgentResultEnvelope? persistedResult;
+            try { persistedResult = JsonSerializer.Deserialize<AgentResultEnvelope>(await File.ReadAllTextAsync(resultPath, token), FactoryJson.Options); }
+            catch (JsonException exception) { throw new AgentProtocolException("MALFORMED_AGENT_RESULT", exception.Message); }
+            var result = new AgentResultValidator().Validate(invocation, persistedResult);
+            if (item is { Kind: WorkItemKind.ReviewCheckpoint, Status: WorkItemStatus.Running } && item.CurrentAttemptId == attemptId && result.Outcome == "needs-fix")
+            {
+                item.LastResultRef = $"attempts/{attemptId}/result.json";
+                InsertCorrection(state, item, result.Payload);
+                state.CurrentAttemptId = null;
+                await SaveAsync(state, token);
+                await events.WriteAsync(state.RunId, "agent-result-recovered", new { attemptId, invocation.Role, result.Outcome, workItemId = item.Id }, token);
+                return;
+            }
+
+            state.CurrentAttemptId = attemptId;
             if (item is not null && item.Status is WorkItemStatus.Dispatching or WorkItemStatus.Running) item.Status = WorkItemStatus.Ready;
             await SaveAsync(state, token); return;
         }

@@ -53,10 +53,18 @@ public sealed class FactoryStateValidator
         foreach (var oldItem in previous.WorkItems)
         {
             var newItem = next.WorkItems.SingleOrDefault(x => x.Id == oldItem.Id);
-            if (newItem is not null && oldItem.Status != newItem.Status && !AllowedTransitions[oldItem.Status].Contains(newItem.Status))
+            if (newItem is not null && oldItem.Status != newItem.Status && !IsAllowedTransition(oldItem, newItem))
                 throw new FactoryStateException("INVALID_STATE_TRANSITION", $"{oldItem.Id}: {oldItem.Status} -> {newItem.Status} is not allowed.");
         }
     }
+
+    private static bool IsAllowedTransition(WorkItemState previous, WorkItemState next) =>
+        AllowedTransitions[previous.Status].Contains(next.Status) ||
+        previous.Kind == WorkItemKind.ReviewCheckpoint &&
+        previous.Status == WorkItemStatus.Running &&
+        next.Status == WorkItemStatus.Planned &&
+        next.CurrentAttemptId is null &&
+        !string.IsNullOrWhiteSpace(next.LastResultRef);
 
     private static bool EquivalentCompleted(WorkItemState left, WorkItemState right) =>
         left == right || (left.Id == right.Id && left.Sequence == right.Sequence && left.Kind == right.Kind &&
