@@ -12,13 +12,13 @@ public enum WorkItemKind { Subtask, ReviewCheckpoint, CorrectiveSubtask }
 [JsonConverter(typeof(JsonStringEnumConverter<WorkItemStatus>))]
 public enum WorkItemStatus
 {
-    Planned, Ready, Dispatching, Running, AwaitingVerification, Completed,
+    Planned, Ready, Dispatching, Running, AwaitingVerification, AwaitingReview, Completed,
     Blocked, Failed, Superseded, Cancelled
 }
 
 public sealed record FactoryState
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     public required string MethodologyVersion { get; init; }
     public required string RuntimeVersion { get; init; }
@@ -35,6 +35,7 @@ public sealed record FactoryState
     public int ReplanCount { get; set; }
     public int CorrectiveCycleCount { get; set; }
     public int FinalVerificationFixAttemptCount { get; set; }
+    public bool FinalVerificationPassed { get; set; }
     public FactoryBlocker? Blocker { get; set; }
     public PendingContinuation? PendingContinuation { get; set; }
     public PendingReplanTrigger? PendingReplanTrigger { get; set; }
@@ -66,7 +67,7 @@ public sealed record PendingContinuation(ContinuationKind Kind, string WorkflowS
 public sealed record PendingReplanTrigger(string SourceRole, string? SourceWorkItemId, string ResultRef, string? Reason, JsonElement? Payload, List<string> EvidenceRefs);
 
 [JsonConverter(typeof(JsonStringEnumConverter<ContinuationKind>))]
-public enum ContinuationKind { SemanticInvocation, VerificationGate, Clarification, Terminal }
+public enum ContinuationKind { SemanticInvocation, VerificationGate, IntentGate, Clarification, Terminal }
 public sealed record FinalReviewState(string Verdict, string? ResultRef, int AttemptCount);
 
 [JsonConverter(typeof(JsonStringEnumConverter<AgentExecutionProfile>))]

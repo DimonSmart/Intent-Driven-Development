@@ -10,9 +10,10 @@ public sealed class FactoryStateValidator
             [WorkItemStatus.Planned] = [WorkItemStatus.Ready, WorkItemStatus.Superseded, WorkItemStatus.Cancelled],
             [WorkItemStatus.Ready] = [WorkItemStatus.Dispatching, WorkItemStatus.Superseded, WorkItemStatus.Cancelled],
             [WorkItemStatus.Dispatching] = [WorkItemStatus.Running, WorkItemStatus.Ready, WorkItemStatus.Failed, WorkItemStatus.Cancelled],
-            [WorkItemStatus.Running] = [WorkItemStatus.AwaitingVerification, WorkItemStatus.Ready, WorkItemStatus.Blocked, WorkItemStatus.Failed, WorkItemStatus.Cancelled],
+            [WorkItemStatus.Running] = [WorkItemStatus.AwaitingVerification, WorkItemStatus.AwaitingReview, WorkItemStatus.Ready, WorkItemStatus.Blocked, WorkItemStatus.Failed, WorkItemStatus.Cancelled],
             [WorkItemStatus.AwaitingVerification] = [WorkItemStatus.Completed, WorkItemStatus.Ready, WorkItemStatus.Blocked, WorkItemStatus.Failed, WorkItemStatus.Cancelled],
-            [WorkItemStatus.Blocked] = [WorkItemStatus.Ready, WorkItemStatus.AwaitingVerification, WorkItemStatus.Cancelled],
+            [WorkItemStatus.AwaitingReview] = [WorkItemStatus.Dispatching, WorkItemStatus.Ready, WorkItemStatus.Blocked, WorkItemStatus.Failed, WorkItemStatus.Cancelled],
+            [WorkItemStatus.Blocked] = [WorkItemStatus.Ready, WorkItemStatus.AwaitingVerification, WorkItemStatus.AwaitingReview, WorkItemStatus.Cancelled],
             [WorkItemStatus.Failed] = [WorkItemStatus.Ready, WorkItemStatus.Cancelled],
             [WorkItemStatus.Completed] = [], [WorkItemStatus.Superseded] = [], [WorkItemStatus.Cancelled] = []
         };
@@ -36,8 +37,17 @@ public sealed class FactoryStateValidator
                 throw new FactoryStateException("CORRUPT_FACTORY_STATE", $"Work item {item.Id} depends on itself.");
         }
         EnsureAcyclic(state.WorkItems);
-        if (state.PendingContinuation is { WorkItemId: { } continuationItem } && !ids.Contains(continuationItem))
-            throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Continuation references unknown work item.");
+        if (state.PendingContinuation is { } continuation)
+        {
+            if (string.IsNullOrWhiteSpace(continuation.WorkflowStep))
+                throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Continuation workflow step is required.");
+            if (continuation.WorkItemId is { } continuationItem && !ids.Contains(continuationItem))
+                throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Continuation references unknown work item.");
+            if (continuation.Kind == ContinuationKind.VerificationGate && continuation.VerificationContext is not ("subtask" or "checkpoint" or "final"))
+                throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification continuation requires a supported verification context.");
+            if (continuation.VerificationContext is "subtask" or "checkpoint" && continuation.WorkItemId is null)
+                throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Work-item verification continuation requires a work item.");
+        }
     }
 
     public void ValidateMutation(FactoryState previous, FactoryState next)

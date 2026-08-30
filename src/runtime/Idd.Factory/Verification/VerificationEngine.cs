@@ -21,7 +21,7 @@ public sealed record VerificationResult(VerificationStatus Status, IReadOnlyList
     public bool Passed => Status == VerificationStatus.Passed;
 }
 
-public sealed class VerificationEngine(string workspace, string currentDirectory)
+public class VerificationEngine(string workspace, string currentDirectory)
 {
     public void ValidateCheckIds(IEnumerable<string> checkIds)
     {
@@ -36,7 +36,7 @@ public sealed class VerificationEngine(string workspace, string currentDirectory
         if (unknown.Length > 0) throw new VerificationException("UNKNOWN_VERIFICATION_CHECK", $"Unknown check IDs: {string.Join(", ", unknown)}.");
     }
 
-    public async Task<VerificationResult> RunContextAsync(string context, CancellationToken cancellationToken)
+    public virtual async Task<VerificationResult> RunContextAsync(string context, CancellationToken cancellationToken)
     {
         var policy = await LoadPolicyAsync(cancellationToken);
         return policy is null
@@ -44,7 +44,7 @@ public sealed class VerificationEngine(string workspace, string currentDirectory
             : await RunPolicyChecksAsync(policy, policy.ResolveContext(context), cancellationToken);
     }
 
-    public async Task<VerificationResult> RunSubtaskAsync(IEnumerable<string> explicitCheckIds, CancellationToken cancellationToken)
+    public virtual async Task<VerificationResult> RunSubtaskAsync(IEnumerable<string> explicitCheckIds, CancellationToken cancellationToken)
     {
         var policy = await LoadPolicyAsync(cancellationToken);
         return policy is null

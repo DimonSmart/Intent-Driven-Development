@@ -106,7 +106,7 @@ public sealed class FactoryRuntimeTests
         var persisted = await new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default);
         Assert.NotNull(persisted); Assert.Equal("INTENT_REQUIRED", persisted.Blocker!.Code); AssertIntentRequiredPayload(persisted.Blocker.Payload);
         var count = backend.Roles.Count; var repeated = await runtime.ContinueAsync(default);
-        Assert.Equal("INTENT_REQUIRED", repeated.FactoryOutcome); AssertIntentRequiredPayload(repeated.Payload); Assert.Equal(count, backend.Roles.Count);
+        Assert.Equal("INTENT_REQUIRED", repeated.FactoryOutcome); Assert.Equal(first.Reason, repeated.Reason); Assert.Equal(first.ResumeWhen, repeated.ResumeWhen); AssertIntentRequiredPayload(repeated.Payload); Assert.Equal(count, backend.Roles.Count);
 
         temp.Write(".idd/intent/spec.md", "after"); EnqueueHappyPath(backend);
         Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default)).FactoryOutcome);
@@ -178,6 +178,54 @@ public sealed class FactoryRuntimeTests
         Assert.Equal(1, backend.Roles.Count(role => role == "implementer"));
     }
 
+    [Fact] public async Task CheckpointVerificationResumeRunsGateOnceThenReviewer()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current"); var workflow = DefaultWorkflow(temp);
+        temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  gate:\n    instructions: Confirm checkpoint.\ndefault:\n  use: []\ncheckpoint:\n  use:\n    - gate\n");
+        var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", new { workItems = new object[]
+        {
+            new { id = "one", sequence = 1, kind = "subtask", contractMarkdown = "# One", dependencies = Array.Empty<string>(), coveredWorkItems = Array.Empty<string>(), verificationCheckIds = Array.Empty<string>() },
+            new { id = "review", sequence = 2, kind = "review-checkpoint", contractMarkdown = "# Review", dependencies = new[] { "one" }, coveredWorkItems = new[] { "one" }, verificationCheckIds = Array.Empty<string>() }
+        } }));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        var runtime = Create(temp.Path, workflow, current, backend);
+        Assert.Equal("VERIFICATION_REQUIRES_USER_ACTION", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  gate:\n    run: dotnet --version\ndefault:\n  use: []\ncheckpoint:\n  use:\n    - gate\n");
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved")); backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+        var outcome = await runtime.ContinueAsync(default);
+        Assert.Equal("COMPLETED", outcome.FactoryOutcome); Assert.Equal(1, backend.Roles.Count(role => role == "implementer")); Assert.Equal(1, backend.Roles.Count(role => role == "checkpoint-reviewer"));
+        Assert.Single(Directory.GetFiles(System.IO.Path.Combine(outcome.ResultDirectory!, "verification"), "*.json").Select(ReadEvidence), x => x.CheckId == "gate" && x.Status == "passed");
+    }
+
+    [Fact] public async Task FinalVerificationResumeRunsGateOnceThenReviewer()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current"); var workflow = DefaultWorkflow(temp);
+        temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  gate:\n    instructions: Confirm final.\ndefault:\n  use: []\nfinal:\n  use:\n    - gate\n");
+        var backend = new FakeAgentBackend(); backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem([]))); backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        var runtime = Create(temp.Path, workflow, current, backend);
+        Assert.Equal("VERIFICATION_REQUIRES_USER_ACTION", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  gate:\n    run: dotnet --version\ndefault:\n  use: []\nfinal:\n  use:\n    - gate\n");
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+        var outcome = await runtime.ContinueAsync(default);
+        Assert.Equal("COMPLETED", outcome.FactoryOutcome); Assert.Equal(1, backend.Roles.Count(role => role == "final-reviewer"));
+        Assert.Single(Directory.GetFiles(System.IO.Path.Combine(outcome.ResultDirectory!, "verification"), "*.json").Select(ReadEvidence), x => x.CheckId == "gate" && x.Status == "passed");
+    }
+
+    [Fact] public async Task VerificationExceptionResumesAsVerificationGate()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current"); var workflow = DefaultWorkflow(temp);
+        var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem([]))); backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        var verification = new ThrowOnceVerificationEngine(temp.Path, current); var runtime = Create(temp.Path, workflow, current, backend, verification);
+        Assert.Equal("TEST_VERIFICATION_EXCEPTION", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        var persisted = await new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default);
+        Assert.Equal(ContinuationKind.VerificationGate, persisted!.PendingContinuation!.Kind); Assert.Equal("subtask", persisted.PendingContinuation.VerificationContext); Assert.Equal("one", persisted.PendingContinuation.WorkItemId);
+        verification.Fail = false;
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+        Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default)).FactoryOutcome); Assert.Equal(1, backend.Roles.Count(role => role == "implementer"));
+    }
+
     [Fact] public async Task ReplanBudgetExhaustionIsTerminal()
     {
         using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current");
@@ -225,6 +273,21 @@ public sealed class FactoryRuntimeTests
         backend.Results.Enqueue(invocation => { Assert.Contains("Initial reason.", invocation.Input); Assert.Contains("missing work", invocation.Input); return Envelope(invocation, "replan-proposed", new { operations = Array.Empty<object>() }); });
         backend.Results.Enqueue(invocation => Envelope(invocation, "completed")); backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
         Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default, answer)).FactoryOutcome);
+    }
+
+    [Fact] public async Task ReplanTriggerSurvivesIntentRequiredStop()
+    {
+        using var temp = new TestWorkspace(); temp.Write(".idd/intent/spec.md", "before"); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current"); var backend = new FakeAgentBackend();
+        var details = new { missingIntentDecisions = new[] { new { area = "Planning", whyBlocking = "The replan needs a durable decision.", requiredDecisions = new[] { "Define the missing constraint." }, intentReferences = new[] { "IDD-0001" }, recommendedNextWorkflow = "idd-intent-change" } } };
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem([])));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "needs-replan", new { defect = "missing work" }, "Original replan reason."));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "intent-required", details, "Replan requires intent."));
+        var runtime = Create(temp.Path, workflow, current, backend);
+        Assert.Equal("INTENT_REQUIRED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        temp.Write(".idd/intent/spec.md", "after");
+        backend.Results.Enqueue(invocation => { Assert.Equal("factory-replanner", invocation.Role); Assert.Contains("Original replan reason.", invocation.Input); Assert.Contains("missing work", invocation.Input); Assert.Contains("attempts/A000002/result.json", invocation.Input); return Envelope(invocation, "replan-proposed", new { operations = Array.Empty<object>() }); });
+        backend.Results.Enqueue(invocation => Envelope(invocation, "completed")); backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+        Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default)).FactoryOutcome);
     }
 
     [Fact] public async Task FailedVerificationUsesOneImplementerFixAndReverifies()
@@ -354,8 +417,8 @@ public sealed class FactoryRuntimeTests
         Assert.Equal(new[] { "task-decomposer", "implementer", "implementer", "checkpoint-reviewer", "final-reviewer" }, backend.Roles);
     }
 
-    private static FactoryRuntime Create(string workspace, WorkflowDefinition workflow, string current, IAgentBackend backend)
-    { var validator = new FactoryStateValidator(); var clock = new FakeClock(); return new(workspace, workflow, new FileFactoryStateStore(current, validator), new AgentExecutor(backend, new AgentResultValidator()), new VerificationEngine(workspace, current), new FactoryEventWriter(current, clock), clock); }
+    private static FactoryRuntime Create(string workspace, WorkflowDefinition workflow, string current, IAgentBackend backend, VerificationEngine? verification = null)
+    { var validator = new FactoryStateValidator(); var clock = new FakeClock(); return new(workspace, workflow, new FileFactoryStateStore(current, validator), new AgentExecutor(backend, new AgentResultValidator()), verification ?? new VerificationEngine(workspace, current), new FactoryEventWriter(current, clock), clock); }
     private static AgentResultEnvelope Envelope(AgentInvocation invocation, string outcome, object? payload = null, string? reason = null)
     { JsonElement? element = payload is null ? null : JsonSerializer.SerializeToElement(payload, FactoryJson.Options); return new() { ProtocolVersion = AgentInvocation.CurrentProtocolVersion, RunId = invocation.RunId, AttemptId = invocation.AttemptId, Role = invocation.Role, Outcome = outcome, Reason = reason, Payload = element }; }
     private static void AssertClarificationPayload(JsonElement? payload)
@@ -391,4 +454,10 @@ public sealed class FactoryRuntimeTests
         public Task CancelAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.CompletedTask;
     }
     private sealed class FakeClock : IClock { public DateTimeOffset UtcNow => DateTimeOffset.Parse("2026-01-01T00:00:00Z"); }
+    private sealed class ThrowOnceVerificationEngine(string workspace, string current) : VerificationEngine(workspace, current)
+    {
+        public bool Fail { get; set; } = true;
+        public override Task<VerificationResult> RunSubtaskAsync(IEnumerable<string> explicitCheckIds, CancellationToken cancellationToken) =>
+            Fail ? throw new VerificationException("TEST_VERIFICATION_EXCEPTION", "The verification configuration needs repair.") : base.RunSubtaskAsync(explicitCheckIds, cancellationToken);
+    }
 }

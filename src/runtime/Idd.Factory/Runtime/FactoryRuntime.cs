@@ -50,6 +50,8 @@ public sealed class FactoryRuntime(
         if (state.WorkflowHash != workflow.Hash) return new("WORKFLOW_CHANGED", state.RunId, "Restore the workflow used to start this run or cancel and restart.");
         if (state.RunStatus == FactoryRunStatus.Cancelled) return new("CANCELLED", state.RunId);
         await ReconcileAsync(state, cancellationToken);
+        if (state.PendingContinuation is { } persistedContinuation)
+            state.CurrentWorkflowStep = persistedContinuation.WorkflowStep;
         if (state.PendingContinuation is { IsResumable: false })
             return new(state.Blocker?.Code ?? "TERMINAL_STOP", state.RunId, state.Blocker?.Reason, state.Blocker?.ResumeWhen, Payload: state.Blocker?.Payload);
         if (state.Blocker?.Code == "NEEDS_CLARIFICATION" && answerPath is null)
@@ -59,6 +61,12 @@ public sealed class FactoryRuntime(
         {
             var resumed = await ResumeVerificationAsync(state, continuation, cancellationToken);
             if (resumed is not null) return resumed;
+        }
+        if (state.PendingContinuation is { Kind: ContinuationKind.IntentGate })
+        {
+            state.RunStatus = FactoryRunStatus.Running;
+            await SaveAsync(state, cancellationToken);
+            return await ExecuteLoopAsync(state, cancellationToken);
         }
         if (state.PendingContinuation is { Kind: ContinuationKind.SemanticInvocation, WorkItemId: { } itemId })
             state.WorkItems.Single(x => x.Id == itemId).Status = WorkItemStatus.Ready;
@@ -132,12 +140,13 @@ public sealed class FactoryRuntime(
 
     private async Task<string> ExecuteWorkAsync(FactoryState state, WorkflowStepDefinition step, CancellationToken cancellationToken)
     {
-        PromoteReady(state); var item = state.WorkItems.OrderBy(x => x.Sequence).FirstOrDefault(x => x.Status == WorkItemStatus.Ready);
+        PromoteReady(state); var item = state.WorkItems.OrderBy(x => x.Sequence).FirstOrDefault(x => x.Status is WorkItemStatus.Ready or WorkItemStatus.AwaitingReview);
         if (item is null) return state.WorkItems.All(x => x.Status is WorkItemStatus.Completed or WorkItemStatus.Superseded) ? "exhausted" : "blocked";
         var role = item.Kind == WorkItemKind.ReviewCheckpoint ? step.Handlers["review-checkpoint"] : step.Handlers["subtask"];
+        var resumeAfterCheckpointGate = item.Status == WorkItemStatus.AwaitingReview;
         item.Status = WorkItemStatus.Dispatching; await SaveAsync(state, cancellationToken); item.Status = WorkItemStatus.Running; await SaveAsync(state, cancellationToken);
         var contract = await File.ReadAllTextAsync(Path.Combine(currentDirectory, item.ContractPath), cancellationToken);
-        if (item.Kind == WorkItemKind.ReviewCheckpoint)
+        if (item.Kind == WorkItemKind.ReviewCheckpoint && !resumeAfterCheckpointGate)
         {
             var gateOutcome = await VerifyWorkItemGateAsync(state, item, "checkpoint", contract, cancellationToken);
             if (gateOutcome != "passed") return gateOutcome;
@@ -176,8 +185,13 @@ public sealed class FactoryRuntime(
 
     private async Task<string> FinalReviewAsync(FactoryState state, WorkflowStepDefinition step, CancellationToken cancellationToken)
     {
-        var gateOutcome = await VerifyFinalGateAsync(state, cancellationToken);
-        if (gateOutcome != "passed") return gateOutcome;
+        if (!state.FinalVerificationPassed)
+        {
+            var gateOutcome = await VerifyFinalGateAsync(state, cancellationToken);
+            if (gateOutcome != "passed") return gateOutcome;
+            state.FinalVerificationPassed = true;
+            await SaveAsync(state, cancellationToken);
+        }
         var request = await File.ReadAllTextAsync(Path.Combine(currentDirectory, state.RequestPath), cancellationToken);
         var result = await InvokeAsync(state, step.Agent!, null, $"Original request:\n{request}\n\nCompleted work:\n{JsonSerializer.Serialize(state.WorkItems.Select(x => new { x.Id, x.Kind, x.ContractPath, x.LastResultRef }))}\n\nAuthoritative final verification evidence references:\n{string.Join("\n", state.VerificationEvidenceRefs)}", cancellationToken);
         state.FinalReview = new(result.Outcome, $"attempts/{result.AttemptId}/result.json", (state.FinalReview?.AttemptCount ?? 0) + 1);
@@ -185,7 +199,11 @@ public sealed class FactoryRuntime(
         {
             InsertCorrection(state, null, result.Payload); await SaveAsync(state, cancellationToken);
         }
-        else await SaveAsync(state, cancellationToken);
+        else
+        {
+            if (result.Outcome != "approved") state.FinalVerificationPassed = false;
+            await SaveAsync(state, cancellationToken);
+        }
         return result.Outcome;
     }
 
@@ -194,9 +212,17 @@ public sealed class FactoryRuntime(
         while (true)
         {
             await events.WriteAsync(state.RunId, "verification-started", new { verificationContext = context, workItemId = item.Id, verificationFixAttempt = item.VerificationFixAttemptCount }, cancellationToken);
-            var result = context == "subtask"
-                ? await verification.RunSubtaskAsync(item.VerificationCheckIds, cancellationToken)
-                : await verification.RunContextAsync(context, cancellationToken);
+            VerificationResult result;
+            try
+            {
+                result = context == "subtask"
+                    ? await verification.RunSubtaskAsync(item.VerificationCheckIds, cancellationToken)
+                    : await verification.RunContextAsync(context, cancellationToken);
+            }
+            catch (VerificationException exception)
+            {
+                return await BlockForVerificationExceptionAsync(state, item, context, exception, cancellationToken);
+            }
             RecordEvidence(state, item, result.Evidence);
             await events.WriteAsync(state.RunId, "verification-completed", new { verificationContext = context, verificationStatus = result.Status.ToString(), verificationFixAttempt = item.VerificationFixAttemptCount }, cancellationToken);
             await SaveAsync(state, cancellationToken);
@@ -220,7 +246,12 @@ public sealed class FactoryRuntime(
         while (true)
         {
             await events.WriteAsync(state.RunId, "verification-started", new { verificationContext = "final", verificationFixAttempt = state.FinalVerificationFixAttemptCount }, cancellationToken);
-            var result = await verification.RunContextAsync("final", cancellationToken);
+            VerificationResult result;
+            try { result = await verification.RunContextAsync("final", cancellationToken); }
+            catch (VerificationException exception)
+            {
+                return await BlockForVerificationExceptionAsync(state, null, "final", exception, cancellationToken);
+            }
             RecordEvidence(state, null, result.Evidence);
             await events.WriteAsync(state.RunId, "verification-completed", new { verificationContext = "final", verificationStatus = result.Status.ToString(), verificationFixAttempt = state.FinalVerificationFixAttemptCount }, cancellationToken);
             await SaveAsync(state, cancellationToken);
@@ -270,6 +301,15 @@ public sealed class FactoryRuntime(
         return "blocked";
     }
 
+    private async Task<string> BlockForVerificationExceptionAsync(FactoryState state, WorkItemState? item, string context, VerificationException exception, CancellationToken cancellationToken)
+    {
+        state.Blocker = new(exception.Code, exception.Message, "Fix the verification failure, then continue.");
+        state.PendingContinuation = new(ContinuationKind.VerificationGate, state.CurrentWorkflowStep, item?.Id, context, exception.Code, true);
+        if (item is not null) item.Status = WorkItemStatus.Blocked;
+        await SaveAsync(state, cancellationToken);
+        return "blocked";
+    }
+
     private static string FailureSummary(VerificationResult result) => string.Join("\n", result.Evidence.Where(x => x.Status != "passed").Select(x =>
         $"- {x.CheckId}: status={x.Status}, exitCode={x.ExitCode}, evidence=verification/{x.EvidenceId}.json\n  {Bounded(x.Output)}"));
 
@@ -295,7 +335,7 @@ public sealed class FactoryRuntime(
             await SaveAsync(state, cancellationToken); return "blocked";
         }
         if (state.IntentSnapshotHash == currentHash) return "blocked";
-        state.IntentSnapshotHash = null; state.Blocker = null; await SaveAsync(state, cancellationToken); return "completed";
+        state.IntentSnapshotHash = null; state.PendingContinuation = null; state.Blocker = null; await SaveAsync(state, cancellationToken); return "completed";
     }
 
     private async Task<AgentResultEnvelope> InvokeAsync(FactoryState state, string role, WorkItemState? item, string input, CancellationToken cancellationToken)
@@ -363,7 +403,7 @@ public sealed class FactoryRuntime(
         return result;
     }
 
-    private static void CaptureSemanticOutcome(FactoryState state, string role, WorkItemState? item, AgentResultEnvelope result)
+    private void CaptureSemanticOutcome(FactoryState state, string role, WorkItemState? item, AgentResultEnvelope result)
     {
         if (result.Outcome == "needs-replan")
         {
@@ -385,8 +425,22 @@ public sealed class FactoryRuntime(
             _ => "Resolve the reported condition and continue."
         };
         state.Blocker = new(code, reason, resumeWhen, result.Payload?.Clone());
-        var kind = result.Outcome == "needs-clarification" ? ContinuationKind.Clarification : ContinuationKind.SemanticInvocation;
-        state.PendingContinuation = new(kind, state.CurrentWorkflowStep, item?.Id, null, code, true);
+        var kind = result.Outcome switch
+        {
+            "needs-clarification" => ContinuationKind.Clarification,
+            "intent-required" => ContinuationKind.IntentGate,
+            _ => ContinuationKind.SemanticInvocation
+        };
+        state.PendingContinuation = new(kind, ContinuationWorkflowStep(state, result.Outcome), item?.Id, null, code, true);
+    }
+
+    private string ContinuationWorkflowStep(FactoryState state, string outcome)
+    {
+        if (outcome != "intent-required") return state.CurrentWorkflowStep;
+        var step = steps[state.CurrentWorkflowStep];
+        return step.Transitions.TryGetValue(outcome, out var target) && target != "$stop"
+            ? target
+            : throw new WorkflowException("UNROUTED_WORKFLOW_OUTCOME", $"Step {step.Id} does not route {outcome} to a resumable intent gate.");
     }
 
     private void AddWorkItem(FactoryState state, JsonElement node)
@@ -452,7 +506,7 @@ public sealed class FactoryRuntime(
             review.Dependencies.Add(id);
             review.CoveredWorkItems.Add(id);
         }
-        else state.FinalVerificationFixAttemptCount = 0;
+        else { state.FinalVerificationFixAttemptCount = 0; state.FinalVerificationPassed = false; }
     }
 
     private void ApplyReplan(FactoryState state, JsonElement? payload)
@@ -502,7 +556,9 @@ public sealed class FactoryRuntime(
             PromoteReady(state);
         }
         else if (continuation.VerificationContext == "checkpoint")
-            state.WorkItems.Single(x => x.Id == continuation.WorkItemId).Status = WorkItemStatus.Ready;
+            state.WorkItems.Single(x => x.Id == continuation.WorkItemId).Status = WorkItemStatus.AwaitingReview;
+        else if (continuation.VerificationContext == "final")
+            state.FinalVerificationPassed = true;
         state.PendingContinuation = null; state.Blocker = null;
         return null;
     }
