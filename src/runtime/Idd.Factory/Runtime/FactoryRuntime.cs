@@ -50,9 +50,20 @@ public sealed class FactoryRuntime(
         if (state.WorkflowHash != workflow.Hash) return new("WORKFLOW_CHANGED", state.RunId, "Restore the workflow used to start this run or cancel and restart.");
         if (state.RunStatus == FactoryRunStatus.Cancelled) return new("CANCELLED", state.RunId);
         await ReconcileAsync(state, cancellationToken);
+        if (state.PendingContinuation is { IsResumable: false })
+            return new(state.Blocker?.Code ?? "TERMINAL_STOP", state.RunId, state.Blocker?.Reason, state.Blocker?.ResumeWhen, Payload: state.Blocker?.Payload);
         if (state.Blocker?.Code == "NEEDS_CLARIFICATION" && answerPath is null)
             return new("NEEDS_CLARIFICATION", state.RunId, state.Blocker.Reason, state.Blocker.ResumeWhen, Payload: state.Blocker.Payload);
         if (answerPath is not null) await RecordClarificationAsync(state, answerPath, cancellationToken);
+        if (state.PendingContinuation is { Kind: ContinuationKind.VerificationGate } continuation)
+        {
+            var resumed = await ResumeVerificationAsync(state, continuation, cancellationToken);
+            if (resumed is not null) return resumed;
+        }
+        if (state.PendingContinuation is { Kind: ContinuationKind.SemanticInvocation, WorkItemId: { } itemId })
+            state.WorkItems.Single(x => x.Id == itemId).Status = WorkItemStatus.Ready;
+        state.PendingContinuation = null;
+        state.Blocker = null;
         state.RunStatus = FactoryRunStatus.Running; await SaveAsync(state, cancellationToken);
         return await ExecuteLoopAsync(state, cancellationToken);
     }
@@ -152,12 +163,15 @@ public sealed class FactoryRuntime(
 
     private async Task<string> ReplanAsync(FactoryState state, WorkflowStepDefinition step, CancellationToken cancellationToken)
     {
-        if (state.ReplanCount >= workflow.Limits.MaxReplans) return "blocked";
+        if (state.ReplanCount >= workflow.Limits.MaxReplans)
+            throw new AgentProtocolException("REPLAN_BUDGET_EXHAUSTED", "Replan budget exhausted.");
         var request = await File.ReadAllTextAsync(Path.Combine(currentDirectory, state.RequestPath), cancellationToken);
         var ready = state.WorkItems.Where(x => x.Status is WorkItemStatus.Ready or WorkItemStatus.Planned).Select(x => new { x.Id, x.Sequence, x.Kind, x.ContractPath });
-        var result = await InvokeAsync(state, step.Agent!, null, $"Original request:\n{request}\n\nRecorded clarifications:\n{await ReadClarificationsAsync(state, cancellationToken)}\n\nMutable remaining work:\n{JsonSerializer.Serialize(ready)}", cancellationToken);
+        var completed = state.WorkItems.Where(x => x.Status == WorkItemStatus.Completed).Select(x => new { x.Id, x.Kind, x.ContractPath, x.LastResultRef });
+        var trigger = state.PendingReplanTrigger ?? throw new AgentProtocolException("MISSING_REPLAN_TRIGGER", "Replan requires a persisted needs-replan trigger.");
+        var result = await InvokeAsync(state, step.Agent!, null, $"Original request:\n{request}\n\nRecorded clarifications:\n{await ReadClarificationsAsync(state, cancellationToken)}\n\nReplan trigger:\n{JsonSerializer.Serialize(trigger)}\n\nMutable remaining work:\n{JsonSerializer.Serialize(ready)}\n\nCompleted work context:\n{JsonSerializer.Serialize(completed)}", cancellationToken);
         if (result.Outcome != "replan-proposed") return result.Outcome;
-        ApplyReplan(state, result.Payload); state.ReplanCount++; await SaveAsync(state, cancellationToken); return "applied";
+        ApplyReplan(state, result.Payload); state.ReplanCount++; state.PendingReplanTrigger = null; await SaveAsync(state, cancellationToken); return "applied";
     }
 
     private async Task<string> FinalReviewAsync(FactoryState state, WorkflowStepDefinition step, CancellationToken cancellationToken)
@@ -246,7 +260,11 @@ public sealed class FactoryRuntime(
             _ => "VERIFICATION_FIX_BUDGET_EXHAUSTED"
         };
         var reason = $"{context} verification ended as {result.Status}: {FailureSummary(result)}";
-        state.Blocker = new(code, reason, "Resolve the reported verification condition, then continue.");
+        var terminal = code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal);
+        state.Blocker = new(code, reason, terminal
+            ? "The configured budget is exhausted. Cancel and restart with a workflow that provides sufficient budget; continue cannot add budget to the current run."
+            : "Resolve the reported verification condition, then continue.");
+        state.PendingContinuation = new(terminal ? ContinuationKind.Terminal : ContinuationKind.VerificationGate, state.CurrentWorkflowStep, item?.Id, context, code, !terminal);
         if (item is not null) item.Status = WorkItemStatus.Blocked;
         await SaveAsync(state, cancellationToken);
         return "blocked";
@@ -294,7 +312,7 @@ public sealed class FactoryRuntime(
                     throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Attempt {persistedAttempt} does not belong to the current semantic operation.");
                 var persistedResult = JsonSerializer.Deserialize<AgentResultEnvelope>(await File.ReadAllTextAsync(persistedResultPath, cancellationToken), FactoryJson.Options);
                 var validated = new AgentResultValidator().Validate(persistedInvocation, persistedResult);
-                CaptureSemanticStop(state, validated); state.CurrentAttemptId = null; await SaveAsync(state, cancellationToken);
+                CaptureSemanticOutcome(state, role, item, validated); state.CurrentAttemptId = null; await SaveAsync(state, cancellationToken);
                 await events.WriteAsync(state.RunId, "agent-result-reused", new { attemptId = persistedAttempt, role }, cancellationToken);
                 return validated;
             }
@@ -327,7 +345,7 @@ public sealed class FactoryRuntime(
         await events.WriteAsync(state.RunId, "agent-dispatching", new { attemptId, role, workItemId = item?.Id }, cancellationToken);
         var execution = await agentExecutor.ExecuteAsync(invocation, cancellationToken);
         var result = execution.Result;
-        CaptureSemanticStop(state, result); state.CurrentAttemptId = null; await SaveAsync(state, cancellationToken);
+        CaptureSemanticOutcome(state, role, item, result); state.CurrentAttemptId = null; await SaveAsync(state, cancellationToken);
         await events.WriteAsync(state.RunId, "agent-completed", new
         {
             attemptId,
@@ -345,8 +363,13 @@ public sealed class FactoryRuntime(
         return result;
     }
 
-    private static void CaptureSemanticStop(FactoryState state, AgentResultEnvelope result)
+    private static void CaptureSemanticOutcome(FactoryState state, string role, WorkItemState? item, AgentResultEnvelope result)
     {
+        if (result.Outcome == "needs-replan")
+        {
+            var evidence = item?.VerificationEvidenceRefs ?? state.VerificationEvidenceRefs;
+            state.PendingReplanTrigger = new(role, item?.Id, $"attempts/{result.AttemptId}/result.json", result.Reason, result.Payload?.Clone(), evidence.ToList());
+        }
         if (result.Outcome is not ("needs-clarification" or "focused-handoff" or "blocked" or "intent-required")) return;
         if (result.Outcome == "intent-required") IntentRequiredPayload.Validate(result.Payload);
         var code = result.Outcome.ToUpperInvariant().Replace('-', '_');
@@ -362,6 +385,8 @@ public sealed class FactoryRuntime(
             _ => "Resolve the reported condition and continue."
         };
         state.Blocker = new(code, reason, resumeWhen, result.Payload?.Clone());
+        var kind = result.Outcome == "needs-clarification" ? ContinuationKind.Clarification : ContinuationKind.SemanticInvocation;
+        state.PendingContinuation = new(kind, state.CurrentWorkflowStep, item?.Id, null, code, true);
     }
 
     private void AddWorkItem(FactoryState state, JsonElement node)
@@ -394,6 +419,14 @@ public sealed class FactoryRuntime(
             if (checkpoint.CoveredWorkItems.Count == 0 || checkpoint.CoveredWorkItems.Any(id => state.WorkItems.Single(x => x.Id == id).Sequence >= checkpoint.Sequence))
                 throw new AgentProtocolException("INVALID_DECOMPOSITION", $"Checkpoint {checkpoint.Id} has invalid coverage.");
         }
+    }
+
+    private void ValidateRuntimeGraph(FactoryState state)
+    {
+        new FactoryStateValidator().Validate(state);
+        verification.ValidateCheckIds(state.WorkItems.SelectMany(x => x.VerificationCheckIds));
+        if (state.WorkItems.Any(x => x.Status is WorkItemStatus.Dispatching or WorkItemStatus.Running && x.CurrentAttemptId is null))
+            throw new AgentProtocolException("INVALID_RUNTIME_GRAPH", "Active work items require an attempt identity.");
     }
 
     private void PromoteReady(FactoryState state)
@@ -438,7 +471,7 @@ public sealed class FactoryRuntime(
             else if (kind == "remove-unused-ready-checkpoint") { var checkpoint = MutableItem(state, operation.GetProperty("id").GetString()!); if (checkpoint.Kind != WorkItemKind.ReviewCheckpoint) throw new AgentProtocolException("INVALID_REPLAN", $"{checkpoint.Id} is not a checkpoint."); checkpoint.Status = WorkItemStatus.Superseded; }
             else throw new AgentProtocolException("INVALID_REPLAN", $"Unsupported or unsafe replan operation {kind}.");
         }
-        ValidateDecomposition(state); PromoteReady(state);
+        ValidateRuntimeGraph(state); PromoteReady(state);
     }
 
     private static WorkItemState MutableItem(FactoryState state, string id)
@@ -451,6 +484,28 @@ public sealed class FactoryRuntime(
         for (var index = 0; index < ids.Count; index++) mutable.Single(x => x.Id == ids[index]).Sequence = slots[index];
     }
     private async Task SaveAsync(FactoryState state, CancellationToken token) { var revision = state.Revision; await stateStore.SaveAsync(state, revision, token); }
+    private async Task<FactoryCliOutcome?> ResumeVerificationAsync(FactoryState state, PendingContinuation continuation, CancellationToken token)
+    {
+        var outcome = continuation.VerificationContext == "final"
+            ? await VerifyFinalGateAsync(state, token)
+            : await VerifyWorkItemGateAsync(state,
+                state.WorkItems.Single(x => x.Id == continuation.WorkItemId),
+                continuation.VerificationContext!,
+                await File.ReadAllTextAsync(Path.Combine(currentDirectory, state.WorkItems.Single(x => x.Id == continuation.WorkItemId).ContractPath), token), token);
+        if (outcome != "passed") return await StopForOutcomeAsync(state, outcome, token);
+        if (continuation.VerificationContext == "subtask")
+        {
+            var item = state.WorkItems.Single(x => x.Id == continuation.WorkItemId);
+            item.Status = WorkItemStatus.AwaitingVerification; item.CurrentAttemptId = null;
+            await SaveAsync(state, token);
+            item.Status = WorkItemStatus.Completed;
+            PromoteReady(state);
+        }
+        else if (continuation.VerificationContext == "checkpoint")
+            state.WorkItems.Single(x => x.Id == continuation.WorkItemId).Status = WorkItemStatus.Ready;
+        state.PendingContinuation = null; state.Blocker = null;
+        return null;
+    }
     private async Task ReconcileAsync(FactoryState state, CancellationToken token)
     {
         var attemptId = state.CurrentAttemptId;
@@ -500,14 +555,25 @@ public sealed class FactoryRuntime(
         await SaveAsync(state, token); await events.WriteAsync(state.RunId, "agent-attempt-interrupted", new { attemptId }, token);
     }
     private async Task<FactoryCliOutcome> StopForOutcomeAsync(FactoryState state, string outcome, CancellationToken token) => await StopAsync(state, state.Blocker?.Code ?? outcome.ToUpperInvariant().Replace('-', '_'), state.Blocker?.Reason ?? $"Workflow stopped with {outcome}.", state.Blocker?.ResumeWhen ?? "Resolve the reported condition and continue.", token, state.Blocker?.Payload);
-    private async Task<FactoryCliOutcome> StopAsync(FactoryState state, string code, string reason, string resume, CancellationToken token, JsonElement? payload = null) { state.RunStatus = FactoryRunStatus.Blocked; state.Blocker = new(code, reason, resume, payload); await SaveAsync(state, token); await events.WriteAsync(state.RunId, "run-blocked", new { code, reason, resume, payload }, token); return new(code, state.RunId, reason, resume, Payload: payload); }
+    private async Task<FactoryCliOutcome> StopAsync(FactoryState state, string code, string reason, string resume, CancellationToken token, JsonElement? payload = null)
+    {
+        state.RunStatus = FactoryRunStatus.Blocked;
+        state.Blocker = new(code, reason, resume, payload);
+        if (state.PendingContinuation is null)
+            state.PendingContinuation = new(code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal) ? ContinuationKind.Terminal : ContinuationKind.SemanticInvocation,
+                state.CurrentWorkflowStep, null, null, code, !code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal));
+        await SaveAsync(state, token); await events.WriteAsync(state.RunId, "run-blocked", new { code, reason, resume, payload }, token); return new(code, state.RunId, reason, resume, Payload: payload);
+    }
     private void DetectLegacyState() { if (!Directory.Exists(currentDirectory)) return; if (Directory.EnumerateFiles(currentDirectory, "*.ready.md").Concat(Directory.EnumerateFiles(currentDirectory, "*.active.md")).Concat(Directory.EnumerateFiles(currentDirectory, "*.completed.md")).Concat(Directory.EnumerateFiles(currentDirectory, "*.blocked.md")).Any()) throw new FactoryStateException("LEGACY_FACTORY_STATE", "Finish with the previous Factory version or cancel/restart with the new runtime."); }
     private async Task RecordClarificationAsync(FactoryState state, string sourcePath, CancellationToken token)
     {
         if (!File.Exists(sourcePath)) throw new FileNotFoundException("Clarification answer file was not found.", sourcePath);
         var directory = Path.Combine(currentDirectory, "clarifications"); Directory.CreateDirectory(directory);
         var relative = $"clarifications/Q{state.ClarificationRefs.Count + 1:00000}.md"; await File.WriteAllTextAsync(Path.Combine(currentDirectory, relative), await File.ReadAllTextAsync(sourcePath, token), token);
-        state.ClarificationRefs.Add(relative); state.Blocker = null; await SaveAsync(state, token);
+        state.ClarificationRefs.Add(relative); state.Blocker = null;
+        if (state.PendingContinuation is { Kind: ContinuationKind.Clarification } continuation)
+            state.PendingContinuation = continuation with { Kind = ContinuationKind.SemanticInvocation };
+        await SaveAsync(state, token);
     }
     private async Task<string> ReadClarificationsAsync(FactoryState state, CancellationToken token) => string.Join("\n\n", await Task.WhenAll(state.ClarificationRefs.Select(path => File.ReadAllTextAsync(Path.Combine(currentDirectory, path), token))));
     private string HashIntent()

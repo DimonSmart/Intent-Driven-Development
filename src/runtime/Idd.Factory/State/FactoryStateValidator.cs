@@ -12,7 +12,7 @@ public sealed class FactoryStateValidator
             [WorkItemStatus.Dispatching] = [WorkItemStatus.Running, WorkItemStatus.Ready, WorkItemStatus.Failed, WorkItemStatus.Cancelled],
             [WorkItemStatus.Running] = [WorkItemStatus.AwaitingVerification, WorkItemStatus.Ready, WorkItemStatus.Blocked, WorkItemStatus.Failed, WorkItemStatus.Cancelled],
             [WorkItemStatus.AwaitingVerification] = [WorkItemStatus.Completed, WorkItemStatus.Ready, WorkItemStatus.Blocked, WorkItemStatus.Failed, WorkItemStatus.Cancelled],
-            [WorkItemStatus.Blocked] = [WorkItemStatus.Ready, WorkItemStatus.Cancelled],
+            [WorkItemStatus.Blocked] = [WorkItemStatus.Ready, WorkItemStatus.AwaitingVerification, WorkItemStatus.Cancelled],
             [WorkItemStatus.Failed] = [WorkItemStatus.Ready, WorkItemStatus.Cancelled],
             [WorkItemStatus.Completed] = [], [WorkItemStatus.Superseded] = [], [WorkItemStatus.Cancelled] = []
         };
@@ -35,6 +35,9 @@ public sealed class FactoryStateValidator
             if (item.Dependencies.Contains(item.Id, StringComparer.Ordinal))
                 throw new FactoryStateException("CORRUPT_FACTORY_STATE", $"Work item {item.Id} depends on itself.");
         }
+        EnsureAcyclic(state.WorkItems);
+        if (state.PendingContinuation is { WorkItemId: { } continuationItem } && !ids.Contains(continuationItem))
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Continuation references unknown work item.");
     }
 
     public void ValidateMutation(FactoryState previous, FactoryState next)
@@ -73,6 +76,22 @@ public sealed class FactoryStateValidator
         left.AttemptCount == right.AttemptCount && left.VerificationFixAttemptCount == right.VerificationFixAttemptCount && left.LastResultRef == right.LastResultRef &&
         left.VerificationCheckIds.SequenceEqual(right.VerificationCheckIds) &&
         left.VerificationEvidenceRefs.SequenceEqual(right.VerificationEvidenceRefs));
+
+    private static void EnsureAcyclic(IEnumerable<WorkItemState> workItems)
+    {
+        var items = workItems.ToDictionary(x => x.Id, StringComparer.Ordinal);
+        var visiting = new HashSet<string>(StringComparer.Ordinal);
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        bool Visit(string id)
+        {
+            if (visited.Contains(id)) return false;
+            if (!visiting.Add(id)) return true;
+            var cyclic = items[id].Dependencies.Any(Visit);
+            visiting.Remove(id); visited.Add(id);
+            return cyclic;
+        }
+        if (items.Keys.Any(Visit)) throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Work-item dependencies contain a cycle.");
+    }
 }
 
 public sealed class FactoryStateException(string code, string message) : Exception(message)

@@ -152,6 +152,81 @@ public sealed class FactoryRuntimeTests
         Assert.Equal("storage-service", persisted!.Blocker!.Payload!.Value.GetProperty("dependency").GetString());
     }
 
+    [Fact] public async Task ContinueRetriesBlockedSemanticWorkItem()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current"); var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem([])));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "blocked", new { dependency = "api" }, "API is unavailable."));
+        var runtime = Create(temp.Path, workflow, current, backend);
+        Assert.Equal("BLOCKED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        backend.Results.Enqueue(invocation => Envelope(invocation, "completed")); backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+        Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default)).FactoryOutcome);
+        Assert.Equal(2, backend.Roles.Count(role => role == "implementer"));
+    }
+
+    [Fact] public async Task ContinueResumesVerificationWithoutRepeatingImplementation()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write("gate.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"); temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  gate:\n    instructions: Confirm gate externally.\ndefault:\n  use:\n    - gate\n");
+        var workflow = DefaultWorkflow(temp); var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem(["gate"]))); backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        var runtime = Create(temp.Path, workflow, current, backend);
+        Assert.Equal("VERIFICATION_REQUIRES_USER_ACTION", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  gate:\n    run: dotnet build gate.csproj --nologo\ndefault:\n  use:\n    - gate\n");
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+        Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default)).FactoryOutcome);
+        Assert.Equal(1, backend.Roles.Count(role => role == "implementer"));
+    }
+
+    [Fact] public async Task ReplanBudgetExhaustionIsTerminal()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current");
+        var baseWorkflow = DefaultWorkflow(temp); var workflow = baseWorkflow with { Limits = baseWorkflow.Limits with { MaxReplans = 0 } }; var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem([]))); backend.Results.Enqueue(invocation => Envelope(invocation, "needs-replan", new { defect = "missing work" }, "Plan is incomplete."));
+        var runtime = Create(temp.Path, workflow, current, backend);
+        var first = await runtime.RunAsync(request, "test", default);
+        Assert.Equal("REPLAN_BUDGET_EXHAUSTED", first.FactoryOutcome); Assert.Contains("Cancel and restart", first.ResumeWhen);
+        var calls = backend.Roles.Count; Assert.Equal("REPLAN_BUDGET_EXHAUSTED", (await runtime.ContinueAsync(default)).FactoryOutcome); Assert.Equal(calls, backend.Roles.Count);
+    }
+
+    [Fact] public async Task FinalReviewReplanIncludesPersistedTriggerWhenNoMutableWorkRemains()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current"); var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem([]))); backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "needs-replan", new { finding = "integration gap" }, "Final integration gap."));
+        backend.Results.Enqueue(invocation => { Assert.Contains("Final integration gap.", invocation.Input); Assert.Contains("integration gap", invocation.Input); Assert.Contains("final-reviewer", invocation.Input); return Envelope(invocation, "replan-proposed", new { operations = Array.Empty<object>() }); });
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+        Assert.Equal("COMPLETED", (await Create(temp.Path, workflow, current, backend).RunAsync(request, "test", default)).FactoryOutcome);
+    }
+
+    [Fact] public async Task CheckpointCorrectionGraphCanBeReplanned()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current"); var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", new { workItems = new object[]
+        {
+            new { id = "one", sequence = 1, kind = "subtask", contractMarkdown = "# One", dependencies = Array.Empty<string>(), coveredWorkItems = Array.Empty<string>(), verificationCheckIds = Array.Empty<string>() },
+            new { id = "review", sequence = 2, kind = "review-checkpoint", contractMarkdown = "# Review", dependencies = new[] { "one" }, coveredWorkItems = new[] { "one" }, verificationCheckIds = Array.Empty<string>() }
+        } }));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "needs-fix", new { correctiveSubtask = new { id = "fix", contractMarkdown = "# Fix", verificationCheckIds = Array.Empty<string>() } }));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "needs-replan", new { defect = "coverage" }, "Review coverage must change."));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "replan-proposed", new { operations = Array.Empty<object>() }));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved")); backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+        Assert.Equal("COMPLETED", (await Create(temp.Path, workflow, current, backend).RunAsync(request, "test", default)).FactoryOutcome);
+    }
+
+    [Fact] public async Task ReplanTriggerSurvivesClarificationStop()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var answer = temp.Write("answer.md", "Proceed."); var workflow = DefaultWorkflow(temp); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current"); var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem([]))); backend.Results.Enqueue(invocation => Envelope(invocation, "needs-replan", new { defect = "missing work" }, "Initial reason."));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "needs-clarification", new { question = "Scope?", options = new[] { "a" } }, "Choose scope."));
+        var runtime = Create(temp.Path, workflow, current, backend); Assert.Equal("NEEDS_CLARIFICATION", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        backend.Results.Enqueue(invocation => { Assert.Contains("Initial reason.", invocation.Input); Assert.Contains("missing work", invocation.Input); return Envelope(invocation, "replan-proposed", new { operations = Array.Empty<object>() }); });
+        backend.Results.Enqueue(invocation => Envelope(invocation, "completed")); backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+        Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default, answer)).FactoryOutcome);
+    }
+
     [Fact] public async Task FailedVerificationUsesOneImplementerFixAndReverifies()
     {
         using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = System.IO.Path.Combine(temp.Path, ".idd", "factory", "current");

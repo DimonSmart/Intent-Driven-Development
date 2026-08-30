@@ -18,7 +18,7 @@ public enum WorkItemStatus
 
 public sealed record FactoryState
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     public required string MethodologyVersion { get; init; }
     public required string RuntimeVersion { get; init; }
@@ -36,6 +36,8 @@ public sealed record FactoryState
     public int CorrectiveCycleCount { get; set; }
     public int FinalVerificationFixAttemptCount { get; set; }
     public FactoryBlocker? Blocker { get; set; }
+    public PendingContinuation? PendingContinuation { get; set; }
+    public PendingReplanTrigger? PendingReplanTrigger { get; set; }
     public FinalReviewState? FinalReview { get; set; }
     public List<string> VerificationEvidenceRefs { get; init; } = [];
     public string? IntentSnapshotHash { get; set; }
@@ -60,6 +62,11 @@ public sealed record WorkItemState
 }
 
 public sealed record FactoryBlocker(string Code, string Reason, string ResumeWhen, JsonElement? Payload = null);
+public sealed record PendingContinuation(ContinuationKind Kind, string WorkflowStep, string? WorkItemId, string? VerificationContext, string Code, bool IsResumable);
+public sealed record PendingReplanTrigger(string SourceRole, string? SourceWorkItemId, string ResultRef, string? Reason, JsonElement? Payload, List<string> EvidenceRefs);
+
+[JsonConverter(typeof(JsonStringEnumConverter<ContinuationKind>))]
+public enum ContinuationKind { SemanticInvocation, VerificationGate, Clarification, Terminal }
 public sealed record FinalReviewState(string Verdict, string? ResultRef, int AttemptCount);
 
 [JsonConverter(typeof(JsonStringEnumConverter<AgentExecutionProfile>))]

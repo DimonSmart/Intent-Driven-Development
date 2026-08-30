@@ -124,6 +124,17 @@ state.
 Legacy `.ready.md`, `.active.md`, `.completed.md`, and `.blocked.md` runs are not
 migrated. Finish them with the prior Factory version or cancel and restart.
 
+Stops also persist a continuation point. A normal `continue` resumes the saved
+semantic invocation, verification gate, or clarification boundary; it does not
+simply set the run back to running. Budget exhaustion is terminal for the pinned
+workflow and requires cancellation followed by a new run with a different
+workflow budget. A `needs-replan` result retains its source, reason, payload,
+result reference, and relevant evidence until its proposal is successfully
+applied. Initial decompositions use `Sequence` as strict topological order.
+Runtime graphs may later contain a correction dependency whose sequence is
+higher than its checkpoint, so runtime validation uses graph structure rather
+than sequence order.
+
 ## Outcomes
 
 The CLI emits one structured outcome and deterministic exit code. Successful
