@@ -131,6 +131,12 @@ public sealed class FactoryRuntime(
                 throw new WorkflowException("UNROUTED_WORKFLOW_OUTCOME", $"Step {step.Id} does not route {outcome}.");
             await events.WriteAsync(state.RunId, "workflow-step-finished", new { step.Id, outcome, target }, cancellationToken);
             if (target == "$stop") return await StopForOutcomeAsync(state, outcome, cancellationToken);
+            if (outcome == "needs-replan")
+            {
+                PersistReplanContinuation(state, step.Id);
+                await SaveAsync(state, cancellationToken);
+                return await ExecuteLoopAsync(state, cancellationToken);
+            }
             state.CurrentWorkflowStep = target; await SaveAsync(state, cancellationToken);
         }
     }
@@ -200,7 +206,10 @@ public sealed class FactoryRuntime(
         var trigger = state.PendingReplanTrigger ?? throw new AgentProtocolException("MISSING_REPLAN_TRIGGER", "Replan requires a persisted needs-replan trigger.");
         var result = await InvokeAsync(state, step.Agent!, null, $"Original request:\n{request}\n\nRecorded clarifications:\n{await ReadClarificationsAsync(state, cancellationToken)}\n\nReplan trigger:\n{JsonSerializer.Serialize(trigger)}\n\nMutable remaining work:\n{JsonSerializer.Serialize(ready)}\n\nCompleted work context:\n{JsonSerializer.Serialize(completed)}", cancellationToken);
         if (result.Outcome != "replan-proposed") return result.Outcome;
-        ApplyReplan(state, result.Payload); state.ReplanCount++; state.PendingReplanTrigger = null; await SaveAsync(state, cancellationToken); return "applied";
+        ApplyReplan(state, result.Payload); state.ReplanCount++; state.PendingReplanTrigger = null;
+        state.PendingContinuation = null;
+        state.Blocker = null;
+        await SaveAsync(state, cancellationToken); return "applied";
     }
 
     private async Task<string> FinalReviewAsync(FactoryState state, WorkflowStepDefinition step, CancellationToken cancellationToken)
@@ -246,17 +255,26 @@ public sealed class FactoryRuntime(
             RecordEvidence(state, item, result.Evidence);
             await events.WriteAsync(state.RunId, "verification-completed", new { verificationContext = context, verificationStatus = result.Status.ToString(), verificationFixAttempt = item.VerificationFixAttemptCount }, cancellationToken);
             await SaveAsync(state, cancellationToken);
-            if (result.Passed) return "passed";
+            if (result.Passed)
+            {
+                state.PendingContinuation = null;
+                state.Blocker = null;
+                await SaveAsync(state, cancellationToken);
+                return "passed";
+            }
             if (result.Status != VerificationStatus.Failed)
                 return await BlockForVerificationAsync(state, item, context, result, cancellationToken);
             if (item.VerificationFixAttemptCount >= workflow.Limits.MaxVerificationFixAttempts)
                 return await BlockForVerificationAsync(state, item, context, result, cancellationToken);
-            item.VerificationFixAttemptCount++; await SaveAsync(state, cancellationToken);
+            item.VerificationFixAttemptCount++;
             var failed = FailureSummary(result);
             var scope = context == "subtask"
                 ? $"work item {item.Id}\n{contract}"
                 : $"checkpoint {item.Id}\ncovered work items: {string.Join(", ", item.CoveredWorkItems)}\nFix only problems preventing this checkpoint verification from passing.";
             var repairInput = $"Mode:\nverification-fix\n\nScope:\n{scope}\n\nFailed authoritative checks:\n{failed}";
+            PersistVerificationFixContinuation(state, item, context, "verification-fix", repairInput);
+            state.Blocker = null;
+            await SaveAsync(state, cancellationToken);
             var repair = await InvokeAsync(state, "implementer", item, repairInput, cancellationToken,
                 context == "subtask" ? SemanticOperationKind.SubtaskVerificationFix : SemanticOperationKind.CheckpointVerificationFix, repairInput);
             if (repair.Outcome != "completed")
@@ -266,6 +284,8 @@ public sealed class FactoryRuntime(
                     repairInput);
                 await SaveAsync(state, cancellationToken); return outcome;
             }
+            PersistVerificationGateContinuation(state, item, context);
+            await SaveAsync(state, cancellationToken);
         }
     }
 
@@ -283,11 +303,20 @@ public sealed class FactoryRuntime(
             RecordEvidence(state, null, result.Evidence);
             await events.WriteAsync(state.RunId, "verification-completed", new { verificationContext = "final", verificationStatus = result.Status.ToString(), verificationFixAttempt = state.FinalVerificationFixAttemptCount }, cancellationToken);
             await SaveAsync(state, cancellationToken);
-            if (result.Passed) return "passed";
+            if (result.Passed)
+            {
+                state.PendingContinuation = null;
+                state.Blocker = null;
+                await SaveAsync(state, cancellationToken);
+                return "passed";
+            }
             if (result.Status != VerificationStatus.Failed || state.FinalVerificationFixAttemptCount >= workflow.Limits.MaxVerificationFixAttempts)
                 return await BlockForVerificationAsync(state, null, "final", result, cancellationToken);
-            state.FinalVerificationFixAttemptCount++; await SaveAsync(state, cancellationToken);
+            state.FinalVerificationFixAttemptCount++;
             var repairInput = $"Mode:\nverification-fix\n\nScope:\nfinal Factory run verification.\nFix only implementation defects required for the failed final checks.\nDo not introduce new product behavior or change durable intent.\n\nFailed authoritative checks:\n{FailureSummary(result)}";
+            PersistVerificationFixContinuation(state, null, "final", "verification-fix", repairInput);
+            state.Blocker = null;
+            await SaveAsync(state, cancellationToken);
             var repair = await InvokeAsync(state, "implementer", null, repairInput, cancellationToken,
                 SemanticOperationKind.FinalVerificationFix, repairInput);
             if (repair.Outcome != "completed")
@@ -296,6 +325,8 @@ public sealed class FactoryRuntime(
                 await SaveAsync(state, cancellationToken);
                 return repair.Outcome;
             }
+            PersistVerificationGateContinuation(state, null, "final");
+            await SaveAsync(state, cancellationToken);
         }
     }
 
@@ -337,7 +368,6 @@ public sealed class FactoryRuntime(
 
     private void PersistVerificationFixContinuation(FactoryState state, WorkItemState? item, string context, string outcome, string input)
     {
-        if (outcome != "blocked") return;
         var operation = context switch
         {
             "subtask" => SemanticOperationKind.SubtaskVerificationFix,
@@ -348,6 +378,10 @@ public sealed class FactoryRuntime(
         state.PendingContinuation = new(ContinuationKind.SemanticInvocation, state.CurrentWorkflowStep, item?.Id, context,
             outcome.ToUpperInvariant().Replace('-', '_'), true, operation, input);
     }
+
+    private void PersistVerificationGateContinuation(FactoryState state, WorkItemState? item, string context) =>
+        state.PendingContinuation = new(ContinuationKind.VerificationGate, state.CurrentWorkflowStep, item?.Id, context,
+            "VERIFICATION_GATE", true);
 
     private async Task<string> BlockForVerificationExceptionAsync(FactoryState state, WorkItemState? item, string context, VerificationException exception, CancellationToken cancellationToken)
     {
@@ -699,7 +733,6 @@ public sealed class FactoryRuntime(
         if (string.IsNullOrWhiteSpace(continuation.OperationInput))
             throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification-fix continuation requires its operation input.");
         var item = continuation.WorkItemId is null ? null : state.WorkItems.Single(x => x.Id == continuation.WorkItemId);
-        state.PendingContinuation = null;
         state.Blocker = null;
         state.RunStatus = FactoryRunStatus.Running;
         await SaveAsync(state, token);
@@ -709,9 +742,13 @@ public sealed class FactoryRuntime(
         {
             if (item is not null) PrepareRepairOutcome(item, repair.Outcome);
             PersistVerificationFixContinuation(state, item, continuation.VerificationContext!, repair.Outcome, continuation.OperationInput);
+            if (repair.Outcome == "needs-replan")
+                PersistReplanContinuation(state, continuation.WorkflowStep);
             await SaveAsync(state, token);
             return await RouteResumedOutcomeAsync(state, continuation.WorkflowStep, repair.Outcome, token);
         }
+        PersistVerificationGateContinuation(state, item, continuation.VerificationContext!);
+        await SaveAsync(state, token);
         var gateOutcome = continuation.VerificationContext == "final"
             ? await VerifyFinalGateAsync(state, token)
             : await VerifyWorkItemGateAsync(state, item!, continuation.VerificationContext!,
@@ -732,6 +769,16 @@ public sealed class FactoryRuntime(
         return await ExecuteLoopAsync(state, token);
     }
 
+    private void PersistReplanContinuation(FactoryState state, string sourceWorkflowStep)
+    {
+        var step = steps[sourceWorkflowStep];
+        if (!step.Transitions.TryGetValue("needs-replan", out var target) || target == "$stop" || !steps.TryGetValue(target, out var targetStep) || targetStep.Uses != "factory.replan")
+            throw new WorkflowException("UNROUTED_WORKFLOW_OUTCOME", $"Step {step.Id} does not route needs-replan to factory.replan.");
+        state.CurrentWorkflowStep = target;
+        state.PendingContinuation = new(ContinuationKind.SemanticInvocation, target, null, null, "NEEDS_REPLAN", true,
+            SemanticOperationKind.Replan);
+    }
+
     private async Task PrepareAndCompleteResumedVerificationAsync(FactoryState state, PendingContinuation continuation, CancellationToken token)
     {
         if (continuation.VerificationContext == "subtask")
@@ -747,6 +794,9 @@ public sealed class FactoryRuntime(
             state.WorkItems.Single(x => x.Id == continuation.WorkItemId).Status = WorkItemStatus.AwaitingReview;
         else if (continuation.VerificationContext == "final")
             state.FinalVerificationPassed = true;
+        state.PendingContinuation = null;
+        state.Blocker = null;
+        await SaveAsync(state, token);
     }
 
     private async Task<FactoryCliOutcome?> ResumeVerificationAsync(FactoryState state, PendingContinuation continuation, CancellationToken token)
@@ -760,6 +810,7 @@ public sealed class FactoryRuntime(
         if (outcome != "passed") return await StopForOutcomeAsync(state, outcome, token);
         await PrepareAndCompleteResumedVerificationAsync(state, continuation, token);
         state.PendingContinuation = null; state.Blocker = null;
+        await SaveAsync(state, token);
         return null;
     }
     private async Task ReconcileAsync(FactoryState state, CancellationToken token)
@@ -822,7 +873,7 @@ public sealed class FactoryRuntime(
     {
         state.RunStatus = FactoryRunStatus.Blocked;
         state.Blocker = new(code, reason, resume, payload);
-        if (state.PendingContinuation is null)
+        if (state.PendingContinuation is null || code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal))
             state.PendingContinuation = new(code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal) ? ContinuationKind.Terminal : ContinuationKind.SemanticInvocation,
                 state.CurrentWorkflowStep, null, null, code, !code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal),
                 SemanticOperationForStep(state.CurrentWorkflowStep));

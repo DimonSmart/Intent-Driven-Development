@@ -423,7 +423,74 @@ public sealed class FactoryRuntimeTests
         var state = await new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default);
         Assert.Equal(FactoryRunStatus.Blocked, state!.RunStatus); Assert.Equal(ContinuationKind.Terminal, state.PendingContinuation!.Kind); Assert.False(state.PendingContinuation.IsResumable);
         var calls = backend.Roles.Count;
-        Assert.Equal("RETRY_BUDGET_EXHAUSTED", (await runtime.ContinueAsync(default)).FactoryOutcome); Assert.Equal(calls, backend.Roles.Count);
+        Assert.Equal("RETRY_BUDGET_EXHAUSTED", (await Create(temp.Path, workflow, current, backend).ContinueAsync(default)).FactoryOutcome); Assert.Equal(calls, backend.Roles.Count);
+    }
+
+    [Fact] public async Task RestartBeforeResumedVerificationFixDispatchKeepsVerificationFixAuthoritative()
+    {
+        using var temp = new TestWorkspace(); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        var state = await SeedVerificationFixContinuationAsync(temp, workflow, current);
+        state.RunStatus = FactoryRunStatus.Running; state.Blocker = null;
+        await new FileFactoryStateStore(current, new FactoryStateValidator()).SaveAsync(state, state.Revision, default);
+        var backend = new FakeAgentBackend(); var observedFixCount = -1;
+        backend.Results.Enqueue(invocation =>
+        {
+            var persisted = new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default).GetAwaiter().GetResult()!;
+            observedFixCount = persisted.WorkItems.Single().VerificationFixAttemptCount;
+            Assert.Equal(SemanticOperationKind.SubtaskVerificationFix, persisted.PendingContinuation!.Operation);
+            Assert.Contains("verification-fix", invocation.Input);
+            return Envelope(invocation, "completed");
+        });
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+
+        Assert.Equal("COMPLETED", (await Create(temp.Path, workflow, current, backend).ContinueAsync(default)).FactoryOutcome);
+        Assert.Equal(1, observedFixCount); Assert.Equal(1, backend.Invocations.Count(x => x.Role == "implementer" && x.Input.Contains("verification-fix")));
+        Assert.DoesNotContain(backend.Invocations, x => x.Role == "implementer" && !x.Input.Contains("verification-fix"));
+    }
+
+    [Fact] public async Task RestartWithResumedVerificationFixAttemptInFlightReconcilesThatFix()
+    {
+        using var temp = new TestWorkspace(); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        var state = await SeedVerificationFixContinuationAsync(temp, workflow, current);
+        await WritePersistedAttemptAsync(temp, current, state, "A000007", result: null);
+        var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => { Assert.Contains("verification-fix", invocation.Input); Assert.NotEqual("A000007", invocation.AttemptId); return Envelope(invocation, "completed"); });
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+
+        Assert.Equal("COMPLETED", (await Create(temp.Path, workflow, current, backend).ContinueAsync(default)).FactoryOutcome);
+        Assert.DoesNotContain(backend.Invocations, x => x.Role == "implementer" && !x.Input.Contains("verification-fix"));
+    }
+
+    [Fact] public async Task RestartAfterResumedVerificationFixCompletedContinuesVerificationGate()
+    {
+        using var temp = new TestWorkspace(); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        var state = await SeedVerificationFixContinuationAsync(temp, workflow, current);
+        await WritePersistedAttemptAsync(temp, current, state, "A000007", "completed");
+        var backend = new FakeAgentBackend(); backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+
+        Assert.Equal("COMPLETED", (await Create(temp.Path, workflow, current, backend).ContinueAsync(default)).FactoryOutcome);
+        Assert.Equal(["final-reviewer"], backend.Roles);
+    }
+
+    [Fact] public async Task RestartAfterResumedVerificationFixNeedsReplanPreservesTriggerAndReplans()
+    {
+        using var temp = new TestWorkspace(); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        var state = await SeedVerificationFixContinuationAsync(temp, workflow, current);
+        await WritePersistedAttemptAsync(temp, current, state, "A000007", "needs-replan", new { defect = "repair scope" }, "Repair requires replanning.");
+        var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation =>
+        {
+            Assert.Equal("factory-replanner", invocation.Role);
+            var persisted = new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default).GetAwaiter().GetResult()!;
+            Assert.Equal("Repair requires replanning.", persisted.PendingReplanTrigger!.Reason);
+            Assert.Equal("repair scope", persisted.PendingReplanTrigger.Payload!.Value.GetProperty("defect").GetString());
+            return Envelope(invocation, "replan-proposed", new { operations = new[] { new { kind = "supersede-ready-subtask", id = "one" } } });
+        });
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+
+        Assert.Equal("COMPLETED", (await Create(temp.Path, workflow, current, backend).ContinueAsync(default)).FactoryOutcome);
+        Assert.Equal(1, backend.Roles.Count(x => x == "factory-replanner"));
+        Assert.DoesNotContain(backend.Roles, x => x == "implementer");
     }
 
     [Fact] public async Task FailedVerificationUsesOneImplementerFixAndReverifies()
@@ -643,6 +710,30 @@ public sealed class FactoryRuntimeTests
         backend.Results.Enqueue(invocation => Envelope(invocation, "completed")); backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
     }
     private static object OneItem(string[] checks) => new { workItems = new[] { new { id = "one", sequence = 1, kind = "subtask", contractMarkdown = "# One", dependencies = Array.Empty<string>(), coveredWorkItems = Array.Empty<string>(), verificationCheckIds = checks } } };
+    private static async Task<FactoryState> SeedVerificationFixContinuationAsync(TestWorkspace temp, WorkflowDefinition workflow, string current)
+    {
+        temp.Write(".idd/factory/current/request.md", "Resume verification fix"); temp.Write(".idd/factory/current/work-items/001-one.md", "# One");
+        var state = StateStoreTests.State() with
+        {
+            WorkflowHash = workflow.Hash,
+            CurrentWorkflowStep = "execute",
+            RunStatus = FactoryRunStatus.Blocked,
+            Blocker = new FactoryBlocker("BLOCKED", "Repair is paused.", "Resolve the reported condition and continue."),
+            PendingContinuation = new PendingContinuation(ContinuationKind.SemanticInvocation, "execute", "one", "subtask", "BLOCKED", true,
+                SemanticOperationKind.SubtaskVerificationFix, "Mode:\nverification-fix\n\nScope:\nwork item one")
+        };
+        state.WorkItems.Add(new WorkItemState { Id = "one", Sequence = 1, Kind = WorkItemKind.Subtask, Status = WorkItemStatus.Blocked, ContractPath = "work-items/001-one.md", AttemptCount = 1, VerificationFixAttemptCount = 1 });
+        await new FileFactoryStateStore(current, new FactoryStateValidator()).CreateAsync(state, default);
+        return state;
+    }
+    private static async Task WritePersistedAttemptAsync(TestWorkspace temp, string current, FactoryState state, string attemptId, string? result, object? payload = null, string? reason = null)
+    {
+        state.CurrentAttemptId = attemptId; state.AttemptSequence = int.Parse(attemptId[1..]); state.WorkItems.Single().CurrentAttemptId = attemptId;
+        await new FileFactoryStateStore(current, new FactoryStateValidator()).SaveAsync(state, state.Revision, default);
+        var invocation = new AgentInvocation { RunId = state.RunId, AttemptId = attemptId, Role = "implementer", WorkItemId = "one", Workspace = temp.Path, ResultPath = Path.Combine(current, "attempts", attemptId, "result.json"), SkillName = "idd-factory-execute-subtask", ExecutionProfile = AgentExecutionProfile.WorkspaceWrite, Input = state.PendingContinuation!.OperationInput!, StartedAt = DateTimeOffset.UnixEpoch };
+        temp.Write($".idd/factory/current/attempts/{attemptId}/invocation.json", JsonSerializer.Serialize(invocation, FactoryJson.Options));
+        if (result is not null) temp.Write($".idd/factory/current/attempts/{attemptId}/result.json", JsonSerializer.Serialize(Envelope(invocation, result, payload, reason), FactoryJson.Options));
+    }
     private static object CheckpointedItem() => new { workItems = new object[]
     {
         new { id = "one", sequence = 1, kind = "subtask", contractMarkdown = "# One", dependencies = Array.Empty<string>(), coveredWorkItems = Array.Empty<string>(), verificationCheckIds = Array.Empty<string>() },
