@@ -68,8 +68,11 @@ public sealed class FactoryRuntime(
             await SaveAsync(state, cancellationToken);
             return await ExecuteLoopAsync(state, cancellationToken);
         }
-        if (state.PendingContinuation is { Kind: ContinuationKind.SemanticInvocation, WorkItemId: { } itemId })
-            state.WorkItems.Single(x => x.Id == itemId).Status = WorkItemStatus.Ready;
+        if (state.PendingContinuation is { Kind: ContinuationKind.SemanticInvocation } semantic)
+        {
+            var resumed = await ResumeSemanticOperationAsync(state, semantic, cancellationToken);
+            if (resumed is not null) return resumed;
+        }
         state.PendingContinuation = null;
         state.Blocker = null;
         state.RunStatus = FactoryRunStatus.Running; await SaveAsync(state, cancellationToken);
@@ -132,9 +135,13 @@ public sealed class FactoryRuntime(
         if (result.Outcome != "ready") return result.Outcome;
         if (result.Payload is not { } payload || !payload.TryGetProperty("workItems", out var items) || items.ValueKind != JsonValueKind.Array)
             throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Decomposer ready result requires payload.workItems.");
-        foreach (var node in items.EnumerateArray()) AddWorkItem(state, node);
-        ValidateDecomposition(state);
-        foreach (var item in state.WorkItems.Where(x => x.Dependencies.Count == 0)) item.Status = WorkItemStatus.Ready;
+        var candidate = CloneState(state);
+        var contracts = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var node in items.EnumerateArray()) AddWorkItem(candidate, node, contracts);
+        ValidateDecomposition(candidate);
+        foreach (var item in candidate.WorkItems.Where(x => x.Dependencies.Count == 0)) item.Status = WorkItemStatus.Ready;
+        ApplyCandidate(state, candidate);
+        WriteContracts(contracts);
         await SaveAsync(state, cancellationToken); return "ready";
     }
 
@@ -156,7 +163,13 @@ public sealed class FactoryRuntime(
             ? $"Work item contract:\n{contract}\n\nAuthoritative Runtime verification evidence references:\n{evidenceRefs}"
             : $"Work item contract:\n{contract}", cancellationToken);
         item.LastResultRef = $"attempts/{result.AttemptId}/result.json";
-        if (result.Outcome is "needs-replan" or "intent-required" or "blocked") { item.Status = result.Outcome == "blocked" ? WorkItemStatus.Blocked : WorkItemStatus.Ready; await SaveAsync(state, cancellationToken); return result.Outcome; }
+        if (result.Outcome is "needs-replan" or "intent-required" or "blocked")
+        {
+            item.Status = result.Outcome == "blocked" && item.Kind == WorkItemKind.ReviewCheckpoint
+                ? WorkItemStatus.AwaitingReview
+                : result.Outcome == "blocked" ? WorkItemStatus.Blocked : WorkItemStatus.Ready;
+            await SaveAsync(state, cancellationToken); return result.Outcome;
+        }
         if (result.Outcome == "needs-fix") { InsertCorrection(state, item, result.Payload); await SaveAsync(state, cancellationToken); return "advanced"; }
         if (result.Outcome is not "completed" and not "approved") throw new AgentProtocolException("UNSUPPORTED_AGENT_OUTCOME", result.Outcome);
         if (item.Kind != WorkItemKind.ReviewCheckpoint)
@@ -201,7 +214,7 @@ public sealed class FactoryRuntime(
         }
         else
         {
-            if (result.Outcome != "approved") state.FinalVerificationPassed = false;
+            if (result.Outcome is not ("approved" or "blocked")) state.FinalVerificationPassed = false;
             await SaveAsync(state, cancellationToken);
         }
         return result.Outcome;
@@ -236,8 +249,16 @@ public sealed class FactoryRuntime(
             var scope = context == "subtask"
                 ? $"work item {item.Id}\n{contract}"
                 : $"checkpoint {item.Id}\ncovered work items: {string.Join(", ", item.CoveredWorkItems)}\nFix only problems preventing this checkpoint verification from passing.";
-            var repair = await InvokeAsync(state, "implementer", item, $"Mode:\nverification-fix\n\nScope:\n{scope}\n\nFailed authoritative checks:\n{failed}", cancellationToken);
-            if (repair.Outcome != "completed") { var outcome = PrepareRepairOutcome(item, repair.Outcome); await SaveAsync(state, cancellationToken); return outcome; }
+            var repairInput = $"Mode:\nverification-fix\n\nScope:\n{scope}\n\nFailed authoritative checks:\n{failed}";
+            var repair = await InvokeAsync(state, "implementer", item, repairInput, cancellationToken,
+                context == "subtask" ? SemanticOperationKind.SubtaskVerificationFix : SemanticOperationKind.CheckpointVerificationFix, repairInput);
+            if (repair.Outcome != "completed")
+            {
+                var outcome = PrepareRepairOutcome(item, repair.Outcome);
+                PersistVerificationFixContinuation(state, item, context, repair.Outcome,
+                    repairInput);
+                await SaveAsync(state, cancellationToken); return outcome;
+            }
         }
     }
 
@@ -259,9 +280,15 @@ public sealed class FactoryRuntime(
             if (result.Status != VerificationStatus.Failed || state.FinalVerificationFixAttemptCount >= workflow.Limits.MaxVerificationFixAttempts)
                 return await BlockForVerificationAsync(state, null, "final", result, cancellationToken);
             state.FinalVerificationFixAttemptCount++; await SaveAsync(state, cancellationToken);
-            var repair = await InvokeAsync(state, "implementer", null,
-                $"Mode:\nverification-fix\n\nScope:\nfinal Factory run verification.\nFix only implementation defects required for the failed final checks.\nDo not introduce new product behavior or change durable intent.\n\nFailed authoritative checks:\n{FailureSummary(result)}", cancellationToken);
-            if (repair.Outcome != "completed") return repair.Outcome;
+            var repairInput = $"Mode:\nverification-fix\n\nScope:\nfinal Factory run verification.\nFix only implementation defects required for the failed final checks.\nDo not introduce new product behavior or change durable intent.\n\nFailed authoritative checks:\n{FailureSummary(result)}";
+            var repair = await InvokeAsync(state, "implementer", null, repairInput, cancellationToken,
+                SemanticOperationKind.FinalVerificationFix, repairInput);
+            if (repair.Outcome != "completed")
+            {
+                PersistVerificationFixContinuation(state, null, "final", repair.Outcome, repairInput);
+                await SaveAsync(state, cancellationToken);
+                return repair.Outcome;
+            }
         }
     }
 
@@ -301,6 +328,20 @@ public sealed class FactoryRuntime(
         return "blocked";
     }
 
+    private void PersistVerificationFixContinuation(FactoryState state, WorkItemState? item, string context, string outcome, string input)
+    {
+        if (outcome != "blocked") return;
+        var operation = context switch
+        {
+            "subtask" => SemanticOperationKind.SubtaskVerificationFix,
+            "checkpoint" => SemanticOperationKind.CheckpointVerificationFix,
+            "final" => SemanticOperationKind.FinalVerificationFix,
+            _ => throw new ArgumentOutOfRangeException(nameof(context))
+        };
+        state.PendingContinuation = new(ContinuationKind.SemanticInvocation, state.CurrentWorkflowStep, item?.Id, context,
+            outcome.ToUpperInvariant().Replace('-', '_'), true, operation, input);
+    }
+
     private async Task<string> BlockForVerificationExceptionAsync(FactoryState state, WorkItemState? item, string context, VerificationException exception, CancellationToken cancellationToken)
     {
         state.Blocker = new(exception.Code, exception.Message, "Fix the verification failure, then continue.");
@@ -338,7 +379,8 @@ public sealed class FactoryRuntime(
         state.IntentSnapshotHash = null; state.PendingContinuation = null; state.Blocker = null; await SaveAsync(state, cancellationToken); return "completed";
     }
 
-    private async Task<AgentResultEnvelope> InvokeAsync(FactoryState state, string role, WorkItemState? item, string input, CancellationToken cancellationToken)
+    private async Task<AgentResultEnvelope> InvokeAsync(FactoryState state, string role, WorkItemState? item, string input, CancellationToken cancellationToken,
+        SemanticOperationKind? continuationOperation = null, string? continuationInput = null)
     {
         if (state.CurrentAttemptId is { } persistedAttempt)
         {
@@ -352,7 +394,7 @@ public sealed class FactoryRuntime(
                     throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Attempt {persistedAttempt} does not belong to the current semantic operation.");
                 var persistedResult = JsonSerializer.Deserialize<AgentResultEnvelope>(await File.ReadAllTextAsync(persistedResultPath, cancellationToken), FactoryJson.Options);
                 var validated = new AgentResultValidator().Validate(persistedInvocation, persistedResult);
-                CaptureSemanticOutcome(state, role, item, validated); state.CurrentAttemptId = null; await SaveAsync(state, cancellationToken);
+                CaptureSemanticOutcome(state, role, item, validated, continuationOperation, continuationInput); state.CurrentAttemptId = null; await SaveAsync(state, cancellationToken);
                 await events.WriteAsync(state.RunId, "agent-result-reused", new { attemptId = persistedAttempt, role }, cancellationToken);
                 return validated;
             }
@@ -385,7 +427,7 @@ public sealed class FactoryRuntime(
         await events.WriteAsync(state.RunId, "agent-dispatching", new { attemptId, role, workItemId = item?.Id }, cancellationToken);
         var execution = await agentExecutor.ExecuteAsync(invocation, cancellationToken);
         var result = execution.Result;
-        CaptureSemanticOutcome(state, role, item, result); state.CurrentAttemptId = null; await SaveAsync(state, cancellationToken);
+        CaptureSemanticOutcome(state, role, item, result, continuationOperation, continuationInput); state.CurrentAttemptId = null; await SaveAsync(state, cancellationToken);
         await events.WriteAsync(state.RunId, "agent-completed", new
         {
             attemptId,
@@ -403,7 +445,8 @@ public sealed class FactoryRuntime(
         return result;
     }
 
-    private void CaptureSemanticOutcome(FactoryState state, string role, WorkItemState? item, AgentResultEnvelope result)
+    private void CaptureSemanticOutcome(FactoryState state, string role, WorkItemState? item, AgentResultEnvelope result,
+        SemanticOperationKind? continuationOperation = null, string? continuationInput = null)
     {
         if (result.Outcome == "needs-replan")
         {
@@ -431,7 +474,9 @@ public sealed class FactoryRuntime(
             "intent-required" => ContinuationKind.IntentGate,
             _ => ContinuationKind.SemanticInvocation
         };
-        state.PendingContinuation = new(kind, ContinuationWorkflowStep(state, result.Outcome), item?.Id, null, code, true);
+        var operation = continuationOperation ?? SemanticOperationFor(role, item);
+        state.PendingContinuation = new(kind, ContinuationWorkflowStep(state, result.Outcome), item?.Id, VerificationContextFor(operation), code, true,
+            operation, continuationInput);
     }
 
     private string ContinuationWorkflowStep(FactoryState state, string outcome)
@@ -443,7 +488,35 @@ public sealed class FactoryRuntime(
             : throw new WorkflowException("UNROUTED_WORKFLOW_OUTCOME", $"Step {step.Id} does not route {outcome} to a resumable intent gate.");
     }
 
-    private void AddWorkItem(FactoryState state, JsonElement node)
+    private SemanticOperationKind SemanticOperationForStep(string workflowStep) =>
+        steps.TryGetValue(workflowStep, out var step) ? step.Uses switch
+        {
+            "factory.decompose" => SemanticOperationKind.Decomposition,
+            "factory.replan" => SemanticOperationKind.Replan,
+            "factory.final-review" => SemanticOperationKind.FinalReview,
+            "factory.execute" => SemanticOperationKind.ExecuteWork,
+            _ => throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Workflow step does not identify a resumable operation.")
+        } : SemanticOperationKind.None;
+
+    private static SemanticOperationKind SemanticOperationFor(string role, WorkItemState? item) => role switch
+    {
+        "task-decomposer" => SemanticOperationKind.Decomposition,
+        "factory-replanner" => SemanticOperationKind.Replan,
+        "checkpoint-reviewer" => SemanticOperationKind.CheckpointReview,
+        "final-reviewer" => SemanticOperationKind.FinalReview,
+        "implementer" when item is not null => SemanticOperationKind.PrimarySubtaskImplementation,
+        _ => SemanticOperationKind.None
+    };
+
+    private static string? VerificationContextFor(SemanticOperationKind operation) => operation switch
+    {
+        SemanticOperationKind.SubtaskVerificationFix => "subtask",
+        SemanticOperationKind.CheckpointVerificationFix => "checkpoint",
+        SemanticOperationKind.FinalVerificationFix => "final",
+        _ => null
+    };
+
+    private void AddWorkItem(FactoryState state, JsonElement node, IDictionary<string, string>? contracts = null)
     {
         var id = node.GetProperty("id").GetString() ?? throw new AgentProtocolException("INVALID_DECOMPOSITION", "Work item id missing.");
         var kindText = node.GetProperty("kind").GetString(); var kind = kindText switch { "subtask" => WorkItemKind.Subtask, "review-checkpoint" => WorkItemKind.ReviewCheckpoint, "corrective-subtask" => WorkItemKind.CorrectiveSubtask, _ => throw new AgentProtocolException("INVALID_DECOMPOSITION", $"Unknown kind {kindText}.") };
@@ -451,7 +524,7 @@ public sealed class FactoryRuntime(
         var file = $"{sequence:000}-{Slug(id)}.md"; var relative = $"work-items/{file}";
         var contract = node.TryGetProperty("contractMarkdown", out var contractNode) ? contractNode.GetString() : null;
         if (string.IsNullOrWhiteSpace(contract)) throw new AgentProtocolException("INVALID_DECOMPOSITION", $"{id} lacks contractMarkdown.");
-        File.WriteAllText(Path.Combine(currentDirectory, relative), contract);
+        contracts?.Add(relative, contract);
         state.WorkItems.Add(new WorkItemState { Id = id, Sequence = sequence, Kind = kind, ContractPath = relative,
             Dependencies = Strings(node, "dependencies"), CoveredWorkItems = Strings(node, "coveredWorkItems"), VerificationCheckIds = Strings(node, "verificationCheckIds") });
     }
@@ -473,6 +546,22 @@ public sealed class FactoryRuntime(
             if (checkpoint.CoveredWorkItems.Count == 0 || checkpoint.CoveredWorkItems.Any(id => state.WorkItems.Single(x => x.Id == id).Sequence >= checkpoint.Sequence))
                 throw new AgentProtocolException("INVALID_DECOMPOSITION", $"Checkpoint {checkpoint.Id} has invalid coverage.");
         }
+    }
+
+    private static FactoryState CloneState(FactoryState state) =>
+        JsonSerializer.Deserialize<FactoryState>(JsonSerializer.Serialize(state, FactoryJson.Options), FactoryJson.Options)
+        ?? throw new InvalidOperationException("Cannot clone Factory state.");
+
+    private static void ApplyCandidate(FactoryState state, FactoryState candidate)
+    {
+        state.WorkItems.Clear();
+        state.WorkItems.AddRange(candidate.WorkItems);
+    }
+
+    private void WriteContracts(IReadOnlyDictionary<string, string> contracts)
+    {
+        foreach (var (relative, content) in contracts)
+            File.WriteAllText(Path.Combine(currentDirectory, relative), content);
     }
 
     private void ValidateRuntimeGraph(FactoryState state)
@@ -511,21 +600,33 @@ public sealed class FactoryRuntime(
 
     private void ApplyReplan(FactoryState state, JsonElement? payload)
     {
+        var candidate = CloneState(state);
+        var contracts = new Dictionary<string, string>(StringComparer.Ordinal);
+        string? runContext = null;
+        ApplyReplanOperations(candidate, payload, contracts, ref runContext);
+        ValidateRuntimeGraph(candidate);
+        PromoteReady(candidate);
+        ApplyCandidate(state, candidate);
+        WriteContracts(contracts);
+        if (runContext is not null) File.WriteAllText(Path.Combine(currentDirectory, "run-context.md"), runContext);
+    }
+
+    private void ApplyReplanOperations(FactoryState state, JsonElement? payload, IDictionary<string, string> contracts, ref string? runContext)
+    {
         if (payload is not { } data || !data.TryGetProperty("operations", out var operations) || operations.ValueKind != JsonValueKind.Array) throw new AgentProtocolException("INVALID_REPLAN", "Replan proposal requires operations.");
         foreach (var operation in operations.EnumerateArray())
         {
             var kind = operation.GetProperty("kind").GetString();
-            if (kind == "insert-subtask") AddWorkItem(state, operation.GetProperty("subtask"));
+            if (kind == "insert-subtask") AddWorkItem(state, operation.GetProperty("subtask"), contracts);
             else if (kind == "supersede-ready-subtask") { var item = MutableItem(state, operation.GetProperty("id").GetString()!); item.Status = WorkItemStatus.Superseded; }
-            else if (kind == "replace-ready-subtask") { var old = MutableItem(state, operation.GetProperty("id").GetString()!); old.Status = WorkItemStatus.Superseded; AddWorkItem(state, operation.GetProperty("subtask")); }
+            else if (kind == "replace-ready-subtask") { var old = MutableItem(state, operation.GetProperty("id").GetString()!); old.Status = WorkItemStatus.Superseded; AddWorkItem(state, operation.GetProperty("subtask"), contracts); }
             else if (kind == "reorder-ready-work") ReorderReady(state, Strings(operation, "workItemIds"));
-            else if (kind == "update-run-context") File.WriteAllText(Path.Combine(currentDirectory, "run-context.md"), operation.GetProperty("content").GetString() ?? "");
+            else if (kind == "update-run-context") runContext = operation.GetProperty("content").GetString() ?? "";
             else if (kind == "update-checkpoint-coverage") { var checkpoint = MutableItem(state, operation.GetProperty("id").GetString()!); if (checkpoint.Kind != WorkItemKind.ReviewCheckpoint) throw new AgentProtocolException("INVALID_REPLAN", $"{checkpoint.Id} is not a checkpoint."); checkpoint.CoveredWorkItems.Clear(); checkpoint.CoveredWorkItems.AddRange(Strings(operation, "coveredWorkItems")); }
-            else if (kind == "insert-checkpoint") AddWorkItem(state, operation.GetProperty("checkpoint"));
+            else if (kind == "insert-checkpoint") AddWorkItem(state, operation.GetProperty("checkpoint"), contracts);
             else if (kind == "remove-unused-ready-checkpoint") { var checkpoint = MutableItem(state, operation.GetProperty("id").GetString()!); if (checkpoint.Kind != WorkItemKind.ReviewCheckpoint) throw new AgentProtocolException("INVALID_REPLAN", $"{checkpoint.Id} is not a checkpoint."); checkpoint.Status = WorkItemStatus.Superseded; }
             else throw new AgentProtocolException("INVALID_REPLAN", $"Unsupported or unsafe replan operation {kind}.");
         }
-        ValidateRuntimeGraph(state); PromoteReady(state);
     }
 
     private static WorkItemState MutableItem(FactoryState state, string id)
@@ -538,6 +639,71 @@ public sealed class FactoryRuntime(
         for (var index = 0; index < ids.Count; index++) mutable.Single(x => x.Id == ids[index]).Sequence = slots[index];
     }
     private async Task SaveAsync(FactoryState state, CancellationToken token) { var revision = state.Revision; await stateStore.SaveAsync(state, revision, token); }
+
+    private async Task<FactoryCliOutcome?> ResumeSemanticOperationAsync(FactoryState state, PendingContinuation continuation, CancellationToken token)
+    {
+        switch (continuation.Operation)
+        {
+            case SemanticOperationKind.PrimarySubtaskImplementation:
+                state.WorkItems.Single(x => x.Id == continuation.WorkItemId).Status = WorkItemStatus.Ready;
+                return null;
+            case SemanticOperationKind.CheckpointReview:
+                state.WorkItems.Single(x => x.Id == continuation.WorkItemId).Status = WorkItemStatus.AwaitingReview;
+                return null;
+            case SemanticOperationKind.FinalReview:
+            case SemanticOperationKind.Decomposition:
+            case SemanticOperationKind.Replan:
+            case SemanticOperationKind.ExecuteWork:
+                return null;
+            case SemanticOperationKind.SubtaskVerificationFix:
+            case SemanticOperationKind.CheckpointVerificationFix:
+            case SemanticOperationKind.FinalVerificationFix:
+                return await ResumeVerificationFixAsync(state, continuation, token);
+            default:
+                throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Unsupported semantic continuation operation.");
+        }
+    }
+
+    private async Task<FactoryCliOutcome?> ResumeVerificationFixAsync(FactoryState state, PendingContinuation continuation, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(continuation.OperationInput))
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification-fix continuation requires its operation input.");
+        var item = continuation.WorkItemId is null ? null : state.WorkItems.Single(x => x.Id == continuation.WorkItemId);
+        var repair = await InvokeAsync(state, "implementer", item, continuation.OperationInput, token,
+            continuation.Operation, continuation.OperationInput);
+        if (repair.Outcome != "completed")
+        {
+            if (item is not null) PrepareRepairOutcome(item, repair.Outcome);
+            PersistVerificationFixContinuation(state, item, continuation.VerificationContext!, repair.Outcome, continuation.OperationInput);
+            await SaveAsync(state, token);
+            return await StopForOutcomeAsync(state, repair.Outcome, token);
+        }
+        var gateOutcome = continuation.VerificationContext == "final"
+            ? await VerifyFinalGateAsync(state, token)
+            : await VerifyWorkItemGateAsync(state, item!, continuation.VerificationContext!,
+                await File.ReadAllTextAsync(Path.Combine(currentDirectory, item!.ContractPath), token), token);
+        if (gateOutcome != "passed") return await StopForOutcomeAsync(state, gateOutcome, token);
+        await PrepareAndCompleteResumedVerificationAsync(state, continuation, token);
+        return null;
+    }
+
+    private async Task PrepareAndCompleteResumedVerificationAsync(FactoryState state, PendingContinuation continuation, CancellationToken token)
+    {
+        if (continuation.VerificationContext == "subtask")
+        {
+            var item = state.WorkItems.Single(x => x.Id == continuation.WorkItemId);
+            item.Status = WorkItemStatus.AwaitingVerification;
+            item.CurrentAttemptId = null;
+            await SaveAsync(state, token);
+            item.Status = WorkItemStatus.Completed;
+            PromoteReady(state);
+        }
+        else if (continuation.VerificationContext == "checkpoint")
+            state.WorkItems.Single(x => x.Id == continuation.WorkItemId).Status = WorkItemStatus.AwaitingReview;
+        else if (continuation.VerificationContext == "final")
+            state.FinalVerificationPassed = true;
+    }
+
     private async Task<FactoryCliOutcome?> ResumeVerificationAsync(FactoryState state, PendingContinuation continuation, CancellationToken token)
     {
         var outcome = continuation.VerificationContext == "final"
@@ -547,18 +713,7 @@ public sealed class FactoryRuntime(
                 continuation.VerificationContext!,
                 await File.ReadAllTextAsync(Path.Combine(currentDirectory, state.WorkItems.Single(x => x.Id == continuation.WorkItemId).ContractPath), token), token);
         if (outcome != "passed") return await StopForOutcomeAsync(state, outcome, token);
-        if (continuation.VerificationContext == "subtask")
-        {
-            var item = state.WorkItems.Single(x => x.Id == continuation.WorkItemId);
-            item.Status = WorkItemStatus.AwaitingVerification; item.CurrentAttemptId = null;
-            await SaveAsync(state, token);
-            item.Status = WorkItemStatus.Completed;
-            PromoteReady(state);
-        }
-        else if (continuation.VerificationContext == "checkpoint")
-            state.WorkItems.Single(x => x.Id == continuation.WorkItemId).Status = WorkItemStatus.AwaitingReview;
-        else if (continuation.VerificationContext == "final")
-            state.FinalVerificationPassed = true;
+        await PrepareAndCompleteResumedVerificationAsync(state, continuation, token);
         state.PendingContinuation = null; state.Blocker = null;
         return null;
     }
@@ -617,7 +772,8 @@ public sealed class FactoryRuntime(
         state.Blocker = new(code, reason, resume, payload);
         if (state.PendingContinuation is null)
             state.PendingContinuation = new(code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal) ? ContinuationKind.Terminal : ContinuationKind.SemanticInvocation,
-                state.CurrentWorkflowStep, null, null, code, !code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal));
+                state.CurrentWorkflowStep, null, null, code, !code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal),
+                SemanticOperationForStep(state.CurrentWorkflowStep));
         await SaveAsync(state, token); await events.WriteAsync(state.RunId, "run-blocked", new { code, reason, resume, payload }, token); return new(code, state.RunId, reason, resume, Payload: payload);
     }
     private void DetectLegacyState() { if (!Directory.Exists(currentDirectory)) return; if (Directory.EnumerateFiles(currentDirectory, "*.ready.md").Concat(Directory.EnumerateFiles(currentDirectory, "*.active.md")).Concat(Directory.EnumerateFiles(currentDirectory, "*.completed.md")).Concat(Directory.EnumerateFiles(currentDirectory, "*.blocked.md")).Any()) throw new FactoryStateException("LEGACY_FACTORY_STATE", "Finish with the previous Factory version or cancel/restart with the new runtime."); }

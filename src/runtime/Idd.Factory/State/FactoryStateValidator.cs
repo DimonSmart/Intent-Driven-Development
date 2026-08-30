@@ -47,6 +47,13 @@ public sealed class FactoryStateValidator
                 throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification continuation requires a supported verification context.");
             if (continuation.VerificationContext is "subtask" or "checkpoint" && continuation.WorkItemId is null)
                 throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Work-item verification continuation requires a work item.");
+            if (continuation.Kind == ContinuationKind.SemanticInvocation && continuation.Operation == SemanticOperationKind.None)
+                throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Semantic continuation requires an exact operation.");
+            if (continuation.Operation is SemanticOperationKind.SubtaskVerificationFix or SemanticOperationKind.CheckpointVerificationFix or SemanticOperationKind.FinalVerificationFix)
+            {
+                if (string.IsNullOrWhiteSpace(continuation.OperationInput) || continuation.VerificationContext is null)
+                    throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification-fix continuation requires its context and input.");
+            }
         }
     }
 
