@@ -1,169 +1,59 @@
-# Factory workflow
+# Factory dynamic task graph
 
-## Runtime boundary
+Factory no longer executes a predefined global sequence of phases. The authoritative operational model is the persisted graph of the user's task plus deterministic runtime policy.
 
-The packaged .NET 10 runtime is a trusted orchestrator process. Codex reaches it
-through the Factory plugin's bundled blocking MCP adapter; Claude and direct
-operators retain the packaged CLI. Both transports start the same runtime from
-the same installed plugin instance and use the same persisted state. MCP owns
-transport only and never dispatches semantic workers or decides workflow
-transitions.
+## Scheduling model
 
-Codex skill metadata can now declare MCP tool dependencies through
-`agents/openai.yaml`. IDD does not use that mechanism as a replacement for the
-bundled Factory transport: the packaged stdio server requires command arguments
-and a plugin-relative working directory (`dotnet runtime/idd-factory.dll mcp`),
-while the current skill dependency metadata is not a complete representation of
-that launch contract. The generated plugin `.mcp.json` therefore remains the
-authoritative Codex binding for the Factory runtime. Skill tool dependencies may
-still be used for external MCP dependencies that can be represented by Codex
-skill metadata; they are dependency metadata, not a permission boundary or a
-requirement that the model invoke a particular tool.
+The .NET runtime inspects `state.json` and deterministically chooses one concrete operation: initial decomposition, exact continuation, work-item verification, scoped refinement of an outline, dispatch of ready work, bounded global replan, final-review materialization, strict final verification, final review dispatch, finalization, or a structured stop.
 
-The runtime needs an available native Codex CLI
-(`IDD_FACTORY_CODEX_EXECUTABLE` can select it). Each semantic subprocess is
-independently launched with `approval_policy=never`; implementers
-receive `workspace-write`, while decomposition and review roles receive
-`read-only` through a backend-neutral execution profile. The Codex adapter
-exposes and explicitly activates the runtime-selected Factory skill. This keeps model-driven tool activity sandboxed without trapping
-the child CLI network control plane inside another Windows sandbox.
+There is no `CurrentWorkflowStep` and no transition table that maps worker outcomes to another global phase. LLM workers never choose what runtime executes next.
 
-On Windows the semantic backend removes `WindowsApps` entries from its child
-PATH before launching sandboxed workers and retains `windows.sandbox =
-"unelevated"`. It records only the sandbox selection and number of removed PATH
-entries, never the full PATH.
+## Work definitions
 
-For file-based Codex authentication, the backend creates an attempt-local
-private `CODEX_HOME`, copies the credential cache, applies the configured
-user-skill inheritance policy, and then exposes the runtime-selected Factory
-skill from the exact plugin instance. A same-name project skill is rejected as
-`FACTORY_SKILL_COLLISION`; a same-name user skill is not inherited. Controlled
-installed-plugin evaluation uses a profile with no user-global skill
-inheritance. The private directory is removed after completion or cancellation,
-and credential material is never part of immutable attempt evidence or final
-Factory results.
+Each task node has an immutable ID and contract provenance. Definitions are:
 
-IDD Factory coordinates multi-stage implementation while current `.idd/intent/`
-remains normative. Factory Runtime manages the workflow deterministically; LLM
-agents perform bounded semantic work inside it.
+- `Outline`: known future scope whose exact executable contract depends on earlier results.
+- `Executable`: self-contained work with a registered capability.
 
-```text
-user / idd-factory-run
-        |
-        v
-Codex bundled MCP or platform CLI
-        |
-        v
-packaged .NET 10 Factory Runtime
-        |
-        +-- task-decomposer
-        +-- implementer
-        +-- checkpoint-reviewer
-        +-- factory-replanner (only when needed)
-        +-- final-reviewer
-```
+Capabilities are semantic work types such as `implementation`, `research`, `documentation`, and `semantic-review`. Runtime maps them to canonical roles/skills and execution profiles. A worker cannot inject an arbitrary role or skill.
 
-There is no semantic step coordinator on the happy path. The runtime chooses the
-next item, validates dependencies and results, runs authoritative verification,
-applies retry and correction budgets, routes reviews, persists state, recovers,
-and finalizes the result.
+Work-item lifecycle is operational state, not a second graph: `Planned`, `Ready`, `Dispatching`, `Running`, `Waiting`, `AwaitingVerification`, `Completed`, `Blocked`, `Failed`, `Superseded`, `Cancelled`.
 
-Codex native subagents are not the Factory orchestration transport. Semantic
-workers are fresh `codex exec` subprocesses owned and awaited by the deterministic
-runtime. If a Codex-specific workflow outside that runtime uses native subagents,
-Multi-Agent V2 `wait_agent` should be treated as an event-driven wait for mailbox
-activity: prefer one long wait allowed by the host when a child result is on the
-critical path, rather than repeatedly waking the parent model with short timeout
-polling. This capability does not remove the blocking MCP boundary between the
-parent Codex session and Factory Runtime.
+Dependencies are the only prerequisite edges. Sequence is a deterministic tie-break/order hint and need not remain topological after valid runtime mutations.
 
-Each invocation carries `Role`, `SkillName`, `ExecutionProfile`, and dynamic
-input. Factory Core neither reads installed `SKILL.md` or role-prompt files nor
-contains Codex skill/sandbox syntax. The selected Factory skill is the sole
-semantic contract; backend activation is adapter-owned, and project/domain
-skills remain available to workers.
+## Dynamic growth
 
-## Execution model
+Initial decomposition may be intentionally partial. Runtime can refine a dependency-ready outline into executable work or a small replacement subgraph.
 
-The complete request is saved unchanged in `request.md`. The decomposer receives
-it and returns ordered self-contained contracts. An implementer receives only
-its active contract, optional shared run context, relevant intent, repository
-evidence, and retry evidence. Every semantic invocation is a fresh subprocess
-context.
+An executing/reviewing worker can return a typed `additional-work-required` requirement. Runtime validates the requested capability, creates the new node, records the dependency/result provenance, and resumes the source only after the dependency completes.
 
-Review checkpoints are selective. A checkpoint covers a contiguous group whose
-early independent review protects later work. Final integrated review is always
-required. A `needs-fix` result inserts a new corrective Subtask; completed work
-is immutable. A semantic decomposition defect invokes the bounded replanner,
-whose proposal is validated before runtime state changes.
+`global-replan-required` is reserved for a real strategy change affecting the remaining graph. The replanner proposes mutations; it never writes state directly.
 
-For every Subtask, the implementer performs semantic implementation and the
-runtime then executes authoritative subtask verification. A checkpoint
-verification gate must pass before its checkpoint reviewer is dispatched, and
-the final verification gate must pass before the final reviewer is dispatched.
-Reviewers consume runtime verification evidence but are not responsible for
-running mandatory checks. A normal failed check is persisted as evidence and
-may trigger the existing implementer skill in runtime-owned
-`verification-fix` mode. The same gate is rerun within its deterministic budget.
+## Revisions and history
 
-Verification policy path rules are evaluated in order against persisted,
-repository-relative changed paths (`/` separators); the first rule covering the
-scope wins and a `fallback: true` rule applies only when no earlier rule does.
-Checks marked `confirmation: required` stop before their command starts and
-require `factory continue --confirmation approve` (or `--confirmation decline` to terminate without running the check). Instruction checks stop with a
-manual-result request and require `factory continue --verification-result
-passed|failed`. Missing policy and fallback are reported as not configured,
-never as a successful empty check set. Verification-fix attempts have their own
-budget and do not consume primary implementation attempts.
-Diagnostics run by workers never replace Runtime-owned authoritative evidence.
+`Revision` is the CAS state revision and changes on persisted state updates.
 
-Every attempt records requested and effective execution configuration when the
-backend can determine it, capability profile and skill source, and explicit
-process termination metadata. `ForcedAfterResult` may preserve a valid semantic
-result but remains an unclean attempt; strict live-evaluation happy paths require
-`CleanExit`.
+`GraphRevision` changes only when graph topology or definitions change. Completed work is immutable. Contract changes create new immutable contract artifacts.
 
-## State and recovery
+`graph/mutations/*.json` is append-only diagnostic provenance. It is not replayed to reconstruct state; `state.json` is authoritative. Orphan diagnostic/contract artifacts after a crash are safe and do not become current state.
 
-The authoritative state is `.idd/factory/current/state.json`. Stable work-item
-contract filenames never encode status. Each mutation increments `revision` and
-uses compare-and-swap atomic persistence. Attempt identity and invocation data
-are written before agent launch. `events.jsonl` is an audit stream, not replayed
-state.
+## Verification
 
-Legacy `.ready.md`, `.active.md`, `.completed.md`, and `.blocked.md` runs are not
-migrated. Finish them with the prior Factory version or cancel and restart.
+Runtime executes authoritative checks. Intermediate work can persist `verificationExpectations` per stable check ID:
 
-Stops also persist a continuation point. A normal `continue` resumes the saved
-semantic invocation, verification gate, or clarification boundary; it does not
-simply set the run back to running. Budget exhaustion is terminal for the pinned
-workflow and requires cancellation followed by a new run with a different
-workflow budget. A `needs-replan` result retains its source, reason, payload,
-result reference, and relevant evidence until its proposal is successfully
-applied. Initial decompositions use `Sequence` as strict topological order.
-Runtime graphs may later contain a correction dependency whose sequence is
-higher than its checkpoint, so runtime validation uses graph structure rather
-than sequence order.
+- `must-pass` (or omitted): a failure is an unexpected regression;
+- `may-fail`: that named intermediate RED is expected.
 
-## Outcomes
+All failed checks must be explicitly `may-fail` for an intermediate result to be accepted as expected RED. Final verification is always strict.
 
-The CLI emits one structured outcome and deterministic exit code. Successful
-finalization creates a collision-safe directory under `.idd/factory/results/`,
-validates `commit-message.md` and `factory-result.json`, preserves the execution
-event log and verification evidence there, then clears `current/`. If result
-creation fails, current state remains resumable.
+No successful verification invokes an LLM classifier or hidden verification-fix loop.
 
-The MCP adapter returns that same structured outcome even when the CLI exit code
-is non-zero for a legitimate Factory result. Interrupting an MCP request stops
-the owned runtime process tree without synthesizing explicit Factory
-cancellation; persisted state remains resumable. Codex 0.147.0 does not satisfy
-the host lifecycle contract needed by the strict installed-plugin lifecycle
-evaluation. OpenAI fixed descendant cleanup for local MCP servers in codex PR
-#37366 and released it in Codex 0.148.0. Host-lifecycle compatibility is
-therefore evaluation evidence and not a prerequisite for publishing an IDD
-release. The cleanup behavior belongs to the Codex host and is covered by its
-upstream process-tree tests; IDD release publication does not recreate that
-evidence for every version.
+## Review and finalization
 
-See [Factory workflow configuration](factory-workflow-configuration.md) for the
-supported YAML composition.
+Semantic reviews are ordinary read-only graph nodes. A defect materializes corrective graph work and preserves the completed review as evidence. Final integrated review is mandatory and is created when ordinary product work quiesces.
+
+For successful completion, strict final verification and the approved final review must both refer to the current `GraphRevision`, with no unfinished required work or active continuation.
+
+## Recovery
+
+Recovery follows the authoritative state snapshot and exact attempt artifacts. Events and graph history are diagnostics only. Runtime either consumes a validated persisted result, safely retries when dispatch is known not to have occurred, or blocks when duplicate side effects cannot be ruled out.
