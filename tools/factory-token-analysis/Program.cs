@@ -155,8 +155,7 @@ internal static class Program
         var userSkills = Int64(telemetry, "inheritedUserSkillCount");
         var projectSkills = Int64(telemetry, "projectLocalSkillCount");
         var workItem = String(invocation, "workItemId");
-        var invocationInput = String(invocation, "input");
-        var launchReason = LaunchReason(role, workItem, invocationInput);
+        var launchReason = LaunchReason(role, workItem);
 
         long inputTokens = 0;
         long cachedInputTokens = 0;
@@ -316,14 +315,13 @@ internal static class Program
             ?? throw new DirectoryNotFoundException($"No completed Factory runs found under {resultsDirectory}.");
     }
 
-    private static string LaunchReason(string role, string workItem, string input)
+    private static string LaunchReason(string role, string workItem)
     {
         if (role == "task-decomposer") return "decomposition";
         if (role == "final-reviewer") return "final review";
         if (role == "checkpoint-reviewer") return "checkpoint review";
         if (role == "factory-replanner") return "replan";
-        if (role == "implementer" && input.StartsWith("Mode:\nverification-fix", StringComparison.Ordinal))
-            return string.IsNullOrWhiteSpace(workItem) ? "verification fix" : $"verification fix {workItem}";
+        if (role == "researcher") return string.IsNullOrWhiteSpace(workItem) ? "research" : $"research {workItem}";
         if (role == "implementer")
             return string.IsNullOrWhiteSpace(workItem) ? "implementation" : $"work item {workItem}";
         return role;
