@@ -151,11 +151,17 @@ public class VerificationEngine(string workspace, string currentDirectory)
         {
             if (check.ConfirmationRequired && !confirmed)
                 return new(VerificationStatus.ConfirmationRequired, evidence, id, check.Run, null);
-            if (check.Instructions is not null && manualPassed is null)
-                return new(VerificationStatus.ResultRequired, evidence, id, null, check.Instructions);
-            evidence.Add(check.Instructions is not null
-                ? await PersistAsync(id, check.Instructions, DateTimeOffset.UtcNow, manualPassed.Value ? 0 : 1, manualPassed.Value ? "passed" : "failed", check.Instructions, cancellationToken)
-                : await ExecuteCheckAsync(id, check, cancellationToken));
+            if (check.Instructions is not null)
+            {
+                if (manualPassed is null)
+                    return new(VerificationStatus.ResultRequired, evidence, id, null, check.Instructions);
+                var passed = manualPassed.Value;
+                evidence.Add(await PersistAsync(id, check.Instructions, DateTimeOffset.UtcNow, passed ? 0 : 1, passed ? "passed" : "failed", check.Instructions, cancellationToken));
+            }
+            else
+            {
+                evidence.Add(await ExecuteCheckAsync(id, check, cancellationToken));
+            }
             confirmed = false;
             manualPassed = null;
         }
