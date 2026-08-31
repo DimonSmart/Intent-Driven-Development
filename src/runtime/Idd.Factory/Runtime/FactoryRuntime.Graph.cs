@@ -143,6 +143,7 @@ public sealed partial class FactoryRuntime
         candidate.RunStatus = FactoryRunStatus.Running;
         NormalizeCandidateReadiness(candidate);
         InvalidateFinalVerification(candidate);
+        ValidateCandidateGraph(state, candidate);
         if (runContext is not null)
             await WriteRuntimeArtifactAtomicallyAsync(Path.Combine(currentDirectory, "run-context.md"), runContext, cancellationToken);
         await PersistGraphMutationAsync(state, candidate, contracts, "semantic-replan", trigger.SourceWorkItemId, trigger.Reason, changed,
@@ -362,6 +363,8 @@ public sealed partial class FactoryRuntime
     private async Task<FactoryCliOutcome?> CreateFinalReviewAsync(FactoryState state, CancellationToken cancellationToken)
     {
         if (!configuration.FinalReview.Required) throw new InvalidOperationException("Final review policy cannot be disabled in this Factory version.");
+        if (!state.FinalVerificationPassed || state.FinalVerificationGraphRevision != state.GraphRevision)
+            throw new InvalidOperationException("Final review materialization requires strict final verification for the current graph revision.");
         EnsureWorkItemCapacity(state, 1, "Mandatory final review");
 
         var candidate = CloneState(state);
@@ -389,7 +392,8 @@ public sealed partial class FactoryRuntime
         candidate.WorkItems.Add(review);
         candidate.PendingContinuation = null;
         candidate.Blocker = null;
-        InvalidateFinalVerification(candidate);
+        candidate.FinalVerificationPassed = true;
+        candidate.FinalVerificationGraphRevision = candidate.GraphRevision;
         await PersistGraphMutationAsync(state, candidate, contracts, "runtime-final-review", null, "Mandatory final integrated review materialized after product-work quiescence.", [review.Id], state.VerificationEvidenceRefs, cancellationToken);
         return null;
     }
