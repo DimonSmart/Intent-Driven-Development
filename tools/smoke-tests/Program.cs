@@ -169,6 +169,7 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
         "idd-factory-run",
         "idd-factory-decompose-task",
         "idd-factory-execute-subtask",
+        "idd-factory-research",
         "idd-factory-review-checkpoint",
         "idd-factory-review-task",
         "idd-factory-replan"
@@ -190,7 +191,8 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-factory-coordinate-step"));
     ExpectMissing(Path.Combine(factoryRoot, "skills", "idd-factory-finalize-run"));
     ExpectFile(Path.Combine(factoryRoot, "runtime", "idd-factory.dll"));
-    ExpectFile(Path.Combine(factoryRoot, "runtime", "factory-workflow.yaml"));
+    ExpectFile(Path.Combine(factoryRoot, "runtime", "factory.yaml"));
+    ExpectMissing(Path.Combine(factoryRoot, "runtime", "factory-workflow.yaml"));
     ExpectDirectory(Path.Combine(factoryRoot, "assets", "bootstrap", ".idd", "factory"));
     ExpectFile(Path.Combine(factoryRoot, "assets", "bootstrap", ".idd", "factory", ".gitignore"));
     using (var methodology = ReadJson(Path.Combine(factoryRoot, "skills", "idd-factory-run", "references", "methodology-version.json")))
@@ -209,6 +211,7 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     {
         (Skill: "idd-factory-decompose-task", Role: "task-decomposer"),
         (Skill: "idd-factory-execute-subtask", Role: "implementer"),
+        (Skill: "idd-factory-research", Role: "researcher"),
         (Skill: "idd-factory-review-checkpoint", Role: "checkpoint-reviewer"),
         (Skill: "idd-factory-review-task", Role: "final-reviewer"),
         (Skill: "idd-factory-replan", Role: "factory-replanner")
@@ -228,6 +231,7 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     {
         "idd-factory-decompose-task",
         "idd-factory-execute-subtask",
+        "idd-factory-research",
         "idd-factory-review-checkpoint",
         "idd-factory-review-task",
         "idd-factory-replan"
@@ -354,7 +358,9 @@ void CheckCanonicalFactoryNeutrality()
     }
 
     var decomposition = ReadText(Path.Combine(repoRoot, "src", "canonical", "skills", "idd-factory-decompose-task.md"));
-    ExpectContains(decomposition, "self-contained contract", "Canonical self-contained decomposition contract");
+    ExpectContains(decomposition, "smallest safe initial task graph", "Canonical minimum-safe decomposition contract");
+    ExpectContains(decomposition, "A complete up-front plan is neither required nor preferred", "Canonical partial decomposition contract");
+    ExpectContains(decomposition, "definitionState: executable | outline", "Canonical executable/outline decomposition contract");
 }
 
 void CheckFactoryRoleGeneration()
@@ -376,6 +382,7 @@ void CheckFactoryRoleGeneration()
     {
         ["idd-factory-decompose-task"] = "task-decomposer",
         ["idd-factory-execute-subtask"] = "implementer",
+        ["idd-factory-research"] = "researcher",
         ["idd-factory-review-checkpoint"] = "checkpoint-reviewer",
         ["idd-factory-review-task"] = "final-reviewer",
         ["idd-factory-replan"] = "factory-replanner"
@@ -391,6 +398,9 @@ void CheckFactoryRoleGeneration()
     var implementerClaudeSkill = ReadFrontMatter(ReadText(Path.Combine(
         marketplaceRoot, "plugins", "claude", "idd-factory", "skills", "idd-factory-execute-subtask", "SKILL.md")));
     ExpectContains(implementerClaudeSkill, "allowed-tools: [Read, Glob, Grep, Edit, Write, Bash]", "Claude implementer native tools");
+    var researchClaudeSkill = ReadFrontMatter(ReadText(Path.Combine(
+        marketplaceRoot, "plugins", "claude", "idd-factory", "skills", "idd-factory-research", "SKILL.md")));
+    ExpectContains(researchClaudeSkill, "allowed-tools: [Read, Glob, Grep]", "Claude researcher read-only native tools");
     var reviewerClaudeSkill = ReadFrontMatter(ReadText(Path.Combine(
         marketplaceRoot, "plugins", "claude", "idd-factory", "skills", "idd-factory-review-task", "SKILL.md")));
     ExpectContains(reviewerClaudeSkill, "allowed-tools: [Read, Glob, Grep, Bash]", "Claude reviewer native tools");
