@@ -15,7 +15,7 @@ public sealed class RecoveryHistoryTests
         temp.Write(".idd/factory/current/request.md", "Resume from authoritative state");
         temp.Write(".idd/factory/current/work-items/A/contracts/000001.md", "# A");
         temp.Write(".idd/factory/current/graph/mutations/orphan.json", "{\"fromGraphRevision\":1,\"toGraphRevision\":99}");
-        var state = StateStoreTests.State() with { RunId = "resume", GraphRevision = 1, FactoryConfigurationHash = Configuration().Hash };
+        var state = StateStoreTests.State() with { RunId = "resume", GraphRevision = 1, FactoryConfigurationHash = CreateConfiguration().Hash };
         state.WorkItems.Add(StateStoreTests.Executable("A", WorkItemStatus.Ready));
         await new FileFactoryStateStore(current, new FactoryStateValidator()).CreateAsync(state, default);
         var backend = new FakeAgentBackend();
