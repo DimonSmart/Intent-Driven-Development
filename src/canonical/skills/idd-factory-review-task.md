@@ -39,9 +39,9 @@ Return protocol version 2 with role `final-reviewer` and one outcome:
 
 - `approved` — no material semantic defect remains; for final review include `payload.commitMessage` with `subject`, `why[]`, `result[]`;
 - `correction-required` — bounded semantic defect that should become corrective graph work;
+- `needs-fix` — backward-compatible alias for `correction-required`;
 - `additional-work-required` — typed prerequisite/investigation should become graph work;
 - `global-replan-required` — remaining global strategy must be restructured;
-- `needs-clarification` — explicit user input is required;
 - `intent-required` — durable product meaning is missing;
 - `blocked` — external condition prevents review.
 
