@@ -51,10 +51,10 @@ public sealed class CrashRecoveryTests
         Assert.Equal("COMPLETED", outcome.FactoryOutcome);
         Assert.DoesNotContain(backend.Invocations, x => x.Role == "researcher");
         Assert.Single(backend.Invocations, x => x.Role == "final-reviewer");
-        var state = await LoadStateFromResultAsync(outcome.ResultDirectory!);
-        var work = state.WorkItems.Single(x => x.Id == "A");
-        Assert.Equal(WorkItemStatus.Completed, work.Status);
-        Assert.Equal("attempts/A000001/result.json", work.LastResultRef);
+        using var graph = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(outcome.ResultDirectory!, "decomposition", "decomposition.json")));
+        var work = graph.RootElement.GetProperty("workItems").EnumerateArray().Single(x => x.GetProperty("id").GetString() == "A");
+        Assert.Equal("Completed", work.GetProperty("status").GetString());
+        Assert.Equal("attempts/A000001/result.json", work.GetProperty("lastResultRef").GetString());
     }
 
     private static FakeAgentBackend HappyRetryBackend()
@@ -120,31 +120,5 @@ public sealed class CrashRecoveryTests
         await File.WriteAllTextAsync(Path.Combine(attemptDirectory, "invocation.json"), JsonSerializer.Serialize(invocation, FactoryJson.Options));
         if (writeResult)
             await File.WriteAllTextAsync(invocation.ResultPath, JsonSerializer.Serialize(Envelope(invocation, "completed", new { finding = "persisted result" }), FactoryJson.Options));
-    }
-
-    private static async Task<FactoryState> LoadStateFromResultAsync(string resultDirectory)
-    {
-        var json = await File.ReadAllTextAsync(Path.Combine(resultDirectory, "factory-result.json"));
-        using var result = JsonDocument.Parse(json);
-        var graphRevision = result.RootElement.GetProperty("graphRevision").GetInt64();
-        var decomposition = await File.ReadAllTextAsync(Path.Combine(resultDirectory, "decomposition", "decomposition.json"));
-        using var graph = JsonDocument.Parse(decomposition);
-        var state = StateStoreTests.State() with { GraphRevision = graphRevision };
-        foreach (var element in graph.RootElement.GetProperty("workItems").EnumerateArray())
-        {
-            state.WorkItems.Add(new WorkItemState
-            {
-                Id = element.GetProperty("id").GetString()!,
-                Sequence = element.GetProperty("sequence").GetInt32(),
-                Kind = Enum.Parse<WorkItemKind>(element.GetProperty("kind").GetString()!, true),
-                Capability = element.GetProperty("capability").GetString(),
-                DefinitionState = Enum.Parse<WorkDefinitionState>(element.GetProperty("definitionState").GetString()!, true),
-                Status = Enum.Parse<WorkItemStatus>(element.GetProperty("status").GetString()!, true),
-                ContractPath = element.GetProperty("contractPath").GetString()!,
-                ContractRevision = element.GetProperty("contractRevision").GetInt32(),
-                LastResultRef = element.TryGetProperty("lastResultRef", out var resultRef) && resultRef.ValueKind != JsonValueKind.Null ? resultRef.GetString() : null
-            });
-        }
-        return state;
     }
 }
