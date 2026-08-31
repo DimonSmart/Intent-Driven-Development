@@ -4,7 +4,7 @@ Factory no longer executes a predefined global sequence of phases. The authorita
 
 ## Scheduling model
 
-The .NET runtime inspects `state.json` and deterministically chooses one concrete operation: initial decomposition, exact continuation, work-item verification, scoped refinement of an outline, dispatch of ready work, bounded global replan, final-review materialization, strict final verification, final review dispatch, finalization, or a structured stop.
+The .NET runtime inspects `state.json` and deterministically chooses one concrete operation: initial decomposition, exact continuation, work-item verification, scoped refinement of an outline, dispatch of ready work, bounded global replan, strict final verification after ordinary product work quiesces, final-review materialization, final review dispatch, finalization, or a structured stop.
 
 There is no `CurrentWorkflowStep` and no transition table that maps worker outcomes to another global phase. LLM workers never choose what runtime executes next.
 
@@ -50,10 +50,16 @@ No successful verification invokes an LLM classifier or hidden verification-fix 
 
 ## Review and finalization
 
-Semantic reviews are ordinary read-only graph nodes. A defect materializes corrective graph work and preserves the completed review as evidence. Final integrated review is mandatory and is created when ordinary product work quiesces.
+Semantic reviews are ordinary read-only graph nodes. A defect materializes corrective graph work and preserves the completed review as evidence. Final integrated review is mandatory. Runtime first reaches ordinary product-work quiescence and passes strict final deterministic verification, then materializes and dispatches the final semantic-review node. Materializing that read-only node advances `GraphRevision` but does not require an otherwise identical second full verification.
 
-For successful completion, strict final verification and the approved final review must both refer to the current `GraphRevision`, with no unfinished required work or active continuation.
+For successful completion, strict final verification and the approved final review must both refer to the current `GraphRevision`, with no unfinished required work or active continuation. Any later product/corrective graph mutation makes the previous final verification/review stale and requires a fresh strict final verification followed by a fresh final review.
 
 ## Recovery
 
-Recovery follows the authoritative state snapshot and exact attempt artifacts. Events and graph history are diagnostics only. Runtime either consumes a validated persisted result, safely retries when dispatch is known not to have occurred, or blocks when duplicate side effects cannot be ruled out.
+Recovery follows the authoritative state snapshot and exact attempt artifacts. Events and graph history are diagnostics only.
+
+- If authoritative state contains an active attempt but its `invocation.json` is absent, semantic dispatch is known not to have begun. Runtime clears that attempt and safely retries the exact persisted operation.
+- If `invocation.json` exists but `result.json` does not, the attempt is treated as interrupted. For workspace-write work, runtime recovers the persisted workspace-change evidence, clears the active attempt, and retries the exact operation.
+- If both `invocation.json` and `result.json` exist, runtime validates attempt/result identity and protocol, recovers workspace-change evidence, and reuses the persisted result without duplicate semantic dispatch.
+
+Recovery never replays transcripts, events, or graph history to reconstruct current state.
