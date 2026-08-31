@@ -37,6 +37,7 @@ public sealed class FactoryStateValidator
                 throw new FactoryStateException("CORRUPT_FACTORY_STATE", $"Work item {item.Id} depends on itself.");
         }
         EnsureAcyclic(state.WorkItems);
+        ValidatePendingVerificationSession(state, ids);
         if (state.PendingContinuation is { } continuation)
         {
             if (string.IsNullOrWhiteSpace(continuation.WorkflowStep))
@@ -55,6 +56,41 @@ public sealed class FactoryStateValidator
                     throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification-fix continuation requires its context and input.");
             }
         }
+    }
+
+    private static void ValidatePendingVerificationSession(FactoryState state, ISet<string> ids)
+    {
+        var session = state.PendingVerificationSession;
+        if (session is null) return;
+        if (session.Context is not ("subtask" or "checkpoint" or "final"))
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification session requires a supported context.");
+        if (session.Context == "final" && session.WorkItemId is not null)
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Final verification session must not reference a work item.");
+        if (session.Context is "subtask" or "checkpoint" && (session.WorkItemId is null || !ids.Contains(session.WorkItemId)))
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Work-item verification session requires an existing work item.");
+        if (string.IsNullOrWhiteSpace(session.PolicyHash) || session.NextCheckIndex < 0 || session.NextCheckIndex > session.CheckIds.Count)
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification session cursor and policy hash are invalid.");
+        if (session.CheckIds.Any(string.IsNullOrWhiteSpace) || session.CheckIds.Distinct(StringComparer.Ordinal).Count() != session.CheckIds.Count)
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification session check IDs must be unique.");
+        if (!session.CompletedCheckIds.SequenceEqual(session.CheckIds.Take(session.NextCheckIndex), StringComparer.Ordinal))
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Completed verification checks must match the session cursor.");
+        if (session.ChangedPaths.Any(path => string.IsNullOrWhiteSpace(path) || Path.IsPathRooted(path) || path.Contains('\\') || path.Split('/').Contains("..", StringComparer.Ordinal)))
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification session changed paths must be normalized repository-relative paths.");
+        var awaiting = session.Stage is VerificationContinuationStage.AwaitingConfirmation or VerificationContinuationStage.AwaitingManualResult;
+        if (awaiting != (session.PendingCheckId is not null && session.PendingCheckDefinitionHash is not null))
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification session pending action does not match its stage.");
+        if (awaiting && (session.NextCheckIndex == session.CheckIds.Count || session.PendingCheckId != session.CheckIds[session.NextCheckIndex]))
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification session pending check does not match its cursor.");
+        if (state.PendingContinuation is { } continuation)
+        {
+            if (continuation.Kind == ContinuationKind.VerificationGate &&
+                (continuation.VerificationContext != session.Context || continuation.WorkItemId != session.WorkItemId || continuation.VerificationStage != session.Stage))
+                throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification continuation contradicts its persisted session.");
+            if (awaiting && continuation.Kind != ContinuationKind.VerificationGate)
+                throw new FactoryStateException("CORRUPT_FACTORY_STATE", "A pending verification action requires a verification-gate continuation.");
+        }
+        else if (awaiting)
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", "A pending verification action requires a continuation.");
     }
 
     public void ValidateMutation(FactoryState previous, FactoryState next)

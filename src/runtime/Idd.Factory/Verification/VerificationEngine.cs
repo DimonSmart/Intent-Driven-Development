@@ -14,7 +14,7 @@ public sealed record VerificationEvidence(
     DateTimeOffset StartedAt, DateTimeOffset FinishedAt,
     int ExitCode, string Status, string Output);
 
-public enum VerificationStatus { Passed, Failed, ConfirmationRequired, ResultRequired, InfrastructureFailure, NoChecks }
+public enum VerificationStatus { Passed, Failed, ConfirmationRequired, ResultRequired, Declined, InfrastructureFailure, NoChecks }
 
 public sealed record VerificationResult(VerificationStatus Status, IReadOnlyList<VerificationEvidence> Evidence,
     string? PendingCheckId = null, string? PendingCommand = null, string? PendingInstructions = null)
@@ -114,6 +114,18 @@ public class VerificationEngine(string workspace, string currentDirectory)
         if (!policy.Checks.TryGetValue(checkId, out var check) || expectedDefinitionHash is not null && !string.Equals(expectedDefinitionHash, DefinitionHash(check), StringComparison.Ordinal))
             throw new VerificationException("VERIFICATION_POLICY_CHANGED", $"Verification check {checkId} changed while user action was pending.");
         return await RunChecksAsync([(checkId, check)], confirmed, manualPassed, cancellationToken);
+    }
+
+    public async Task<VerificationResult> DeclineCheckAsync(string checkId, string? expectedDefinitionHash, string? expectedPolicyHash, CancellationToken cancellationToken)
+    {
+        var policy = await LoadPolicyAsync(cancellationToken) ?? throw new VerificationException("VERIFICATION_POLICY_CHANGED", "Verification policy is no longer available.");
+        if (expectedPolicyHash is not null && !string.Equals(expectedPolicyHash, PolicyHash(policy), StringComparison.Ordinal))
+            throw new VerificationException("VERIFICATION_POLICY_CHANGED", "Verification policy changed while user action was pending.");
+        if (!policy.Checks.TryGetValue(checkId, out var check) || expectedDefinitionHash is not null && !string.Equals(expectedDefinitionHash, DefinitionHash(check), StringComparison.Ordinal))
+            throw new VerificationException("VERIFICATION_POLICY_CHANGED", $"Verification check {checkId} changed while user action was pending.");
+        if (!check.ConfirmationRequired) throw new VerificationException("VERIFICATION_POLICY_CHANGED", $"Verification check {checkId} no longer requires confirmation.");
+        var evidence = await PersistAsync(checkId, check.Run!, DateTimeOffset.UtcNow, -1, "not-verified", "User explicitly declined confirmation.", cancellationToken);
+        return new(VerificationStatus.Declined, [evidence], checkId, check.Run, null);
     }
 
     public async Task<ResolvedVerificationSelection> ResolveContextAsync(string context, IEnumerable<string> changedPaths, CancellationToken cancellationToken)

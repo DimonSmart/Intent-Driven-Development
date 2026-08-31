@@ -43,6 +43,17 @@ public sealed class VerificationTests
         Assert.Equal(VerificationStatus.Passed, completed.Status);
     }
 
+    [Fact] public async Task ExplicitConfirmationDeclineRecordsNotVerifiedEvidenceWithoutRunningTheCheck()
+    {
+        using var temp = new TestWorkspace(); temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  expensive:\n    run: throw 'must not run'\n    confirmation: required\ndefault:\n  use:\n    - expensive\n");
+        var engine = new VerificationEngine(temp.Path, Path.Combine(temp.Path, ".idd", "factory", "current"));
+        var pending = await engine.RunCheckAsync("expensive", confirmed: false, manualPassed: null, default);
+
+        var declined = await engine.DeclineCheckAsync("expensive", (await engine.GetCheckDefinitionHashAsync("expensive", default)), (await engine.ResolveContextAsync("subtask", [], default)).PolicyHash, default);
+
+        Assert.Equal(VerificationStatus.Declined, declined.Status); Assert.Equal("not-verified", Assert.Single(declined.Evidence).Status); Assert.Equal(pending.PendingCheckId, declined.PendingCheckId);
+    }
+
     [Fact] public async Task FailedCheckReturnsStructuredResultAndPersistsEvidence()
     {
         using var temp = new TestWorkspace(); temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  fail:\n    run: exit 7\ndefault:\n  use:\n    - fail\n");

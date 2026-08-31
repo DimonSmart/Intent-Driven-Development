@@ -43,7 +43,7 @@ public sealed class FactoryRuntime(
         return await ExecuteLoopAsync(state, cancellationToken);
     }
 
-    public async Task<FactoryCliOutcome> ContinueAsync(CancellationToken cancellationToken, string? answerPath = null, bool confirm = false, bool? verificationPassed = null)
+    public async Task<FactoryCliOutcome> ContinueAsync(CancellationToken cancellationToken, string? answerPath = null, VerificationConfirmation confirmation = VerificationConfirmation.None, bool? verificationPassed = null)
     {
         DetectLegacyState();
         var state = await stateStore.LoadAsync(cancellationToken) ?? throw new FactoryStateException("MISSING_FACTORY_STATE", "No Factory run exists.");
@@ -56,23 +56,41 @@ public sealed class FactoryRuntime(
             return new(state.Blocker?.Code ?? "TERMINAL_STOP", state.RunId, state.Blocker?.Reason, state.Blocker?.ResumeWhen, Payload: state.Blocker?.Payload);
         if (state.PendingContinuation is { VerificationStage: VerificationContinuationStage.AwaitingConfirmation or VerificationContinuationStage.AwaitingManualResult } pending)
         {
-            if (pending.VerificationStage == VerificationContinuationStage.AwaitingConfirmation && !confirm)
+            if (pending.VerificationStage == VerificationContinuationStage.AwaitingConfirmation && confirmation == VerificationConfirmation.None)
                 return new("VERIFICATION_CONFIRMATION_REQUIRED", state.RunId, state.Blocker?.Reason, state.Blocker?.ResumeWhen, Payload: state.Blocker?.Payload);
             if (pending.VerificationStage == VerificationContinuationStage.AwaitingManualResult && verificationPassed is null)
                 return new("VERIFICATION_RESULT_REQUIRED", state.RunId, state.Blocker?.Reason, state.Blocker?.ResumeWhen, Payload: state.Blocker?.Payload);
             var session = state.PendingVerificationSession ?? throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Pending verification action has no persisted verification session.");
             try
             {
-                var resolved = await verification.RunCheckAsync(session.PendingCheckId!, confirm, verificationPassed, session.PendingCheckDefinitionHash, session.PolicyHash, cancellationToken);
                 var item = pending.WorkItemId is null ? null : state.WorkItems.Single(x => x.Id == pending.WorkItemId);
+                if (pending.VerificationStage == VerificationContinuationStage.AwaitingConfirmation && confirmation == VerificationConfirmation.Decline)
+                {
+                    var declined = await verification.DeclineCheckAsync(session.PendingCheckId!, session.PendingCheckDefinitionHash, session.PolicyHash, cancellationToken);
+                    RecordEvidence(state, item, declined.Evidence);
+                    state.Blocker = new("VERIFICATION_DECLINED", $"Confirmation for check {session.PendingCheckId} was explicitly declined.", "Start a new Factory run when this verification can be approved.");
+                    state.PendingContinuation = new(ContinuationKind.Terminal, pending.WorkflowStep, pending.WorkItemId, pending.VerificationContext, "VERIFICATION_DECLINED", false,
+                        VerificationCheckId: session.PendingCheckId, VerificationStage: VerificationContinuationStage.AwaitingConfirmation);
+                    if (item is not null) item.Status = WorkItemStatus.Blocked;
+                    await SaveAsync(state, cancellationToken);
+                    return new("VERIFICATION_DECLINED", state.RunId, state.Blocker.Reason, state.Blocker.ResumeWhen);
+                }
+                var resolved = await verification.RunCheckAsync(session.PendingCheckId!, confirmation == VerificationConfirmation.Approve, verificationPassed, session.PendingCheckDefinitionHash, session.PolicyHash, cancellationToken);
                 RecordEvidence(state, item, resolved.Evidence);
                 if (resolved.Status == VerificationStatus.Failed)
-                    return await StopForOutcomeAsync(state, await HandlePersistedVerificationFailureAsync(state, item, session.Context, resolved, cancellationToken), cancellationToken);
+                {
+                    var outcome = await HandlePersistedVerificationFailureAsync(state, item, session.Context, resolved, cancellationToken);
+                    var resumed = await ResumePendingVerificationActionAsync(state, pending, outcome, cancellationToken);
+                    if (resumed is not null) return resumed;
+                }
+                else
+                {
                 session = session with { NextCheckIndex = session.NextCheckIndex + 1, CompletedCheckIds = session.CompletedCheckIds.Concat([session.PendingCheckId!]).ToList(), EvidenceRefs = session.EvidenceRefs.Concat(resolved.Evidence.Select(x => $"verification/{x.EvidenceId}.json")).ToList(), PendingCheckId = null, PendingCheckDefinitionHash = null, Stage = VerificationContinuationStage.ExecuteCheck };
                 state.PendingVerificationSession = session;
                 state.PendingContinuation = pending with { VerificationStage = VerificationContinuationStage.ExecuteCheck };
                 state.Blocker = null;
                 await SaveAsync(state, cancellationToken);
+                }
             }
             catch (VerificationException exception)
             {
@@ -374,8 +392,7 @@ public sealed class FactoryRuntime(
                 state.PendingReplanTrigger = new("verification", item.Id, "", "The work item changed paths require a different verification selection.", null, item.VerificationEvidenceRefs.ToList());
                 return "needs-replan";
             }
-            var checkIds = context == "subtask" && item is not null && item.VerificationCheckIds.Count > 0 && selection.CheckIds.Count == 0 ? item.VerificationCheckIds : selection.CheckIds;
-            session = new(context, item?.Id, checkIds.ToList(), changedPaths.ToList(), 0, [], [], null, null, selection.PolicyHash, VerificationContinuationStage.ExecuteCheck);
+            session = new(context, item?.Id, selection.CheckIds.ToList(), changedPaths.ToList(), 0, [], [], null, null, selection.PolicyHash, VerificationContinuationStage.ExecuteCheck);
             state.PendingVerificationSession = session;
             await SaveAsync(state, cancellationToken);
         }
@@ -383,7 +400,9 @@ public sealed class FactoryRuntime(
         {
             if (session.PolicyHash == "not-configured")
             {
-                var fallback = await verification.RunContextAsync(context, session.ChangedPaths, cancellationToken);
+                VerificationResult fallback;
+                try { fallback = await verification.RunContextAsync(context, session.ChangedPaths, cancellationToken); }
+                catch (VerificationException exception) { return await BlockForVerificationExceptionAsync(state, item, context, exception, cancellationToken); }
                 RecordEvidence(state, item, fallback.Evidence);
                 if (fallback.Status == VerificationStatus.Failed) return await HandlePersistedVerificationFailureAsync(state, item, context, fallback, cancellationToken);
                 if (fallback.Status is not (VerificationStatus.Passed or VerificationStatus.NoChecks)) return await BlockForVerificationAsync(state, item, context, fallback, cancellationToken);
@@ -428,7 +447,7 @@ public sealed class FactoryRuntime(
         await SaveAsync(state, cancellationToken);
         var repair = await InvokeAsync(state, "implementer", item, input, cancellationToken,
             context == "subtask" ? SemanticOperationKind.SubtaskVerificationFix : context == "checkpoint" ? SemanticOperationKind.CheckpointVerificationFix : SemanticOperationKind.FinalVerificationFix, input);
-        if (repair.Outcome != "completed") { HandleVerificationFixOutcomeContinuation(state, item, context, repair, input); await SaveAsync(state, cancellationToken); return repair.Outcome; }
+        if (repair.Outcome != "completed") { if (item is not null) PrepareRepairOutcome(item, repair.Outcome); HandleVerificationFixOutcomeContinuation(state, item, context, repair, input); await SaveAsync(state, cancellationToken); return repair.Outcome; }
         HandleVerificationFixOutcomeContinuation(state, item, context, repair, input);
         await SaveAsync(state, cancellationToken);
         return await RunPersistedVerificationAsync(state, item, context, cancellationToken);
@@ -639,11 +658,27 @@ public sealed class FactoryRuntime(
 
     private Dictionary<string, string> SnapshotWorkspace()
     {
-        var excluded = Path.Combine(workspace, ".idd", "factory", "current") + Path.DirectorySeparatorChar;
-        return Directory.EnumerateFiles(workspace, "*", SearchOption.AllDirectories)
-            .Where(path => !path.StartsWith(excluded, StringComparison.OrdinalIgnoreCase))
-            .ToDictionary(path => Path.GetRelativePath(workspace, path).Replace('\\', '/'), path => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path))), StringComparer.Ordinal);
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var path in Directory.EnumerateFiles(workspace, "*", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(workspace, path).Replace('\\', '/');
+            if (IsOperationalArtifact(relative)) continue;
+            try { result.Add(relative, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)))); }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                events.WriteAsync("snapshot", "workspace-snapshot-file-skipped", new { path = relative, exception = exception.GetType().Name }, CancellationToken.None).GetAwaiter().GetResult();
+            }
+        }
+        return result;
     }
+
+    private static bool IsOperationalArtifact(string path) => path.StartsWith(".git/", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith(".idd/factory/", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith(".vs/", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith(".idea/", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith(".vscode/", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("bin/", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("obj/", StringComparison.OrdinalIgnoreCase);
 
     private void CaptureSemanticOutcome(FactoryState state, string role, WorkItemState? item, AgentResultEnvelope result,
         SemanticOperationKind? continuationOperation = null, string? continuationInput = null)
@@ -978,6 +1013,13 @@ public sealed class FactoryRuntime(
         await PrepareAndCompleteResumedVerificationAsync(state, continuation, token);
         state.PendingContinuation = null; state.Blocker = null;
         await SaveAsync(state, token);
+        return null;
+    }
+
+    private async Task<FactoryCliOutcome?> ResumePendingVerificationActionAsync(FactoryState state, PendingContinuation continuation, string outcome, CancellationToken token)
+    {
+        if (outcome != "passed") return await RouteResumedOutcomeAsync(state, continuation.WorkflowStep, outcome, token);
+        await PrepareAndCompleteResumedVerificationAsync(state, continuation, token);
         return null;
     }
     private async Task ReconcileAsync(FactoryState state, CancellationToken token)

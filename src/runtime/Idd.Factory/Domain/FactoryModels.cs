@@ -80,6 +80,9 @@ public enum ContinuationKind { SemanticInvocation, VerificationGate, IntentGate,
 [JsonConverter(typeof(JsonStringEnumConverter<VerificationContinuationStage>))]
 public enum VerificationContinuationStage { ExecuteCheck, AwaitingConfirmation, AwaitingManualResult }
 
+[JsonConverter(typeof(JsonStringEnumConverter<VerificationConfirmation>))]
+public enum VerificationConfirmation { None, Approve, Decline }
+
 [JsonConverter(typeof(JsonStringEnumConverter<SemanticOperationKind>))]
 public enum SemanticOperationKind
 {

@@ -174,7 +174,7 @@ public sealed class FactoryRuntimeTests
         Assert.Equal("VERIFICATION_RESULT_REQUIRED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
         temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  gate:\n    run: dotnet build gate.csproj --nologo\ndefault:\n  use:\n    - gate\n");
         backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
-        Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default, verificationPassed: true)).FactoryOutcome);
+        Assert.Equal("VERIFICATION_POLICY_CHANGED", (await runtime.ContinueAsync(default, verificationPassed: true)).FactoryOutcome);
         Assert.Equal(1, backend.Roles.Count(role => role == "implementer"));
     }
 
@@ -823,7 +823,7 @@ public sealed class FactoryRuntimeTests
     private sealed class ThrowOnceVerificationEngine(string workspace, string current) : VerificationEngine(workspace, current)
     {
         public bool Fail { get; set; } = true;
-        public override Task<VerificationResult> RunSubtaskAsync(IEnumerable<string> explicitCheckIds, CancellationToken cancellationToken) =>
-            Fail ? throw new VerificationException("TEST_VERIFICATION_EXCEPTION", "The verification configuration needs repair.") : base.RunSubtaskAsync(explicitCheckIds, cancellationToken);
+        public override Task<VerificationResult> RunContextAsync(string context, IEnumerable<string> changedPaths, CancellationToken cancellationToken) =>
+            Fail ? throw new VerificationException("TEST_VERIFICATION_EXCEPTION", "The verification configuration needs repair.") : base.RunContextAsync(context, changedPaths, cancellationToken);
     }
 }

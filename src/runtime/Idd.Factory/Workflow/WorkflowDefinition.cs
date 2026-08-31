@@ -62,6 +62,9 @@ public sealed class WorkflowValidator
             var outcomes = Outcomes(step.Uses);
             if (step.Transitions.Keys.Any(outcome => !outcomes.Contains(outcome)))
                 throw new WorkflowException("INVALID_WORKFLOW", $"Step {step.Id} routes an outcome its primitive cannot return.");
+            var missing = outcomes.Where(outcome => !step.Transitions.ContainsKey(outcome)).ToArray();
+            if (step.Uses != "factory.finalize" && missing.Length > 0)
+                throw new WorkflowException("MISSING_REQUIRED_TRANSITION", $"Step {step.Id} does not route: {string.Join(", ", missing)}.");
             foreach (var target in step.Transitions.Values.Where(x => !x.StartsWith('$')))
                 if (!idSet.Contains(target)) throw new WorkflowException("MISSING_TRANSITION_TARGET", $"Step {step.Id} targets missing step {target}.");
             if (step.Transitions.Values.Any(x => x.StartsWith('$') && x != "$stop"))
@@ -87,6 +90,8 @@ public sealed class WorkflowValidator
         };
         if (expectedAgent is not null && step.Agent != expectedAgent)
             throw new WorkflowException("INVALID_WORKFLOW", $"Step {step.Id} must use agent {expectedAgent}.");
+        if (expectedAgent is null && step.Agent is not null)
+            throw new WorkflowException("INVALID_WORKFLOW", $"Step {step.Id} does not accept an agent.");
         if (step.Uses == "factory.execute" && (step.Handlers.GetValueOrDefault("subtask") != "implementer" || step.Handlers.GetValueOrDefault("review-checkpoint") != "checkpoint-reviewer"))
             throw new WorkflowException("INVALID_WORKFLOW", $"Step {step.Id} requires subtask and review-checkpoint handlers with supported roles.");
         if (step.Uses is "factory.intent" or "factory.finalize" && (step.Agent is not null || step.Handlers.Count != 0))
@@ -95,11 +100,11 @@ public sealed class WorkflowValidator
 
     private static HashSet<string> Outcomes(string primitive) => primitive switch
     {
-        "factory.decompose" => ["ready", "blocked", "needs-clarification", "focused-handoff", "needs-replan", "intent-required"],
+        "factory.decompose" => ["ready", "blocked", "needs-clarification", "focused-handoff", "intent-required"],
         "factory.intent" => ["completed", "blocked", "needs-clarification"],
-        "factory.execute" => ["advanced", "exhausted", "blocked", "needs-replan", "intent-required", "needs-clarification", "focused-handoff"],
+        "factory.execute" => ["advanced", "exhausted", "blocked", "needs-replan", "intent-required"],
         "factory.replan" => ["applied", "blocked", "needs-clarification", "intent-required"],
-        "factory.final-review" => ["approved", "needs-fix", "blocked", "needs-replan", "intent-required", "needs-clarification", "focused-handoff"],
+        "factory.final-review" => ["approved", "needs-fix", "blocked", "needs-replan", "intent-required"],
         "factory.finalize" => ["finalized"], _ => []
     };
 

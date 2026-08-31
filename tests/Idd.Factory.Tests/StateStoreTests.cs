@@ -51,6 +51,14 @@ public sealed class StateStoreTests
         Assert.Equal("UNSUPPORTED_STATE_SCHEMA", Assert.Throws<FactoryStateException>(() => new FactoryStateValidator().Validate(state)).Code);
     }
 
+    [Fact] public void MalformedPendingVerificationSessionIsRejected()
+    {
+        var state = State();
+        state.WorkItems.Add(new WorkItemState { Id = "one", Sequence = 1, Kind = WorkItemKind.Subtask, ContractPath = "work-items/one.md" });
+        state.PendingVerificationSession = new("subtask", "one", ["check"], ["../outside"], 1, ["check"], [], null, null, "policy", VerificationContinuationStage.ExecuteCheck);
+        Assert.Equal("CORRUPT_FACTORY_STATE", Assert.Throws<FactoryStateException>(() => new FactoryStateValidator().Validate(state)).Code);
+    }
+
     [Fact] public void StateSerializationDoesNotContainBaselineRevision()
     {
         using var document = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(State(), FactoryJson.Options));
