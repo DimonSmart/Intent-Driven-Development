@@ -54,12 +54,15 @@ public sealed class FactoryAgentExecutor(IAgentBackend backend, FactoryAgentResu
             JsonSerializer.Serialize(process, FactoryJson.Options),
             CancellationToken.None);
 
+        // Protected ownership is authoritative even when the semantic process crashes or is cancelled.
+        // A failed worker must not bypass the guard and leave runner-owned state damaged before retry/recovery.
+        legacyProtected.ValidateUnchanged();
+        graphProtected.ValidateUnchanged();
+
         if (process.TerminationKind == AgentTerminationKind.Cancelled) throw new OperationCanceledException(cancellationToken);
         if (process.TerminationKind == AgentTerminationKind.TransportFailure && !process.CompleteResultObserved)
             throw new AgentProtocolException("AGENT_TRANSPORT_FAILURE", $"Agent exited with {process.ExitCode?.ToString() ?? "unknown"}: {process.Stderr}");
 
-        legacyProtected.ValidateUnchanged();
-        graphProtected.ValidateUnchanged();
         if (!File.Exists(invocation.ResultPath)) throw new AgentProtocolException("MISSING_AGENT_RESULT", "Agent did not produce result.json.");
 
         AgentResultEnvelope? result;
@@ -69,6 +72,10 @@ public sealed class FactoryAgentExecutor(IAgentBackend backend, FactoryAgentResu
     }
 }
 
+/// <summary>
+/// Additional protection for dynamic graph provenance and policy artifacts that were introduced
+/// after the base worker ownership guard.
+/// </summary>
 internal sealed class DynamicProtectedArtifactGuard
 {
     private readonly IReadOnlyDictionary<string, string> hashes;
