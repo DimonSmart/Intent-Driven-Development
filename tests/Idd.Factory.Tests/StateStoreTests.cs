@@ -1,71 +1,131 @@
+using System.Text.Json;
 using Idd.Factory.Domain;
 using Idd.Factory.Persistence;
 using Idd.Factory.State;
-using System.Text.Json.Nodes;
 
 namespace Idd.Factory.Tests;
 
 public sealed class StateStoreTests
 {
-    [Fact] public async Task CreateSaveAndStaleRevisionAreDeterministic()
+    [Fact]
+    public async Task RevisionIsCasAndGraphRevisionDoesNotChangeForLifecycleSave()
     {
-        using var temp = new TestWorkspace(); var store = new FileFactoryStateStore(temp.Path, new FactoryStateValidator()); var state = State();
-        await store.CreateAsync(state, default); state.CurrentWorkflowStep = "execute"; await store.SaveAsync(state, 0, default);
-        Assert.Equal(1, (await store.LoadAsync(default))!.Revision);
+        using var temp = new TestWorkspace();
+        var store = new FileFactoryStateStore(temp.Path, new FactoryStateValidator());
+        var state = State();
+        state.WorkItems.Add(Executable("one", WorkItemStatus.Ready));
+        state.GraphRevision = 1;
+        await store.CreateAsync(state, default);
+
+        state.WorkItems[0].Status = WorkItemStatus.Dispatching;
+        await store.SaveAsync(state, 0, default);
+
+        var loaded = (await store.LoadAsync(default))!;
+        Assert.Equal(1, loaded.Revision);
+        Assert.Equal(1, loaded.GraphRevision);
+        Assert.Equal(WorkItemStatus.Dispatching, loaded.WorkItems[0].Status);
         Assert.Equal("STALE_STATE_REVISION", (await Assert.ThrowsAsync<FactoryStateException>(() => store.SaveAsync(state, 0, default))).Code);
-        Assert.False(File.Exists(System.IO.Path.Combine(temp.Path, "state.json.tmp")));
     }
 
-    [Fact] public async Task CompletedItemCannotBeMutated()
+    [Fact]
+    public async Task CompletedWorkIsImmutable()
     {
-        using var temp = new TestWorkspace(); var store = new FileFactoryStateStore(temp.Path, new FactoryStateValidator()); var state = State();
-        state.WorkItems.Add(new WorkItemState { Id = "one", Sequence = 1, Kind = WorkItemKind.Subtask, Status = WorkItemStatus.Completed, ContractPath = "work-items/one.md", LastResultRef = "attempts/A/result.json" });
-        await store.CreateAsync(state, default); state.WorkItems[0].LastResultRef = "attempts/changed/result.json";
+        using var temp = new TestWorkspace();
+        var store = new FileFactoryStateStore(temp.Path, new FactoryStateValidator());
+        var state = State();
+        state.WorkItems.Add(Executable("one", WorkItemStatus.Completed) with
+        {
+            LastResultRef = "attempts/A000001/result.json",
+            LastSemanticOutcome = "completed"
+        });
+        state.GraphRevision = 1;
+        await store.CreateAsync(state, default);
+
+        state.WorkItems[0].LastResultRef = "attempts/changed/result.json";
+
         Assert.Equal("COMPLETED_ITEM_MUTATED", (await Assert.ThrowsAsync<FactoryStateException>(() => store.SaveAsync(state, 0, default))).Code);
     }
 
-    [Fact] public async Task ExistingBlockerWithoutPayloadRemainsReadable()
+    [Fact]
+    public async Task ActivePriorSchemaReturnsLegacyFactoryState()
     {
-        using var temp = new TestWorkspace(); var state = State(); state.Blocker = new("NEEDS_CLARIFICATION", "Choose one.", "Continue with an answer.");
-        var json = JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(state, FactoryJson.Options))!.AsObject();
-        json["blocker"]!.AsObject().Remove("payload");
-        await File.WriteAllTextAsync(System.IO.Path.Combine(temp.Path, "state.json"), json.ToJsonString(FactoryJson.Options));
+        using var temp = new TestWorkspace();
+        var json = JsonSerializer.Serialize(State() with { SchemaVersion = FactoryState.CurrentSchemaVersion - 1 }, FactoryJson.Options);
+        await File.WriteAllTextAsync(Path.Combine(temp.Path, "state.json"), json);
 
-        var loaded = await new FileFactoryStateStore(temp.Path, new FactoryStateValidator()).LoadAsync(default);
+        var exception = await Assert.ThrowsAsync<FactoryStateException>(() => new FileFactoryStateStore(temp.Path, new FactoryStateValidator()).LoadAsync(default));
 
-        Assert.NotNull(loaded); Assert.Equal("Choose one.", loaded.Blocker!.Reason); Assert.Null(loaded.Blocker.Payload);
+        Assert.Equal("LEGACY_FACTORY_STATE", exception.Code);
+        Assert.Contains("cancel/restart", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact] public void UnknownDependencyAndInvalidTransitionAreRejected()
+    [Fact]
+    public void SerializationContainsNoGlobalWorkflowGraph()
     {
-        var validator = new FactoryStateValidator(); var state = State(); state.WorkItems.Add(new WorkItemState { Id = "one", Sequence = 1, Kind = WorkItemKind.Subtask, ContractPath = "one.md", Dependencies = ["missing"] });
-        Assert.Equal("CORRUPT_FACTORY_STATE", Assert.Throws<FactoryStateException>(() => validator.Validate(state)).Code);
-        state.WorkItems[0].Dependencies.Clear(); var next = Clone(state); next.WorkItems[0].Status = WorkItemStatus.Completed;
-        Assert.Equal("INVALID_STATE_TRANSITION", Assert.Throws<FactoryStateException>(() => validator.ValidateMutation(state, next)).Code);
+        using var document = JsonDocument.Parse(JsonSerializer.Serialize(State(), FactoryJson.Options));
+        var root = document.RootElement;
+
+        Assert.False(root.TryGetProperty("currentWorkflowStep", out _));
+        Assert.False(root.TryGetProperty("workflowName", out _));
+        Assert.False(root.TryGetProperty("workflowHash", out _));
     }
 
-    [Fact] public void PriorStateSchemaIsRejected()
+    [Fact]
+    public void GraphDefinitionChangeRequiresGraphRevisionAndLifecycleChangeDoesNot()
     {
-        var state = State() with { SchemaVersion = FactoryState.CurrentSchemaVersion - 1 };
+        var validator = new FactoryStateValidator();
+        var previous = State();
+        previous.WorkItems.Add(Executable("one", WorkItemStatus.Ready));
+        previous.GraphRevision = 1;
 
-        Assert.Equal("UNSUPPORTED_STATE_SCHEMA", Assert.Throws<FactoryStateException>(() => new FactoryStateValidator().Validate(state)).Code);
+        var lifecycle = Clone(previous);
+        lifecycle.WorkItems[0].Status = WorkItemStatus.Dispatching;
+        validator.ValidateMutation(previous, lifecycle);
+
+        var definition = Clone(previous);
+        definition.WorkItems[0].ContractRevision = 2;
+        definition.WorkItems[0].ContractPath = "work-items/one/contracts/000002.md";
+        Assert.Equal("INVALID_GRAPH_REVISION", Assert.Throws<FactoryStateException>(() => validator.ValidateMutation(previous, definition)).Code);
+
+        definition.GraphRevision = 2;
+        validator.ValidateMutation(previous, definition);
     }
 
-    [Fact] public void MalformedPendingVerificationSessionIsRejected()
+    [Fact]
+    public void CyclesAreRejected()
     {
         var state = State();
-        state.WorkItems.Add(new WorkItemState { Id = "one", Sequence = 1, Kind = WorkItemKind.Subtask, ContractPath = "work-items/one.md" });
-        state.PendingVerificationSession = new("subtask", "one", ["check"], ["../outside"], 1, ["check"], [], null, null, "policy", VerificationContinuationStage.ExecuteCheck);
+        state.GraphRevision = 1;
+        state.WorkItems.Add(Executable("a", WorkItemStatus.Planned, ["b"]));
+        state.WorkItems.Add(Executable("b", WorkItemStatus.Planned, ["a"], sequence: 2));
+
         Assert.Equal("CORRUPT_FACTORY_STATE", Assert.Throws<FactoryStateException>(() => new FactoryStateValidator().Validate(state)).Code);
     }
 
-    [Fact] public void StateSerializationDoesNotContainBaselineRevision()
+    internal static FactoryState State() => new()
     {
-        using var document = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(State(), FactoryJson.Options));
+        MethodologyVersion = "test",
+        RuntimeVersion = "test",
+        RunId = "run",
+        Revision = 0,
+        GraphRevision = 0,
+        FactoryConfigurationHash = "config-hash",
+        RequestPath = "request.md"
+    };
 
-        Assert.False(document.RootElement.TryGetProperty("baselineRevision", out _));
-    }
+    internal static WorkItemState Executable(string id, WorkItemStatus status, IEnumerable<string>? dependencies = null, int sequence = 1) => new()
+    {
+        Id = id,
+        Sequence = sequence,
+        Kind = WorkItemKind.Subtask,
+        Capability = "implementation",
+        DefinitionState = WorkDefinitionState.Executable,
+        Status = status,
+        ContractPath = $"work-items/{id}/contracts/000001.md",
+        ContractRevision = 1,
+        Dependencies = dependencies?.ToList() ?? []
+    };
 
-    internal static FactoryState State() => new() { MethodologyVersion = "1", RuntimeVersion = "1", RunId = "run", Revision = 0, CurrentWorkflowStep = "decompose", WorkflowName = "test", WorkflowHash = "hash", RequestPath = "request.md" };
-    private static FactoryState Clone(FactoryState state) => System.Text.Json.JsonSerializer.Deserialize<FactoryState>(System.Text.Json.JsonSerializer.Serialize(state, FactoryJson.Options), FactoryJson.Options)!;
+    private static FactoryState Clone(FactoryState state) =>
+        JsonSerializer.Deserialize<FactoryState>(JsonSerializer.Serialize(state, FactoryJson.Options), FactoryJson.Options)!;
 }
