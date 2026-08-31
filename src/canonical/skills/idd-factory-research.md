@@ -25,7 +25,6 @@ Return protocol version 2 with role `researcher` and one outcome:
 - `completed` — include concise findings, evidence/references, unresolved concerns if any;
 - `additional-work-required` — runtime should materialize a focused dependency;
 - `global-replan-required` — the global remaining strategy must change;
-- `needs-clarification` — explicit user input is required;
 - `intent-required` — durable product meaning is missing;
 - `blocked` — an external condition prevents useful research.
 
