@@ -15,6 +15,9 @@ public sealed class FinalizeHandler(string workspace)
             throw new InvalidOperationException("Finalization requires an approved final review for the current graph and no incomplete work items.");
         if (!state.FinalVerificationPassed || state.FinalVerificationGraphRevision != state.GraphRevision)
             throw new InvalidOperationException("Finalization requires strict final verification for the current graph revision.");
+        if (state.CurrentAttemptId is not null || state.WorkItems.Any(x => x.CurrentAttemptId is not null) ||
+            state.PendingContinuation is not null || state.PendingVerificationSession is not null || state.PendingReplanTrigger is not null)
+            throw new InvalidOperationException("Finalization requires no active semantic attempt, continuation, pending verification, or pending replan.");
 
         var current = Path.Combine(workspace, ".idd", "factory", "current");
         foreach (var evidenceRef in state.VerificationEvidenceRefs)
@@ -99,16 +102,20 @@ public sealed class FinalizeHandler(string workspace)
                 x.VerificationExpectations,
                 x.LastResultRef,
                 x.PriorResultRefs,
+                x.VerificationEvidenceRefs,
+                x.ChangedPaths,
                 x.IsFinalReview,
                 x.ReviewTargetGraphRevision
             })
         }, FactoryJson.Options), cancellationToken);
 
+        string? RelativeDirectory(string path) => Directory.Exists(path) ? Path.GetRelativePath(directory, path).Replace('\\', '/') : null;
         var result = new
         {
             schemaVersion = 2,
             state.MethodologyVersion,
             runtimeVersion = state.RuntimeVersion,
+            protocolVersion = AgentInvocation.CurrentProtocolVersion,
             workerProtocolVersion = AgentInvocation.CurrentProtocolVersion,
             factoryOutcome = "COMPLETED",
             graphRevision = state.GraphRevision,
@@ -121,13 +128,23 @@ public sealed class FinalizeHandler(string workspace)
             blockedItemCount = 0,
             incompleteItemCount = 0,
             finalReviewVerdict = "approved",
+            finalReviewProvenance = new
+            {
+                workItemId = reviewState.WorkItemId,
+                reviewedGraphRevision = reviewState.ReviewedGraphRevision,
+                resultPath = reviewState.ResultRef,
+                attemptCount = reviewState.AttemptCount
+            },
             verificationStatus = "passed",
-            commitMessagePath = Path.GetRelativePath(workspace, commitPath).Replace('\\', '/'),
-            eventLogPath = File.Exists(eventsPath) ? Path.GetRelativePath(workspace, eventsPath).Replace('\\', '/') : null,
-            verificationEvidencePath = Directory.Exists(verificationResultDirectory) ? Path.GetRelativePath(workspace, verificationResultDirectory).Replace('\\', '/') : null,
-            agentAttemptsPath = Directory.Exists(attemptsResultDirectory) ? Path.GetRelativePath(workspace, attemptsResultDirectory).Replace('\\', '/') : null,
-            taskGraphHistoryPath = Directory.Exists(graphResultDirectory) ? Path.GetRelativePath(workspace, graphResultDirectory).Replace('\\', '/') : null,
-            decompositionPath = Path.GetRelativePath(workspace, decompositionPath).Replace('\\', '/')
+            finalVerificationGraphRevision = state.FinalVerificationGraphRevision,
+            commitMessagePath = Path.GetRelativePath(directory, commitPath).Replace('\\', '/'),
+            eventLogPath = File.Exists(eventsPath) ? Path.GetRelativePath(directory, eventsPath).Replace('\\', '/') : null,
+            verificationEvidencePath = RelativeDirectory(verificationResultDirectory),
+            agentAttemptsPath = RelativeDirectory(attemptsResultDirectory),
+            contractProvenancePath = RelativeDirectory(workItemsResultDirectory),
+            taskGraphHistoryPath = RelativeDirectory(graphResultDirectory),
+            workItemGraphPath = Path.GetRelativePath(directory, decompositionPath).Replace('\\', '/'),
+            decompositionPath = Path.GetRelativePath(directory, decompositionPath).Replace('\\', '/')
         };
         var resultPath = Path.Combine(directory, "factory-result.json");
         await File.WriteAllTextAsync(resultPath, JsonSerializer.Serialize(result, FactoryJson.Options), cancellationToken);
