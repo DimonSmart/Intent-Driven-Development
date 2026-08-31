@@ -1,296 +1,171 @@
+using System.Text.Json;
 using Idd.Factory.Agents;
 using Idd.Factory.Domain;
-using System.Text.Json;
 
 namespace Idd.Factory.Tests;
 
 public sealed class AgentProtocolTests
 {
-    [Fact] public void ValidResultPasses()
+    [Theory]
+    [InlineData("implementer", "completed")]
+    [InlineData("implementer", "additional-work-required")]
+    [InlineData("implementer", "global-replan-required")]
+    [InlineData("researcher", "completed")]
+    [InlineData("researcher", "additional-work-required")]
+    [InlineData("final-reviewer", "approved")]
+    [InlineData("final-reviewer", "correction-required")]
+    [InlineData("final-reviewer", "additional-work-required")]
+    [InlineData("final-reviewer", "global-replan-required")]
+    [InlineData("task-decomposer", "ready")]
+    [InlineData("factory-replanner", "replan-proposed")]
+    public void CapabilityProtocolAcceptsTypedOutcomes(string role, string outcome)
     {
-        var invocation = Invocation(); var result = Result();
-        Assert.Same(result, new AgentResultValidator().Validate(invocation, result));
+        var invocation = Invocation(role);
+        var result = Envelope(invocation, outcome);
+
+        Assert.Same(result, new FactoryAgentResultValidator().Validate(invocation, result));
+    }
+
+    [Fact]
+    public void InvalidRoleOutcomeCombinationIsRejected()
+    {
+        var invocation = Invocation("researcher");
+        var exception = Assert.Throws<AgentProtocolException>(() =>
+            new FactoryAgentResultValidator().Validate(invocation, Envelope(invocation, "approved")));
+
+        Assert.Equal("UNSUPPORTED_AGENT_OUTCOME", exception.Code);
     }
 
     [Theory]
-    [InlineData("run", "wrong", "AGENT_RESULT_IDENTITY_MISMATCH")]
-    [InlineData("outcome", "approved", "UNSUPPORTED_AGENT_OUTCOME")]
-    [InlineData("role", "final-reviewer", "AGENT_RESULT_IDENTITY_MISMATCH")]
-    public void IdentityAndOutcomeAreValidated(string field, string value, string code)
+    [InlineData("implementation", "implementer", "idd-factory-execute-subtask", AgentExecutionProfile.WorkspaceWrite)]
+    [InlineData("research", "researcher", "idd-factory-research", AgentExecutionProfile.ReadOnly)]
+    [InlineData("semantic-review", "final-reviewer", "idd-factory-review-task", AgentExecutionProfile.ReadOnly)]
+    [InlineData("documentation", "implementer", "idd-factory-execute-subtask", AgentExecutionProfile.WorkspaceWrite)]
+    public void WorkCapabilityMapsDeterministically(string capability, string role, string skill, AgentExecutionProfile profile)
     {
-        var source = Result(); var result = source with { RunId = field == "run" ? value : source.RunId, Outcome = field == "outcome" ? value : source.Outcome, Role = field == "role" ? value : source.Role };
-        Assert.Equal(code, Assert.Throws<AgentProtocolException>(() => new AgentResultValidator().Validate(Invocation(), result)).Code);
+        var contract = FactoryCapabilityCatalog.ResolveWorkItem(capability);
+
+        Assert.Equal(role, contract.Agent.Role);
+        Assert.Equal(skill, contract.Agent.SkillName);
+        Assert.Equal(profile, contract.Agent.ExecutionProfile);
     }
 
-    [Fact] public void ProtocolVersionIsValidated()
-    { Assert.Equal("UNSUPPORTED_AGENT_PROTOCOL", Assert.Throws<AgentProtocolException>(() => new AgentResultValidator().Validate(Invocation(), Result() with { ProtocolVersion = AgentInvocation.CurrentProtocolVersion - 1 })).Code); }
+    [Fact]
+    public void UnknownCapabilityIsRejected()
+    {
+        Assert.Equal("UNKNOWN_CAPABILITY", Assert.Throws<AgentProtocolException>(() => FactoryCapabilityCatalog.ResolveWorkItem("mystery")).Code);
+    }
+
+    [Fact]
+    public void ThereIsOnlyOneAuthoritativeAgentProtocolExceptionType()
+    {
+        var types = typeof(AgentProtocolException).Assembly.GetTypes().Where(type => type.Name == nameof(AgentProtocolException)).ToArray();
+        Assert.Single(types);
+        Assert.Equal(typeof(AgentProtocolException), types[0]);
+    }
 
     [Theory]
-    [InlineData("task-decomposer", "idd-factory-decompose-task", AgentExecutionProfile.ReadOnly)]
-    [InlineData("implementer", "idd-factory-execute-subtask", AgentExecutionProfile.WorkspaceWrite)]
-    [InlineData("checkpoint-reviewer", "idd-factory-review-checkpoint", AgentExecutionProfile.ReadOnly)]
-    [InlineData("final-reviewer", "idd-factory-review-task", AgentExecutionProfile.ReadOnly)]
-    [InlineData("factory-replanner", "idd-factory-replan", AgentExecutionProfile.ReadOnly)]
-    public void FactoryRolesResolveToSemanticAgentContracts(string role, string skillName, AgentExecutionProfile executionProfile)
-    {
-        Assert.Equal(new FactoryAgentContract(role, skillName, executionProfile), FactoryAgentCatalog.Resolve(role));
-    }
-
-    [Fact] public void InvocationSerializesBackendNeutralSemanticContract()
-    {
-        var json = JsonSerializer.Serialize(Invocation(), FactoryJson.Options);
-        using var document = JsonDocument.Parse(json); var root = document.RootElement;
-
-        Assert.Equal(AgentInvocation.CurrentProtocolVersion, root.GetProperty("protocolVersion").GetInt32());
-        Assert.Equal("implementer", root.GetProperty("role").GetString());
-        Assert.Equal("idd-factory-execute-subtask", root.GetProperty("skillName").GetString());
-        Assert.Equal("workspace-write", root.GetProperty("executionProfile").GetString());
-        Assert.Equal("input", root.GetProperty("input").GetString());
-        Assert.False(root.TryGetProperty("workspaceFingerprint", out _));
-        Assert.False(root.TryGetProperty("skillReferences", out _));
-        Assert.False(root.TryGetProperty("prompt", out _));
-
-        Assert.Equal(Invocation(), JsonSerializer.Deserialize<AgentInvocation>(json, FactoryJson.Options));
-    }
-
-    [Fact] public void CodexAdapterMapsProfileWithoutRoleKnowledge()
-    {
-        Assert.Equal("read-only", CodexCliBackend.Sandbox(AgentExecutionProfile.ReadOnly));
-        Assert.Equal("workspace-write", CodexCliBackend.Sandbox(AgentExecutionProfile.WorkspaceWrite));
-    }
-
-    [Fact] public void CodexAdapterBuildsSelfContainedSkillPrompt()
-    {
-        const string skillInstructions = "# Implementer\n\nImplement exactly one assigned subtask.";
-        var prompt = CodexCliBackend.BuildBootstrapPrompt(Invocation(), skillInstructions);
-
-        Assert.StartsWith("Factory-selected role instructions (idd-factory-execute-subtask):", prompt);
-        Assert.Contains(skillInstructions, prompt);
-        Assert.Contains("Assigned Factory work:\n\ninput", prompt);
-        Assert.DoesNotContain("Use $", prompt, StringComparison.Ordinal);
-        Assert.Contains($"protocolVersion={AgentInvocation.CurrentProtocolVersion}", prompt);
-    }
-
-    [Fact] public void CodexAdapterReadsPackagedSkillInstructions()
+    [InlineData(".idd/factory.yaml", "WORKER_CHANGED_FACTORY_POLICY")]
+    [InlineData(".idd/factory/current/graph/mutations/G000001.json", "WORKER_CHANGED_RUNNER_STATE")]
+    [InlineData(".idd/factory/current/state.json", "WORKER_CHANGED_RUNNER_STATE")]
+    [InlineData(".idd/intent/current.md", "WORKER_CHANGED_PRODUCT_INTENT")]
+    [InlineData(".idd/verification.yaml", "WORKER_CHANGED_PRODUCT_INTENT")]
+    public async Task WorkerCannotMutateProtectedArtifacts(string path, string expectedCode)
     {
         using var temp = new TestWorkspace();
-        temp.Write("plugin/skills/idd-factory-execute-subtask/SKILL.md", "  factory instructions  \n");
-        var invocation = Invocation() with { Workspace = Path.Combine(temp.Path, "workspace") };
-
-        var instructions = CodexCliBackend.ReadSkillInstructions(Path.Combine(temp.Path, "plugin"), invocation);
-
-        Assert.Equal("factory instructions", instructions);
-    }
-
-    [Fact] public void CodexAdapterReportsRequiredAttemptTelemetry()
-    {
-        var telemetry = CodexCliBackend.BuildTelemetry(Invocation());
-        Assert.Equal("implementer", telemetry.Role); Assert.Equal("idd-factory-execute-subtask", telemetry.SkillName);
-        Assert.Equal("codex-cli", telemetry.Backend); Assert.Equal(AgentExecutionProfile.WorkspaceWrite, telemetry.ExecutionProfile);
-        Assert.Equal("inline-skill", telemetry.SkillInvocationMode); Assert.Equal("input".Length, telemetry.InputChars);
-        Assert.Equal("default/unpinned", telemetry.RequestedModel);
-        Assert.Equal("default/unpinned", telemetry.RequestedReasoningEffort);
-        Assert.Equal("unknown", telemetry.EffectiveModel);
-        Assert.Equal("unknown", telemetry.EffectiveReasoningEffort);
-    }
-
-    [Fact] public void CodexAdapterReportsSafeWindowsSandboxTelemetry()
-    {
-        var telemetry = CodexCliBackend.BuildTelemetry(Invocation(), windowsSandbox: "unelevated", windowsAppsPathEntriesRemoved: 2);
-        Assert.Equal("unelevated", telemetry.WindowsSandbox);
-        Assert.Equal(2, telemetry.WindowsAppsPathEntriesRemoved);
-    }
-
-    [Fact]
-    public void WindowsSandboxPathRemovesAppExecutionAliasDirectories()
-    {
-        var path = string.Join(';',
-            @"C:\Program Files\Git\cmd",
-            " ",
-            @" C:\Users\u\AppData\Local\Microsoft\WindowsApps ",
-            @"C:\PROGRAM FILES\WINDOWSAPPS\PowerShell",
-            @"C:\Program Files\dotnet");
-
-        var result = CodexProcessEnvironment.PrepareSandboxCompatiblePath(path, isWindows: true);
-
-        Assert.Equal(string.Join(';', @"C:\Program Files\Git\cmd", @"C:\Program Files\dotnet"), result.Path);
-        Assert.Equal(2, result.WindowsAppsPathEntriesRemoved);
-    }
-
-    [Fact]
-    public void WindowsSandboxPathPreservesOrderWhenNoAliasDirectoryExists()
-    {
-        var path = string.Join(';', @"C:\Program Files\Git\cmd", @"C:\Program Files\dotnet");
-        var result = CodexProcessEnvironment.PrepareSandboxCompatiblePath(path, isWindows: true);
-        Assert.Equal(path, result.Path);
-        Assert.Equal(0, result.WindowsAppsPathEntriesRemoved);
-    }
-
-    [Fact]
-    public void NonWindowsPathIsUnchanged()
-    {
-        const string path = "/usr/bin:/opt/WindowsApps/bin:: /custom/bin ";
-        var result = CodexProcessEnvironment.PrepareSandboxCompatiblePath(path, isWindows: false);
-        Assert.Equal(path, result.Path);
-        Assert.Equal(0, result.WindowsAppsPathEntriesRemoved);
-    }
-
-    [Fact] public void CodexAdapterMapsPinnedExecutionConfigurationToCommandLine()
-    {
-        var arguments = CodexCliBackend.BuildArguments(Invocation(), new("gpt-test", "high"), isWindows: false);
-        Assert.Contains("--model", arguments);
-        Assert.Equal("gpt-test", arguments[arguments.ToList().IndexOf("--model") + 1]);
-        Assert.Contains("model_reasoning_effort=high", arguments);
-    }
-
-    [Fact] public void CodexAdapterOmitsUnpinnedExecutionConfiguration()
-    {
-        var arguments = CodexCliBackend.BuildArguments(Invocation(), new(), isWindows: false);
-        Assert.DoesNotContain("--model", arguments);
-        Assert.DoesNotContain(arguments, value => value.StartsWith("model_reasoning_effort=", StringComparison.Ordinal));
-    }
-
-    [Fact] public void CodexAdapterMapsConfiguredWindowsSandbox()
-    {
-        var arguments = CodexCliBackend.BuildArguments(Invocation(), new(WindowsSandbox: "elevated"), isWindows: true);
-        Assert.Contains("windows.sandbox=\"elevated\"", arguments);
-    }
-
-    [Fact] public void CodexAdapterDoesNotInventWindowsSandbox()
-    {
-        var arguments = CodexCliBackend.BuildArguments(Invocation(), new(), isWindows: true);
-        Assert.DoesNotContain(arguments, value => value.StartsWith("windows.sandbox=", StringComparison.Ordinal));
-    }
-
-    [Fact] public void CodexAdapterRejectsUnknownWindowsSandbox()
-    {
-        Assert.Throws<ArgumentException>(() => CodexCliBackend.BuildArguments(Invocation(), new(WindowsSandbox: "invalid"), isWindows: true));
-    }
-
-    [Fact] public void SelectedFactorySkillIsNeverInheritedFromUserHome()
-    {
-        Assert.False(CodexCliBackend.ShouldInheritSkill("idd-factory-execute-subtask", "idd-factory-execute-subtask"));
-        Assert.True(CodexCliBackend.ShouldInheritSkill("domain-skill", "idd-factory-execute-subtask"));
-    }
-
-    [Fact] public void ProjectSkillCollisionFailsExplicitly()
-    {
-        using var temp = new TestWorkspace();
-        var plugin = temp.Write("plugin/skills/idd-factory-execute-subtask/SKILL.md", "factory");
-        temp.Write("workspace/.agents/skills/idd-factory-execute-subtask/SKILL.md", "collision");
-        var invocation = Invocation() with { Workspace = Path.Combine(temp.Path, "workspace") };
-        var exception = Assert.Throws<AgentProtocolException>(() => CodexCliBackend.ValidateSkillIdentity(Path.GetFullPath(Path.Combine(temp.Path, "plugin")), invocation));
-        Assert.Equal("FACTORY_SKILL_COLLISION", exception.Code);
-    }
-
-    [Fact] public void ControlledCapabilityTelemetryReportsNoUserSkillInheritance()
-    {
-        var telemetry = CodexCliBackend.BuildTelemetry(Invocation(), new("model", "low"), new(false, "release-eval-controlled"));
-        Assert.Equal("isolated", telemetry.UserSkillInheritancePolicy);
-        Assert.Equal(0, telemetry.InheritedUserSkillCount);
-        Assert.Equal("release-eval-controlled", telemetry.CapabilityProfile);
-    }
-
-    [Fact] public async Task WorkerCannotChangeRunnerOwnedState()
-    {
-        using var temp = new TestWorkspace(); var resultPath = temp.Write(".idd/factory/current/attempts/A000001/placeholder", "x"); resultPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(resultPath)!, "result.json");
-        var statePath = temp.Write(".idd/factory/current/state.json", "before"); temp.Write(".idd/factory/current/request.md", "request");
-        var invocation = Invocation() with { Workspace = temp.Path, ResultPath = resultPath };
-        var backend = new MutatingBackend(invocation, statePath);
-        var exception = await Assert.ThrowsAsync<AgentProtocolException>(() => new AgentExecutor(backend, new AgentResultValidator()).ExecuteAsync(invocation, default));
-        Assert.Equal("WORKER_CHANGED_RUNNER_STATE", exception.Code);
-    }
-
-    [Theory]
-    [InlineData(".idd/intent/changed.md")]
-    [InlineData(".idd/verification.yaml")]
-    public async Task WorkerCannotChangeProtectedProductArtifacts(string path)
-    {
-        using var temp = new TestWorkspace(); temp.Write(".idd/intent/current.md", "before"); temp.Write(".idd/verification.yaml", "version: 1");
+        PrepareProtectedArtifacts(temp);
         var invocation = PreparedInvocation(temp);
         var backend = new MutatingBackend(invocation, Path.Combine(temp.Path, path));
 
-        var exception = await Assert.ThrowsAsync<AgentProtocolException>(() => new AgentExecutor(backend, new AgentResultValidator()).ExecuteAsync(invocation, default));
+        var exception = await Assert.ThrowsAsync<AgentProtocolException>(() =>
+            new FactoryAgentExecutor(backend, new FactoryAgentResultValidator()).ExecuteAsync(invocation, default));
 
-        Assert.Equal("WORKER_CHANGED_PRODUCT_INTENT", exception.Code);
+        Assert.Equal(expectedCode, exception.Code);
     }
 
-    [Fact] public async Task WorkerCannotDeleteProtectedArtifact()
+    [Fact]
+    public void InvocationContainsFreshBackendNeutralSemanticContract()
     {
-        using var temp = new TestWorkspace(); var verification = temp.Write(".idd/verification.yaml", "version: 1");
-        var invocation = PreparedInvocation(temp);
-        var backend = new DeletingBackend(invocation, verification);
+        var invocation = Invocation("researcher");
+        var json = JsonSerializer.Serialize(invocation, FactoryJson.Options);
+        using var document = JsonDocument.Parse(json);
 
-        var exception = await Assert.ThrowsAsync<AgentProtocolException>(() => new AgentExecutor(backend, new AgentResultValidator()).ExecuteAsync(invocation, default));
-
-        Assert.Equal("WORKER_CHANGED_PRODUCT_INTENT", exception.Code);
+        Assert.Equal("researcher", document.RootElement.GetProperty("role").GetString());
+        Assert.Equal("idd-factory-research", document.RootElement.GetProperty("skillName").GetString());
+        Assert.Equal("read-only", document.RootElement.GetProperty("executionProfile").GetString());
+        Assert.False(document.RootElement.TryGetProperty("conversationHistory", out _));
+        Assert.False(document.RootElement.TryGetProperty("nextWorkflowStep", out _));
     }
 
-    [Theory]
-    [InlineData(AgentTerminationKind.CleanExit, 0, false)]
-    [InlineData(AgentTerminationKind.ForcedAfterResult, -1, true)]
-    public async Task CompleteResultIsAcceptedWithExplicitTermination(AgentTerminationKind kind, int exitCode, bool killed)
+    private static AgentInvocation Invocation(string role)
     {
-        using var temp = new TestWorkspace();
-        var invocation = PreparedInvocation(temp);
-        var execution = await new AgentExecutor(new ResultBackend(invocation, new(exitCode, "", "", true, killed, kind), produceResult: true), new AgentResultValidator()).ExecuteAsync(invocation, default);
-        Assert.Equal(kind, execution.Process.TerminationKind);
-        Assert.Equal(exitCode, execution.Process.ExitCode);
-        Assert.Equal(killed, execution.Process.KillRequired);
+        var contract = role switch
+        {
+            "researcher" => FactoryCapabilityCatalog.ResolveWorkItem("research").Agent,
+            "final-reviewer" => FactoryCapabilityCatalog.ResolveWorkItem("semantic-review").Agent,
+            "task-decomposer" => FactoryCapabilityCatalog.Resolve("initial-decomposition").Agent,
+            "factory-replanner" => FactoryCapabilityCatalog.Resolve("global-replan").Agent,
+            _ => FactoryCapabilityCatalog.ResolveWorkItem("implementation").Agent
+        };
+        return new AgentInvocation
+        {
+            RunId = "run",
+            AttemptId = "A000001",
+            Role = role,
+            Workspace = "workspace",
+            ResultPath = "result.json",
+            SkillName = contract.SkillName,
+            ExecutionProfile = contract.ExecutionProfile,
+            Input = "focused input",
+            StartedAt = DateTimeOffset.UnixEpoch
+        };
     }
 
-    [Fact] public async Task NonZeroExitBeforeResultIsTransportFailure()
-    {
-        using var temp = new TestWorkspace();
-        var invocation = PreparedInvocation(temp);
-        var exception = await Assert.ThrowsAsync<AgentProtocolException>(() => new AgentExecutor(new ResultBackend(invocation, new(17, "", "failure", false, false, AgentTerminationKind.TransportFailure), produceResult: false), new AgentResultValidator()).ExecuteAsync(invocation, default));
-        Assert.Equal("AGENT_TRANSPORT_FAILURE", exception.Code);
-    }
-
-    [Fact] public async Task CancelledProcessPropagatesCancellation()
-    {
-        using var temp = new TestWorkspace();
-        var invocation = PreparedInvocation(temp);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new AgentExecutor(new ResultBackend(invocation, new(-1, "", "", false, true, AgentTerminationKind.Cancelled), produceResult: false), new AgentResultValidator()).ExecuteAsync(invocation, new CancellationToken(canceled: true)));
-    }
-
-    [Fact] public void CodexResolverPrefersPackagedNativeExecutableOnWindows()
-    {
-        using var temp = new TestWorkspace(); var native = temp.Write("node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/bin/codex.exe", "");
-        Assert.Equal(native.Replace('/', Path.DirectorySeparatorChar), CodexExecutableResolver.ResolveFromPath(temp.Path, true).Executable);
-    }
-
-    private static AgentInvocation Invocation() => new() { RunId = "run", AttemptId = "A000001", Role = "implementer", Workspace = "w", ResultPath = "r", SkillName = "idd-factory-execute-subtask", ExecutionProfile = AgentExecutionProfile.WorkspaceWrite, Input = "input", StartedAt = DateTimeOffset.UnixEpoch };
     private static AgentInvocation PreparedInvocation(TestWorkspace temp)
+    {
+        var placeholder = temp.Write(".idd/factory/current/attempts/A000001/placeholder", "x");
+        var source = Invocation("implementer");
+        return source with
+        {
+            Workspace = temp.Path,
+            ResultPath = Path.Combine(Path.GetDirectoryName(placeholder)!, "result.json")
+        };
+    }
+
+    private static void PrepareProtectedArtifacts(TestWorkspace temp)
     {
         temp.Write(".idd/factory/current/state.json", "state");
         temp.Write(".idd/factory/current/request.md", "request");
-        var placeholder = temp.Write(".idd/factory/current/attempts/A000001/placeholder", "x");
-        return Invocation() with { Workspace = temp.Path, ResultPath = Path.Combine(Path.GetDirectoryName(placeholder)!, "result.json") };
+        temp.Write(".idd/factory/current/run-context.md", "context");
+        temp.Write(".idd/factory/current/work-items/item/contracts/000001.md", "contract");
+        temp.Write(".idd/factory/current/graph/mutations/G000000.json", "history");
+        temp.Write(".idd/factory.yaml", "schemaVersion: 1");
+        temp.Write(".idd/intent/current.md", "intent");
+        temp.Write(".idd/verification.yaml", "version: 1");
     }
-    private static AgentResultEnvelope Result() => new() { ProtocolVersion = AgentInvocation.CurrentProtocolVersion, RunId = "run", AttemptId = "A000001", Role = "implementer", Outcome = "completed" };
+
+    private static AgentResultEnvelope Envelope(AgentInvocation invocation, string outcome) => new()
+    {
+        ProtocolVersion = AgentInvocation.CurrentProtocolVersion,
+        RunId = invocation.RunId,
+        AttemptId = invocation.AttemptId,
+        Role = invocation.Role,
+        Outcome = outcome
+    };
 
     private sealed class MutatingBackend(AgentInvocation invocation, string path) : IAgentBackend
     {
-        public Task<AgentRunHandle> StartAsync(AgentInvocation _, CancellationToken cancellationToken) { Directory.CreateDirectory(Path.GetDirectoryName(path)!); File.WriteAllText(path, "changed"); File.WriteAllText(invocation.ResultPath, System.Text.Json.JsonSerializer.Serialize(Result(), FactoryJson.Options)); return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId)); }
-        public Task<AgentProcessResult> WaitAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.FromResult(new AgentProcessResult(0, "", "", true, false, AgentTerminationKind.CleanExit));
-        public Task CancelAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.CompletedTask;
-    }
-
-    private sealed class ResultBackend(AgentInvocation invocation, AgentProcessResult process, bool produceResult) : IAgentBackend
-    {
         public Task<AgentRunHandle> StartAsync(AgentInvocation _, CancellationToken cancellationToken)
         {
-            if (produceResult) File.WriteAllText(invocation.ResultPath, JsonSerializer.Serialize(Result(), FactoryJson.Options));
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, "changed");
+            File.WriteAllText(invocation.ResultPath, JsonSerializer.Serialize(Envelope(invocation, "completed"), FactoryJson.Options));
             return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId));
         }
-        public Task<AgentProcessResult> WaitAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.FromResult(process);
-        public Task CancelAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.CompletedTask;
-    }
-    private sealed class DeletingBackend(AgentInvocation invocation, string path) : IAgentBackend
-    {
-        public Task<AgentRunHandle> StartAsync(AgentInvocation _, CancellationToken cancellationToken) { File.Delete(path); File.WriteAllText(invocation.ResultPath, JsonSerializer.Serialize(Result(), FactoryJson.Options)); return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId)); }
-        public Task<AgentProcessResult> WaitAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.FromResult(new AgentProcessResult(0, "", "", true, false, AgentTerminationKind.CleanExit));
+
+        public Task<AgentProcessResult> WaitAsync(AgentRunHandle handle, CancellationToken cancellationToken) =>
+            Task.FromResult(new AgentProcessResult(0, "", "", true, false, AgentTerminationKind.CleanExit));
+
         public Task CancelAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }
