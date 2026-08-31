@@ -109,7 +109,7 @@ public sealed class FinalizeHandler(string workspace)
             })
         }, FactoryJson.Options), cancellationToken);
 
-        string? RelativeDirectory(string path) => Directory.Exists(path) ? Path.GetRelativePath(directory, path).Replace('\\', '/') : null;
+        string? WorkspaceRelativeDirectory(string path) => Directory.Exists(path) ? Path.GetRelativePath(workspace, path).Replace('\\', '/') : null;
         var result = new
         {
             schemaVersion = 2,
@@ -137,14 +137,14 @@ public sealed class FinalizeHandler(string workspace)
             },
             verificationStatus = "passed",
             finalVerificationGraphRevision = state.FinalVerificationGraphRevision,
-            commitMessagePath = Path.GetRelativePath(directory, commitPath).Replace('\\', '/'),
-            eventLogPath = File.Exists(eventsPath) ? Path.GetRelativePath(directory, eventsPath).Replace('\\', '/') : null,
-            verificationEvidencePath = RelativeDirectory(verificationResultDirectory),
-            agentAttemptsPath = RelativeDirectory(attemptsResultDirectory),
-            contractProvenancePath = RelativeDirectory(workItemsResultDirectory),
-            taskGraphHistoryPath = RelativeDirectory(graphResultDirectory),
-            workItemGraphPath = Path.GetRelativePath(directory, decompositionPath).Replace('\\', '/'),
-            decompositionPath = Path.GetRelativePath(directory, decompositionPath).Replace('\\', '/')
+            commitMessagePath = Path.GetRelativePath(workspace, commitPath).Replace('\\', '/'),
+            eventLogPath = File.Exists(eventsPath) ? Path.GetRelativePath(workspace, eventsPath).Replace('\\', '/') : null,
+            verificationEvidencePath = WorkspaceRelativeDirectory(verificationResultDirectory),
+            agentAttemptsPath = WorkspaceRelativeDirectory(attemptsResultDirectory),
+            contractProvenancePath = WorkspaceRelativeDirectory(workItemsResultDirectory),
+            taskGraphHistoryPath = WorkspaceRelativeDirectory(graphResultDirectory),
+            workItemGraphPath = Path.GetRelativePath(workspace, decompositionPath).Replace('\\', '/'),
+            decompositionPath = Path.GetRelativePath(workspace, decompositionPath).Replace('\\', '/')
         };
         var resultPath = Path.Combine(directory, "factory-result.json");
         await File.WriteAllTextAsync(resultPath, JsonSerializer.Serialize(result, FactoryJson.Options), cancellationToken);
