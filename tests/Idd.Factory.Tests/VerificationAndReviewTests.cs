@@ -127,6 +127,26 @@ public sealed class VerificationAndReviewTests
     }
 
     [Fact]
+    public async Task FinalReviewMaterializationPreservesStrictVerificationForReadOnlyReviewRevision()
+    {
+        using var temp = new TestWorkspace();
+        var backend = new FakeAgentBackend();
+        backend.Enqueue(invocation => Envelope(invocation, "ready", new { workItems = new[] { Work("A", "implementation") } }));
+        backend.Enqueue(invocation => Envelope(invocation, "completed"));
+        backend.Enqueue(invocation => Envelope(invocation, "approved"));
+
+        var outcome = await CreateRuntime(temp.Path, backend).RunRequestAsync("Verify once before final review", "test", default);
+
+        Assert.Equal("COMPLETED", outcome.FactoryOutcome);
+        var schedulerEvents = File.ReadLines(Path.Combine(outcome.ResultDirectory!, "events.jsonl"))
+            .Select(JsonDocument.Parse)
+            .Where(document => document.RootElement.GetProperty("type").GetString() == "scheduler-decision")
+            .Select(document => document.RootElement.GetProperty("data").GetProperty("Kind").GetInt32())
+            .ToArray();
+        Assert.Single(schedulerEvents, kind => kind == (int)Idd.Factory.Runtime.FactoryCommandKind.RunFinalVerification);
+    }
+
+    [Fact]
     public async Task FinalReviewCorrectionCreatesNewWorkAndNewReviewWithoutMutatingOldReview()
     {
         using var temp = new TestWorkspace();
