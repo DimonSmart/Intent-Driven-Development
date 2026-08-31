@@ -2,77 +2,47 @@
 
 ## Purpose
 
-Independently review the complete integrated Factory result after all work items
-and checkpoints complete.
-This skill is the complete semantic contract for the `final-reviewer` role.
+Perform one read-only semantic review work item over the integrated product. Final review is represented by an ordinary persisted graph node with capability `semantic-review`; it is not a global workflow phase.
+
+Runtime owns scheduling, strict final verification, corrections, graph mutation, persistence, and finalization.
 
 ## Inputs and boundaries
 
-Review the final integrated product against the original request and current
-durable intent. Review the final state, not the Factory execution history.
+Review the supplied review contract, original Factory request when this is final review, relevant durable intent, completed dependency/result references, current product changes, and compact authoritative runtime verification observations/evidence.
 
-The runtime supplies the original request, completed-work references, and
-authoritative final verification evidence references. Factory artifact
-references are relative to `.idd/factory/current` unless already rooted. The
-final reviewer is invoked only after the authoritative final verification gate
-has passed.
+Review current product semantics, not worker transcripts or orchestration history. Do not recursively inventory `.idd/factory`, attempt directories, `bin`, or `obj`. Do not rerun deterministic Factory checks merely to reconfirm runtime evidence.
 
-Start with the original request and a focused inspection of the current product
-changes. Read only the intent, product files, work-item contracts/results,
-checkpoint results, or verification evidence needed to resolve a concrete
-semantic review question. Runtime-supplied references are navigation aids, not
-a requirement to read every referenced artifact.
+Do not modify product files, Factory state, graph history, `.idd/factory.yaml`, durable intent, or verification policy. Do not select a next role, skill, or runtime phase.
 
-Do not begin final review with a broad or recursive workspace inventory. Do not
-enumerate the whole workspace, `.idd/factory`, `bin`, or `obj`. Use the original
-request and known paths first. Discover additional files only with focused
-searches needed to answer a concrete semantic question.
+## Defects become graph work
 
-Do not recursively inspect Factory state or attempt directories during normal
-review. Worker stdout/stderr, invocation data, process telemetry, and worker
-conversations are diagnostics, not normal final-review inputs; inspect them only
-when a concrete protocol or execution inconsistency prevents semantic review.
-Do not rerun mandatory Factory verification or re-audit successful command
-output merely to reconfirm that it passed. Do not modify code, intent,
-verification policy, Factory state, or delegate.
+A semantic finding completes the review operation; it does not make the reviewer an implementer.
 
-Detect lost requirements, integration gaps, incorrect coverage, intent-changing
-implementation work, and unsupported completion claims. Focused read-only
-inspection and relevant project or domain skills remain available when they
-help resolve a concrete semantic concern.
-
-## Structured result
-
-Return worker protocol version 1 with role `final-reviewer` and one outcome:
-`approved`, `needs-fix`, `needs-replan`, `blocked`, or `intent-required`.
-
-`approved` supplies semantic commit-message material under
-`payload.commitMessage` with `subject`, `why[]`, and `result[]`.
-`needs-fix` supplies one bounded self-contained implementation-only
-`payload.correctiveSubtask`; final review itself is the next gate. Keep
-implementation and verification assessments separate. Never describe blocked
-or unverified work as approved.
-
-For `intent-required`, `payload.missingIntentDecisions` is a non-empty array.
-Each item contains:
+For a concrete bounded defect, return `correction-required` (compatibility alias `needs-fix` may be accepted) with:
 
 ```text
-area
-whyBlocking
-requiredDecisions[]
-intentReferences[]
-recommendedNextWorkflow?  # e.g. idd-intent-change or idd-intent-new-document: ADR
+payload.correctiveSubtask:
+  id?
+  capability: implementation | documentation | ...
+  contractMarkdown
+  verificationCheckIds[]?
+  verificationExpectations?
 ```
 
-`area` is a short domain or contract area name. `whyBlocking` explains why the
-integrated result cannot be approved safely against durable product meaning.
-`requiredDecisions[]` names the concrete durable decisions that must be recorded
-under `.idd/intent`. `intentReferences[]` names related IDD document IDs or
-paths; use an empty array only when no existing intent document applies.
-`recommendedNextWorkflow` is optional and must name an available intent workflow
-when a useful next step is known. Keep the list concise and decision-oriented;
-do not substitute logs, implementation guesses, or vague requests to "clarify
-intent".
+Runtime materializes that correction as a new graph work item. A final review with a defect remains immutable evidence; after correction and strict verification, runtime materializes a fresh final review node.
 
-The runtime owns machine validation, completion policy, workflow transitions,
-and selection of any next semantic capability.
+If review discovers a prerequisite/investigation rather than a direct correction, return `additional-work-required` with a typed capability/goal/reason requirement. Use `global-replan-required` only when the remaining global strategy itself is invalid.
+
+## Outcomes
+
+Return protocol version 2 with role `final-reviewer` and one outcome:
+
+- `approved` — no material semantic defect remains; for final review include `payload.commitMessage` with `subject`, `why[]`, `result[]`;
+- `correction-required` — bounded semantic defect that should become corrective graph work;
+- `additional-work-required` — typed prerequisite/investigation should become graph work;
+- `global-replan-required` — remaining global strategy must be restructured;
+- `needs-clarification` — explicit user input is required;
+- `intent-required` — durable product meaning is missing;
+- `blocked` — external condition prevents review.
+
+Never describe failed, blocked, or unverified semantics as approved. `recommendedNextWorkflow` in an `intent-required` payload, when present, refers only to a durable-intent editing workflow outside Factory runtime orchestration.

@@ -2,89 +2,61 @@
 
 ## Purpose
 
-Produce the smallest safe ordered decomposition for one complete Factory
-request. This skill is the complete semantic contract for the
-`task-decomposer` role.
+Create the smallest safe initial task graph that lets the Factory make useful progress. A complete up-front plan is neither required nor preferred when later work depends on facts that are not known yet.
+
+This skill is the semantic contract for capability `initial-decomposition` and role `task-decomposer`. Runtime owns scheduling, state transitions, graph mutation, persistence, verification, and selection of later capabilities.
 
 ## Inputs and boundaries
 
-Read the complete request, relevant current intent, and only repository evidence
-needed for task boundaries, dependencies, checkpoint placement, and stable
-verification IDs. The project verification policy may be inspected only to
-select existing stable IDs; the worker does not execute mandatory checks. Do
-not read previous runs, write code or state, edit intent, or delegate.
+Read the complete request, relevant durable intent, and only repository evidence needed to identify safe work boundaries and dependencies. When `.idd/verification.yaml` exists, use only real top-level stable check IDs from that valid policy. When it is absent, use no invented check IDs and leave fallback verification to runtime.
 
-When `.idd/verification.yaml` exists, every `verificationCheckIds[]` value must
-be copied exactly from a top-level key under `checks:`. Never put test class
-names, test method names, commands, filters, descriptions, or invented
-identifiers in this field. If an existing valid policy has no configured check
-ID covering a required property, return `needs-clarification` or `blocked`; do
-not fabricate one. An existing malformed policy is a blocking policy error and
-must not be treated as missing or replaced with fallback.
+Do not implement product changes, mutate Factory state, edit intent or verification policy, choose the next role/skill, or attempt to predict every future task.
 
-When `.idd/verification.yaml` is absent, continue normally. Use
-`verificationCheckIds: []` for every work item, preserve the required
-verification properties in human-readable contract Markdown, and let the
-deterministic Runtime apply repository/platform fallback at its verification
-gates. Absence alone is never `needs-clarification` or `blocked`: do not ask the
-user to create a policy, create one, or invent stable IDs.
+Return `intent-required` rather than inventing missing durable product meaning. Return `needs-clarification` only when a user decision is genuinely required before any safe progress can be represented.
 
-Return `intent-required` instead of inventing durable behavior. Preserve any
-explicit ordering, staging, dependency, and review boundaries from the request.
-Order independently verifiable outcomes rather than files. Every Subtask is a
-self-contained contract that an implementer can execute without the complete
-request, other tasks, checkpoints, or worker transcripts.
+## Dynamic decomposition
 
-Use selective checkpoints only where early independent review protects later
-work. Coverage is contiguous, names only preceding Subtask IDs, never covers a
-checkpoint, and does not duplicate final review.
-
-## Structured result
-
-Return worker protocol version 1 with role `task-decomposer` and one outcome:
-`ready`, `needs-clarification`, `intent-required`, `focused-handoff`, or
-`blocked`.
-
-`ready` supplies `payload.workItems`, an ordered array. Each item contains:
+`ready` returns `payload.workItems`. Each node contains:
 
 ```text
 id
 sequence
 kind: subtask | review-checkpoint
+definitionState: executable | outline
+capability?          # required for executable; optional for outline
 contractMarkdown
 dependencies[]
 coveredWorkItems[]
 verificationCheckIds[]
+verificationExpectations?  # object keyed by stable check ID: must-pass | may-fail
 intentReferences[]
 ```
 
-For `intent-required`, `payload.missingIntentDecisions` is a non-empty array.
-Each item contains:
+Use `executable` only when the work contract is self-contained enough to dispatch in a fresh context. Use `outline` for known future scope whose exact implementation contract depends on earlier results. An outline must still state its goal, dependency boundary, and why refinement is deferred.
+
+The initial graph may contain only the work needed now plus useful outlines. Do not manufacture speculative detail merely to make the plan look complete. At least one root node must be executable or safely refinable unless the result reports a real blocker.
+
+Capabilities describe the required kind of work, not an agent identity. Use only capabilities supported by Factory policy, such as `implementation`, `research`, `documentation`, or `semantic-review`. Never return a role or skill name as a scheduling decision.
+
+`verificationExpectations` are deterministic intermediate expectations. Omitted checks and `must-pass` are treated as strict. `may-fail` is allowed only when a specific intermediate RED condition is intentionally expected; it never relaxes final verification.
+
+## Intent-required payload
+
+`payload.missingIntentDecisions` must be non-empty. Each item contains:
 
 ```text
 area
 whyBlocking
 requiredDecisions[]
 intentReferences[]
-recommendedNextWorkflow?  # e.g. idd-intent-change or idd-intent-new-document: ADR
+recommendedNextWorkflow?
 ```
 
-`area` is a short domain or contract area name. `whyBlocking` explains why safe
-decomposition cannot continue. `requiredDecisions[]` names the concrete durable
-decisions that must be recorded under `.idd/intent`. `intentReferences[]` names
-related IDD document IDs or paths; use an empty array only when no existing
-intent document applies. `recommendedNextWorkflow` is optional and must name an
-available intent workflow when a useful next step is known. Keep the list
-concise and decision-oriented; do not substitute logs, implementation guesses,
-or vague requests to "clarify intent".
+`recommendedNextWorkflow` refers only to a user-facing durable-intent workflow (for example `idd-intent-change`), never to Factory execution routing.
 
-Subtask contract Markdown contains goal, context, scope, requirements, done
-conditions, verification properties, and preservation boundaries. A checkpoint
-contract contains coverage, review scope, and focused verification. Do not
-include commands; use stable verification IDs.
+## Result outcomes
 
-The runtime validates identity, order, dependencies, coverage, intent boundary,
-and verification IDs before creating state. The runtime owns workflow routing,
-machine protocol validation, persisted state, and authoritative verification.
-The worker never creates files or chooses the next role or skill. Relevant
-project and domain skills may be used normally for focused semantic analysis.
+Return protocol version 2 with role `task-decomposer` and one outcome:
+`ready`, `needs-clarification`, `intent-required`, `focused-handoff`, or `blocked`.
+
+The worker never creates Factory files and never chooses what runtime does next.
