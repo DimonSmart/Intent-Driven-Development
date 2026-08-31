@@ -79,8 +79,14 @@ public sealed class FactoryScheduler
         var currentFinalReview = ordered.FirstOrDefault(item =>
             item.IsFinalReview && item.ReviewTargetGraphRevision == state.GraphRevision && IsRequiredIncomplete(item));
 
-        // Materialize the read-only final review as graph work first. Strict final verification then runs for
-        // exactly that graph revision, so no verification result has to be carried across a graph mutation.
+        // Strict deterministic verification must pass before runtime materializes the final semantic review.
+        // Materializing review work changes the graph revision, so the scheduler will require strict verification
+        // again for that exact graph before dispatching the review. This deliberately favors correctness over
+        // carrying a verification result across a graph mutation.
+        if (!finalReviewApproved && currentFinalReview is null &&
+            (!state.FinalVerificationPassed || state.FinalVerificationGraphRevision != state.GraphRevision))
+            return new(FactoryCommandKind.RunFinalVerification, VerificationContext: "final");
+
         if (!finalReviewApproved && currentFinalReview is null)
             return new(FactoryCommandKind.CreateFinalReview);
 
