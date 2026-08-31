@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Idd.Factory.Domain;
-using Idd.Factory.Verification;
 
 namespace Idd.Factory.Agents;
 
@@ -386,48 +385,6 @@ public static class CodexExecutableResolver
     }
 }
 
-public sealed class AgentExecutor(IAgentBackend backend, AgentResultValidator validator)
-{
-    public async Task<AgentExecutionResult> ExecuteAsync(AgentInvocation invocation, CancellationToken cancellationToken)
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(invocation.ResultPath)!);
-        var invocationPath = Path.Combine(Path.GetDirectoryName(invocation.ResultPath)!, "invocation.json");
-        if (!File.Exists(invocationPath))
-            await File.WriteAllTextAsync(invocationPath, JsonSerializer.Serialize(invocation, FactoryJson.Options), cancellationToken);
-        var protectedArtifacts = ProtectedArtifactGuard.Capture(invocation);
-        var handle = await backend.StartAsync(invocation, cancellationToken);
-        var process = await backend.WaitAsync(handle, cancellationToken);
-        await File.WriteAllTextAsync(Path.Combine(Path.GetDirectoryName(invocation.ResultPath)!, "process-telemetry.json"), JsonSerializer.Serialize(process, FactoryJson.Options), CancellationToken.None);
-        if (process.TerminationKind == AgentTerminationKind.Cancelled) throw new OperationCanceledException(cancellationToken);
-        if (process.TerminationKind == AgentTerminationKind.TransportFailure && !process.CompleteResultObserved)
-            throw new AgentProtocolException("AGENT_TRANSPORT_FAILURE", $"Agent exited with {process.ExitCode?.ToString() ?? "unknown"}: {process.Stderr}");
-        protectedArtifacts.ValidateUnchanged();
-        if (!File.Exists(invocation.ResultPath)) throw new AgentProtocolException("MISSING_AGENT_RESULT", "Agent did not produce result.json.");
-        AgentResultEnvelope? result;
-        try { result = JsonSerializer.Deserialize<AgentResultEnvelope>(await File.ReadAllTextAsync(invocation.ResultPath, cancellationToken), FactoryJson.Options); }
-        catch (JsonException exception) { throw new AgentProtocolException("MALFORMED_AGENT_RESULT", exception.Message); }
-        var validated = validator.Validate(invocation, result);
-        validated = validated.Metrics is null && TryReadUsage(process.Stdout) is { } usage ? validated with { Metrics = usage } : validated;
-        return new(validated, process);
-    }
-
-    private static JsonElement? TryReadUsage(string stdout)
-    {
-        JsonElement? usage = null;
-        foreach (var line in stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-        {
-            try
-            {
-                using var document = JsonDocument.Parse(line);
-                if (document.RootElement.TryGetProperty("usage", out var direct)) usage = direct.Clone();
-                else if (document.RootElement.TryGetProperty("payload", out var payload) && payload.TryGetProperty("usage", out var nested)) usage = nested.Clone();
-            }
-            catch (JsonException) { }
-        }
-        return usage;
-    }
-}
-
 internal sealed class ProtectedArtifactGuard
 {
     private readonly IReadOnlyDictionary<string, string> hashes;
@@ -460,29 +417,6 @@ internal sealed class ProtectedArtifactGuard
     private static IEnumerable<string> Enumerate(IEnumerable<string> roots) => roots.SelectMany(root => File.Exists(root) ? [root] : Directory.Exists(root) ? Directory.GetFiles(root, "*", SearchOption.AllDirectories) : []);
     private static string Hash(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
     private static bool IsProductArtifact(string path) => path.Contains($"{Path.DirectorySeparatorChar}intent{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) || path.EndsWith("verification.yaml", StringComparison.OrdinalIgnoreCase);
-}
-
-public sealed class AgentResultValidator
-{
-    private static readonly IReadOnlyDictionary<string, HashSet<string>> Outcomes = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
-    {
-        ["task-decomposer"] = ["ready", "intent-required", "needs-clarification", "focused-handoff", "blocked"],
-        ["implementer"] = ["completed", "blocked", "needs-replan", "intent-required"],
-        ["checkpoint-reviewer"] = ["approved", "needs-fix", "needs-replan", "blocked", "intent-required"],
-        ["final-reviewer"] = ["approved", "needs-fix", "needs-replan", "blocked", "intent-required"],
-        ["factory-replanner"] = ["replan-proposed", "intent-required", "needs-clarification", "blocked"]
-    };
-
-    public AgentResultEnvelope Validate(AgentInvocation invocation, AgentResultEnvelope? result)
-    {
-        if (result is null) throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Result is null.");
-        if (result.ProtocolVersion != AgentInvocation.CurrentProtocolVersion) throw new AgentProtocolException("UNSUPPORTED_AGENT_PROTOCOL", $"Unsupported protocol {result.ProtocolVersion}.");
-        if (result.RunId != invocation.RunId || result.AttemptId != invocation.AttemptId || result.Role != invocation.Role)
-            throw new AgentProtocolException("AGENT_RESULT_IDENTITY_MISMATCH", "Result identity does not match invocation.");
-        if (!Outcomes.TryGetValue(result.Role, out var outcomes) || !outcomes.Contains(result.Outcome))
-            throw new AgentProtocolException("UNSUPPORTED_AGENT_OUTCOME", $"Outcome {result.Outcome} is invalid for {result.Role}.");
-        return result;
-    }
 }
 
 public sealed class AgentProtocolException(string code, string message) : Exception(message) { public string Code { get; } = code; }
