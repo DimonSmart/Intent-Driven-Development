@@ -12,10 +12,10 @@ public sealed class FactoryAgentResultValidator
     private static readonly IReadOnlyDictionary<string, HashSet<string>> Outcomes = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
     {
         ["task-decomposer"] = ["ready", "intent-required", "needs-clarification", "focused-handoff", "blocked"],
-        ["implementer"] = ["completed", "additional-work-required", "global-replan-required", "needs-replan", "blocked", "intent-required", "needs-clarification"],
-        ["researcher"] = ["completed", "additional-work-required", "global-replan-required", "needs-replan", "blocked", "intent-required", "needs-clarification"],
-        ["checkpoint-reviewer"] = ["approved", "needs-fix", "correction-required", "additional-work-required", "global-replan-required", "needs-replan", "blocked", "intent-required", "needs-clarification"],
-        ["final-reviewer"] = ["approved", "needs-fix", "correction-required", "additional-work-required", "global-replan-required", "needs-replan", "blocked", "intent-required", "needs-clarification"],
+        ["implementer"] = ["completed", "additional-work-required", "global-replan-required", "needs-replan", "blocked", "intent-required"],
+        ["researcher"] = ["completed", "additional-work-required", "global-replan-required", "needs-replan", "blocked", "intent-required"],
+        ["checkpoint-reviewer"] = ["approved", "needs-fix", "correction-required", "additional-work-required", "global-replan-required", "needs-replan", "blocked", "intent-required"],
+        ["final-reviewer"] = ["approved", "needs-fix", "correction-required", "additional-work-required", "global-replan-required", "needs-replan", "blocked", "intent-required"],
         ["factory-replanner"] = ["replan-proposed", "intent-required", "needs-clarification", "blocked"]
     };
 
