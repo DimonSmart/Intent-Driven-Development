@@ -11,7 +11,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
     <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
-    <None Include="factory-workflow.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="factory.yaml" CopyToOutputDirectory="PreserveNewest" />
     <InternalsVisibleTo Include="Idd.Factory.Tests" />
     <InternalsVisibleTo Include="Idd.Factory.LiveTests" />
   </ItemGroup>

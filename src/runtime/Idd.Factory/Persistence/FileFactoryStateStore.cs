@@ -20,8 +20,16 @@ public sealed class FileFactoryStateStore(string currentDirectory, FactoryStateV
         if (!File.Exists(StatePath)) return null;
         try
         {
-            await using var stream = File.OpenRead(StatePath);
-            var state = await JsonSerializer.DeserializeAsync<FactoryState>(stream, FactoryJson.Options, cancellationToken)
+            await using var schemaStream = File.OpenRead(StatePath);
+            using var document = await JsonDocument.ParseAsync(schemaStream, cancellationToken: cancellationToken);
+            if (!document.RootElement.TryGetProperty("schemaVersion", out var schemaNode) || !schemaNode.TryGetInt32(out var schemaVersion))
+                throw new FactoryStateException("CORRUPT_FACTORY_STATE", "state.json has no valid schemaVersion.");
+            if (schemaVersion != FactoryState.CurrentSchemaVersion)
+                throw new FactoryStateException(
+                    "LEGACY_FACTORY_STATE",
+                    $"Active Factory state uses schema {schemaVersion}; this runtime uses schema {FactoryState.CurrentSchemaVersion}. Finish the run with the previous Factory version, or cancel/restart it with the new runtime.");
+
+            var state = document.RootElement.Deserialize<FactoryState>(FactoryJson.Options)
                 ?? throw new FactoryStateException("CORRUPT_FACTORY_STATE", "state.json is empty.");
             validator.Validate(state);
             return state;

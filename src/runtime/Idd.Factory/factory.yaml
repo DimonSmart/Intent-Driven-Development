@@ -1,0 +1,17 @@
+schemaVersion: 1
+
+limits:
+  maxAgentAttempts: 4
+  maxReplans: 3
+  maxCorrectiveCycles: 5
+  maxWorkItems: 64
+
+finalReview:
+  required: true
+
+capabilities:
+  allow:
+    - implementation
+    - research
+    - semantic-review
+    - documentation
