@@ -152,6 +152,19 @@
       }
     }
   },
+  "idd-factory-research": {
+    "description": "Perform one focused read-only research work item in an isolated worker context and return findings for dependent graph work.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "argument-hint": "[active research work-item path]",
+          "allowed-tools": ["Read", "Glob", "Grep"]
+        }
+      }
+    }
+  },
   "idd-factory-review-checkpoint": {
     "description": "Independently review one active Review checkpoint across its covered completed Subtasks.",
     "adapters": {
