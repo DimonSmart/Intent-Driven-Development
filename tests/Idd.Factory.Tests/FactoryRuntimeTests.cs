@@ -796,19 +796,68 @@ public sealed class FactoryRuntimeTests
         Assert.Equal(2, backend.Roles.Count(role => role == "implementer"));
     }
 
-    [Fact] public async Task VerificationFixNewPathRecomputesRulesAndRequestsReplan()
+    [Fact] public async Task ResumedVerificationFixNewPathRecomputesRulesAndDispatchesPersistedReplan()
     {
         using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
         temp.Write("broken.csproj", "<Project");
         temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  area-a:\n    run: dotnet build broken.csproj --nologo\n  area-b:\n    run: dotnet --version\ndefault:\n  use: []\nsubtask:\n  rules:\n    - paths:\n        - src/A/**\n      use:\n        - area-a\n    - fallback: true\n      use:\n        - area-b\nfinal:\n  use: []\n");
         var backend = new FakeAgentBackend(); backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem(["area-a"])));
         backend.Results.Enqueue(invocation => { temp.Write("src/A/a.cs", "a"); return Envelope(invocation, "completed"); });
+        backend.Results.Enqueue(invocation => Envelope(invocation, "blocked", reason: "Repair is paused."));
+        var runtime = Create(temp.Path, workflow, current, backend);
+        Assert.Equal("BLOCKED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
         backend.Results.Enqueue(invocation => { temp.Write("src/B/b.cs", "b"); return Envelope(invocation, "completed"); });
-        backend.Results.Enqueue(invocation => Envelope(invocation, "blocked", reason: "Stop after observing replan."));
-        var outcome = await Create(temp.Path, workflow, current, backend).RunAsync(request, "test", default);
-        Assert.Equal("BLOCKED", outcome.FactoryOutcome); Assert.Equal("factory-replanner", backend.Roles[^1]);
+        backend.Results.Enqueue(invocation =>
+        {
+            Assert.Equal("factory-replanner", invocation.Role);
+            Assert.Contains("different verification selection", invocation.Input);
+            var persisted = new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default).GetAwaiter().GetResult()!;
+            Assert.Equal("replan", persisted.CurrentWorkflowStep);
+            Assert.Equal(ContinuationKind.SemanticInvocation, persisted.PendingContinuation!.Kind);
+            Assert.Equal(SemanticOperationKind.Replan, persisted.PendingContinuation.Operation);
+            Assert.Equal("replan", persisted.PendingContinuation.WorkflowStep);
+            Assert.Contains("src/B/b.cs", persisted.WorkItems.Single().ChangedPaths);
+            return Envelope(invocation, "blocked", reason: "Stop after observing replan.");
+        });
+
+        var outcome = await runtime.ContinueAsync(default);
+        Assert.Equal("BLOCKED", outcome.FactoryOutcome); Assert.NotEqual("NEEDS_REPLAN", outcome.FactoryOutcome);
+        Assert.Equal("factory-replanner", backend.Roles[^1]);
         var state = await new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default);
         Assert.Contains("src/B/b.cs", state!.WorkItems.Single().ChangedPaths);
+        Assert.Equal(2, backend.Invocations.Count(x => x.Role == "implementer" && x.Input.Contains("verification-fix")));
+    }
+
+    [Fact] public async Task ResumedManualVerificationFailureRoutesVerificationFixReplanWithoutRepeatingChecks()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write("broken.csproj", "<Project");
+        temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  manual:\n    instructions: Confirm behavior.\n  automatic:\n    run: dotnet build broken.csproj --nologo\ndefault:\n  use: []\nsubtask:\n  use:\n    - manual\n    - automatic\nfinal:\n  use: []\n");
+        var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem(["manual", "automatic"])));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        var runtime = Create(temp.Path, workflow, current, backend);
+        Assert.Equal("VERIFICATION_RESULT_REQUIRED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        backend.Results.Enqueue(invocation => Envelope(invocation, "needs-replan", new { defect = "automatic verification repair requires replanning" }, "Replan the failed automatic verification repair."));
+        backend.Results.Enqueue(invocation =>
+        {
+            Assert.Equal("factory-replanner", invocation.Role);
+            var persisted = new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default).GetAwaiter().GetResult()!;
+            Assert.Equal("replan", persisted.CurrentWorkflowStep);
+            Assert.Equal(ContinuationKind.SemanticInvocation, persisted.PendingContinuation!.Kind);
+            Assert.Equal(SemanticOperationKind.Replan, persisted.PendingContinuation.Operation);
+            Assert.Equal("Replan the failed automatic verification repair.", persisted.PendingReplanTrigger!.Reason);
+            return Envelope(invocation, "blocked", reason: "Stop after observing replan.");
+        });
+
+        var outcome = await runtime.ContinueAsync(default, verificationPassed: true);
+
+        Assert.Equal("BLOCKED", outcome.FactoryOutcome); Assert.NotEqual("NEEDS_REPLAN", outcome.FactoryOutcome);
+        Assert.Single(backend.Invocations, x => x.Role == "implementer" && x.Input.Contains("verification-fix"));
+        Assert.Single(backend.Invocations, x => x.Role == "factory-replanner");
+        var evidence = (await new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default))!.VerificationEvidenceRefs.Select(path => ReadEvidence(current, path)).ToArray();
+        Assert.Single(evidence, item => item.CheckId == "manual" && item.Status == "passed");
+        Assert.Single(evidence, item => item.CheckId == "automatic" && item.Status == "failed");
     }
 
     [Fact] public async Task CheckpointRepairPathsParticipateInFreshCheckpointScope()

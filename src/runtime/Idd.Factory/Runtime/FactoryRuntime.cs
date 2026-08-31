@@ -1052,7 +1052,7 @@ public sealed class FactoryRuntime(
             ? await VerifyFinalGateAsync(state, token)
             : await VerifyWorkItemGateAsync(state, item!, continuation.VerificationContext!,
                 await File.ReadAllTextAsync(Path.Combine(currentDirectory, item!.ContractPath), token), token);
-        if (gateOutcome != "passed") return await StopForOutcomeAsync(state, gateOutcome, token);
+        if (gateOutcome != "passed") return await RouteResumedOutcomeAsync(state, continuation.WorkflowStep, gateOutcome, token);
         await PrepareAndCompleteResumedVerificationAsync(state, continuation, token);
         return null;
     }
@@ -1063,6 +1063,12 @@ public sealed class FactoryRuntime(
         if (!step.Transitions.TryGetValue(outcome, out var target))
             throw new WorkflowException("UNROUTED_WORKFLOW_OUTCOME", $"Step {step.Id} does not route {outcome}.");
         if (target == "$stop") return await StopForOutcomeAsync(state, outcome, token);
+        if (outcome == "needs-replan")
+        {
+            PersistReplanContinuation(state, workflowStep);
+            await SaveAsync(state, token);
+            return await ExecuteLoopAsync(state, token);
+        }
         state.CurrentWorkflowStep = target;
         await SaveAsync(state, token);
         return await ExecuteLoopAsync(state, token);
@@ -1106,7 +1112,7 @@ public sealed class FactoryRuntime(
                 state.WorkItems.Single(x => x.Id == continuation.WorkItemId),
                 continuation.VerificationContext!,
                 await File.ReadAllTextAsync(Path.Combine(currentDirectory, state.WorkItems.Single(x => x.Id == continuation.WorkItemId).ContractPath), token), token);
-        if (outcome != "passed") return await StopForOutcomeAsync(state, outcome, token);
+        if (outcome != "passed") return await RouteResumedOutcomeAsync(state, continuation.WorkflowStep, outcome, token);
         await PrepareAndCompleteResumedVerificationAsync(state, continuation, token);
         state.PendingContinuation = null; state.Blocker = null;
         await SaveAsync(state, token);
