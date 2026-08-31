@@ -138,12 +138,15 @@ public sealed class VerificationAndReviewTests
         var outcome = await CreateRuntime(temp.Path, backend).RunRequestAsync("Verify once before final review", "test", default);
 
         Assert.Equal("COMPLETED", outcome.FactoryOutcome);
-        var schedulerEvents = File.ReadLines(Path.Combine(outcome.ResultDirectory!, "events.jsonl"))
-            .Select(JsonDocument.Parse)
-            .Where(document => document.RootElement.GetProperty("type").GetString() == "scheduler-decision")
-            .Select(document => document.RootElement.GetProperty("data").GetProperty("Kind").GetInt32())
-            .ToArray();
-        Assert.Single(schedulerEvents, kind => kind == (int)Idd.Factory.Runtime.FactoryCommandKind.RunFinalVerification);
+        var finalVerificationDecisions = 0;
+        foreach (var line in File.ReadLines(Path.Combine(outcome.ResultDirectory!, "events.jsonl")))
+        {
+            using var document = JsonDocument.Parse(line);
+            if (document.RootElement.GetProperty("type").GetString() == "scheduler-decision" &&
+                document.RootElement.GetProperty("data").GetProperty("Kind").GetInt32() == (int)Idd.Factory.Runtime.FactoryCommandKind.RunFinalVerification)
+                finalVerificationDecisions++;
+        }
+        Assert.Equal(1, finalVerificationDecisions);
     }
 
     [Fact]
