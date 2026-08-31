@@ -124,7 +124,7 @@ public sealed class CrashRecoveryTests
 
     private static async Task<FactoryState> LoadStateFromResultAsync(string resultDirectory)
     {
-        var json = await File.ReadAllTextAsync(Path.Combine(resultDirectory, "result.json"));
+        var json = await File.ReadAllTextAsync(Path.Combine(resultDirectory, "factory-result.json"));
         using var result = JsonDocument.Parse(json);
         var graphRevision = result.RootElement.GetProperty("graphRevision").GetInt64();
         var decomposition = await File.ReadAllTextAsync(Path.Combine(resultDirectory, "decomposition", "decomposition.json"));
