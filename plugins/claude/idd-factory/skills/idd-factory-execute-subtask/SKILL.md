@@ -1,9 +1,9 @@
 ---
 name: idd-factory-execute-subtask
-description: Implement one explicit active Subtask in an isolated worker context.
+description: Execute one focused implementation or documentation work item in an isolated worker context.
 context: fork
 agent: general-purpose
-argument-hint: "[active subtask path]"
+argument-hint: "[active work-item path]"
 allowed-tools: [Read, Glob, Grep, Edit, Write, Bash]
 ---
 
@@ -11,66 +11,54 @@ allowed-tools: [Read, Glob, Grep, Edit, Write, Bash]
 
 ## Purpose
 
-Implement exactly one self-contained active Subtask in a fresh context. Current
-`.idd/intent/` remains normative. This skill is the complete semantic contract
-for the `implementer` role.
+Execute one `implementation` or `documentation` work item in a fresh semantic context. The supplied immutable work-item contract and current `.idd/intent/` are normative.
 
-## Modes
-
-- `normal`: implement the supplied Subtask contract.
-- `verification-fix`: make only the implementation changes needed for the
-  supplied failed authoritative verification gate and textual scope.
-
-Both modes use the same role and outcomes. In `verification-fix`, `completed`
-means only that the repair attempt ended; the runtime must rerun the same gate
-and only a runtime `Passed` result can complete it.
+Runtime owns selection, retries, graph mutation, persistence, verification, and scheduling. This worker never acts as coordinator.
 
 ## Inputs and boundaries
 
-Read the supplied Subtask, optional run context, relevant intent, current diff,
-focused repository evidence, and retry/verification-failure evidence. Do not
-read the full request, unrelated Subtasks, checkpoints, or previous transcripts.
+Read the supplied work-item contract, relevant durable intent, completed dependency result summaries/references, prior result references for this same work item, focused repository evidence, and runtime-supplied verification observations.
 
-Make the smallest coherent implementation change. Do not select work, mutate
-Factory state, change intent, perform review or finalization, broaden scope, or
-delegate. Runtime verification is authoritative; worker verification claims are
-diagnostic only.
+Do not read unrelated work merely to reconstruct a global plan. Do not mutate Factory state, graph history, `.idd/factory.yaml`, intent, or verification policy. Do not select another worker, role, skill, or runtime phase.
 
-Use lightweight repository inspection needed for implementation, but do not run
-build, test, lint, or other potentially long-lived diagnostic commands. The
-runtime executes the applicable authoritative verification gate immediately
-after this result. Do not resolve or run mandatory Factory check IDs, and never
-leave a tool process active when returning the structured result. The runtime
-owns orchestration, retries, machine protocol validation, authoritative
-verification, and the next semantic capability.
+Make the smallest coherent product change needed by the contract. Runtime verification is authoritative. Do not run Factory verification checks merely to classify success or repair a hidden gate; there is no `verification-fix` orchestration mode.
 
-## Structured result
+## Dynamic dependency discovery
 
-Return worker protocol version 1 with role `implementer` and one outcome:
-`completed`, `needs-replan`, `blocked`, or `intent-required`.
+If the assigned work cannot safely continue because a concrete additional prerequisite has been discovered, return `additional-work-required` rather than broadening scope or choosing an agent.
 
-For `completed`, payload contains a concise `summary`, `declaredChanges[]`,
-`concerns[]`, and optional `verificationClaims[]`. Use `needs-replan` when the
-contract, ordering, repository reality, or assigned verification scope is
-insufficient. Use `intent-required` only for missing durable product meaning and
-`blocked` for an external or human-decision condition.
-
-For `intent-required`, `payload.missingIntentDecisions` is a non-empty array.
-Each item contains:
+`payload.additionalWork` (or `payload.requirement`) contains:
 
 ```text
-area
-whyBlocking
-requiredDecisions[]
-intentReferences[]
-recommendedNextWorkflow?  # e.g. idd-intent-change or idd-intent-new-document: ADR
+capability
+ goal
+reason
+context?
+constraints[]?
+expectedOutput?
+verificationCheckIds[]?
+verificationExpectations?  # check ID -> must-pass | may-fail
 ```
 
-`area` is a short domain or contract area name. `whyBlocking` explains why safe
-implementation cannot continue. `requiredDecisions[]` names the concrete durable
-decisions that must be recorded under `.idd/intent`. `intentReferences[]` names
-related IDD document IDs or paths; use an empty array only when no existing
-intent document applies. `recommendedNextWorkflow` is optional and must name an
-available intent workflow when a useful next step is known. Keep the list
-concise and decision-oriented; do not substitute logs, implementation guesses,
-or vague requests to "clarify intent".
+The requirement states *what work is needed*, not who should perform it. Runtime validates the capability, materializes a new graph node, persists the dependency, and later resumes this work item with the dependency result.
+
+Use `global-replan-required` only when the discovery invalidates the global remaining strategy and cannot be represented as local additional work or scoped refinement. `needs-replan` may be accepted by older adapters but should not be emitted by new workers.
+
+## Verification expectations
+
+Do not reinterpret a failed authoritative check. Runtime classifies intermediate failures deterministically from the work-item's persisted `verificationExpectations`:
+- `must-pass` or an unspecified expectation: failure is unexpected;
+- `may-fail`: the named intermediate failure may be expected;
+- final verification is always strict.
+
+## Outcomes
+
+Return protocol version 2 with role `implementer` and one outcome:
+
+- `completed` — assigned semantic work is finished; include concise `summary`, `declaredChanges[]`, `concerns[]`, optional diagnostic `verificationClaims[]`;
+- `additional-work-required` — a local typed prerequisite was discovered;
+- `global-replan-required` — the global remaining strategy must change;
+- `intent-required` — durable product meaning is missing;
+- `blocked` — an external/non-semantic condition prevents progress.
+
+For `intent-required`, return the standard non-empty `payload.missingIntentDecisions` structure. `recommendedNextWorkflow`, when present, refers only to a user-facing durable-intent workflow, never Factory scheduling.

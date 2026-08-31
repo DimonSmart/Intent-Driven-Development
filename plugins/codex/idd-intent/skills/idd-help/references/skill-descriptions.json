@@ -127,7 +127,7 @@
     "description": "Run, resume, or cancel a deterministic IDD Factory Runtime execution."
   },
   "idd-factory-decompose-task": {
-    "description": "Decompose one Factory Task into ordered Subtasks and Review checkpoints.",
+    "description": "Create the smallest safe initial Factory task graph using executable and outline work without requiring a complete up-front plan.",
     "adapters": {
       "claude": {
         "frontmatter": {
@@ -140,33 +140,46 @@
     }
   },
   "idd-factory-execute-subtask": {
-    "description": "Implement one explicit active Subtask in an isolated worker context.",
+    "description": "Execute one focused implementation or documentation work item in an isolated worker context.",
     "adapters": {
       "claude": {
         "frontmatter": {
           "context": "fork",
           "agent": "general-purpose",
-          "argument-hint": "[active subtask path]",
+          "argument-hint": "[active work-item path]",
           "allowed-tools": ["Read", "Glob", "Grep", "Edit", "Write", "Bash"]
         }
       }
     }
   },
-  "idd-factory-review-checkpoint": {
-    "description": "Independently review one active Review checkpoint across its covered completed Subtasks.",
+  "idd-factory-research": {
+    "description": "Perform one focused read-only research work item in an isolated worker context and return findings for dependent graph work.",
     "adapters": {
       "claude": {
         "frontmatter": {
           "context": "fork",
           "agent": "Explore",
-          "argument-hint": "[active review-checkpoint path]",
+          "argument-hint": "[active research work-item path]",
+          "allowed-tools": ["Read", "Glob", "Grep"]
+        }
+      }
+    }
+  },
+  "idd-factory-review-checkpoint": {
+    "description": "Independently review one intermediate semantic-review graph work item over its covered completed work.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "argument-hint": "[active review work-item path]",
           "allowed-tools": ["Read", "Glob", "Grep", "Bash"]
         }
       }
     }
   },
   "idd-factory-review-task": {
-    "description": "Independently review the complete result of the Factory Task.",
+    "description": "Independently review the integrated Factory result as read-only semantic-review graph work.",
     "adapters": {
       "claude": {
         "frontmatter": {
@@ -178,7 +191,7 @@
     }
   },
   "idd-factory-replan": {
-    "description": "Propose bounded semantic changes to remaining Factory work without mutating runtime state.",
+    "description": "Propose bounded semantic changes to remaining Factory graph work without mutating authoritative runtime state.",
     "adapters": {
       "claude": {
         "frontmatter": {

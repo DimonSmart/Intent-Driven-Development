@@ -1,67 +1,41 @@
 ---
 name: idd-factory-review-checkpoint
-description: Independently review one active Review checkpoint across its covered completed Subtasks.
+description: Independently review one intermediate semantic-review graph work item over its covered completed work.
 ---
 
 # idd-factory-review-checkpoint
 
 ## Purpose
 
-Independently review one selective checkpoint over its explicitly covered
-completed Subtasks in a fresh read-only context.
-This skill is the complete semantic contract for the `checkpoint-reviewer`
-role.
+Review an intermediate integrated slice without owning orchestration. A checkpoint is semantic-review graph work, not a workflow state.
 
 ## Inputs and boundaries
 
-Read the checkpoint contract, covered contracts/results, relevant intent,
-checkpoint-local diff, and authoritative runtime verification evidence. Do not
-read the full request, unrelated or later work, or worker conversations. Do not
-modify code, intent, verification policy, Factory state, or delegate.
-The runtime runs the checkpoint gate before invoking this skill. Review the
-supplied authoritative evidence; do not rerun mandatory Factory verification.
+Use the supplied checkpoint contract, covered completed work/result references, relevant durable intent, current focused product state, and authoritative runtime verification observations/evidence. Do not rely on transcript or event-history replay.
 
-Do not begin checkpoint review with a broad or recursive workspace inventory.
-Do not enumerate the whole workspace, `.idd/factory`, `bin`, or `obj`. Use the
-checkpoint contract and runtime-supplied references first. Discover additional
-files only with focused searches needed to resolve a concrete semantic review
-question.
+Do not modify product files, Factory state, graph history, `.idd/factory.yaml`, durable intent, or verification policy. Do not rerun deterministic Factory checks solely to classify their outcome.
 
-Focused read-only diagnostics and relevant project or domain skills remain
-available when they help semantic review.
+## Findings
 
-## Structured result
+Return `approved` when the covered slice is semantically coherent.
 
-Return worker protocol version 1 with role `checkpoint-reviewer` and one
-outcome: `approved`, `needs-fix`, `needs-replan`, `blocked`, or
-`intent-required`.
+For a bounded defect, return `correction-required` with `payload.correctiveSubtask` containing capability, contract Markdown, and optional stable verification IDs/expectations. Runtime materializes corrective work as a new graph node; completed work remains immutable.
 
-`needs-fix` supplies `payload.correctiveSubtask`: a complete implementation-only
-contract with ID, contract Markdown, dependencies, and verification check IDs.
-Do not reopen or rewrite completed work. Use `needs-replan` for invalid coverage,
-ordering, or remaining contracts. Separate implementation assessment from
-verification assessment and report only material current findings.
+For a missing focused prerequisite or investigation, return `additional-work-required` with a typed capability/goal/reason requirement. Return `global-replan-required` only if the remaining global strategy cannot stay correct through local graph work.
 
-For `intent-required`, `payload.missingIntentDecisions` is a non-empty array.
-Each item contains:
+Use `intent-required` only when durable product meaning is missing, or `blocked` when an external/non-semantic condition prevents review. Ordinary review work does not own user clarification; do not return `needs-clarification`.
 
-```text
-area
-whyBlocking
-requiredDecisions[]
-intentReferences[]
-recommendedNextWorkflow?  # e.g. idd-intent-change or idd-intent-new-document: ADR
-```
+## Outcomes
 
-`area` is a short domain or contract area name. `whyBlocking` explains why the
-checkpoint cannot be assessed safely against durable product meaning.
-`requiredDecisions[]` names the concrete durable decisions that must be recorded
-under `.idd/intent`. `intentReferences[]` names related IDD document IDs or
-paths; use an empty array only when no existing intent document applies.
-`recommendedNextWorkflow` is optional and must name an available intent workflow
-when a useful next step is known. Keep the list concise and decision-oriented;
-do not substitute logs, implementation guesses, or vague requests to "clarify
-intent".
+Return protocol version 2 with role `checkpoint-reviewer` and one outcome:
 
-The runtime owns machine validation, workflow transitions, corrections, and the
-next role or skill.
+- `approved`;
+- `correction-required`;
+- compatibility alias `needs-fix`;
+- `additional-work-required`;
+- `global-replan-required`;
+- compatibility alias `needs-replan`;
+- `intent-required`;
+- `blocked`.
+
+Do not choose a next role, skill, phase, retry, or transition. Runtime owns all operational decisions.

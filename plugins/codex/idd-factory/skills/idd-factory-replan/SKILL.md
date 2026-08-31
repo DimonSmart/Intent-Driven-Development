@@ -1,83 +1,64 @@
 ---
 name: idd-factory-replan
-description: Propose bounded semantic changes to remaining Factory work without mutating runtime state.
+description: Propose bounded semantic changes to remaining Factory graph work without mutating authoritative runtime state.
 ---
 
 # idd-factory-replan
 
 ## Purpose
 
-Propose bounded semantic changes to remaining Factory work when repository
-reality proves the current decomposition incorrect. The runtime validates and
-applies the proposal. This skill is the complete semantic contract for the
-`factory-replanner` role.
+Propose a bounded global restructuring of the *remaining* task graph when a persisted `global-replan-required` trigger proves that the current global strategy is no longer correct.
+
+This skill is not the normal mechanism for discovering one prerequisite. Local discoveries belong in `additional-work-required`; deferred detail belongs in scoped refinement. Runtime owns candidate validation and atomic graph mutation.
 
 ## Inputs
 
-Read only the supplied original request, relevant current intent, run context,
-triggering work item and reason, mutable ready/planned contracts, minimal
-completed-work context, and supplied verification evidence when relevant.
+Read the supplied original request, relevant durable intent, persisted replan trigger, remaining graph definitions, minimal immutable completed-work references, run context, and supplied authoritative verification evidence.
+
+Completed work and its contract/result provenance are immutable.
 
 ## Result protocol
 
-Return a worker protocol version 1 envelope with role `factory-replanner` and
-one outcome: `replan-proposed`, `intent-required`, `needs-clarification`, or
-`blocked`.
+Return protocol version 2 with role `factory-replanner` and one outcome:
+`replan-proposed`, `intent-required`, `needs-clarification`, or `blocked`.
 
-`replan-proposed` contains `payload.operations`. Supported V1 operations are:
+`replan-proposed` contains `payload.operations`. Prefer the smallest set of operations necessary to restore a correct strategy. Supported operations are:
 
-- `insert-subtask`
-- `replace-ready-subtask`
-- `supersede-ready-subtask`
-- `reorder-ready-work`
-- `update-run-context`
-- `update-checkpoint-coverage`
-- `insert-checkpoint`
-- `remove-unused-ready-checkpoint`
+- `add-work` — add an executable or outline work item;
+- `refine-work` — replace the definition of mutable remaining work or replace it with a new node;
+- `supersede-work` — retire mutable work that is no longer required;
+- `change-dependencies` — change dependencies of mutable remaining work;
+- `reorder-work` — reorder mutable remaining work without implying execution order beyond dependencies;
+- `update-checkpoint-coverage` — adjust a mutable semantic review boundary;
+- `update-run-context` — update compact runtime context when useful.
 
-Every inserted or replaced work item is a self-contained structured contract
-with stable ID, kind, sequence, contract Markdown, dependencies, coverage, and
-verification check IDs as applicable.
+Compatibility aliases from protocol-v1 may be accepted by runtime, but new proposals should use the operations above.
 
-For `intent-required`, `payload.missingIntentDecisions` is a non-empty array.
-Each item contains:
+Every added/refined work item uses the dynamic task-graph schema:
 
 ```text
-area
-whyBlocking
-requiredDecisions[]
-intentReferences[]
-recommendedNextWorkflow?  # e.g. idd-intent-change or idd-intent-new-document: ADR
+id
+sequence?
+kind
+definitionState
+capability?
+contractMarkdown
+dependencies[]
+coveredWorkItems[]
+verificationCheckIds[]
+verificationExpectations?
 ```
 
-`area` is a short domain or contract area name. `whyBlocking` explains why a
-safe replan cannot be produced. `requiredDecisions[]` names the concrete durable
-decisions that must be recorded under `.idd/intent`. `intentReferences[]` names
-related IDD document IDs or paths; use an empty array only when no existing
-intent document applies. `recommendedNextWorkflow` is optional and must name an
-available intent workflow when a useful next step is known. Keep the list
-concise and decision-oriented; do not substitute logs, implementation guesses,
-or vague requests to "clarify intent".
-
-When `.idd/verification.yaml` exists, use only real top-level stable check IDs
-from the valid policy; never invent IDs, and never silently replace a malformed
-existing policy with fallback. When the file is absent, every inserted or
-replaced work item uses `verificationCheckIds: []`, keeps required verification
-properties in its human-readable contract Markdown, and leaves
-repository/platform fallback verification to the deterministic Runtime.
-Missing policy alone is not a clarification or blocker and must not cause the
-worker to create or request a policy.
+Use only real stable verification IDs from a valid `.idd/verification.yaml`. Never invent IDs or edit verification policy.
 
 ## Boundaries
 
-- Do not modify completed work or results.
-- Do not change operational status, mark work complete, or mutate Factory state.
-- Do not edit product intent, implementation, verification policy, or review
-  results.
-- Do not perform implementation or review.
-- Do not create child agents or use conversation history as Factory memory.
-- Prefer the smallest proposal that repairs the demonstrated semantic defect.
-- The runtime owns machine validation, state mutation, workflow routing,
-  authoritative verification, and selection of the next role or skill.
-- Focused repository reads and relevant project or domain skills may be used for
-  semantic diagnosis.
+- Do not modify completed or superseded work.
+- Do not mark work complete or select operational statuses.
+- Do not modify implementation, intent, Factory state, graph history, or `.idd/factory.yaml`.
+- Do not perform implementation or semantic review.
+- Do not select a role, skill, workflow phase, or next operation.
+- Do not use Factory event/history replay as memory; supplied persisted state is authoritative.
+- Do not use global replan when a local additional dependency or scoped refinement is sufficient.
+
+For `intent-required`, use the standard `missingIntentDecisions` structure. Any `recommendedNextWorkflow` refers only to an intent-editing workflow outside Factory runtime orchestration.
