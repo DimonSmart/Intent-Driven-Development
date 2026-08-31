@@ -14,6 +14,7 @@ public sealed class AgentProtocolTests
     [InlineData("researcher", "additional-work-required")]
     [InlineData("final-reviewer", "approved")]
     [InlineData("final-reviewer", "correction-required")]
+    [InlineData("final-reviewer", "needs-fix")]
     [InlineData("final-reviewer", "additional-work-required")]
     [InlineData("final-reviewer", "global-replan-required")]
     [InlineData("task-decomposer", "ready")]
@@ -32,6 +33,20 @@ public sealed class AgentProtocolTests
         var invocation = Invocation("researcher");
         var exception = Assert.Throws<AgentProtocolException>(() =>
             new FactoryAgentResultValidator().Validate(invocation, Envelope(invocation, "approved")));
+
+        Assert.Equal("UNSUPPORTED_AGENT_OUTCOME", exception.Code);
+    }
+
+    [Theory]
+    [InlineData("implementer")]
+    [InlineData("researcher")]
+    [InlineData("final-reviewer")]
+    public void WorkWorkersDoNotOwnUserClarificationOutcome(string role)
+    {
+        var invocation = Invocation(role);
+
+        var exception = Assert.Throws<AgentProtocolException>(() =>
+            new FactoryAgentResultValidator().Validate(invocation, Envelope(invocation, "needs-clarification")));
 
         Assert.Equal("UNSUPPORTED_AGENT_OUTCOME", exception.Code);
     }
@@ -66,8 +81,12 @@ public sealed class AgentProtocolTests
 
     [Theory]
     [InlineData(".idd/factory.yaml", "WORKER_CHANGED_FACTORY_POLICY")]
-    [InlineData(".idd/factory/current/graph/mutations/G000001.json", "WORKER_CHANGED_RUNNER_STATE")]
     [InlineData(".idd/factory/current/state.json", "WORKER_CHANGED_RUNNER_STATE")]
+    [InlineData(".idd/factory/current/request.md", "WORKER_CHANGED_RUNNER_STATE")]
+    [InlineData(".idd/factory/current/run-context.md", "WORKER_CHANGED_RUNNER_STATE")]
+    [InlineData(".idd/factory/current/work-items/item/contracts/000001.md", "WORKER_CHANGED_RUNNER_STATE")]
+    [InlineData(".idd/factory/current/graph/mutations/G000001.json", "WORKER_CHANGED_RUNNER_STATE")]
+    [InlineData(".idd/factory/current/clarifications/C000001.md", "WORKER_CHANGED_RUNNER_STATE")]
     [InlineData(".idd/intent/current.md", "WORKER_CHANGED_PRODUCT_INTENT")]
     [InlineData(".idd/verification.yaml", "WORKER_CHANGED_PRODUCT_INTENT")]
     public async Task WorkerCannotMutateProtectedArtifacts(string path, string expectedCode)
@@ -76,6 +95,29 @@ public sealed class AgentProtocolTests
         PrepareProtectedArtifacts(temp);
         var invocation = PreparedInvocation(temp);
         var backend = new MutatingBackend(invocation, Path.Combine(temp.Path, path));
+
+        var exception = await Assert.ThrowsAsync<AgentProtocolException>(() =>
+            new FactoryAgentExecutor(backend, new FactoryAgentResultValidator()).ExecuteAsync(invocation, default));
+
+        Assert.Equal(expectedCode, exception.Code);
+    }
+
+    [Theory]
+    [InlineData(".idd/factory.yaml", "WORKER_CHANGED_FACTORY_POLICY")]
+    [InlineData(".idd/factory/current/state.json", "WORKER_CHANGED_RUNNER_STATE")]
+    [InlineData(".idd/factory/current/request.md", "WORKER_CHANGED_RUNNER_STATE")]
+    [InlineData(".idd/factory/current/run-context.md", "WORKER_CHANGED_RUNNER_STATE")]
+    [InlineData(".idd/factory/current/work-items/item/contracts/000001.md", "WORKER_CHANGED_RUNNER_STATE")]
+    [InlineData(".idd/factory/current/graph/mutations/G000000.json", "WORKER_CHANGED_RUNNER_STATE")]
+    [InlineData(".idd/factory/current/clarifications/C000000.md", "WORKER_CHANGED_RUNNER_STATE")]
+    [InlineData(".idd/intent/current.md", "WORKER_CHANGED_PRODUCT_INTENT")]
+    [InlineData(".idd/verification.yaml", "WORKER_CHANGED_PRODUCT_INTENT")]
+    public async Task WorkerCannotDeleteProtectedArtifacts(string path, string expectedCode)
+    {
+        using var temp = new TestWorkspace();
+        PrepareProtectedArtifacts(temp);
+        var invocation = PreparedInvocation(temp);
+        var backend = new DeletingBackend(invocation, Path.Combine(temp.Path, path));
 
         var exception = await Assert.ThrowsAsync<AgentProtocolException>(() =>
             new FactoryAgentExecutor(backend, new FactoryAgentResultValidator()).ExecuteAsync(invocation, default));
@@ -139,6 +181,7 @@ public sealed class AgentProtocolTests
         temp.Write(".idd/factory/current/run-context.md", "context");
         temp.Write(".idd/factory/current/work-items/item/contracts/000001.md", "contract");
         temp.Write(".idd/factory/current/graph/mutations/G000000.json", "history");
+        temp.Write(".idd/factory/current/clarifications/C000000.md", "clarification");
         temp.Write(".idd/factory.yaml", "schemaVersion: 1");
         temp.Write(".idd/intent/current.md", "intent");
         temp.Write(".idd/verification.yaml", "version: 1");
@@ -159,6 +202,21 @@ public sealed class AgentProtocolTests
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, "changed");
+            File.WriteAllText(invocation.ResultPath, JsonSerializer.Serialize(Envelope(invocation, "completed"), FactoryJson.Options));
+            return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId));
+        }
+
+        public Task<AgentProcessResult> WaitAsync(AgentRunHandle handle, CancellationToken cancellationToken) =>
+            Task.FromResult(new AgentProcessResult(0, "", "", true, false, AgentTerminationKind.CleanExit));
+
+        public Task CancelAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class DeletingBackend(AgentInvocation invocation, string path) : IAgentBackend
+    {
+        public Task<AgentRunHandle> StartAsync(AgentInvocation _, CancellationToken cancellationToken)
+        {
+            File.Delete(path);
             File.WriteAllText(invocation.ResultPath, JsonSerializer.Serialize(Envelope(invocation, "completed"), FactoryJson.Options));
             return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId));
         }
