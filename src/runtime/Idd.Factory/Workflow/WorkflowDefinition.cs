@@ -92,16 +92,16 @@ public sealed class WorkflowValidator
             throw new WorkflowException("INVALID_WORKFLOW", $"Step {step.Id} must use agent {expectedAgent}.");
         if (expectedAgent is null && step.Agent is not null)
             throw new WorkflowException("INVALID_WORKFLOW", $"Step {step.Id} does not accept an agent.");
-        if (step.Uses == "factory.execute" && (step.Handlers.GetValueOrDefault("subtask") != "implementer" || step.Handlers.GetValueOrDefault("review-checkpoint") != "checkpoint-reviewer"))
+        if (step.Uses == "factory.execute" && (step.Handlers.Count != 2 || step.Handlers.GetValueOrDefault("subtask") != "implementer" || step.Handlers.GetValueOrDefault("review-checkpoint") != "checkpoint-reviewer"))
             throw new WorkflowException("INVALID_WORKFLOW", $"Step {step.Id} requires subtask and review-checkpoint handlers with supported roles.");
-        if (step.Uses is "factory.intent" or "factory.finalize" && (step.Agent is not null || step.Handlers.Count != 0))
-            throw new WorkflowException("INVALID_WORKFLOW", $"Step {step.Id} does not accept an agent or handlers.");
+        if (step.Uses != "factory.execute" && step.Handlers.Count != 0)
+            throw new WorkflowException("INVALID_WORKFLOW", $"Step {step.Id} does not accept handlers.");
     }
 
     private static HashSet<string> Outcomes(string primitive) => primitive switch
     {
         "factory.decompose" => ["ready", "blocked", "needs-clarification", "focused-handoff", "intent-required"],
-        "factory.intent" => ["completed", "blocked", "needs-clarification"],
+        "factory.intent" => ["completed", "blocked"],
         "factory.execute" => ["advanced", "exhausted", "blocked", "needs-replan", "intent-required"],
         "factory.replan" => ["applied", "blocked", "needs-clarification", "intent-required"],
         "factory.final-review" => ["approved", "needs-fix", "blocked", "needs-replan", "intent-required"],

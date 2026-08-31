@@ -16,8 +16,10 @@ public sealed class FinalizeHandler(string workspace)
         foreach (var evidenceRef in state.VerificationEvidenceRefs)
             evidence.Add(JsonSerializer.Deserialize<VerificationEvidence>(await File.ReadAllTextAsync(Path.Combine(current, evidenceRef), cancellationToken), FactoryJson.Options)
                 ?? throw new InvalidOperationException($"Verification evidence is invalid: {evidenceRef}"));
-        foreach (var latest in evidence.GroupBy(x => x.CheckId, StringComparer.Ordinal).Select(group => group.OrderBy(x => x.FinishedAt).Last()))
-            if (latest.Status != "passed") throw new InvalidOperationException($"Latest verification did not pass: {latest.CheckId}");
+        // Historical failures remain audit evidence even when a repair changes path-based
+        // selection. Completion and FinalVerificationPassed are the authoritative gate state.
+        if (!state.FinalVerificationPassed)
+            throw new InvalidOperationException("Finalization requires the current final verification gate to pass.");
         var results = Path.Combine(workspace, ".idd", "factory", "results"); Directory.CreateDirectory(results);
         var request = await File.ReadAllTextAsync(Path.Combine(current, state.RequestPath), cancellationToken);
         var slug = Slug(request.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "factory-result");

@@ -201,7 +201,34 @@ public class VerificationEngine(string workspace, string currentDirectory)
     }
 
     private static string DefinitionHash(VerificationCheck check) => Hash($"run={check.Run}\ninstructions={check.Instructions}\ntimeout={check.Timeout:c}\nconfirmation={check.ConfirmationRequired}");
-    private static string PolicyHash(VerificationPolicy policy) => Hash(string.Join("\n", policy.Checks.OrderBy(x => x.Key, StringComparer.Ordinal).Select(x => $"{x.Key}:{DefinitionHash(x.Value)}")));
+    private static string PolicyHash(VerificationPolicy policy)
+    {
+        var canonical = new
+        {
+            version = 1,
+            checks = policy.Checks.OrderBy(x => x.Key, StringComparer.Ordinal).Select(x => new
+            {
+                id = x.Key,
+                run = x.Value.Run,
+                instructions = x.Value.Instructions,
+                timeoutTicks = x.Value.Timeout.Ticks,
+                confirmationRequired = x.Value.ConfirmationRequired
+            }).ToArray(),
+            contexts = policy.Contexts.OrderBy(x => x.Key, StringComparer.Ordinal).Select(x => new
+            {
+                name = x.Key,
+                hasUse = x.Value.HasUse,
+                use = x.Value.Use.ToArray(),
+                rules = x.Value.Rules.Select(rule => new
+                {
+                    paths = rule.Paths.ToArray(),
+                    fallback = rule.Fallback,
+                    use = rule.Use.ToArray()
+                }).ToArray()
+            }).ToArray()
+        };
+        return Hash(JsonSerializer.Serialize(canonical));
+    }
     private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
 
     private VerificationCheck? RepositoryFallback()

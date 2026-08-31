@@ -190,10 +190,9 @@ public sealed class FactoryRuntimeTests
         } }));
         backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
         var runtime = Create(temp.Path, workflow, current, backend);
-        Assert.Equal("VERIFICATION_REQUIRES_USER_ACTION", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
-        temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  gate:\n    run: dotnet --version\ndefault:\n  use: []\ncheckpoint:\n  use:\n    - gate\n");
+        Assert.Equal("VERIFICATION_RESULT_REQUIRED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
         backend.Results.Enqueue(invocation => Envelope(invocation, "approved")); backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
-        var outcome = await runtime.ContinueAsync(default);
+        var outcome = await runtime.ContinueAsync(default, verificationPassed: true);
         Assert.Equal("COMPLETED", outcome.FactoryOutcome); Assert.Equal(1, backend.Roles.Count(role => role == "implementer")); Assert.Equal(1, backend.Roles.Count(role => role == "checkpoint-reviewer"));
         Assert.Single(Directory.GetFiles(System.IO.Path.Combine(outcome.ResultDirectory!, "verification"), "*.json").Select(ReadEvidence), x => x.CheckId == "gate" && x.Status == "passed");
     }
@@ -204,10 +203,9 @@ public sealed class FactoryRuntimeTests
         temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  gate:\n    instructions: Confirm final.\ndefault:\n  use: []\nfinal:\n  use:\n    - gate\n");
         var backend = new FakeAgentBackend(); backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem([]))); backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
         var runtime = Create(temp.Path, workflow, current, backend);
-        Assert.Equal("VERIFICATION_REQUIRES_USER_ACTION", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
-        temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  gate:\n    run: dotnet --version\ndefault:\n  use: []\nfinal:\n  use:\n    - gate\n");
+        Assert.Equal("VERIFICATION_RESULT_REQUIRED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
         backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
-        var outcome = await runtime.ContinueAsync(default);
+        var outcome = await runtime.ContinueAsync(default, verificationPassed: true);
         Assert.Equal("COMPLETED", outcome.FactoryOutcome); Assert.Equal(1, backend.Roles.Count(role => role == "final-reviewer"));
         Assert.Single(Directory.GetFiles(System.IO.Path.Combine(outcome.ResultDirectory!, "verification"), "*.json").Select(ReadEvidence), x => x.CheckId == "gate" && x.Status == "passed");
     }
@@ -421,7 +419,7 @@ public sealed class FactoryRuntimeTests
         backend.Results.Enqueue(invocation => { temp.Write("gate.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"); return Envelope(invocation, "completed"); });
         backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
         Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default)).FactoryOutcome);
-        Assert.Equal(2, backend.Roles.Count(role => role == "implementer"));
+        Assert.Equal(3, backend.Roles.Count(role => role == "implementer"));
     }
 
     [Fact] public async Task RestartBeforeResumedVerificationFixDispatchKeepsVerificationFixAuthoritative()
@@ -740,6 +738,173 @@ public sealed class FactoryRuntimeTests
         Assert.Equal(new[] { "task-decomposer", "implementer", "implementer", "checkpoint-reviewer", "final-reviewer" }, backend.Roles);
     }
 
+    [Fact] public async Task ConfirmationApproveRunsExactCheckOnceAndContinues()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  gate:\n    run: dotnet --version\n    confirmation: required\ndefault:\n  use: []\nsubtask:\n  use:\n    - gate\nfinal:\n  use: []\n");
+        var backend = new FakeAgentBackend(); backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem(["gate"]))); backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        var runtime = Create(temp.Path, workflow, current, backend);
+        Assert.Equal("VERIFICATION_CONFIRMATION_REQUIRED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+        var outcome = await runtime.ContinueAsync(default, confirmation: VerificationConfirmation.Approve);
+        Assert.Equal("COMPLETED", outcome.FactoryOutcome);
+        Assert.Single(Directory.GetFiles(Path.Combine(outcome.ResultDirectory!, "verification"), "*.json").Select(ReadEvidence), evidence => evidence.CheckId == "gate" && evidence.Status == "passed");
+    }
+
+    [Fact] public async Task ConfirmationDeclinePersistsValidTerminalStateWithoutRunningCommand()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  gate:\n    run: dotnet --version > confirmation-ran.txt\n    confirmation: required\ndefault:\n  use: []\nsubtask:\n  use:\n    - gate\n");
+        var backend = new FakeAgentBackend(); backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem(["gate"]))); backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        var runtime = Create(temp.Path, workflow, current, backend);
+        Assert.Equal("VERIFICATION_CONFIRMATION_REQUIRED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        Assert.Equal("VERIFICATION_DECLINED", (await runtime.ContinueAsync(default, confirmation: VerificationConfirmation.Decline)).FactoryOutcome);
+        var persisted = await new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default);
+        Assert.Null(persisted!.PendingVerificationSession); Assert.False(persisted.PendingContinuation!.IsResumable);
+        Assert.Contains(persisted.VerificationEvidenceRefs, path => ReadEvidence(current, path).Status == "not-verified");
+        Assert.False(File.Exists(Path.Combine(temp.Path, "confirmation-ran.txt")));
+        Assert.Equal("VERIFICATION_DECLINED", (await runtime.ContinueAsync(default)).FactoryOutcome);
+        Assert.False(File.Exists(Path.Combine(temp.Path, "confirmation-ran.txt")));
+    }
+
+    [Fact] public async Task ManualPassedAdvancesCursorToNextCheck()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  manual:\n    instructions: Confirm behavior.\n  automatic:\n    run: dotnet --version\ndefault:\n  use: []\nsubtask:\n  use:\n    - manual\n    - automatic\nfinal:\n  use: []\n");
+        var backend = new FakeAgentBackend(); backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem(["manual", "automatic"]))); backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        var runtime = Create(temp.Path, workflow, current, backend);
+        Assert.Equal("VERIFICATION_RESULT_REQUIRED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+        var outcome = await runtime.ContinueAsync(default, verificationPassed: true);
+        Assert.Equal("COMPLETED", outcome.FactoryOutcome);
+        var evidence = Directory.GetFiles(Path.Combine(outcome.ResultDirectory!, "verification"), "*.json").Select(ReadEvidence).ToArray();
+        Assert.Single(evidence, item => item.CheckId == "manual" && item.Status == "passed");
+        Assert.Single(evidence, item => item.CheckId == "automatic" && item.Status == "passed");
+    }
+
+    [Fact] public async Task ManualFailureRepairRequiresFreshManualResult()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  manual:\n    instructions: Confirm behavior.\ndefault:\n  use: []\nsubtask:\n  use:\n    - manual\nfinal:\n  use: []\n");
+        var backend = new FakeAgentBackend(); backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem(["manual"]))); backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        var runtime = Create(temp.Path, workflow, current, backend);
+        Assert.Equal("VERIFICATION_RESULT_REQUIRED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        backend.Results.Enqueue(invocation => { temp.Write("src/repaired.cs", "fixed"); return Envelope(invocation, "completed"); });
+        Assert.Equal("VERIFICATION_RESULT_REQUIRED", (await runtime.ContinueAsync(default, verificationPassed: false)).FactoryOutcome);
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+        Assert.Equal("COMPLETED", (await runtime.ContinueAsync(default, verificationPassed: true)).FactoryOutcome);
+        Assert.Equal(2, backend.Roles.Count(role => role == "implementer"));
+    }
+
+    [Fact] public async Task VerificationFixNewPathRecomputesRulesAndRequestsReplan()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write("broken.csproj", "<Project");
+        temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  area-a:\n    run: dotnet build broken.csproj --nologo\n  area-b:\n    run: dotnet --version\ndefault:\n  use: []\nsubtask:\n  rules:\n    - paths:\n        - src/A/**\n      use:\n        - area-a\n    - fallback: true\n      use:\n        - area-b\nfinal:\n  use: []\n");
+        var backend = new FakeAgentBackend(); backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem(["area-a"])));
+        backend.Results.Enqueue(invocation => { temp.Write("src/A/a.cs", "a"); return Envelope(invocation, "completed"); });
+        backend.Results.Enqueue(invocation => { temp.Write("src/B/b.cs", "b"); return Envelope(invocation, "completed"); });
+        backend.Results.Enqueue(invocation => Envelope(invocation, "blocked", reason: "Stop after observing replan."));
+        var outcome = await Create(temp.Path, workflow, current, backend).RunAsync(request, "test", default);
+        Assert.Equal("BLOCKED", outcome.FactoryOutcome); Assert.Equal("factory-replanner", backend.Roles[^1]);
+        var state = await new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default);
+        Assert.Contains("src/B/b.cs", state!.WorkItems.Single().ChangedPaths);
+    }
+
+    [Fact] public async Task CheckpointRepairPathsParticipateInFreshCheckpointScope()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write("broken.csproj", "<Project");
+        temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  area-a:\n    run: dotnet build broken.csproj --nologo\n  combined:\n    run: dotnet --version\ndefault:\n  use: []\ncheckpoint:\n  rules:\n    - paths:\n        - src/A/**\n      use:\n        - area-a\n    - fallback: true\n      use:\n        - combined\nfinal:\n  use: []\n");
+        var backend = new FakeAgentBackend(); backend.Results.Enqueue(invocation => Envelope(invocation, "ready", CheckpointedItem()));
+        backend.Results.Enqueue(invocation => { temp.Write("src/A/a.cs", "a"); return Envelope(invocation, "completed"); });
+        backend.Results.Enqueue(invocation => { temp.Write("src/B/b.cs", "b"); return Envelope(invocation, "completed"); });
+        backend.Results.Enqueue(invocation =>
+        {
+            var state = JsonSerializer.Deserialize<FactoryState>(File.ReadAllText(Path.Combine(current, "state.json")), FactoryJson.Options)!;
+            Assert.Contains("src/B/b.cs", state.WorkItems.Single(item => item.Id == "review").ChangedPaths); return Envelope(invocation, "approved");
+        });
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+        var outcome = await Create(temp.Path, workflow, current, backend).RunAsync(request, "test", default);
+        Assert.Equal("COMPLETED", outcome.FactoryOutcome);
+        var evidence = Directory.GetFiles(Path.Combine(outcome.ResultDirectory!, "verification"), "*.json").Select(ReadEvidence).ToArray();
+        Assert.Contains(evidence, item => item.CheckId == "area-a" && item.Status == "failed"); Assert.Contains(evidence, item => item.CheckId == "combined" && item.Status == "passed");
+    }
+
+    [Fact] public async Task FinalVerificationRepairReplanCreatesFreshSessionAfterImplementation()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write("final.csproj", "<Project");
+        temp.Write(".idd/verification.yaml", "version: 1\nchecks:\n  final-gate:\n    run: dotnet build final.csproj --nologo\ndefault:\n  use: []\nfinal:\n  use:\n    - final-gate\n");
+        var backend = new FakeAgentBackend(); backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem([]))); backend.Results.Enqueue(invocation => Envelope(invocation, "completed"));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "needs-replan", new { defect = "final repair needs implementation" }, "Replan final repair."));
+        backend.Results.Enqueue(invocation => Envelope(invocation, "replan-proposed", new { operations = new object[] { new { kind = "insert-subtask", subtask = new { id = "final-fix", sequence = 2, kind = "subtask", contractMarkdown = "# Fix", dependencies = new[] { "one" }, coveredWorkItems = Array.Empty<string>(), verificationCheckIds = Array.Empty<string>() } } } }));
+        backend.Results.Enqueue(invocation => { temp.Write("final.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>"); return Envelope(invocation, "completed"); });
+        backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
+        var outcome = await Create(temp.Path, workflow, current, backend).RunAsync(request, "test", default);
+        Assert.Equal("COMPLETED", outcome.FactoryOutcome);
+        var evidence = Directory.GetFiles(Path.Combine(outcome.ResultDirectory!, "verification"), "*.json").Select(ReadEvidence).Where(item => item.CheckId == "final-gate").ToArray();
+        Assert.Contains(evidence, item => item.Status == "failed"); Assert.Contains(evidence, item => item.Status == "passed");
+    }
+
+    [Fact] public async Task RestartRecoversWorkspaceChangesBeforeReusingPersistedResult()
+    {
+        using var temp = new TestWorkspace(); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write(".idd/factory/current/request.md", "Resume task"); temp.Write(".idd/factory/current/work-items/001-one.md", "# One"); temp.Write("product.txt", "before");
+        var state = StateStoreTests.State() with { WorkflowHash = workflow.Hash, CurrentWorkflowStep = "execute", CurrentAttemptId = "A000001", AttemptSequence = 1 };
+        state.WorkItems.Add(new WorkItemState { Id = "one", Sequence = 1, Kind = WorkItemKind.Subtask, Status = WorkItemStatus.Running, ContractPath = "work-items/001-one.md", CurrentAttemptId = "A000001", AttemptCount = 1 });
+        await new FileFactoryStateStore(current, new FactoryStateValidator()).CreateAsync(state, default);
+        var invocation = PersistedWorkspaceWriteInvocation(temp, current, state); WriteWorkspaceBaseline(temp, "before");
+        temp.Write("product.txt", "after"); temp.Write(".idd/factory/current/attempts/A000001/result.json", JsonSerializer.Serialize(Envelope(invocation, "completed"), FactoryJson.Options));
+        var backend = new FakeAgentBackend(); backend.Results.Enqueue(next =>
+        {
+            var recovered = JsonSerializer.Deserialize<FactoryState>(File.ReadAllText(Path.Combine(current, "state.json")), FactoryJson.Options)!;
+            Assert.Contains("product.txt", recovered.WorkItems.Single().ChangedPaths); Assert.Contains("product.txt", recovered.FactoryRunChangedPaths); return Envelope(next, "approved");
+        });
+        Assert.Equal("COMPLETED", (await Create(temp.Path, workflow, current, backend).ContinueAsync(default)).FactoryOutcome);
+    }
+
+    [Fact] public async Task InterruptedWorkspaceWriteAttemptRetainsChangesBeforeRetry()
+    {
+        using var temp = new TestWorkspace(); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        temp.Write(".idd/factory/current/request.md", "Resume task"); temp.Write(".idd/factory/current/work-items/001-one.md", "# One"); temp.Write("product.txt", "before");
+        var state = StateStoreTests.State() with { WorkflowHash = workflow.Hash, CurrentWorkflowStep = "execute", CurrentAttemptId = "A000001", AttemptSequence = 1 };
+        state.WorkItems.Add(new WorkItemState { Id = "one", Sequence = 1, Kind = WorkItemKind.Subtask, Status = WorkItemStatus.Running, ContractPath = "work-items/001-one.md", CurrentAttemptId = "A000001", AttemptCount = 1 });
+        await new FileFactoryStateStore(current, new FactoryStateValidator()).CreateAsync(state, default);
+        PersistedWorkspaceWriteInvocation(temp, current, state); WriteWorkspaceBaseline(temp, "before"); temp.Write("product.txt", "interrupted change");
+        var backend = new FakeAgentBackend(); backend.Results.Enqueue(next =>
+        {
+            var recovered = JsonSerializer.Deserialize<FactoryState>(File.ReadAllText(Path.Combine(current, "state.json")), FactoryJson.Options)!;
+            Assert.Contains("product.txt", recovered.WorkItems.Single().ChangedPaths); Assert.Contains("product.txt", recovered.FactoryRunChangedPaths); return Envelope(next, "completed");
+        }); backend.Results.Enqueue(next => Envelope(next, "approved"));
+        Assert.Equal("COMPLETED", (await Create(temp.Path, workflow, current, backend).ContinueAsync(default)).FactoryOutcome);
+    }
+
+    [Fact] public async Task NestedBuildArtifactsDoNotEnterChangedScope()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current"); var backend = new FakeAgentBackend();
+        backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem([])));
+        backend.Results.Enqueue(invocation => { temp.Write("src/App/product.cs", "product"); temp.Write("src/App/bin/generated.dll", "bin"); temp.Write("src/App/obj/generated.cs", "obj"); return Envelope(invocation, "completed"); });
+        backend.Results.Enqueue(invocation =>
+        {
+            var state = JsonSerializer.Deserialize<FactoryState>(File.ReadAllText(Path.Combine(current, "state.json")), FactoryJson.Options)!;
+            Assert.Equal(["src/App/product.cs"], state.WorkItems.Single().ChangedPaths); return Envelope(invocation, "approved");
+        });
+        Assert.Equal("COMPLETED", (await Create(temp.Path, workflow, current, backend).RunAsync(request, "test", default)).FactoryOutcome);
+    }
+
+    [Fact] public async Task ConfirmationDetectsPathRuleOnlyPolicyMutation()
+    {
+        using var temp = new TestWorkspace(); var request = temp.Write("task.md", "Task"); var workflow = DefaultWorkflow(temp); var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        var policy = "version: 1\nchecks:\n  gate:\n    run: dotnet --version > policy-ran.txt\n    confirmation: required\ndefault:\n  use: []\nsubtask:\n  rules:\n    - paths:\n        - src/A/**\n      use:\n        - gate\n    - fallback: true\n      use:\n        - gate\n";
+        temp.Write(".idd/verification.yaml", policy); var backend = new FakeAgentBackend(); backend.Results.Enqueue(invocation => Envelope(invocation, "ready", OneItem(["gate"]))); backend.Results.Enqueue(invocation => { temp.Write("src/A/a.cs", "a"); return Envelope(invocation, "completed"); });
+        var runtime = Create(temp.Path, workflow, current, backend);
+        Assert.Equal("VERIFICATION_CONFIRMATION_REQUIRED", (await runtime.RunAsync(request, "test", default)).FactoryOutcome);
+        temp.Write(".idd/verification.yaml", policy.Replace("src/A/**", "src/B/**"));
+        Assert.Equal("VERIFICATION_POLICY_CHANGED", (await runtime.ContinueAsync(default, confirmation: VerificationConfirmation.Approve)).FactoryOutcome);
+        Assert.False(File.Exists(Path.Combine(temp.Path, "policy-ran.txt")));
+    }
+
     private static FactoryRuntime Create(string workspace, WorkflowDefinition workflow, string current, IAgentBackend backend, VerificationEngine? verification = null)
     { var validator = new FactoryStateValidator(); var clock = new FakeClock(); return new(workspace, workflow, new FileFactoryStateStore(current, validator), new AgentExecutor(backend, new AgentResultValidator()), verification ?? new VerificationEngine(workspace, current), new FactoryEventWriter(current, clock), clock); }
     private static AgentResultEnvelope Envelope(AgentInvocation invocation, string outcome, object? payload = null, string? reason = null)
@@ -765,6 +930,17 @@ public sealed class FactoryRuntimeTests
         backend.Results.Enqueue(invocation => Envelope(invocation, "completed")); backend.Results.Enqueue(invocation => Envelope(invocation, "approved"));
     }
     private static object OneItem(string[] checks) => new { workItems = new[] { new { id = "one", sequence = 1, kind = "subtask", contractMarkdown = "# One", dependencies = Array.Empty<string>(), coveredWorkItems = Array.Empty<string>(), verificationCheckIds = checks } } };
+    private static AgentInvocation PersistedWorkspaceWriteInvocation(TestWorkspace temp, string current, FactoryState state)
+    {
+        var invocation = new AgentInvocation { RunId = state.RunId, AttemptId = "A000001", Role = "implementer", WorkItemId = "one", Workspace = temp.Path, ResultPath = Path.Combine(current, "attempts", "A000001", "result.json"), SkillName = "idd-factory-execute-subtask", ExecutionProfile = AgentExecutionProfile.WorkspaceWrite, Input = "input", StartedAt = DateTimeOffset.UnixEpoch };
+        temp.Write(".idd/factory/current/attempts/A000001/invocation.json", JsonSerializer.Serialize(invocation, FactoryJson.Options));
+        return invocation;
+    }
+    private static void WriteWorkspaceBaseline(TestWorkspace temp, string content)
+    {
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(content)));
+        temp.Write(".idd/factory/current/attempts/A000001/workspace-before.json", JsonSerializer.Serialize(new { schemaVersion = 1, files = new Dictionary<string, string> { ["product.txt"] = hash } }, FactoryJson.Options));
+    }
     private static async Task<FactoryState> SeedVerificationFixContinuationAsync(TestWorkspace temp, WorkflowDefinition workflow, string current)
     {
         temp.Write(".idd/factory/current/request.md", "Resume verification fix"); temp.Write(".idd/factory/current/work-items/001-one.md", "# One");

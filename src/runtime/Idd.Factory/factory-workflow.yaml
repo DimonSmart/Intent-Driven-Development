@@ -21,7 +21,6 @@ steps:
     uses: factory.intent
     on:
       completed: decompose
-      needs-clarification: $stop
       blocked: $stop
   - id: execute
     uses: factory.execute
@@ -38,7 +37,6 @@ steps:
     uses: factory.intent
     on:
       completed: replan
-      needs-clarification: $stop
       blocked: $stop
   - id: replan
     uses: factory.replan

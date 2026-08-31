@@ -110,7 +110,7 @@ Verification policy path rules are evaluated in order against persisted,
 repository-relative changed paths (`/` separators); the first rule covering the
 scope wins and a `fallback: true` rule applies only when no earlier rule does.
 Checks marked `confirmation: required` stop before their command starts and
-require `factory continue --confirm true`. Instruction checks stop with a
+require `factory continue --confirmation approve` (or `--confirmation decline` to terminate without running the check). Instruction checks stop with a
 manual-result request and require `factory continue --verification-result
 passed|failed`. Missing policy and fallback are reported as not configured,
 never as a successful empty check set. Verification-fix attempts have their own

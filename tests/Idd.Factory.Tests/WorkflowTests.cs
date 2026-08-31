@@ -25,7 +25,6 @@ public sealed class WorkflowTests
             uses: factory.intent
             on:
               completed: replan
-              needs-clarification: $stop
               blocked: $stop
           - id: execute
             uses: factory.execute
@@ -98,6 +97,25 @@ public sealed class WorkflowTests
         Assert.Throws<WorkflowException>(() => new WorkflowDefinitionLoader().Load(temp.Path, temp.Write("impossible.yaml", impossible)));
         var missing = Valid.Replace("needs-replan: replan", "");
         Assert.Equal("MISSING_REQUIRED_TRANSITION", Assert.Throws<WorkflowException>(() => new WorkflowDefinitionLoader().Load(temp.Path, temp.Write("missing-required.yaml", missing))).Code);
+    }
+
+    [Theory]
+    [InlineData("factory.decompose", "task-decomposer")]
+    [InlineData("factory.replan", "factory-replanner")]
+    [InlineData("factory.final-review", "final-reviewer")]
+    public void SemanticPrimitivesRejectIgnoredHandlers(string primitive, string role)
+    {
+        using var temp = new TestWorkspace();
+        var marker = $"uses: {primitive}\n    agent: {role}";
+        var changed = Valid.Replace(marker, marker + "\n    handlers:\n      ignored: implementer");
+        Assert.Equal("INVALID_WORKFLOW", Assert.Throws<WorkflowException>(() => new WorkflowDefinitionLoader().Load(temp.Path, temp.Write("ignored-handler.yaml", changed))).Code);
+    }
+
+    [Fact] public void ExecuteRejectsAdditionalIgnoredHandler()
+    {
+        using var temp = new TestWorkspace();
+        var changed = Valid.Replace("review-checkpoint: checkpoint-reviewer", "review-checkpoint: checkpoint-reviewer\n      ignored: final-reviewer");
+        Assert.Equal("INVALID_WORKFLOW", Assert.Throws<WorkflowException>(() => new WorkflowDefinitionLoader().Load(temp.Path, temp.Write("ignored-execute-handler.yaml", changed))).Code);
     }
 
     public static string ValidText => Valid;

@@ -68,9 +68,10 @@ public sealed class FactoryRuntime(
                 {
                     var declined = await verification.DeclineCheckAsync(session.PendingCheckId!, session.PendingCheckDefinitionHash, session.PolicyHash, cancellationToken);
                     RecordEvidence(state, item, declined.Evidence);
+                    state.PendingVerificationSession = null;
                     state.Blocker = new("VERIFICATION_DECLINED", $"Confirmation for check {session.PendingCheckId} was explicitly declined.", "Start a new Factory run when this verification can be approved.");
                     state.PendingContinuation = new(ContinuationKind.Terminal, pending.WorkflowStep, pending.WorkItemId, pending.VerificationContext, "VERIFICATION_DECLINED", false,
-                        VerificationCheckId: session.PendingCheckId, VerificationStage: VerificationContinuationStage.AwaitingConfirmation);
+                        VerificationCheckId: session.PendingCheckId);
                     if (item is not null) item.Status = WorkItemStatus.Blocked;
                     await SaveAsync(state, cancellationToken);
                     return new("VERIFICATION_DECLINED", state.RunId, state.Blocker.Reason, state.Blocker.ResumeWhen);
@@ -252,6 +253,7 @@ public sealed class FactoryRuntime(
         var result = await InvokeAsync(state, step.Agent!, null, $"Original request:\n{request}\n\nRecorded clarifications:\n{await ReadClarificationsAsync(state, cancellationToken)}\n\nReplan trigger:\n{JsonSerializer.Serialize(trigger)}\n\nMutable remaining work:\n{JsonSerializer.Serialize(ready)}\n\nCompleted work context:\n{JsonSerializer.Serialize(completed)}", cancellationToken);
         if (result.Outcome != "replan-proposed") return result.Outcome;
         ApplyReplan(state, result.Payload); state.ReplanCount++; state.PendingReplanTrigger = null;
+        state.PendingVerificationSession = null;
         state.PendingContinuation = null;
         state.Blocker = null;
         await SaveAsync(state, cancellationToken); return "applied";
@@ -390,6 +392,7 @@ public sealed class FactoryRuntime(
             if (context == "subtask" && item is not null && item.VerificationCheckIds.Count > 0 && selection.CheckIds.Count > 0 && !item.VerificationCheckIds.SequenceEqual(selection.CheckIds, StringComparer.Ordinal))
             {
                 state.PendingReplanTrigger = new("verification", item.Id, "", "The work item changed paths require a different verification selection.", null, item.VerificationEvidenceRefs.ToList());
+                state.PendingVerificationSession = null;
                 return "needs-replan";
             }
             session = new(context, item?.Id, selection.CheckIds.ToList(), changedPaths.ToList(), 0, [], [], null, null, selection.PolicyHash, VerificationContinuationStage.ExecuteCheck);
@@ -408,6 +411,9 @@ public sealed class FactoryRuntime(
                 if (fallback.Status is not (VerificationStatus.Passed or VerificationStatus.NoChecks)) return await BlockForVerificationAsync(state, item, context, fallback, cancellationToken);
             }
             state.PendingVerificationSession = null;
+            state.PendingContinuation = null;
+            state.Blocker = null;
+            await SaveAsync(state, cancellationToken);
             return "passed";
         }
         while (session.NextCheckIndex < session.CheckIds.Count)
@@ -443,6 +449,7 @@ public sealed class FactoryRuntime(
         if (attempts >= workflow.Limits.MaxVerificationFixAttempts) return await BlockForVerificationAsync(state, item, context, result, cancellationToken);
         if (item is not null) item.VerificationFixAttemptCount++; else state.FinalVerificationFixAttemptCount++;
         var input = $"Mode:\nverification-fix\n\nScope:\n{context} verification.\n\nFailed authoritative checks:\n{FailureSummary(result)}";
+        state.PendingVerificationSession = null;
         PersistVerificationFixContinuation(state, item, context, "verification-fix", input);
         await SaveAsync(state, cancellationToken);
         var repair = await InvokeAsync(state, "implementer", item, input, cancellationToken,
@@ -456,7 +463,8 @@ public sealed class FactoryRuntime(
     private static IReadOnlyList<string> ChangedPathsFor(FactoryState state, WorkItemState? item, string context) => context switch
     {
         "subtask" => item?.ChangedPaths ?? [],
-        "checkpoint" => state.WorkItems.Where(x => item!.CoveredWorkItems.Contains(x.Id, StringComparer.Ordinal)).SelectMany(x => x.ChangedPaths).Distinct(StringComparer.Ordinal).ToArray(),
+        "checkpoint" => state.WorkItems.Where(x => item!.CoveredWorkItems.Contains(x.Id, StringComparer.Ordinal)).SelectMany(x => x.ChangedPaths)
+            .Concat(item!.ChangedPaths).Distinct(StringComparer.Ordinal).ToArray(),
         "final" => state.FactoryRunChangedPaths,
         _ => []
     };
@@ -496,7 +504,7 @@ public sealed class FactoryRuntime(
         var terminal = code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal);
         state.Blocker = new(code, reason, terminal
             ? "The configured budget is exhausted. Cancel and restart with a workflow that provides sufficient budget; continue cannot add budget to the current run."
-            : result.Status == VerificationStatus.ConfirmationRequired ? "Run continue with --confirm true to execute this exact check."
+            : result.Status == VerificationStatus.ConfirmationRequired ? "Run continue with --confirmation approve to execute this exact check, or --confirmation decline to terminate without running it."
             : result.Status == VerificationStatus.ResultRequired ? "Run continue with --verification-result passed or failed for this exact check."
             : "Resolve the reported verification condition, then continue.");
         var stage = result.Status == VerificationStatus.ConfirmationRequired ? VerificationContinuationStage.AwaitingConfirmation
@@ -526,12 +534,15 @@ public sealed class FactoryRuntime(
         switch (repair.Outcome)
         {
             case "completed":
+                state.PendingVerificationSession = null;
                 PersistVerificationGateContinuation(state, item, context);
                 return;
             case "needs-replan":
+                state.PendingVerificationSession = null;
                 PersistReplanContinuation(state, state.CurrentWorkflowStep);
                 return;
             case "intent-required":
+                state.PendingVerificationSession = null;
                 return;
             default:
                 PersistVerificationFixContinuation(state, item, context, repair.Outcome, input);
@@ -593,6 +604,7 @@ public sealed class FactoryRuntime(
                     ?? throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Attempt {persistedAttempt} has no valid invocation.");
                 if (persistedInvocation.Role != role || persistedInvocation.WorkItemId != item?.Id)
                     throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Attempt {persistedAttempt} does not belong to the current semantic operation.");
+                await RecoverWorkspaceChangesAsync(state, item, persistedInvocation, cancellationToken);
                 var persistedResult = JsonSerializer.Deserialize<AgentResultEnvelope>(await File.ReadAllTextAsync(persistedResultPath, cancellationToken), FactoryJson.Options);
                 var validated = new AgentResultValidator().Validate(persistedInvocation, persistedResult);
                 CaptureSemanticOutcome(state, role, item, validated, continuationOperation, continuationInput); state.CurrentAttemptId = null; await SaveAsync(state, cancellationToken);
@@ -626,16 +638,19 @@ public sealed class FactoryRuntime(
             Input = input,
             StartedAt = clock.UtcNow
         };
-        var beforeWorkspaceWrite = agentContract.ExecutionProfile == AgentExecutionProfile.WorkspaceWrite ? SnapshotWorkspace() : null;
+        await WriteJsonAtomicallyAsync(Path.Combine(attemptDirectory, "invocation.json"), invocation, cancellationToken);
+        if (agentContract.ExecutionProfile == AgentExecutionProfile.WorkspaceWrite)
+            await PersistWorkspaceSnapshotAsync(state.RunId, attemptDirectory, cancellationToken);
         await events.WriteAsync(state.RunId, "agent-dispatching", new { attemptId, role, workItemId = item?.Id }, cancellationToken);
-        var execution = await agentExecutor.ExecuteAsync(invocation, cancellationToken);
-        if (beforeWorkspaceWrite is not null)
+        AgentExecutionResult execution;
+        try
         {
-            var changed = SnapshotWorkspace().Where(pair => !beforeWorkspaceWrite.TryGetValue(pair.Key, out var prior) || prior != pair.Value).Select(pair => pair.Key)
-                .Concat(beforeWorkspaceWrite.Keys.Where(path => !File.Exists(Path.Combine(workspace, path.Replace('/', Path.DirectorySeparatorChar)))))
-                .Distinct(StringComparer.Ordinal).OrderBy(path => path, StringComparer.Ordinal).ToArray();
-            if (item is not null) foreach (var path in changed) if (!item.ChangedPaths.Contains(path, StringComparer.Ordinal)) item.ChangedPaths.Add(path);
-            foreach (var path in changed) if (!state.FactoryRunChangedPaths.Contains(path, StringComparer.Ordinal)) state.FactoryRunChangedPaths.Add(path);
+            execution = await agentExecutor.ExecuteAsync(invocation, cancellationToken);
+        }
+        finally
+        {
+            if (agentContract.ExecutionProfile == AgentExecutionProfile.WorkspaceWrite)
+                await RecoverWorkspaceChangesAsync(state, item, invocation, CancellationToken.None);
         }
         var result = execution.Result;
         CaptureSemanticOutcome(state, role, item, result, continuationOperation, continuationInput); state.CurrentAttemptId = null; await SaveAsync(state, cancellationToken);
@@ -656,29 +671,111 @@ public sealed class FactoryRuntime(
         return result;
     }
 
-    private Dictionary<string, string> SnapshotWorkspace()
+    private async Task PersistWorkspaceSnapshotAsync(string runId, string attemptDirectory, CancellationToken cancellationToken)
     {
-        var result = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var path in Directory.EnumerateFiles(workspace, "*", SearchOption.AllDirectories))
+        var snapshot = await SnapshotWorkspaceAsync(runId, cancellationToken);
+        await WriteJsonAtomicallyAsync(Path.Combine(attemptDirectory, "workspace-before.json"), new WorkspaceSnapshotArtifact(1, snapshot), cancellationToken);
+    }
+
+    private async Task RecoverWorkspaceChangesAsync(FactoryState state, WorkItemState? item, AgentInvocation invocation, CancellationToken cancellationToken)
+    {
+        if (invocation.ExecutionProfile != AgentExecutionProfile.WorkspaceWrite) return;
+        var attemptDirectory = Path.GetDirectoryName(invocation.ResultPath)!;
+        var changesPath = Path.Combine(attemptDirectory, "workspace-changes.json");
+        WorkspaceChangesArtifact? changes = null;
+        if (File.Exists(changesPath))
         {
-            var relative = Path.GetRelativePath(workspace, path).Replace('\\', '/');
-            if (IsOperationalArtifact(relative)) continue;
-            try { result.Add(relative, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)))); }
+            changes = JsonSerializer.Deserialize<WorkspaceChangesArtifact>(await File.ReadAllTextAsync(changesPath, cancellationToken), FactoryJson.Options)
+                ?? throw new AgentProtocolException("MALFORMED_WORKSPACE_CHANGES", $"Attempt {invocation.AttemptId} has malformed workspace changes.");
+        }
+        else
+        {
+            var beforePath = Path.Combine(attemptDirectory, "workspace-before.json");
+            if (!File.Exists(beforePath)) return;
+            var before = JsonSerializer.Deserialize<WorkspaceSnapshotArtifact>(await File.ReadAllTextAsync(beforePath, cancellationToken), FactoryJson.Options)
+                ?? throw new AgentProtocolException("MALFORMED_WORKSPACE_SNAPSHOT", $"Attempt {invocation.AttemptId} has malformed workspace baseline.");
+            var after = await SnapshotWorkspaceAsync(state.RunId, cancellationToken);
+            var changedPaths = after.Where(pair => !before.Files.TryGetValue(pair.Key, out var prior) || prior != pair.Value).Select(pair => pair.Key)
+                .Concat(before.Files.Keys.Where(path => !after.ContainsKey(path)))
+                .Distinct(StringComparer.Ordinal).OrderBy(path => path, StringComparer.Ordinal).ToList();
+            changes = new(1, changedPaths);
+            await WriteJsonAtomicallyAsync(changesPath, changes, cancellationToken);
+        }
+        if (item is not null)
+            foreach (var path in changes.ChangedPaths)
+                if (!item.ChangedPaths.Contains(path, StringComparer.Ordinal)) item.ChangedPaths.Add(path);
+        foreach (var path in changes.ChangedPaths)
+            if (!state.FactoryRunChangedPaths.Contains(path, StringComparer.Ordinal)) state.FactoryRunChangedPaths.Add(path);
+    }
+
+    private async Task<SortedDictionary<string, string>> SnapshotWorkspaceAsync(string runId, CancellationToken cancellationToken)
+    {
+        var result = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        var pending = new Stack<string>();
+        pending.Push(workspace);
+        while (pending.TryPop(out var directory))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string[] directories;
+            string[] files;
+            try
+            {
+                directories = Directory.GetDirectories(directory);
+                files = Directory.GetFiles(directory);
+            }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
-                events.WriteAsync("snapshot", "workspace-snapshot-file-skipped", new { path = relative, exception = exception.GetType().Name }, CancellationToken.None).GetAwaiter().GetResult();
+                await events.WriteAsync(runId, "workspace-snapshot-directory-skipped", new { path = RelativePath(directory), exception = exception.GetType().Name }, CancellationToken.None);
+                continue;
+            }
+            foreach (var child in directories.OrderByDescending(path => path, StringComparer.Ordinal))
+            {
+                var relative = RelativePath(child);
+                if (IsOperationalArtifact(relative)) continue;
+                try
+                {
+                    if ((File.GetAttributes(child) & FileAttributes.ReparsePoint) == 0) pending.Push(child);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                { await events.WriteAsync(runId, "workspace-snapshot-directory-skipped", new { path = relative, exception = exception.GetType().Name }, CancellationToken.None); }
+            }
+            foreach (var path in files.OrderBy(path => path, StringComparer.Ordinal))
+            {
+                var relative = RelativePath(path);
+                if (IsOperationalArtifact(relative)) continue;
+                try { result.Add(relative, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(path, cancellationToken)))); }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                { await events.WriteAsync(runId, "workspace-snapshot-file-skipped", new { path = relative, exception = exception.GetType().Name }, CancellationToken.None); }
             }
         }
         return result;
     }
 
-    private static bool IsOperationalArtifact(string path) => path.StartsWith(".git/", StringComparison.OrdinalIgnoreCase)
-        || path.StartsWith(".idd/factory/", StringComparison.OrdinalIgnoreCase)
-        || path.StartsWith(".vs/", StringComparison.OrdinalIgnoreCase)
-        || path.StartsWith(".idea/", StringComparison.OrdinalIgnoreCase)
-        || path.StartsWith(".vscode/", StringComparison.OrdinalIgnoreCase)
-        || path.StartsWith("bin/", StringComparison.OrdinalIgnoreCase)
-        || path.StartsWith("obj/", StringComparison.OrdinalIgnoreCase);
+    private string RelativePath(string path) => Path.GetRelativePath(workspace, path).Replace('\\', '/');
+
+    private static bool IsOperationalArtifact(string path)
+    {
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length >= 2 && segments[0].Equals(".idd", StringComparison.OrdinalIgnoreCase) && segments[1].Equals("factory", StringComparison.OrdinalIgnoreCase)) return true;
+        return segments.Any(segment => segment.Equals(".git", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals(".vs", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals(".idea", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals(".vscode", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals("bin", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals("obj", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals("TestResults", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static async Task WriteJsonAtomicallyAsync<T>(string path, T value, CancellationToken cancellationToken)
+    {
+        var temporary = path + ".tmp";
+        await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(value, FactoryJson.Options), cancellationToken);
+        File.Move(temporary, path, true);
+    }
+
+    private sealed record WorkspaceSnapshotArtifact(int SchemaVersion, SortedDictionary<string, string> Files);
+    private sealed record WorkspaceChangesArtifact(int SchemaVersion, List<string> ChangedPaths);
 
     private void CaptureSemanticOutcome(FactoryState state, string role, WorkItemState? item, AgentResultEnvelope result,
         SemanticOperationKind? continuationOperation = null, string? continuationInput = null)
@@ -1045,6 +1142,7 @@ public sealed class FactoryRuntime(
         if (invocation.RunId != state.RunId || invocation.AttemptId != attemptId) throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Persisted attempt {attemptId} identity is invalid.");
         var item = invocation.WorkItemId is null ? null : state.WorkItems.SingleOrDefault(x => x.Id == invocation.WorkItemId)
             ?? throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Attempt {attemptId} references unknown work.");
+        await RecoverWorkspaceChangesAsync(state, item, invocation, token);
         var resultPath = Path.Combine(directory, "result.json");
         if (File.Exists(resultPath))
         {

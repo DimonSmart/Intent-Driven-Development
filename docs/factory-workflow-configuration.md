@@ -95,5 +95,5 @@ default when customizing a production workflow.
 
 Validation is primitive-specific: decomposition, replanning and final review
 require their matching agent role; execute requires both built-in handlers;
-intent and finalize accept neither agents nor handlers. Transitions may name
+only execute accepts handlers, and intent and finalize accept no agent. Transitions may name
 only outcomes emitted by that primitive, and `$stop` is the sole special target.

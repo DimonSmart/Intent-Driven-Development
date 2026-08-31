@@ -392,7 +392,8 @@ public sealed class AgentExecutor(IAgentBackend backend, AgentResultValidator va
     {
         Directory.CreateDirectory(Path.GetDirectoryName(invocation.ResultPath)!);
         var invocationPath = Path.Combine(Path.GetDirectoryName(invocation.ResultPath)!, "invocation.json");
-        await File.WriteAllTextAsync(invocationPath, JsonSerializer.Serialize(invocation, FactoryJson.Options), cancellationToken);
+        if (!File.Exists(invocationPath))
+            await File.WriteAllTextAsync(invocationPath, JsonSerializer.Serialize(invocation, FactoryJson.Options), cancellationToken);
         var protectedArtifacts = ProtectedArtifactGuard.Capture(invocation);
         var handle = await backend.StartAsync(invocation, cancellationToken);
         var process = await backend.WaitAsync(handle, cancellationToken);
