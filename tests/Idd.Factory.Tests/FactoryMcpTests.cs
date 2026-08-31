@@ -123,7 +123,7 @@ public sealed class FactoryMcpTests
 
     private static string ValueAfter(FactoryProcessInvocation invocation, string option)
     {
-        var index = invocation.Arguments.IndexOf(option);
+        var index = invocation.Arguments.ToList().IndexOf(option);
         Assert.True(index >= 0 && index + 1 < invocation.Arguments.Count);
         return invocation.Arguments[index + 1];
     }
