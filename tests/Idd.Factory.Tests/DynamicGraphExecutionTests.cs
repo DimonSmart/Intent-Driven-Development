@@ -116,6 +116,7 @@ public sealed class DynamicGraphExecutionTests
         {
             operations = new object[]
             {
+                new { kind = "update-run-context", content = "must not become authoritative" },
                 new { kind = "add-work", workItem = Work("B", "implementation", 2, new[] { "A" }) },
                 new { kind = "change-dependencies", id = "A", dependencies = new[] { "B" } }
             }
@@ -127,6 +128,7 @@ public sealed class DynamicGraphExecutionTests
         var state = await LoadState(temp.Path);
         Assert.Equal(1, state.GraphRevision);
         Assert.Single(state.WorkItems);
+        Assert.False(File.Exists(Path.Combine(temp.Path, ".idd", "factory", "current", "run-context.md")));
         var contracts = Directory.GetFiles(Path.Combine(temp.Path, ".idd", "factory", "current", "work-items"), "*.md", SearchOption.AllDirectories);
         Assert.Single(contracts);
         var mutations = Directory.GetFiles(Path.Combine(temp.Path, ".idd", "factory", "current", "graph", "mutations"), "*.json");
