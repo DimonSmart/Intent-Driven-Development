@@ -102,7 +102,9 @@ public sealed partial class FactoryRuntime
         CancellationToken cancellationToken)
     {
         var capabilityContract = FactoryCapabilityCatalog.Resolve(capability);
-        var agent = capabilityContract.Agent;
+        var agent = operation == SemanticOperationKind.WorkItemExecution && item is { Capability: "semantic-review", IsFinalReview: false }
+            ? FactoryAgentCatalog.Resolve("checkpoint-reviewer")
+            : capabilityContract.Agent;
         if (state.CurrentAttemptId is { } persistedAttempt)
         {
             var directory = Path.Combine(currentDirectory, "attempts", persistedAttempt);
