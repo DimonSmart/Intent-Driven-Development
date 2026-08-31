@@ -16,7 +16,7 @@ internal static class FactoryRuntimeTestHarness
     {
         var current = Path.Combine(workspace, ".idd", "factory", "current");
         var clock = new FakeClock();
-        var configuration = Configuration(allowed);
+        var configuration = CreateConfiguration(allowed);
         return new FactoryRuntime(
             workspace,
             configuration,
@@ -27,7 +27,7 @@ internal static class FactoryRuntimeTestHarness
             clock);
     }
 
-    public static FactoryConfiguration Configuration(IEnumerable<string>? allowed = null) => new(
+    public static FactoryConfiguration CreateConfiguration(IEnumerable<string>? allowed = null) => new(
         1,
         new FactoryLimits(4, 3, 5, 64),
         new FinalReviewPolicy(true),
