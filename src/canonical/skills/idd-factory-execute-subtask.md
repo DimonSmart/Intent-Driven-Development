@@ -49,7 +49,6 @@ Return protocol version 2 with role `implementer` and one outcome:
 - `completed` — assigned semantic work is finished; include concise `summary`, `declaredChanges[]`, `concerns[]`, optional diagnostic `verificationClaims[]`;
 - `additional-work-required` — a local typed prerequisite was discovered;
 - `global-replan-required` — the global remaining strategy must change;
-- `needs-clarification` — an explicit user answer is required;
 - `intent-required` — durable product meaning is missing;
 - `blocked` — an external/non-semantic condition prevents progress.
 
