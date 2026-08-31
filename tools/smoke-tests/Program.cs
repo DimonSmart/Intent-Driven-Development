@@ -358,9 +358,10 @@ void CheckCanonicalFactoryNeutrality()
     }
 
     var decomposition = ReadText(Path.Combine(repoRoot, "src", "canonical", "skills", "idd-factory-decompose-task.md"));
-    ExpectContains(decomposition, "smallest safe initial task graph", "Canonical minimum-safe decomposition contract");
-    ExpectContains(decomposition, "A complete up-front plan is neither required nor preferred", "Canonical partial decomposition contract");
-    ExpectContains(decomposition, "definitionState: executable | outline", "Canonical executable/outline decomposition contract");
+    ExpectContains(decomposition, "ordered work that remains to be done", "Canonical ordered planning contract");
+    ExpectContains(decomposition, "A complete up-front plan is not required", "Canonical partial planning contract");
+    ExpectContains(decomposition, "\"capability\": \"implementation\"", "Canonical flat task DTO contract");
+    ExpectContains(decomposition, "return IDs, sequence numbers, dependencies", "Canonical runtime-owned bookkeeping contract");
 }
 
 void CheckFactoryRoleGeneration()

@@ -4,7 +4,7 @@ using Idd.Factory.Domain;
 namespace Idd.Factory.Agents;
 
 /// <summary>
-/// Protocol validator for the dynamic task-graph Factory. Role is transport metadata;
+/// Protocol validator for the linear Factory. Role is transport metadata;
 /// runtime scheduling is based on capabilities.
 /// </summary>
 public sealed class FactoryAgentResultValidator
@@ -15,8 +15,7 @@ public sealed class FactoryAgentResultValidator
         ["implementer"] = ["completed", "additional-work-required", "global-replan-required", "needs-replan", "blocked", "intent-required"],
         ["researcher"] = ["completed", "additional-work-required", "global-replan-required", "needs-replan", "blocked", "intent-required"],
         ["checkpoint-reviewer"] = ["approved", "needs-fix", "correction-required", "additional-work-required", "global-replan-required", "needs-replan", "blocked", "intent-required"],
-        ["final-reviewer"] = ["approved", "needs-fix", "correction-required", "additional-work-required", "global-replan-required", "needs-replan", "blocked", "intent-required"],
-        ["factory-replanner"] = ["replan-proposed", "intent-required", "needs-clarification", "blocked"]
+        ["final-reviewer"] = ["approved", "needs-fix", "correction-required", "additional-work-required", "global-replan-required", "needs-replan", "blocked", "intent-required"]
     };
 
     public AgentResultEnvelope Validate(AgentInvocation invocation, AgentResultEnvelope? result)
@@ -34,7 +33,7 @@ public sealed class FactoryAgentResultValidator
 
 /// <summary>
 /// Uses the existing backend transport, but validates the capability-oriented protocol and
-/// additionally protects graph history and Factory policy from worker mutation.
+/// additionally protects plan history and Factory policy from worker mutation.
 /// </summary>
 public sealed class FactoryAgentExecutor(IAgentBackend backend, FactoryAgentResultValidator validator)
 {
@@ -46,7 +45,7 @@ public sealed class FactoryAgentExecutor(IAgentBackend backend, FactoryAgentResu
             await File.WriteAllTextAsync(invocationPath, JsonSerializer.Serialize(invocation, FactoryJson.Options), cancellationToken);
 
         var legacyProtected = ProtectedArtifactGuard.Capture(invocation);
-        var graphProtected = DynamicProtectedArtifactGuard.Capture(invocation);
+        var planProtected = PlanProtectedArtifactGuard.Capture(invocation);
         var handle = await backend.StartAsync(invocation, cancellationToken);
         var process = await backend.WaitAsync(handle, cancellationToken);
         await File.WriteAllTextAsync(
@@ -57,7 +56,7 @@ public sealed class FactoryAgentExecutor(IAgentBackend backend, FactoryAgentResu
         // Protected ownership is authoritative even when the semantic process crashes or is cancelled.
         // A failed worker must not bypass the guard and leave runner-owned state damaged before retry/recovery.
         legacyProtected.ValidateUnchanged();
-        graphProtected.ValidateUnchanged();
+        planProtected.ValidateUnchanged();
 
         if (process.TerminationKind == AgentTerminationKind.Cancelled) throw new OperationCanceledException(cancellationToken);
         if (process.TerminationKind == AgentTerminationKind.TransportFailure && !process.CompleteResultObserved)
@@ -73,27 +72,26 @@ public sealed class FactoryAgentExecutor(IAgentBackend backend, FactoryAgentResu
 }
 
 /// <summary>
-/// Additional protection for dynamic graph provenance and policy artifacts that were introduced
-/// after the base worker ownership guard.
+/// Additional protection for plan provenance and policy artifacts.
 /// </summary>
-internal sealed class DynamicProtectedArtifactGuard
+internal sealed class PlanProtectedArtifactGuard
 {
     private readonly IReadOnlyDictionary<string, string> hashes;
     private readonly IReadOnlyList<string> roots;
 
-    private DynamicProtectedArtifactGuard(IReadOnlyDictionary<string, string> hashes, IReadOnlyList<string> roots)
+    private PlanProtectedArtifactGuard(IReadOnlyDictionary<string, string> hashes, IReadOnlyList<string> roots)
     {
         this.hashes = hashes;
         this.roots = roots;
     }
 
-    public static DynamicProtectedArtifactGuard Capture(AgentInvocation invocation)
+    public static PlanProtectedArtifactGuard Capture(AgentInvocation invocation)
     {
         var attemptDirectory = Path.GetDirectoryName(invocation.ResultPath)!;
         var current = Directory.GetParent(Directory.GetParent(attemptDirectory)!.FullName)!.FullName;
         var roots = new[]
         {
-            Path.Combine(current, "graph"),
+            Path.Combine(current, "plan-revisions"),
             Path.Combine(invocation.Workspace, ".idd", "factory.yaml")
         };
         return new(Enumerate(roots).ToDictionary(path => path, Hash, StringComparer.OrdinalIgnoreCase), roots);

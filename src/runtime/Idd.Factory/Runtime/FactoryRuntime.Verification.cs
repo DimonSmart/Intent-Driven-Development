@@ -13,7 +13,9 @@ public sealed partial class FactoryRuntime
     {
         if (context is not ("subtask" or "final"))
             throw new VerificationException("INVALID_VERIFICATION_CONTEXT", $"Unsupported verification context {context}.");
-        var item = workItemId is null ? null : state.WorkItems.Single(x => x.Id == workItemId);
+        var item = workItemId is null ? null : state.Current is { } current && current.Id == workItemId
+            ? current
+            : throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification must target Current work.");
         if (context == "subtask" && item is null)
             throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Subtask verification requires a work item.");
 
@@ -134,7 +136,9 @@ public sealed partial class FactoryRuntime
             ?? throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification action requires a pending check ID.");
         var definitionHash = session.PendingCheckDefinitionHash
             ?? throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification action requires a pending check definition hash.");
-        var item = session.WorkItemId is null ? null : state.WorkItems.Single(x => x.Id == session.WorkItemId);
+        var item = session.WorkItemId is null ? null : state.Current is { } current && current.Id == session.WorkItemId
+            ? current
+            : throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification session does not target Current work.");
 
         if (session.Stage == VerificationContinuationStage.AwaitingConfirmation && confirmation == VerificationConfirmation.Decline)
         {
@@ -144,7 +148,7 @@ public sealed partial class FactoryRuntime
             state.RunStatus = FactoryRunStatus.Blocked;
             state.Blocker = new("VERIFICATION_DECLINED", $"User declined authoritative check {checkId}.", "Cancel/restart the run when verification can be performed.");
             state.PendingContinuation = new(ContinuationKind.Terminal, item?.Id, session.Context, "VERIFICATION_DECLINED", false);
-            if (item is not null) item.Status = WorkItemStatus.Blocked;
+            if (item is not null) state.CurrentPhase = CurrentWorkPhase.Blocked;
             await SaveAsync(state, cancellationToken);
             return OutcomeFromBlocker(state, "VERIFICATION_DECLINED");
         }
@@ -211,7 +215,7 @@ public sealed partial class FactoryRuntime
 
     private async Task<FactoryCliOutcome?> CompleteVerificationAsync(
         FactoryState state,
-        WorkItemState? item,
+        PlannedWorkItem? item,
         string context,
         IReadOnlyCollection<string> failedCheckIds,
         CancellationToken cancellationToken)
@@ -226,25 +230,22 @@ public sealed partial class FactoryRuntime
             state.Blocker = null;
             state.RunStatus = FactoryRunStatus.Running;
             if (item is not null)
-            {
-                item.Status = WorkItemStatus.Completed;
-                item.CurrentAttemptId = null;
-            }
+                await CommitCurrentAsync(state, cancellationToken);
             else
             {
                 state.FinalVerificationPassed = true;
-                state.FinalVerificationGraphRevision = state.GraphRevision;
+                state.FinalVerificationPlanRevision = state.PlanRevision;
+                await SaveAsync(state, cancellationToken);
             }
-            await SaveAsync(state, cancellationToken);
             await events.WriteAsync(state.RunId, "verification-decision", new { context, workItemId = item?.Id, decision, failedCheckIds }, cancellationToken);
             return null;
         }
 
-        if (item is not null) item.Status = WorkItemStatus.Blocked;
+        if (item is not null) state.CurrentPhase = CurrentWorkPhase.Blocked;
         else
         {
             state.FinalVerificationPassed = false;
-            state.FinalVerificationGraphRevision = null;
+            state.FinalVerificationPlanRevision = null;
         }
         state.RunStatus = FactoryRunStatus.Blocked;
         var failed = failedCheckIds.Count == 0 ? "unknown check" : string.Join(", ", failedCheckIds);
@@ -260,7 +261,7 @@ public sealed partial class FactoryRuntime
         return OutcomeFromBlocker(state, "UNEXPECTED_VERIFICATION_FAILURE");
     }
 
-    internal static VerificationDecision ClassifyVerification(WorkItemState? item, string context, IReadOnlyCollection<string> failedCheckIds)
+    internal static VerificationDecision ClassifyVerification(PlannedWorkItem? item, string context, IReadOnlyCollection<string> failedCheckIds)
     {
         if (failedCheckIds.Count == 0) return VerificationDecision.Ok;
         if (context == "final" || item is null) return VerificationDecision.UnexpectedFailure;
@@ -271,7 +272,7 @@ public sealed partial class FactoryRuntime
 
     private async Task<FactoryCliOutcome> BlockVerificationAsync(
         FactoryState state,
-        WorkItemState? item,
+        PlannedWorkItem? item,
         string context,
         string code,
         string reason,
@@ -286,7 +287,7 @@ public sealed partial class FactoryRuntime
         return OutcomeFromBlocker(state, code);
     }
 
-    private static void RecordEvidence(FactoryState state, WorkItemState? item, IEnumerable<VerificationEvidence> evidence)
+    private static void RecordEvidence(FactoryState state, PlannedWorkItem? item, IEnumerable<VerificationEvidence> evidence)
     {
         foreach (var record in evidence)
         {

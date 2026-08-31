@@ -1,6 +1,6 @@
 # Factory configuration
 
-Factory configuration is policy-only. It does not describe an execution workflow, step handlers, transitions, or a second DAG.
+Factory configuration is policy-only. It does not describe execution steps, handlers, or transitions.
 
 The packaged default is `factory.yaml`. A workspace may provide `.idd/factory.yaml`; the effective configuration hash is pinned into the active run and a change is reported rather than silently adopted.
 
@@ -20,15 +20,14 @@ capabilities:
     - implementation
     - research
     - semantic-review
-    - documentation
 ```
 
 ## Limits
 
-- `maxAgentAttempts`: per semantic work/refinement attempt budget.
+- `maxAgentAttempts`: per semantic operation attempt budget.
 - `maxReplans`: bounded global strategy-replan count.
 - `maxCorrectiveCycles`: bounded semantic-review correction count.
-- `maxWorkItems`: hard dynamic graph-expansion bound, including runtime-created work/review nodes.
+- `maxWorkItems`: hard bound for completed, current, and remaining work, including runtime-created tasks.
 
 Values must be positive. Budget exhaustion is explicit run state/outcome rather than an implicit retry loop.
 
@@ -43,9 +42,8 @@ Values must be positive. Budget exhaustion is explicit run state/outcome rather 
 - `implementation`
 - `research`
 - `semantic-review`
-- `documentation`
 
-Operational capabilities such as initial decomposition, scoped refinement, and global replan are runtime-owned and are not arbitrary work-item routing choices.
+Planning and global replan triggers are runtime-owned and are not arbitrary work-item routing choices.
 
 Unknown capabilities, duplicates, empty allow-lists, unsupported schema fields, or attempts to disable mandatory safety invariants are rejected before run execution.
 
@@ -57,7 +55,7 @@ Factory configuration cannot define:
 - outcome-to-phase routing;
 - arbitrary role or skill names;
 - custom handlers or executable scripts;
-- a generic workflow/DAG language;
+- a generic workflow language;
 - policies that mutate completed work or weaken strict final verification/final review.
 
-The dynamic task graph lives in run state and evolves through validated runtime graph mutations. Configuration bounds that behavior; it does not duplicate the graph.
+Linear completed/current/remaining state evolves through validated atomic transitions. Configuration bounds that behavior; it does not duplicate the plan.

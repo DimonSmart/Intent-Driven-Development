@@ -6,6 +6,27 @@ namespace Idd.Factory.Tests;
 
 public sealed class AgentProtocolTests
 {
+    [Fact]
+    public void PlanningResultIsCompleteWithOnlyOutcomeAndFlatTasksAsSemanticBody()
+    {
+        var invocation = Invocation("task-decomposer");
+        var result = FactoryRuntimeTestHarness.Envelope(invocation, "ready", new
+        {
+            tasks = new object[]
+            {
+                new { capability = "implementation", task = "Do A" },
+                new { capability = "research", task = "Investigate B" }
+            }
+        });
+        var json = JsonSerializer.SerializeToElement(result, FactoryJson.Options);
+
+        Assert.Equal("ready", json.GetProperty("outcome").GetString());
+        Assert.Equal(2, json.GetProperty("tasks").GetArrayLength());
+        Assert.Equal(JsonValueKind.Null, json.GetProperty("payload").ValueKind);
+        Assert.False(json.GetProperty("tasks")[0].TryGetProperty("id", out _));
+        Assert.False(json.GetProperty("tasks")[0].TryGetProperty("dependencies", out _));
+    }
+
     [Theory]
     [InlineData("implementer", "completed")]
     [InlineData("implementer", "additional-work-required")]
@@ -18,7 +39,6 @@ public sealed class AgentProtocolTests
     [InlineData("final-reviewer", "additional-work-required")]
     [InlineData("final-reviewer", "global-replan-required")]
     [InlineData("task-decomposer", "ready")]
-    [InlineData("factory-replanner", "replan-proposed")]
     public void CapabilityProtocolAcceptsTypedOutcomes(string role, string outcome)
     {
         var invocation = Invocation(role);
@@ -54,8 +74,7 @@ public sealed class AgentProtocolTests
     [Theory]
     [InlineData("implementation", "implementer", "idd-factory-execute-subtask", AgentExecutionProfile.WorkspaceWrite)]
     [InlineData("research", "researcher", "idd-factory-research", AgentExecutionProfile.ReadOnly)]
-    [InlineData("semantic-review", "final-reviewer", "idd-factory-review-task", AgentExecutionProfile.ReadOnly)]
-    [InlineData("documentation", "implementer", "idd-factory-execute-subtask", AgentExecutionProfile.WorkspaceWrite)]
+    [InlineData("semantic-review", "checkpoint-reviewer", "idd-factory-review-checkpoint", AgentExecutionProfile.ReadOnly)]
     public void WorkCapabilityMapsDeterministically(string capability, string role, string skill, AgentExecutionProfile profile)
     {
         var contract = FactoryCapabilityCatalog.ResolveWorkItem(capability);
@@ -84,8 +103,8 @@ public sealed class AgentProtocolTests
     [InlineData(".idd/factory/current/state.json", "WORKER_CHANGED_RUNNER_STATE")]
     [InlineData(".idd/factory/current/request.md", "WORKER_CHANGED_RUNNER_STATE")]
     [InlineData(".idd/factory/current/run-context.md", "WORKER_CHANGED_RUNNER_STATE")]
-    [InlineData(".idd/factory/current/work-items/item/contracts/000001.md", "WORKER_CHANGED_RUNNER_STATE")]
-    [InlineData(".idd/factory/current/graph/mutations/G000001.json", "WORKER_CHANGED_RUNNER_STATE")]
+    [InlineData(".idd/factory/current/work-items/W000001/contract.md", "WORKER_CHANGED_RUNNER_STATE")]
+    [InlineData(".idd/factory/current/plan-revisions/P000001.json", "WORKER_CHANGED_RUNNER_STATE")]
     [InlineData(".idd/factory/current/clarifications/C000001.md", "WORKER_CHANGED_RUNNER_STATE")]
     [InlineData(".idd/intent/current.md", "WORKER_CHANGED_PRODUCT_INTENT")]
     [InlineData(".idd/verification.yaml", "WORKER_CHANGED_PRODUCT_INTENT")]
@@ -107,8 +126,8 @@ public sealed class AgentProtocolTests
     [InlineData(".idd/factory/current/state.json", "WORKER_CHANGED_RUNNER_STATE")]
     [InlineData(".idd/factory/current/request.md", "WORKER_CHANGED_RUNNER_STATE")]
     [InlineData(".idd/factory/current/run-context.md", "WORKER_CHANGED_RUNNER_STATE")]
-    [InlineData(".idd/factory/current/work-items/item/contracts/000001.md", "WORKER_CHANGED_RUNNER_STATE")]
-    [InlineData(".idd/factory/current/graph/mutations/G000000.json", "WORKER_CHANGED_RUNNER_STATE")]
+    [InlineData(".idd/factory/current/work-items/W000001/contract.md", "WORKER_CHANGED_RUNNER_STATE")]
+    [InlineData(".idd/factory/current/plan-revisions/P000001.json", "WORKER_CHANGED_RUNNER_STATE")]
     [InlineData(".idd/factory/current/clarifications/C000000.md", "WORKER_CHANGED_RUNNER_STATE")]
     [InlineData(".idd/intent/current.md", "WORKER_CHANGED_PRODUCT_INTENT")]
     [InlineData(".idd/verification.yaml", "WORKER_CHANGED_PRODUCT_INTENT")]
@@ -144,9 +163,8 @@ public sealed class AgentProtocolTests
         var contract = role switch
         {
             "researcher" => FactoryCapabilityCatalog.ResolveWorkItem("research").Agent,
-            "final-reviewer" => FactoryCapabilityCatalog.ResolveWorkItem("semantic-review").Agent,
-            "task-decomposer" => FactoryCapabilityCatalog.Resolve("initial-decomposition").Agent,
-            "factory-replanner" => FactoryCapabilityCatalog.Resolve("global-replan").Agent,
+            "final-reviewer" => FactoryCapabilityCatalog.Resolve("final-review").Agent,
+            "task-decomposer" => FactoryCapabilityCatalog.Resolve("planning").Agent,
             _ => FactoryCapabilityCatalog.ResolveWorkItem("implementation").Agent
         };
         return new AgentInvocation
@@ -179,8 +197,8 @@ public sealed class AgentProtocolTests
         temp.Write(".idd/factory/current/state.json", "state");
         temp.Write(".idd/factory/current/request.md", "request");
         temp.Write(".idd/factory/current/run-context.md", "context");
-        temp.Write(".idd/factory/current/work-items/item/contracts/000001.md", "contract");
-        temp.Write(".idd/factory/current/graph/mutations/G000000.json", "history");
+        temp.Write(".idd/factory/current/work-items/W000001/contract.md", "contract");
+        temp.Write(".idd/factory/current/plan-revisions/P000001.json", "history");
         temp.Write(".idd/factory/current/clarifications/C000000.md", "clarification");
         temp.Write(".idd/factory.yaml", "schemaVersion: 1");
         temp.Write(".idd/intent/current.md", "intent");

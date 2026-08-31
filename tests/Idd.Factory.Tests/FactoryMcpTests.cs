@@ -87,7 +87,7 @@ public sealed class FactoryMcpTests
             FactoryConfigurationHash = configuration.Hash,
             RunStatus = FactoryRunStatus.Blocked,
             Blocker = new("NEEDS_CLARIFICATION", "Choose one option.", "Continue with an answer."),
-            PendingContinuation = new(ContinuationKind.Clarification, null, null, "NEEDS_CLARIFICATION", true, SemanticOperationKind.Decomposition, "original input")
+            PendingContinuation = new(ContinuationKind.Clarification, null, null, "NEEDS_CLARIFICATION", true, SemanticOperationKind.Planning, "original input")
         };
         await new FileFactoryStateStore(current, new FactoryStateValidator()).CreateAsync(state, CancellationToken.None);
 

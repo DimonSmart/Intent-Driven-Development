@@ -11,20 +11,13 @@ public sealed class SemanticReviewDispatchTests
         var backend = new FakeAgentBackend();
         backend.Enqueue(invocation => Envelope(invocation, "ready", new
         {
-            workItems = new object[]
+            tasks = new object[]
             {
                 Work("A", "implementation"),
                 new
                 {
-                    id = "R",
-                    sequence = 2,
-                    kind = "review-checkpoint",
-                    definitionState = "executable",
                     capability = "semantic-review",
-                    contractMarkdown = "# Review A",
-                    dependencies = new[] { "A" },
-                    coveredWorkItems = new[] { "A" },
-                    verificationCheckIds = Array.Empty<string>()
+                    task = "# Review A"
                 }
             }
         }));

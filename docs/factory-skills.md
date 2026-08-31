@@ -21,18 +21,18 @@ Use idd-factory-run to implement the task described in ./ui-audit.md.
 
 ## Semantic worker skills
 
-- `idd-factory-decompose-task` creates the smallest safe initial task graph and may leave future work as `outline` for later scoped refinement.
-- `idd-factory-execute-subtask` executes one focused implementation or documentation work item.
-- `idd-factory-research` performs one focused read-only research work item whose findings can unblock dependent graph work.
-- `idd-factory-review-checkpoint` independently reviews selected completed graph work.
-- `idd-factory-review-task` performs mandatory integrated final semantic review as graph work.
-- `idd-factory-replan` proposes bounded changes to remaining global graph strategy without mutating authoritative state.
+- `idd-factory-decompose-task` returns the smallest safe ordered list of remaining work and is reused after new evidence or a global strategy change.
+- `idd-factory-execute-subtask` executes one focused workspace-writing implementation work item, including documentation changes when its contract requires them.
+- `idd-factory-research` performs one focused read-only research work item whose findings become completed-work context.
+- `idd-factory-review-checkpoint` independently reviews completed work at its ordered position.
+- `idd-factory-review-task` performs mandatory integrated final semantic review as a terminal orchestration phase.
+- `idd-factory-replan` is a legacy name for returning a complete replacement future list.
 
 Workers return structured result envelopes through attempt-specific
 `result.json`. Human-readable stdout and stderr are diagnostics only. Workers do
-not own state mutations, authoritative verification, scheduling, retry, graph
-mutation, or filesystem finalization.
+not own state mutations, authoritative verification, scheduling, retry, plan
+replacement, or filesystem finalization.
 
 The former `idd-factory-coordinate-step`, `factory-step-coordinator`, predefined
 global Factory workflow, and LLM-driven finalization are not part of the current
-plugin. `FactoryState.WorkItems` is the authoritative execution graph.
+plugin. `FactoryState.Completed`, `Current`, and `Remaining` are authoritative.

@@ -28,4 +28,4 @@ Return protocol version 2 with role `researcher` and one outcome:
 - `intent-required` — durable product meaning is missing;
 - `blocked` — an external condition prevents useful research.
 
-Runtime persists the result reference and owns all scheduling and graph mutation.
+Runtime persists the result reference and owns all scheduling and ordered-plan mutation.

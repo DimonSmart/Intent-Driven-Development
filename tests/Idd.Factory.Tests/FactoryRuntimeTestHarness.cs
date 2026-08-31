@@ -31,7 +31,7 @@ internal static class FactoryRuntimeTestHarness
         1,
         new FactoryLimits(4, 3, 5, 64),
         new FinalReviewPolicy(true),
-        (allowed ?? new[] { "implementation", "research", "semantic-review", "documentation" }).ToHashSet(StringComparer.Ordinal),
+        (allowed ?? new[] { "implementation", "research", "semantic-review" }).ToHashSet(StringComparer.Ordinal),
         "test-factory.yaml",
         "test-config-hash");
 
@@ -40,26 +40,28 @@ internal static class FactoryRuntimeTestHarness
 
     public static object Work(string id, string capability, int sequence = 1, string[]? dependencies = null, string? contract = null) => new
     {
-        id,
-        sequence,
-        kind = "subtask",
-        definitionState = "executable",
         capability,
-        contractMarkdown = contract ?? $"# {id}",
-        dependencies = dependencies ?? Array.Empty<string>(),
-        verificationCheckIds = Array.Empty<string>()
+        task = contract ?? $"# {id}"
     };
 
-    public static AgentResultEnvelope Envelope(AgentInvocation invocation, string outcome, object? payload = null, string? reason = null) => new()
+    public static AgentResultEnvelope Envelope(AgentInvocation invocation, string outcome, object? payload = null, string? reason = null)
     {
-        ProtocolVersion = AgentInvocation.CurrentProtocolVersion,
-        RunId = invocation.RunId,
-        AttemptId = invocation.AttemptId,
-        Role = invocation.Role,
-        Outcome = outcome,
-        Reason = reason,
-        Payload = payload is null ? null : JsonSerializer.SerializeToElement(payload, FactoryJson.Options)
-    };
+        var body = payload is null ? (JsonElement?)null : JsonSerializer.SerializeToElement(payload, FactoryJson.Options);
+        var tasks = outcome == "ready" && body is { ValueKind: JsonValueKind.Object } value && value.TryGetProperty("tasks", out var taskArray)
+            ? taskArray.Clone()
+            : (JsonElement?)null;
+        return new()
+        {
+            ProtocolVersion = AgentInvocation.CurrentProtocolVersion,
+            RunId = invocation.RunId,
+            AttemptId = invocation.AttemptId,
+            Role = invocation.Role,
+            Outcome = outcome,
+            Tasks = tasks,
+            Reason = reason,
+            Payload = tasks is null ? body : null
+        };
+    }
 }
 
 internal sealed class FakeAgentBackend : IAgentBackend

@@ -4,7 +4,7 @@
 
 Perform one read-only semantic review work item over the integrated product. Final review is represented by an ordinary persisted graph node with capability `semantic-review`; it is not a global workflow phase.
 
-Runtime owns scheduling, strict final verification, corrections, graph mutation, persistence, and finalization.
+Runtime owns scheduling, strict final verification, corrections, ordered future work, persistence, and finalization.
 
 ## Inputs and boundaries
 
@@ -23,7 +23,7 @@ For a concrete bounded defect, return `correction-required` (compatibility alias
 ```text
 payload.correctiveSubtask:
   id?
-  capability: implementation | documentation | ...
+  capability: implementation | research | ...
   contractMarkdown
   verificationCheckIds[]?
   verificationExpectations?

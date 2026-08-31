@@ -18,7 +18,6 @@ public sealed class FactoryConfigurationTests
             - implementation
             - research
             - semantic-review
-            - documentation
         """;
 
     [Fact]
@@ -55,7 +54,7 @@ public sealed class FactoryConfigurationTests
     public void UnknownCapabilityIsRejected()
     {
         using var temp = new TestWorkspace();
-        var path = temp.Write("factory.yaml", Valid.Replace("    - documentation", "    - documentation\n    - mystery"));
+        var path = temp.Write("factory.yaml", Valid.Replace("    - semantic-review", "    - semantic-review\n    - mystery"));
 
         var exception = Assert.Throws<FactoryConfigurationException>(() => new FactoryConfigurationLoader().Load(temp.Path, path));
 

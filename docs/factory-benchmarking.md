@@ -10,7 +10,7 @@ The Factory Benchmark Runner measures the observed cost and success rate of the 
 | B1 `structured-single` | One session receives the task plus ideal ordered work items. | B1 − B0: structuring overhead. |
 | B2 `manual-isolated` | One fresh Codex process executes each ideal work item against a shared workspace. | B2 − B1: fresh-context isolation overhead. |
 | B3 `factory-split-replay` | The canonical Factory decomposer creates contracts; ordinary fresh workers replay its subtasks without Runtime gates or reviews. | B3 − B2: observed effect of Factory's decomposition choice. |
-| B4 `factory` | The production Factory Runtime executes the complete task using its dynamic task graph and deterministic policy. | B4 − B3: observed Factory runtime/orchestration overhead. |
+| B4 `factory` | The production Factory Runtime executes the complete task using its linear plan and deterministic policy. | B4 − B3: observed Factory runtime/orchestration overhead. |
 
 B3 currently obtains decomposition independently from B4. Reports mark this explicitly and retain every generated contract. Consequently B4 − B3 is an estimate, not an exact causal measurement. Model execution is nondeterministic even with identical configuration, which is why repeated runs and successful-run medians are the primary statistics.
 

@@ -30,7 +30,8 @@ public static class FactoryPostRunDiagnostics
         var commitPath = result.String("commitMessagePath");
         var workspace = new DirectoryInfo(Path.GetDirectoryName(result.Path)!).Parent!.Parent!.Parent!.Parent!.FullName;
         assertions.Require(!string.IsNullOrWhiteSpace(commitPath) && File.Exists(Path.Combine(workspace, commitPath.Replace('/', Path.DirectorySeparatorChar))), "Factory contract", "Commit message path", $"Expected factory-result.json commitMessagePath to point to an existing file, but it reports '{commitPath ?? "missing"}'.");
-        foreach (var (name, expected) in new (string, object)[] { ("factoryOutcome", "COMPLETED"), ("subtaskCount", 2), ("completedSubtaskCount", 2), ("reviewCheckpointCount", 1), ("completedReviewCheckpointCount", 1), ("correctiveSubtaskCount", 0), ("blockedItemCount", 0), ("incompleteItemCount", 0), ("finalReviewVerdict", "approved"), ("verificationStatus", "passed") })
+        assertions.Require(result.Int("completedWorkCount") is >= 2, "Factory contract", "completedWorkCount", $"Expected at least two completed ordered work items, but factory-result.json reports '{result.Int("completedWorkCount")?.ToString() ?? "missing"}'.");
+        foreach (var (name, expected) in new (string, object)[] { ("factoryOutcome", "COMPLETED"), ("finalReviewVerdict", "approved"), ("verificationStatus", "passed") })
         {
             object? actual = expected is int ? result.Int(name) : result.String(name);
             assertions.Require(Equals(actual, expected), "Factory contract", name, $"Expected Factory {name} to be '{expected}', but factory-result.json reports '{actual ?? "missing"}'.");

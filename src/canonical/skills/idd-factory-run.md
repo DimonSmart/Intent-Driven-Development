@@ -3,8 +3,8 @@
 ## Purpose
 
 Launch or resume the packaged deterministic IDD Factory Runtime. The runtime,
-not this skill or an LLM coordinator, owns authoritative state, task-graph
-scheduling, verification, retries, graph mutation, and finalization.
+not this skill or an LLM coordinator, owns authoritative linear work state,
+scheduling, verification, retries, plan replacement, and finalization.
 
 Use this skill only when the user explicitly invokes IDD Factory. Pass the
 complete user request to the platform launcher unchanged. The launcher must use
@@ -28,8 +28,9 @@ runtime returns one structured Factory outcome.
 
 - Do not select work items, inspect operational state, route reviews, apply
   retries, create corrections, choose final review, or finalize files.
-- Do not choose a next phase or maintain a second workflow/transition graph.
-  `FactoryState.WorkItems` and runtime-owned continuations are authoritative.
+- Do not choose a next phase or maintain a second workflow model.
+  `FactoryState.Completed`, `Current`, `Remaining`, and runtime-owned
+  continuations are authoritative.
 - Do not spawn semantic or coordinator agents. The packaged backend creates
   fresh semantic subprocess contexts through the runtime.
 - Do not weaken the worker sandbox to compensate for launcher constraints.

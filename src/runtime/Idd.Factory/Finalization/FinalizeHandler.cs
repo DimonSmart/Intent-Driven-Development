@@ -9,152 +9,58 @@ public sealed class FinalizeHandler(string workspace)
 {
     public async Task<string> FinalizeAsync(FactoryState state, CancellationToken cancellationToken)
     {
-        if (state.FinalReview is not { Verdict: "approved", ReviewedGraphRevision: not null } reviewState ||
-            reviewState.ReviewedGraphRevision != state.GraphRevision ||
-            state.WorkItems.Any(x => x.Status is not WorkItemStatus.Completed and not WorkItemStatus.Superseded and not WorkItemStatus.Cancelled))
-            throw new InvalidOperationException("Finalization requires an approved final review for the current graph and no incomplete work items.");
-        if (!state.FinalVerificationPassed || state.FinalVerificationGraphRevision != state.GraphRevision)
-            throw new InvalidOperationException("Finalization requires strict final verification for the current graph revision.");
-        if (state.CurrentAttemptId is not null || state.WorkItems.Any(x => x.CurrentAttemptId is not null) ||
-            state.PendingContinuation is not null || state.PendingVerificationSession is not null || state.PendingReplanTrigger is not null)
-            throw new InvalidOperationException("Finalization requires no active semantic attempt, continuation, pending verification, or pending replan.");
+        if (state.Current is not null || state.Remaining.Count != 0 || state.CurrentAttemptId is not null || state.PendingContinuation is not null || state.PendingVerificationSession is not null || state.PendingReplanTrigger is not null)
+            throw new InvalidOperationException("Finalization requires quiescent linear work state.");
+        if (!state.FinalVerificationPassed || state.FinalVerificationPlanRevision != state.PlanRevision) throw new InvalidOperationException("Finalization requires current strict verification.");
+        if (state.FinalReview is not { Verdict: "approved", ReviewedPlanRevision: not null } review || review.ReviewedPlanRevision != state.PlanRevision) throw new InvalidOperationException("Finalization requires current approved review.");
 
         var current = Path.Combine(workspace, ".idd", "factory", "current");
-        foreach (var evidenceRef in state.VerificationEvidenceRefs)
-            _ = JsonSerializer.Deserialize<VerificationEvidence>(await File.ReadAllTextAsync(Path.Combine(current, evidenceRef), cancellationToken), FactoryJson.Options)
-                ?? throw new InvalidOperationException($"Verification evidence is invalid: {evidenceRef}");
+        foreach (var reference in state.VerificationEvidenceRefs)
+            _ = JsonSerializer.Deserialize<VerificationEvidence>(await File.ReadAllTextAsync(Path.Combine(current, reference), cancellationToken), FactoryJson.Options)
+                ?? throw new InvalidOperationException($"Invalid verification evidence: {reference}");
 
-        var results = Path.Combine(workspace, ".idd", "factory", "results");
-        Directory.CreateDirectory(results);
         var request = await File.ReadAllTextAsync(Path.Combine(current, state.RequestPath), cancellationToken);
-        var slug = Slug(request.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "factory-result");
-        var baseName = $"{slug}_{DateTimeOffset.UtcNow:yyyy-MM-dd_HH-mm-ssZ}";
-        var directory = Path.Combine(results, baseName);
-        var suffix = 2;
-        while (Directory.Exists(directory)) directory = Path.Combine(results, baseName + "-" + suffix++);
+        var resultsRoot = Path.Combine(workspace, ".idd", "factory", "results");
+        Directory.CreateDirectory(resultsRoot);
+        var baseName = $"{Slug(request.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "factory-result")}_{DateTimeOffset.UtcNow:yyyy-MM-dd_HH-mm-ssZ}";
+        var directory = Path.Combine(resultsRoot, baseName);
+        for (var suffix = 2; Directory.Exists(directory); suffix++) directory = Path.Combine(resultsRoot, baseName + "-" + suffix);
         Directory.CreateDirectory(directory);
 
-        if (string.IsNullOrWhiteSpace(reviewState.ResultRef))
-            throw new InvalidOperationException("Approved final review has no result artifact reference.");
-        var review = JsonSerializer.Deserialize<AgentResultEnvelope>(
-            await File.ReadAllTextAsync(Path.Combine(current, reviewState.ResultRef), cancellationToken), FactoryJson.Options);
-        var message = ReadCommitMessage(review?.Payload);
-        var subject = message.Subject ?? request.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim().TrimStart('#', ' ') ?? "Complete Factory task";
+        var subject = request.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim().TrimStart('#', ' ') ?? "Complete Factory task";
         if (subject.Length > 72) subject = subject[..72].TrimEnd();
-        var why = message.Why.Count > 0 ? string.Join(" ", message.Why.Take(3)) : Summarize(request);
-        var bullets = message.Result.Count > 0
-            ? message.Result.Take(6).Select(x => "- " + x)
-            : [$"- Completed {state.WorkItems.Count(x => x.Kind != WorkItemKind.ReviewCheckpoint)} implementation work items", "- Passed strict integrated verification and semantic review"];
-        var commit = $"{subject.TrimEnd('.')}\n\nPerformed by: IDD Factory\n\nWhy:\n{why}\n\nResult:\n{string.Join("\n", bullets)}\n";
-        var commitPath = Path.Combine(directory, "commit-message.md");
-        await File.WriteAllTextAsync(commitPath, commit, cancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "commit-message.md"), $"{subject.TrimEnd('.')}\n\nPerformed by: IDD Factory\n\nResult:\n- Completed {state.Completed.Count} ordered work items\n- Passed strict integrated verification and semantic review\n", cancellationToken);
 
-        var eventsSource = Path.Combine(current, "events.jsonl");
-        var eventsPath = Path.Combine(directory, "events.jsonl");
-        if (File.Exists(eventsSource))
+        foreach (var name in new[] { "attempts", "verification", "work-items", "plan-revisions" })
         {
-            await File.AppendAllTextAsync(eventsSource, JsonSerializer.Serialize(new
-            {
-                schemaVersion = 1,
-                timestamp = DateTimeOffset.UtcNow,
-                runId = state.RunId,
-                type = "run-completed",
-                data = new { graphRevision = state.GraphRevision }
-            }) + Environment.NewLine, cancellationToken);
-            File.Copy(eventsSource, eventsPath);
+            var source = Path.Combine(current, name);
+            if (Directory.Exists(source)) CopyDirectory(source, Path.Combine(directory, name));
         }
-
-        var verificationResultDirectory = Path.Combine(directory, "verification");
-        if (Directory.Exists(Path.Combine(current, "verification"))) CopyDirectory(Path.Combine(current, "verification"), verificationResultDirectory);
-        var attemptsResultDirectory = Path.Combine(directory, "attempts");
-        if (Directory.Exists(Path.Combine(current, "attempts"))) CopyDirectory(Path.Combine(current, "attempts"), attemptsResultDirectory);
-        var workItemsResultDirectory = Path.Combine(directory, "work-items");
-        if (Directory.Exists(Path.Combine(current, "work-items"))) CopyDirectory(Path.Combine(current, "work-items"), workItemsResultDirectory);
-        var graphResultDirectory = Path.Combine(directory, "graph");
-        if (Directory.Exists(Path.Combine(current, "graph"))) CopyDirectory(Path.Combine(current, "graph"), graphResultDirectory);
-
-        var decompositionResultDirectory = Path.Combine(directory, "decomposition");
-        Directory.CreateDirectory(decompositionResultDirectory);
-        var decompositionPath = Path.Combine(decompositionResultDirectory, "decomposition.json");
-        await File.WriteAllTextAsync(decompositionPath, JsonSerializer.Serialize(new
+        var plan = new
         {
-            schemaVersion = 2,
-            graphRevision = state.GraphRevision,
-            workItems = state.WorkItems.OrderBy(x => x.Sequence).Select(x => new
-            {
-                x.Id,
-                x.Sequence,
-                kind = x.Kind switch
-                {
-                    WorkItemKind.Subtask => "subtask",
-                    WorkItemKind.ReviewCheckpoint => "review-checkpoint",
-                    WorkItemKind.CorrectiveSubtask => "corrective-subtask",
-                    _ => throw new InvalidOperationException($"Unknown work-item kind {x.Kind}.")
-                },
-                definitionState = x.DefinitionState.ToString(),
-                x.Capability,
-                status = x.Status.ToString(),
-                x.ContractPath,
-                x.ContractRevision,
-                x.Dependencies,
-                x.CoveredWorkItems,
-                x.VerificationCheckIds,
-                x.VerificationExpectations,
-                x.LastResultRef,
-                x.PriorResultRefs,
-                x.VerificationEvidenceRefs,
-                x.ChangedPaths,
-                x.IsFinalReview,
-                x.ReviewTargetGraphRevision
-            })
-        }, FactoryJson.Options), cancellationToken);
-
-        string? WorkspaceRelativeDirectory(string path) => Directory.Exists(path) ? Path.GetRelativePath(workspace, path).Replace('\\', '/') : null;
+            schemaVersion = 1,
+            state.PlanRevision,
+            completed = state.Completed.Select(x => new { x.Id, x.Capability, x.ContractPath, x.ResultRef, x.ChangedPaths, x.VerificationEvidenceRefs })
+        };
+        await File.WriteAllTextAsync(Path.Combine(directory, "completed-work.json"), JsonSerializer.Serialize(plan, FactoryJson.Options), cancellationToken);
         var result = new
         {
-            schemaVersion = 2,
+            schemaVersion = 3,
             state.MethodologyVersion,
-            runtimeVersion = state.RuntimeVersion,
-            protocolVersion = AgentInvocation.CurrentProtocolVersion,
-            workerProtocolVersion = AgentInvocation.CurrentProtocolVersion,
+            state.RuntimeVersion,
             factoryOutcome = "COMPLETED",
-            graphRevision = state.GraphRevision,
-            factoryConfigurationHash = state.FactoryConfigurationHash,
-            subtaskCount = state.WorkItems.Count(x => x.Kind != WorkItemKind.ReviewCheckpoint),
-            completedSubtaskCount = state.WorkItems.Count(x => x.Kind != WorkItemKind.ReviewCheckpoint && x.Status == WorkItemStatus.Completed),
-            reviewCheckpointCount = state.WorkItems.Count(x => x.Kind == WorkItemKind.ReviewCheckpoint),
-            completedReviewCheckpointCount = state.WorkItems.Count(x => x.Kind == WorkItemKind.ReviewCheckpoint && x.Status == WorkItemStatus.Completed),
-            correctiveSubtaskCount = state.WorkItems.Count(x => x.Kind == WorkItemKind.CorrectiveSubtask),
-            blockedItemCount = 0,
-            incompleteItemCount = 0,
-            finalReviewVerdict = "approved",
-            finalReviewProvenance = new
-            {
-                workItemId = reviewState.WorkItemId,
-                reviewedGraphRevision = reviewState.ReviewedGraphRevision,
-                resultPath = reviewState.ResultRef,
-                attemptCount = reviewState.AttemptCount
-            },
+            state.PlanRevision,
+            state.FactoryConfigurationHash,
+            completedWorkCount = state.Completed.Count,
+            finalReviewVerdict = review.Verdict,
             verificationStatus = "passed",
-            finalVerificationGraphRevision = state.FinalVerificationGraphRevision,
-            commitMessagePath = Path.GetRelativePath(workspace, commitPath).Replace('\\', '/'),
-            eventLogPath = File.Exists(eventsPath) ? Path.GetRelativePath(workspace, eventsPath).Replace('\\', '/') : null,
-            verificationEvidencePath = WorkspaceRelativeDirectory(verificationResultDirectory),
-            agentAttemptsPath = WorkspaceRelativeDirectory(attemptsResultDirectory),
-            contractProvenancePath = WorkspaceRelativeDirectory(workItemsResultDirectory),
-            taskGraphHistoryPath = WorkspaceRelativeDirectory(graphResultDirectory),
-            workItemGraphPath = Path.GetRelativePath(workspace, decompositionPath).Replace('\\', '/'),
-            decompositionPath = Path.GetRelativePath(workspace, decompositionPath).Replace('\\', '/')
+            finalReviewResultPath = review.ResultRef,
+            finalVerificationPlanRevision = state.FinalVerificationPlanRevision,
+            commitMessagePath = Path.GetRelativePath(workspace, Path.Combine(directory, "commit-message.md")).Replace('\\', '/'),
+            planHistoryPath = Directory.Exists(Path.Combine(directory, "plan-revisions")) ? Path.GetRelativePath(workspace, Path.Combine(directory, "plan-revisions")).Replace('\\', '/') : null
         };
-        var resultPath = Path.Combine(directory, "factory-result.json");
-        await File.WriteAllTextAsync(resultPath, JsonSerializer.Serialize(result, FactoryJson.Options), cancellationToken);
-        _ = JsonDocument.Parse(await File.ReadAllTextAsync(resultPath, cancellationToken));
-
-        foreach (var entry in Directory.EnumerateFileSystemEntries(current))
-        {
-            if (Directory.Exists(entry)) Directory.Delete(entry, true);
-            else File.Delete(entry);
-        }
+        await File.WriteAllTextAsync(Path.Combine(directory, "factory-result.json"), JsonSerializer.Serialize(result, FactoryJson.Options), cancellationToken);
+        foreach (var entry in Directory.EnumerateFileSystemEntries(current)) { if (Directory.Exists(entry)) Directory.Delete(entry, true); else File.Delete(entry); }
         return directory;
     }
 
@@ -163,25 +69,6 @@ public sealed class FinalizeHandler(string workspace)
         var slug = Regex.Replace(value.ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-');
         return string.IsNullOrEmpty(slug) ? "factory-result" : slug[..Math.Min(slug.Length, 40)].TrimEnd('-');
     }
-
-    private static string Summarize(string request)
-    {
-        var line = request.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim().TrimStart('#', ' ') ?? "Implement the requested product intent.";
-        return line.Length > 240 ? line[..240].TrimEnd() + "." : line.TrimEnd('.') + ".";
-    }
-
-    private static CommitMaterial ReadCommitMessage(JsonElement? payload)
-    {
-        if (payload is not { } value || !value.TryGetProperty("commitMessage", out var message)) return new(null, [], []);
-        var subject = message.TryGetProperty("subject", out var subjectNode) ? subjectNode.GetString() : null;
-        static IReadOnlyList<string> Values(JsonElement node, string name) =>
-            node.TryGetProperty(name, out var values) && values.ValueKind == JsonValueKind.Array
-                ? values.EnumerateArray().Select(x => x.GetString()).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToArray()
-                : [];
-        return new(subject, Values(message, "why"), Values(message, "result"));
-    }
-
-    private sealed record CommitMaterial(string? Subject, IReadOnlyList<string> Why, IReadOnlyList<string> Result);
 
     private static void CopyDirectory(string source, string destination)
     {

@@ -2,9 +2,9 @@
 
 ## Purpose
 
-Execute one `implementation` or `documentation` work item in a fresh semantic context. The supplied immutable work-item contract and current `.idd/intent/` are normative.
+Execute one `implementation` work item in a fresh semantic context. It may include documentation changes when required by the contract. The supplied immutable work-item contract and current `.idd/intent/` are normative.
 
-Runtime owns selection, retries, graph mutation, persistence, verification, and scheduling. This worker never acts as coordinator.
+Runtime owns selection, retries, ordered-plan mutation, persistence, verification, and scheduling. This worker never acts as coordinator.
 
 ## Inputs and boundaries
 
@@ -33,7 +33,7 @@ verificationExpectations?  # check ID -> must-pass | may-fail
 
 The requirement states *what work is needed*, not who should perform it. Runtime validates the capability, materializes a new graph node, persists the dependency, and later resumes this work item with the dependency result.
 
-Use `global-replan-required` only when the discovery invalidates the global remaining strategy and cannot be represented as local additional work or scoped refinement. `needs-replan` may be accepted by older adapters but should not be emitted by new workers.
+Use `global-replan-required` only when the discovery invalidates the global remaining strategy and cannot be represented as local additional work. `needs-replan` may be accepted by older adapters but should not be emitted by new workers.
 
 ## Verification expectations
 
