@@ -21,5 +21,8 @@ should replace the existing remaining plan.
   planning.
 - Do not edit implementation, intent, verification policy, or Factory state.
 
-Return protocol version 2 with role `task-decomposer` and one outcome: `ready`,
-`intent-required`, `needs-clarification`, or `blocked`.
+Return one JSON object with `outcome` and only its outcome-specific fields. Use
+one outcome: `ready`, `intent-required`, `needs-clarification`, or `blocked`.
+Do not return invocation identity, role, capability, work-item ID, attempt ID,
+run ID, protocol or schema version, skill, execution profile, result path, or
+other runtime bookkeeping.

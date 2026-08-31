@@ -44,7 +44,7 @@ internal static class FactoryRuntimeTestHarness
         task = contract ?? $"# {id}"
     };
 
-    public static AgentResultEnvelope Envelope(AgentInvocation invocation, string outcome, object? payload = null, string? reason = null)
+    public static SemanticAgentResult Envelope(AgentInvocation invocation, string outcome, object? payload = null, string? reason = null)
     {
         var body = payload is null ? (JsonElement?)null : JsonSerializer.SerializeToElement(payload, FactoryJson.Options);
         var tasks = outcome == "ready" && body is { ValueKind: JsonValueKind.Object } value && value.TryGetProperty("tasks", out var taskArray)
@@ -52,10 +52,6 @@ internal static class FactoryRuntimeTestHarness
             : (JsonElement?)null;
         return new()
         {
-            ProtocolVersion = AgentInvocation.CurrentProtocolVersion,
-            RunId = invocation.RunId,
-            AttemptId = invocation.AttemptId,
-            Role = invocation.Role,
             Outcome = outcome,
             Tasks = tasks,
             Reason = reason,
@@ -66,18 +62,18 @@ internal static class FactoryRuntimeTestHarness
 
 internal sealed class FakeAgentBackend : IAgentBackend
 {
-    private readonly Queue<Func<AgentInvocation, AgentResultEnvelope>> results = new();
+    private readonly Queue<Func<AgentInvocation, SemanticAgentResult>> results = new();
     public List<AgentInvocation> Invocations { get; } = [];
 
-    public void Enqueue(Func<AgentInvocation, AgentResultEnvelope> result) => results.Enqueue(result);
+    public void Enqueue(Func<AgentInvocation, SemanticAgentResult> result) => results.Enqueue(result);
 
     public Task<AgentRunHandle> StartAsync(AgentInvocation invocation, CancellationToken cancellationToken)
     {
         if (results.Count == 0) throw new InvalidOperationException($"No fake result queued for {invocation.Role}/{invocation.WorkItemId}.");
         Invocations.Add(invocation);
-        Directory.CreateDirectory(Path.GetDirectoryName(invocation.ResultPath)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(invocation.RawResultPath)!);
         var result = results.Dequeue()(invocation);
-        File.WriteAllText(invocation.ResultPath, JsonSerializer.Serialize(result, FactoryJson.Options));
+        File.WriteAllText(invocation.RawResultPath, JsonSerializer.Serialize(result, FactoryJson.Options));
         return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId));
     }
 

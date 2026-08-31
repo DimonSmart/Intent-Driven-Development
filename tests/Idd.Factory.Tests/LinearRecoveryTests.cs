@@ -39,12 +39,19 @@ public sealed class LinearRecoveryTests
         Directory.CreateDirectory(attemptDirectory);
         var invocation = new AgentInvocation
         {
-            RunId = state.RunId, AttemptId = "A000001", Role = "researcher", WorkItemId = state.Current.Id,
-            Workspace = temp.Path, ResultPath = Path.Combine(attemptDirectory, "result.json"), SkillName = "idd-factory-research",
-            ExecutionProfile = AgentExecutionProfile.ReadOnly, Input = "persisted input", StartedAt = DateTimeOffset.UnixEpoch
+            RunId = state.RunId, AttemptId = "A000001", Capability = "research", Role = "researcher", WorkItemId = state.Current.Id,
+            Workspace = temp.Path, RawResultPath = Path.Combine(attemptDirectory, "raw-result.json"), SkillName = "idd-factory-research",
+            ExecutionProfile = AgentExecutionProfile.ReadOnly, SemanticResultSchema = "research-v1", Input = "persisted input", StartedAt = DateTimeOffset.UnixEpoch
         };
         await File.WriteAllTextAsync(Path.Combine(attemptDirectory, "invocation.json"), JsonSerializer.Serialize(invocation, FactoryJson.Options));
-        await File.WriteAllTextAsync(invocation.ResultPath, JsonSerializer.Serialize(Envelope(invocation, "completed", new { finding = "persisted" }), FactoryJson.Options));
+        var persisted = new PersistedAttemptResult
+        {
+            Invocation = AttemptIdentity.From(invocation),
+            SemanticResult = Envelope(invocation, "completed", new { finding = "persisted" }),
+            ReceivedAt = DateTimeOffset.UnixEpoch,
+            TerminationKind = AgentTerminationKind.CleanExit
+        };
+        await File.WriteAllTextAsync(Path.Combine(attemptDirectory, "result.json"), JsonSerializer.Serialize(persisted, FactoryJson.Options));
         await Store(temp).CreateAsync(state, default);
         var backend = new FakeAgentBackend();
         backend.Enqueue(x => Envelope(x, "approved"));

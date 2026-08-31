@@ -28,10 +28,19 @@ Use idd-factory-run to implement the task described in ./ui-audit.md.
 - `idd-factory-review-task` performs mandatory integrated final semantic review as a terminal orchestration phase.
 - `idd-factory-replan` is a legacy name for returning a complete replacement future list.
 
-Workers return structured result envelopes through attempt-specific
-`result.json`. Human-readable stdout and stderr are diagnostics only. Workers do
-not own state mutations, authoritative verification, scheduling, retry, plan
-replacement, or filesystem finalization.
+Workers return identity-free semantic JSON through an invocation-specific
+backend channel. For the Codex backend, the captured body is retained as
+diagnostic `raw-result.json`. It contains only `outcome` and fields defined for
+that outcome; workers never return run, attempt, role, work-item, protocol,
+schema, result-path, or execution-profile bookkeeping.
+
+Runtime validates the raw body against the assigned capability and role, then
+atomically creates authoritative `result.json`. That persisted artifact has its
+own schema version, runtime-owned invocation provenance, the validated semantic
+result, receipt time, and backend-observed termination kind. Human-readable
+stdout and stderr remain diagnostics only. Workers do not own state mutations,
+authoritative verification, scheduling, retry, plan replacement, persistence,
+or filesystem finalization.
 
 The former `idd-factory-coordinate-step`, `factory-step-coordinator`, predefined
 global Factory workflow, and LLM-driven finalization are not part of the current

@@ -60,8 +60,12 @@ recommendedNextWorkflow?
 
 ## Result outcomes
 
-Return protocol version 2 with role `task-decomposer` and one outcome:
-`ready`, `needs-clarification`, `intent-required`, `focused-handoff`, or
-`blocked`.
+Return one JSON object containing only `outcome` and the outcome-specific fields
+defined above. Use one outcome: `ready`, `needs-clarification`,
+`intent-required`, `focused-handoff`, or `blocked`.
+
+Do not return invocation identity, role, capability, work-item ID, attempt ID,
+run ID, protocol or schema version, skill, execution profile, result path, or
+other runtime bookkeeping.
 
 The worker never creates Factory files and never chooses what runtime does next.

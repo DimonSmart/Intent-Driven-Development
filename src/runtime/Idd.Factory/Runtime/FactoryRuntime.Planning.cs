@@ -57,30 +57,28 @@ public sealed partial class FactoryRuntime
         return new PlannedWorkItem { Id = id, Capability = capability, ContractPath = path };
     }
 
-    private async Task<FactoryCliOutcome?> PrependAdditionalWorkAsync(FactoryState state, PlannedWorkItem source, AgentResultEnvelope result, CancellationToken cancellationToken)
+    private async Task<FactoryCliOutcome?> PrependAdditionalWorkAsync(FactoryState state, PlannedWorkItem source, BoundSemanticAgentResult result, CancellationToken cancellationToken)
     {
         if (result.Payload is not { } payload) throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "additional-work-required requires a payload.");
-        var requirement = payload.TryGetProperty("requirement", out var nested) ? nested : payload;
-        return await PrependBeforeRetryAsync(state, source, result, requirement, "worker-additional-work", cancellationToken);
+        return await PrependBeforeRetryAsync(state, source, result, payload, "worker-additional-work", cancellationToken);
     }
 
-    private async Task<FactoryCliOutcome?> PrependReviewCorrectionAsync(FactoryState state, PlannedWorkItem source, AgentResultEnvelope result, CancellationToken cancellationToken)
+    private async Task<FactoryCliOutcome?> PrependReviewCorrectionAsync(FactoryState state, PlannedWorkItem source, BoundSemanticAgentResult result, CancellationToken cancellationToken)
     {
         if (state.CorrectiveCycleCount >= configuration.Limits.MaxCorrectiveCycles) throw new AgentProtocolException("CORRECTIVE_BUDGET_EXHAUSTED", "Corrective work budget exhausted.");
-        if (result.Payload is not { } payload || !(payload.TryGetProperty("correction", out var correction) || payload.TryGetProperty("correctiveSubtask", out correction)))
-            throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Review correction requires payload.correction.");
+        if (result.Payload is not { } correction)
+            throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Review correction requires a payload.");
         state.CorrectiveCycleCount++;
         return await PrependBeforeRetryAsync(state, source, result, correction, "review-correction", cancellationToken);
     }
 
-    private async Task<FactoryCliOutcome?> PrependBeforeRetryAsync(FactoryState state, PlannedWorkItem source, AgentResultEnvelope result, JsonElement requirement, string reason, CancellationToken cancellationToken)
+    private async Task<FactoryCliOutcome?> PrependBeforeRetryAsync(FactoryState state, PlannedWorkItem source, BoundSemanticAgentResult result, JsonElement requirement, string reason, CancellationToken cancellationToken)
     {
         if (state.Remaining.Count + state.Completed.Count + 2 > configuration.Limits.MaxWorkItems) throw new AgentProtocolException("WORK_EXPANSION_BUDGET_EXHAUSTED", "Dynamic work would exceed the configured work-item limit.");
         var capability = RequiredString(requirement, "capability", "Additional work capability is required.");
         FactoryCapabilityCatalog.ResolveWorkItem(capability);
         if (!configuration.AllowedCapabilities.Contains(capability)) throw new AgentProtocolException("CAPABILITY_NOT_ALLOWED", $"Capability '{capability}' is not allowed.");
-        var task = OptionalString(requirement, "task") ?? OptionalString(requirement, "contractMarkdown") ?? OptionalString(requirement, "goal")
-            ?? throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Additional work task is required.");
+        var task = RequiredString(requirement, "task", "Additional work task is required.");
         var previous = CloneState(state);
         var id = $"W{state.NextWorkItemNumber++:000000}";
         var path = $"work-items/{id}/contract.md";
@@ -114,12 +112,11 @@ public sealed partial class FactoryRuntime
             await SaveAsync(state, cancellationToken);
             return null;
         }
-        if (result.Outcome is "needs-fix" or "correction-required" or "additional-work-required")
+        if (result.Outcome is "correction-required" or "additional-work-required")
         {
             if (result.Payload is not { } payload) throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Final review correction requires a payload.");
-            var correction = payload.TryGetProperty("correction", out var value) || payload.TryGetProperty("correctiveSubtask", out value) || payload.TryGetProperty("requirement", out value) ? value : payload;
-            var capability = RequiredString(correction, "capability", "Final review correction capability is required.");
-            var task = OptionalString(correction, "task") ?? OptionalString(correction, "contractMarkdown") ?? OptionalString(correction, "goal") ?? throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Final review correction task is required.");
+            var capability = RequiredString(payload, "capability", "Final review correction capability is required.");
+            var task = RequiredString(payload, "task", "Final review correction task is required.");
             var previous = CloneState(state);
             var contracts = new List<(string Path, string Content)>();
             using var document = JsonDocument.Parse(JsonSerializer.Serialize(new { capability, task }));

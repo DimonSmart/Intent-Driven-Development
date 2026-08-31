@@ -14,13 +14,14 @@ Keep investigation proportional to the contract. Return findings and evidence ra
 
 ## Dynamic discovery
 
-If research exposes a concrete missing prerequisite that should be performed separately, return `additional-work-required` with a typed `payload.additionalWork`/`payload.requirement` containing `capability`, `goal`, and `reason` plus optional context, constraints, expected output, stable verification IDs, and expectations.
+If research exposes a concrete missing prerequisite that should be performed separately, return `additional-work-required` with a flat `payload` containing non-empty `capability`, `task`, and `reason` fields.
 
 Use `global-replan-required` only when the discovery invalidates the global remaining strategy. A local prerequisite is not a global replan.
 
 ## Outcomes
 
-Return protocol version 2 with role `researcher` and one outcome:
+Return one JSON object with `outcome` and only its outcome-specific fields. Use
+one outcome:
 
 - `completed` — include concise findings, evidence/references, unresolved concerns if any;
 - `additional-work-required` — runtime should materialize a focused dependency;
@@ -29,3 +30,7 @@ Return protocol version 2 with role `researcher` and one outcome:
 - `blocked` — an external condition prevents useful research.
 
 Runtime persists the result reference and owns all scheduling and ordered-plan mutation.
+
+Do not return invocation identity, role, capability outside an outcome payload,
+work-item ID, attempt ID, run ID, protocol or schema version, skill, execution
+profile, result path, or other runtime bookkeeping.

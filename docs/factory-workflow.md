@@ -76,9 +76,26 @@ are atomic state transitions. Immutable contracts and optional
 `plan-revisions/Pnnnnnn.json` diagnostics may be written before state; orphan
 artifacts are harmless and are never replayed as authority.
 
-Recovery resumes the exact persisted semantic or verification operation. A
-persisted complete worker result is consumed without redispatch, and completed
-work cannot be committed twice.
+Each semantic attempt separates four artifacts:
+
+```text
+invocation.json        runtime-owned identity and assigned schema
+raw-result.json        untrusted semantic worker output
+result.json            validated runtime-owned persisted attempt result
+process-telemetry.json backend-observed process evidence
+```
+
+The worker returns only semantic meaning. Runtime binds the raw body to the
+invocation-specific backend channel, rejects runtime-owned identity or
+bookkeeping fields, validates the outcome and payload against the assigned
+capability and role, and atomically writes `result.json`. A malformed raw body
+never changes authoritative state.
+
+Recovery resumes the exact persisted semantic or verification operation. It
+verifies that `invocation.json`, the attempt directory, authoritative current
+operation, and persisted result provenance agree. A valid persisted result is
+consumed without redispatch, and completed work cannot be committed twice. Raw
+output alone is not authoritative.
 
 ## Verification, review, and finalization
 

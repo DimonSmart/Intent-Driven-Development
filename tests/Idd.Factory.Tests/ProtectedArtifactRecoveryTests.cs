@@ -18,12 +18,14 @@ public sealed class ProtectedArtifactRecoveryTests
         {
             RunId = "run",
             AttemptId = "A000001",
+            Capability = "implementation",
             Role = agent.Role,
             WorkItemId = "W1",
             Workspace = temp.Path,
-            ResultPath = Path.Combine(Path.GetDirectoryName(placeholder)!, "result.json"),
+            RawResultPath = Path.Combine(Path.GetDirectoryName(placeholder)!, "raw-result.json"),
             SkillName = agent.SkillName,
             ExecutionProfile = agent.ExecutionProfile,
+            SemanticResultSchema = "implementation-v1",
             Input = "focused input",
             StartedAt = DateTimeOffset.UnixEpoch
         };

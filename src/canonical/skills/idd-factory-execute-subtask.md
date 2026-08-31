@@ -18,22 +18,17 @@ Make the smallest coherent product change needed by the contract. Runtime verifi
 
 If the assigned work cannot safely continue because a concrete additional prerequisite has been discovered, return `additional-work-required` rather than broadening scope or choosing an agent.
 
-`payload.additionalWork` (or `payload.requirement`) contains:
+`payload` contains:
 
 ```text
 capability
- goal
+task
 reason
-context?
-constraints[]?
-expectedOutput?
-verificationCheckIds[]?
-verificationExpectations?  # check ID -> must-pass | may-fail
 ```
 
 The requirement states *what work is needed*, not who should perform it. Runtime validates the capability, materializes a new graph node, persists the dependency, and later resumes this work item with the dependency result.
 
-Use `global-replan-required` only when the discovery invalidates the global remaining strategy and cannot be represented as local additional work. `needs-replan` may be accepted by older adapters but should not be emitted by new workers.
+Use `global-replan-required` only when the discovery invalidates the global remaining strategy and cannot be represented as local additional work.
 
 ## Verification expectations
 
@@ -44,7 +39,8 @@ Do not reinterpret a failed authoritative check. Runtime classifies intermediate
 
 ## Outcomes
 
-Return protocol version 2 with role `implementer` and one outcome:
+Return one JSON object with `outcome` and only its outcome-specific fields. Use
+one outcome:
 
 - `completed` — assigned semantic work is finished; include concise `summary`, `declaredChanges[]`, `concerns[]`, optional diagnostic `verificationClaims[]`;
 - `additional-work-required` — a local typed prerequisite was discovered;
@@ -53,3 +49,7 @@ Return protocol version 2 with role `implementer` and one outcome:
 - `blocked` — an external/non-semantic condition prevents progress.
 
 For `intent-required`, return the standard non-empty `payload.missingIntentDecisions` structure. `recommendedNextWorkflow`, when present, refers only to a user-facing durable-intent workflow, never Factory scheduling.
+
+Do not return invocation identity, role, capability outside an outcome payload,
+work-item ID, attempt ID, run ID, protocol or schema version, skill, execution
+profile, result path, or other runtime bookkeeping.

@@ -54,9 +54,9 @@ public sealed partial class FactoryRuntime
                 return null;
             case "additional-work-required":
                 return await PrependAdditionalWorkAsync(state, item, result, cancellationToken);
-            case "needs-fix" or "correction-required" when item.Capability == "semantic-review":
+            case "correction-required" when item.Capability == "semantic-review":
                 return await PrependReviewCorrectionAsync(state, item, result, cancellationToken);
-            case "global-replan-required" or "needs-replan":
+            case "global-replan-required":
                 state.PendingReplanTrigger = new(item.Capability, item.Id, item.LastResultRef, result.Reason, result.Payload?.Clone(), item.VerificationEvidenceRefs.ToList());
                 state.PendingContinuation = null;
                 state.Blocker = null;
@@ -93,7 +93,7 @@ public sealed partial class FactoryRuntime
         await SaveAsync(state, cancellationToken);
     }
 
-    private async Task<AgentResultEnvelope> InvokeSemanticAsync(FactoryState state, string capability, PlannedWorkItem? item, string input, SemanticOperationKind operation, CancellationToken cancellationToken)
+    private async Task<BoundSemanticAgentResult> InvokeSemanticAsync(FactoryState state, string capability, PlannedWorkItem? item, string input, SemanticOperationKind operation, CancellationToken cancellationToken)
     {
         var agent = FactoryCapabilityCatalog.Resolve(capability).Agent;
         if (state.CurrentAttemptId is { } persistedAttempt)
@@ -104,11 +104,11 @@ public sealed partial class FactoryRuntime
             if (!File.Exists(invocationPath) || !File.Exists(persistedResultPath)) throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Persisted attempt {persistedAttempt} cannot be resumed from its artifacts.");
             var invocation = JsonSerializer.Deserialize<AgentInvocation>(await File.ReadAllTextAsync(invocationPath, cancellationToken), FactoryJson.Options)
                 ?? throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Attempt {persistedAttempt} has no valid invocation.");
-            if (invocation.RunId != state.RunId || invocation.AttemptId != persistedAttempt || invocation.Role != agent.Role || invocation.WorkItemId != item?.Id)
+            if (invocation.RunId != state.RunId || invocation.AttemptId != persistedAttempt || invocation.Capability != capability || invocation.Role != agent.Role || invocation.WorkItemId != item?.Id)
                 throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Attempt {persistedAttempt} does not belong to the current operation.");
             await RecoverWorkspaceChangesAsync(state, item, invocation, cancellationToken);
-            var persisted = JsonSerializer.Deserialize<AgentResultEnvelope>(await File.ReadAllTextAsync(persistedResultPath, cancellationToken), FactoryJson.Options);
-            var validated = new FactoryAgentResultValidator().Validate(invocation, persisted);
+            var persisted = JsonSerializer.Deserialize<PersistedAttemptResult>(await File.ReadAllTextAsync(persistedResultPath, cancellationToken), FactoryJson.Options);
+            var validated = ValidatePersistedResult(invocation, persisted);
             state.CurrentAttemptId = null;
             if (item is not null) item.CurrentAttemptId = null;
             state.PendingContinuation = null;
@@ -124,12 +124,12 @@ public sealed partial class FactoryRuntime
 
         var attemptDirectory = Path.Combine(currentDirectory, "attempts", attemptId);
         Directory.CreateDirectory(attemptDirectory);
-        var resultPath = Path.Combine(attemptDirectory, "result.json");
+        var rawResultPath = Path.Combine(attemptDirectory, "raw-result.json");
         var invocationNew = new AgentInvocation
         {
-            RunId = state.RunId, AttemptId = attemptId, Role = agent.Role, WorkItemId = item?.Id,
-            Workspace = workspace, ResultPath = resultPath, SkillName = agent.SkillName,
-            ExecutionProfile = agent.ExecutionProfile, Input = input, StartedAt = clock.UtcNow
+            RunId = state.RunId, AttemptId = attemptId, Capability = capability, Role = agent.Role, WorkItemId = item?.Id,
+            Workspace = workspace, RawResultPath = rawResultPath, SkillName = agent.SkillName,
+            ExecutionProfile = agent.ExecutionProfile, SemanticResultSchema = $"{capability}-v1", Input = input, StartedAt = clock.UtcNow
         };
         await WriteJsonAtomicallyAsync(Path.Combine(attemptDirectory, "invocation.json"), invocationNew, cancellationToken);
         if (agent.ExecutionProfile == AgentExecutionProfile.WorkspaceWrite) await PersistWorkspaceSnapshotAsync(state.RunId, attemptDirectory, cancellationToken);
@@ -179,8 +179,8 @@ public sealed partial class FactoryRuntime
         if (!File.Exists(path)) return "missing result artifact";
         try
         {
-            var result = JsonSerializer.Deserialize<AgentResultEnvelope>(await File.ReadAllTextAsync(path, cancellationToken), FactoryJson.Options);
-            var summary = JsonSerializer.Serialize(new { result?.Outcome, result?.Reason, result?.Payload }, FactoryJson.Options).Replace("\r\n", "\n").Trim();
+            var result = JsonSerializer.Deserialize<PersistedAttemptResult>(await File.ReadAllTextAsync(path, cancellationToken), FactoryJson.Options);
+            var summary = JsonSerializer.Serialize(new { result?.SemanticResult.Outcome, result?.SemanticResult.Reason, result?.SemanticResult.Payload }, FactoryJson.Options).Replace("\r\n", "\n").Trim();
             return summary.Length <= 4000 ? summary : summary[..4000] + " [truncated]";
         }
         catch (JsonException) { return "invalid result artifact"; }
@@ -203,7 +203,9 @@ public sealed partial class FactoryRuntime
         }
         var invocation = JsonSerializer.Deserialize<AgentInvocation>(await File.ReadAllTextAsync(invocationPath, cancellationToken), FactoryJson.Options)
             ?? throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Persisted attempt {attemptId} is malformed.");
-        if (invocation.RunId != state.RunId || invocation.AttemptId != attemptId || invocation.WorkItemId != state.Current?.Id)
+        var expectedCapability = state.Current?.Capability ?? invocation.Capability;
+        var expectedAgent = FactoryCapabilityCatalog.Resolve(expectedCapability).Agent;
+        if (invocation.RunId != state.RunId || invocation.AttemptId != attemptId || invocation.Capability != expectedCapability || invocation.Role != expectedAgent.Role || invocation.WorkItemId != state.Current?.Id)
             throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Persisted attempt {attemptId} identity is invalid.");
         await RecoverWorkspaceChangesAsync(state, state.Current, invocation, cancellationToken);
         if (File.Exists(Path.Combine(directory, "result.json")))
@@ -230,7 +232,7 @@ public sealed partial class FactoryRuntime
     private async Task RecoverWorkspaceChangesAsync(FactoryState state, PlannedWorkItem? item, AgentInvocation invocation, CancellationToken cancellationToken)
     {
         if (invocation.ExecutionProfile != AgentExecutionProfile.WorkspaceWrite) return;
-        var directory = Path.GetDirectoryName(invocation.ResultPath)!;
+        var directory = Path.GetDirectoryName(invocation.RawResultPath)!;
         var changesPath = Path.Combine(directory, "workspace-changes.json");
         WorkspaceChangesArtifact changes;
         if (File.Exists(changesPath)) changes = JsonSerializer.Deserialize<WorkspaceChangesArtifact>(await File.ReadAllTextAsync(changesPath, cancellationToken), FactoryJson.Options)!;
@@ -279,6 +281,17 @@ public sealed partial class FactoryRuntime
         var temporary = path + ".tmp";
         await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(value, FactoryJson.Options), cancellationToken);
         File.Move(temporary, path, true);
+    }
+
+    private static BoundSemanticAgentResult ValidatePersistedResult(AgentInvocation invocation, PersistedAttemptResult? persisted)
+    {
+        if (persisted is null || persisted.SchemaVersion != PersistedAttemptResult.CurrentSchemaVersion)
+            throw new AgentProtocolException("UNSUPPORTED_ATTEMPT_RESULT_SCHEMA", "Persisted attempt result has an unsupported schema version.");
+        var expected = AttemptIdentity.From(invocation);
+        if (persisted.Invocation != expected)
+            throw new AgentProtocolException("ATTEMPT_RESULT_IDENTITY_MISMATCH", "Persisted attempt result does not belong to its invocation.");
+        var semantic = new FactoryAgentResultValidator().Validate(invocation, persisted.SemanticResult);
+        return new BoundSemanticAgentResult(invocation.AttemptId, semantic);
     }
 
     private sealed record WorkspaceSnapshotArtifact(int SchemaVersion, SortedDictionary<string, string> Files);

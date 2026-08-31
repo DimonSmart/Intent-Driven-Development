@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Idd.Factory.Domain;
+using Idd.Factory.Runtime;
 
 namespace Idd.Factory.Agents;
 
@@ -11,24 +12,81 @@ public sealed class FactoryAgentResultValidator
 {
     private static readonly IReadOnlyDictionary<string, HashSet<string>> Outcomes = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
     {
-        ["task-decomposer"] = ["ready", "intent-required", "needs-clarification", "focused-handoff", "blocked"],
-        ["implementer"] = ["completed", "additional-work-required", "global-replan-required", "needs-replan", "blocked", "intent-required"],
-        ["researcher"] = ["completed", "additional-work-required", "global-replan-required", "needs-replan", "blocked", "intent-required"],
-        ["checkpoint-reviewer"] = ["approved", "needs-fix", "correction-required", "additional-work-required", "global-replan-required", "needs-replan", "blocked", "intent-required"],
-        ["final-reviewer"] = ["approved", "needs-fix", "correction-required", "additional-work-required", "global-replan-required", "needs-replan", "blocked", "intent-required"]
+        ["planning"] = ["ready", "intent-required", "needs-clarification", "focused-handoff", "blocked"],
+        ["implementation"] = ["completed", "additional-work-required", "global-replan-required", "blocked", "intent-required"],
+        ["research"] = ["completed", "additional-work-required", "global-replan-required", "blocked", "intent-required"],
+        ["semantic-review"] = ["approved", "correction-required", "additional-work-required", "global-replan-required", "blocked", "intent-required"],
+        ["final-review"] = ["approved", "correction-required", "additional-work-required", "global-replan-required", "blocked", "intent-required"]
     };
 
-    public AgentResultEnvelope Validate(AgentInvocation invocation, AgentResultEnvelope? result)
+    private static readonly HashSet<string> CommonFields = ["outcome", "reason", "payload", "metrics"];
+
+    public SemanticAgentResult ParseAndValidate(AgentInvocation invocation, string json)
     {
-        if (result is null) throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Result is null.");
-        if (result.ProtocolVersion != AgentInvocation.CurrentProtocolVersion)
-            throw new AgentProtocolException("UNSUPPORTED_AGENT_PROTOCOL", $"Unsupported protocol {result.ProtocolVersion}.");
-        if (result.RunId != invocation.RunId || result.AttemptId != invocation.AttemptId || result.Role != invocation.Role)
-            throw new AgentProtocolException("AGENT_RESULT_IDENTITY_MISMATCH", "Result identity does not match invocation.");
-        if (!Outcomes.TryGetValue(result.Role, out var outcomes) || !outcomes.Contains(result.Outcome))
-            throw new AgentProtocolException("UNSUPPORTED_AGENT_OUTCOME", $"Outcome {result.Outcome} is invalid for {result.Role}.");
+        JsonDocument document;
+        try { document = JsonDocument.Parse(json); }
+        catch (JsonException exception) { throw new AgentProtocolException("MALFORMED_AGENT_RESULT", exception.Message); }
+        using (document)
+        {
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                throw Malformed("Semantic result must be one JSON object.");
+            var allowed = new HashSet<string>(CommonFields, StringComparer.Ordinal);
+            if (invocation.Capability == "planning") allowed.Add("tasks");
+            var unexpected = document.RootElement.EnumerateObject().FirstOrDefault(property => !allowed.Contains(property.Name));
+            if (unexpected.Name is not null)
+                throw Malformed($"Semantic result field '{unexpected.Name}' is not allowed; runtime identity and bookkeeping must not be returned by workers.");
+            SemanticAgentResult? result;
+            try { result = document.RootElement.Deserialize<SemanticAgentResult>(FactoryJson.Options); }
+            catch (JsonException exception) { throw Malformed(exception.Message); }
+            return Validate(invocation, result);
+        }
+    }
+
+    public SemanticAgentResult Validate(AgentInvocation invocation, SemanticAgentResult? result)
+    {
+        if (result is null || string.IsNullOrWhiteSpace(result.Outcome)) throw Malformed("Result outcome is required.");
+        var contract = FactoryCapabilityCatalog.Resolve(invocation.Capability);
+        if (contract.Agent.Role != invocation.Role || contract.Agent.SkillName != invocation.SkillName || contract.Agent.ExecutionProfile != invocation.ExecutionProfile)
+            throw new AgentProtocolException("INVALID_AGENT_INVOCATION", "Invocation capability does not match its runtime-assigned agent contract.");
+        if (!Outcomes.TryGetValue(invocation.Capability, out var outcomes) || !outcomes.Contains(result.Outcome))
+            throw new AgentProtocolException("UNSUPPORTED_AGENT_OUTCOME", $"Outcome {result.Outcome} is invalid for capability {invocation.Capability} and role {invocation.Role}.");
+        if (invocation.Capability != "planning" && result.Tasks is not null)
+            throw Malformed("Top-level tasks are allowed only for planning.");
+        if (result.Outcome == "ready") ValidatePlanningTasks(result.Tasks);
+        if (result.Outcome is "additional-work-required" or "correction-required") ValidateFutureTask(result.Payload, result.Outcome);
+        if (result.Outcome == "intent-required") IntentRequiredPayload.Validate(result.Payload);
         return result;
     }
+
+    private static void ValidatePlanningTasks(JsonElement? tasks)
+    {
+        if (tasks is not { ValueKind: JsonValueKind.Array } array) throw Malformed("Planning ready result requires top-level tasks.");
+        foreach (var task in array.EnumerateArray())
+        {
+            if (task.ValueKind != JsonValueKind.Object) throw Malformed("Each planned task must be an object.");
+            if (task.EnumerateObject().Any(property => property.Name is not ("capability" or "task")))
+                throw Malformed("Planning tasks may contain only capability and task.");
+            var capability = RequiredString(task, "capability", "Planned task capability is required.");
+            FactoryCapabilityCatalog.ResolveWorkItem(capability);
+            RequiredString(task, "task", "Planned task text is required.");
+        }
+    }
+
+    private static void ValidateFutureTask(JsonElement? payload, string outcome)
+    {
+        if (payload is not { ValueKind: JsonValueKind.Object } task) throw Malformed($"{outcome} requires an object payload.");
+        var capability = RequiredString(task, "capability", $"{outcome} payload.capability is required.");
+        FactoryCapabilityCatalog.ResolveWorkItem(capability);
+        RequiredString(task, "task", $"{outcome} payload.task is required.");
+        RequiredString(task, "reason", $"{outcome} payload.reason is required.");
+    }
+
+    private static string RequiredString(JsonElement value, string property, string message) =>
+        value.TryGetProperty(property, out var element) && element.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(element.GetString())
+            ? element.GetString()!
+            : throw Malformed(message);
+
+    private static AgentProtocolException Malformed(string message) => new("MALFORMED_AGENT_RESULT", message);
 }
 
 /// <summary>
@@ -39,17 +97,19 @@ public sealed class FactoryAgentExecutor(IAgentBackend backend, FactoryAgentResu
 {
     public async Task<AgentExecutionResult> ExecuteAsync(AgentInvocation invocation, CancellationToken cancellationToken)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(invocation.ResultPath)!);
-        var invocationPath = Path.Combine(Path.GetDirectoryName(invocation.ResultPath)!, "invocation.json");
+        var attemptDirectory = Path.GetDirectoryName(invocation.RawResultPath)!;
+        Directory.CreateDirectory(attemptDirectory);
+        var invocationPath = Path.Combine(attemptDirectory, "invocation.json");
         if (!File.Exists(invocationPath))
             await File.WriteAllTextAsync(invocationPath, JsonSerializer.Serialize(invocation, FactoryJson.Options), cancellationToken);
 
         var legacyProtected = ProtectedArtifactGuard.Capture(invocation);
         var planProtected = PlanProtectedArtifactGuard.Capture(invocation);
+        var invocationHash = Hash(invocationPath);
         var handle = await backend.StartAsync(invocation, cancellationToken);
         var process = await backend.WaitAsync(handle, cancellationToken);
         await File.WriteAllTextAsync(
-            Path.Combine(Path.GetDirectoryName(invocation.ResultPath)!, "process-telemetry.json"),
+            Path.Combine(attemptDirectory, "process-telemetry.json"),
             JsonSerializer.Serialize(process, FactoryJson.Options),
             CancellationToken.None);
 
@@ -57,17 +117,34 @@ public sealed class FactoryAgentExecutor(IAgentBackend backend, FactoryAgentResu
         // A failed worker must not bypass the guard and leave runner-owned state damaged before retry/recovery.
         legacyProtected.ValidateUnchanged();
         planProtected.ValidateUnchanged();
+        if (!File.Exists(invocationPath) || Hash(invocationPath) != invocationHash)
+            throw new AgentProtocolException("WORKER_CHANGED_RUNNER_STATE", $"Worker changed protected artifact {invocationPath}.");
 
         if (process.TerminationKind == AgentTerminationKind.Cancelled) throw new OperationCanceledException(cancellationToken);
         if (process.TerminationKind == AgentTerminationKind.TransportFailure && !process.CompleteResultObserved)
             throw new AgentProtocolException("AGENT_TRANSPORT_FAILURE", $"Agent exited with {process.ExitCode?.ToString() ?? "unknown"}: {process.Stderr}");
 
-        if (!File.Exists(invocation.ResultPath)) throw new AgentProtocolException("MISSING_AGENT_RESULT", "Agent did not produce result.json.");
+        if (!File.Exists(invocation.RawResultPath)) throw new AgentProtocolException("MISSING_AGENT_RESULT", "Agent did not produce raw-result.json.");
 
-        AgentResultEnvelope? result;
-        try { result = JsonSerializer.Deserialize<AgentResultEnvelope>(await File.ReadAllTextAsync(invocation.ResultPath, cancellationToken), FactoryJson.Options); }
-        catch (JsonException exception) { throw new AgentProtocolException("MALFORMED_AGENT_RESULT", exception.Message); }
-        return new(validator.Validate(invocation, result), process);
+        var semanticResult = validator.ParseAndValidate(invocation, await File.ReadAllTextAsync(invocation.RawResultPath, cancellationToken));
+        var persisted = new PersistedAttemptResult
+        {
+            Invocation = AttemptIdentity.From(invocation),
+            SemanticResult = semanticResult,
+            ReceivedAt = DateTimeOffset.UtcNow,
+            TerminationKind = process.TerminationKind
+        };
+        await WriteJsonAtomicallyAsync(Path.Combine(attemptDirectory, "result.json"), persisted, cancellationToken);
+        return new(new BoundSemanticAgentResult(invocation.AttemptId, semanticResult), process);
+    }
+
+    private static string Hash(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
+
+    private static async Task WriteJsonAtomicallyAsync<T>(string path, T value, CancellationToken cancellationToken)
+    {
+        var temporary = path + ".tmp";
+        await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(value, FactoryJson.Options), cancellationToken);
+        File.Move(temporary, path, true);
     }
 }
 
@@ -87,7 +164,7 @@ internal sealed class PlanProtectedArtifactGuard
 
     public static PlanProtectedArtifactGuard Capture(AgentInvocation invocation)
     {
-        var attemptDirectory = Path.GetDirectoryName(invocation.ResultPath)!;
+        var attemptDirectory = Path.GetDirectoryName(invocation.RawResultPath)!;
         var current = Directory.GetParent(Directory.GetParent(attemptDirectory)!.FullName)!.FullName;
         var roots = new[]
         {

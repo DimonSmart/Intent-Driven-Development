@@ -173,31 +173,72 @@ public static class FactoryAgentCatalog
 
 public sealed record AgentInvocation
 {
-    public const int CurrentProtocolVersion = 2;
-    public int ProtocolVersion { get; init; } = CurrentProtocolVersion;
+    public const int CurrentSchemaVersion = 1;
+    public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     public required string RunId { get; init; }
     public required string AttemptId { get; init; }
+    public required string Capability { get; init; }
     public required string Role { get; init; }
     public string? WorkItemId { get; init; }
     public required string Workspace { get; init; }
-    public required string ResultPath { get; init; }
+    public required string RawResultPath { get; init; }
     public required string SkillName { get; init; }
     public required AgentExecutionProfile ExecutionProfile { get; init; }
+    public required string SemanticResultSchema { get; init; }
     public required string Input { get; init; }
     public required DateTimeOffset StartedAt { get; init; }
 }
 
-public sealed record AgentResultEnvelope
+public sealed record SemanticAgentResult
 {
-    public int ProtocolVersion { get; init; }
-    public required string RunId { get; init; }
-    public required string AttemptId { get; init; }
-    public required string Role { get; init; }
     public required string Outcome { get; init; }
     public JsonElement? Tasks { get; init; }
     public string? Reason { get; init; }
     public JsonElement? Payload { get; init; }
     public JsonElement? Metrics { get; init; }
+}
+
+public sealed record SemanticPlannedTask
+{
+    public required string Capability { get; init; }
+    public required string Task { get; init; }
+}
+
+public sealed record AttemptIdentity
+{
+    public required string RunId { get; init; }
+    public required string AttemptId { get; init; }
+    public required string Capability { get; init; }
+    public required string Role { get; init; }
+    public string? WorkItemId { get; init; }
+
+    public static AttemptIdentity From(AgentInvocation invocation) => new()
+    {
+        RunId = invocation.RunId,
+        AttemptId = invocation.AttemptId,
+        Capability = invocation.Capability,
+        Role = invocation.Role,
+        WorkItemId = invocation.WorkItemId
+    };
+}
+
+public sealed record PersistedAttemptResult
+{
+    public const int CurrentSchemaVersion = 2;
+    public int SchemaVersion { get; init; } = CurrentSchemaVersion;
+    public required AttemptIdentity Invocation { get; init; }
+    public required SemanticAgentResult SemanticResult { get; init; }
+    public required DateTimeOffset ReceivedAt { get; init; }
+    public required AgentTerminationKind TerminationKind { get; init; }
+}
+
+public sealed record BoundSemanticAgentResult(string AttemptId, SemanticAgentResult SemanticResult)
+{
+    public string Outcome => SemanticResult.Outcome;
+    public JsonElement? Tasks => SemanticResult.Tasks;
+    public string? Reason => SemanticResult.Reason;
+    public JsonElement? Payload => SemanticResult.Payload;
+    public JsonElement? Metrics => SemanticResult.Metrics;
 }
 
 public sealed record AgentRunHandle(string AttemptId, int ProcessId, string BackendHandle);
@@ -211,7 +252,7 @@ public sealed record AgentExecutionConfiguration(string? Model = null, string? R
 }
 public sealed record AgentCapabilityPolicy(bool InheritUserSkills, string Profile) { public static AgentCapabilityPolicy ProductionDefault { get; } = new(true, "production-default"); }
 public sealed record AgentAttemptTelemetry(string Role, string SkillName, string Backend, AgentExecutionProfile ExecutionProfile, string SkillInvocationMode, int InputChars, string RequestedModel, string RequestedReasoningEffort, string EffectiveModel, string EffectiveReasoningEffort, string SkillSource, string SkillSourceVersion, string UserSkillInheritancePolicy, int ProjectLocalSkillCount, int InheritedUserSkillCount, string CapabilityProfile, string? WindowsSandbox, int WindowsAppsPathEntriesRemoved);
-public sealed record AgentExecutionResult(AgentResultEnvelope Result, AgentProcessResult Process);
+public sealed record AgentExecutionResult(BoundSemanticAgentResult Result, AgentProcessResult Process);
 public sealed record FactoryCliOutcome(string FactoryOutcome, string RunId, string? Reason = null, string? ResumeWhen = null, string? ResultDirectory = null, JsonElement? Payload = null);
 
 public static class FactoryJson

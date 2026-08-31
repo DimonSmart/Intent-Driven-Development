@@ -164,7 +164,7 @@ public sealed partial class FactoryRuntime(
             new(ContinuationKind.Terminal, state.Current?.Id, null, "FACTORY_BLOCKED", false));
     }
 
-    private async Task<FactoryCliOutcome> HandleSemanticStopAsync(FactoryState state, PlannedWorkItem? item, AgentResultEnvelope result, SemanticOperationKind operation, string input, CancellationToken cancellationToken)
+    private async Task<FactoryCliOutcome> HandleSemanticStopAsync(FactoryState state, PlannedWorkItem? item, BoundSemanticAgentResult result, SemanticOperationKind operation, string input, CancellationToken cancellationToken)
     {
         if (result.Outcome == "intent-required") IntentRequiredPayload.Validate(result.Payload);
         var code = result.Outcome.ToUpperInvariant().Replace('-', '_');

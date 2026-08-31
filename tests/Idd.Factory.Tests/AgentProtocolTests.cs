@@ -35,7 +35,6 @@ public sealed class AgentProtocolTests
     [InlineData("researcher", "additional-work-required")]
     [InlineData("final-reviewer", "approved")]
     [InlineData("final-reviewer", "correction-required")]
-    [InlineData("final-reviewer", "needs-fix")]
     [InlineData("final-reviewer", "additional-work-required")]
     [InlineData("final-reviewer", "global-replan-required")]
     [InlineData("task-decomposer", "ready")]
@@ -171,11 +170,13 @@ public sealed class AgentProtocolTests
         {
             RunId = "run",
             AttemptId = "A000001",
+            Capability = role switch { "researcher" => "research", "final-reviewer" => "final-review", "task-decomposer" => "planning", _ => "implementation" },
             Role = role,
             Workspace = "workspace",
-            ResultPath = "result.json",
+            RawResultPath = "raw-result.json",
             SkillName = contract.SkillName,
             ExecutionProfile = contract.ExecutionProfile,
+            SemanticResultSchema = "test-v1",
             Input = "focused input",
             StartedAt = DateTimeOffset.UnixEpoch
         };
@@ -188,7 +189,7 @@ public sealed class AgentProtocolTests
         return source with
         {
             Workspace = temp.Path,
-            ResultPath = Path.Combine(Path.GetDirectoryName(placeholder)!, "result.json")
+            RawResultPath = Path.Combine(Path.GetDirectoryName(placeholder)!, "raw-result.json")
         };
     }
 
@@ -205,14 +206,16 @@ public sealed class AgentProtocolTests
         temp.Write(".idd/verification.yaml", "version: 1");
     }
 
-    private static AgentResultEnvelope Envelope(AgentInvocation invocation, string outcome) => new()
+    private static SemanticAgentResult Envelope(AgentInvocation invocation, string outcome)
     {
-        ProtocolVersion = AgentInvocation.CurrentProtocolVersion,
-        RunId = invocation.RunId,
-        AttemptId = invocation.AttemptId,
-        Role = invocation.Role,
-        Outcome = outcome
-    };
+        var futureTask = JsonSerializer.SerializeToElement(new { capability = "research", task = "Investigate", reason = "Evidence is required." }, FactoryJson.Options);
+        return new SemanticAgentResult
+        {
+            Outcome = outcome,
+            Tasks = outcome == "ready" ? JsonSerializer.SerializeToElement(new[] { new { capability = "research", task = "Investigate" } }, FactoryJson.Options) : null,
+            Payload = outcome is "additional-work-required" or "correction-required" ? futureTask : null
+        };
+    }
 
     private sealed class MutatingBackend(AgentInvocation invocation, string path) : IAgentBackend
     {
@@ -220,7 +223,7 @@ public sealed class AgentProtocolTests
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, "changed");
-            File.WriteAllText(invocation.ResultPath, JsonSerializer.Serialize(Envelope(invocation, "completed"), FactoryJson.Options));
+            File.WriteAllText(invocation.RawResultPath, JsonSerializer.Serialize(Envelope(invocation, "completed"), FactoryJson.Options));
             return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId));
         }
 
@@ -235,7 +238,7 @@ public sealed class AgentProtocolTests
         public Task<AgentRunHandle> StartAsync(AgentInvocation _, CancellationToken cancellationToken)
         {
             File.Delete(path);
-            File.WriteAllText(invocation.ResultPath, JsonSerializer.Serialize(Envelope(invocation, "completed"), FactoryJson.Options));
+            File.WriteAllText(invocation.RawResultPath, JsonSerializer.Serialize(Envelope(invocation, "completed"), FactoryJson.Options));
             return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId));
         }
 

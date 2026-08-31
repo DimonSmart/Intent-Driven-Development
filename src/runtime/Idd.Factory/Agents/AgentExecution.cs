@@ -39,7 +39,7 @@ public sealed class CodexCliBackend : IAgentBackend
         catch (FileNotFoundException exception)
         { throw new AgentProtocolException("AGENT_BACKEND_UNAVAILABLE", $"Codex CLI could not be located: {exception.Message}"); }
 
-        var attemptDirectory = Path.GetDirectoryName(invocation.ResultPath)!;
+        var attemptDirectory = Path.GetDirectoryName(invocation.RawResultPath)!;
         var privateHome = PreparePrivateHome(invocation.RunId, invocation.AttemptId, invocation.SkillName);
         var codexHome = privateHome.Path;
         string skillInstructions;
@@ -94,7 +94,7 @@ public sealed class CodexCliBackend : IAgentBackend
         var prompt = BuildBootstrapPrompt(invocation, skillInstructions);
         await process.StandardInput.WriteAsync(prompt.AsMemory(), cancellationToken);
         await process.StandardInput.FlushAsync(cancellationToken); process.StandardInput.Close();
-        processes.Add(invocation.AttemptId, new(process, stdout, stderr, invocation.ResultPath));
+        processes.Add(invocation.AttemptId, new(process, stdout, stderr, invocation.RawResultPath));
         return new(invocation.AttemptId, process.Id, invocation.AttemptId);
     }
 
@@ -233,7 +233,7 @@ public sealed class CodexCliBackend : IAgentBackend
         arguments.AddRange(["--sandbox", Sandbox(invocation.ExecutionProfile), "-c", "approval_policy=\"never\"", "-c", "mcp_servers={}"]);
         if ((isWindows ?? OperatingSystem.IsWindows()) && !string.IsNullOrWhiteSpace(configuration.WindowsSandbox))
             arguments.AddRange(["-c", $"windows.sandbox=\"{configuration.WindowsSandbox}\""]);
-        arguments.AddRange(["--skip-git-repo-check", "-C", invocation.Workspace, "--output-last-message", invocation.ResultPath, "-"]);
+        arguments.AddRange(["--skip-git-repo-check", "-C", invocation.Workspace, "--output-last-message", invocation.RawResultPath, "-"]);
         return arguments;
     }
 
@@ -242,8 +242,8 @@ public sealed class CodexCliBackend : IAgentBackend
         if (string.IsNullOrWhiteSpace(skillInstructions))
             throw new ArgumentException("Factory-selected skill instructions cannot be empty.", nameof(skillInstructions));
         return $"Factory-selected role instructions ({invocation.SkillName}):\n\n{skillInstructions.Trim()}\n\nAssigned Factory work:\n\n{invocation.Input}\n\n" +
-            $"Return only one JSON object as your final response. The backend captures it as {invocation.ResultPath}; do not create or edit that file yourself. " +
-            $"Required envelope: protocolVersion={AgentInvocation.CurrentProtocolVersion}, runId={invocation.RunId}, attemptId={invocation.AttemptId}, role={invocation.Role}, outcome=<allowed semantic outcome>, reason=<optional>, payload=<role data>. " +
+            $"Return only one semantic JSON object as your final response. The backend captures it through the invocation-specific result channel; do not create or edit result artifacts yourself. " +
+            "Return outcome and only the outcome-specific fields defined by the selected skill. Do not return protocol or schema versions, run ID, attempt ID, role, capability, work-item ID, skill, execution profile, result path, or other runtime bookkeeping. " +
             "Do not mutate .idd/factory/current or .idd/intent. stdout is diagnostic only.";
     }
 
@@ -398,7 +398,7 @@ internal sealed class ProtectedArtifactGuard
 
     public static ProtectedArtifactGuard Capture(AgentInvocation invocation)
     {
-        var attemptDirectory = Path.GetDirectoryName(invocation.ResultPath)!;
+        var attemptDirectory = Path.GetDirectoryName(invocation.RawResultPath)!;
         var current = Directory.GetParent(Directory.GetParent(attemptDirectory)!.FullName)!.FullName;
         var roots = new[] { Path.Combine(current, "state.json"), Path.Combine(current, "request.md"), Path.Combine(current, "run-context.md"), Path.Combine(current, "work-items"), Path.Combine(current, "clarifications"), Path.Combine(invocation.Workspace, ".idd", "intent"), Path.Combine(invocation.Workspace, ".idd", "verification.yaml") };
         return new(Enumerate(roots).ToDictionary(path => path, Hash, StringComparer.OrdinalIgnoreCase), roots);
