@@ -18,6 +18,19 @@ For a bounded defect, return `correction-required` with `payload.correctiveSubta
 
 For a missing focused prerequisite or investigation, return `additional-work-required` with a typed capability/goal/reason requirement. Return `global-replan-required` only if the remaining global strategy cannot stay correct through local graph work.
 
-Use `intent-required`, `needs-clarification`, or `blocked` only for the corresponding real condition.
+Use `intent-required` only when durable product meaning is missing, or `blocked` when an external/non-semantic condition prevents review. Ordinary review work does not own user clarification; do not return `needs-clarification`.
 
-Return protocol version 2. Do not choose a next role, skill, phase, retry, or transition. Runtime owns all operational decisions.
+## Outcomes
+
+Return protocol version 2 with role `checkpoint-reviewer` and one outcome:
+
+- `approved`;
+- `correction-required`;
+- compatibility alias `needs-fix`;
+- `additional-work-required`;
+- `global-replan-required`;
+- compatibility alias `needs-replan`;
+- `intent-required`;
+- `blocked`.
+
+Do not choose a next role, skill, phase, retry, or transition. Runtime owns all operational decisions.
