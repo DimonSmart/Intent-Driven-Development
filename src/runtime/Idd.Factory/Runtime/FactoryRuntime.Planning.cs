@@ -204,4 +204,12 @@ public sealed partial class FactoryRuntime
         await File.WriteAllTextAsync(temporary, content, cancellationToken);
         File.Move(temporary, path, true);
     }
+
+    private static void InvalidateFinalEvidence(FactoryState state)
+    {
+        state.FinalVerificationPassed = false;
+        state.FinalVerificationPlanRevision = null;
+        if (state.FinalReview?.ReviewedPlanRevision != state.PlanRevision)
+            state.FinalReview = null;
+    }
 }
