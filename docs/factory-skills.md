@@ -4,9 +4,9 @@
 
 `idd-factory-run` is a transport-neutral launcher contract. The generated Codex
 skill uses the plugin's directly visible bundled `factory_run`,
-`factory_continue`, and `factory_cancel` MCP tools. The generated Claude skill
-uses the packaged CLI launcher. Neither form contains scheduling logic or
-dispatches agents itself.
+`factory_continue`, `factory_cancel`, and read-only `factory_status` MCP tools.
+The generated Claude skill uses the packaged CLI launcher. Neither form contains
+scheduling logic or dispatches agents itself.
 
 For a new run, the launcher first performs the bounded Intent Preflight defined
 by the packaged `intent-preflight.md` reference. It classifies the unchanged
@@ -19,10 +19,22 @@ pre-runtime stage does not create Factory work items or alter scheduler state.
 Absence of a corresponding spec is not sufficient. Explicit
 `implementation-only` scope still forbids intent writes.
 
-The Codex launcher makes one blocking MCP call and never falls back to launching
-the runtime through a shell. If the installed Codex host does not expose the
-bundled Factory tools, update to a supported host instead of using a polling
-loop.
+The Codex launcher normally makes one blocking MCP call and never falls back to
+launching the runtime through a shell. Generated Factory MCP configuration uses
+a three-hour tool timeout because an end-to-end Factory run may legitimately
+span many semantic attempts and verification cycles.
+
+A host/tool timeout is transport loss, not a Factory outcome. It does not prove
+that the runtime stopped. After a lost or timed-out blocking `factory_run` or
+`factory_continue` response, the Codex launcher may call `factory_status` once
+to distinguish an active owner from a persisted run that is safe to continue, a
+persisted blocker, or an already completed result. `factory_status` is strictly
+read-only and is not a scheduler or polling mechanism. While it reports
+`ACTIVE`, the launcher must not start or continue another runtime for the same
+workspace.
+
+If the installed Codex host does not expose the bundled Factory tools, update to
+a supported host instead of using a polling loop.
 
 Example:
 

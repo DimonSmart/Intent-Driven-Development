@@ -3,6 +3,7 @@ using System.Text.Json;
 using Idd.Factory.Configuration;
 using Idd.Factory.Domain;
 using Idd.Factory.Persistence;
+using Idd.Factory.Runtime;
 using Idd.Factory.State;
 
 namespace Idd.Factory.Tests;
@@ -60,7 +61,7 @@ public sealed class FactoryMcpTests
     }
 
     [Fact]
-    public void PublicMcpCatalogContainsOnlyFactoryControlTools()
+    public void PublicMcpCatalogContainsFactoryControlAndStatusTools()
     {
         var names = typeof(FactoryMcpTools).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
             .Select(method => method.GetCustomAttributesData()
@@ -69,7 +70,93 @@ public sealed class FactoryMcpTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(new string?[] { "factory_cancel", "factory_continue", "factory_run" }, names);
+        Assert.Equal(new string?[] { "factory_cancel", "factory_continue", "factory_run", "factory_status" }, names);
+    }
+
+    [Fact]
+    public async Task StatusReportsActiveRuntimeWithoutStartingAnotherRuntime()
+    {
+        using var temp = new TestWorkspace();
+        var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        await new FileFactoryStateStore(current, new FactoryStateValidator()).CreateAsync(
+            StateStoreTests.State() with { RunId = "active-run" },
+            CancellationToken.None);
+        var lockPath = Path.Combine(temp.Path, ".idd", "factory", "runtime.lock");
+        Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
+        var startedAt = new DateTimeOffset(2026, 9, 1, 21, 29, 0, TimeSpan.Zero);
+
+        await using var held = FactoryRuntimeLock.Acquire(lockPath, "run", startedAt);
+        var status = await new FactoryStatusReader().ReadAsync(temp.Path, CancellationToken.None);
+
+        Assert.Equal("ACTIVE", status.Status);
+        Assert.Equal("active-run", status.RunId);
+        Assert.Null(status.FactoryOutcome);
+        Assert.Equal(Environment.ProcessId, status.RuntimeProcessId);
+        Assert.Equal(Environment.MachineName, status.RuntimeMachineName);
+        Assert.Equal("run", status.RuntimeOperation);
+        Assert.Equal(startedAt, status.RuntimeStartedAt);
+        Assert.Contains("timed-out MCP response", status.Reason!, StringComparison.Ordinal);
+        Assert.Contains("Do not call factory_run or factory_continue", status.ResumeWhen!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StatusReportsReadyToContinueWhenPersistedRunHasNoOwner()
+    {
+        using var temp = new TestWorkspace();
+        var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        await new FileFactoryStateStore(current, new FactoryStateValidator()).CreateAsync(
+            StateStoreTests.State() with { RunId = "interrupted-run" },
+            CancellationToken.None);
+
+        var status = await new FactoryStatusReader().ReadAsync(temp.Path, CancellationToken.None);
+
+        Assert.Equal("READY_TO_CONTINUE", status.Status);
+        Assert.Equal("interrupted-run", status.RunId);
+        Assert.Contains("factory_continue", status.ResumeWhen!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StatusReportsPersistedBlockerWithoutResumingIt()
+    {
+        using var temp = new TestWorkspace();
+        var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        var state = StateStoreTests.State() with
+        {
+            RunId = "blocked-run",
+            RunStatus = FactoryRunStatus.Blocked,
+            Blocker = new("NEEDS_CLARIFICATION", "Choose one option.", "Continue with an answer."),
+            PendingContinuation = new(ContinuationKind.Clarification, null, null, "NEEDS_CLARIFICATION", true, SemanticOperationKind.Planning, "original input")
+        };
+        await new FileFactoryStateStore(current, new FactoryStateValidator()).CreateAsync(state, CancellationToken.None);
+
+        var status = await new FactoryStatusReader().ReadAsync(temp.Path, CancellationToken.None);
+
+        Assert.Equal("WAITING_FOR_CONTINUATION", status.Status);
+        Assert.Equal("blocked-run", status.RunId);
+        Assert.Equal("NEEDS_CLARIFICATION", status.FactoryOutcome);
+        Assert.Equal("Choose one option.", status.Reason);
+        Assert.Equal("Continue with an answer.", status.ResumeWhen);
+    }
+
+    [Fact]
+    public async Task StatusReportsLatestCompletedResultWhenCurrentRunWasFinalized()
+    {
+        using var temp = new TestWorkspace();
+        var resultDirectory = Path.Combine(temp.Path, ".idd", "factory", "results", "completed-run");
+        Directory.CreateDirectory(resultDirectory);
+        await File.WriteAllTextAsync(
+            Path.Combine(resultDirectory, "factory-result.json"),
+            "{\"factoryOutcome\":\"COMPLETED\"}");
+        await File.WriteAllTextAsync(
+            Path.Combine(resultDirectory, "state.json"),
+            "{\"runId\":\"completed-run-id\"}");
+
+        var status = await new FactoryStatusReader().ReadAsync(temp.Path, CancellationToken.None);
+
+        Assert.Equal("COMPLETED", status.Status);
+        Assert.Equal("COMPLETED", status.FactoryOutcome);
+        Assert.Equal("completed-run-id", status.RunId);
+        Assert.Equal(resultDirectory, status.ResultDirectory);
     }
 
     [Fact]

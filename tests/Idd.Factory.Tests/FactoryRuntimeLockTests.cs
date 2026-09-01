@@ -16,6 +16,7 @@ public sealed class FactoryRuntimeLockTests
         await using (var held = FactoryRuntimeLock.Acquire(path, "run", startedAt))
         {
             Assert.True(File.Exists(path));
+            Assert.True(FactoryRuntimeLock.IsHeld(path));
             var descriptor = FactoryRuntimeLock.TryReadDescriptor(path);
 
             Assert.NotNull(descriptor);
@@ -26,6 +27,7 @@ public sealed class FactoryRuntimeLockTests
         }
 
         Assert.False(File.Exists(path));
+        Assert.False(FactoryRuntimeLock.IsHeld(path));
     }
 
     [Fact]
@@ -41,6 +43,7 @@ public sealed class FactoryRuntimeLockTests
             FactoryRuntimeLock.Acquire(path, "run", startedAt.AddMinutes(1)));
 
         Assert.Equal("FACTORY_ALREADY_RUNNING", exception.Code);
+        Assert.Contains("timed-out or disconnected caller", exception.Message, StringComparison.Ordinal);
         Assert.Contains($"PID {Environment.ProcessId}", exception.Message, StringComparison.Ordinal);
         Assert.Contains("operation 'continue'", exception.Message, StringComparison.Ordinal);
         Assert.Contains(startedAt.ToString("O"), exception.Message, StringComparison.Ordinal);
@@ -55,8 +58,10 @@ public sealed class FactoryRuntimeLockTests
         await File.WriteAllTextAsync(path, "stale lock from terminated process");
         var startedAt = new DateTimeOffset(2026, 9, 1, 19, 0, 0, TimeSpan.Zero);
 
+        Assert.False(FactoryRuntimeLock.IsHeld(path));
         await using (var held = FactoryRuntimeLock.Acquire(path, "run", startedAt))
         {
+            Assert.True(FactoryRuntimeLock.IsHeld(path));
             var descriptor = FactoryRuntimeLock.TryReadDescriptor(path);
             Assert.NotNull(descriptor);
             Assert.Equal(startedAt, descriptor.StartedAt);

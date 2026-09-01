@@ -15,6 +15,7 @@ internal static class FactoryMcpServer
         builder.Logging.AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace);
         builder.Services.AddSingleton<IFactoryProcessInvoker, SystemFactoryProcessInvoker>();
         builder.Services.AddSingleton<FactoryRuntimeProcessRunner>();
+        builder.Services.AddSingleton<FactoryStatusReader>();
         builder.Services
             .AddMcpServer(options => options.ServerInfo = new()
             {
@@ -30,10 +31,10 @@ internal static class FactoryMcpServer
 }
 
 [McpServerToolType]
-internal sealed class FactoryMcpTools(FactoryRuntimeProcessRunner runner)
+internal sealed class FactoryMcpTools(FactoryRuntimeProcessRunner runner, FactoryStatusReader statusReader)
 {
     [McpServerTool(Name = "factory_run", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true, UseStructuredContent = true)]
-    [Description("Run an explicitly requested IDD Factory workflow and block until the packaged runtime returns a structured outcome.")]
+    [Description("Run an explicitly requested IDD Factory workflow and block until the packaged runtime returns a structured outcome. A host/tool timeout is transport loss, not a Factory outcome; use factory_status once to determine whether the runtime is still active.")]
     public Task<FactoryMcpResult> FactoryRunAsync(
         [Description("Absolute path to the target workspace.")] string workspace,
         [Description("Complete Factory request text, passed unchanged as UTF-8.")] string request,
@@ -41,7 +42,7 @@ internal sealed class FactoryMcpTools(FactoryRuntimeProcessRunner runner)
         runner.RunAsync(FactoryRuntimeCommand.Run, workspace, request, null, cancellationToken);
 
     [McpServerTool(Name = "factory_continue", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true, UseStructuredContent = true)]
-    [Description("Continue an explicitly requested IDD Factory workflow, optionally supplying its clarification answer.")]
+    [Description("Continue an explicitly requested IDD Factory workflow, optionally supplying its clarification answer. A host/tool timeout is transport loss, not a Factory outcome; use factory_status once before deciding whether another continue is safe.")]
     public Task<FactoryMcpResult> FactoryContinueAsync(
         [Description("Absolute path to the target workspace.")] string workspace,
         [Description("Optional clarification answer, passed unchanged as UTF-8.")] string? answer = null,
@@ -54,6 +55,13 @@ internal sealed class FactoryMcpTools(FactoryRuntimeProcessRunner runner)
         [Description("Absolute path to the target workspace.")] string workspace,
         CancellationToken cancellationToken) =>
         runner.RunAsync(FactoryRuntimeCommand.Cancel, workspace, null, null, cancellationToken);
+
+    [McpServerTool(Name = "factory_status", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false, UseStructuredContent = true)]
+    [Description("Read Factory runtime and persisted-run status without starting, continuing, cancelling, or polling the workflow. Use once after a blocking Factory MCP response is lost or times out, or for an explicit user status request.")]
+    public Task<FactoryStatusResult> FactoryStatusAsync(
+        [Description("Absolute path to the target workspace.")] string workspace,
+        CancellationToken cancellationToken = default) =>
+        statusReader.ReadAsync(workspace, cancellationToken);
 }
 
 internal sealed record FactoryMcpResult(

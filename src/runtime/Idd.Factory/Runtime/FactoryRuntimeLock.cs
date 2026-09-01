@@ -63,6 +63,18 @@ internal sealed class FactoryRuntimeLock : IAsyncDisposable
         catch (JsonException) { return null; }
     }
 
+    internal static bool IsHeld(string path)
+    {
+        if (!File.Exists(path)) return false;
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+            return false;
+        }
+        catch (IOException) { return true; }
+        catch (UnauthorizedAccessException) { return true; }
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (disposed) return;
@@ -73,11 +85,12 @@ internal sealed class FactoryRuntimeLock : IAsyncDisposable
 
     private static FactoryStateException AlreadyRunning(string path)
     {
+        const string reason = "A Factory runtime is already active for this workspace. A timed-out or disconnected caller does not imply that the runtime stopped.";
         var owner = TryReadDescriptor(path);
         return owner is null
-            ? new("FACTORY_ALREADY_RUNNING", "Another Factory runtime owns this workspace.")
+            ? new("FACTORY_ALREADY_RUNNING", reason)
             : new("FACTORY_ALREADY_RUNNING",
-                $"Another Factory runtime owns this workspace. PID {owner.ProcessId} on {owner.MachineName}; operation '{owner.Operation}'; started {owner.StartedAt:O}.");
+                $"{reason} PID {owner.ProcessId} on {owner.MachineName}; operation '{owner.Operation}'; started {owner.StartedAt:O}.");
     }
 
     private static void TryDelete(string path)

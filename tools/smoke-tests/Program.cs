@@ -83,7 +83,7 @@ void CheckClaudeMarketplace()
         }
 
         var source = plugin.GetProperty("source").GetString();
-        ExpectMarketplacePath(source, $"Claude marketplace {name} source");
+        ExpectMarketplacePath(source, $"Claude marketplace {name} source path");
     }
 }
 
@@ -270,6 +270,7 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
         ExpectContains(runSkill, "factory_run", "Codex Factory run tool");
         ExpectContains(runSkill, "factory_continue", "Codex Factory continue tool");
         ExpectContains(runSkill, "factory_cancel", "Codex Factory cancel tool");
+        ExpectContains(runSkill, "factory_status", "Codex Factory status tool");
         if (runSkill.Contains("runtime/idd-factory.dll", StringComparison.Ordinal)) failures.Add("Codex run skill still instructs shell-launching idd-factory.dll.");
         if (runSkill.Contains("write_stdin", StringComparison.Ordinal)) failures.Add("Codex run skill still instructs launcher write_stdin polling.");
         ExpectContains(runSkill, "Do not spawn semantic or coordinator agents", "Codex coordinator removal invariant");
@@ -452,7 +453,7 @@ void CheckFactoryTransportGeneration()
             var factory = mcp.RootElement.GetProperty("mcpServers").GetProperty("factory");
             ExpectString(factory, "command", "dotnet", "Codex Factory MCP command");
             ExpectString(factory, "cwd", ".", "Codex Factory MCP cwd");
-            if (factory.GetProperty("tool_timeout_sec").GetInt32() != 1800) failures.Add("Codex Factory MCP timeout must equal 1800 seconds.");
+            if (factory.GetProperty("tool_timeout_sec").GetInt32() != 10800) failures.Add("Codex Factory MCP timeout must equal 10800 seconds.");
             var arguments = factory.GetProperty("args").EnumerateArray().Select(value => value.GetString()).ToArray();
             if (!arguments.SequenceEqual(new[] { "runtime/idd-factory.dll", "mcp" })) failures.Add("Codex Factory MCP args are not exact.");
             var omitted = factory.GetProperty("omit_tools_from").EnumerateArray().Select(value => value.GetString()).ToArray();
