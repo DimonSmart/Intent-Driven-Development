@@ -214,6 +214,7 @@ public sealed partial class FactoryRuntime(
         state.Completed.Clear(); state.Completed.AddRange(candidate.Completed); state.Current = candidate.Current; state.CurrentPhase = candidate.CurrentPhase;
         state.Remaining.Clear(); state.Remaining.AddRange(candidate.Remaining); state.CurrentAttemptId = candidate.CurrentAttemptId; state.AttemptSequence = candidate.AttemptSequence;
         state.ReplanCount = candidate.ReplanCount; state.CorrectiveCycleCount = candidate.CorrectiveCycleCount; state.InitialPlanningCompleted = candidate.InitialPlanningCompleted;
+        state.PlannedThroughCompletedCount = candidate.PlannedThroughCompletedCount;
         state.FinalVerificationPassed = candidate.FinalVerificationPassed; state.FinalVerificationPlanRevision = candidate.FinalVerificationPlanRevision;
         state.Blocker = candidate.Blocker; state.PendingContinuation = candidate.PendingContinuation; state.PendingVerificationSession = candidate.PendingVerificationSession;
         state.PendingReplanTrigger = candidate.PendingReplanTrigger; state.FinalReview = candidate.FinalReview; state.IntentSnapshotHash = candidate.IntentSnapshotHash;
