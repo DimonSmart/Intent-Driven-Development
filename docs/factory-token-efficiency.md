@@ -107,7 +107,7 @@ The most useful regression signals are:
 
 ## Analyze a completed run
 
-Pass either a specific result directory or a workspace. When a workspace is supplied, the latest directory under `.idd/factory/results` is used.
+Pass either a specific result directory or a workspace. When a workspace is supplied, the latest directory under `.idd/factory/results` is used. Finalization moves the complete run directory into `results`, so completed runs retain `events.jsonl`, `attempts`, and the other execution diagnostics consumed by this analyzer.
 
 ```bat
 dotnet run --project tools/factory-token-analysis -- analyze C:\Private\FactoryBubbleSortSmoke
