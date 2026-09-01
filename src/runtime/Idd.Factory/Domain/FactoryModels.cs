@@ -132,22 +132,27 @@ public enum AgentExecutionProfile
 }
 
 public sealed record FactoryAgentContract(string Role, string SkillName, AgentExecutionProfile ExecutionProfile);
-public sealed record FactoryCapabilityContract(string Capability, FactoryAgentContract Agent, bool WorkItemCapability);
+public sealed record FactoryCapabilityContract(
+    string Capability,
+    FactoryAgentContract Agent,
+    bool WorkItemCapability,
+    SemanticOperationKind SemanticOperation);
 
 public static class FactoryCapabilityCatalog
 {
     private static readonly IReadOnlyDictionary<string, FactoryCapabilityContract> Contracts = new[]
     {
-        new FactoryCapabilityContract("planning", new("task-decomposer", "idd-factory-decompose-task", AgentExecutionProfile.ReadOnly), false),
-        new FactoryCapabilityContract("implementation", new("implementer", "idd-factory-execute-subtask", AgentExecutionProfile.WorkspaceWrite), true),
-        new FactoryCapabilityContract("research", new("researcher", "idd-factory-research", AgentExecutionProfile.ReadOnly), true),
-        new FactoryCapabilityContract("semantic-review", new("checkpoint-reviewer", "idd-factory-review-checkpoint", AgentExecutionProfile.ReadOnly), true),
-        new FactoryCapabilityContract("final-review", new("final-reviewer", "idd-factory-review-task", AgentExecutionProfile.ReadOnly), false)
+        new FactoryCapabilityContract("planning", new("task-decomposer", "idd-factory-decompose-task", AgentExecutionProfile.ReadOnly), false, SemanticOperationKind.Planning),
+        new FactoryCapabilityContract("implementation", new("implementer", "idd-factory-execute-subtask", AgentExecutionProfile.WorkspaceWrite), true, SemanticOperationKind.WorkItemExecution),
+        new FactoryCapabilityContract("research", new("researcher", "idd-factory-research", AgentExecutionProfile.ReadOnly), true, SemanticOperationKind.WorkItemExecution),
+        new FactoryCapabilityContract("semantic-review", new("checkpoint-reviewer", "idd-factory-review-checkpoint", AgentExecutionProfile.ReadOnly), true, SemanticOperationKind.WorkItemExecution),
+        new FactoryCapabilityContract("final-review", new("final-reviewer", "idd-factory-review-task", AgentExecutionProfile.ReadOnly), false, SemanticOperationKind.FinalReview)
     }.ToDictionary(x => x.Capability, StringComparer.Ordinal);
 
     public static IReadOnlyCollection<string> WorkItemCapabilities { get; } = Contracts.Values.Where(x => x.WorkItemCapability).Select(x => x.Capability).ToArray();
     public static FactoryCapabilityContract Resolve(string capability) => Contracts.TryGetValue(capability, out var value)
         ? value : throw new AgentProtocolException("UNKNOWN_CAPABILITY", $"Unknown Factory capability '{capability}'.");
+    public static SemanticOperationKind ResolveSemanticOperation(string capability) => Resolve(capability).SemanticOperation;
     public static FactoryCapabilityContract ResolveWorkItem(string capability)
     {
         var value = Resolve(capability);

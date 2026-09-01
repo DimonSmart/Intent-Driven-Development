@@ -254,45 +254,8 @@ public sealed partial class FactoryRuntime
         return output[..length] + "\n[verification output truncated; see evidence artifact]";
     }
 
-    private async Task ReconcileAsync(FactoryState state, CancellationToken cancellationToken)
-    {
-        var attemptId = state.CurrentAttemptId ?? state.Current?.CurrentAttemptId;
-        if (attemptId is null) return;
-        state.CurrentAttemptId = attemptId;
-        var directory = Path.Combine(currentDirectory, "attempts", attemptId);
-        var invocationPath = Path.Combine(directory, "invocation.json");
-        if (!File.Exists(invocationPath))
-        {
-            state.CurrentAttemptId = null;
-            if (state.Current is not null) { state.Current.CurrentAttemptId = null; state.Current.AttemptCount = Math.Max(0, state.Current.AttemptCount - 1); state.CurrentPhase = CurrentWorkPhase.Ready; }
-            state.PendingContinuation = null;
-            await SaveAsync(state, cancellationToken);
-            return;
-        }
-        var invocation = JsonSerializer.Deserialize<AgentInvocation>(await File.ReadAllTextAsync(invocationPath, cancellationToken), FactoryJson.Options)
-            ?? throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Persisted attempt {attemptId} is malformed.");
-        var expectedCapability = state.Current?.Capability ?? invocation.Capability;
-        var expectedAgent = FactoryCapabilityCatalog.Resolve(expectedCapability).Agent;
-        if (invocation.RunId != state.RunId || invocation.AttemptId != attemptId || invocation.Capability != expectedCapability || invocation.Role != expectedAgent.Role || invocation.WorkItemId != state.Current?.Id)
-            throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Persisted attempt {attemptId} identity is invalid.");
-        await RecoverWorkspaceChangesAsync(state, state.Current, invocation, cancellationToken);
-        if (File.Exists(Path.Combine(directory, "result.json")))
-        {
-            var operation = invocation.Role switch
-            {
-                "task-decomposer" => SemanticOperationKind.Planning,
-                "final-reviewer" => SemanticOperationKind.FinalReview,
-                _ => SemanticOperationKind.WorkItemExecution
-            };
-            state.PendingContinuation = new(ContinuationKind.SemanticInvocation, state.Current?.Id, null, operation.ToString(), true, operation);
-            await SaveAsync(state, cancellationToken);
-            return;
-        }
-        state.CurrentAttemptId = null;
-        if (state.Current is not null) { state.Current.CurrentAttemptId = null; state.CurrentPhase = CurrentWorkPhase.Ready; }
-        state.PendingContinuation = null;
-        await SaveAsync(state, cancellationToken);
-    }
+    private Task ReconcileAsync(FactoryState state, CancellationToken cancellationToken) =>
+        new SemanticAttemptReconciler(currentDirectory, RecoverWorkspaceChangesAsync, SaveAsync).ReconcileAsync(state, cancellationToken);
 
     private async Task PersistWorkspaceSnapshotAsync(string runId, string attemptDirectory, CancellationToken cancellationToken) =>
         await WriteJsonAtomicallyAsync(Path.Combine(attemptDirectory, "workspace-before.json"), new WorkspaceSnapshotArtifact(1, await SnapshotWorkspaceAsync(runId, cancellationToken)), cancellationToken);
