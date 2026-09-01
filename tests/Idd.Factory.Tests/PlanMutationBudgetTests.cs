@@ -50,6 +50,7 @@ public sealed class PlanMutationBudgetTests
         };
         backend.Enqueue(x => Envelope(x, "ready", new { tasks = new[] { Work("A", "research") } }));
         backend.Enqueue(x => Envelope(x, "completed"));
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "correction-required", new
         {
             capability = "research",
@@ -64,7 +65,8 @@ public sealed class PlanMutationBudgetTests
         Assert.Equal("WORK_EXPANSION_BUDGET_EXHAUSTED", outcome.FactoryOutcome);
         Assert.Equal(0, state.CorrectiveCycleCount);
         Assert.Equal(2, state.NextWorkItemNumber);
-        Assert.Equal(2, state.PlanRevision);
+        Assert.Equal(3, state.PlanRevision);
+        Assert.Equal(1, state.PlannedThroughCompletedCount);
         Assert.Single(state.Completed);
         Assert.Null(state.Current);
         Assert.Empty(state.Remaining);
@@ -81,6 +83,7 @@ public sealed class PlanMutationBudgetTests
         var configuration = defaults with { Limits = defaults.Limits with { MaxWorkItems = 2 } };
         backend.Enqueue(x => Envelope(x, "ready", new { tasks = new[] { Work("A", "research") } }));
         backend.Enqueue(x => Envelope(x, "completed"));
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "global-replan-required", new
         {
             finding = "The integrated strategy must change"
@@ -101,12 +104,13 @@ public sealed class PlanMutationBudgetTests
         Assert.Equal("WORK_EXPANSION_BUDGET_EXHAUSTED", outcome.FactoryOutcome);
         Assert.Equal(0, state.ReplanCount);
         Assert.Equal(2, state.NextWorkItemNumber);
-        Assert.Equal(2, state.PlanRevision);
+        Assert.Equal(3, state.PlanRevision);
+        Assert.Equal(1, state.PlannedThroughCompletedCount);
         Assert.Single(state.Completed);
         Assert.Null(state.Current);
         Assert.Empty(state.Remaining);
         Assert.NotNull(state.PendingReplanTrigger);
         Assert.False(File.Exists(Path.Combine(temp.Path, ".idd", "factory", "current", "work-items", "W000002", "contract.md")));
-        Assert.Equal(2, backend.Invocations.Count(x => x.Role == "task-decomposer"));
+        Assert.Equal(3, backend.Invocations.Count(x => x.Role == "task-decomposer"));
     }
 }
