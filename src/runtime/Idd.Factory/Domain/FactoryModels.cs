@@ -155,22 +155,6 @@ public static class FactoryCapabilityCatalog
     }
 }
 
-public static class FactoryAgentCatalog
-{
-    private static readonly IReadOnlyDictionary<string, FactoryAgentContract> Contracts = new[]
-    {
-        new FactoryAgentContract("factory-planner", "idd-factory-decompose-task", AgentExecutionProfile.ReadOnly),
-        new FactoryAgentContract("task-decomposer", "idd-factory-decompose-task", AgentExecutionProfile.ReadOnly),
-        new FactoryAgentContract("implementer", "idd-factory-execute-subtask", AgentExecutionProfile.WorkspaceWrite),
-        new FactoryAgentContract("checkpoint-reviewer", "idd-factory-review-checkpoint", AgentExecutionProfile.ReadOnly),
-        new FactoryAgentContract("final-reviewer", "idd-factory-review-task", AgentExecutionProfile.ReadOnly),
-        new FactoryAgentContract("factory-replanner", "idd-factory-replan", AgentExecutionProfile.ReadOnly),
-        new FactoryAgentContract("researcher", "idd-factory-research", AgentExecutionProfile.ReadOnly)
-    }.ToDictionary(x => x.Role, StringComparer.Ordinal);
-    public static FactoryAgentContract Resolve(string role) => Contracts.TryGetValue(role, out var value)
-        ? value : throw new ArgumentOutOfRangeException(nameof(role), role, "Unknown Factory agent role.");
-}
-
 public sealed record AgentInvocation
 {
     public const int CurrentSchemaVersion = 1;
