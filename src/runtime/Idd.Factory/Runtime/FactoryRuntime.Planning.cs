@@ -19,7 +19,6 @@ public sealed partial class FactoryRuntime
         if (result.Outcome != "ready") return await HandleSemanticStopAsync(state, null, result, SemanticOperationKind.Planning, input, cancellationToken);
         if (result.Tasks is not { ValueKind: JsonValueKind.Array } tasks)
             throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Planning ready result requires top-level tasks.");
-        if (tasks.GetArrayLength() > configuration.Limits.MaxWorkItems) throw new AgentProtocolException("WORK_EXPANSION_BUDGET_EXHAUSTED", "Planning result exceeds the configured work-item limit.");
 
         var previous = CloneState(state);
         var candidate = CloneState(state);
@@ -36,21 +35,32 @@ public sealed partial class FactoryRuntime
         candidate.PlanRevision++;
         if (replanning) candidate.ReplanCount++;
         InvalidateFinalEvidence(candidate);
-        stateValidator.Validate(candidate);
-        foreach (var contract in contracts) await WriteRuntimeArtifactAtomicallyAsync(Path.Combine(currentDirectory, contract.Path), contract.Content, cancellationToken);
-        await planRevisions.WriteAsync(previous, candidate, replanning ? "semantic-replan" : "initial-planning", result.AttemptId, state.Current?.Id, cancellationToken);
-        ApplyCandidate(state, candidate);
-        await SaveAsync(state, cancellationToken);
+        await CommitPlanMutationAsync(
+            state,
+            previous,
+            candidate,
+            contracts,
+            replanning ? "semantic-replan" : "initial-planning",
+            result.AttemptId,
+            state.Current?.Id,
+            cancellationToken);
         return null;
     }
 
     private PlannedWorkItem ParsePlannedTask(FactoryState state, JsonElement node, List<(string Path, string Content)> contracts)
     {
         if (node.ValueKind != JsonValueKind.Object) throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Each planned task must be an object.");
-        var capability = RequiredString(node, "capability", "Planned task capability is required.");
+        return CreatePlannedTask(
+            state,
+            RequiredString(node, "capability", "Planned task capability is required."),
+            RequiredString(node, "task", "Planned task text is required."),
+            contracts);
+    }
+
+    private PlannedWorkItem CreatePlannedTask(FactoryState state, string capability, string task, List<(string Path, string Content)> contracts)
+    {
         FactoryCapabilityCatalog.ResolveWorkItem(capability);
         if (!configuration.AllowedCapabilities.Contains(capability)) throw new AgentProtocolException("CAPABILITY_NOT_ALLOWED", $"Capability '{capability}' is not allowed.");
-        var task = RequiredString(node, "task", "Planned task text is required.");
         var id = $"W{state.NextWorkItemNumber++:000000}";
         var path = $"work-items/{id}/contract.md";
         contracts.Add((path, task.Trim() + Environment.NewLine));
@@ -60,15 +70,14 @@ public sealed partial class FactoryRuntime
     private async Task<FactoryCliOutcome?> PrependAdditionalWorkAsync(FactoryState state, PlannedWorkItem source, BoundSemanticAgentResult result, CancellationToken cancellationToken)
     {
         if (result.Payload is not { } payload) throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "additional-work-required requires a payload.");
-        return await PrependBeforeRetryAsync(state, source, result, payload, "worker-additional-work", cancellationToken);
+        return await PrependBeforeRetryAsync(state, source, result, payload, "worker-additional-work", false, cancellationToken);
     }
 
     private async Task<FactoryCliOutcome?> PrependReviewCorrectionAsync(FactoryState state, PlannedWorkItem source, BoundSemanticAgentResult result, CancellationToken cancellationToken)
     {
         if (result.Payload is not { } correction)
             throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Review correction requires a payload.");
-        StartCorrectiveCycle(state);
-        return await PrependBeforeRetryAsync(state, source, result, correction, "review-correction", cancellationToken);
+        return await PrependBeforeRetryAsync(state, source, result, correction, "review-correction", true, cancellationToken);
     }
 
     private void StartCorrectiveCycle(FactoryState state)
@@ -78,31 +87,37 @@ public sealed partial class FactoryRuntime
         state.CorrectiveCycleCount++;
     }
 
-    private async Task<FactoryCliOutcome?> PrependBeforeRetryAsync(FactoryState state, PlannedWorkItem source, BoundSemanticAgentResult result, JsonElement requirement, string reason, CancellationToken cancellationToken)
+    private async Task<FactoryCliOutcome?> PrependBeforeRetryAsync(
+        FactoryState state,
+        PlannedWorkItem source,
+        BoundSemanticAgentResult result,
+        JsonElement requirement,
+        string reason,
+        bool correctiveCycle,
+        CancellationToken cancellationToken)
     {
-        if (state.Remaining.Count + state.Completed.Count + 2 > configuration.Limits.MaxWorkItems) throw new AgentProtocolException("WORK_EXPANSION_BUDGET_EXHAUSTED", "Dynamic work would exceed the configured work-item limit.");
         var capability = RequiredString(requirement, "capability", "Additional work capability is required.");
-        FactoryCapabilityCatalog.ResolveWorkItem(capability);
-        if (!configuration.AllowedCapabilities.Contains(capability)) throw new AgentProtocolException("CAPABILITY_NOT_ALLOWED", $"Capability '{capability}' is not allowed.");
         var task = RequiredString(requirement, "task", "Additional work task is required.");
         var previous = CloneState(state);
-        var id = $"W{state.NextWorkItemNumber++:000000}";
-        var path = $"work-items/{id}/contract.md";
-        await WriteRuntimeArtifactAtomicallyAsync(Path.Combine(currentDirectory, path), task.Trim() + Environment.NewLine, cancellationToken);
-        source.LastResultRef = $"attempts/{result.AttemptId}/result.json";
-        if (!source.PriorResultRefs.Contains(source.LastResultRef, StringComparer.Ordinal)) source.PriorResultRefs.Add(source.LastResultRef);
-        source.CurrentAttemptId = null;
-        var newWork = new PlannedWorkItem { Id = id, Capability = capability, ContractPath = path };
-        state.Current = null;
-        state.CurrentPhase = null;
-        state.Remaining.Insert(0, source);
-        state.Remaining.Insert(0, newWork);
-        state.PendingContinuation = null;
-        state.Blocker = null;
-        state.PlanRevision++;
-        InvalidateFinalEvidence(state);
-        await planRevisions.WriteAsync(previous, state, reason, result.AttemptId, source.Id, cancellationToken);
-        await SaveAsync(state, cancellationToken);
+        var candidate = CloneState(state);
+        var candidateSource = candidate.Current is { } current && current.Id == source.Id
+            ? current
+            : throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Dynamic work must retry the authoritative Current work item.");
+        var contracts = new List<(string Path, string Content)>();
+        var newWork = CreatePlannedTask(candidate, capability, task, contracts);
+        if (correctiveCycle) StartCorrectiveCycle(candidate);
+        candidateSource.LastResultRef = $"attempts/{result.AttemptId}/result.json";
+        if (!candidateSource.PriorResultRefs.Contains(candidateSource.LastResultRef, StringComparer.Ordinal)) candidateSource.PriorResultRefs.Add(candidateSource.LastResultRef);
+        candidateSource.CurrentAttemptId = null;
+        candidate.Current = null;
+        candidate.CurrentPhase = null;
+        candidate.Remaining.Insert(0, candidateSource);
+        candidate.Remaining.Insert(0, newWork);
+        candidate.PendingContinuation = null;
+        candidate.Blocker = null;
+        candidate.PlanRevision++;
+        InvalidateFinalEvidence(candidate);
+        await CommitPlanMutationAsync(state, previous, candidate, contracts, reason, result.AttemptId, source.Id, cancellationToken);
         return null;
     }
 
@@ -133,20 +148,36 @@ public sealed partial class FactoryRuntime
             if (result.Payload is not { } payload) throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Final review correction requires a payload.");
             var capability = RequiredString(payload, "capability", "Final review correction capability is required.");
             var task = RequiredString(payload, "task", "Final review correction task is required.");
-            StartCorrectiveCycle(state);
             var previous = CloneState(state);
+            var candidate = CloneState(state);
             var contracts = new List<(string Path, string Content)>();
-            using var document = JsonDocument.Parse(JsonSerializer.Serialize(new { capability, task }));
-            state.Remaining.Add(ParsePlannedTask(state, document.RootElement, contracts));
-            foreach (var contract in contracts) await WriteRuntimeArtifactAtomicallyAsync(Path.Combine(currentDirectory, contract.Path), contract.Content, cancellationToken);
-            state.PlanRevision++;
-            state.FinalReview = new(result.Outcome, $"attempts/{result.AttemptId}/result.json", (state.FinalReview?.AttemptCount ?? 0) + 1, null);
-            InvalidateFinalEvidence(state);
-            await planRevisions.WriteAsync(previous, state, "final-review-correction", result.AttemptId, null, cancellationToken);
-            await SaveAsync(state, cancellationToken);
+            candidate.Remaining.Add(CreatePlannedTask(candidate, capability, task, contracts));
+            StartCorrectiveCycle(candidate);
+            candidate.PlanRevision++;
+            candidate.FinalReview = new(result.Outcome, $"attempts/{result.AttemptId}/result.json", (candidate.FinalReview?.AttemptCount ?? 0) + 1, null);
+            InvalidateFinalEvidence(candidate);
+            await CommitPlanMutationAsync(state, previous, candidate, contracts, "final-review-correction", result.AttemptId, null, cancellationToken);
             return null;
         }
         return await HandleSemanticStopAsync(state, null, result, SemanticOperationKind.FinalReview, input, cancellationToken);
+    }
+
+    private async Task CommitPlanMutationAsync(
+        FactoryState state,
+        FactoryState previous,
+        FactoryState candidate,
+        IReadOnlyList<(string Path, string Content)> contracts,
+        string reason,
+        string? sourceAttemptId,
+        string? sourceWorkItemId,
+        CancellationToken cancellationToken)
+    {
+        ValidateRuntimeState(candidate);
+        foreach (var contract in contracts)
+            await WriteRuntimeArtifactAtomicallyAsync(Path.Combine(currentDirectory, contract.Path), contract.Content, cancellationToken);
+        await planRevisions.WriteAsync(previous, candidate, reason, sourceAttemptId, sourceWorkItemId, cancellationToken);
+        ApplyCandidate(state, candidate);
+        await SaveAsync(state, cancellationToken);
     }
 
     private string ReadContract(string path) => File.Exists(Path.Combine(currentDirectory, path)) ? File.ReadAllText(Path.Combine(currentDirectory, path)) : "[missing contract]";
