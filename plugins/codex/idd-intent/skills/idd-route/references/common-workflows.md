@@ -146,7 +146,9 @@ routing or intent work.
   approval.
 - Import uses existing product knowledge as evidence and does not reconstruct
   requirements primarily from code.
-- Factory may read intent, but must not create or change product intent.
+- Factory Runtime and its work items may read intent, but must not create or
+  change product intent. An end-to-end Factory launcher may complete the
+  separate Intent Preflight workflow before runtime creation.
 - Plans, route classifications, preservation records, discovery reports,
   confirmation transcripts, and review notes are temporary workflow evidence.
 - Obsolete ordinary specs are deleted, not archived.
@@ -416,6 +418,27 @@ commit-message handoff under `.idd/factory/results/` before safely clearing
 `current/`. Neither directory is product intent, and both are ignored by
 default.
 
+Before a new end-to-end Factory run, apply Intent Preflight:
+
+```text
+original request + requested scope + relevant current intent
+-> Covered | ExplicitIntentChange | MissingIntentDecision | ImplementationOnly
+-> optional existing intent workflow
+-> semantic coverage validation
+-> Factory Runtime
+```
+
+Missing or absent documentation is not by itself a missing product decision.
+When the request explicitly and unambiguously defines changed durable behavior,
+update current intent through `idd-intent-change` and, when ownership requires
+it, `idd-intent-new-document`, then start Factory with the same unchanged
+request. `implementation-only` scope forbids that intent update and must stop
+with `INTENT_REQUIRED` if current intent is insufficient.
+
+Intent preparation finishes before `.idd/factory/current/` is created. It is
+not a Factory work item and does not change the deterministic
+`Completed / Current / Remaining` scheduler.
+
 Do not start or resume Factory work when requested scope is `route-only` or
 `intent-only`. For `implementation-only`, Factory may be used only when current
 intent is already sufficient and execution is orchestrated.
@@ -473,7 +496,8 @@ routing or intent work.
 Verification configuration completes after the confirmed policy is written, or
 a deliberate review concludes that no change is required.
 
-For `end-to-end`, product changes complete after intent is updated,
+For `end-to-end`, product changes complete after intent is updated and coverage
+is validated against the original request,
 implementation is performed, and `idd-code-check-implementation` verifies
 changed, removed, and preserved behavior. Implementation-only work completes
 after verification proves current intent was preserved. Normalization completes

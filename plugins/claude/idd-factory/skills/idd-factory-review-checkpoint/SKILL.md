@@ -32,7 +32,11 @@ For a missing focused prerequisite or investigation, return
 Return `global-replan-required` only if the remaining global strategy cannot
 stay correct through local future work.
 
-Use `intent-required` only when durable product meaning is missing, or `blocked` when an external/non-semantic condition prevents review. Ordinary review work does not own user clarification; do not return `needs-clarification`.
+Use `intent-required` only when a durable product decision required to judge the
+covered work cannot be determined from the original request and current intent.
+Missing documentation alone is not sufficient. Use `blocked` when an
+external/non-semantic condition prevents review. Ordinary review work does not
+own user clarification; do not return `needs-clarification`.
 
 ## Outcomes
 

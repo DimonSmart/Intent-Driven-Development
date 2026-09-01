@@ -31,10 +31,17 @@ one outcome:
 - `completed` — include concise findings, evidence/references, unresolved concerns if any;
 - `additional-work-required` — runtime should materialize a focused dependency;
 - `global-replan-required` — the global remaining strategy must change;
-- `intent-required` — durable product meaning is missing;
+- `intent-required` — a durable product decision required for safe research or
+  later implementation cannot be determined from the original request and
+  current intent;
 - `blocked` — an external condition prevents useful research.
 
 Runtime persists the result reference and owns all scheduling and ordered-plan mutation.
+
+Technical feasibility uncertainty is normally the subject of this work item,
+not `intent-required`. Use the intent outcome only when the missing answer would
+choose durable product or safety semantics rather than an implementation
+approach.
 
 Do not return invocation identity, role, capability outside an outcome payload,
 work-item ID, attempt ID, run ID, protocol or schema version, skill, execution

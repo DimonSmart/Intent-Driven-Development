@@ -124,7 +124,7 @@
     "description": "Update `.idd/intent/` product intent from confirmed implementation behavior."
   },
   "idd-factory-run": {
-    "description": "Run, resume, or cancel a deterministic IDD Factory Runtime execution."
+    "description": "Prepare explicit durable product changes when required, then run, resume, or cancel a deterministic IDD Factory Runtime execution."
   },
   "idd-factory-decompose-task": {
     "description": "Return the smallest safe ordered list of remaining Factory work without requiring a complete up-front plan.",

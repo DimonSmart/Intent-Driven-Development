@@ -13,7 +13,10 @@ Runtime owns scheduling, strict final verification, corrections, ordered future 
 
 ## Inputs and boundaries
 
-Review the supplied review contract, original Factory request when this is final review, relevant durable intent, completed dependency/result references, current product changes, and compact authoritative runtime verification observations/evidence.
+Review the supplied review contract, the unchanged original Factory request,
+current durable intent after any preflight preparation, completed
+dependency/result references, current product changes, and compact authoritative
+runtime verification observations/evidence.
 
 Review current product semantics, not worker transcripts or orchestration history. Do not recursively inventory `.idd/factory`, attempt directories, `bin`, or `obj`. Do not rerun deterministic Factory checks merely to reconfirm runtime evidence.
 
@@ -45,10 +48,15 @@ one outcome:
 - `correction-required` — bounded semantic defect that should become corrective graph work;
 - `additional-work-required` — typed prerequisite/investigation should become graph work;
 - `global-replan-required` — remaining global strategy must be restructured;
-- `intent-required` — durable product meaning is missing;
+- `intent-required` — a durable product decision required to judge the result
+  cannot be determined from the original request and current intent;
 - `blocked` — external condition prevents review.
 
 Never describe failed, blocked, or unverified semantics as approved. `recommendedNextWorkflow` in an `intent-required` payload, when present, refers only to a durable-intent editing workflow outside Factory runtime orchestration.
+Do not treat implementation as authoritative when it matches the request but
+the resulting durable intent is incomplete or contradictory. Return a bounded
+correction when implementation is wrong; return structured `intent-required`
+when a genuine durable decision is absent.
 
 Do not return invocation identity, role, capability outside an outcome payload,
 work-item ID, attempt ID, run ID, protocol or schema version, skill, execution
