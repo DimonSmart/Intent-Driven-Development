@@ -59,6 +59,7 @@ internal static class FactoryRuntimeTestHarness
         return new()
         {
             Outcome = outcome,
+            Summary = outcome == "completed" ? $"Completed {invocation.Capability} work." : null,
             Tasks = tasks,
             Reason = reason,
             Payload = tasks is null ? body : null

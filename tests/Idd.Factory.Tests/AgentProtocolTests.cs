@@ -27,6 +27,106 @@ public sealed class AgentProtocolTests
         Assert.False(json.GetProperty("tasks")[0].TryGetProperty("dependencies", out _));
     }
 
+    [Fact]
+    public void ImplementationCompletedAcceptsDocumentedSemanticFields()
+    {
+        var invocation = Invocation("implementer");
+        const string json = """
+        {
+          "outcome": "completed",
+          "summary": "Implemented requested feature.",
+          "declaredChanges": ["Added implementation", "Added tests"],
+          "concerns": [],
+          "verificationClaims": ["Tests were added"]
+        }
+        """;
+
+        var result = new FactoryAgentResultValidator().ParseAndValidate(invocation, json);
+
+        Assert.Equal("completed", result.Outcome);
+        Assert.Equal("Implemented requested feature.", result.Summary);
+        Assert.Equal(2, result.DeclaredChanges?.Count);
+        Assert.Empty(result.Concerns!);
+        Assert.Single(result.VerificationClaims!);
+    }
+
+    [Fact]
+    public void RuntimeOwnedSemanticFieldIsRejected()
+    {
+        var invocation = Invocation("implementer");
+        const string json = """
+        {
+          "outcome": "completed",
+          "summary": "Done",
+          "attemptId": "A000123"
+        }
+        """;
+
+        var exception = Assert.Throws<AgentProtocolException>(() =>
+            new FactoryAgentResultValidator().ParseAndValidate(invocation, json));
+
+        Assert.Equal("MALFORMED_AGENT_RESULT", exception.Code);
+        Assert.Contains("attemptId", exception.Message);
+        Assert.Contains("implementation-v1", exception.Message);
+    }
+
+    [Fact]
+    public void ImplementationCompletedRequiresSummary()
+    {
+        var invocation = Invocation("implementer");
+
+        var exception = Assert.Throws<AgentProtocolException>(() =>
+            new FactoryAgentResultValidator().ParseAndValidate(invocation, "{\"outcome\":\"completed\"}"));
+
+        Assert.Equal("MALFORMED_AGENT_RESULT", exception.Code);
+        Assert.Contains("summary", exception.Message);
+    }
+
+    [Fact]
+    public void OutcomeSpecificFieldsDoNotLeakAcrossOutcomes()
+    {
+        var invocation = Invocation("implementer");
+        const string json = """
+        {
+          "outcome": "additional-work-required",
+          "summary": "Not valid for this outcome",
+          "payload": {
+            "capability": "research",
+            "task": "Investigate",
+            "reason": "Need evidence"
+          }
+        }
+        """;
+
+        var exception = Assert.Throws<AgentProtocolException>(() =>
+            new FactoryAgentResultValidator().ParseAndValidate(invocation, json));
+
+        Assert.Equal("MALFORMED_AGENT_RESULT", exception.Code);
+        Assert.Contains("summary", exception.Message);
+    }
+
+    [Fact]
+    public void UnknownSemanticResultSchemaIsRejected()
+    {
+        var invocation = Invocation("implementer") with { SemanticResultSchema = "implementation-v99" };
+
+        var exception = Assert.Throws<AgentProtocolException>(() =>
+            new FactoryAgentResultValidator().ParseAndValidate(invocation, "{\"outcome\":\"completed\",\"summary\":\"Done\"}"));
+
+        Assert.Equal("UNSUPPORTED_SEMANTIC_RESULT_SCHEMA", exception.Code);
+    }
+
+    [Fact]
+    public void SemanticResultSchemaCannotBeBorrowedFromAnotherCapability()
+    {
+        var invocation = Invocation("implementer") with { SemanticResultSchema = "research-v1" };
+
+        var exception = Assert.Throws<AgentProtocolException>(() =>
+            new FactoryAgentResultValidator().ParseAndValidate(invocation, "{\"outcome\":\"completed\",\"summary\":\"Done\"}"));
+
+        Assert.Equal("UNSUPPORTED_SEMANTIC_RESULT_SCHEMA", exception.Code);
+    }
+
     [Theory]
     [InlineData("implementer", "completed")]
     [InlineData("implementer", "additional-work-required")]
@@ -153,6 +253,7 @@ public sealed class AgentProtocolTests
         Assert.Equal("researcher", document.RootElement.GetProperty("role").GetString());
         Assert.Equal("idd-factory-research", document.RootElement.GetProperty("skillName").GetString());
         Assert.Equal("read-only", document.RootElement.GetProperty("executionProfile").GetString());
+        Assert.Equal("research-v1", document.RootElement.GetProperty("semanticResultSchema").GetString());
         Assert.False(document.RootElement.TryGetProperty("conversationHistory", out _));
         Assert.False(document.RootElement.TryGetProperty("nextWorkflowStep", out _));
     }
@@ -166,17 +267,18 @@ public sealed class AgentProtocolTests
             "task-decomposer" => FactoryCapabilityCatalog.Resolve("planning").Agent,
             _ => FactoryCapabilityCatalog.ResolveWorkItem("implementation").Agent
         };
+        var capability = role switch { "researcher" => "research", "final-reviewer" => "final-review", "task-decomposer" => "planning", _ => "implementation" };
         return new AgentInvocation
         {
             RunId = "run",
             AttemptId = "A000001",
-            Capability = role switch { "researcher" => "research", "final-reviewer" => "final-review", "task-decomposer" => "planning", _ => "implementation" },
+            Capability = capability,
             Role = role,
             Workspace = "workspace",
             RawResultPath = "raw-result.json",
             SkillName = contract.SkillName,
             ExecutionProfile = contract.ExecutionProfile,
-            SemanticResultSchema = "test-v1",
+            SemanticResultSchema = SemanticResultContracts.SchemaForCapability(capability),
             Input = "focused input",
             StartedAt = DateTimeOffset.UnixEpoch
         };
@@ -212,6 +314,7 @@ public sealed class AgentProtocolTests
         return new SemanticAgentResult
         {
             Outcome = outcome,
+            Summary = outcome == "completed" ? $"Completed {invocation.Capability} work." : null,
             Tasks = outcome == "ready" ? JsonSerializer.SerializeToElement(new[] { new { capability = "research", task = "Investigate" } }, FactoryJson.Options) : null,
             Payload = outcome is "additional-work-required" or "correction-required" ? futureTask : null
         };

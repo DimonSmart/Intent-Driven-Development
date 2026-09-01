@@ -10,51 +10,44 @@ namespace Idd.Factory.Agents;
 /// </summary>
 public sealed class FactoryAgentResultValidator
 {
-    private static readonly IReadOnlyDictionary<string, HashSet<string>> Outcomes = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
-    {
-        ["planning"] = ["ready", "intent-required", "needs-clarification", "focused-handoff", "blocked"],
-        ["implementation"] = ["completed", "additional-work-required", "global-replan-required", "blocked", "intent-required"],
-        ["research"] = ["completed", "additional-work-required", "global-replan-required", "blocked", "intent-required"],
-        ["semantic-review"] = ["approved", "correction-required", "additional-work-required", "global-replan-required", "blocked", "intent-required"],
-        ["final-review"] = ["approved", "correction-required", "additional-work-required", "global-replan-required", "blocked", "intent-required"]
-    };
-
-    private static readonly HashSet<string> CommonFields = ["outcome", "reason", "payload", "metrics"];
-
     public SemanticAgentResult ParseAndValidate(AgentInvocation invocation, string json)
     {
         JsonDocument document;
         try { document = JsonDocument.Parse(json); }
-        catch (JsonException exception) { throw new AgentProtocolException("MALFORMED_AGENT_RESULT", exception.Message); }
+        catch (JsonException exception) { throw Malformed(invocation, exception.Message); }
         using (document)
         {
             if (document.RootElement.ValueKind != JsonValueKind.Object)
-                throw Malformed("Semantic result must be one JSON object.");
-            var allowed = new HashSet<string>(CommonFields, StringComparer.Ordinal);
-            if (invocation.Capability == "planning") allowed.Add("tasks");
-            var unexpected = document.RootElement.EnumerateObject()
-                .Where(property => !allowed.Contains(property.Name))
-                .Select(property => property.Name)
-                .FirstOrDefault();
-            if (unexpected is not null)
-                throw Malformed($"Semantic result field '{unexpected}' is not allowed; runtime identity and bookkeeping must not be returned by workers.");
+                throw Malformed(invocation, "Semantic result must be one JSON object.");
+
+            var contract = SemanticResultContracts.Resolve(invocation);
+            if (!document.RootElement.TryGetProperty("outcome", out var outcomeElement)
+                || outcomeElement.ValueKind != JsonValueKind.String
+                || string.IsNullOrWhiteSpace(outcomeElement.GetString()))
+                throw Malformed(invocation, "Result outcome is required.");
+            var outcome = contract.ResolveOutcome(outcomeElement.GetString()!);
+            SemanticResultContracts.ValidateJsonFields(invocation, document.RootElement, contract, outcome);
+
             SemanticAgentResult? result;
             try { result = document.RootElement.Deserialize<SemanticAgentResult>(FactoryJson.Options); }
-            catch (JsonException exception) { throw Malformed(exception.Message); }
+            catch (JsonException exception) { throw Malformed(invocation, exception.Message); }
             return Validate(invocation, result);
         }
     }
 
     public SemanticAgentResult Validate(AgentInvocation invocation, SemanticAgentResult? result)
     {
-        if (result is null || string.IsNullOrWhiteSpace(result.Outcome)) throw Malformed("Result outcome is required.");
-        var contract = FactoryCapabilityCatalog.Resolve(invocation.Capability);
-        if (contract.Agent.Role != invocation.Role || contract.Agent.SkillName != invocation.SkillName || contract.Agent.ExecutionProfile != invocation.ExecutionProfile)
+        if (result is null || string.IsNullOrWhiteSpace(result.Outcome)) throw Malformed(invocation, "Result outcome is required.");
+        var capability = FactoryCapabilityCatalog.Resolve(invocation.Capability);
+        if (capability.Agent.Role != invocation.Role || capability.Agent.SkillName != invocation.SkillName || capability.Agent.ExecutionProfile != invocation.ExecutionProfile)
             throw new AgentProtocolException("INVALID_AGENT_INVOCATION", "Invocation capability does not match its runtime-assigned agent contract.");
-        if (!Outcomes.TryGetValue(invocation.Capability, out var outcomes) || !outcomes.Contains(result.Outcome))
-            throw new AgentProtocolException("UNSUPPORTED_AGENT_OUTCOME", $"Outcome {result.Outcome} is invalid for capability {invocation.Capability} and role {invocation.Role}.");
-        if (invocation.Capability != "planning" && result.Tasks is not null)
-            throw Malformed("Top-level tasks are allowed only for planning.");
+
+        var contract = SemanticResultContracts.Resolve(invocation);
+        var outcome = contract.ResolveOutcome(result.Outcome);
+        SemanticResultContracts.ValidateTypedFields(invocation, result, contract, outcome);
+
+        if (invocation.Capability == "implementation" && result.Outcome == "completed" && string.IsNullOrWhiteSpace(result.Summary))
+            throw Malformed(invocation, "Implementation completed result requires non-empty summary.");
         if (result.Outcome == "ready") ValidatePlanningTasks(result.Tasks);
         if (result.Outcome is "additional-work-required" or "correction-required") ValidateFutureTask(result.Payload, result.Outcome);
         if (result.Outcome == "intent-required") IntentRequiredPayload.Validate(result.Payload);
@@ -88,6 +81,9 @@ public sealed class FactoryAgentResultValidator
         value.TryGetProperty(property, out var element) && element.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(element.GetString())
             ? element.GetString()!
             : throw Malformed(message);
+
+    private static AgentProtocolException Malformed(AgentInvocation invocation, string message) =>
+        new("MALFORMED_AGENT_RESULT", $"Capability '{invocation.Capability}', semantic result schema '{invocation.SemanticResultSchema}': {message}");
 
     private static AgentProtocolException Malformed(string message) => new("MALFORMED_AGENT_RESULT", message);
 }
