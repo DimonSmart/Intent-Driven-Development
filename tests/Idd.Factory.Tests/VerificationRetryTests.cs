@@ -61,8 +61,8 @@ public sealed class VerificationRetryTests
         using var temp = new TestWorkspace();
         var backend = new FakeAgentBackend();
         backend.Enqueue(x => Envelope(x, "ready", new { tasks = new[] { Work("Implement", "implementation") } }));
-        backend.Enqueue(x => Envelope(x, "completed", new { summary = "first semantic result" }));
-        backend.Enqueue(x => Envelope(x, "completed", new { summary = "corrected semantic result" }));
+        backend.Enqueue(_ => new SemanticAgentResult { Outcome = "completed", Summary = "first semantic result" });
+        backend.Enqueue(_ => new SemanticAgentResult { Outcome = "completed", Summary = "corrected semantic result" });
         backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "approved"));
         var diagnostic = "compiler error\n" + new string('x', 20_000) + "FULL_OUTPUT_END";
