@@ -115,6 +115,11 @@
       "skillReferences": [
         {
           "skill": "idd-factory-run",
+          "source": "src/canonical/methodology/intent-preflight.md",
+          "destination": "intent-preflight.md"
+        },
+        {
+          "skill": "idd-factory-run",
           "source": "src/canonical/methodology/project-verification.md",
           "destination": "project-verification.md"
         }

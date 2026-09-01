@@ -39,6 +39,9 @@ idd-intent-change =
 - When a request combines an intent change with implementation work, keep the
   spec implementation-independent and pass the concrete implementation focus to
   the next implementation skill rather than recording it as intent.
+- When invoked by Factory Intent Preflight, keep the complete original request
+  as authoritative input. Do not replace it with a route summary or generated
+  implementation plan.
 - Do not archive old specs.
 - If behavior changes inside the same product area, edit the existing spec.
 - If product area identity changes, delegate creation of the new owning spec to
@@ -162,7 +165,12 @@ For `operation: remove`:
    document locally.
 10. If the change affects behavior, update acceptance criteria.
 11. If the change affects testable behavior, update verification.
-12. Report:
+12. When invoked by Factory Intent Preflight, validate the resulting current
+    intent against the unchanged original request. Confirm requested behavior,
+    material non-goals, safety/durability constraints, and compatibility
+    boundaries are covered without copying private implementation shape. Stop
+    on a genuinely unresolved durable decision.
+13. Report:
 
     - operation;
     - ownership outcome;
@@ -173,6 +181,8 @@ For `operation: remove`:
     - document changes;
     - recommended implementation depth;
     - recommended next skill.
+    - preflight coverage as `Covered` or `MissingIntentDecision` when the
+      caller requested Factory Intent Preflight.
 
 `existing-spec-update` means this skill updates the current owning document.
 The three new-document classifications always hand off creation to

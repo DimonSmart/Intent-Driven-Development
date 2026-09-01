@@ -4,6 +4,21 @@ IDD Factory is a deterministic, resumable orchestrator. Semantic workers decide
 the content of work; the .NET runtime owns state, ordering, persistence,
 verification, recovery, and finalization.
 
+For a new end-to-end product request, `idd-factory-run` completes Intent
+Preflight before this execution model begins:
+
+```text
+original request
+-> classify against relevant current intent
+-> optional existing intent workflow
+-> coverage validation
+-> create Factory run with the same original request
+```
+
+Intent preparation is outside the runtime. It never appears in `Completed`,
+`Current`, or `Remaining`, and implementation workers remain unable to change
+`.idd/intent/`.
+
 ```text
                    +---------------+
                    |   Completed   |

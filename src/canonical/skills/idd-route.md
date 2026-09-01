@@ -138,6 +138,9 @@ classification or advice without changing files; otherwise use `end-to-end`.
 
 Do not assign route fields when another explicitly named skill or `idd-skip`
 bypasses routing. Those cases are direct skill invocation, not route results.
+An explicit `idd-factory-run` still performs its own required Intent Preflight
+for a new run; bypassing this router must not bypass end-to-end intent
+preparation.
 
 ## First Skill
 

@@ -144,8 +144,17 @@ The separation is visible to the user because the responsibilities have differen
 
 - `idd-intent` is the normal standalone installation;
 - `idd-factory` is optional and depends on `idd-intent`;
-- Factory may read intent but must not create or silently modify product truth;
-- when Factory discovers missing, contradictory, or insufficient intent, it must stop and route the work to an `idd-intent` workflow;
+- Factory Runtime and its work items may read intent but must not create or
+  silently modify product truth;
+- before a new end-to-end run, the Factory launcher distinguishes a missing
+  intent document from a genuinely missing product decision and may invoke the
+  existing `idd-intent` workflow before runtime creation;
+- `INTENT_REQUIRED` means that a durable decision required for safe
+  implementation cannot be determined from the original request and current
+  intent, not merely that a corresponding specification file is absent;
+- when Factory discovers such a decision later, it stops with structured
+  `missingIntentDecisions` and resumes only after intent is resolved outside
+  runtime;
 - `.idd/factory/current/` holds at most one active run and
   `.idd/factory/results/` holds compact commit-message handoffs;
 - both directories are ignored by default and are never durable product intent.

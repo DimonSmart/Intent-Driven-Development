@@ -8,6 +8,17 @@ skill uses the plugin's directly visible bundled `factory_run`,
 uses the packaged CLI launcher. Neither form contains scheduling logic or
 dispatches agents itself.
 
+For a new run, the launcher first performs the bounded Intent Preflight defined
+by the packaged `intent-preflight.md` reference. It classifies the unchanged
+request against relevant current intent, invokes the existing intent-change or
+new-document workflow when an end-to-end request already contains a complete
+product decision, validates coverage, and only then calls the runtime. This
+pre-runtime stage does not create Factory work items or alter scheduler state.
+
+`INTENT_REQUIRED` therefore denotes a genuinely missing durable decision.
+Absence of a corresponding spec is not sufficient. Explicit
+`implementation-only` scope still forbids intent writes.
+
 The Codex launcher makes one blocking MCP call and never falls back to launching
 the runtime through a shell. If the installed Codex host does not expose the
 bundled Factory tools, update to a supported host instead of using a polling

@@ -45,10 +45,15 @@ one outcome:
 - `completed` — assigned semantic work is finished; include concise `summary`, `declaredChanges[]`, `concerns[]`, optional diagnostic `verificationClaims[]`;
 - `additional-work-required` — a local typed prerequisite was discovered;
 - `global-replan-required` — the global remaining strategy must change;
-- `intent-required` — durable product meaning is missing;
+- `intent-required` — a durable product decision required for safe
+  implementation cannot be determined from the original request and current
+  intent;
 - `blocked` — an external/non-semantic condition prevents progress.
 
 For `intent-required`, return the standard non-empty `payload.missingIntentDecisions` structure. `recommendedNextWorkflow`, when present, refers only to a user-facing durable-intent workflow, never Factory scheduling.
+Use `additional-work-required` for a technical prerequisite or researchable
+implementation question. Never use `intent-required` to request that already
+explicit behavior merely be copied into a spec.
 
 Do not return invocation identity, role, capability outside an outcome payload,
 work-item ID, attempt ID, run ID, protocol or schema version, skill, execution

@@ -48,6 +48,12 @@ smallest ordered prefix that can safely make progress.
 
 ## Intent-required payload
 
+Use `intent-required` only when a durable product decision required for safe
+planning cannot be determined from the original request and current durable
+intent. Missing documentation alone is not sufficient, and technical
+implementation uncertainty that can be represented as `research` is not a
+product-decision blocker.
+
 `payload.missingIntentDecisions` must be non-empty. Each item contains:
 
 ```text
