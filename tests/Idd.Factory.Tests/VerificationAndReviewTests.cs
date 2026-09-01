@@ -34,6 +34,29 @@ public sealed class VerificationAndReviewTests
     }
 
     [Fact]
+    public async Task FinalReviewCorrectionStopsAtCorrectiveCycleLimit()
+    {
+        using var temp = new TestWorkspace();
+        var backend = new FakeAgentBackend();
+        var defaults = CreateConfiguration();
+        var configuration = defaults with { Limits = defaults.Limits with { MaxCorrectiveCycles = 1 } };
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = new[] { Work("A", "research") } }));
+        backend.Enqueue(x => Envelope(x, "completed"));
+        backend.Enqueue(x => Envelope(x, "correction-required", new { capability = "research", task = "First correction", reason = "First defect" }));
+        backend.Enqueue(x => Envelope(x, "completed"));
+        backend.Enqueue(x => Envelope(x, "correction-required", new { capability = "research", task = "Second correction", reason = "Second defect" }));
+
+        var outcome = await CreateRuntime(temp.Path, backend, configuration: configuration).RunRequestAsync("Bound final review corrections", "test", default);
+        var state = await LoadState(temp.Path);
+
+        Assert.Equal("CORRECTIVE_BUDGET_EXHAUSTED", outcome.FactoryOutcome);
+        Assert.Equal(1, state.CorrectiveCycleCount);
+        Assert.Empty(state.Remaining);
+        Assert.Equal(2, backend.Invocations.Count(x => x.Role == "final-reviewer"));
+        Assert.Equal(2, backend.Invocations.Count(x => x.Role == "researcher"));
+    }
+
+    [Fact]
     public async Task FinalReviewGlobalReplanRunsPlanningAndContinuesWithReplacementWork()
     {
         using var temp = new TestWorkspace();
