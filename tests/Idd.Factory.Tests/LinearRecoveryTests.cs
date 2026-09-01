@@ -16,6 +16,7 @@ public sealed class LinearRecoveryTests
         await Store(temp).CreateAsync(state, default);
         var backend = new FakeAgentBackend();
         backend.Enqueue(x => Envelope(x, "completed", new { finding = "done" }));
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "approved"));
 
         var outcome = await CreateRuntime(temp.Path, backend).ContinueAsync(default);
@@ -54,13 +55,14 @@ public sealed class LinearRecoveryTests
         await File.WriteAllTextAsync(Path.Combine(attemptDirectory, "result.json"), JsonSerializer.Serialize(persisted, FactoryJson.Options));
         await Store(temp).CreateAsync(state, default);
         var backend = new FakeAgentBackend();
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "approved"));
 
         var outcome = await CreateRuntime(temp.Path, backend).ContinueAsync(default);
 
         Assert.Equal("COMPLETED", outcome.FactoryOutcome);
-        Assert.Single(backend.Invocations);
-        Assert.Equal("final-reviewer", backend.Invocations[0].Role);
+        Assert.DoesNotContain(backend.Invocations, x => x.Role == "researcher");
+        Assert.Equal(new[] { "task-decomposer", "final-reviewer" }, backend.Invocations.Select(x => x.Role));
     }
 
     [Fact]
@@ -74,6 +76,7 @@ public sealed class LinearRecoveryTests
         await Store(temp).CreateAsync(state, default);
         var backend = new FakeAgentBackend();
         backend.Enqueue(x => Envelope(x, "completed"));
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "approved"));
 
         var outcome = await CreateRuntime(temp.Path, backend).ContinueAsync(default);
