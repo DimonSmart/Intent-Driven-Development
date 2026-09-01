@@ -8,11 +8,20 @@ public sealed partial class FactoryRuntime
     private async Task<FactoryCliOutcome?> PlanAsync(FactoryState state, CancellationToken cancellationToken)
     {
         var replanning = state.PendingReplanTrigger is not null;
+        var initialPlanning = !state.InitialPlanningCompleted;
+        var incrementalPlanning = !initialPlanning && !replanning;
         if (replanning && state.ReplanCount >= configuration.Limits.MaxReplans) throw new AgentProtocolException("REPLAN_BUDGET_EXHAUSTED", "Semantic replan budget exhausted.");
+        if (incrementalPlanning && state.Completed.Count <= state.PlannedThroughCompletedCount)
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Incremental planning requires completed work that has not yet been incorporated into planning.");
+
         var request = await File.ReadAllTextAsync(Path.Combine(currentDirectory, state.RequestPath), cancellationToken);
         var completed = JsonSerializer.Serialize(state.Completed.Select(x => new { x.Id, x.Capability, x.ContractPath, x.ResultRef }), FactoryJson.Options);
         var future = new[] { state.Current }.Where(x => x is not null).Concat(state.Remaining).Select(x => new { x!.Capability, task = ReadContract(x.ContractPath) });
-        var trigger = replanning ? JsonSerializer.Serialize(state.PendingReplanTrigger, FactoryJson.Options) : "initial request";
+        var trigger = replanning
+            ? JsonSerializer.Serialize(state.PendingReplanTrigger, FactoryJson.Options)
+            : initialPlanning
+                ? "initial request"
+                : $"new completed work since previous planning: {state.Completed.Count - state.PlannedThroughCompletedCount} item(s)";
         var input = $"Original request:\n{request}\n\nCompleted immutable work:\n{completed}\n\nCurrent planning trigger:\n{trigger}\n\nExisting future plan:\n{JsonSerializer.Serialize(future, FactoryJson.Options)}\n\n" +
                     "Return only the ordered work that remains to be done. Completed work is immutable and must not be reproduced. The first task executes first. Do not return IDs, dependencies, status, sequence, revisions, outlines, or mutation operations.";
         var result = await InvokeSemanticAsync(state, "planning", null, input, SemanticOperationKind.Planning, cancellationToken);
@@ -28,6 +37,7 @@ public sealed partial class FactoryRuntime
         var contracts = new List<(string Path, string Content)>();
         foreach (var node in tasks.EnumerateArray()) candidate.Remaining.Add(ParsePlannedTask(candidate, node, contracts));
         candidate.InitialPlanningCompleted = true;
+        candidate.PlannedThroughCompletedCount = candidate.Completed.Count;
         candidate.PendingReplanTrigger = null;
         candidate.PendingContinuation = null;
         candidate.Blocker = null;
@@ -40,7 +50,7 @@ public sealed partial class FactoryRuntime
             previous,
             candidate,
             contracts,
-            replanning ? "semantic-replan" : "initial-planning",
+            replanning ? "semantic-replan" : initialPlanning ? "initial-planning" : "incremental-planning",
             result.AttemptId,
             state.Current?.Id,
             cancellationToken);
