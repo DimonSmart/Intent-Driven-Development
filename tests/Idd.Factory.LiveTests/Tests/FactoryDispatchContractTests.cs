@@ -22,6 +22,6 @@ public sealed class FactoryDispatchContractTests
     [Fact]
     public void ValidateAcceptsRoleOnlyDiagnosticPrompt()
     {
-        Assert.Empty(FactoryDispatchContract.Validate("factory-replanner", "Role:\nfactory-replanner\n"));
+        Assert.Empty(FactoryDispatchContract.Validate("task-decomposer", "Role:\ntask-decomposer\n"));
     }
 }
