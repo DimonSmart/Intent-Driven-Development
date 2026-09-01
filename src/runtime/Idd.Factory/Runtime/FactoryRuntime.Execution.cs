@@ -131,7 +131,7 @@ public sealed partial class FactoryRuntime
         {
             RunId = state.RunId, AttemptId = attemptId, Capability = capability, Role = agent.Role, WorkItemId = item?.Id,
             Workspace = workspace, RawResultPath = rawResultPath, SkillName = agent.SkillName,
-            ExecutionProfile = agent.ExecutionProfile, SemanticResultSchema = $"{capability}-v1", Input = input, StartedAt = clock.UtcNow
+            ExecutionProfile = agent.ExecutionProfile, SemanticResultSchema = SemanticResultContracts.SchemaForCapability(capability), Input = input, StartedAt = clock.UtcNow
         };
         await WriteJsonAtomicallyAsync(Path.Combine(attemptDirectory, "invocation.json"), invocationNew, cancellationToken);
         if (agent.ExecutionProfile == AgentExecutionProfile.WorkspaceWrite) await PersistWorkspaceSnapshotAsync(state.RunId, attemptDirectory, cancellationToken);
@@ -183,7 +183,16 @@ public sealed partial class FactoryRuntime
         try
         {
             var result = JsonSerializer.Deserialize<PersistedAttemptResult>(await File.ReadAllTextAsync(path, cancellationToken), FactoryJson.Options);
-            var summary = JsonSerializer.Serialize(new { result?.SemanticResult.Outcome, result?.SemanticResult.Reason, result?.SemanticResult.Payload }, FactoryJson.Options).Replace("\r\n", "\n").Trim();
+            var semantic = result?.SemanticResult;
+            var summary = JsonSerializer.Serialize(new
+            {
+                semantic?.Outcome,
+                semantic?.Summary,
+                Concerns = semantic?.Concerns?.Take(8).ToArray(),
+                DeclaredChanges = semantic?.DeclaredChanges?.Take(8).ToArray(),
+                semantic?.Reason,
+                semantic?.Payload
+            }, FactoryJson.Options).Replace("\r\n", "\n").Trim();
             return summary.Length <= 4000 ? summary : summary[..4000] + " [truncated]";
         }
         catch (JsonException) { return "invalid result artifact"; }
