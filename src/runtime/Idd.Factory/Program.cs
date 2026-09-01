@@ -70,8 +70,8 @@ internal static class FactoryCli
             var factoryDirectory = Path.Combine(workspace, ".idd", "factory");
             Directory.CreateDirectory(factoryDirectory);
             var cancellationMarker = Path.Combine(factoryDirectory, "cancellation.requested");
-            FileStream runLock;
-            try { runLock = AcquireLock(Path.Combine(factoryDirectory, "runtime.lock")); }
+            FactoryRuntimeLock runLock;
+            try { runLock = FactoryRuntimeLock.Acquire(Path.Combine(factoryDirectory, "runtime.lock"), command, clock.UtcNow); }
             catch (FactoryStateException) when (command == "cancel")
             {
                 await File.WriteAllTextAsync(cancellationMarker, DateTimeOffset.UtcNow.ToString("O"));
@@ -156,12 +156,6 @@ internal static class FactoryCli
 
     private static string Required(IReadOnlyDictionary<string, string> options, string name) =>
         options.TryGetValue(name, out var value) && !string.IsNullOrWhiteSpace(value) ? value : throw new ArgumentException($"--{name} is required.");
-
-    private static FileStream AcquireLock(string path)
-    {
-        try { return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
-        catch (IOException) { throw new FactoryStateException("FACTORY_ALREADY_RUNNING", "Another Factory runtime owns this workspace."); }
-    }
 
     private static string ReadMethodologyVersion(string pluginRoot)
     {
