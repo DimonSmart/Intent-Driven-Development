@@ -109,5 +109,5 @@ public sealed class FinalizationDurabilityTests
         return (state, current);
     }
 
-    private sealed class SimulatedCrashException : Exception;
+    private sealed class SimulatedCrashException : Exception { }
 }
