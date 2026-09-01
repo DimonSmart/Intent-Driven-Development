@@ -20,9 +20,7 @@ public sealed partial class FactoryRuntime
                 "Incremental planning requires completed work that has not yet been incorporated into planning.");
 
         var request = await File.ReadAllTextAsync(Path.Combine(currentDirectory, state.RequestPath), cancellationToken);
-        var completed = JsonSerializer.Serialize(
-            state.Completed.Select(x => new { x.Id, x.Capability, x.ContractPath, x.ResultRef }),
-            FactoryJson.Options);
+        var completed = await BuildCompletedContextAsync(state, cancellationToken);
         var future = new[] { state.Current }
             .Where(x => x is not null)
             .Concat(state.Remaining)
