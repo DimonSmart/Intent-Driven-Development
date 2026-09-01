@@ -34,7 +34,7 @@ public sealed partial class FactoryRuntime
             candidate.RunStatus = FactoryRunStatus.Running;
             candidate.PlanRevision++;
             if (replanning) candidate.ReplanCount++;
-            InvalidateFinalEvidence(candidate);
+            FactoryRuntime.InvalidateFinalEvidence(candidate);
 
             await CommitAsync(
                 state,
@@ -81,7 +81,7 @@ public sealed partial class FactoryRuntime
             candidate.PendingContinuation = null;
             candidate.Blocker = null;
             candidate.PlanRevision++;
-            InvalidateFinalEvidence(candidate);
+            FactoryRuntime.InvalidateFinalEvidence(candidate);
 
             await CommitAsync(
                 state,
@@ -114,7 +114,7 @@ public sealed partial class FactoryRuntime
                 $"attempts/{result.AttemptId}/result.json",
                 (candidate.FinalReview?.AttemptCount ?? 0) + 1,
                 null);
-            InvalidateFinalEvidence(candidate);
+            FactoryRuntime.InvalidateFinalEvidence(candidate);
 
             await CommitAsync(
                 state,
@@ -212,13 +212,5 @@ public sealed partial class FactoryRuntime
             !string.IsNullOrWhiteSpace(value.GetString())
                 ? value.GetString()
                 : null;
-
-        private static void InvalidateFinalEvidence(FactoryState state)
-        {
-            state.FinalVerificationPassed = false;
-            state.FinalVerificationPlanRevision = null;
-            if (state.FinalReview?.ReviewedPlanRevision != state.PlanRevision)
-                state.FinalReview = null;
-        }
     }
 }
