@@ -61,8 +61,16 @@ public sealed class FactoryStateValidator
             throw Error("Verification progress is outside the selected check range.");
 
         var awaitingAction = session.Stage is VerificationContinuationStage.AwaitingConfirmation or VerificationContinuationStage.AwaitingManualResult;
-        if (awaitingAction != (session.PendingCheckId is not null && session.PendingCheckDefinitionHash is not null))
-            throw Error("Verification pending-check metadata does not match its stage.");
+        var hasPendingCheck = session.PendingCheckId is not null;
+        var hasPendingDefinition = session.PendingCheckDefinitionHash is not null;
+        if (awaitingAction)
+        {
+            if (!hasPendingCheck || !hasPendingDefinition) throw Error("Verification action stage requires complete pending-check metadata.");
+        }
+        else if (hasPendingCheck || hasPendingDefinition)
+        {
+            throw Error("Verification execute stage cannot retain pending-check metadata.");
+        }
     }
 
     private static bool Equivalent(CompletedWorkItem left, CompletedWorkItem right) =>
