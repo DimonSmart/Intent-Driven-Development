@@ -53,6 +53,15 @@ public sealed class StateInvariantTests
         AssertCorrupt(state);
     }
 
+    [Fact]
+    public void FinalEvidenceRevisionCannotBeNegative()
+    {
+        var state = StateStoreTests.State();
+        state.FinalReview = new FinalReviewState("approved", "attempts/A000001/result.json", 1, -1);
+
+        AssertCorrupt(state);
+    }
+
     [Theory]
     [InlineData(true, null)]
     [InlineData(false, 0L)]
@@ -76,28 +85,33 @@ public sealed class StateInvariantTests
         AssertCorrupt(state);
     }
 
-    [Fact]
-    public void VerificationActionStageRequiresPendingCheckMetadata()
+    [Theory]
+    [InlineData(null, "hash")]
+    [InlineData("build", null)]
+    public void VerificationActionStageRequiresCompletePendingCheckMetadata(string? pendingCheckId, string? pendingCheckDefinitionHash)
     {
         var state = StateStoreTests.State();
         state.PendingVerificationSession = Session(
             0,
             VerificationContinuationStage.AwaitingConfirmation,
-            pendingCheckId: null,
-            pendingCheckDefinitionHash: null);
+            pendingCheckId,
+            pendingCheckDefinitionHash);
 
         AssertCorrupt(state);
     }
 
-    [Fact]
-    public void VerificationExecuteStageCannotRetainPendingCheckMetadata()
+    [Theory]
+    [InlineData("build", "hash")]
+    [InlineData(null, "hash")]
+    [InlineData("build", null)]
+    public void VerificationExecuteStageCannotRetainPendingCheckMetadata(string? pendingCheckId, string? pendingCheckDefinitionHash)
     {
         var state = StateStoreTests.State();
         state.PendingVerificationSession = Session(
             0,
             VerificationContinuationStage.ExecuteCheck,
-            pendingCheckId: "build",
-            pendingCheckDefinitionHash: "hash");
+            pendingCheckId,
+            pendingCheckDefinitionHash);
 
         AssertCorrupt(state);
     }
