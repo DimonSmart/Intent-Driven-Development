@@ -112,6 +112,16 @@ public sealed partial class FactoryRuntime
             await SaveAsync(state, cancellationToken);
             return null;
         }
+        if (result.Outcome == "global-replan-required")
+        {
+            var resultRef = $"attempts/{result.AttemptId}/result.json";
+            state.PendingReplanTrigger = new("final-review", null, resultRef, result.Reason, result.Payload?.Clone(), state.VerificationEvidenceRefs.ToList());
+            state.PendingContinuation = null;
+            state.Blocker = null;
+            state.FinalReview = new(result.Outcome, resultRef, (state.FinalReview?.AttemptCount ?? 0) + 1, null);
+            await SaveAsync(state, cancellationToken);
+            return null;
+        }
         if (result.Outcome is "correction-required" or "additional-work-required")
         {
             if (result.Payload is not { } payload) throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Final review correction requires a payload.");
