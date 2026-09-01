@@ -9,7 +9,8 @@ public sealed class FactoryStateValidator
     {
         if (state.SchemaVersion != FactoryState.CurrentSchemaVersion) throw Error($"Unsupported state schema {state.SchemaVersion}.");
         if (string.IsNullOrWhiteSpace(state.RunId) || string.IsNullOrWhiteSpace(state.MethodologyVersion) || string.IsNullOrWhiteSpace(state.RuntimeVersion)) throw Error("Factory identity is incomplete.");
-        if (state.Revision < 0 || state.PlanRevision < 0 || state.NextWorkItemNumber < 1) throw Error("State counters cannot be negative or zero.");
+        if (state.Revision < 0 || state.PlanRevision < 0 || state.NextWorkItemNumber < 1 || state.PlannedThroughCompletedCount < 0) throw Error("State counters cannot be negative or zero.");
+        if (state.PlannedThroughCompletedCount > state.Completed.Count) throw Error("Planning cannot include completed work that does not exist.");
         if ((state.Current is null) != (state.CurrentPhase is null)) throw Error("Current and CurrentPhase must be set or cleared together.");
 
         var all = state.Completed.Select(x => (x.Id, x.Capability, x.ContractPath))
@@ -33,7 +34,8 @@ public sealed class FactoryStateValidator
     {
         Validate(next);
         if (next.Revision != previous.Revision + 1) throw Error("Revision must advance by exactly one.");
-        if (next.PlanRevision < previous.PlanRevision || next.NextWorkItemNumber < previous.NextWorkItemNumber) throw Error("Plan and ID counters are monotonic.");
+        if (next.PlanRevision < previous.PlanRevision || next.NextWorkItemNumber < previous.NextWorkItemNumber || next.PlannedThroughCompletedCount < previous.PlannedThroughCompletedCount)
+            throw Error("Plan, ID, and planning-knowledge counters are monotonic.");
         if (next.Completed.Count < previous.Completed.Count) throw Error("Completed history cannot shrink.");
         for (var index = 0; index < previous.Completed.Count; index++)
             if (!Equivalent(previous.Completed[index], next.Completed[index])) throw Error($"Completed work {previous.Completed[index].Id} is immutable.");
