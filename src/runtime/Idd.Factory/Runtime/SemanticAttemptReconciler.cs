@@ -72,7 +72,18 @@ internal sealed class SemanticAttemptReconciler(
         if (process is null || !process.CompleteResultObserved || process.TerminationKind == AgentTerminationKind.Cancelled)
             throw new AgentProtocolException("ATTEMPT_RECOVERY_UNSAFE", $"Attempt '{attemptId}' does not have telemetry proving that a complete semantic result was observed.");
 
-        var semantic = validator.ParseAndValidate(invocation, await File.ReadAllTextAsync(invocation.RawResultPath, cancellationToken));
+        SemanticAgentResult semantic;
+        try
+        {
+            semantic = validator.ParseAndValidate(invocation, await File.ReadAllTextAsync(invocation.RawResultPath, cancellationToken));
+        }
+        catch (AgentProtocolException exception)
+        {
+            throw new AgentProtocolException(
+                exception.Code,
+                $"{exception.Message} Persisted attempt '{attemptId}' at '{directory}' was not promoted to authoritative result.json.");
+        }
+
         var persisted = new PersistedAttemptResult
         {
             Invocation = AttemptIdentity.From(invocation),
