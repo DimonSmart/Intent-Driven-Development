@@ -66,6 +66,7 @@ public sealed class CapabilityDrivenRecoveryTests
         string? attemptDirectory = null)
     {
         attemptDirectory ??= Path.Combine(Path.GetTempPath(), "idd-capability-recovery", Guid.NewGuid().ToString("N"));
+        var agent = FactoryCapabilityCatalog.Resolve(capability).Agent;
         return new AgentInvocation
         {
             RunId = runId,
@@ -75,9 +76,9 @@ public sealed class CapabilityDrivenRecoveryTests
             WorkItemId = null,
             Workspace = Path.GetTempPath(),
             RawResultPath = Path.Combine(attemptDirectory, "raw-result.json"),
-            SkillName = "test-skill",
-            ExecutionProfile = AgentExecutionProfile.ReadOnly,
-            SemanticResultSchema = capability + "-v1",
+            SkillName = agent.SkillName,
+            ExecutionProfile = agent.ExecutionProfile,
+            SemanticResultSchema = SemanticResultContracts.SchemaForCapability(capability),
             Input = "test",
             StartedAt = DateTimeOffset.UnixEpoch
         };

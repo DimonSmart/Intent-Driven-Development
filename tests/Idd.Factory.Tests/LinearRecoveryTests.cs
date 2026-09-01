@@ -66,6 +66,45 @@ public sealed class LinearRecoveryTests
     }
 
     [Fact]
+    public async Task PersistedRawWorkerResultIsValidatedAndConsumedWithoutRedispatch()
+    {
+        using var temp = new TestWorkspace();
+        var state = PrepareCurrentState(temp, CurrentWorkPhase.Running);
+        state.AttemptSequence = 1;
+        state.CurrentAttemptId = "A000001";
+        state.Current!.CurrentAttemptId = "A000001";
+        state.Current.AttemptCount = 1;
+        state.PendingContinuation = new(ContinuationKind.SemanticInvocation, state.Current.Id, null, "WORKITEMEXECUTION", true, SemanticOperationKind.WorkItemExecution);
+        var attemptDirectory = Path.Combine(temp.Path, ".idd", "factory", "current", "attempts", "A000001");
+        Directory.CreateDirectory(attemptDirectory);
+        var invocation = new AgentInvocation
+        {
+            RunId = state.RunId, AttemptId = "A000001", Capability = "research", Role = "researcher", WorkItemId = state.Current.Id,
+            Workspace = temp.Path, RawResultPath = Path.Combine(attemptDirectory, "raw-result.json"), SkillName = "idd-factory-research",
+            ExecutionProfile = AgentExecutionProfile.ReadOnly, SemanticResultSchema = "research-v1", Input = "persisted input", StartedAt = DateTimeOffset.UnixEpoch
+        };
+        await File.WriteAllTextAsync(Path.Combine(attemptDirectory, "invocation.json"), JsonSerializer.Serialize(invocation, FactoryJson.Options));
+        await File.WriteAllTextAsync(invocation.RawResultPath, "{\"outcome\":\"completed\",\"summary\":\"Recovered existing raw result.\"}");
+        await File.WriteAllTextAsync(
+            Path.Combine(attemptDirectory, "process-telemetry.json"),
+            JsonSerializer.Serialize(new AgentProcessResult(0, "", "", true, false, AgentTerminationKind.CleanExit), FactoryJson.Options));
+        await Store(temp).CreateAsync(state, default);
+        var backend = new FakeAgentBackend();
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
+        backend.Enqueue(x => Envelope(x, "approved"));
+
+        var outcome = await CreateRuntime(temp.Path, backend).ContinueAsync(default);
+
+        Assert.Equal("COMPLETED", outcome.FactoryOutcome);
+        Assert.DoesNotContain(backend.Invocations, x => x.Role == "researcher");
+        Assert.True(File.Exists(Path.Combine(outcome.ResultDirectory!, "attempts", "A000001", "result.json")));
+        var persisted = JsonSerializer.Deserialize<PersistedAttemptResult>(
+            File.ReadAllText(Path.Combine(outcome.ResultDirectory!, "attempts", "A000001", "result.json")), FactoryJson.Options)!;
+        Assert.Equal("Recovered existing raw result.", persisted.SemanticResult.Summary);
+        Assert.Equal(AttemptIdentity.From(invocation), persisted.Invocation);
+    }
+
+    [Fact]
     public async Task AwaitingVerificationResumesBeforeAnyLaterWork()
     {
         using var temp = new TestWorkspace();
