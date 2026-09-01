@@ -61,7 +61,14 @@ public sealed class VerificationRetryTests
         using var temp = new TestWorkspace();
         var backend = new FakeAgentBackend();
         backend.Enqueue(x => Envelope(x, "ready", new { tasks = new[] { Work("Implement", "implementation") } }));
-        backend.Enqueue(_ => new SemanticAgentResult { Outcome = "completed", Summary = "first semantic result" });
+        backend.Enqueue(_ => new SemanticAgentResult
+        {
+            Outcome = "completed",
+            Summary = "first semantic result",
+            DeclaredChanges = ["changed file A", "changed file B"],
+            Concerns = ["remaining concern"],
+            VerificationClaims = ["worker says tests pass"]
+        });
         backend.Enqueue(_ => new SemanticAgentResult { Outcome = "completed", Summary = "corrected semantic result" });
         backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "approved"));
@@ -79,6 +86,10 @@ public sealed class VerificationRetryTests
         Assert.Equal(2, implementations.Length);
         Assert.All(implementations, invocation => Assert.Equal("W000001", invocation.WorkItemId));
         Assert.Contains("attempts/A000002/result.json", implementations[1].Input);
+        Assert.Contains("first semantic result", implementations[1].Input);
+        Assert.Contains("changed file A", implementations[1].Input);
+        Assert.Contains("remaining concern", implementations[1].Input);
+        Assert.DoesNotContain("worker says tests pass", implementations[1].Input);
         Assert.Contains("Authoritative verification observations:", implementations[1].Input);
         Assert.Contains("Check: repository-fallback", implementations[1].Input);
         Assert.Contains("Status: failed", implementations[1].Input);
