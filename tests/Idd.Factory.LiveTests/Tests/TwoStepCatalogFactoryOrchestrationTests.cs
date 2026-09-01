@@ -15,10 +15,10 @@ public sealed class TwoStepCatalogFactoryOrchestrationTests
     }
 
     [Fact]
-    public void AssertOrchestration_FailsForUnexpectedReplanner()
+    public void AssertOrchestration_FailsForUnexpectedWorker()
     {
         var trace = ExpectedTrace();
-        var agents = trace.Agents.Append(Node("replan", "root", "factory-replanner", null, DateTimeOffset.Parse("2026-01-01T00:00:10Z"))).ToArray();
+        var agents = trace.Agents.Append(Node("research", "root", "researcher", null, DateTimeOffset.Parse("2026-01-01T00:00:10Z"))).ToArray();
         var assertions = AssertOrchestration(trace with { Agents = agents });
 
         Assert.True(assertions.HasFailuresIn("Orchestration failure"));
