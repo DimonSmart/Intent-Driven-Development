@@ -65,11 +65,17 @@ public sealed partial class FactoryRuntime
 
     private async Task<FactoryCliOutcome?> PrependReviewCorrectionAsync(FactoryState state, PlannedWorkItem source, BoundSemanticAgentResult result, CancellationToken cancellationToken)
     {
-        if (state.CorrectiveCycleCount >= configuration.Limits.MaxCorrectiveCycles) throw new AgentProtocolException("CORRECTIVE_BUDGET_EXHAUSTED", "Corrective work budget exhausted.");
         if (result.Payload is not { } correction)
             throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Review correction requires a payload.");
-        state.CorrectiveCycleCount++;
+        StartCorrectiveCycle(state);
         return await PrependBeforeRetryAsync(state, source, result, correction, "review-correction", cancellationToken);
+    }
+
+    private void StartCorrectiveCycle(FactoryState state)
+    {
+        if (state.CorrectiveCycleCount >= configuration.Limits.MaxCorrectiveCycles)
+            throw new AgentProtocolException("CORRECTIVE_BUDGET_EXHAUSTED", "Corrective work budget exhausted.");
+        state.CorrectiveCycleCount++;
     }
 
     private async Task<FactoryCliOutcome?> PrependBeforeRetryAsync(FactoryState state, PlannedWorkItem source, BoundSemanticAgentResult result, JsonElement requirement, string reason, CancellationToken cancellationToken)
@@ -127,13 +133,13 @@ public sealed partial class FactoryRuntime
             if (result.Payload is not { } payload) throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Final review correction requires a payload.");
             var capability = RequiredString(payload, "capability", "Final review correction capability is required.");
             var task = RequiredString(payload, "task", "Final review correction task is required.");
+            StartCorrectiveCycle(state);
             var previous = CloneState(state);
             var contracts = new List<(string Path, string Content)>();
             using var document = JsonDocument.Parse(JsonSerializer.Serialize(new { capability, task }));
             state.Remaining.Add(ParsePlannedTask(state, document.RootElement, contracts));
             foreach (var contract in contracts) await WriteRuntimeArtifactAtomicallyAsync(Path.Combine(currentDirectory, contract.Path), contract.Content, cancellationToken);
             state.PlanRevision++;
-            state.CorrectiveCycleCount++;
             state.FinalReview = new(result.Outcome, $"attempts/{result.AttemptId}/result.json", (state.FinalReview?.AttemptCount ?? 0) + 1, null);
             InvalidateFinalEvidence(state);
             await planRevisions.WriteAsync(previous, state, "final-review-correction", result.AttemptId, null, cancellationToken);
