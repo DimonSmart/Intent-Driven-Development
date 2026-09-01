@@ -32,13 +32,11 @@ Use `global-replan-required` only when the discovery invalidates the global rema
 Return one JSON object with `outcome` and only its outcome-specific fields. Use
 one outcome:
 
-- `completed` — include concise findings, evidence/references, unresolved concerns if any;
-- `additional-work-required` — runtime should materialize a focused dependency;
-- `global-replan-required` — the global remaining strategy must change;
-- `intent-required` — a durable product decision required for safe research or
-  later implementation cannot be determined from the original request and
-  current intent;
-- `blocked` — an external condition prevents useful research.
+- `completed` — include a concise non-empty `summary`; use `concerns[]` for unresolved concerns when any, and optional `payload` for focused findings, evidence, or references that need structured preservation;
+- `additional-work-required` — runtime should materialize a focused dependency; return the flat `payload.capability`, `payload.task`, and `payload.reason` described above;
+- `global-replan-required` — the global remaining strategy must change; `reason` and `payload` are optional semantic context;
+- `intent-required` — a durable product decision required for safe research or later implementation cannot be determined from the original request and current intent; return the standard non-empty `payload.missingIntentDecisions` structure;
+- `blocked` — an external condition prevents useful research; `reason` and `payload` may describe the blocker.
 
 Runtime persists the result reference and owns all scheduling and ordered-plan mutation.
 

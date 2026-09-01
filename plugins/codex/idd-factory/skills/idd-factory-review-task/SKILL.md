@@ -7,9 +7,9 @@ description: Independently review the integrated Factory result as read-only sem
 
 ## Purpose
 
-Perform one read-only semantic review work item over the integrated product. Final review is represented by an ordinary persisted graph node with capability `semantic-review`; it is not a global workflow phase.
+Perform the read-only `final-review` semantic operation over the integrated product after strict final verification. It is a runtime-owned final review operation, not an ordinary `semantic-review` work item and not an orchestration authority.
 
-Runtime owns scheduling, strict final verification, corrections, ordered future work, persistence, and finalization.
+Runtime owns scheduling, strict final verification, corrections, ordered future work, persistence, commit-message generation, and finalization.
 
 ## Inputs and boundaries
 
@@ -35,7 +35,7 @@ payload:
   reason: Why the correction is required.
 ```
 
-Runtime materializes that correction as a new graph work item. A final review with a defect remains immutable evidence; after correction and strict verification, runtime materializes a fresh final review node.
+Runtime materializes that correction as a new graph work item. A final review with a defect remains immutable evidence; after correction and strict verification, runtime performs a fresh final review.
 
 If review discovers a prerequisite/investigation rather than a direct correction, return `additional-work-required` with the same flat capability/task/reason payload. Use `global-replan-required` only when the remaining global strategy itself is invalid.
 
@@ -44,13 +44,12 @@ If review discovers a prerequisite/investigation rather than a direct correction
 Return one JSON object with `outcome` and only its outcome-specific fields. Use
 one outcome:
 
-- `approved` — no material semantic defect remains; for final review include `payload.commitMessage` with `subject`, `why[]`, `result[]`;
-- `correction-required` — bounded semantic defect that should become corrective graph work;
-- `additional-work-required` — typed prerequisite/investigation should become graph work;
-- `global-replan-required` — remaining global strategy must be restructured;
-- `intent-required` — a durable product decision required to judge the result
-  cannot be determined from the original request and current intent;
-- `blocked` — external condition prevents review.
+- `approved` — no material semantic defect remains; no additional semantic payload is required;
+- `correction-required` — bounded semantic defect that should become corrective graph work; return the flat `payload.capability`, `payload.task`, and `payload.reason` described above;
+- `additional-work-required` — typed prerequisite/investigation should become graph work; return the same flat payload;
+- `global-replan-required` — remaining global strategy must be restructured; `reason` and `payload` are optional semantic context;
+- `intent-required` — a durable product decision required to judge the result cannot be determined from the original request and current intent; return the standard non-empty `payload.missingIntentDecisions` structure;
+- `blocked` — external condition prevents review; `reason` and `payload` may describe the blocker.
 
 Never describe failed, blocked, or unverified semantics as approved. `recommendedNextWorkflow` in an `intent-required` payload, when present, refers only to a durable-intent editing workflow outside Factory runtime orchestration.
 Do not treat implementation as authoritative when it matches the request but
