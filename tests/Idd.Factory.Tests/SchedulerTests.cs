@@ -31,6 +31,18 @@ public sealed class SchedulerTests
     }
 
     [Fact]
+    public void NewCompletedKnowledgeRequestsPlanningBeforeFinalVerification()
+    {
+        var state = StateStoreTests.State(); state.InitialPlanningCompleted = true; state.PlanRevision = 2;
+        state.Completed.Add(StateStoreTests.Completed("W000001", "research"));
+
+        Assert.Equal(FactoryCommandKind.Plan, new FactoryScheduler().Decide(state).Kind);
+
+        state.PlannedThroughCompletedCount = 1;
+        Assert.Equal(FactoryCommandKind.RunFinalVerification, new FactoryScheduler().Decide(state).Kind);
+    }
+
+    [Fact]
     public void FinalVerificationThenReviewThenFinalize()
     {
         var state = StateStoreTests.State(); state.InitialPlanningCompleted = true; state.PlanRevision = 3;
