@@ -385,38 +385,4 @@ public static class CodexExecutableResolver
     }
 }
 
-internal sealed class ProtectedArtifactGuard
-{
-    private readonly IReadOnlyDictionary<string, string> hashes;
-    private readonly IReadOnlyList<string> roots;
-
-    private ProtectedArtifactGuard(IReadOnlyDictionary<string, string> hashes, IReadOnlyList<string> roots)
-    {
-        this.hashes = hashes;
-        this.roots = roots;
-    }
-
-    public static ProtectedArtifactGuard Capture(AgentInvocation invocation)
-    {
-        var attemptDirectory = Path.GetDirectoryName(invocation.RawResultPath)!;
-        var current = Directory.GetParent(Directory.GetParent(attemptDirectory)!.FullName)!.FullName;
-        var roots = new[] { Path.Combine(current, "state.json"), Path.Combine(current, "request.md"), Path.Combine(current, "run-context.md"), Path.Combine(current, "work-items"), Path.Combine(current, "clarifications"), Path.Combine(invocation.Workspace, ".idd", "intent"), Path.Combine(invocation.Workspace, ".idd", "verification.yaml") };
-        return new(Enumerate(roots).ToDictionary(path => path, Hash, StringComparer.OrdinalIgnoreCase), roots);
-    }
-
-    public void ValidateUnchanged()
-    {
-        var current = Enumerate(roots).ToDictionary(path => path, Hash, StringComparer.OrdinalIgnoreCase);
-        foreach (var path in hashes.Keys.Union(current.Keys, StringComparer.OrdinalIgnoreCase))
-        {
-            if (hashes.TryGetValue(path, out var before) && current.TryGetValue(path, out var after) && before == after) continue;
-            throw new AgentProtocolException(IsProductArtifact(path) ? "WORKER_CHANGED_PRODUCT_INTENT" : "WORKER_CHANGED_RUNNER_STATE", $"Worker changed protected artifact {path}.");
-        }
-    }
-
-    private static IEnumerable<string> Enumerate(IEnumerable<string> roots) => roots.SelectMany(root => File.Exists(root) ? [root] : Directory.Exists(root) ? Directory.GetFiles(root, "*", SearchOption.AllDirectories) : []);
-    private static string Hash(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
-    private static bool IsProductArtifact(string path) => path.Contains($"{Path.DirectorySeparatorChar}intent{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) || path.EndsWith("verification.yaml", StringComparison.OrdinalIgnoreCase);
-}
-
 public sealed class AgentProtocolException(string code, string message) : Exception(message) { public string Code { get; } = code; }
