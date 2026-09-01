@@ -9,9 +9,13 @@ public sealed class FactoryStateValidator
     {
         if (state.SchemaVersion != FactoryState.CurrentSchemaVersion) throw Error($"Unsupported state schema {state.SchemaVersion}.");
         if (string.IsNullOrWhiteSpace(state.RunId) || string.IsNullOrWhiteSpace(state.MethodologyVersion) || string.IsNullOrWhiteSpace(state.RuntimeVersion)) throw Error("Factory identity is incomplete.");
-        if (state.Revision < 0 || state.PlanRevision < 0 || state.NextWorkItemNumber < 1 || state.PlannedThroughCompletedCount < 0) throw Error("State counters cannot be negative or zero.");
+        if (state.Revision < 0 || state.PlanRevision < 0 || state.NextWorkItemNumber < 1 || state.AttemptSequence < 0 || state.ReplanCount < 0 || state.CorrectiveCycleCount < 0 || state.PlannedThroughCompletedCount < 0)
+            throw Error("State counters cannot be negative or zero where a positive value is required.");
         if (state.PlannedThroughCompletedCount > state.Completed.Count) throw Error("Planning cannot include completed work that does not exist.");
         if ((state.Current is null) != (state.CurrentPhase is null)) throw Error("Current and CurrentPhase must be set or cleared together.");
+
+        var active = new[] { state.Current }.Where(x => x is not null).Concat(state.Remaining).Select(x => x!).ToArray();
+        if (active.Any(x => x.AttemptCount < 0)) throw Error("Work item attempt counts cannot be negative.");
 
         var all = state.Completed.Select(x => (x.Id, x.Capability, x.ContractPath))
             .Concat(state.Current is null ? [] : [(state.Current.Id, state.Current.Capability, state.Current.ContractPath)])
@@ -27,6 +31,10 @@ public sealed class FactoryStateValidator
         if (state.CurrentAttemptId is not null && state.Current is null && state.PendingContinuation?.Operation is not (SemanticOperationKind.Planning or SemanticOperationKind.FinalReview))
             throw Error("An active attempt without Current work must be planning or final review.");
         if (state.PendingVerificationSession is { WorkItemId: not null } session && state.Current?.Id != session.WorkItemId) throw Error("Subtask verification must target Current work.");
+        if (state.PendingVerificationSession is { } verificationSession) ValidateVerificationSession(verificationSession);
+        if (state.FinalVerificationPassed != (state.FinalVerificationPlanRevision is not null)) throw Error("Final verification status and plan revision must be set or cleared together.");
+        if (state.FinalReview is { AttemptCount: < 0 }) throw Error("Final review attempt count cannot be negative.");
+        if (state.FinalVerificationPlanRevision < 0 || state.FinalReview?.ReviewedPlanRevision < 0) throw Error("Final evidence revisions cannot be negative.");
         if (state.FinalVerificationPlanRevision > state.PlanRevision || state.FinalReview?.ReviewedPlanRevision > state.PlanRevision) throw Error("Final evidence cannot target a future plan revision.");
     }
 
@@ -44,6 +52,24 @@ public sealed class FactoryStateValidator
         {
             if (previous.Current is null || next.Completed[^1].Id != previous.Current.Id) throw Error("New completed work must be the previous Current task.");
             if (next.Current is not null) throw Error("Current must be cleared when it is committed to Completed.");
+        }
+    }
+
+    private static void ValidateVerificationSession(PendingVerificationSession session)
+    {
+        if (session.NextCheckIndex < 0 || session.NextCheckIndex > session.CheckIds.Count)
+            throw Error("Verification progress is outside the selected check range.");
+
+        var awaitingAction = session.Stage is VerificationContinuationStage.AwaitingConfirmation or VerificationContinuationStage.AwaitingManualResult;
+        var hasPendingCheck = session.PendingCheckId is not null;
+        var hasPendingDefinition = session.PendingCheckDefinitionHash is not null;
+        if (awaitingAction)
+        {
+            if (!hasPendingCheck || !hasPendingDefinition) throw Error("Verification action stage requires complete pending-check metadata.");
+        }
+        else if (hasPendingCheck || hasPendingDefinition)
+        {
+            throw Error("Verification execute stage cannot retain pending-check metadata.");
         }
     }
 
