@@ -59,9 +59,12 @@ Ownership rules:
 
 The canonical Factory skill set is `idd-factory-run`,
 `idd-factory-decompose-task`, `idd-factory-execute-subtask`,
-`idd-factory-review-checkpoint`, `idd-factory-review-task`, and
-`idd-factory-replan`. Its semantic roles are `task-decomposer`, `implementer`,
-`checkpoint-reviewer`, `final-reviewer`, and `factory-replanner`.
+`idd-factory-research`, `idd-factory-review-checkpoint`,
+`idd-factory-review-task`, and `idd-factory-replan`. Its runtime semantic roles
+are `task-decomposer`, `implementer`, `researcher`, `checkpoint-reviewer`, and
+`final-reviewer`. Initial planning and semantic replanning both use the unified
+`planning` capability and the `task-decomposer` role. `idd-factory-replan` is
+retained only as the legacy public skill name for that unified planning contract.
 Do not reintroduce the obsolete single `work-plan.md` create/execute workflow.
 
 The generator publishes the .NET 10 Factory Runtime into each Factory plugin.
