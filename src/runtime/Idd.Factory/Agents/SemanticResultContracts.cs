@@ -49,7 +49,7 @@ internal static class SemanticResultContracts
         }),
         Contract("research-v1", "research", new Dictionary<string, SemanticOutcomeContract>(StringComparer.Ordinal)
         {
-            ["completed"] = Outcome(["summary", "concerns", "payload", "metrics"]),
+            ["completed"] = Outcome(["summary", "concerns", "payload", "metrics"], ["summary"]),
             ["additional-work-required"] = Outcome(["payload", "metrics"], ["payload"]),
             ["global-replan-required"] = Outcome(["reason", "payload", "metrics"]),
             ["intent-required"] = Outcome(["reason", "payload", "metrics"], ["payload"]),
@@ -57,7 +57,7 @@ internal static class SemanticResultContracts
         }),
         Contract("semantic-review-v1", "semantic-review", new Dictionary<string, SemanticOutcomeContract>(StringComparer.Ordinal)
         {
-            ["approved"] = Outcome(["reason", "payload", "metrics"]),
+            ["approved"] = Outcome([]),
             ["correction-required"] = Outcome(["payload", "metrics"], ["payload"]),
             ["additional-work-required"] = Outcome(["payload", "metrics"], ["payload"]),
             ["global-replan-required"] = Outcome(["reason", "payload", "metrics"]),
@@ -66,7 +66,7 @@ internal static class SemanticResultContracts
         }),
         Contract("final-review-v1", "final-review", new Dictionary<string, SemanticOutcomeContract>(StringComparer.Ordinal)
         {
-            ["approved"] = Outcome(["reason", "payload", "metrics"]),
+            ["approved"] = Outcome([]),
             ["correction-required"] = Outcome(["payload", "metrics"], ["payload"]),
             ["additional-work-required"] = Outcome(["payload", "metrics"], ["payload"]),
             ["global-replan-required"] = Outcome(["reason", "payload", "metrics"]),
