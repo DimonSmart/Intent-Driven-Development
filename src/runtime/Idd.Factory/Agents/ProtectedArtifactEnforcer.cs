@@ -1,3 +1,5 @@
+using Idd.Factory.Domain;
+
 namespace Idd.Factory.Agents;
 
 /// <summary>
