@@ -46,8 +46,10 @@ public sealed class FactoryAgentResultValidator
         var outcome = contract.ResolveOutcome(result.Outcome);
         SemanticResultContracts.ValidateTypedFields(invocation, result, contract, outcome);
 
-        if (invocation.Capability == "implementation" && result.Outcome == "completed" && string.IsNullOrWhiteSpace(result.Summary))
-            throw Malformed(invocation, "Implementation completed result requires non-empty summary.");
+        if (result.Outcome == "completed"
+            && invocation.Capability is "implementation" or "research"
+            && string.IsNullOrWhiteSpace(result.Summary))
+            throw Malformed(invocation, $"{invocation.Capability} completed result requires non-empty summary.");
         if (result.Outcome == "ready") ValidatePlanningTasks(result.Tasks);
         if (result.Outcome is "additional-work-required" or "correction-required") ValidateFutureTask(result.Payload, result.Outcome);
         if (result.Outcome == "intent-required") IntentRequiredPayload.Validate(result.Payload);
