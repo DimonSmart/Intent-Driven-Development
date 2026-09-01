@@ -59,7 +59,8 @@ public sealed partial class FactoryRuntime(
         var state = await stateStore.LoadAsync(cancellationToken) ?? throw new FactoryStateException("MISSING_FACTORY_STATE", "No Factory run exists.");
         if (state.FactoryConfigurationHash != configuration.Hash) return new("FACTORY_CONFIGURATION_CHANGED", state.RunId, "Restore the pinned configuration or cancel and restart.");
         if (state.RunStatus == FactoryRunStatus.Cancelled) return new("CANCELLED", state.RunId);
-        await ReconcileAsync(state, cancellationToken);
+        try { await ReconcileAsync(state, cancellationToken); }
+        catch (AgentProtocolException exception) { return await StopForAgentProtocolExceptionAsync(state, exception, cancellationToken); }
 
         if (state.PendingContinuation is { IsResumable: false }) return OutcomeFromBlocker(state, "TERMINAL_STOP");
         if (state.PendingContinuation is { Kind: ContinuationKind.VerificationGate, VerificationStage: VerificationContinuationStage.AwaitingConfirmation or VerificationContinuationStage.AwaitingManualResult } pending)
