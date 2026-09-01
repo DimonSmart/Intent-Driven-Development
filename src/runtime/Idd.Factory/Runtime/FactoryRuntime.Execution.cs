@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Idd.Factory.Domain;
 using Idd.Factory.Verification;
@@ -24,7 +25,8 @@ public sealed partial class FactoryRuntime
         FactoryCapabilityCatalog.ResolveWorkItem(item.Capability);
         if (!configuration.AllowedCapabilities.Contains(item.Capability)) throw new AgentProtocolException("CAPABILITY_NOT_ALLOWED", $"Capability '{item.Capability}' is not allowed.");
         var reusable = state.CurrentAttemptId is { } attempt && File.Exists(Path.Combine(currentDirectory, "attempts", attempt, "result.json"));
-        if (!reusable && item.AttemptCount >= configuration.Limits.MaxAgentAttempts) throw new AgentProtocolException("RETRY_BUDGET_EXHAUSTED", $"{item.Id} exhausted its semantic attempt budget.");
+        if (!reusable && item.AttemptCount >= configuration.Limits.MaxAgentAttempts)
+            throw new AgentProtocolException("RETRY_BUDGET_EXHAUSTED", await BuildRetryBudgetExhaustedMessageAsync(item, cancellationToken));
 
         state.CurrentPhase = CurrentWorkPhase.Running;
         await SaveAsync(state, cancellationToken);
@@ -150,7 +152,8 @@ public sealed partial class FactoryRuntime
         var contract = await File.ReadAllTextAsync(Path.Combine(currentDirectory, item.ContractPath), cancellationToken);
         var completed = await BuildCompletedContextAsync(state, cancellationToken);
         var prior = await BuildPriorResultContextAsync(item, cancellationToken);
-        return $"Work item contract:\n{contract}\n\nRelevant completed work and results:\n{completed}\n\nPrevious attempts for this task:\n{prior}\n\nUse a fresh semantic context. Do not rely on conversation history or internal planning state.";
+        var verificationObservations = await BuildVerificationObservationsAsync(item, cancellationToken);
+        return $"Work item contract:\n{contract}\n\nRelevant completed work and results:\n{completed}\n\nPrevious attempts for this task:\n{prior}\n\nAuthoritative verification observations:\n{verificationObservations}\n\nUse a fresh semantic context. Do not rely on conversation history or internal planning state.";
     }
 
     private async Task<string> BuildCompletedContextAsync(FactoryState state, CancellationToken cancellationToken)
@@ -184,6 +187,71 @@ public sealed partial class FactoryRuntime
             return summary.Length <= 4000 ? summary : summary[..4000] + " [truncated]";
         }
         catch (JsonException) { return "invalid result artifact"; }
+    }
+
+    private async Task<string> BuildVerificationObservationsAsync(PlannedWorkItem item, CancellationToken cancellationToken)
+    {
+        var failures = await ReadFailedVerificationEvidenceAsync(item, cancellationToken);
+        if (failures.Count == 0) return "none";
+
+        var observations = new List<string>();
+        foreach (var (reference, evidence) in failures)
+        {
+            observations.Add($"- Check: {evidence.CheckId}");
+            observations.Add($"  Status: {evidence.Status}");
+            observations.Add($"  Exit code: {evidence.ExitCode}");
+            observations.Add($"  Evidence: {reference}");
+            observations.Add("");
+            observations.Add("  Relevant output:");
+            foreach (var line in BoundedVerificationOutput(evidence.Output).Replace("\r\n", "\n").Split('\n'))
+                observations.Add($"  {line}");
+        }
+        return string.Join("\n", observations).TrimEnd();
+    }
+
+    private async Task<string> BuildRetryBudgetExhaustedMessageAsync(PlannedWorkItem item, CancellationToken cancellationToken)
+    {
+        var failures = await ReadFailedVerificationEvidenceAsync(item, cancellationToken);
+        if (failures.Count == 0) return $"{item.Id} exhausted its semantic attempt budget.";
+
+        var (reference, evidence) = failures[^1];
+        return $"Work item {item.Id} could not pass authoritative verification after {item.AttemptCount} semantic attempts.\n\nFailed check:\n{evidence.CheckId}\n\nLatest verification output:\n{BoundedVerificationOutput(evidence.Output)}\n\nEvidence:\n{reference}";
+    }
+
+    private async Task<List<(string Reference, VerificationEvidence Evidence)>> ReadFailedVerificationEvidenceAsync(
+        PlannedWorkItem item,
+        CancellationToken cancellationToken)
+    {
+        var failures = new List<(string Reference, VerificationEvidence Evidence)>();
+        foreach (var reference in item.VerificationEvidenceRefs)
+        {
+            var path = Path.Combine(currentDirectory, reference);
+            if (!File.Exists(path)) continue;
+            try
+            {
+                var evidence = JsonSerializer.Deserialize<VerificationEvidence>(await File.ReadAllTextAsync(path, cancellationToken), FactoryJson.Options);
+                if (evidence?.Status == "failed") failures.Add((reference, evidence));
+            }
+            catch (JsonException) { }
+        }
+        return failures;
+    }
+
+    private static string BoundedVerificationOutput(string output)
+    {
+        const int maximumBytes = 12 * 1024;
+        if (Encoding.UTF8.GetByteCount(output) <= maximumBytes) return output;
+
+        var minimum = 0;
+        var maximum = Math.Min(output.Length, maximumBytes);
+        while (minimum < maximum)
+        {
+            var candidate = minimum + (maximum - minimum + 1) / 2;
+            if (Encoding.UTF8.GetByteCount(output.AsSpan(0, candidate)) <= maximumBytes) minimum = candidate;
+            else maximum = candidate - 1;
+        }
+        var length = minimum;
+        return output[..length] + "\n[verification output truncated; see evidence artifact]";
     }
 
     private async Task ReconcileAsync(FactoryState state, CancellationToken cancellationToken)

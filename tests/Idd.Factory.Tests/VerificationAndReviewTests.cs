@@ -24,7 +24,7 @@ public sealed class VerificationAndReviewTests
         var backend = new FakeAgentBackend();
         backend.Enqueue(x => Envelope(x, "ready", new { tasks = new[] { Work("A", "research") } }));
         backend.Enqueue(x => Envelope(x, "completed"));
-        backend.Enqueue(x => Envelope(x, "correction-required", new { correction = new { capability = "research", task = "Correct the integrated defect" } }));
+        backend.Enqueue(x => Envelope(x, "correction-required", new { capability = "research", task = "Correct the integrated defect", reason = "Integrated review found a defect" }));
         backend.Enqueue(x => Envelope(x, "completed"));
         backend.Enqueue(x => Envelope(x, "approved"));
         var outcome = await CreateRuntime(temp.Path, backend).RunRequestAsync("Review and correct", "test", default);

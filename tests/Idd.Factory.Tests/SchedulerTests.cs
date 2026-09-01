@@ -22,6 +22,15 @@ public sealed class SchedulerTests
     }
 
     [Fact]
+    public void ReadyCurrentIsDispatchedWithoutVerificationSpecificCommand()
+    {
+        var state = StateStoreTests.State(); state.InitialPlanningCompleted = true;
+        state.Current = StateStoreTests.Planned("W000001"); state.CurrentPhase = CurrentWorkPhase.Ready;
+
+        Assert.Equal(new FactoryCommand(FactoryCommandKind.DispatchWork, "W000001"), new FactoryScheduler().Decide(state));
+    }
+
+    [Fact]
     public void FinalVerificationThenReviewThenFinalize()
     {
         var state = StateStoreTests.State(); state.InitialPlanningCompleted = true; state.PlanRevision = 3;

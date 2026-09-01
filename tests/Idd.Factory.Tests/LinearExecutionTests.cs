@@ -30,7 +30,7 @@ public sealed class LinearExecutionTests
         using var temp = new TestWorkspace();
         var backend = new FakeAgentBackend();
         backend.Enqueue(x => Envelope(x, "ready", new { tasks = new[] { Work("B", "research"), Work("C", "research"), Work("D", "research") } }));
-        backend.Enqueue(x => Envelope(x, "additional-work-required", new { requirement = new { capability = "research", task = "X" } }));
+        backend.Enqueue(x => Envelope(x, "additional-work-required", new { capability = "research", task = "X", reason = "X is required first" }));
         backend.Enqueue(x => Envelope(x, "completed", new { finding = "X" }));
         backend.Enqueue(x => Envelope(x, "completed", new { finding = "B" }));
         backend.Enqueue(x => Envelope(x, "completed", new { finding = "C" }));
@@ -72,7 +72,7 @@ public sealed class LinearExecutionTests
         using var temp = new TestWorkspace();
         var backend = new FakeAgentBackend();
         backend.Enqueue(x => Envelope(x, "ready", new { tasks = new[] { Work("A", "research"), Work("B", "research") } }));
-        backend.Enqueue(x => Envelope(x, "additional-work-required", new { requirement = new { capability = "mystery", task = "X" } }));
+        backend.Enqueue(x => Envelope(x, "additional-work-required", new { capability = "mystery", task = "X", reason = "X is required first" }));
 
         var outcome = await CreateRuntime(temp.Path, backend).RunRequestAsync("Reject malformed expansion", "test", default);
 

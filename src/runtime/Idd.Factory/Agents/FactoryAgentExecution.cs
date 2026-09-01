@@ -32,9 +32,12 @@ public sealed class FactoryAgentResultValidator
                 throw Malformed("Semantic result must be one JSON object.");
             var allowed = new HashSet<string>(CommonFields, StringComparer.Ordinal);
             if (invocation.Capability == "planning") allowed.Add("tasks");
-            var unexpected = document.RootElement.EnumerateObject().FirstOrDefault(property => !allowed.Contains(property.Name));
-            if (unexpected.Name is not null)
-                throw Malformed($"Semantic result field '{unexpected.Name}' is not allowed; runtime identity and bookkeeping must not be returned by workers.");
+            var unexpected = document.RootElement.EnumerateObject()
+                .Where(property => !allowed.Contains(property.Name))
+                .Select(property => property.Name)
+                .FirstOrDefault();
+            if (unexpected is not null)
+                throw Malformed($"Semantic result field '{unexpected}' is not allowed; runtime identity and bookkeeping must not be returned by workers.");
             SemanticAgentResult? result;
             try { result = document.RootElement.Deserialize<SemanticAgentResult>(FactoryJson.Options); }
             catch (JsonException exception) { throw Malformed(exception.Message); }

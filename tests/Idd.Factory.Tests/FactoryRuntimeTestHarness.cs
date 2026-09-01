@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Idd.Factory.Agents;
 using Idd.Factory.Configuration;
 using Idd.Factory.Domain;
@@ -12,17 +13,22 @@ namespace Idd.Factory.Tests;
 
 internal static class FactoryRuntimeTestHarness
 {
-    public static FactoryRuntime CreateRuntime(string workspace, FakeAgentBackend backend, IEnumerable<string>? allowed = null)
+    public static FactoryRuntime CreateRuntime(
+        string workspace,
+        FakeAgentBackend backend,
+        IEnumerable<string>? allowed = null,
+        FactoryConfiguration? configuration = null,
+        VerificationEngine? verification = null)
     {
         var current = Path.Combine(workspace, ".idd", "factory", "current");
         var clock = new FakeClock();
-        var configuration = CreateConfiguration(allowed);
+        configuration ??= CreateConfiguration(allowed);
         return new FactoryRuntime(
             workspace,
             configuration,
             new FileFactoryStateStore(current, new FactoryStateValidator()),
             new FactoryAgentExecutor(backend, new FactoryAgentResultValidator()),
-            new VerificationEngine(workspace, current),
+            verification ?? new VerificationEngine(workspace, current),
             new FactoryEventWriter(current, clock),
             clock);
     }
@@ -62,6 +68,10 @@ internal static class FactoryRuntimeTestHarness
 
 internal sealed class FakeAgentBackend : IAgentBackend
 {
+    private static readonly JsonSerializerOptions WireOptions = new(FactoryJson.Options)
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
     private readonly Queue<Func<AgentInvocation, SemanticAgentResult>> results = new();
     public List<AgentInvocation> Invocations { get; } = [];
 
@@ -73,7 +83,7 @@ internal sealed class FakeAgentBackend : IAgentBackend
         Invocations.Add(invocation);
         Directory.CreateDirectory(Path.GetDirectoryName(invocation.RawResultPath)!);
         var result = results.Dequeue()(invocation);
-        File.WriteAllText(invocation.RawResultPath, JsonSerializer.Serialize(result, FactoryJson.Options));
+        File.WriteAllText(invocation.RawResultPath, JsonSerializer.Serialize(result, WireOptions));
         return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId));
     }
 

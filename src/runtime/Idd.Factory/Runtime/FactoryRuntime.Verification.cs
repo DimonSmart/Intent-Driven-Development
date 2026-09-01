@@ -241,12 +241,21 @@ public sealed partial class FactoryRuntime
             return null;
         }
 
-        if (item is not null) state.CurrentPhase = CurrentWorkPhase.Blocked;
-        else
+        if (item is not null)
         {
-            state.FinalVerificationPassed = false;
-            state.FinalVerificationPlanRevision = null;
+            if (item.LastResultRef is not null && !item.PriorResultRefs.Contains(item.LastResultRef, StringComparer.Ordinal))
+                item.PriorResultRefs.Add(item.LastResultRef);
+            state.CurrentPhase = CurrentWorkPhase.Ready;
+            state.PendingContinuation = null;
+            state.Blocker = null;
+            state.RunStatus = FactoryRunStatus.Running;
+            await SaveAsync(state, cancellationToken);
+            await events.WriteAsync(state.RunId, "verification-decision", new { context, workItemId = item.Id, decision, failedCheckIds }, cancellationToken);
+            return null;
         }
+
+        state.FinalVerificationPassed = false;
+        state.FinalVerificationPlanRevision = null;
         state.RunStatus = FactoryRunStatus.Blocked;
         var failed = failedCheckIds.Count == 0 ? "unknown check" : string.Join(", ", failedCheckIds);
         state.Blocker = new(

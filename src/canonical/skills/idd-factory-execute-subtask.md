@@ -8,11 +8,11 @@ Runtime owns selection, retries, ordered-plan mutation, persistence, verificatio
 
 ## Inputs and boundaries
 
-Read the supplied work-item contract, relevant durable intent, completed dependency result summaries/references, prior result references for this same work item, focused repository evidence, and runtime-supplied verification observations.
+Read the supplied work-item contract, relevant durable intent, completed dependency result summaries/references, prior semantic attempt results for this same work item, focused repository evidence, and runtime-supplied authoritative verification observations from earlier attempts.
 
 Do not read unrelated work merely to reconstruct a global plan. Do not mutate Factory state, graph history, `.idd/factory.yaml`, intent, or verification policy. Do not select another worker, role, skill, or runtime phase.
 
-Make the smallest coherent product change needed by the contract. Runtime verification is authoritative. Do not run Factory verification checks merely to classify success or repair a hidden gate; there is no `verification-fix` orchestration mode.
+Make the smallest coherent product change needed by the contract. When earlier authoritative verification observations are supplied, use them as diagnostic evidence and correct the assigned work item accordingly. Runtime verification remains authoritative: do not run or classify authoritative Factory verification yourself, and do not repair a hidden gate; there is no `verification-fix` orchestration mode.
 
 ## Dynamic dependency discovery
 
