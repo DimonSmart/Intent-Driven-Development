@@ -118,3 +118,125 @@ To also save a machine-readable report:
 ```bat
 dotnet run --project tools/factory-token-analysis -- analyze C:\Private\FactoryBubbleSortSmoke --json token-report.json
 ```
+
+The tool reads:
+
+```text
+events.jsonl
+attempts/*/attempt-telemetry.json
+attempts/*/invocation.json
+attempts/*/stdout.log
+```
+
+It also flags common context-pollution patterns such as:
+
+- a worker reading its own Factory `SKILL.md` even though the runtime inlines the selected skill instructions;
+- broad recursive workspace inventory;
+- Git failures caused by a non-Git workspace;
+- failed commands producing at least 10,000 characters;
+- five or more sequential tool batches;
+- a final reviewer consuming more than 30% of the run's gross input.
+
+These warnings are diagnostic signals, not proof of a defect. For example, a genuinely large repository may legitimately require more inspection.
+
+## Establish a baseline
+
+Token counts vary across runs, so do not baseline from one execution if it can be avoided. Run the same small canonical scenario 3-5 times with comparable:
+
+- Codex CLI/runtime;
+- semantic model and reasoning configuration;
+- Factory version/skills;
+- workspace contents;
+- user-skill setup.
+
+Keep each completed result directory, then create a median baseline:
+
+```bat
+dotnet run --project tools/factory-token-analysis -- baseline factory-token-baseline.json ^
+  C:\FactoryRuns\run-1 ^
+  C:\FactoryRuns\run-2 ^
+  C:\FactoryRuns\run-3
+```
+
+The baseline stores the median of the structural and token metrics. Median is preferred to mean because one unusual agent trajectory should not redefine the expected cost.
+
+The baseline also records the requested model set and Factory skill versions. A mismatch is reported as a comparability note.
+
+## Compare a later run
+
+```bat
+dotnet run --project tools/factory-token-analysis -- analyze C:\Private\FactoryBubbleSortSmoke ^
+  --baseline factory-token-baseline.json
+```
+
+The analyzer currently uses these regression thresholds:
+
+| Metric | Warning | Critical |
+| --- | ---: | ---: |
+| Gross input | > 1.25x baseline | > 1.50x baseline |
+| New input | > 1.25x baseline | > 1.50x baseline |
+| Tool output chars | > 1.50x baseline | > 2.00x baseline |
+| Semantic attempts | > baseline + 1 | > baseline + 2 |
+| Tool batches | > baseline + 2 | > baseline + 5 |
+| Failed tool output | — | >= 10 KB above baseline |
+
+For CI or a release-certification check, add:
+
+```bat
+--fail-on-regression
+```
+
+The tool returns exit code `2` when a critical regression is detected. Without that option it reports findings but returns success, which is useful while the baseline is still being tuned.
+
+## How not to miss real overuse
+
+A token regression can hide if only one metric is watched.
+
+For example:
+
+- Good cache reuse can keep `new input` moderate while excessive sequential rounds make gross input explode.
+- A model/runtime update can raise the fixed base context while the Factory workflow itself remains efficient.
+- A redundant semantic worker can add a large cost even if every individual attempt looks reasonable.
+- One failed command can inject tens of kilobytes of useless context without noticeably changing the original Factory input packet.
+
+For that reason, treat these together as the primary efficiency contract:
+
+```text
+semantic attempts
+tool batches
+gross input
+new input
+tool output chars
+failed tool output chars
+```
+
+When one of them moves, inspect the per-attempt table before optimizing prompts.
+
+A good canonical smoke task should be deliberately small and stable. Bubble Sort with a console app and a fixed seven-case test suite is suitable because the repository context is tiny, the expected product is unambiguous, and unexpected semantic attempts or tool rounds stand out immediately.
+
+Do not compare unrelated production tasks to this smoke baseline. Use the smoke baseline to detect Factory/Codex orchestration regressions, and maintain separate baselines for other repeatable workload classes if needed.
+
+## Interpreting cached input correctly
+
+Codex usage reports:
+
+```text
+input_tokens
+cached_input_tokens
+output_tokens
+```
+
+`cached_input_tokens` is a subset of `input_tokens`. Therefore:
+
+```text
+new_input_tokens = input_tokens - cached_input_tokens
+```
+
+Do not calculate total input as `input + cached`; that double-counts cached tokens.
+
+Both gross and new input are useful:
+
+- **gross input** shows how much context was repeatedly presented to the model and is sensitive to sequential-round growth;
+- **new input** shows how much non-cached context was introduced.
+
+The analyzer reports both deliberately.
