@@ -28,6 +28,7 @@ public sealed class SemanticReviewDispatchTests
             Assert.Equal("idd-factory-review-checkpoint", invocation.SkillName);
             return Envelope(invocation, "approved");
         });
+        backend.Enqueue(invocation => Envelope(invocation, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(invocation =>
         {
             Assert.Equal("final-reviewer", invocation.Role);
@@ -39,7 +40,7 @@ public sealed class SemanticReviewDispatchTests
 
         Assert.Equal("COMPLETED", outcome.FactoryOutcome);
         Assert.Equal(
-            new[] { "task-decomposer", "implementer", "checkpoint-reviewer", "final-reviewer" },
+            new[] { "task-decomposer", "implementer", "checkpoint-reviewer", "task-decomposer", "final-reviewer" },
             backend.Invocations.Select(x => x.Role));
     }
 

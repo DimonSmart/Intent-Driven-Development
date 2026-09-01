@@ -43,6 +43,7 @@ public sealed class FactoryScheduler
             };
         }
         if (state.Remaining.Count > 0) return new(FactoryCommandKind.SelectNextWork);
+        if (state.Completed.Count > state.PlannedThroughCompletedCount) return new(FactoryCommandKind.Plan);
 
         var finalVerified = state.FinalVerificationPassed && state.FinalVerificationPlanRevision == state.PlanRevision;
         var finalReviewed = state.FinalReview is { Verdict: "approved", ReviewedPlanRevision: not null } review && review.ReviewedPlanRevision == state.PlanRevision;

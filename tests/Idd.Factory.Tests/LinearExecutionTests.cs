@@ -14,6 +14,7 @@ public sealed class LinearExecutionTests
         backend.Enqueue(x => Envelope(x, "completed", new { finding = "A" }));
         backend.Enqueue(x => Envelope(x, "completed", new { finding = "B" }));
         backend.Enqueue(x => Envelope(x, "completed", new { finding = "C" }));
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "approved"));
 
         var outcome = await CreateRuntime(temp.Path, backend).RunRequestAsync("Execute A, B, C", "test", default);
@@ -35,6 +36,7 @@ public sealed class LinearExecutionTests
         backend.Enqueue(x => Envelope(x, "completed", new { finding = "B" }));
         backend.Enqueue(x => Envelope(x, "completed", new { finding = "C" }));
         backend.Enqueue(x => Envelope(x, "completed", new { finding = "D" }));
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "approved"));
 
         var outcome = await CreateRuntime(temp.Path, backend).RunRequestAsync("Dynamic prerequisite", "test", default);
@@ -56,6 +58,7 @@ public sealed class LinearExecutionTests
         backend.Enqueue(x => Envelope(x, "ready", new { tasks = new[] { Work("X", "research"), Work("Y", "research") } }));
         backend.Enqueue(x => Envelope(x, "completed"));
         backend.Enqueue(x => Envelope(x, "completed"));
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "approved"));
 
         var outcome = await CreateRuntime(temp.Path, backend).RunRequestAsync("Replace future strategy", "test", default);
@@ -63,7 +66,7 @@ public sealed class LinearExecutionTests
         Assert.Equal("COMPLETED", outcome.FactoryOutcome);
         using var completed = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(outcome.ResultDirectory!, "completed-work.json")));
         Assert.Equal(new[] { "W000001", "W000002", "W000004", "W000005" }, completed.RootElement.GetProperty("completed").EnumerateArray().Select(x => x.GetProperty("id").GetString()));
-        Assert.Equal(2, backend.Invocations.Count(x => x.Role == "task-decomposer"));
+        Assert.Equal(3, backend.Invocations.Count(x => x.Role == "task-decomposer"));
     }
 
     [Fact]

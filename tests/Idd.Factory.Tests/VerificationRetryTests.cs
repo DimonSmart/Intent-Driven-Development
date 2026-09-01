@@ -63,6 +63,7 @@ public sealed class VerificationRetryTests
         backend.Enqueue(x => Envelope(x, "ready", new { tasks = new[] { Work("Implement", "implementation") } }));
         backend.Enqueue(x => Envelope(x, "completed", new { summary = "first semantic result" }));
         backend.Enqueue(x => Envelope(x, "completed", new { summary = "corrected semantic result" }));
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "approved"));
         var diagnostic = "compiler error\n" + new string('x', 20_000) + "FULL_OUTPUT_END";
         var verification = new SequencedVerificationEngine(temp.Path,
@@ -133,6 +134,7 @@ public sealed class VerificationRetryTests
         var backend = new FakeAgentBackend();
         backend.Enqueue(x => Envelope(x, "ready", new { tasks = new[] { Work("Implement", "implementation") } }));
         backend.Enqueue(x => Envelope(x, "completed"));
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         var verification = new SequencedVerificationEngine(temp.Path,
             (VerificationStatus.Passed, "subtask", 0, "passed"),
             (VerificationStatus.Failed, "final", 1, "strict final failure"));

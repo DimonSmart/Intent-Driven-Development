@@ -42,6 +42,7 @@ public sealed record FactoryState
     public int ReplanCount { get; set; }
     public int CorrectiveCycleCount { get; set; }
     public bool InitialPlanningCompleted { get; set; }
+    public int PlannedThroughCompletedCount { get; set; }
     public bool FinalVerificationPassed { get; set; }
     public long? FinalVerificationPlanRevision { get; set; }
     public FactoryBlocker? Blocker { get; set; }

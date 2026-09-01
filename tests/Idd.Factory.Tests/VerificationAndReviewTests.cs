@@ -11,6 +11,7 @@ public sealed class VerificationAndReviewTests
         var backend = new FakeAgentBackend();
         backend.Enqueue(x => Envelope(x, "ready", new { tasks = new[] { Work("A", "research") } }));
         backend.Enqueue(x => Envelope(x, "completed"));
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "approved"));
         var outcome = await CreateRuntime(temp.Path, backend).RunRequestAsync("Verify and review", "test", default);
         Assert.Equal("COMPLETED", outcome.FactoryOutcome);
@@ -24,8 +25,10 @@ public sealed class VerificationAndReviewTests
         var backend = new FakeAgentBackend();
         backend.Enqueue(x => Envelope(x, "ready", new { tasks = new[] { Work("A", "research") } }));
         backend.Enqueue(x => Envelope(x, "completed"));
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "correction-required", new { capability = "research", task = "Correct the integrated defect", reason = "Integrated review found a defect" }));
         backend.Enqueue(x => Envelope(x, "completed"));
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "approved"));
         var outcome = await CreateRuntime(temp.Path, backend).RunRequestAsync("Review and correct", "test", default);
         Assert.Equal("COMPLETED", outcome.FactoryOutcome);
@@ -42,8 +45,10 @@ public sealed class VerificationAndReviewTests
         var configuration = defaults with { Limits = defaults.Limits with { MaxCorrectiveCycles = 1 } };
         backend.Enqueue(x => Envelope(x, "ready", new { tasks = new[] { Work("A", "research") } }));
         backend.Enqueue(x => Envelope(x, "completed"));
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "correction-required", new { capability = "research", task = "First correction", reason = "First defect" }));
         backend.Enqueue(x => Envelope(x, "completed"));
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "correction-required", new { capability = "research", task = "Second correction", reason = "Second defect" }));
 
         var outcome = await CreateRuntime(temp.Path, backend, configuration: configuration).RunRequestAsync("Bound final review corrections", "test", default);
@@ -63,17 +68,19 @@ public sealed class VerificationAndReviewTests
         var backend = new FakeAgentBackend();
         backend.Enqueue(x => Envelope(x, "ready", new { tasks = new[] { Work("A", "research") } }));
         backend.Enqueue(x => Envelope(x, "completed"));
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "global-replan-required", new { finding = "Integrated review invalidated the remaining strategy" }, "Global strategy must change"));
         backend.Enqueue(x => Envelope(x, "ready", new { tasks = new[] { Work("X", "research") } }));
         backend.Enqueue(x => Envelope(x, "completed"));
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
         backend.Enqueue(x => Envelope(x, "approved"));
 
         var outcome = await CreateRuntime(temp.Path, backend).RunRequestAsync("Review and replan", "test", default);
 
         Assert.Equal("COMPLETED", outcome.FactoryOutcome);
-        Assert.Equal(2, backend.Invocations.Count(x => x.Role == "task-decomposer"));
+        Assert.Equal(4, backend.Invocations.Count(x => x.Role == "task-decomposer"));
         Assert.Equal(2, backend.Invocations.Count(x => x.Role == "final-reviewer"));
-        var replanInvocation = backend.Invocations.Where(x => x.Role == "task-decomposer").ElementAt(1);
+        var replanInvocation = backend.Invocations.Where(x => x.Role == "task-decomposer").ElementAt(2);
         Assert.Contains("Global strategy must change", replanInvocation.Input);
         Assert.Contains("final-review", replanInvocation.Input);
     }
