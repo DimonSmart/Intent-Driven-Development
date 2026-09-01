@@ -182,6 +182,10 @@ public sealed record AgentInvocation
 public sealed record SemanticAgentResult
 {
     public required string Outcome { get; init; }
+    public string? Summary { get; init; }
+    public List<string>? DeclaredChanges { get; init; }
+    public List<string>? Concerns { get; init; }
+    public List<string>? VerificationClaims { get; init; }
     public JsonElement? Tasks { get; init; }
     public string? Reason { get; init; }
     public JsonElement? Payload { get; init; }
@@ -225,6 +229,10 @@ public sealed record PersistedAttemptResult
 public sealed record BoundSemanticAgentResult(string AttemptId, SemanticAgentResult SemanticResult)
 {
     public string Outcome => SemanticResult.Outcome;
+    public string? Summary => SemanticResult.Summary;
+    public IReadOnlyList<string>? DeclaredChanges => SemanticResult.DeclaredChanges;
+    public IReadOnlyList<string>? Concerns => SemanticResult.Concerns;
+    public IReadOnlyList<string>? VerificationClaims => SemanticResult.VerificationClaims;
     public JsonElement? Tasks => SemanticResult.Tasks;
     public string? Reason => SemanticResult.Reason;
     public JsonElement? Payload => SemanticResult.Payload;
