@@ -93,8 +93,8 @@ public sealed class FactoryAgentResultValidator
 }
 
 /// <summary>
-/// Uses the existing backend transport, but validates the capability-oriented protocol and
-/// additionally protects plan history and Factory policy from worker mutation.
+/// Uses the existing backend transport, validates the capability-oriented protocol, and enforces
+/// runner/product ownership by restoring protected artifacts before reporting worker violations.
 /// </summary>
 public sealed class FactoryAgentExecutor(IAgentBackend backend, FactoryAgentResultValidator validator)
 {
@@ -106,9 +106,7 @@ public sealed class FactoryAgentExecutor(IAgentBackend backend, FactoryAgentResu
         if (!File.Exists(invocationPath))
             await File.WriteAllTextAsync(invocationPath, JsonSerializer.Serialize(invocation, FactoryJson.Options), cancellationToken);
 
-        var legacyProtected = ProtectedArtifactGuard.Capture(invocation);
-        var planProtected = PlanProtectedArtifactGuard.Capture(invocation);
-        var invocationHash = Hash(invocationPath);
+        var protectedArtifacts = ProtectedArtifactEnforcer.Capture(invocation);
         var handle = await backend.StartAsync(invocation, cancellationToken);
         var process = await backend.WaitAsync(handle, cancellationToken);
         await File.WriteAllTextAsync(
@@ -117,11 +115,8 @@ public sealed class FactoryAgentExecutor(IAgentBackend backend, FactoryAgentResu
             CancellationToken.None);
 
         // Protected ownership is authoritative even when the semantic process crashes or is cancelled.
-        // A failed worker must not bypass the guard and leave runner-owned state damaged before retry/recovery.
-        legacyProtected.ValidateUnchanged();
-        planProtected.ValidateUnchanged();
-        if (!File.Exists(invocationPath) || Hash(invocationPath) != invocationHash)
-            throw new AgentProtocolException("WORKER_CHANGED_RUNNER_STATE", $"Worker changed protected artifact {invocationPath}.");
+        // Restore protected roots before any retry/recovery path can observe worker mutations.
+        protectedArtifacts.ValidateAndRestore();
 
         if (process.TerminationKind == AgentTerminationKind.Cancelled) throw new OperationCanceledException(cancellationToken);
         if (process.TerminationKind == AgentTerminationKind.TransportFailure && !process.CompleteResultObserved)
@@ -141,57 +136,10 @@ public sealed class FactoryAgentExecutor(IAgentBackend backend, FactoryAgentResu
         return new(new BoundSemanticAgentResult(invocation.AttemptId, semanticResult), process);
     }
 
-    private static string Hash(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
-
     private static async Task WriteJsonAtomicallyAsync<T>(string path, T value, CancellationToken cancellationToken)
     {
         var temporary = path + ".tmp";
         await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(value, FactoryJson.Options), cancellationToken);
         File.Move(temporary, path, true);
     }
-}
-
-/// <summary>
-/// Additional protection for plan provenance and policy artifacts.
-/// </summary>
-internal sealed class PlanProtectedArtifactGuard
-{
-    private readonly IReadOnlyDictionary<string, string> hashes;
-    private readonly IReadOnlyList<string> roots;
-
-    private PlanProtectedArtifactGuard(IReadOnlyDictionary<string, string> hashes, IReadOnlyList<string> roots)
-    {
-        this.hashes = hashes;
-        this.roots = roots;
-    }
-
-    public static PlanProtectedArtifactGuard Capture(AgentInvocation invocation)
-    {
-        var attemptDirectory = Path.GetDirectoryName(invocation.RawResultPath)!;
-        var current = Directory.GetParent(Directory.GetParent(attemptDirectory)!.FullName)!.FullName;
-        var roots = new[]
-        {
-            Path.Combine(current, "plan-revisions"),
-            Path.Combine(invocation.Workspace, ".idd", "factory.yaml")
-        };
-        return new(Enumerate(roots).ToDictionary(path => path, Hash, StringComparer.OrdinalIgnoreCase), roots);
-    }
-
-    public void ValidateUnchanged()
-    {
-        var current = Enumerate(roots).ToDictionary(path => path, Hash, StringComparer.OrdinalIgnoreCase);
-        foreach (var path in hashes.Keys.Union(current.Keys, StringComparer.OrdinalIgnoreCase))
-        {
-            if (hashes.TryGetValue(path, out var before) && current.TryGetValue(path, out var after) && before == after) continue;
-            throw new AgentProtocolException(
-                path.EndsWith("factory.yaml", StringComparison.OrdinalIgnoreCase) ? "WORKER_CHANGED_FACTORY_POLICY" : "WORKER_CHANGED_RUNNER_STATE",
-                $"Worker changed protected artifact {path}.");
-        }
-    }
-
-    private static IEnumerable<string> Enumerate(IEnumerable<string> roots) =>
-        roots.SelectMany(root => File.Exists(root) ? [root] : Directory.Exists(root) ? Directory.GetFiles(root, "*", SearchOption.AllDirectories) : []);
-
-    private static string Hash(string path) =>
-        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
 }
