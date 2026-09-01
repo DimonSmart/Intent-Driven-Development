@@ -127,7 +127,7 @@
     "description": "Run, resume, or cancel a deterministic IDD Factory Runtime execution."
   },
   "idd-factory-decompose-task": {
-    "description": "Create the smallest safe initial Factory task graph using executable and outline work without requiring a complete up-front plan.",
+    "description": "Return the smallest safe ordered list of remaining Factory work without requiring a complete up-front plan.",
     "adapters": {
       "claude": {
         "frontmatter": {
@@ -140,7 +140,7 @@
     }
   },
   "idd-factory-execute-subtask": {
-    "description": "Execute one focused implementation or documentation work item in an isolated worker context.",
+    "description": "Execute one focused workspace-writing implementation work item in an isolated worker context.",
     "adapters": {
       "claude": {
         "frontmatter": {

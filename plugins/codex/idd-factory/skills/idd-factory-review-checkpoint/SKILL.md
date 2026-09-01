@@ -19,23 +19,30 @@ Do not modify product files, Factory state, graph history, `.idd/factory.yaml`, 
 
 Return `approved` when the covered slice is semantically coherent.
 
-For a bounded defect, return `correction-required` with `payload.correctiveSubtask` containing capability, contract Markdown, and optional stable verification IDs/expectations. Runtime materializes corrective work as a new graph node; completed work remains immutable.
+For a bounded defect, return `correction-required` with a flat `payload`
+containing non-empty `capability`, `task`, and `reason` fields. Runtime
+materializes corrective future work; completed work remains immutable.
 
-For a missing focused prerequisite or investigation, return `additional-work-required` with a typed capability/goal/reason requirement. Return `global-replan-required` only if the remaining global strategy cannot stay correct through local graph work.
+For a missing focused prerequisite or investigation, return
+`additional-work-required` with the same flat capability/task/reason payload.
+Return `global-replan-required` only if the remaining global strategy cannot
+stay correct through local future work.
 
 Use `intent-required` only when durable product meaning is missing, or `blocked` when an external/non-semantic condition prevents review. Ordinary review work does not own user clarification; do not return `needs-clarification`.
 
 ## Outcomes
 
-Return protocol version 2 with role `checkpoint-reviewer` and one outcome:
+Return one JSON object with `outcome` and only its outcome-specific fields. Use
+one outcome:
 
 - `approved`;
 - `correction-required`;
-- compatibility alias `needs-fix`;
 - `additional-work-required`;
 - `global-replan-required`;
-- compatibility alias `needs-replan`;
 - `intent-required`;
 - `blocked`.
 
 Do not choose a next role, skill, phase, retry, or transition. Runtime owns all operational decisions.
+Do not return invocation identity, role, capability outside an outcome payload,
+work-item ID, attempt ID, run ID, protocol or schema version, skill, execution
+profile, result path, or other runtime bookkeeping.
