@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Idd.Factory.Configuration;
 using Idd.Factory.Domain;
@@ -17,6 +18,8 @@ public sealed partial class FactoryRuntime(
     FactoryEventWriter events,
     IClock clock)
 {
+    private static readonly UTF8Encoding HumanReadableUtf8 = new(encoderShouldEmitUTF8Identifier: true, throwOnInvalidBytes: true);
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
     private readonly string workspace = workspace;
     private readonly FactoryConfiguration configuration = configuration;
     private readonly IFactoryStateStore stateStore = stateStore;
@@ -35,12 +38,13 @@ public sealed partial class FactoryRuntime(
     public async Task<FactoryCliOutcome> RunRequestAsync(string request, string methodologyVersion, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request)) throw new ArgumentException("Factory request cannot be empty.", nameof(request));
+        ValidateUtf8Text(request, "INVALID_REQUEST_ENCODING", "Factory request");
         if (await stateStore.LoadAsync(cancellationToken) is not null) return new("RUN_EXISTS", "unknown", "Use continue or cancel for the existing Factory run.");
         Directory.CreateDirectory(currentDirectory);
         Directory.CreateDirectory(Path.Combine(currentDirectory, "work-items"));
         Directory.CreateDirectory(Path.Combine(currentDirectory, "attempts"));
         Directory.CreateDirectory(Path.Combine(currentDirectory, "plan-revisions"));
-        await File.WriteAllTextAsync(Path.Combine(currentDirectory, "request.md"), request, cancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(currentDirectory, "request.md"), request, HumanReadableUtf8, cancellationToken);
         var state = new FactoryState
         {
             MethodologyVersion = methodologyVersion,
@@ -230,9 +234,22 @@ public sealed partial class FactoryRuntime(
     private async Task RecordClarificationAsync(FactoryState state, string sourcePath, CancellationToken cancellationToken)
     {
         if (!File.Exists(sourcePath)) throw new FileNotFoundException("Clarification answer file was not found.", sourcePath);
+        var answer = await File.ReadAllTextAsync(sourcePath, cancellationToken);
+        ValidateUtf8Text(answer, "INVALID_CLARIFICATION_ENCODING", "Factory clarification answer");
         var relative = $"clarifications/Q{state.ClarificationRefs.Count + 1:00000}.md";
-        await WriteRuntimeArtifactAtomicallyAsync(Path.Combine(currentDirectory, relative), await File.ReadAllTextAsync(sourcePath, cancellationToken), cancellationToken);
+        await WriteRuntimeArtifactAtomicallyAsync(Path.Combine(currentDirectory, relative), answer, cancellationToken);
         state.ClarificationRefs.Add(relative);
+    }
+
+    private static void ValidateUtf8Text(string text, string code, string label)
+    {
+        if (text.Contains('\uFFFD'))
+            throw new FactoryStateException(code, $"{label} contains Unicode replacement character U+FFFD and may have been corrupted before Factory received it.");
+        try { _ = StrictUtf8.GetByteCount(text); }
+        catch (EncoderFallbackException)
+        {
+            throw new FactoryStateException(code, $"{label} contains invalid Unicode data that cannot be represented as UTF-8 without replacement.");
+        }
     }
 
     private string HashIntent()
