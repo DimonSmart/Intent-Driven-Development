@@ -94,19 +94,47 @@ public sealed partial class FactoryRuntime
                 cancellationToken);
         }
 
-        public async Task ApplyFinalReviewCorrectionAsync(
+        public Task ApplyFinalReviewCorrectionAsync(
             FactoryState state,
             BoundSemanticAgentResult result,
             JsonElement payload,
+            CancellationToken cancellationToken) =>
+            ApplyFinalReviewWorkAsync(
+                state,
+                result,
+                payload,
+                PostCompletionRoute.FinalPipeline,
+                "final-review-correction",
+                cancellationToken);
+
+        public Task ApplyFinalReviewAdditionalWorkAsync(
+            FactoryState state,
+            BoundSemanticAgentResult result,
+            JsonElement payload,
+            CancellationToken cancellationToken) =>
+            ApplyFinalReviewWorkAsync(
+                state,
+                result,
+                payload,
+                PostCompletionRoute.IncrementalPlanning,
+                "final-review-additional-work",
+                cancellationToken);
+
+        private async Task ApplyFinalReviewWorkAsync(
+            FactoryState state,
+            BoundSemanticAgentResult result,
+            JsonElement payload,
+            PostCompletionRoute postCompletionRoute,
+            string reason,
             CancellationToken cancellationToken)
         {
-            var capability = RequiredString(payload, "capability", "Final review correction capability is required.");
-            var task = RequiredString(payload, "task", "Final review correction task is required.");
+            var capability = RequiredString(payload, "capability", "Final review future-work capability is required.");
+            var task = RequiredString(payload, "task", "Final review future-work task is required.");
             var previous = FactoryRuntime.CloneState(state);
             var candidate = FactoryRuntime.CloneState(state);
             var contracts = new List<(string Path, string Content)>();
 
-            candidate.Remaining.Add(CreatePlannedTask(candidate, capability, task, contracts));
+            candidate.Remaining.Add(CreatePlannedTask(candidate, capability, task, contracts, postCompletionRoute));
             StartCorrectiveCycle(candidate);
             candidate.PlanRevision++;
             candidate.FinalReview = new(
@@ -121,7 +149,7 @@ public sealed partial class FactoryRuntime
                 previous,
                 candidate,
                 contracts,
-                "final-review-correction",
+                reason,
                 result.AttemptId,
                 null,
                 cancellationToken);
@@ -148,7 +176,8 @@ public sealed partial class FactoryRuntime
             FactoryState state,
             string capability,
             string task,
-            List<(string Path, string Content)> contracts)
+            List<(string Path, string Content)> contracts,
+            PostCompletionRoute postCompletionRoute = PostCompletionRoute.IncrementalPlanning)
         {
             FactoryCapabilityCatalog.ResolveWorkItem(capability);
             if (!runtime.configuration.AllowedCapabilities.Contains(capability))
@@ -159,7 +188,13 @@ public sealed partial class FactoryRuntime
             var id = $"W{state.NextWorkItemNumber++:000000}";
             var path = $"work-items/{id}/contract.md";
             contracts.Add((path, task.Trim() + Environment.NewLine));
-            return new PlannedWorkItem { Id = id, Capability = capability, ContractPath = path };
+            return new PlannedWorkItem
+            {
+                Id = id,
+                Capability = capability,
+                ContractPath = path,
+                PostCompletionRoute = postCompletionRoute
+            };
         }
 
         private void StartCorrectiveCycle(FactoryState state)

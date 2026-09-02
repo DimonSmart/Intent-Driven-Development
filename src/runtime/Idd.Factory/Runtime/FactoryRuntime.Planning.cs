@@ -163,9 +163,9 @@ public sealed partial class FactoryRuntime
             return null;
         }
 
-        if (result.Outcome is "correction-required" or "additional-work-required")
+        if (result.Outcome == "correction-required")
         {
-            if (result.Payload is not { } payload)
+            if (result.Payload is not { } correction)
                 throw new AgentProtocolException(
                     "MALFORMED_AGENT_RESULT",
                     "Final review correction requires a payload.");
@@ -173,7 +173,22 @@ public sealed partial class FactoryRuntime
             await CreatePlanMutationService().ApplyFinalReviewCorrectionAsync(
                 state,
                 result,
-                payload,
+                correction,
+                cancellationToken);
+            return null;
+        }
+
+        if (result.Outcome == "additional-work-required")
+        {
+            if (result.Payload is not { } additionalWork)
+                throw new AgentProtocolException(
+                    "MALFORMED_AGENT_RESULT",
+                    "Final review additional work requires a payload.");
+
+            await CreatePlanMutationService().ApplyFinalReviewAdditionalWorkAsync(
+                state,
+                result,
+                additionalWork,
                 cancellationToken);
             return null;
         }

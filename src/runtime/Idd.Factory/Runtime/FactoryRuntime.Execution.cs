@@ -88,6 +88,8 @@ public sealed partial class FactoryRuntime
             VerificationEvidenceRefs = item.VerificationEvidenceRefs.ToList(),
             VerificationDecision = item.LastVerificationDecision
         });
+        if (item.PostCompletionRoute == PostCompletionRoute.FinalPipeline)
+            state.PlannedThroughCompletedCount = state.Completed.Count;
         state.Current = null;
         state.CurrentPhase = null;
         state.PlanRevision++;

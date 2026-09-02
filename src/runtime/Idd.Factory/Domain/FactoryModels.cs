@@ -11,6 +11,13 @@ public enum FactoryRunStatus { Running, Blocked, Completed, Cancelled, Failed }
 [JsonConverter(typeof(JsonStringEnumConverter<CurrentWorkPhase>))]
 public enum CurrentWorkPhase { Ready, Running, AwaitingVerification, Blocked }
 
+[JsonConverter(typeof(JsonStringEnumConverter<PostCompletionRoute>))]
+public enum PostCompletionRoute
+{
+    IncrementalPlanning = 0,
+    FinalPipeline = 1
+}
+
 [JsonConverter(typeof(JsonStringEnumConverter<VerificationExpectation>))]
 public enum VerificationExpectation
 {
@@ -62,6 +69,8 @@ public sealed record PlannedWorkItem
     public required string Id { get; init; }
     public required string Capability { get; init; }
     public required string ContractPath { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public PostCompletionRoute PostCompletionRoute { get; init; } = PostCompletionRoute.IncrementalPlanning;
     public int AttemptCount { get; set; }
     public string? CurrentAttemptId { get; set; }
     public List<string> VerificationCheckIds { get; init; } = [];
