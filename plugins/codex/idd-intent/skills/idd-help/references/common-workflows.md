@@ -413,9 +413,12 @@ The original user request defines the Factory Task and is stored unchanged in
 `.idd/factory/current/`; `state.json` is authoritative and stable work-item
 filenames do not encode status. Fresh semantic workers perform decomposition,
 implementation, selective checkpoint reviews, bounded replanning, and final
-review. Programmatic orchestration runs verification and writes a compact
-commit-message handoff under `.idd/factory/results/` before safely clearing
-`current/`. Neither directory is product intent, and both are ignored by
+review. Programmatic orchestration runs verification, prepares final result
+artifacts, and moves the complete run directory to
+`.idd/factory/results/<timestamp>_<work-slug>/`. The completed result preserves
+state, events, attempts, verification evidence, commit-message handoff, and
+other diagnostics. `.idd/factory/current/` remains reserved for an active or
+resumable run. Neither directory is product intent, and both are ignored by
 default.
 
 Before a new end-to-end Factory run, apply Intent Preflight:
