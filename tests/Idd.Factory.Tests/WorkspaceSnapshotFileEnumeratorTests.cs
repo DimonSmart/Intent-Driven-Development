@@ -39,6 +39,20 @@ public sealed class WorkspaceSnapshotFileEnumeratorTests
         Assert.Contains("tracked.tmp", relative);
     }
 
+    [Fact]
+    public async Task NonGitFallbackExcludesVisualStudioWorkspaceDirectory()
+    {
+        using var temp = new TestWorkspace();
+        temp.Write("visible.txt", "visible");
+        temp.Write(".vs/session.bin", "ignored");
+
+        var files = await WorkspaceSnapshotFileEnumerator.EnumerateAsync(temp.Path, default);
+        var relative = RelativePaths(temp.Path, files);
+
+        Assert.Contains("visible.txt", relative);
+        Assert.DoesNotContain(".vs/session.bin", relative);
+    }
+
     private static string[] RelativePaths(string workspace, IReadOnlyList<string> files) =>
         files.Select(path => Path.GetRelativePath(workspace, path).Replace('\\', '/')).ToArray();
 

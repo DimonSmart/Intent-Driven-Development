@@ -138,7 +138,7 @@ internal sealed class FactoryMcpTools(FactoryRuntimeProcessRunner runner, Factor
             activity += $", {phase.ToLowerInvariant()}";
 
         var elapsed = status.RuntimeStartedAt is { } startedAt && now >= startedAt
-            ? $"; active {FormatElapsed(now - startedAt)}"
+            ? $"; runtime active {FormatElapsed(now - startedAt)}"
             : string.Empty;
         return $"Factory {status.RuntimeOperation ?? "run"}: {activity}; completed {status.CompletedWorkCount}, remaining {status.RemainingWorkCount}{elapsed}.";
     }
