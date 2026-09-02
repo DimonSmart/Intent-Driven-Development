@@ -16,7 +16,7 @@ For a new run, build one self-contained logical request from the visible user
 request and the exact textual inputs explicitly supplied with it. Preserve all
 user-authored content exactly; mechanically materializing host-local attachment
 references is transport normalization, not a semantic rewrite. Use that same
-logical request for intent preparation and `factory_run`.
+logical request for intent preparation and the new-run invocation.
 
 The launcher must use the runtime packaged with this installed plugin instance
 and block until the runtime returns one structured Factory outcome.
@@ -37,12 +37,11 @@ Before calling the runtime for a new run:
    content into the logical request. The path or attachment marker itself is
    transport metadata, not request semantics.
 4. Materialize supplied text losslessly. Prefer the host file/attachment reader.
-   If a local Codex `pasted-text.txt` must be read directly, decode it as strict
+   If a host-local supplied-text file must be read directly, decode it as strict
    UTF-8 rather than using shell-default or locale-dependent text decoding.
    Reject invalid Unicode or U+FFFD replacement characters. Do not call Factory
-   with a path-only `.codex/attachments/.../pasted-text.txt` envelope and do not
-   expand arbitrary file paths that were not explicitly supplied as request
-   input.
+   with an unresolved host-local attachment envelope and do not expand arbitrary
+   file paths that were not explicitly supplied as request input.
 5. Compare every explicit durable claim in the materialized logical request with
    relevant current intent, then classify it as `Covered`,
    `ExplicitIntentChange`, `MissingIntentDecision`, or `ImplementationOnly`.
@@ -63,10 +62,10 @@ blocked. Missing documentation alone is not `INTENT_REQUIRED`.
 
 ## Run, continue, and cancel
 
-- For a new run whose preflight is covered, call `factory_run` with the exact
-  self-contained materialized logical request and resolved absolute workspace.
-  The persisted `request.md` must remain sufficient after any host-local pasted
-  or attachment file disappears.
+- For a new run whose preflight is covered, invoke the packaged runtime's new-run
+  operation with the exact self-contained materialized logical request and
+  resolved absolute workspace. The persisted `request.md` must remain sufficient
+  after any host-local pasted or attachment file disappears.
 - If supplied request text cannot be read losslessly, do not start Factory.
   Report an input transport/encoding failure; do not summarize around the lost
   content or continue with replacement characters.
@@ -105,8 +104,8 @@ blocked. Missing documentation alone is not `INTENT_REQUIRED`.
 
 ## Reporting
 
-For a structured result returned directly by `factory_run` or `factory_continue`,
-report separately:
+For a structured result returned by a new-run or continuation operation, report
+separately:
 
 ```text
 Factory outcome: <outcome>
@@ -118,15 +117,15 @@ Intent before/after hash: <hashes when available>
 Intent paths changed: <paths when present>
 ```
 
-When `factory_status` is used after a lost or timed-out blocking response, its
-`status` is launcher/runtime ownership state, not a Factory outcome. Report it
-as `Factory status: <status>`. In particular, `ACTIVE` must never be reported as
-`Factory outcome: ACTIVE`: it means the run has not finished and no final Factory
-outcome is available yet. For `ACTIVE`, include the current work item, attempt,
-phase, completed/remaining counts, runtime operation, and start time when the
-status payload provides them, then report the returned reason and resume
-condition. Do not imply that the current semantic attempt has completed merely
-because the workspace remains owned.
+When a read-only runtime status operation is used after a lost or timed-out
+blocking response, its `status` is launcher/runtime ownership state, not a
+Factory outcome. Report it as `Factory status: <status>`. In particular,
+`ACTIVE` must never be reported as `Factory outcome: ACTIVE`: it means the run
+has not finished and no final Factory outcome is available yet. For `ACTIVE`,
+include the current work item, attempt, phase, completed/remaining counts,
+runtime operation, and start time when the status payload provides them, then
+report the returned reason and resume condition. Do not imply that the current
+semantic attempt has completed merely because the workspace remains owned.
 
 When durable intent was updated from the logical request before implementation,
 say so explicitly. After reporting the final structured runtime outcome, do not
