@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Idd.Factory.Domain;
 using Idd.Factory.Runtime;
 using Idd.Factory.State;
 
@@ -50,25 +52,39 @@ public sealed class FactoryRuntimeLockTests
     }
 
     [Fact]
-    public async Task StaleLockIsReplacedByNewOwner()
+    public async Task ExistingLockFileBlocksEvenWhenDescriptorOwnerIsNotRunning()
     {
         using var temp = new TestWorkspace();
         var path = LockPath(temp.Path);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        await File.WriteAllTextAsync(path, "stale lock from terminated process");
         var startedAt = new DateTimeOffset(2026, 9, 1, 19, 0, 0, TimeSpan.Zero);
+        var descriptor = new FactoryRuntimeLockDescriptor(int.MaxValue, Environment.MachineName, startedAt, "run");
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(descriptor, FactoryJson.Options));
 
-        Assert.False(FactoryRuntimeLock.IsHeld(path));
-        await using (var held = FactoryRuntimeLock.Acquire(path, "run", startedAt))
-        {
-            Assert.True(FactoryRuntimeLock.IsHeld(path));
-            var descriptor = FactoryRuntimeLock.TryReadDescriptor(path);
-            Assert.NotNull(descriptor);
-            Assert.Equal(startedAt, descriptor.StartedAt);
-            Assert.Equal("run", descriptor.Operation);
-        }
+        Assert.True(FactoryRuntimeLock.IsHeld(path));
+        var exception = Assert.Throws<FactoryStateException>(() =>
+            FactoryRuntimeLock.Acquire(path, "continue", startedAt.AddMinutes(1)));
 
-        Assert.False(File.Exists(path));
+        Assert.Equal("FACTORY_ALREADY_RUNNING", exception.Code);
+        Assert.Contains($"PID {int.MaxValue}", exception.Message, StringComparison.Ordinal);
+        Assert.True(File.Exists(path));
+    }
+
+    [Fact]
+    public async Task AnyExistingLockFileBlocksEvenWithoutReadableDescriptor()
+    {
+        using var temp = new TestWorkspace();
+        var path = LockPath(temp.Path);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllTextAsync(path, "incomplete or legacy lock");
+
+        Assert.True(FactoryRuntimeLock.IsHeld(path));
+        var exception = Assert.Throws<FactoryStateException>(() =>
+            FactoryRuntimeLock.Acquire(path, "run", DateTimeOffset.UtcNow));
+
+        Assert.Equal("FACTORY_ALREADY_RUNNING", exception.Code);
+        Assert.DoesNotContain("PID ", exception.Message, StringComparison.Ordinal);
+        Assert.True(File.Exists(path));
     }
 
     private static string LockPath(string workspace) => Path.Combine(workspace, ".idd", "factory", "runtime.lock");
