@@ -118,7 +118,7 @@ public sealed class FactoryAgentExecutor(IAgentBackend backend, FactoryAgentResu
 
         if (process.TerminationKind == AgentTerminationKind.Cancelled) throw new OperationCanceledException(cancellationToken);
         if (process.TerminationKind == AgentTerminationKind.TransportFailure && !process.CompleteResultObserved)
-            throw new AgentProtocolException("AGENT_TRANSPORT_FAILURE", $"Agent exited with {process.ExitCode?.ToString() ?? "unknown"}: {process.Stderr}");
+            throw new AgentProtocolException("AGENT_TRANSPORT_FAILURE", BuildTransportFailureMessage(process));
 
         if (!File.Exists(invocation.RawResultPath)) throw new AgentProtocolException("MISSING_AGENT_RESULT", "Agent did not produce raw-result.json.");
 
@@ -132,6 +132,67 @@ public sealed class FactoryAgentExecutor(IAgentBackend backend, FactoryAgentResu
         };
         await WriteJsonAtomicallyAsync(Path.Combine(attemptDirectory, "result.json"), persisted, cancellationToken);
         return new(new BoundSemanticAgentResult(invocation.AttemptId, semanticResult), process);
+    }
+
+    private static string BuildTransportFailureMessage(AgentProcessResult process)
+    {
+        const int maximumDiagnosticLength = 4096;
+        var diagnostic = TryExtractStructuredFailure(process.Stdout);
+        if (string.IsNullOrWhiteSpace(diagnostic))
+            diagnostic = !string.IsNullOrWhiteSpace(process.Stderr)
+                ? BoundedTail(process.Stderr, maximumDiagnosticLength)
+                : BoundedTail(process.Stdout, maximumDiagnosticLength);
+        else diagnostic = BoundedHead(diagnostic, maximumDiagnosticLength);
+
+        if (string.IsNullOrWhiteSpace(diagnostic)) diagnostic = "no diagnostic output";
+        return $"Agent exited with {process.ExitCode?.ToString() ?? "unknown"}: {diagnostic.Trim()}";
+    }
+
+    private static string? TryExtractStructuredFailure(string stdout)
+    {
+        string? errorMessage = null;
+        string? turnFailedMessage = null;
+        using var reader = new StringReader(stdout);
+        while (reader.ReadLine() is { } line)
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            try
+            {
+                using var document = JsonDocument.Parse(line);
+                var root = document.RootElement;
+                if (root.ValueKind != JsonValueKind.Object
+                    || !root.TryGetProperty("type", out var type)
+                    || type.ValueKind != JsonValueKind.String)
+                    continue;
+
+                switch (type.GetString())
+                {
+                    case "turn.failed" when root.TryGetProperty("error", out var error)
+                                            && error.ValueKind == JsonValueKind.Object
+                                            && error.TryGetProperty("message", out var failedMessage)
+                                            && failedMessage.ValueKind == JsonValueKind.String
+                                            && !string.IsNullOrWhiteSpace(failedMessage.GetString()):
+                        turnFailedMessage = failedMessage.GetString();
+                        break;
+                    case "error" when root.TryGetProperty("message", out var message)
+                                      && message.ValueKind == JsonValueKind.String
+                                      && !string.IsNullOrWhiteSpace(message.GetString()):
+                        errorMessage = message.GetString();
+                        break;
+                }
+            }
+            catch (JsonException) { }
+        }
+        return turnFailedMessage ?? errorMessage;
+    }
+
+    private static string BoundedHead(string value, int maximumLength) =>
+        value.Length <= maximumLength ? value : value[..maximumLength] + " [truncated]";
+
+    private static string BoundedTail(string value, int maximumLength)
+    {
+        var trimmed = value.Trim();
+        return trimmed.Length <= maximumLength ? trimmed : "[truncated] " + trimmed[^maximumLength..];
     }
 
     private static async Task WriteJsonAtomicallyAsync<T>(string path, T value, CancellationToken cancellationToken)
