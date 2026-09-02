@@ -15,7 +15,7 @@ public sealed class FactoryMcpProgressTests
         var tools = new FactoryMcpTools(
             new FactoryRuntimeProcessRunner(new ImmediateInvoker("COMPLETED")),
             statusReader,
-            new FactoryProgressMonitor(statusReader));
+            new FactoryMcpProgressMonitor(statusReader));
         var progress = new RecordingProgress();
 
         var result = await tools.FactoryRunAsync(temp.Path, "test request", progress, CancellationToken.None);
@@ -38,11 +38,11 @@ public sealed class FactoryMcpProgressTests
         Directory.CreateDirectory(current);
         var events = Path.Combine(current, "events.jsonl");
         await File.WriteAllLinesAsync(events, [Event("run-created", new { }), Event("agent-completed", new { })]);
-        var monitor = new FactoryProgressMonitor(new FactoryStatusReader());
+        var monitor = new FactoryMcpProgressMonitor(new FactoryStatusReader());
         var baseline = monitor.CaptureExistingEventCount(temp.Path);
         await File.AppendAllTextAsync(events, Event("scheduler-decision", new { Kind = FactoryCommandKind.RunFinalVerification }) + Environment.NewLine);
 
-        var batch = await FactoryProgressMonitor.ReadNewEventLinesAsync(temp.Path, baseline, CancellationToken.None);
+        var batch = await FactoryMcpProgressMonitor.ReadNewEventLinesAsync(temp.Path, baseline, CancellationToken.None);
 
         Assert.Single(batch.Lines);
         Assert.Equal(3, batch.NextIndex);
@@ -66,7 +66,7 @@ public sealed class FactoryMcpProgressTests
             workItemId = "W000003"
         });
 
-        var message = await FactoryProgressMonitor.ProjectEventAsync(temp.Path, line);
+        var message = await FactoryMcpProgressMonitor.ProjectEventAsync(temp.Path, line);
 
         Assert.NotNull(message);
         Assert.StartsWith("W000003 implementation A000007: \"Implement locked-file diagnostics", message, StringComparison.Ordinal);
@@ -85,10 +85,10 @@ public sealed class FactoryMcpProgressTests
         Directory.CreateDirectory(current);
         var line = Event("scheduler-decision", new { Kind = FactoryCommandKind.Plan });
 
-        Assert.Equal("Planning", await FactoryProgressMonitor.ProjectEventAsync(temp.Path, line));
+        Assert.Equal("Planning", await FactoryMcpProgressMonitor.ProjectEventAsync(temp.Path, line));
 
         await File.WriteAllTextAsync(Path.Combine(current, "state.json"), "{\"pendingReplanTrigger\":{\"workItemId\":\"W000003\"}}");
-        Assert.Equal("Replanning", await FactoryProgressMonitor.ProjectEventAsync(temp.Path, line));
+        Assert.Equal("Replanning", await FactoryMcpProgressMonitor.ProjectEventAsync(temp.Path, line));
     }
 
     [Theory]
@@ -101,7 +101,7 @@ public sealed class FactoryMcpProgressTests
         using var temp = new TestWorkspace();
         var line = Event("scheduler-decision", new { Kind = kind, WorkItemId = workItemId });
 
-        Assert.Equal(expected, await FactoryProgressMonitor.ProjectEventAsync(temp.Path, line));
+        Assert.Equal(expected, await FactoryMcpProgressMonitor.ProjectEventAsync(temp.Path, line));
     }
 
     [Theory]
@@ -119,7 +119,7 @@ public sealed class FactoryMcpProgressTests
             stdout = new string('z', 1000)
         });
 
-        var message = await FactoryProgressMonitor.ProjectEventAsync(temp.Path, line);
+        var message = await FactoryMcpProgressMonitor.ProjectEventAsync(temp.Path, line);
 
         Assert.Equal(expected, message);
         Assert.DoesNotContain("zzz", message!, StringComparison.Ordinal);
@@ -142,7 +142,7 @@ public sealed class FactoryMcpProgressTests
             semanticResult = new string('s', 1000)
         });
 
-        var message = await FactoryProgressMonitor.ProjectEventAsync(temp.Path, line);
+        var message = await FactoryMcpProgressMonitor.ProjectEventAsync(temp.Path, line);
 
         Assert.Equal("W000003 implementation: additional work required", message);
         Assert.DoesNotContain("sss", message!, StringComparison.Ordinal);
@@ -153,8 +153,8 @@ public sealed class FactoryMcpProgressTests
     {
         using var temp = new TestWorkspace();
 
-        Assert.Null(await FactoryProgressMonitor.ProjectEventAsync(temp.Path, "{not-json"));
-        var batch = await FactoryProgressMonitor.ReadNewEventLinesAsync(temp.Path, 10, CancellationToken.None);
+        Assert.Null(await FactoryMcpProgressMonitor.ProjectEventAsync(temp.Path, "{not-json"));
+        var batch = await FactoryMcpProgressMonitor.ReadNewEventLinesAsync(temp.Path, 10, CancellationToken.None);
         Assert.Empty(batch.Lines);
         Assert.Equal(10, batch.NextIndex);
     }
@@ -173,7 +173,7 @@ public sealed class FactoryMcpProgressTests
             RuntimeStartedAt = startedAt
         };
 
-        var message = FactoryProgressMonitor.FormatHeartbeat(status, startedAt.AddMinutes(1).AddSeconds(15));
+        var message = FactoryMcpProgressMonitor.FormatHeartbeat(status, startedAt.AddMinutes(1).AddSeconds(15));
 
         Assert.Equal("W000003 A000007 running; active 1:15", message);
     }
