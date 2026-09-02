@@ -6,5 +6,20 @@ internal sealed class TestWorkspace : IDisposable
     public TestWorkspace() { Directory.CreateDirectory(Path); }
     public string Write(string relative, string content)
     { var path = System.IO.Path.Combine(Path, relative); Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!); File.WriteAllText(path, content); return path; }
-    public void Dispose() { if (Directory.Exists(Path)) Directory.Delete(Path, true); }
+
+    public void Dispose()
+    {
+        if (!Directory.Exists(Path)) return;
+
+        foreach (var file in Directory.EnumerateFiles(Path, "*", SearchOption.AllDirectories))
+        {
+            var attributes = File.GetAttributes(file);
+            if ((attributes & FileAttributes.ReadOnly) != 0)
+            {
+                File.SetAttributes(file, attributes & ~FileAttributes.ReadOnly);
+            }
+        }
+
+        Directory.Delete(Path, true);
+    }
 }
