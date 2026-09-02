@@ -26,20 +26,31 @@ public sealed class FactoryMcpTests
     }
 
     [Fact]
-    public async Task ProcessRunnerPreservesExactRunRequestAndUsesPackagedPluginRoot()
+    public async Task ProcessRunnerPreservesExactRunRequestInTemporaryUtf8BomFileAndUsesPackagedPluginRoot()
     {
         using var temp = new TestWorkspace();
-        var invoker = new RecordingInvoker(Outcome());
-        const string request = "  Реализуй café без изменения пробелов.  \n";
+        string? requestPath = null;
+        byte[]? requestBytes = null;
+        const string request = "  Реализуй café, Málaga, 漢字 и 🔒 без изменения пробелов.  \n";
+        var invoker = new RecordingInvoker(Outcome(), invocation =>
+        {
+            requestPath = ValueAfter(invocation, "--request-file");
+            requestBytes = File.ReadAllBytes(requestPath);
+            Assert.Equal(request, File.ReadAllText(requestPath));
+        });
 
         var result = await new FactoryRuntimeProcessRunner(invoker)
             .RunAsync(FactoryRuntimeCommand.Run, temp.Path, request, null, CancellationToken.None);
 
         Assert.Equal("COMPLETED", result.FactoryOutcome);
-        Assert.Equal(request, invoker.Invocation!.StandardInput);
+        Assert.Null(invoker.Invocation!.StandardInput);
         Assert.Contains("run", invoker.Invocation.Arguments);
-        Assert.Contains("--request-stdin", invoker.Invocation.Arguments);
-        Assert.Equal("true", ValueAfter(invoker.Invocation, "--request-stdin"));
+        Assert.DoesNotContain("--request-stdin", invoker.Invocation.Arguments);
+        Assert.NotNull(requestPath);
+        Assert.False(File.Exists(requestPath));
+        Assert.NotNull(requestBytes);
+        Assert.True(requestBytes!.Length >= 3);
+        Assert.Equal(new byte[] { 0xEF, 0xBB, 0xBF }, requestBytes[..3]);
         Assert.Equal(FactoryRuntimeProcessRunner.ResolvePluginRoot(AppContext.BaseDirectory), ValueAfter(invoker.Invocation, "--plugin-root"));
     }
 

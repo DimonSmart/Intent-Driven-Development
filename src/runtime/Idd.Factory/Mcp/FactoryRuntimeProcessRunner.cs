@@ -10,6 +10,8 @@ internal sealed class FactoryRuntimeProcessRunner(
     Action<string>? deleteTemporaryFile = null)
 {
     private const int DiagnosticTailLimit = 2048;
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+    private static readonly UTF8Encoding TextUtf8 = new(encoderShouldEmitUTF8Identifier: true, throwOnInvalidBytes: true);
 
     public async Task<FactoryMcpResult> RunAsync(
         FactoryRuntimeCommand command,
@@ -26,20 +28,31 @@ internal sealed class FactoryRuntimeProcessRunner(
         if (command != FactoryRuntimeCommand.Continue && answer is not null)
             throw new ArgumentException("answer is supported only for factory_continue.", nameof(answer));
 
+        if (request is not null && InvalidUnicodeReason(request, "Factory request") is { } requestError)
+            return new("INVALID_REQUEST_ENCODING", "unknown", requestError, "Resubmit the original request without corrupted Unicode replacement characters.", null);
+        if (answer is not null && InvalidUnicodeReason(answer, "Factory clarification answer") is { } answerError)
+            return new("INVALID_CLARIFICATION_ENCODING", "unknown", answerError, "Resubmit the clarification answer without corrupted Unicode replacement characters.", null);
+
         var runtimeAssembly = Path.Combine(AppContext.BaseDirectory, "idd-factory.dll");
         if (!File.Exists(runtimeAssembly))
             throw new FactoryTransportException("FACTORY_TRANSPORT_UNAVAILABLE", "The packaged Factory Runtime assembly is missing.");
         var pluginRoot = ResolvePluginRoot(AppContext.BaseDirectory);
+        string? requestFile = null;
         string? answerFile = null;
         try
         {
+            if (request is not null)
+            {
+                requestFile = Path.Combine(Path.GetTempPath(), $"idd-factory-request-{Guid.NewGuid():N}.md");
+                await File.WriteAllTextAsync(requestFile, request, TextUtf8, cancellationToken);
+            }
             if (answer is not null)
             {
                 answerFile = Path.Combine(Path.GetTempPath(), $"idd-factory-answer-{Guid.NewGuid():N}.txt");
-                await File.WriteAllTextAsync(answerFile, answer, new UTF8Encoding(false), cancellationToken);
+                await File.WriteAllTextAsync(answerFile, answer, TextUtf8, cancellationToken);
             }
 
-            var invocation = BuildInvocation(command, workspace, request, answerFile, runtimeAssembly, pluginRoot);
+            var invocation = BuildInvocation(command, workspace, requestFile, answerFile, runtimeAssembly, pluginRoot);
             FactoryProcessResult processResult;
             try
             {
@@ -70,8 +83,23 @@ internal sealed class FactoryRuntimeProcessRunner(
         }
         finally
         {
-            if (answerFile is not null)
-                TryDeleteTemporaryFile(answerFile);
+            if (requestFile is not null) TryDeleteTemporaryFile(requestFile);
+            if (answerFile is not null) TryDeleteTemporaryFile(answerFile);
+        }
+    }
+
+    private static string? InvalidUnicodeReason(string text, string label)
+    {
+        if (text.Contains('\uFFFD'))
+            return $"{label} contains Unicode replacement character U+FFFD and may have been corrupted during transport.";
+        try
+        {
+            _ = StrictUtf8.GetByteCount(text);
+            return null;
+        }
+        catch (EncoderFallbackException)
+        {
+            return $"{label} contains invalid Unicode data that cannot be encoded as UTF-8 without replacement.";
         }
     }
 
@@ -92,7 +120,7 @@ internal sealed class FactoryRuntimeProcessRunner(
     internal static FactoryProcessInvocation BuildInvocation(
         FactoryRuntimeCommand command,
         string workspace,
-        string? request,
+        string? requestFile,
         string? answerFile,
         string runtimeAssembly,
         string pluginRoot)
@@ -105,10 +133,13 @@ internal sealed class FactoryRuntimeProcessRunner(
             "--plugin-root", pluginRoot
         };
         if (command == FactoryRuntimeCommand.Run)
-            arguments.AddRange(["--request-stdin", "true"]);
+        {
+            if (requestFile is null) throw new ArgumentException("requestFile is required for Factory run.", nameof(requestFile));
+            arguments.AddRange(["--request-file", requestFile]);
+        }
         if (answerFile is not null)
             arguments.AddRange(["--answer-file", answerFile]);
-        return new(ResolveDotnetHost(), arguments, workspace, request);
+        return new(ResolveDotnetHost(), arguments, workspace, null);
     }
 
     internal static string ResolvePluginRoot(string runtimeDirectory) =>
@@ -148,6 +179,8 @@ internal interface IFactoryProcessInvoker
 
 internal sealed class SystemFactoryProcessInvoker(Action<int>? onProcessStarted = null) : IFactoryProcessInvoker
 {
+    private static readonly UTF8Encoding TransportUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
     public async Task<FactoryProcessResult> RunAsync(FactoryProcessInvocation invocation, CancellationToken cancellationToken)
     {
         var startInfo = new ProcessStartInfo(invocation.Executable)
@@ -157,6 +190,7 @@ internal sealed class SystemFactoryProcessInvoker(Action<int>? onProcessStarted 
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            StandardInputEncoding = TransportUtf8,
             CreateNoWindow = true
         };
         foreach (var argument in invocation.Arguments) startInfo.ArgumentList.Add(argument);
