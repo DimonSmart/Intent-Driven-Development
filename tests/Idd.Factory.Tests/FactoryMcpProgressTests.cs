@@ -166,6 +166,7 @@ public sealed class FactoryMcpProgressTests
         var status = new FactoryStatusResult
         {
             Status = "ACTIVE",
+            RunId = "run-1",
             CurrentWorkItemId = "W000003",
             CurrentAttemptId = "A000007",
             CurrentPhase = "Running",
