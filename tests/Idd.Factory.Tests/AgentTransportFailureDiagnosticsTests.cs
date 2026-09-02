@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.Json;
 using Idd.Factory.Agents;
 using Idd.Factory.Domain;
 
@@ -67,6 +69,58 @@ public sealed class AgentTransportFailureDiagnosticsTests
             new FactoryAgentExecutor(backend, new FactoryAgentResultValidator()).ExecuteAsync(invocation, default));
 
         Assert.Equal("Agent exited with 1: process stopped before producing a semantic result", exception.Message);
+    }
+
+    [Fact]
+    public async Task ProcessTelemetryReferencesLogsWithoutEmbeddingDiagnosticStreams()
+    {
+        using var temp = new TestWorkspace();
+        var invocation = Invocation(temp);
+        const string stdout = "stdout diagnostic payload";
+        const string stderr = "stderr diagnostic payload";
+        var backend = new ProcessResultBackend(new AgentProcessResult(
+            1,
+            stdout,
+            stderr,
+            CompleteResultObserved: false,
+            KillRequired: false,
+            TerminationKind: AgentTerminationKind.TransportFailure));
+
+        await Assert.ThrowsAsync<AgentProtocolException>(() =>
+            new FactoryAgentExecutor(backend, new FactoryAgentResultValidator()).ExecuteAsync(invocation, default));
+
+        var telemetryPath = Path.Combine(Path.GetDirectoryName(invocation.RawResultPath)!, "process-telemetry.json");
+        using var document = JsonDocument.Parse(await File.ReadAllTextAsync(telemetryPath));
+        var root = document.RootElement;
+
+        Assert.False(root.TryGetProperty("stdout", out _));
+        Assert.False(root.TryGetProperty("stderr", out _));
+        Assert.Equal("stdout.log", root.GetProperty("stdoutLogPath").GetString());
+        Assert.Equal("stderr.log", root.GetProperty("stderrLogPath").GetString());
+        Assert.Equal(Encoding.UTF8.GetByteCount(stdout), root.GetProperty("stdoutBytes").GetInt32());
+        Assert.Equal(Encoding.UTF8.GetByteCount(stderr), root.GetProperty("stderrBytes").GetInt32());
+    }
+
+    [Fact]
+    public void LegacyProcessTelemetryStillDeserializesForRecoveryEvidence()
+    {
+        const string json = """
+            {
+              "exitCode": 0,
+              "stdout": "legacy stdout",
+              "stderr": "legacy stderr",
+              "completeResultObserved": true,
+              "killRequired": false,
+              "terminationKind": "CleanExit"
+            }
+            """;
+
+        var process = JsonSerializer.Deserialize<AgentProcessResult>(json, FactoryJson.Options);
+
+        Assert.NotNull(process);
+        Assert.True(process.CompleteResultObserved);
+        Assert.False(process.KillRequired);
+        Assert.Equal(AgentTerminationKind.CleanExit, process.TerminationKind);
     }
 
     private static AgentInvocation Invocation(TestWorkspace temp)
