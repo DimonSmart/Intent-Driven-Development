@@ -17,7 +17,7 @@ internal static class FactoryMcpServer
         builder.Services.AddSingleton<IFactoryProcessInvoker, SystemFactoryProcessInvoker>();
         builder.Services.AddSingleton<FactoryRuntimeProcessRunner>();
         builder.Services.AddSingleton<FactoryStatusReader>();
-        builder.Services.AddSingleton<FactoryProgressMonitor>();
+        builder.Services.AddSingleton<FactoryMcpProgressMonitor>();
         builder.Services
             .AddMcpServer(options => options.ServerInfo = new()
             {
@@ -36,7 +36,7 @@ internal static class FactoryMcpServer
 internal sealed class FactoryMcpTools(
     FactoryRuntimeProcessRunner runner,
     FactoryStatusReader statusReader,
-    FactoryProgressMonitor progressMonitor)
+    FactoryMcpProgressMonitor progressMonitor)
 {
     [McpServerTool(Name = "factory_run", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true, UseStructuredContent = true)]
     [Description("Run an explicitly requested IDD Factory workflow and block until the packaged runtime returns a structured outcome. Progress notifications describe high-level runtime activity when the MCP client supplies a progress token. A host/tool timeout is transport loss, not a Factory outcome; use factory_status once to determine whether the runtime is still active.")]
