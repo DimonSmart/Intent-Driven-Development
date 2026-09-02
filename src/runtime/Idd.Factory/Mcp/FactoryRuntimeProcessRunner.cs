@@ -11,6 +11,7 @@ internal sealed class FactoryRuntimeProcessRunner(
 {
     private const int DiagnosticTailLimit = 2048;
     private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+    private static readonly UTF8Encoding TextUtf8 = new(encoderShouldEmitUTF8Identifier: true, throwOnInvalidBytes: true);
 
     public async Task<FactoryMcpResult> RunAsync(
         FactoryRuntimeCommand command,
@@ -36,16 +37,22 @@ internal sealed class FactoryRuntimeProcessRunner(
         if (!File.Exists(runtimeAssembly))
             throw new FactoryTransportException("FACTORY_TRANSPORT_UNAVAILABLE", "The packaged Factory Runtime assembly is missing.");
         var pluginRoot = ResolvePluginRoot(AppContext.BaseDirectory);
+        string? requestFile = null;
         string? answerFile = null;
         try
         {
+            if (request is not null)
+            {
+                requestFile = Path.Combine(Path.GetTempPath(), $"idd-factory-request-{Guid.NewGuid():N}.md");
+                await File.WriteAllTextAsync(requestFile, request, TextUtf8, cancellationToken);
+            }
             if (answer is not null)
             {
                 answerFile = Path.Combine(Path.GetTempPath(), $"idd-factory-answer-{Guid.NewGuid():N}.txt");
-                await File.WriteAllTextAsync(answerFile, answer, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true, throwOnInvalidBytes: true), cancellationToken);
+                await File.WriteAllTextAsync(answerFile, answer, TextUtf8, cancellationToken);
             }
 
-            var invocation = BuildInvocation(command, workspace, request, answerFile, runtimeAssembly, pluginRoot);
+            var invocation = BuildInvocation(command, workspace, requestFile, answerFile, runtimeAssembly, pluginRoot);
             FactoryProcessResult processResult;
             try
             {
@@ -76,8 +83,8 @@ internal sealed class FactoryRuntimeProcessRunner(
         }
         finally
         {
-            if (answerFile is not null)
-                TryDeleteTemporaryFile(answerFile);
+            if (requestFile is not null) TryDeleteTemporaryFile(requestFile);
+            if (answerFile is not null) TryDeleteTemporaryFile(answerFile);
         }
     }
 
@@ -113,7 +120,7 @@ internal sealed class FactoryRuntimeProcessRunner(
     internal static FactoryProcessInvocation BuildInvocation(
         FactoryRuntimeCommand command,
         string workspace,
-        string? request,
+        string? requestFile,
         string? answerFile,
         string runtimeAssembly,
         string pluginRoot)
@@ -126,10 +133,13 @@ internal sealed class FactoryRuntimeProcessRunner(
             "--plugin-root", pluginRoot
         };
         if (command == FactoryRuntimeCommand.Run)
-            arguments.AddRange(["--request-stdin", "true"]);
+        {
+            if (requestFile is null) throw new ArgumentException("requestFile is required for Factory run.", nameof(requestFile));
+            arguments.AddRange(["--request-file", requestFile]);
+        }
         if (answerFile is not null)
             arguments.AddRange(["--answer-file", answerFile]);
-        return new(ResolveDotnetHost(), arguments, workspace, request);
+        return new(ResolveDotnetHost(), arguments, workspace, null);
     }
 
     internal static string ResolvePluginRoot(string runtimeDirectory) =>
@@ -170,100 +180,52 @@ internal interface IFactoryProcessInvoker
 internal sealed class SystemFactoryProcessInvoker(Action<int>? onProcessStarted = null) : IFactoryProcessInvoker
 {
     private static readonly UTF8Encoding TransportUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
-    private static readonly UTF8Encoding TextUtf8 = new(encoderShouldEmitUTF8Identifier: true, throwOnInvalidBytes: true);
 
     public async Task<FactoryProcessResult> RunAsync(FactoryProcessInvocation invocation, CancellationToken cancellationToken)
     {
-        string? temporaryRequestFile = null;
-        var arguments = invocation.Arguments.ToList();
-        var standardInput = invocation.StandardInput;
-        var requestStdinIndex = FindRequestStdin(arguments);
-        if (standardInput is not null && requestStdinIndex >= 0)
+        var startInfo = new ProcessStartInfo(invocation.Executable)
         {
-            temporaryRequestFile = Path.Combine(Path.GetTempPath(), $"idd-factory-request-{Guid.NewGuid():N}.md");
-            await File.WriteAllTextAsync(temporaryRequestFile, standardInput, TextUtf8, cancellationToken);
-            ReplaceRequestStdinWithFile(arguments, requestStdinIndex, temporaryRequestFile);
-            standardInput = null;
-        }
+            WorkingDirectory = invocation.WorkingDirectory,
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardInputEncoding = TransportUtf8,
+            CreateNoWindow = true
+        };
+        foreach (var argument in invocation.Arguments) startInfo.ArgumentList.Add(argument);
 
+        using var process = new Process { StartInfo = startInfo };
         try
         {
-            var startInfo = new ProcessStartInfo(invocation.Executable)
-            {
-                WorkingDirectory = invocation.WorkingDirectory,
-                UseShellExecute = false,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                StandardInputEncoding = TransportUtf8,
-                StandardOutputEncoding = TransportUtf8,
-                StandardErrorEncoding = TransportUtf8,
-                CreateNoWindow = true
-            };
-            foreach (var argument in arguments) startInfo.ArgumentList.Add(argument);
-
-            using var process = new Process { StartInfo = startInfo };
-            try
-            {
-                if (!process.Start()) throw new InvalidOperationException("The packaged Factory Runtime process did not start.");
-                onProcessStarted?.Invoke(process.Id);
-            }
-            catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or FileNotFoundException or InvalidOperationException)
-            {
-                throw new FactoryTransportException("FACTORY_TRANSPORT_UNAVAILABLE", "The packaged Factory Runtime process did not start.", exception);
-            }
-
-            var stdoutTask = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
-            var stderrTask = process.StandardError.ReadToEndAsync(CancellationToken.None);
-            try
-            {
-                if (standardInput is not null)
-                {
-                    await process.StandardInput.WriteAsync(standardInput.AsMemory(), cancellationToken);
-                    process.StandardInput.Close();
-                }
-                await process.WaitForExitAsync(cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                if (!process.HasExited) process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync(CancellationToken.None);
-                await Task.WhenAll(stdoutTask, stderrTask);
-                throw;
-            }
-
-            return new(process.ExitCode, await stdoutTask, await stderrTask);
+            if (!process.Start()) throw new InvalidOperationException("The packaged Factory Runtime process did not start.");
+            onProcessStarted?.Invoke(process.Id);
         }
-        finally
+        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or FileNotFoundException or InvalidOperationException)
         {
-            if (temporaryRequestFile is not null)
-            {
-                try { File.Delete(temporaryRequestFile); }
-                catch (IOException) { }
-                catch (UnauthorizedAccessException) { }
-            }
+            throw new FactoryTransportException("FACTORY_TRANSPORT_UNAVAILABLE", "The packaged Factory Runtime process did not start.", exception);
         }
-    }
 
-    internal static IReadOnlyList<string> UseRequestFileTransport(IReadOnlyList<string> sourceArguments, string requestFile)
-    {
-        var arguments = sourceArguments.ToList();
-        var index = FindRequestStdin(arguments);
-        if (index >= 0) ReplaceRequestStdinWithFile(arguments, index, requestFile);
-        return arguments;
-    }
+        var stdoutTask = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
+        var stderrTask = process.StandardError.ReadToEndAsync(CancellationToken.None);
+        try
+        {
+            if (invocation.StandardInput is not null)
+            {
+                await process.StandardInput.WriteAsync(invocation.StandardInput.AsMemory(), cancellationToken);
+                process.StandardInput.Close();
+            }
+            await process.WaitForExitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            if (!process.HasExited) process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync(CancellationToken.None);
+            await Task.WhenAll(stdoutTask, stderrTask);
+            throw;
+        }
 
-    private static int FindRequestStdin(IReadOnlyList<string> arguments)
-    {
-        for (var i = 0; i + 1 < arguments.Count; i++)
-            if (arguments[i] == "--request-stdin" && arguments[i + 1] == "true") return i;
-        return -1;
-    }
-
-    private static void ReplaceRequestStdinWithFile(List<string> arguments, int index, string requestFile)
-    {
-        arguments.RemoveRange(index, 2);
-        arguments.InsertRange(index, ["--request-file", requestFile]);
+        return new(process.ExitCode, await stdoutTask, await stderrTask);
     }
 }
 
