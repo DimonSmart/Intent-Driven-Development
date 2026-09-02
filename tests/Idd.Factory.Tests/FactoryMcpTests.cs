@@ -5,6 +5,7 @@ using Idd.Factory.Domain;
 using Idd.Factory.Persistence;
 using Idd.Factory.Runtime;
 using Idd.Factory.State;
+using ModelContextProtocol;
 
 namespace Idd.Factory.Tests;
 
@@ -71,6 +72,44 @@ public sealed class FactoryMcpTests
             .ToArray();
 
         Assert.Equal(new string?[] { "factory_cancel", "factory_continue", "factory_run", "factory_status" }, names);
+    }
+
+    [Theory]
+    [InlineData(nameof(FactoryMcpTools.FactoryRunAsync))]
+    [InlineData(nameof(FactoryMcpTools.FactoryContinueAsync))]
+    [InlineData(nameof(FactoryMcpTools.FactoryCancelAsync))]
+    public void BlockingMcpToolsAcceptProgressSink(string methodName)
+    {
+        var method = typeof(FactoryMcpTools).GetMethod(methodName);
+
+        Assert.NotNull(method);
+        Assert.Contains(method.GetParameters(), parameter => parameter.ParameterType == typeof(IProgress<ProgressNotificationValue>));
+    }
+
+    [Fact]
+    public void ActiveProgressNamesWorkAttemptCountsAndElapsedTime()
+    {
+        var startedAt = new DateTimeOffset(2026, 9, 2, 10, 0, 0, TimeSpan.Zero);
+        var status = new FactoryStatusResult
+        {
+            Status = "ACTIVE",
+            RunId = "run-1",
+            CurrentWorkItemId = "W000003",
+            CurrentAttemptId = "A000007",
+            CurrentPhase = "Running",
+            CompletedWorkCount = 2,
+            RemainingWorkCount = 3,
+            RuntimeOperation = "continue",
+            RuntimeStartedAt = startedAt
+        };
+
+        var message = FactoryMcpTools.FormatActiveProgress(status, startedAt.AddMinutes(1).AddSeconds(5));
+
+        Assert.Contains("Factory continue", message, StringComparison.Ordinal);
+        Assert.Contains("work item W000003", message, StringComparison.Ordinal);
+        Assert.Contains("attempt A000007", message, StringComparison.Ordinal);
+        Assert.Contains("completed 2, remaining 3", message, StringComparison.Ordinal);
+        Assert.Contains("active 1:05", message, StringComparison.Ordinal);
     }
 
     [Fact]
