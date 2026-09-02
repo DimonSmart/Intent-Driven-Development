@@ -87,5 +87,21 @@ public sealed class FactoryRuntimeLockTests
         Assert.True(File.Exists(path));
     }
 
+    [Fact]
+    public async Task ForcedTerminationCleanupDeletesOnlyTheKilledRuntimeOwnerLock()
+    {
+        using var temp = new TestWorkspace();
+        var path = LockPath(temp.Path);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await using var held = FactoryRuntimeLock.Acquire(path, "continue", DateTimeOffset.UtcNow);
+        var invocation = new FactoryProcessInvocation("dotnet", Array.Empty<string>(), temp.Path, null);
+
+        Assert.False(SystemFactoryProcessInvoker.ReleaseRuntimeLockAfterForcedTermination(invocation, Environment.ProcessId + 1));
+        Assert.True(File.Exists(path));
+
+        Assert.True(SystemFactoryProcessInvoker.ReleaseRuntimeLockAfterForcedTermination(invocation, Environment.ProcessId));
+        Assert.False(File.Exists(path));
+    }
+
     private static string LockPath(string workspace) => Path.Combine(workspace, ".idd", "factory", "runtime.lock");
 }

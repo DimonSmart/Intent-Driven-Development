@@ -222,10 +222,17 @@ internal sealed class SystemFactoryProcessInvoker(Action<int>? onProcessStarted 
             if (!process.HasExited) process.Kill(entireProcessTree: true);
             await process.WaitForExitAsync(CancellationToken.None);
             await Task.WhenAll(stdoutTask, stderrTask);
+            ReleaseRuntimeLockAfterForcedTermination(invocation, process.Id);
             throw;
         }
 
         return new(process.ExitCode, await stdoutTask, await stderrTask);
+    }
+
+    internal static bool ReleaseRuntimeLockAfterForcedTermination(FactoryProcessInvocation invocation, int processId)
+    {
+        var lockPath = Path.Combine(invocation.WorkingDirectory, ".idd", "factory", "runtime.lock");
+        return FactoryRuntimeLock.TryReleaseOwned(lockPath, processId);
     }
 }
 

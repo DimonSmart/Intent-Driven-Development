@@ -1,101 +1,22 @@
-using System.Text.Json;
 using System.Text.Json.Nodes;
 
-internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
+namespace Idd.Generate.Generation;
+
+internal sealed class CodexPlatformAdapter(TemplateLoader templates) : PlatformAdapter(templates)
 {
-    private const int FactoryMcpToolTimeoutSeconds = 3 * 60 * 60;
-
     public override string Platform => "codex";
-    protected override string ManifestDirectory => ".codex-plugin";
-    protected override string ManifestFileName => "plugin.json";
 
-    public override GeneratedFile BuildMarketplaceFile(PluginManifest manifest, string version) =>
-        CodexMarketplaceBuilder.Build(manifest);
-
-    protected override string BuildPluginManifest(
-        AdapterConfig adapter,
-        string pluginName,
-        PluginDefinition plugin,
-        string version)
-    {
-        var displayName = pluginName switch
-        {
-            "idd-intent" => "IDD Intent",
-            "idd-factory" => "IDD Factory",
-            _ => DisplayName(pluginName)
-        };
-
-        var pluginJson = new JsonObject
-        {
-            ["name"] = pluginName,
-            ["version"] = version,
-            ["description"] = plugin.Description,
-            ["skills"] = "./skills/",
-            ["author"] = new JsonObject
-            {
-                ["name"] = AuthorName
-            },
-            ["repository"] = RepositoryUrl,
-            ["license"] = "MIT",
-            ["interface"] = new JsonObject
-            {
-                ["displayName"] = displayName,
-                ["shortDescription"] = plugin.Description
-            }
-        };
-        if (StringComparer.Ordinal.Equals(pluginName, "idd-factory"))
-        {
-            pluginJson["mcpServers"] = "./.mcp.json";
-        }
-
-        return pluginJson.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n";
-    }
-
-    protected override IReadOnlyList<GeneratedFile> BuildAdditionalPluginFiles(string pluginName, string version)
-    {
-        var files = base.BuildAdditionalPluginFiles(pluginName, version).ToList();
-        if (!StringComparer.Ordinal.Equals(pluginName, "idd-factory"))
-        {
-            return files;
-        }
-
-        var mcp = new JsonObject
-        {
-            ["mcpServers"] = new JsonObject
-            {
-                ["factory"] = new JsonObject
-                {
-                    ["command"] = "dotnet",
-                    ["args"] = new JsonArray("runtime/idd-factory.dll", "mcp"),
-                    ["cwd"] = ".",
-                    ["tool_timeout_sec"] = FactoryMcpToolTimeoutSeconds,
-                    ["env"] = new JsonObject
-                    {
-                        ["IDD_FACTORY_WINDOWS_SANDBOX"] = "unelevated"
-                    },
-                    ["env_vars"] = new JsonArray(
-                        "IDD_FACTORY_CODEX_EXECUTABLE",
-                        "IDD_FACTORY_MODEL",
-                        "IDD_FACTORY_REASONING_EFFORT",
-                        "IDD_FACTORY_INHERIT_USER_SKILLS",
-                        "IDD_FACTORY_CAPABILITY_PROFILE"),
-                    ["omit_tools_from"] = new JsonArray("deferred", "code_mode")
-                }
-            }
-        };
-        files.Add(new GeneratedFile(".mcp.json", mcp.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n"));
-        return files;
-    }
-
-    protected override IReadOnlyList<GeneratedFile> BuildSkillFiles(
+    protected override string BuildSkill(
         AdapterConfig adapter,
         PluginDefinition plugin,
-        IReadOnlyDictionary<string, RoleDefinition> roleDefinitions,
         string skillName,
+        string canonical,
+        IReadOnlyDictionary<string, string> methodologyFiles,
+        IReadOnlyDictionary<string, RoleDefinition> roleDefinitions,
         IReadOnlyDictionary<string, SkillDescription> skillDescriptions)
     {
-        var files = base.BuildSkillFiles(adapter, plugin, roleDefinitions, skillName, skillDescriptions).ToList();
-        if (StringComparer.Ordinal.Equals(skillName, "idd-factory-run"))
+        var files = base.BuildSkillFiles(adapter, plugin, skillName, canonical, methodologyFiles, roleDefinitions, skillDescriptions).ToList();
+        if (skillName == "idd-factory-run")
         {
             var skill = files.Single(file => StringComparer.Ordinal.Equals(
                 file.RelativePath,
@@ -119,8 +40,12 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                     `factory_continue` times out or loses its response, call
                     `factory_status` once:
 
-                    - `ACTIVE`: the original runtime still owns the workspace; do not
-                      call `factory_run` or `factory_continue`.
+                    - `ACTIVE`: the original runtime still owns the workspace; the run
+                      has not finished and no Factory outcome is available yet. Report
+                      this as `Factory status: ACTIVE`, never `Factory outcome: ACTIVE`.
+                      Include current work item, attempt, phase, completed/remaining
+                      counts, operation, and start time when returned. Do not call
+                      `factory_run` or `factory_continue`.
                     - `READY_TO_CONTINUE`: no runtime owns the workspace; resume the
                       persisted run once with `factory_continue`.
                     - `WAITING_FOR_CONTINUATION`: report the persisted Factory outcome,
@@ -258,20 +183,15 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
         RoleTool.FileRead =>
             "Read files using the available shell or file-reading operations.",
         RoleTool.FileWrite =>
-            "Create, modify, rename, or remove files using the available file-editing or shell operations.",
-        RoleTool.CommandExecute =>
-            "Execute repository commands using the available command-execution operation.",
+            "Write or patch workspace files using the available shell or file-writing operations.",
+        RoleTool.Search =>
+            "Search workspace text using the available shell search operations.",
+        RoleTool.ShellExec =>
+            "Execute shell commands using the available command-execution operation.",
         RoleTool.AgentSpawn =>
-            "Call the Codex `spawn_agent` collaboration tool.",
+            "Spawn generic child agents with `spawn_agent`; deliver the required Factory role and skill contract in the child message.",
         RoleTool.AgentWait =>
-            "Call the Codex `wait_agent` collaboration tool. In Multi-Agent V2 it waits for mailbox activity from any live agent and does not take an agent id; prefer a long event-driven wait over short polling loops.",
-        _ => throw new ArgumentOutOfRangeException(nameof(tool), tool, "Unknown role capability.")
+            "Wait for child-agent mailbox activity with `wait_agent`; Codex Multi-Agent V2 wait is event-driven and does not take a child id.",
+        _ => throw new ArgumentOutOfRangeException(nameof(tool), tool, null)
     };
-
-    protected override string BuildSkillFrontMatter(
-        string skillName,
-        SkillDescription skillDescription,
-        AdapterConfig adapter,
-        IReadOnlyList<RoleDefinition> roles) =>
-        YamlFrontMatterWriter.BuildCodexSkillFrontMatter(skillName, skillDescription);
 }

@@ -42,6 +42,18 @@ public sealed class IntentPreflightContractTests
     }
 
     [Fact]
+    public void ActiveRecoveryStatusIsNotReportedAsFactoryOutcome()
+    {
+        var launcher = Read("src/canonical/skills/idd-factory-run.md");
+        var codexAdapter = Read("tools/generate/Generation/CodexPlatformAdapter.cs");
+
+        Assert.Contains("Factory status: <status>", launcher, StringComparison.Ordinal);
+        Assert.Contains("ACTIVE` must never be reported as", launcher, StringComparison.Ordinal);
+        Assert.Contains("Factory status: ACTIVE", codexAdapter, StringComparison.Ordinal);
+        Assert.Contains("never `Factory outcome: ACTIVE`", codexAdapter, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void FocusedEvalSuiteCoversPositiveAndNegativeRelations()
     {
         var cases = Read("evals/idd-factory-intent-preflight/cases.yaml");

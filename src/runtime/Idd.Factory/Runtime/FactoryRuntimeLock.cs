@@ -68,6 +68,21 @@ internal sealed class FactoryRuntimeLock : IAsyncDisposable
 
     internal static bool IsHeld(string path) => File.Exists(Path.GetFullPath(path));
 
+    internal static bool TryReleaseOwned(string path, int processId)
+    {
+        path = Path.GetFullPath(path);
+        var owner = TryReadDescriptor(path);
+        if (owner is null || owner.ProcessId != processId) return false;
+
+        try
+        {
+            File.Delete(path);
+            return !File.Exists(path);
+        }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
+    }
+
     public ValueTask DisposeAsync()
     {
         if (disposed) return ValueTask.CompletedTask;

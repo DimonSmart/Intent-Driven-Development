@@ -80,7 +80,8 @@ alone is not `INTENT_REQUIRED`.
 
 ## Reporting
 
-Report separately:
+For a structured result returned directly by `factory_run` or `factory_continue`,
+report separately:
 
 ```text
 Factory outcome: <outcome>
@@ -91,6 +92,16 @@ Intent preparation: unchanged | updated | blocked
 Intent before/after hash: <hashes when available>
 Intent paths changed: <paths when present>
 ```
+
+When `factory_status` is used after a lost or timed-out blocking response, its
+`status` is launcher/runtime ownership state, not a Factory outcome. Report it
+as `Factory status: <status>`. In particular, `ACTIVE` must never be reported as
+`Factory outcome: ACTIVE`: it means the run has not finished and no final Factory
+outcome is available yet. For `ACTIVE`, include the current work item, attempt,
+phase, completed/remaining counts, runtime operation, and start time when the
+status payload provides them, then report the returned reason and resume
+condition. Do not imply that the current semantic attempt has completed merely
+because the workspace remains owned.
 
 When durable intent was updated from the original request before
 implementation, say so explicitly. After reporting the final structured runtime
