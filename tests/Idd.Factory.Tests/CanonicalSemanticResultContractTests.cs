@@ -39,6 +39,17 @@ public sealed class CanonicalSemanticResultContractTests
     }
 
     [Fact]
+    public void PlanningContractReturnsAllCurrentlyContractableWork()
+    {
+        var skill = Read("src/canonical/skills/idd-factory-decompose-task.md");
+
+        Assert.Contains("Return all work whose contract is known now.", skill, StringComparison.Ordinal);
+        Assert.Contains("merely to keep the plan small.", skill, StringComparison.Ordinal);
+        Assert.Contains("Stop only at the first material uncertainty", skill, StringComparison.Ordinal);
+        Assert.DoesNotContain("smallest ordered prefix", skill, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ImplementationCompletedContractMatchesCanonicalSemanticFields()
     {
         var skill = Read("src/canonical/skills/idd-factory-execute-subtask.md");

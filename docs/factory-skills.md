@@ -44,7 +44,7 @@ Use idd-factory-run to implement the task described in ./ui-audit.md.
 
 ## Semantic worker skills
 
-- `idd-factory-decompose-task` returns the smallest safe ordered list of remaining work and is reused after new evidence or a global strategy change.
+- `idd-factory-decompose-task` returns all currently contractable remaining work in execution order and defers only work whose safe contract depends on evidence not yet available.
 - `idd-factory-execute-subtask` executes one focused workspace-writing implementation work item, including documentation changes when its contract requires them.
 - `idd-factory-research` performs one focused read-only research work item whose findings become completed-work context.
 - `idd-factory-review-checkpoint` independently reviews completed work at its ordered position.
