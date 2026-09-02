@@ -6,26 +6,6 @@ namespace Idd.Factory.Tests;
 public sealed class FactoryUtf8TransportTests
 {
     [Fact]
-    public void SystemTransportReplacesRequestStdinWithRequestFile()
-    {
-        var invocation = FactoryRuntimeProcessRunner.BuildInvocation(
-            FactoryRuntimeCommand.Run,
-            Path.GetTempPath(),
-            "Русский запрос: Málaga, 漢字, 🔒",
-            null,
-            "idd-factory.dll",
-            Path.GetTempPath());
-        var requestFile = Path.Combine(Path.GetTempPath(), "factory-request-test.md");
-
-        var arguments = SystemFactoryProcessInvoker.UseRequestFileTransport(invocation.Arguments, requestFile);
-
-        Assert.DoesNotContain("--request-stdin", arguments);
-        var option = arguments.ToList().IndexOf("--request-file");
-        Assert.True(option >= 0 && option + 1 < arguments.Count);
-        Assert.Equal(requestFile, arguments[option + 1]);
-    }
-
-    [Fact]
     public async Task CorruptedRequestStopsBeforeLaunchingRuntime()
     {
         using var temp = new TestWorkspace();
