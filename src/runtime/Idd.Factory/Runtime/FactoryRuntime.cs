@@ -183,6 +183,12 @@ public sealed partial class FactoryRuntime(
 
     private async Task<FactoryCliOutcome> StopForAgentProtocolExceptionAsync(FactoryState state, AgentProtocolException exception, CancellationToken cancellationToken)
     {
+        if (exception.Code == "AGENT_TRANSPORT_FAILURE"
+            && state.CurrentAttemptId is { } attemptId
+            && state.Current is { AttemptCount: > 0 } current
+            && current.CurrentAttemptId == attemptId)
+            current.AttemptCount--;
+
         var existing = state.PendingContinuation is { IsResumable: true } value ? value : null;
         var hard = exception.Code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal) || exception.Code is "UNKNOWN_CAPABILITY" or "CAPABILITY_NOT_ALLOWED" or "INVALID_RUNTIME_STATE";
         return await StopAsync(state, exception.Code, exception.Message, hard || existing is null ? "Cancel/restart after resolving the condition." : "Resolve the condition, then continue the exact operation.", cancellationToken,
