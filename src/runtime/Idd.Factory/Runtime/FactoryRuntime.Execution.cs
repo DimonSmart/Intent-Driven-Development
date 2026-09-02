@@ -296,7 +296,7 @@ public sealed partial class FactoryRuntime
     private async Task<SortedDictionary<string, string>> SnapshotWorkspaceAsync(string runId, CancellationToken cancellationToken)
     {
         var result = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        foreach (var path in Directory.EnumerateFiles(workspace, "*", SearchOption.AllDirectories).OrderBy(x => x, StringComparer.Ordinal))
+        foreach (var path in await WorkspaceSnapshotFileEnumerator.EnumerateAsync(workspace, cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var relative = RelativePath(path);
