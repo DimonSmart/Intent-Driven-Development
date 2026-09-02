@@ -12,7 +12,9 @@ Read the supplied work-item contract, relevant durable intent, completed depende
 
 Do not read unrelated work merely to reconstruct a global plan. Do not mutate Factory state, graph history, `.idd/factory.yaml`, intent, or verification policy. Do not select another worker, role, skill, or runtime phase.
 
-Make the smallest coherent product change needed by the contract. When earlier authoritative verification observations are supplied, use them as diagnostic evidence and correct the assigned work item accordingly. Runtime verification remains authoritative: do not run or classify authoritative Factory verification yourself, and do not repair a hidden gate; there is no `verification-fix` orchestration mode.
+Make the smallest coherent product change needed by the contract. When earlier authoritative verification observations are supplied, use them as diagnostic evidence and correct the assigned work item accordingly.
+
+Runtime verification remains authoritative. You may run focused build or test commands when they are useful for developing the assigned change. Do not discover or reproduce the repository's Factory verification procedure, run broad repository verification, or keep iterating merely to make verification pass. Once the assigned semantic change is coherently implemented, return `completed`; Factory Runtime performs authoritative verification, and a later invocation receives exact verification observations when correction is needed. Do not repair a hidden gate; there is no `verification-fix` orchestration mode.
 
 ## Dynamic dependency discovery
 
