@@ -15,7 +15,7 @@ public sealed class FactoryUtf8TransportTests
             .RunAsync(FactoryRuntimeCommand.Run, temp.Path, "Русский текст уже повреждён: \uFFFD", null, CancellationToken.None);
 
         Assert.Equal("INVALID_REQUEST_ENCODING", result.FactoryOutcome);
-        Assert.Contains("U+FFFD", result.Reason, StringComparison.Ordinal);
+        Assert.Contains("U+FFFD", result.Reason!, StringComparison.Ordinal);
         Assert.False(invoker.WasInvoked);
     }
 
