@@ -3,7 +3,7 @@ using System.Text.Json;
 using Idd.Factory.Domain;
 using Idd.Factory.Runtime;
 
-internal sealed class FactoryProgressMonitor(FactoryStatusReader statusReader)
+internal sealed class FactoryMcpProgressMonitor(FactoryStatusReader statusReader)
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(15);
