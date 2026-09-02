@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Idd.Factory.Agents;
@@ -242,7 +243,19 @@ public sealed record BoundSemanticAgentResult(string AttemptId, SemanticAgentRes
 public sealed record AgentRunHandle(string AttemptId, int ProcessId, string BackendHandle);
 [JsonConverter(typeof(JsonStringEnumConverter<AgentTerminationKind>))]
 public enum AgentTerminationKind { CleanExit, ForcedAfterResult, Cancelled, TransportFailure }
-public sealed record AgentProcessResult(int? ExitCode, string Stdout, string Stderr, bool CompleteResultObserved, bool KillRequired, AgentTerminationKind TerminationKind);
+public sealed record AgentProcessResult(
+    int? ExitCode,
+    [property: JsonIgnore] string Stdout,
+    [property: JsonIgnore] string Stderr,
+    bool CompleteResultObserved,
+    bool KillRequired,
+    AgentTerminationKind TerminationKind)
+{
+    public string StdoutLogPath => "stdout.log";
+    public string StderrLogPath => "stderr.log";
+    public int StdoutBytes => Encoding.UTF8.GetByteCount(Stdout ?? string.Empty);
+    public int StderrBytes => Encoding.UTF8.GetByteCount(Stderr ?? string.Empty);
+}
 public sealed record AgentExecutionConfiguration(string? Model = null, string? ReasoningEffort = null, string? WindowsSandbox = null)
 {
     public string RequestedModel => string.IsNullOrWhiteSpace(Model) ? "default/unpinned" : Model;
