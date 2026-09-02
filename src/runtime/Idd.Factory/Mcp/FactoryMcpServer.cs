@@ -5,7 +5,7 @@ using Idd.Factory.Domain;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using ModelContextProtocol.Protocol;
+using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
 internal static class FactoryMcpServer
@@ -78,7 +78,7 @@ internal sealed class FactoryMcpTools(FactoryRuntimeProcessRunner runner, Factor
         IProgress<ProgressNotificationValue> progress,
         CancellationToken cancellationToken)
     {
-        long sequence = 0;
+        var sequence = 0;
         void Report(string message) => progress.Report(new ProgressNotificationValue
         {
             Progress = Interlocked.Increment(ref sequence),
@@ -115,13 +115,7 @@ internal sealed class FactoryMcpTools(FactoryRuntimeProcessRunner runner, Factor
             var status = await statusReader.ReadAsync(workspace, cancellationToken);
             if (!StringComparer.Ordinal.Equals(status.Status, "ACTIVE")) continue;
 
-            var snapshot = string.Join('|',
-                status.RunId,
-                status.CurrentWorkItemId,
-                status.CurrentAttemptId,
-                status.CurrentPhase,
-                status.CompletedWorkCount,
-                status.RemainingWorkCount);
+            var snapshot = $"{status.RunId}|{status.CurrentWorkItemId}|{status.CurrentAttemptId}|{status.CurrentPhase}|{status.CompletedWorkCount}|{status.RemainingWorkCount}";
             var now = DateTimeOffset.UtcNow;
             if (StringComparer.Ordinal.Equals(snapshot, previousSnapshot)
                 && now - lastReportAt < ProgressHeartbeatInterval)
