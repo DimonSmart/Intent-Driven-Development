@@ -28,6 +28,20 @@ public sealed class IntentPreflightContractTests
     }
 
     [Fact]
+    public void FactoryPlanningDoesNotRematerializeIntentPreflightWork()
+    {
+        var decomposer = Read("src/canonical/skills/idd-factory-decompose-task.md");
+        var planningRuntime = Read("src/runtime/Idd.Factory/Runtime/FactoryRuntime.Planning.cs");
+
+        Assert.Contains("Durable intent is read-only", decomposer, StringComparison.Ordinal);
+        Assert.Contains("must not be materialized", decomposer, StringComparison.Ordinal);
+        Assert.Contains("rather than returning an intent-editing task", decomposer, StringComparison.Ordinal);
+        Assert.Contains("Factory planning boundary", planningRuntime, StringComparison.Ordinal);
+        Assert.Contains("Durable intent is read-only Factory input and never remaining Factory work", planningRuntime, StringComparison.Ordinal);
+        Assert.Contains("not a Factory task", planningRuntime, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void FocusedEvalSuiteCoversPositiveAndNegativeRelations()
     {
         var cases = Read("evals/idd-factory-intent-preflight/cases.yaml");

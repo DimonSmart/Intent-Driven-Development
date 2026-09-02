@@ -5,6 +5,27 @@ namespace Idd.Factory.Tests;
 public sealed class IncrementalPlanningTests
 {
     [Fact]
+    public async Task InitialPlanningKeepsOriginalIntentInstructionButMarksItOutsideFactoryWork()
+    {
+        using var temp = new TestWorkspace();
+        var backend = new FakeAgentBackend();
+        const string request = "Update durable intent for marquee file names, then implement the feature.";
+
+        backend.Enqueue(x => Envelope(x, "ready", new { tasks = Array.Empty<object>() }));
+        backend.Enqueue(x => Envelope(x, "blocked", reason: "Stop after inspecting the planning handoff"));
+
+        var outcome = await CreateRuntime(temp.Path, backend)
+            .RunRequestAsync(request, "test", default);
+
+        Assert.Equal("BLOCKED", outcome.FactoryOutcome);
+        var planner = Assert.Single(backend.Invocations, x => x.Role == "task-decomposer");
+        Assert.Contains(request, planner.Input, StringComparison.Ordinal);
+        Assert.Contains("Factory planning boundary", planner.Input, StringComparison.Ordinal);
+        Assert.Contains("Durable intent is read-only Factory input and never remaining Factory work", planner.Input, StringComparison.Ordinal);
+        Assert.Contains("not a Factory task", planner.Input, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ExhaustedKnownWorkRunsPlanningAgainWithoutConsumingReplanBudget()
     {
         using var temp = new TestWorkspace();

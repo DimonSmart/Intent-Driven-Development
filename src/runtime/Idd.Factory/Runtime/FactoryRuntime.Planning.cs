@@ -32,6 +32,7 @@ public sealed partial class FactoryRuntime
                 : $"new completed work since previous planning: {state.Completed.Count - state.PlannedThroughCompletedCount} item(s)";
         var input =
             $"Original request:\n{request}\n\nCompleted immutable work:\n{completed}\n\nCurrent planning trigger:\n{trigger}\n\nExisting future plan:\n{JsonSerializer.Serialize(future, FactoryJson.Options)}\n\n" +
+            "Factory planning boundary:\nIntent preparation is outside Factory runtime. Durable intent is read-only Factory input and never remaining Factory work. A normal new end-to-end run reaches planning only after required Intent Preflight. The original request remains unchanged, so any instruction in it to create or update durable intent is pre-runtime scope, not a Factory task. If current durable intent still lacks a required product decision, return intent-required rather than an intent-editing task.\n\n" +
             "Return only the ordered work that remains to be done. Completed work is immutable and must not be reproduced. The first task executes first. Do not return IDs, dependencies, status, sequence, revisions, outlines, or mutation operations.";
 
         var result = await InvokeSemanticAsync(
