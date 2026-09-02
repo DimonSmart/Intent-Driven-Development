@@ -17,6 +17,7 @@ internal static class FactoryMcpServer
         builder.Services.AddSingleton<IFactoryProcessInvoker, SystemFactoryProcessInvoker>();
         builder.Services.AddSingleton<FactoryRuntimeProcessRunner>();
         builder.Services.AddSingleton<FactoryStatusReader>();
+        builder.Services.AddSingleton<FactoryProgressMonitor>();
         builder.Services
             .AddMcpServer(options => options.ServerInfo = new()
             {
@@ -32,13 +33,13 @@ internal static class FactoryMcpServer
 }
 
 [McpServerToolType]
-internal sealed class FactoryMcpTools(FactoryRuntimeProcessRunner runner, FactoryStatusReader statusReader)
+internal sealed class FactoryMcpTools(
+    FactoryRuntimeProcessRunner runner,
+    FactoryStatusReader statusReader,
+    FactoryProgressMonitor progressMonitor)
 {
-    private static readonly TimeSpan ProgressPollInterval = TimeSpan.FromSeconds(2);
-    private static readonly TimeSpan ProgressHeartbeatInterval = TimeSpan.FromSeconds(15);
-
     [McpServerTool(Name = "factory_run", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true, UseStructuredContent = true)]
-    [Description("Run an explicitly requested IDD Factory workflow and block until the packaged runtime returns a structured outcome. Progress notifications describe the active work item/attempt when the MCP client supplies a progress token. A host/tool timeout is transport loss, not a Factory outcome; use factory_status once to determine whether the runtime is still active.")]
+    [Description("Run an explicitly requested IDD Factory workflow and block until the packaged runtime returns a structured outcome. Progress notifications describe high-level runtime activity when the MCP client supplies a progress token. A host/tool timeout is transport loss, not a Factory outcome; use factory_status once to determine whether the runtime is still active.")]
     public Task<FactoryMcpResult> FactoryRunAsync(
         [Description("Absolute path to the target workspace.")] string workspace,
         [Description("Complete Factory request text, passed unchanged as UTF-8.")] string request,
@@ -47,7 +48,7 @@ internal sealed class FactoryMcpTools(FactoryRuntimeProcessRunner runner, Factor
         RunWithProgressAsync(FactoryRuntimeCommand.Run, workspace, request, null, progress, cancellationToken);
 
     [McpServerTool(Name = "factory_continue", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true, UseStructuredContent = true)]
-    [Description("Continue an explicitly requested IDD Factory workflow, optionally supplying its clarification answer. Progress notifications describe the active work item/attempt when the MCP client supplies a progress token. A host/tool timeout is transport loss, not a Factory outcome; use factory_status once before deciding whether another continue is safe.")]
+    [Description("Continue an explicitly requested IDD Factory workflow, optionally supplying its clarification answer. Progress notifications describe high-level runtime activity when the MCP client supplies a progress token. A host/tool timeout is transport loss, not a Factory outcome; use factory_status once before deciding whether another continue is safe.")]
     public Task<FactoryMcpResult> FactoryContinueAsync(
         [Description("Absolute path to the target workspace.")] string workspace,
         IProgress<ProgressNotificationValue> progress,
@@ -79,52 +80,41 @@ internal sealed class FactoryMcpTools(FactoryRuntimeProcessRunner runner, Factor
         CancellationToken cancellationToken)
     {
         var sequence = 0;
-        void Report(string message) => progress.Report(new ProgressNotificationValue
+        void Report(string message)
         {
-            Progress = Interlocked.Increment(ref sequence),
-            Message = message
-        });
+            try
+            {
+                progress.Report(new ProgressNotificationValue
+                {
+                    Progress = Interlocked.Increment(ref sequence),
+                    Message = message
+                });
+            }
+            catch
+            {
+                // Progress is best-effort and must never change the Factory outcome.
+            }
+        }
 
-        Report($"Factory {command.ToString().ToLowerInvariant()} started.");
+        var initialEventCount = progressMonitor.CaptureExistingEventCount(workspace);
+        Report($"Factory {command.ToString().ToLowerInvariant()} started");
         using var monitorCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var monitor = MonitorProgressAsync(workspace, Report, monitorCancellation.Token);
+        var monitor = progressMonitor.RunAsync(workspace, initialEventCount, Report, monitorCancellation.Token);
+
+        FactoryMcpResult result;
         try
         {
-            var result = await runner.RunAsync(command, workspace, request, answer, cancellationToken);
-            Report($"Factory finished with {result.FactoryOutcome}.");
-            return result;
+            result = await runner.RunAsync(command, workspace, request, answer, cancellationToken);
         }
         finally
         {
             monitorCancellation.Cancel();
             try { await monitor; }
-            catch (OperationCanceledException) when (monitorCancellation.IsCancellationRequested) { }
+            catch { }
         }
-    }
 
-    private async Task MonitorProgressAsync(
-        string workspace,
-        Action<string> report,
-        CancellationToken cancellationToken)
-    {
-        string? previousSnapshot = null;
-        var lastReportAt = DateTimeOffset.MinValue;
-        while (true)
-        {
-            await Task.Delay(ProgressPollInterval, cancellationToken);
-            var status = await statusReader.ReadAsync(workspace, cancellationToken);
-            if (!StringComparer.Ordinal.Equals(status.Status, "ACTIVE")) continue;
-
-            var snapshot = $"{status.RunId}|{status.CurrentWorkItemId}|{status.CurrentAttemptId}|{status.CurrentPhase}|{status.CompletedWorkCount}|{status.RemainingWorkCount}";
-            var now = DateTimeOffset.UtcNow;
-            if (StringComparer.Ordinal.Equals(snapshot, previousSnapshot)
-                && now - lastReportAt < ProgressHeartbeatInterval)
-                continue;
-
-            report(FormatActiveProgress(status, now));
-            previousSnapshot = snapshot;
-            lastReportAt = now;
-        }
+        Report(FormatFinalProgress(result));
+        return result;
     }
 
     internal static string FormatActiveProgress(FactoryStatusResult status, DateTimeOffset now)
@@ -147,6 +137,13 @@ internal sealed class FactoryMcpTools(FactoryRuntimeProcessRunner runner, Factor
         elapsed.TotalHours >= 1
             ? $"{(int)elapsed.TotalHours}:{elapsed.Minutes:00}:{elapsed.Seconds:00}"
             : $"{elapsed.Minutes}:{elapsed.Seconds:00}";
+
+    internal static string FormatFinalProgress(FactoryMcpResult result) => result.FactoryOutcome switch
+    {
+        "COMPLETED" => "Factory completed",
+        "CANCELLED" => "Factory cancelled",
+        _ => $"Factory blocked: {result.FactoryOutcome}"
+    };
 }
 
 internal sealed record FactoryMcpResult(
