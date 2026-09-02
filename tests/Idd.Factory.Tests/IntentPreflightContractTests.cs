@@ -28,6 +28,20 @@ public sealed class IntentPreflightContractTests
     }
 
     [Fact]
+    public void PreflightResolvesSuppliedContentAndDetectsExplicitDurableConflicts()
+    {
+        var contract = Read("src/canonical/methodology/intent-preflight.md");
+        var launcher = Read("src/canonical/skills/idd-factory-run.md");
+        var cases = Read("evals/idd-factory-intent-preflight/cases.yaml");
+
+        Assert.Contains("resolve and read request-supplied pasted or attached", contract, StringComparison.Ordinal);
+        Assert.Contains("takes precedence over `Covered` and `ImplementationOnly`", launcher, StringComparison.Ordinal);
+        Assert.Contains("pasted-explicit-conflict-before-runtime", cases, StringComparison.Ordinal);
+        Assert.Contains("1003 + 1006", cases, StringComparison.Ordinal);
+        Assert.Contains("planner-discovers-initial-1002-1003-conflict", cases, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void FactoryPlanningDoesNotRematerializeIntentPreflightWork()
     {
         var decomposer = Read("src/canonical/skills/idd-factory-decompose-task.md");

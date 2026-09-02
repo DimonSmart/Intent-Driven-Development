@@ -57,6 +57,18 @@ cases:
     expected_owner_action: update-existing-spec
     forbidden_outcomes: [UNNECESSARY_CONFIRMATION, INTENT_REQUIRED]
 
+  - id: pasted-explicit-conflict-before-runtime
+    fixture: unix-mouse-mode-1002-only
+    request: "Use idd-factory-run. Implement the hover marquee described in the supplied pasted-text file."
+    request_supplied_file:
+      name: pasted-text.txt
+      content: "Hover marquee requires passive pointer movement on Unix. Panels must use xterm 1003 + 1006 instead of the current normative 1002 + 1006; full mouse-mode teardown remains required."
+    expected_relation: ExplicitIntentChange
+    expected_owner_action: update-existing-spec
+    expected_intent_contains: ["1003 + 1006"]
+    expected_factory_started_after_intent_update: true
+    forbidden_actions: [factory-start-before-intent-update, planner-discovers-initial-1002-1003-conflict]
+
   - id: ambiguous-conflict
     fixture: conflicting-owner-behavior
     request: "Use idd-factory-run to revise owner shutdown behavior while retaining whichever existing safety rule is appropriate."

@@ -25,15 +25,23 @@ Before calling the runtime for a new run:
    of initial preflight.
 2. Resolve explicit requested scope. Explicit prohibitions on intent writes or
    implementation take precedence over Factory invocation.
-3. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and only relevant
-   current documents.
-4. Classify the request as `Covered`, `ExplicitIntentChange`,
-   `MissingIntentDecision`, or `ImplementationOnly`.
+3. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, only relevant current
+   documents, and any pasted or attached content explicitly supplied as part of
+   the user request. If the host exposes supplied content only through a local
+   reference, read that content before classification; do not treat the path or
+   attachment marker itself as the request semantics.
+4. Compare every explicit durable claim in the resolved request semantics with
+   relevant current intent, then classify the request as `Covered`,
+   `ExplicitIntentChange`, `MissingIntentDecision`, or `ImplementationOnly`.
+   A clear request-side contradiction that supersedes current durable behavior
+   takes precedence over `Covered` and `ImplementationOnly`.
 5. For an allowed `ExplicitIntentChange`, invoke `idd-intent-change` with the
-   unchanged original request. Let it hand off to `idd-intent-new-document` when
-   normal ownership rules require a new spec, ADR, or spike.
+   unchanged original request and the resolved user-supplied request content.
+   Let it hand off to `idd-intent-new-document` when normal ownership rules
+   require a new spec, ADR, or spike.
 6. After any intent update, validate semantic coverage against the original
-   request as defined by the required reference.
+   request and resolved request-supplied content as defined by the required
+   reference.
 7. Start Factory only for permitted `end-to-end` or `implementation-only` scope
    when current intent covers the product semantics or the request is strictly
    `ImplementationOnly`.
@@ -51,11 +59,11 @@ alone is not `INTENT_REQUIRED`.
 - When Factory returns `NEEDS_CLARIFICATION`, report the question, collect the
   user's answer, and continue with that answer unchanged.
 - When Factory returns structured `INTENT_REQUIRED`, compare the missing durable
-  decisions with the unchanged original request and current intent. If the
-  request already resolves them and scope permits writes, use the existing
-  intent workflow outside Factory, validate coverage, and continue the exact
-  persisted operation. Otherwise report the genuinely missing decision and
-  pause for user input.
+  decisions with the unchanged original request, request-supplied content that
+  resolves its references, and current intent. If the request already resolves
+  them and scope permits writes, use the existing intent workflow outside
+  Factory, validate coverage, and continue the exact persisted operation.
+  Otherwise report the genuinely missing decision and pause for user input.
 - Cancellation is explicit. Warn that product changes are preserved; do not
   delete Factory state or revert code in the launcher.
 

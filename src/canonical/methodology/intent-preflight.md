@@ -13,10 +13,22 @@ implementation plan.
 Use:
 
 - the complete original request;
+- any pasted or attached content explicitly supplied by the user as part of that
+  request, including content that the host represents only by a request-local
+  file or attachment reference;
 - requested scope;
 - `.idd/intent/README.md` and `.idd/intent/INDEX.md`;
 - only current intent documents relevant to the request;
 - an existing route result when one is already available.
+
+Before classification, resolve and read request-supplied pasted or attached
+content when the visible request contains only a reference to it. The reference
+or local path is transport metadata, not a substitute for the supplied semantic
+content. Treat the visible request together with that resolved user-supplied
+content as the authoritative semantic request for preflight. Do not use this rule
+to read arbitrary local or repository files that the user did not supply as
+request input, and do not rewrite the original launcher payload merely for this
+classification step.
 
 Do not read the entire intent tree by default. Missing documentation is evidence
 about storage, not proof that a product decision is missing.
@@ -35,6 +47,21 @@ Explicit scope limits override the normal meaning of an explicit
 ## Classification
 
 Classify the request relation to current intent as exactly one of:
+
+Before choosing a relation, compare every explicit durable claim in the
+authoritative semantic request with the relevant current intent. An explicit
+claim that adds or supersedes observable behavior, a durable architecture
+boundary, or a platform/safety/compatibility constraint is
+`ExplicitIntentChange` when the request supplies the decision. Do not classify
+such a request as `Covered` merely because the surrounding feature already has
+an owning specification, and do not classify it as `ImplementationOnly` merely
+because the request also contains concrete implementation instructions.
+
+A concrete technical setting can be private implementation detail or durable
+intent depending on context. When current intent normatively fixes that setting
+as part of supported product/platform behavior and the request explicitly
+changes it to enable the requested behavior, the contradiction is a durable
+intent change and must be resolved before Factory starts.
 
 ### `Covered`
 
@@ -82,6 +109,11 @@ The request changes implementation but not product truth: for example, a
 refactor, cleanup, dependency update, or a bug fix whose expected behavior is
 already determined. Do not write intent. Start Factory when scope permits.
 
+`ImplementationOnly` requires that all requested product behavior and durable
+constraints are already established by current intent. It is not a fallback for
+a request that introduces or supersedes durable semantics alongside
+implementation detail.
+
 ## Product decisions and technical research
 
 Technical uncertainty is not automatically missing intent. When product and
@@ -109,7 +141,8 @@ or other proposed private implementation shape.
 ## Coverage validation
 
 After any intent write, and before Factory creation, compare the resulting
-current intent with the unchanged original request. Validate that:
+current intent with the unchanged original request and any resolved
+request-supplied content used during classification. Validate that:
 
 - the main requested behavior is owned by current intent;
 - material non-goals, safety, durability, and compatibility constraints remain;
@@ -145,9 +178,9 @@ Do not repeat initial preflight for an ordinary continue. Runtime-level
 review discovers a genuinely missing durable decision.
 
 When an existing run returns structured `missingIntentDecisions`, compare those
-decisions with the unchanged original Factory request and current intent. If the
-request already supplies them and scope permits intent writes, invoke the
-existing intent workflow, validate coverage, then continue the exact persisted
-Factory operation. If a decision is genuinely absent, ask the user and preserve
-the run. Factory implementation and research workers never edit intent.
-
+decisions with the unchanged original Factory request, any request-supplied
+content that resolves its references, and current intent. If the request already
+supplies them and scope permits intent writes, invoke the existing intent
+workflow, validate coverage, then continue the exact persisted Factory
+operation. If a decision is genuinely absent, ask the user and preserve the run.
+Factory implementation and research workers never edit intent.
