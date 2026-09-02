@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Idd.Factory.Domain;
+using Idd.Factory.Runtime;
 
 internal enum FactoryRuntimeCommand { Run, Continue, Cancel }
 
