@@ -75,7 +75,7 @@ public sealed class FinalizeHandler
             return persisted;
         }
 
-        var baseName = $"{Slug(request.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "factory-result")}_{DateTimeOffset.UtcNow:yyyy-MM-dd_HH-mm-ssZ}";
+        var baseName = $"{DateTimeOffset.UtcNow:yyyy-MM-dd_HH-mm-ssZ}_{Slug(request.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "factory-result")}";
         var name = baseName;
         for (var suffix = 2; Directory.Exists(Path.Combine(resultsRoot, name)); suffix++) name = baseName + "-" + suffix;
         var manifest = new FinalizationManifest(1, state.RunId, name);

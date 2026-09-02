@@ -63,9 +63,11 @@ contracts; runtime-owned `state.json` is the only status source. Successful exec
 tasks complete without automatic independent review. `idd-factory-review-checkpoint`
 runs only for an explicit checkpoint covering one contiguous group of completed
 Subtasks. After all work items complete, Factory performs a mandatory
-final integrated review and writes
-`.idd/factory/results/<work-slug>_<timestamp>/commit-message.md` before clearing
-`current/`.
+final integrated review, prepares final result artifacts, and moves the complete
+run directory to `.idd/factory/results/<timestamp>_<work-slug>/`. The moved
+result retains the state, event log, attempts, verification evidence,
+commit-message handoff, and other diagnostics, while `.idd/factory/current/`
+remains reserved for an active or resumable run.
 
 When Factory decomposition discovers missing durable intent, it creates no task
 state. Resolve intent first, then decompose the original request again. Intent

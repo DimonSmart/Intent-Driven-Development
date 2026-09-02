@@ -18,6 +18,7 @@ public sealed class FinalizationDurabilityTests
 
         var result = await new FinalizeHandler(temp.Path).FinalizeAsync(state, default);
 
+        Assert.Matches(@"^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}Z_durable-finalization$", Path.GetFileName(result));
         Assert.False(Directory.Exists(current));
         Assert.True(File.Exists(Path.Combine(result, "state.json")));
         Assert.True(File.Exists(Path.Combine(result, "request.md")));

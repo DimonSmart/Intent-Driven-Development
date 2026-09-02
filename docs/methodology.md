@@ -155,8 +155,8 @@ The separation is visible to the user because the responsibilities have differen
 - when Factory discovers such a decision later, it stops with structured
   `missingIntentDecisions` and resumes only after intent is resolved outside
   runtime;
-- `.idd/factory/current/` holds at most one active run and
-  `.idd/factory/results/` holds compact commit-message handoffs;
+- `.idd/factory/current/` holds at most one active or resumable run and
+  `.idd/factory/results/` preserves complete successfully finalized run directories for diagnostics and handoff;
 - both directories are ignored by default and are never durable product intent.
 
 The current workspace contains immutable `request.md`, authoritative
@@ -166,10 +166,11 @@ not filenames or conversation history, support validation and safe resume.
 
 Selective checkpoints protect later dependent work; they are not mandatory
 after every Subtask. Review findings create a new corrective task instead of
-reopening completed history. Only after final
-approval does Factory create
-`.idd/factory/results/<work-slug>/commit-message.md`; it then clears the
-contents of `current/` and leaves prior results intact.
+reopening completed history. Only after final approval does Factory prepare the
+final result artifacts and move the complete `.idd/factory/current/` directory to
+`.idd/factory/results/<timestamp>_<work-slug>/`. The completed result therefore
+retains state, request, events, attempts, verification evidence, commit-message
+handoff, and other run diagnostics; prior results remain intact.
 
 ## Routing Model
 
@@ -210,4 +211,4 @@ IDD does not attempt to preserve every step that led to the product. It preserve
 
 ## Summary
 
-`idd-intent` preserves product memory and may optionally maintain a deliberately small project glossary. `idd-factory` organizes resumable temporary implementation work. Requests, task statuses, reviews, and commit-message handoffs remain temporary, and Git owns history.
+`idd-intent` preserves product memory and may optionally maintain a deliberately small project glossary. `idd-factory` organizes resumable temporary implementation work. Requests, task statuses, reviews, completed-run diagnostics, and commit-message handoffs remain temporary, and Git owns product-intent history.
