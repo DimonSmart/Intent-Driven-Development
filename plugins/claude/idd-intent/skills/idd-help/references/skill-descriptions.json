@@ -127,7 +127,7 @@
     "description": "Prepare explicit durable product changes when required, then run, resume, or cancel a deterministic IDD Factory Runtime execution."
   },
   "idd-factory-decompose-task": {
-    "description": "Return the smallest safe ordered list of remaining Factory work without requiring a complete up-front plan.",
+    "description": "Return all currently contractable remaining Factory work in execution order, deferring only work that needs evidence not yet available.",
     "adapters": {
       "claude": {
         "frontmatter": {

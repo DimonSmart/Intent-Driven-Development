@@ -1,6 +1,6 @@
 ---
 name: idd-factory-decompose-task
-description: Return the smallest safe ordered list of remaining Factory work without requiring a complete up-front plan.
+description: Return all currently contractable remaining Factory work in execution order, deferring only work that needs evidence not yet available.
 ---
 
 # idd-factory-decompose-task
@@ -9,7 +9,9 @@ description: Return the smallest safe ordered list of remaining Factory work wit
 
 Return the ordered work that remains to be done. This is the shared planning
 contract for initial planning, planning after new evidence, and global
-replanning. A complete up-front plan is not required.
+replanning. A complete up-front plan is not required, but planning should include
+every remaining work item whose executable contract can be safely determined
+from the evidence available now.
 
 Runtime owns persistent IDs, contracts, state transitions, ordering,
 persistence, verification, recovery, and finalization.
@@ -21,9 +23,12 @@ work, the current planning trigger, and the existing future plan. Treat
 completed work as historical fact: do not reproduce, change, reorder, or reopen
 it. If previous work needs correction, return a new corrective task.
 
-Return only work whose contract is known now. Do not materialize vague future
-scope. Later planning can add work after research or implementation supplies
-the missing facts.
+Return all work whose contract is known now. Do not stop after the first
+executable task merely to keep the plan small. Preserve execution order and
+continue materializing known work until the next task cannot be safely
+contracted without evidence or results from earlier work. Do not materialize
+vague future scope past that uncertainty boundary. Later planning can add that
+work after research or implementation supplies the missing facts.
 
 Do not implement changes, edit intent or verification policy, mutate Factory
 state, choose roles/skills, or expose runtime bookkeeping.
@@ -48,8 +53,10 @@ Use only capabilities allowed by the supplied Factory policy, such as
 `implementation`, `research`, or `semantic-review`. Documentation changes are
 ordinary `implementation` work because they have the same runtime semantics.
 
-An empty list is valid only when no product work remains. Otherwise return the
-smallest ordered prefix that can safely make progress.
+An empty list is valid only when no product work remains. Otherwise return all
+currently contractable remaining work in execution order. This may be many
+tasks. Stop only at the first material uncertainty where defining the next task
+contract depends on evidence or results that are not yet available.
 
 ## Intent-required payload
 
