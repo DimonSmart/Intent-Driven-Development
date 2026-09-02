@@ -39,6 +39,7 @@ public sealed partial class FactoryRuntime(
     {
         if (string.IsNullOrWhiteSpace(request)) throw new ArgumentException("Factory request cannot be empty.", nameof(request));
         ValidateUtf8Text(request, "INVALID_REQUEST_ENCODING", "Factory request");
+        ValidateMaterializedRequest(request);
         if (await stateStore.LoadAsync(cancellationToken) is not null) return new("RUN_EXISTS", "unknown", "Use continue or cancel for the existing Factory run.");
         Directory.CreateDirectory(currentDirectory);
         Directory.CreateDirectory(Path.Combine(currentDirectory, "work-items"));
@@ -250,6 +251,22 @@ public sealed partial class FactoryRuntime(
         {
             throw new FactoryStateException(code, $"{label} contains invalid Unicode data that cannot be represented as UTF-8 without replacement.");
         }
+    }
+
+    private static void ValidateMaterializedRequest(string request)
+    {
+        var hasSuppliedFileEnvelope =
+            request.Contains("# Files pasted by the user:", StringComparison.OrdinalIgnoreCase) ||
+            request.Contains("# Files mentioned by the user:", StringComparison.OrdinalIgnoreCase);
+        if (!hasSuppliedFileEnvelope) return;
+
+        var normalized = request.Replace('\\', '/');
+        if (!normalized.Contains("/.codex/attachments/", StringComparison.OrdinalIgnoreCase) ||
+            !normalized.Contains("pasted-text.txt", StringComparison.OrdinalIgnoreCase)) return;
+
+        throw new FactoryStateException(
+            "UNMATERIALIZED_REQUEST_INPUT",
+            "Factory request contains a host-local pasted-text reference instead of the supplied text. Materialize the exact user-supplied content into a self-contained request before starting Factory.");
     }
 
     private string HashIntent()

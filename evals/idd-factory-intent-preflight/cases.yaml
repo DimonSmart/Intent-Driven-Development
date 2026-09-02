@@ -69,6 +69,26 @@ cases:
     expected_factory_started_after_intent_update: true
     forbidden_actions: [factory-start-before-intent-update, planner-discovers-initial-1002-1003-conflict]
 
+  - id: materialized-request-survives-host-attachment
+    fixture: supplied-cyrillic-hover-marquee
+    request_transport_contains: ["# Files pasted by the user:", ".codex/attachments", "pasted-text.txt"]
+    request_supplied_file:
+      name: pasted-text.txt
+      encoding: utf-8
+      content: "# ТЗ: Hover marquee\nИспользовать 1003 + 1006. Сохранить Unicode: café, Málaga, 漢字 и 🔒."
+    expected_runtime_request: self-contained-materialized-logical-request
+    expected_request_artifact_contains: ["# ТЗ: Hover marquee", "1003 + 1006", "Сохранить Unicode"]
+    forbidden_request_artifact_dependency: host-local-pasted-text
+    expected_factory_started: true
+
+  - id: corrupted-pasted-unicode-stops-before-runtime
+    fixture: supplied-text-with-replacement-character
+    request_supplied_file:
+      name: pasted-text.txt
+      content_contains_unicode_replacement: true
+    expected_outcome: INVALID_REQUEST_ENCODING
+    expected_factory_started: false
+
   - id: ambiguous-conflict
     fixture: conflicting-owner-behavior
     request: "Use idd-factory-run to revise owner shutdown behavior while retaining whichever existing safety rule is appropriate."

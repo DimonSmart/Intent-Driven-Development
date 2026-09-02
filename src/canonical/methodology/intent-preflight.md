@@ -4,31 +4,52 @@ Intent Preflight is the bounded entry stage for an end-to-end Factory request.
 It determines whether durable intent is ready before a new Factory run is
 created. It is not a Factory work item, a planner phase, or a second runtime.
 
-The original user request remains authoritative. Pass it unchanged to both the
-intent workflow and Factory Runtime; do not substitute a route summary or an
-implementation plan.
+The user's logical request remains authoritative. Preserve all user-authored
+request text and all explicitly supplied textual request inputs exactly. A host
+may represent supplied text using a request-local attachment or pasted-file
+reference; that reference is transport metadata, not durable request semantics.
+Before Factory starts, mechanically materialize such supplied text into one
+self-contained logical request. Do not substitute a route summary,
+implementation plan, paraphrase, or semantic rewrite.
 
 ## Inputs
 
 Use:
 
-- the complete original request;
-- any pasted or attached content explicitly supplied by the user as part of that
-  request, including content that the host represents only by a request-local
-  file or attachment reference;
+- the complete visible user request;
+- any pasted or attached textual content explicitly supplied by the user as part
+  of that request, including content that the host represents only by a
+  request-local file or attachment reference;
 - requested scope;
 - `.idd/intent/README.md` and `.idd/intent/INDEX.md`;
 - only current intent documents relevant to the request;
 - an existing route result when one is already available.
 
 Before classification, resolve and read request-supplied pasted or attached
-content when the visible request contains only a reference to it. The reference
-or local path is transport metadata, not a substitute for the supplied semantic
-content. Treat the visible request together with that resolved user-supplied
-content as the authoritative semantic request for preflight. Do not use this rule
-to read arbitrary local or repository files that the user did not supply as
-request input, and do not rewrite the original launcher payload merely for this
-classification step.
+text when the visible request contains only a reference to it. The reference or
+local path is transport metadata, not a substitute for the supplied semantic
+content. Treat the visible request together with that exact resolved content as
+the authoritative logical request for preflight.
+
+Materialization is a transport normalization, not a semantic transformation:
+
+- expand only text explicitly supplied by the user as request input; never read
+  arbitrary local or repository files merely because a path appears in text;
+- preserve the supplied text exactly, including whitespace and Unicode, while
+  replacing host-only attachment dependence with the exact content;
+- prefer the host's file/attachment reader when it provides the supplied text;
+  when a local text file such as Codex `pasted-text.txt` must be decoded, use
+  strict UTF-8 rather than shell-default or locale-dependent decoding;
+- reject invalid Unicode or U+FFFD replacement characters instead of silently
+  continuing with corrupted text;
+- if supplied request text cannot be resolved losslessly, stop before runtime
+  creation and report the input transport problem;
+- the same materialized logical request is the semantic source for intent
+  preparation and the request passed to Factory Runtime.
+
+The resulting Factory request must be self-contained: interpreting
+`request.md`, resuming the run, and performing final review must not require a
+host-local temporary attachment to still exist.
 
 Do not read the entire intent tree by default. Missing documentation is evidence
 about storage, not proof that a product decision is missing.
@@ -46,10 +67,10 @@ Explicit scope limits override the normal meaning of an explicit
 
 ## Classification
 
-Classify the request relation to current intent as exactly one of:
+Classify the logical request relation to current intent as exactly one of:
 
 Before choosing a relation, compare every explicit durable claim in the
-authoritative semantic request with the relevant current intent. An explicit
+materialized logical request with the relevant current intent. An explicit
 claim that adds or supersedes observable behavior, a durable architecture
 boundary, or a platform/safety/compatibility constraint is
 `ExplicitIntentChange` when the request supplies the decision. Do not classify
@@ -77,10 +98,10 @@ that supersede current intent. A contradiction with old intent is not a blocker
 when the request unambiguously states the new authoritative behavior.
 
 For end-to-end or intent-only scope, invoke the existing `idd-intent-change`
-workflow with the unchanged request, classification, scope, and relevant current
-intent. That workflow may hand off to `idd-intent-new-document` for a distinct
-owner, ADR, or spike. Do not reproduce document-ownership or formatting logic in
-preflight.
+workflow with the materialized logical request, classification, scope, and
+relevant current intent. That workflow may hand off to
+`idd-intent-new-document` for a distinct owner, ADR, or spike. Do not reproduce
+document-ownership or formatting logic in preflight.
 
 For implementation-only scope, do not write intent; return `INTENT_REQUIRED`
 because the authorized durable source remains insufficient.
@@ -88,7 +109,7 @@ because the authorized durable source remains insufficient.
 ### `MissingIntentDecision`
 
 A durable product decision required for safe implementation cannot be
-determined from either the original request or current intent. Return
+determined from either the logical request or current intent. Return
 `INTENT_REQUIRED` only with a non-empty `missingIntentDecisions` payload. Each
 item contains:
 
@@ -141,8 +162,8 @@ or other proposed private implementation shape.
 ## Coverage validation
 
 After any intent write, and before Factory creation, compare the resulting
-current intent with the unchanged original request and any resolved
-request-supplied content used during classification. Validate that:
+current intent with the same materialized logical request that will be passed to
+Factory. Validate that:
 
 - the main requested behavior is owned by current intent;
 - material non-goals, safety, durability, and compatibility constraints remain;
@@ -164,7 +185,7 @@ Intent preparation:
   beforeHash: <intent tree hash>
   afterHash: <intent tree hash>
   changedPaths: [...]
-  source: original-user-request
+  source: materialized-logical-user-request
 ```
 
 An intent update completes before the runtime launcher is called. If the later
@@ -173,14 +194,14 @@ automatically.
 
 ## Existing runs
 
-Do not repeat initial preflight for an ordinary continue. Runtime-level
-`INTENT_REQUIRED` remains valid when planning, research, implementation, or
-review discovers a genuinely missing durable decision.
+Do not repeat initial preflight or rematerialize host attachments for an ordinary
+continue. A valid persisted run already owns a self-contained `request.md`.
+Runtime-level `INTENT_REQUIRED` remains valid when planning, research,
+implementation, or review discovers a genuinely missing durable decision.
 
 When an existing run returns structured `missingIntentDecisions`, compare those
-decisions with the unchanged original Factory request, any request-supplied
-content that resolves its references, and current intent. If the request already
-supplies them and scope permits intent writes, invoke the existing intent
-workflow, validate coverage, then continue the exact persisted Factory
-operation. If a decision is genuinely absent, ask the user and preserve the run.
-Factory implementation and research workers never edit intent.
+decisions with the persisted logical Factory request and current intent. If the
+request already supplies them and scope permits intent writes, invoke the
+existing intent workflow, validate coverage, then continue the exact persisted
+Factory operation. If a decision is genuinely absent, ask the user and preserve
+the run. Factory implementation and research workers never edit intent.

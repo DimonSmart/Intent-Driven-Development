@@ -21,7 +21,7 @@ public sealed class IntentPreflightContractTests
     {
         var contract = Read("src/canonical/methodology/intent-preflight.md");
 
-        Assert.Contains("original user request remains authoritative", contract, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("logical request remains authoritative", contract, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Missing documentation", contract, StringComparison.Ordinal);
         Assert.Contains("Do not call the runtime", Read("src/canonical/skills/idd-factory-run.md"), StringComparison.Ordinal);
         Assert.Contains("Factory implementation and research workers never edit intent", contract, StringComparison.Ordinal);
@@ -39,6 +39,23 @@ public sealed class IntentPreflightContractTests
         Assert.Contains("pasted-explicit-conflict-before-runtime", cases, StringComparison.Ordinal);
         Assert.Contains("1003 + 1006", cases, StringComparison.Ordinal);
         Assert.Contains("planner-discovers-initial-1002-1003-conflict", cases, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FactoryRequestIsMaterializedLosslesslyBeforeRuntime()
+    {
+        var contract = Read("src/canonical/methodology/intent-preflight.md");
+        var launcher = Read("src/canonical/skills/idd-factory-run.md");
+        var intent = Read(".idd/intent/IDD-0001.spec-factory-runtime.md");
+        var cases = Read("evals/idd-factory-intent-preflight/cases.yaml");
+
+        Assert.Contains("self-contained logical request", contract, StringComparison.Ordinal);
+        Assert.Contains("strict UTF-8", contract, StringComparison.Ordinal);
+        Assert.Contains("pasted-text.txt", launcher, StringComparison.Ordinal);
+        Assert.Contains("UNMATERIALIZED_REQUEST_INPUT", launcher, StringComparison.Ordinal);
+        Assert.Contains("self-contained", intent, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("materialized-request-survives-host-attachment", cases, StringComparison.Ordinal);
+        Assert.Contains("host-local-pasted-text", cases, StringComparison.Ordinal);
     }
 
     [Fact]
