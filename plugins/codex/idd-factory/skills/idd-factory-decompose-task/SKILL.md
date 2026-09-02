@@ -23,6 +23,16 @@ work, the current planning trigger, and the existing future plan. Treat
 completed work as historical fact: do not reproduce, change, reorder, or reopen
 it. If previous work needs correction, return a new corrective task.
 
+Intent preparation is outside Factory runtime. Durable intent is read-only
+Factory input and is never remaining Factory work. For a normal new end-to-end
+run, required Intent Preflight has already completed before initial planning.
+The original request is intentionally unchanged, so instructions in it to create
+or update durable intent describe pre-runtime scope and must not be materialized
+as Factory tasks. Plan only implementation, research, semantic review, and
+non-intent documentation work that remains against current durable intent. If
+current durable intent still lacks a genuinely required product decision, use
+`intent-required` rather than returning an intent-editing task.
+
 Return all work whose contract is known now. Do not stop after the first
 executable task merely to keep the plan small. Preserve execution order and
 continue materializing known work until the next task cannot be safely
@@ -50,8 +60,9 @@ states, covered-work references, revisions, verification check selections, or
 mutation operations.
 
 Use only capabilities allowed by the supplied Factory policy, such as
-`implementation`, `research`, or `semantic-review`. Documentation changes are
-ordinary `implementation` work because they have the same runtime semantics.
+`implementation`, `research`, or `semantic-review`. Non-intent documentation
+changes are ordinary `implementation` work because they have the same runtime
+semantics. Durable intent changes are excluded by the planning boundary above.
 
 An empty list is valid only when no product work remains. Otherwise return all
 currently contractable remaining work in execution order. This may be many
