@@ -108,6 +108,27 @@ Use the bundled direct `mcp__factory` tools:
 - new run: `factory_run`
 - continue without or with a clarification answer: `factory_continue`
 - explicit cancellation: `factory_cancel`
+- read-only recovery/status after a lost or timed-out blocking response: `factory_status`
+
+A host/tool timeout is transport loss, not a Factory outcome, and
+it does not prove that the runtime stopped. If `factory_run` or
+`factory_continue` times out or loses its response, call
+`factory_status` once:
+
+- `ACTIVE`: the original runtime still owns the workspace; do not
+  call `factory_run` or `factory_continue`.
+- `READY_TO_CONTINUE`: no runtime owns the workspace; resume the
+  persisted run once with `factory_continue`.
+- `WAITING_FOR_CONTINUATION`: report the persisted Factory outcome,
+  reason, resume condition, and payload; continue only when that
+  outcome's normal contract permits it.
+- `COMPLETED`: report the persisted completed result.
+- any other status: report it as returned rather than guessing.
+
+Do not use `factory_status` as a polling loop. An `ACTIVE` status
+ends the current launcher attempt; a later explicit invocation can
+check status again or continue after the runtime releases the
+workspace.
 
 Do not start `idd-factory.dll` through a shell. Do not use a
 command execution, wait, write-stdin, or status-polling loop as

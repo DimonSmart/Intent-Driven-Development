@@ -7,7 +7,7 @@
         "mcp"
       ],
       "cwd": ".",
-      "tool_timeout_sec": 1800,
+      "tool_timeout_sec": 10800,
       "env": {
         "IDD_FACTORY_WINDOWS_SANDBOX": "unelevated"
       },
