@@ -44,7 +44,7 @@ public sealed class FactoryUtf8TransportTests
     {
         using var temp = new TestWorkspace();
         var backend = new FakeAgentBackend();
-        backend.Enqueue(x => FactoryRuntimeTestHarness.Envelope(x, "blocked", reason: "Stop after request persistence."));
+        backend.Enqueue(_ => "# Done");
         const string request = """
             Implement the supplied hover-marquee requirements.
 
