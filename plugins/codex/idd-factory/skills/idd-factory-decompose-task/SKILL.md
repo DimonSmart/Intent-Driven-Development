@@ -77,6 +77,17 @@ Do not mix `# Task` and `# Question` sections in one response. If tasks are
 already safely contractable, return those tasks; the next planning cycle can
 ask after the batch is exhausted if the uncertainty still blocks further work.
 
-If no semantic work remains, return an empty response. Do not return an
-explanation, approval, confidence, summary, JSON, outcome, payload, reason,
-capability, or completion marker.
+If no semantic work remains after reassessing the complete request, current
+durable intent, current repository reality, completed work, and available
+authoritative evidence, return exactly:
+
+```markdown
+# Done
+```
+
+`# Done` is allowed only after that semantic reassessment. It is not a shortcut
+for having no obvious next task. Return no explanation, approval, confidence,
+summary, reason, JSON, outcome, payload, capability, or other text with it.
+
+Return exactly one logical mode: one or more `# Task` sections, exactly one
+`# Question` section, or exactly `# Done`. Do not mix these forms.
