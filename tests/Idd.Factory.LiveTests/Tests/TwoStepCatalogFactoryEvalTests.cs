@@ -14,7 +14,7 @@ public sealed class TwoStepCatalogFactoryEvalTests
 {
     [LiveFactoryEvalFact]
     [Trait("Category", "LiveFactoryEval")]
-    public async Task TwoStepCatalog_CompletesTwoSubtasksAndReviewCheckpoint()
+    public async Task TwoStepCatalog_CompletesTwoTaskBatchAndFinalVerification()
     {
         using var sleepPrevention = SystemSleepPrevention.Acquire();
         var cancellationToken = CancellationToken.None;
@@ -201,15 +201,13 @@ public sealed class TwoStepCatalogFactoryEvalTests
         var expectedRoleCounts = new Dictionary<string, int>(StringComparer.Ordinal)
         {
             ["factory-root"] = 1,
-            ["task-decomposer"] = 1,
-            ["implementer"] = 2,
-            ["checkpoint-reviewer"] = 1,
-            ["final-reviewer"] = 1
+            ["planner"] = 2,
+            ["executor"] = 2
         };
         assertions.Require(roleCounts.Count == expectedRoleCounts.Count && expectedRoleCounts.All(expected => roleCounts.GetValueOrDefault(expected.Key) == expected.Value), "Orchestration failure", "Semantic roles", $"Expected roles {FormatCounts(expectedRoleCounts)}; actual roles {FormatCounts(roleCounts)}.");
 
         var rootChildren = trace.Agents.Where(agent => agent.ParentThreadId == trace.RootThreadId).ToArray();
-        assertions.Require(rootChildren.Length == 5 && rootChildren.Count(agent => agent.Role == "task-decomposer") == 1 && rootChildren.Count(agent => agent.Role == "implementer") == 2 && rootChildren.Count(agent => agent.Role == "checkpoint-reviewer") == 1 && rootChildren.Count(agent => agent.Role == "final-reviewer") == 1, "Orchestration failure", "Runtime topology", "Expected five direct semantic subprocess workers and no coordinator agents.");
+        assertions.Require(rootChildren.Length == 4 && rootChildren.Count(agent => agent.Role == "planner") == 2 && rootChildren.Count(agent => agent.Role == "executor") == 2, "Orchestration failure", "Runtime topology", "Expected two planning and two execution subprocesses with no semantic coordinator or reviewer.");
         assertions.Require(!trace.Agents.Any(agent => agent.Role == "factory-step-coordinator"), "Orchestration failure", "Coordinator absence", "Expected factory-step-coordinator count to be zero.");
         assertions.Require(!trace.Agents.Any(agent => agent.Role == "factory-replanner"), "Orchestration failure", "Happy-path replan absence", "Expected factory-replanner count to be zero on the happy path.");
         assertions.Require(trace.Agents.Where(agent => agent.Role != "factory-root").All(agent => agent.Status == "completed"), "Orchestration failure", "Agent completion", "Expected every semantic subprocess worker to complete.");

@@ -95,9 +95,6 @@ public sealed class CurrentIddArtifactBuilder(ProcessRunner processRunner)
             Path.Combine("skills", "idd-factory-run", "SKILL.md"),
             Path.Combine("skills", "idd-factory-decompose-task", "SKILL.md"),
             Path.Combine("skills", "idd-factory-execute-subtask", "SKILL.md"),
-            Path.Combine("skills", "idd-factory-review-checkpoint", "SKILL.md"),
-            Path.Combine("skills", "idd-factory-review-task", "SKILL.md"),
-            Path.Combine("skills", "idd-factory-replan", "SKILL.md"),
             Path.Combine("runtime", "idd-factory.dll"),
             Path.Combine("runtime", "idd-factory.deps.json"),
             Path.Combine("runtime", "idd-factory.runtimeconfig.json")

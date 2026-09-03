@@ -16,7 +16,7 @@ public static class FactoryDispatchContract
     public static IReadOnlyList<FactoryDispatchViolation> Validate(string role, string? dispatch)
     {
         if (role == "factory-root" || string.IsNullOrWhiteSpace(dispatch)) return [];
-        if (role == "factory-step-coordinator") return [new("COORDINATOR_FORBIDDEN", "Factory runtime must not dispatch factory-step-coordinator.")];
+        if (role is not ("planner" or "executor")) return [new("ROLE_FORBIDDEN", $"Factory runtime must not dispatch unknown semantic role '{role}'.")];
         if (ReadAction(dispatch) is not null) return [new("DISPATCH_ACTION_FORBIDDEN", $"Semantic role '{role}' must not receive an orchestration Action field.")];
         var declared = Read(RolePattern, dispatch);
         return declared is null || declared == role ? [] : [new("DISPATCH_ROLE_MISMATCH", $"Declared role '{declared}' does not match '{role}'.")];

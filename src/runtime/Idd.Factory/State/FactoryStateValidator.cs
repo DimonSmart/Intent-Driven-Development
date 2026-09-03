@@ -9,7 +9,7 @@ public sealed class FactoryStateValidator
     {
         if (state.SchemaVersion != FactoryState.CurrentSchemaVersion) throw Error($"Unsupported state schema {state.SchemaVersion}.");
         if (string.IsNullOrWhiteSpace(state.RunId) || string.IsNullOrWhiteSpace(state.MethodologyVersion) || string.IsNullOrWhiteSpace(state.RuntimeVersion)) throw Error("Factory identity is incomplete.");
-        if (state.Revision < 0 || state.PlanRevision < 0 || state.NextWorkItemNumber < 1 || state.AttemptSequence < 0 || state.ReplanCount < 0 || state.CorrectiveCycleCount < 0 || state.PlannedThroughCompletedCount < 0)
+        if (state.Revision < 0 || state.PlanRevision < 0 || state.NextWorkItemNumber < 1 || state.AttemptSequence < 0 || state.PlanningCycleCount < 0 || state.PlannedThroughCompletedCount < 0)
             throw Error("State counters cannot be negative or zero where a positive value is required.");
         if (state.PlannedThroughCompletedCount > state.Completed.Count) throw Error("Planning cannot include completed work that does not exist.");
         if ((state.Current is null) != (state.CurrentPhase is null)) throw Error("Current and CurrentPhase must be set or cleared together.");
@@ -17,25 +17,23 @@ public sealed class FactoryStateValidator
         var active = new[] { state.Current }.Where(x => x is not null).Concat(state.Remaining).Select(x => x!).ToArray();
         if (active.Any(x => x.AttemptCount < 0)) throw Error("Work item attempt counts cannot be negative.");
 
-        var all = state.Completed.Select(x => (x.Id, x.Capability, x.ContractPath))
-            .Concat(state.Current is null ? [] : [(state.Current.Id, state.Current.Capability, state.Current.ContractPath)])
-            .Concat(state.Remaining.Select(x => (x.Id, x.Capability, x.ContractPath))).ToArray();
+        var all = state.Completed.Select(x => (x.Id, x.ContractPath))
+            .Concat(state.Current is null ? [] : [(state.Current.Id, state.Current.ContractPath)])
+            .Concat(state.Remaining.Select(x => (x.Id, x.ContractPath))).ToArray();
         if (all.Any(x => string.IsNullOrWhiteSpace(x.Id))) throw Error("Every work item requires an ID.");
         if (all.Select(x => x.Id).Distinct(StringComparer.Ordinal).Count() != all.Length) throw Error("Work item IDs must be unique across Completed, Current, and Remaining.");
         foreach (var item in all)
         {
-            if (string.IsNullOrWhiteSpace(item.Capability) || string.IsNullOrWhiteSpace(item.ContractPath)) throw Error($"Work item {item.Id} has an incomplete contract.");
-            _ = FactoryCapabilityCatalog.ResolveWorkItem(item.Capability);
+            if (string.IsNullOrWhiteSpace(item.ContractPath)) throw Error($"Work item {item.Id} has an incomplete contract.");
             ValidateContractPath(item.ContractPath, item.Id);
         }
-        if (state.CurrentAttemptId is not null && state.Current is null && state.PendingContinuation?.Operation is not (SemanticOperationKind.Planning or SemanticOperationKind.FinalReview))
-            throw Error("An active attempt without Current work must be planning or final review.");
+        if (state.CurrentAttemptId is not null && state.Current is null && state.PendingContinuation?.Operation != SemanticOperationKind.Planning)
+            throw Error("An active attempt without Current work must be planning.");
         if (state.PendingVerificationSession is { WorkItemId: not null } session && state.Current?.Id != session.WorkItemId) throw Error("Subtask verification must target Current work.");
         if (state.PendingVerificationSession is { } verificationSession) ValidateVerificationSession(verificationSession);
-        if (state.FinalVerificationPassed != (state.FinalVerificationPlanRevision is not null)) throw Error("Final verification status and plan revision must be set or cleared together.");
-        if (state.FinalReview is { AttemptCount: < 0 }) throw Error("Final review attempt count cannot be negative.");
-        if (state.FinalVerificationPlanRevision < 0 || state.FinalReview?.ReviewedPlanRevision < 0) throw Error("Final evidence revisions cannot be negative.");
-        if (state.FinalVerificationPlanRevision > state.PlanRevision || state.FinalReview?.ReviewedPlanRevision > state.PlanRevision) throw Error("Final evidence cannot target a future plan revision.");
+        if (state.FinalVerificationPassed && state.FinalVerificationPlanRevision is null) throw Error("Passed final verification requires its plan revision.");
+        if (state.FinalVerificationPlanRevision < 0) throw Error("Final evidence revisions cannot be negative.");
+        if (state.FinalVerificationPlanRevision > state.PlanRevision) throw Error("Final evidence cannot target a future plan revision.");
     }
 
     public void ValidateMutation(FactoryState previous, FactoryState next)

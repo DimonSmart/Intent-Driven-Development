@@ -10,7 +10,6 @@ public enum FactoryCommandKind
     SelectNextWork,
     DispatchWork,
     RunFinalVerification,
-    RunFinalReview,
     Finalize,
     StopBlocked
 }
@@ -32,7 +31,7 @@ public sealed class FactoryScheduler
             };
         }
 
-        if (!state.InitialPlanningCompleted || state.PendingReplanTrigger is not null) return new(FactoryCommandKind.Plan);
+        if (state.PlanningCycleCount == 0) return new(FactoryCommandKind.Plan);
         if (state.Current is { } current)
         {
             return state.CurrentPhase switch
@@ -45,10 +44,9 @@ public sealed class FactoryScheduler
         if (state.Remaining.Count > 0) return new(FactoryCommandKind.SelectNextWork);
         if (state.Completed.Count > state.PlannedThroughCompletedCount) return new(FactoryCommandKind.Plan);
 
-        var finalVerified = state.FinalVerificationPassed && state.FinalVerificationPlanRevision == state.PlanRevision;
-        var finalReviewed = state.FinalReview is { Verdict: "approved", ReviewedPlanRevision: not null } review && review.ReviewedPlanRevision == state.PlanRevision;
-        if (!finalVerified) return new(FactoryCommandKind.RunFinalVerification, VerificationContext: "final");
-        if (!finalReviewed) return new(FactoryCommandKind.RunFinalReview);
+        var finalVerificationIsCurrent = state.FinalVerificationPlanRevision == state.PlanRevision;
+        if (finalVerificationIsCurrent && !state.FinalVerificationPassed) return new(FactoryCommandKind.Plan);
+        if (!finalVerificationIsCurrent) return new(FactoryCommandKind.RunFinalVerification, VerificationContext: "final");
         return new(FactoryCommandKind.Finalize);
     }
 }

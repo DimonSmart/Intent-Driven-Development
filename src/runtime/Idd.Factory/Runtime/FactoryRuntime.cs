@@ -59,7 +59,7 @@ public sealed partial class FactoryRuntime(
         return await ExecuteLoopAsync(state, cancellationToken);
     }
 
-    public async Task<FactoryCliOutcome> ContinueAsync(CancellationToken cancellationToken, string? answerPath = null, VerificationConfirmation confirmation = VerificationConfirmation.None, bool? verificationPassed = null)
+    public async Task<FactoryCliOutcome> ContinueAsync(CancellationToken cancellationToken, VerificationConfirmation confirmation = VerificationConfirmation.None, bool? verificationPassed = null)
     {
         var state = await stateStore.LoadAsync(cancellationToken) ?? throw new FactoryStateException("MISSING_FACTORY_STATE", "No Factory run exists.");
         if (state.FactoryConfigurationHash != configuration.Hash) return new("FACTORY_CONFIGURATION_CHANGED", state.RunId, "Restore the pinned configuration or cancel and restart.");
@@ -75,19 +75,6 @@ public sealed partial class FactoryRuntime(
             var resolved = await ResolvePendingVerificationActionAsync(state, pending, confirmation, verificationPassed, cancellationToken);
             if (resolved is not null) return resolved;
         }
-        if (state.PendingContinuation is { Kind: ContinuationKind.IntentGate } intent)
-        {
-            if (state.IntentSnapshotHash == HashIntent()) return OutcomeFromBlocker(state, "INTENT_REQUIRED");
-            state.IntentSnapshotHash = null;
-            state.PendingContinuation = intent with { Kind = ContinuationKind.SemanticInvocation };
-        }
-        if (state.PendingContinuation is { Kind: ContinuationKind.Clarification } clarification)
-        {
-            if (answerPath is null) return OutcomeFromBlocker(state, "NEEDS_CLARIFICATION");
-            await RecordClarificationAsync(state, answerPath, cancellationToken);
-            state.PendingContinuation = clarification with { Kind = ContinuationKind.SemanticInvocation };
-        }
-        else if (answerPath is not null) await RecordClarificationAsync(state, answerPath, cancellationToken);
         state.Blocker = null;
         state.RunStatus = FactoryRunStatus.Running;
         if (state.Current is not null && state.CurrentPhase == CurrentWorkPhase.Blocked) state.CurrentPhase = CurrentWorkPhase.Ready;
@@ -125,7 +112,6 @@ public sealed partial class FactoryRuntime(
                     FactoryCommandKind.SelectNextWork => await SelectNextWorkAsync(state, cancellationToken),
                     FactoryCommandKind.DispatchWork => await DispatchWorkAsync(state, command.WorkItemId!, cancellationToken),
                     FactoryCommandKind.RunFinalVerification => await RunVerificationAsync(state, null, "final", cancellationToken),
-                    FactoryCommandKind.RunFinalReview => await RunFinalReviewAsync(state, cancellationToken),
                     FactoryCommandKind.Finalize => await FinalizeAsync(state, cancellationToken),
                     FactoryCommandKind.StopBlocked => await StopBlockedAsync(state, cancellationToken),
                     _ => throw new ArgumentOutOfRangeException()
@@ -144,7 +130,6 @@ public sealed partial class FactoryRuntime(
         {
             SemanticOperationKind.Planning => PlanAsync(state, cancellationToken),
             SemanticOperationKind.WorkItemExecution => DispatchWorkAsync(state, continuation.WorkItemId!, cancellationToken),
-            SemanticOperationKind.FinalReview => RunFinalReviewAsync(state, cancellationToken),
             _ => throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Unsupported semantic continuation.")
         };
     }
@@ -160,7 +145,6 @@ public sealed partial class FactoryRuntime(
         if (state.Current is not null || state.Remaining.Count != 0) throw new FactoryStateException("FINAL_VERIFICATION_FAILED", "Future work remains incomplete.");
         if (state.CurrentAttemptId is not null || state.PendingVerificationSession is not null || state.PendingContinuation is not null) throw new FactoryStateException("FINAL_VERIFICATION_FAILED", "An operation is still active.");
         if (!state.FinalVerificationPassed || state.FinalVerificationPlanRevision != state.PlanRevision) throw new FactoryStateException("FINAL_VERIFICATION_FAILED", "Strict final verification is stale or missing.");
-        if (state.FinalReview is not { Verdict: "approved" } review || review.ReviewedPlanRevision != state.PlanRevision) throw new FactoryStateException("FINAL_REVIEW_REQUIRED", "Final review is stale or missing.");
     }
 
     private async Task<FactoryCliOutcome?> StopBlockedAsync(FactoryState state, CancellationToken cancellationToken)
@@ -168,22 +152,6 @@ public sealed partial class FactoryRuntime(
         if (state.Blocker is not null) return OutcomeFromBlocker(state, state.Blocker.Code);
         return await StopAsync(state, "FACTORY_BLOCKED", "No deterministic action is applicable.", "Resolve the blocker or cancel/restart.", cancellationToken,
             new(ContinuationKind.Terminal, state.Current?.Id, null, "FACTORY_BLOCKED", false));
-    }
-
-    private async Task<FactoryCliOutcome> HandleSemanticStopAsync(FactoryState state, PlannedWorkItem? item, BoundSemanticAgentResult result, SemanticOperationKind operation, string input, CancellationToken cancellationToken)
-    {
-        if (result.Outcome == "intent-required") IntentRequiredPayload.Validate(result.Payload);
-        var code = result.Outcome.ToUpperInvariant().Replace('-', '_');
-        var reason = result.Reason ?? $"Semantic operation stopped with {result.Outcome}.";
-        var kind = result.Outcome switch { "needs-clarification" => ContinuationKind.Clarification, "intent-required" => ContinuationKind.IntentGate, "focused-handoff" => ContinuationKind.Terminal, _ => ContinuationKind.SemanticInvocation };
-        var resumable = result.Outcome != "focused-handoff";
-        if (item is not null) state.CurrentPhase = CurrentWorkPhase.Blocked;
-        if (result.Outcome == "intent-required") state.IntentSnapshotHash = HashIntent();
-        state.RunStatus = FactoryRunStatus.Blocked;
-        state.Blocker = new(code, reason, resumable ? "Resolve the reported condition and continue." : "Continue outside Factory.", result.Payload?.Clone());
-        state.PendingContinuation = new(kind, item?.Id, null, code, resumable, operation, input);
-        await SaveAsync(state, cancellationToken);
-        return OutcomeFromBlocker(state, code);
     }
 
     private async Task<FactoryCliOutcome> StopForAgentProtocolExceptionAsync(FactoryState state, AgentProtocolException exception, CancellationToken cancellationToken)
@@ -195,7 +163,7 @@ public sealed partial class FactoryRuntime(
             current.AttemptCount--;
 
         var existing = state.PendingContinuation is { IsResumable: true } value ? value : null;
-        var hard = exception.Code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal) || exception.Code is "UNKNOWN_CAPABILITY" or "CAPABILITY_NOT_ALLOWED" or "INVALID_RUNTIME_STATE";
+        var hard = exception.Code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal) || exception.Code is "UNKNOWN_CAPABILITY" or "INVALID_RUNTIME_STATE";
         return await StopAsync(state, exception.Code, exception.Message, hard || existing is null ? "Cancel/restart after resolving the condition." : "Resolve the condition, then continue the exact operation.", cancellationToken,
             hard || existing is null ? new(ContinuationKind.Terminal, state.Current?.Id, null, exception.Code, false) : existing);
     }
@@ -215,7 +183,6 @@ public sealed partial class FactoryRuntime(
     {
         stateValidator.Validate(state);
         if (state.Completed.Count + state.Remaining.Count + (state.Current is null ? 0 : 1) > configuration.Limits.MaxWorkItems) throw new AgentProtocolException("WORK_EXPANSION_BUDGET_EXHAUSTED", "Factory work exceeds the configured maximum.");
-        foreach (var item in state.Remaining.Concat(state.Current is null ? [] : [state.Current])) if (!configuration.AllowedCapabilities.Contains(item.Capability)) throw new AgentProtocolException("CAPABILITY_NOT_ALLOWED", $"Capability '{item.Capability}' is not allowed.");
     }
 
     private async Task SaveAsync(FactoryState state, CancellationToken cancellationToken) => await stateStore.SaveAsync(state, state.Revision, cancellationToken);
@@ -225,21 +192,11 @@ public sealed partial class FactoryRuntime(
         state.PlanRevision = candidate.PlanRevision; state.NextWorkItemNumber = candidate.NextWorkItemNumber; state.RunStatus = candidate.RunStatus;
         state.Completed.Clear(); state.Completed.AddRange(candidate.Completed); state.Current = candidate.Current; state.CurrentPhase = candidate.CurrentPhase;
         state.Remaining.Clear(); state.Remaining.AddRange(candidate.Remaining); state.CurrentAttemptId = candidate.CurrentAttemptId; state.AttemptSequence = candidate.AttemptSequence;
-        state.ReplanCount = candidate.ReplanCount; state.CorrectiveCycleCount = candidate.CorrectiveCycleCount; state.InitialPlanningCompleted = candidate.InitialPlanningCompleted;
+        state.PlanningCycleCount = candidate.PlanningCycleCount;
         state.PlannedThroughCompletedCount = candidate.PlannedThroughCompletedCount;
         state.FinalVerificationPassed = candidate.FinalVerificationPassed; state.FinalVerificationPlanRevision = candidate.FinalVerificationPlanRevision;
         state.Blocker = candidate.Blocker; state.PendingContinuation = candidate.PendingContinuation; state.PendingVerificationSession = candidate.PendingVerificationSession;
-        state.PendingReplanTrigger = candidate.PendingReplanTrigger; state.FinalReview = candidate.FinalReview; state.IntentSnapshotHash = candidate.IntentSnapshotHash;
-    }
-
-    private async Task RecordClarificationAsync(FactoryState state, string sourcePath, CancellationToken cancellationToken)
-    {
-        if (!File.Exists(sourcePath)) throw new FileNotFoundException("Clarification answer file was not found.", sourcePath);
-        var answer = await File.ReadAllTextAsync(sourcePath, cancellationToken);
-        ValidateUtf8Text(answer, "INVALID_CLARIFICATION_ENCODING", "Factory clarification answer");
-        var relative = $"clarifications/Q{state.ClarificationRefs.Count + 1:00000}.md";
-        await WriteRuntimeArtifactAtomicallyAsync(Path.Combine(currentDirectory, relative), answer, cancellationToken);
-        state.ClarificationRefs.Add(relative);
+        state.FactoryRunChangedPaths.Clear(); state.FactoryRunChangedPaths.AddRange(candidate.FactoryRunChangedPaths);
     }
 
     private static void ValidateUtf8Text(string text, string code, string label)
@@ -267,15 +224,6 @@ public sealed partial class FactoryRuntime(
         throw new FactoryStateException(
             "UNMATERIALIZED_REQUEST_INPUT",
             "Factory request contains a host-local pasted-text reference instead of the supplied text. Materialize the exact user-supplied content into a self-contained request before starting Factory.");
-    }
-
-    private string HashIntent()
-    {
-        var root = Path.Combine(workspace, ".idd", "intent");
-        if (!Directory.Exists(root)) return "missing";
-        using var hash = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
-        foreach (var path in Directory.GetFiles(root, "*", SearchOption.AllDirectories).OrderBy(x => x, StringComparer.Ordinal)) { hash.AppendData(System.Text.Encoding.UTF8.GetBytes(Path.GetRelativePath(root, path))); hash.AppendData(File.ReadAllBytes(path)); }
-        return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
     }
 
     private static string Version() => typeof(FactoryRuntime).Assembly.GetName().Version?.ToString() ?? "0.0.0";

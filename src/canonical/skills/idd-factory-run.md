@@ -10,12 +10,12 @@ finalization.
 
 Use this skill when the user explicitly invokes IDD Factory or when an
 end-to-end IDD route selects Factory for orchestrated implementation. Read
-`references/intent-preflight.md` completely before a new run or when handling a
-runtime `INTENT_REQUIRED` result. Treat it as the canonical preflight contract.
+`references/intent-preflight.md` completely before a new run. Treat it as the
+canonical preflight contract.
 For a new run, build one self-contained logical request from the visible user
 request and the exact textual inputs explicitly supplied with it. Preserve all
 user-authored content exactly; mechanically materializing host-local attachment
-references is transport normalization, not a semantic rewrite. Use that same
+references such as `pasted-text.txt` is transport normalization, not a semantic rewrite. Use that same
 logical request for intent preparation and the new-run invocation.
 
 The launcher must use the runtime packaged with this installed plugin instance
@@ -72,21 +72,13 @@ blocked. Missing documentation alone is not `INTENT_REQUIRED`.
 - For an ordinary existing run, continue Factory without repeating initial
   preflight, rematerializing host attachments, or inventing a user answer. The
   persisted self-contained request is authoritative.
-- When Factory returns `NEEDS_CLARIFICATION`, report the question, collect the
-  user's answer, and continue with that answer unchanged.
-- When Factory returns structured `INTENT_REQUIRED`, compare the missing durable
-  decisions with the persisted logical Factory request and current intent. If
-  the request already resolves them and scope permits writes, use the existing
-  intent workflow outside Factory, validate coverage, and continue the exact
-  persisted operation. Otherwise report the genuinely missing decision and
-  pause for user input.
 - Cancellation is explicit. Warn that product changes are preserved; do not
   delete Factory state or revert code in the launcher.
 
 ## Boundaries
 
-- Do not select work items, inspect operational state, route reviews, apply
-  retries, create corrections, choose final review, or finalize files.
+- Do not select work items, inspect operational state, apply retries, create
+  corrections, choose future work, or finalize files.
 - Do not choose a next phase or maintain a second workflow model.
   `FactoryState.Completed`, `Current`, `Remaining`, and runtime-owned
   continuations are authoritative.

@@ -4,6 +4,24 @@ This page records IDD changes that require action in repositories that already u
 
 Updating the installed plugins and migrating project-owned files are separate operations. Follow [Updating IDD](updating-idd.md) to refresh `idd-intent` and `idd-factory`. Then apply any relevant migration instructions below. Plugin updates do not automatically rewrite a repository's `.idd/intent/` directory.
 
+## 2026-09-03 — Batch planning Factory Runtime
+
+Factory now runs a single semantic loop: a planner emits an ordered Markdown
+batch, the runtime executes and verifies every task in that batch, and the
+planner is invoked again. An empty planner response after a successful batch
+leads to strict final verification; a failed final verification returns its
+evidence to the planner.
+
+The only runtime semantic roles are `planner` and `executor`. Worker JSON
+outcomes, capability routing, research and review roles, checkpoint/final
+review stages, and the standalone replan skill have been removed. Executor
+output is free-form Markdown evidence and cannot alter control flow.
+
+This is intentionally incompatible with active runs from the previous runtime.
+Cancel such a run and start it again. Runtime state schema is 10, attempt
+metadata schema is 3, Factory configuration schema is 2, and final result
+schema is 4.
+
 ## 2026-08-23 — Codex host compatibility and event-driven agent waiting
 
 Codex Multi-Agent V2 now exposes `wait_agent` as an event-driven wait for

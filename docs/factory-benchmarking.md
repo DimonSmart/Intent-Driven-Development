@@ -52,4 +52,4 @@ Exit code 0 means every requested mode has at least one successful iteration. Ex
 
 Each benchmark directory contains `report.json` and `report.md`. JSON is authoritative and contains raw runs, invocations, environment evidence, aggregates, decomposition metadata, and derived comparisons. Markdown is a human-readable projection; no metric exists only there.
 
-Compare optimization results only when Codex version, model, reasoning effort, Factory/plugin versions, skill identities, source revision, and benchmark definition are suitable for comparison. Treat Direct/Factory as a reliability-and-cost comparison, not simply “useful tokens versus wasted tokens”: decomposition, independent verification, review, and corrective cycles can change both cost and success rate.
+Compare optimization results only when Codex version, model, reasoning effort, Factory/plugin versions, skill identities, source revision, and benchmark definition are suitable for comparison. Treat Direct/Factory as a reliability-and-cost comparison, not simply “useful tokens versus wasted tokens”: repeated planning, isolated execution, verification, and retries can change both cost and success rate.

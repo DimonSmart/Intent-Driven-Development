@@ -87,14 +87,13 @@ public sealed class FactoryMcpProgressTests
 
         Assert.Equal("Planning", await FactoryMcpProgressMonitor.ProjectEventAsync(temp.Path, line));
 
-        await File.WriteAllTextAsync(Path.Combine(current, "state.json"), "{\"pendingReplanTrigger\":{\"workItemId\":\"W000003\"}}");
+        await File.WriteAllTextAsync(Path.Combine(current, "state.json"), "{\"planningCycleCount\":1}");
         Assert.Equal("Replanning", await FactoryMcpProgressMonitor.ProjectEventAsync(temp.Path, line));
     }
 
     [Theory]
     [InlineData(FactoryCommandKind.RunVerification, "W000003", "Verifying W000003")]
     [InlineData(FactoryCommandKind.RunFinalVerification, null, "Final verification")]
-    [InlineData(FactoryCommandKind.RunFinalReview, null, "Final review")]
     [InlineData(FactoryCommandKind.Finalize, null, "Finalizing")]
     public async Task SchedulerEventsProjectHighLevelActivity(FactoryCommandKind kind, string? workItemId, string expected)
     {
@@ -138,13 +137,12 @@ public sealed class FactoryMcpProgressTests
         {
             attemptId = "A000008",
             capability = "implementation",
-            Outcome = "additional-work-required",
             semanticResult = new string('s', 1000)
         });
 
         var message = await FactoryMcpProgressMonitor.ProjectEventAsync(temp.Path, line);
 
-        Assert.Equal("W000003 implementation: additional work required", message);
+        Assert.Equal("W000003 implementation completed", message);
         Assert.DoesNotContain("sss", message!, StringComparison.Ordinal);
     }
 

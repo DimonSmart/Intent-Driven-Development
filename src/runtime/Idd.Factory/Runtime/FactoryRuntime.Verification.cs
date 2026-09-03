@@ -255,19 +255,13 @@ public sealed partial class FactoryRuntime
         }
 
         state.FinalVerificationPassed = false;
-        state.FinalVerificationPlanRevision = null;
-        state.RunStatus = FactoryRunStatus.Blocked;
-        var failed = failedCheckIds.Count == 0 ? "unknown check" : string.Join(", ", failedCheckIds);
-        state.Blocker = new(
-            "UNEXPECTED_VERIFICATION_FAILURE",
-            context == "final"
-                ? $"Strict final verification failed: {failed}."
-                : $"Verification failed outside the work item's deterministic may-fail expectations: {failed}.",
-            "Correct the regression, then continue to rerun the authoritative checks.");
-        state.PendingContinuation = new(ContinuationKind.VerificationGate, item?.Id, context, "UNEXPECTED_VERIFICATION_FAILURE", true);
+        state.FinalVerificationPlanRevision = state.PlanRevision;
+        state.RunStatus = FactoryRunStatus.Running;
+        state.Blocker = null;
+        state.PendingContinuation = null;
         await SaveAsync(state, cancellationToken);
         await events.WriteAsync(state.RunId, "verification-decision", new { context, workItemId = item?.Id, decision, failedCheckIds }, cancellationToken);
-        return OutcomeFromBlocker(state, "UNEXPECTED_VERIFICATION_FAILURE");
+        return null;
     }
 
     internal static VerificationDecision ClassifyVerification(PlannedWorkItem? item, string context, IReadOnlyCollection<string> failedCheckIds)

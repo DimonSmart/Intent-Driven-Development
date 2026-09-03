@@ -42,10 +42,9 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
 
                 Pipe the exact request as UTF-8 standard input, wait for process
                 exit, and parse the single structured outcome. Use `continue` with
-                the same workspace and plugin root; when supplying an answer, write
-                it to a temporary UTF-8 file and pass `--answer-file`. Use `cancel`
-                for explicit cancellation. Always remove launcher-owned temporary
-                files. Do not search for a repository-local runtime.
+                the same workspace and plugin root, and `cancel` for explicit
+                cancellation. Always remove launcher-owned temporary files. Do not
+                search for a repository-local runtime.
 
                 On Windows, launch this trusted packaged Factory Runtime outside
                 the parent agent OS sandbox. The runtime applies a fresh,

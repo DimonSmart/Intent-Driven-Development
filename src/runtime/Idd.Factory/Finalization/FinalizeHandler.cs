@@ -50,12 +50,10 @@ public sealed class FinalizeHandler
 
     private static void ValidateState(FactoryState state)
     {
-        if (state.Current is not null || state.Remaining.Count != 0 || state.CurrentAttemptId is not null || state.PendingContinuation is not null || state.PendingVerificationSession is not null || state.PendingReplanTrigger is not null)
+        if (state.Current is not null || state.Remaining.Count != 0 || state.CurrentAttemptId is not null || state.PendingContinuation is not null || state.PendingVerificationSession is not null)
             throw new InvalidOperationException("Finalization requires quiescent linear work state.");
         if (!state.FinalVerificationPassed || state.FinalVerificationPlanRevision != state.PlanRevision)
             throw new InvalidOperationException("Finalization requires current strict verification.");
-        if (state.FinalReview is not { Verdict: "approved", ReviewedPlanRevision: not null } review || review.ReviewedPlanRevision != state.PlanRevision)
-            throw new InvalidOperationException("Finalization requires current approved review.");
     }
 
     private async Task<FinalizationManifest> ReadOrCreateManifestAsync(
@@ -90,34 +88,31 @@ public sealed class FinalizeHandler
         string request,
         CancellationToken cancellationToken)
     {
-        var review = state.FinalReview!;
         var subject = request.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim().TrimStart('#', ' ') ?? "Complete Factory task";
         if (subject.Length > 72) subject = subject[..72].TrimEnd();
         await WriteTextAtomicallyAsync(
             Path.Combine(current, "commit-message.md"),
-            $"{subject.TrimEnd('.')}\n\nPerformed by: IDD Factory\n\nResult:\n- Completed {state.Completed.Count} ordered work items\n- Passed strict integrated verification and semantic review\n",
+            $"{subject.TrimEnd('.')}\n\nPerformed by: IDD Factory\n\nResult:\n- Completed {state.Completed.Count} ordered work items\n- Passed strict integrated verification\n",
             cancellationToken);
 
         var plan = new
         {
             schemaVersion = 1,
             state.PlanRevision,
-            completed = state.Completed.Select(x => new { x.Id, x.Capability, x.ContractPath, x.ResultRef, x.ChangedPaths, x.VerificationEvidenceRefs })
+            completed = state.Completed.Select(x => new { x.Id, x.ContractPath, x.ResultRef, x.ChangedPaths, x.VerificationEvidenceRefs })
         };
         await WriteJsonAtomicallyAsync(Path.Combine(current, "completed-work.json"), plan, cancellationToken);
 
         var result = new
         {
-            schemaVersion = 3,
+            schemaVersion = 4,
             state.MethodologyVersion,
             state.RuntimeVersion,
             factoryOutcome = "COMPLETED",
             state.PlanRevision,
             state.FactoryConfigurationHash,
             completedWorkCount = state.Completed.Count,
-            finalReviewVerdict = review.Verdict,
             verificationStatus = "passed",
-            finalReviewResultPath = review.ResultRef,
             finalVerificationPlanRevision = state.FinalVerificationPlanRevision,
             commitMessagePath = Path.GetRelativePath(workspace, Path.Combine(destination, "commit-message.md")).Replace('\\', '/'),
             planHistoryPath = Directory.Exists(Path.Combine(current, "plan-revisions"))

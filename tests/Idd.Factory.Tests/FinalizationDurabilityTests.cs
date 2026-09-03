@@ -101,10 +101,9 @@ public sealed class FinalizationDurabilityTests
             FactoryConfigurationHash = "test-config",
             RequestPath = "request.md",
             PlanRevision = 3,
-            InitialPlanningCompleted = true,
+            PlanningCycleCount = 2,
             FinalVerificationPassed = true,
-            FinalVerificationPlanRevision = 3,
-            FinalReview = new FinalReviewState("approved", "attempts/A000001/result.json", 1, 3)
+            FinalVerificationPlanRevision = 3
         };
         await new FileFactoryStateStore(current, new FactoryStateValidator()).CreateAsync(state, default);
         return (state, current);

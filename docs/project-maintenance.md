@@ -58,14 +58,11 @@ Ownership rules:
 - Intent must not depend on Factory.
 
 The canonical Factory skill set is `idd-factory-run`,
-`idd-factory-decompose-task`, `idd-factory-execute-subtask`,
-`idd-factory-research`, `idd-factory-review-checkpoint`,
-`idd-factory-review-task`, and `idd-factory-replan`. Its runtime semantic roles
-are `task-decomposer`, `implementer`, `researcher`, `checkpoint-reviewer`, and
-`final-reviewer`. Initial planning and semantic replanning both use the unified
-`planning` capability and the `task-decomposer` role. `idd-factory-replan` is
-retained only as the legacy public skill name for that unified planning contract.
-Do not reintroduce the obsolete single `work-plan.md` create/execute workflow.
+`idd-factory-decompose-task`, and `idd-factory-execute-subtask`. Its runtime
+semantic roles are `planner` and `executor`. The same planner creates the
+initial batch, every post-batch plan, and corrections after failed final
+verification. Do not reintroduce semantic review roles, worker control outcomes,
+or a standalone replan skill.
 
 The generator publishes the .NET 10 Factory Runtime into each Factory plugin.
 `idd-factory-run` only launches that runtime. Each Factory skill is the sole

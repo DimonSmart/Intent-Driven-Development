@@ -31,8 +31,6 @@ public static class FactoryRuntimeTraceReader
                 {
                     attempt.CompletedAt = timestamp;
                     attempt.CompletionWasRecorded = true;
-                    if (data.TryGetProperty("Outcome", out var outcome) || data.TryGetProperty("outcome", out outcome))
-                        attempt.Outcome = outcome.GetString();
                     if (data.TryGetProperty("metrics", out var metrics) && metrics.ValueKind == JsonValueKind.Object) attempt.ReadMetrics(metrics);
                 }
             }
@@ -140,8 +138,7 @@ public static class FactoryRuntimeTraceReader
                 try
                 {
                     using var result = JsonDocument.Parse(File.ReadAllText(resultPath));
-                    var root = result.RootElement;
-                    if (root.TryGetProperty("outcome", out var outcome)) Outcome ??= outcome.GetString();
+                    _ = result.RootElement;
                 }
                 catch (JsonException) { }
             }
@@ -175,13 +172,12 @@ public static class FactoryRuntimeTraceReader
                     ? "result-produced"
                     : processInterrupted ? "interrupted" : "running";
             long? duration = StartedAt is not null && CompletedAt is not null ? (long)(CompletedAt.Value - StartedAt.Value).TotalMilliseconds : null;
-            var terminal = Outcome is null ? null : new AgentTerminalResult(Outcome, null, null, null, null);
             var fresh = Input is not null && Cached is not null && Input >= Cached ? Input - Cached : null;
             double? cachePercentage = Input is > 0 && Cached is not null && Cached <= Input ? 100d * Cached.Value / Input.Value : null;
             return new(Id, root, Role, WorkItem, null, status, StartedAt, CompletedAt, duration, TurnCount, ToolCallCount, Input, Cached, Output, Reasoning,
                 Input is not null && Output is not null ? Input + Output : null, fresh, cachePercentage, FailedToolCallCount, RejectedToolCallCount,
                 RetryOrFallbackCallCount, FileReadCount, UniqueFileReadCount, RepeatedFileReadCount, FileReadBytes, WaitAgentMs,
-                DispatchCharacters, DispatchUtf8Bytes, TokenProgression, ToolCalls, FileReads, DispatchReferences, terminal);
+                DispatchCharacters, DispatchUtf8Bytes, TokenProgression, ToolCalls, FileReads, DispatchReferences, null);
         }
 
         private static long? Number(JsonElement value, params string[] names)

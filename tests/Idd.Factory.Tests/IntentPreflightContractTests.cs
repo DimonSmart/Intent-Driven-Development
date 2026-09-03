@@ -67,9 +67,9 @@ public sealed class IntentPreflightContractTests
         Assert.Contains("Durable intent is read-only", decomposer, StringComparison.Ordinal);
         Assert.Contains("must not be materialized", decomposer, StringComparison.Ordinal);
         Assert.Contains("rather than returning an intent-editing task", decomposer, StringComparison.Ordinal);
-        Assert.Contains("Factory planning boundary", planningRuntime, StringComparison.Ordinal);
-        Assert.Contains("Durable intent is read-only Factory input and never remaining Factory work", planningRuntime, StringComparison.Ordinal);
-        Assert.Contains("not a Factory task", planningRuntime, StringComparison.Ordinal);
+        Assert.Contains("Read current durable intent from .idd/intent", planningRuntime, StringComparison.Ordinal);
+        Assert.Contains("inspect the current repository directly", planningRuntime, StringComparison.Ordinal);
+        Assert.Contains("If no semantic work remains, return an empty response", planningRuntime, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -53,25 +53,23 @@ manually.
 Use IDD skills when a request involves durable product intent, implementation
 based on current intent, conformance checking, or Factory orchestration. Use
 `idd-code-implement` for one focused implementation change. Use the optional
-`idd-factory-run` entry point when temporary multi-task sequencing, explicit
-Review checkpoints, or coordinated execution is required; Factory may be
+`idd-factory-run` entry point when temporary multi-task sequencing or
+coordinated execution is required; Factory may be
 selected automatically and never becomes product intent.
 
-Factory keeps at most one resumable run in `.idd/factory/current/`. Its work
-items are a numbered sequence of stable Subtask and optional Review checkpoint
-contracts; runtime-owned `state.json` is the only status source. Successful execution
-tasks complete without automatic independent review. `idd-factory-review-checkpoint`
-runs only for an explicit checkpoint covering one contiguous group of completed
-Subtasks. After all work items complete, Factory performs a mandatory
-final integrated review, prepares final result artifacts, and moves the complete
+Factory keeps at most one resumable run in `.idd/factory/current/`. The planner
+is the only semantic source of new work and materializes an ordered batch of
+stable task contracts. Runtime-owned `state.json` is the only status source.
+Executors return free-form semantic reports and never decide future workflow.
+After each exhausted batch Factory plans again. An empty plan starts strict
+final verification; success prepares final result artifacts and moves the complete
 run directory to `.idd/factory/results/<timestamp>_<work-slug>/`. The moved
 result retains the state, event log, attempts, verification evidence,
 commit-message handoff, and other diagnostics, while `.idd/factory/current/`
 remains reserved for an active or resumable run.
 
-When Factory decomposition discovers missing durable intent, it creates no task
-state. Resolve intent first, then decompose the original request again. Intent
-changes never become Factory Subtasks.
+Intent decisions are resolved by preflight before Factory creates run state.
+Intent changes never become Factory tasks.
 
 When a user asks to continue current Factory work, the packaged runtime validates
 and reconciles saved state instead of reconstructing work from conversation

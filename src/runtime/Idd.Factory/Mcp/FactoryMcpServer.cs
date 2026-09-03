@@ -45,16 +45,15 @@ internal sealed class FactoryMcpTools(
         [Description("Complete Factory request text, passed unchanged as UTF-8.")] string request,
         IProgress<ProgressNotificationValue> progress,
         CancellationToken cancellationToken) =>
-        RunWithProgressAsync(FactoryRuntimeCommand.Run, workspace, request, null, progress, cancellationToken);
+        RunWithProgressAsync(FactoryRuntimeCommand.Run, workspace, request, progress, cancellationToken);
 
     [McpServerTool(Name = "factory_continue", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true, UseStructuredContent = true)]
-    [Description("Continue an explicitly requested IDD Factory workflow, optionally supplying its clarification answer. Progress notifications describe high-level runtime activity when the MCP client supplies a progress token. A host/tool timeout is transport loss, not a Factory outcome; use factory_status once before deciding whether another continue is safe.")]
+    [Description("Continue an explicitly requested IDD Factory workflow. Progress notifications describe high-level runtime activity when the MCP client supplies a progress token. A host/tool timeout is transport loss, not a Factory outcome; use factory_status once before deciding whether another continue is safe.")]
     public Task<FactoryMcpResult> FactoryContinueAsync(
         [Description("Absolute path to the target workspace.")] string workspace,
         IProgress<ProgressNotificationValue> progress,
-        [Description("Optional clarification answer, passed unchanged as UTF-8.")] string? answer = null,
         CancellationToken cancellationToken = default) =>
-        RunWithProgressAsync(FactoryRuntimeCommand.Continue, workspace, null, answer, progress, cancellationToken);
+        RunWithProgressAsync(FactoryRuntimeCommand.Continue, workspace, null, progress, cancellationToken);
 
     [McpServerTool(Name = "factory_cancel", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true, UseStructuredContent = true)]
     [Description("Request explicit cancellation of an IDD Factory workflow while preserving its product changes.")]
@@ -62,7 +61,7 @@ internal sealed class FactoryMcpTools(
         [Description("Absolute path to the target workspace.")] string workspace,
         IProgress<ProgressNotificationValue> progress,
         CancellationToken cancellationToken) =>
-        RunWithProgressAsync(FactoryRuntimeCommand.Cancel, workspace, null, null, progress, cancellationToken);
+        RunWithProgressAsync(FactoryRuntimeCommand.Cancel, workspace, null, progress, cancellationToken);
 
     [McpServerTool(Name = "factory_status", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false, UseStructuredContent = true)]
     [Description("Read Factory runtime and persisted-run status without starting, continuing, cancelling, or polling the workflow. Use once after a blocking Factory MCP response is lost or times out, or for an explicit user status request.")]
@@ -75,7 +74,6 @@ internal sealed class FactoryMcpTools(
         FactoryRuntimeCommand command,
         string workspace,
         string? request,
-        string? answer,
         IProgress<ProgressNotificationValue> progress,
         CancellationToken cancellationToken)
     {
@@ -104,7 +102,7 @@ internal sealed class FactoryMcpTools(
         FactoryMcpResult result;
         try
         {
-            result = await runner.RunAsync(command, workspace, request, answer, cancellationToken);
+            result = await runner.RunAsync(command, workspace, request, cancellationToken);
         }
         finally
         {

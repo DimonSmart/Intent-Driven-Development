@@ -15,7 +15,7 @@ internal sealed class ProtectedArtifactEnforcer
 
     public static ProtectedArtifactEnforcer Capture(AgentInvocation invocation)
     {
-        var attemptDirectory = Path.GetDirectoryName(invocation.RawResultPath)!;
+        var attemptDirectory = Path.GetDirectoryName(invocation.SemanticOutputPath)!;
         var current = Directory.GetParent(Directory.GetParent(attemptDirectory)!.FullName)!.FullName;
         var invocationPath = Path.Combine(attemptDirectory, "invocation.json");
         var policies = new[]

@@ -173,7 +173,6 @@ internal sealed class FactoryMcpProgressMonitor(FactoryStatusReader statusReader
             FactoryCommandKind.SelectNextWork => "Selecting next work",
             FactoryCommandKind.RunVerification => workItemId is null ? "Verification" : $"Verifying {workItemId}",
             FactoryCommandKind.RunFinalVerification => "Final verification",
-            FactoryCommandKind.RunFinalReview => "Final review",
             FactoryCommandKind.Finalize => "Finalizing",
             FactoryCommandKind.StopBlocked => "Factory blocked",
             _ => null
@@ -188,8 +187,9 @@ internal sealed class FactoryMcpProgressMonitor(FactoryStatusReader statusReader
             if (!File.Exists(path)) return false;
             using var document = JsonDocument.Parse(await File.ReadAllTextAsync(path, cancellationToken));
             var root = document.RootElement;
-            return root.TryGetProperty("pendingReplanTrigger", out var trigger)
-                && trigger.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined);
+            return root.TryGetProperty("planningCycleCount", out var cycles)
+                && cycles.TryGetInt32(out var count)
+                && count > 0;
         }
         catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -210,9 +210,6 @@ internal sealed class FactoryMcpProgressMonitor(FactoryStatusReader statusReader
 
         if (StringComparer.Ordinal.Equals(capability, "planning"))
             return subject is null ? $"Planning {attemptId}" : $"Planning {attemptId}: \"{subject}\"";
-        if (StringComparer.Ordinal.Equals(capability, "final-review"))
-            return $"Final review {attemptId}";
-
         var prefix = workItemId is null ? capability : $"{workItemId} {capability}";
         return subject is null ? $"{prefix} {attemptId}" : $"{prefix} {attemptId}: \"{subject}\"";
     }
@@ -221,23 +218,14 @@ internal sealed class FactoryMcpProgressMonitor(FactoryStatusReader statusReader
     {
         var attemptId = Text(data, "attemptId", "AttemptId");
         var capability = Text(data, "capability", "Capability");
-        var outcome = Text(data, "Outcome", "outcome");
-        if (attemptId is null || capability is null || outcome is null) return null;
+        if (attemptId is null || capability is null) return null;
 
         var invocation = await ReadInvocationAsync(workspace, attemptId, cancellationToken);
         if (StringComparer.Ordinal.Equals(capability, "planning"))
-            return outcome == "ready" ? "Planning completed" : $"Planning: {Humanize(outcome)}";
-        if (StringComparer.Ordinal.Equals(capability, "final-review"))
-            return outcome == "approved" ? "Final review approved" : $"Final review: {Humanize(outcome)}";
+            return "Planning completed";
 
         var prefix = invocation.WorkItemId is null ? capability : $"{invocation.WorkItemId} {capability}";
-        return outcome switch
-        {
-            "completed" or "approved" => $"{prefix} completed",
-            "additional-work-required" => $"{prefix}: additional work required",
-            "global-replan-required" => $"{prefix}: replanning required",
-            _ => $"{prefix}: {Humanize(outcome)}"
-        };
+        return $"{prefix} completed";
     }
 
     private static string? FormatVerificationDecision(JsonElement data)
@@ -285,7 +273,6 @@ internal sealed class FactoryMcpProgressMonitor(FactoryStatusReader statusReader
         var candidate = capability switch
         {
             "planning" => Section(input, "Original request:"),
-            "final-review" => Section(input, "Original Factory request:"),
             _ => Section(input, "Work item contract:")
         };
         var preview = NormalizePreview(candidate ?? input);

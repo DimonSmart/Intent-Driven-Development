@@ -18,7 +18,7 @@ public sealed class TwoStepCatalogFactoryOrchestrationTests
     public void AssertOrchestration_FailsForUnexpectedWorker()
     {
         var trace = ExpectedTrace();
-        var agents = trace.Agents.Append(Node("research", "root", "researcher", null, DateTimeOffset.Parse("2026-01-01T00:00:10Z"))).ToArray();
+        var agents = trace.Agents.Append(Node("impl-3", "root", "executor", null, DateTimeOffset.Parse("2026-01-01T00:00:10Z"))).ToArray();
         var assertions = AssertOrchestration(trace with { Agents = agents });
 
         Assert.True(assertions.HasFailuresIn("Orchestration failure"));
@@ -86,11 +86,10 @@ public sealed class TwoStepCatalogFactoryOrchestrationTests
         var start = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
         return new AgentTrace(2, "root", [
             Node("root", null, "factory-root", null, start),
-            Node("decomposer", "root", "task-decomposer", null, start),
-            Node("impl-1", "root", "implementer", null, start.AddSeconds(1)),
-            Node("impl-2", "root", "implementer", null, start.AddSeconds(2)),
-            Node("checkpoint-review", "root", "checkpoint-reviewer", null, start.AddSeconds(3)),
-            Node("final-review", "root", "final-reviewer", null, start.AddSeconds(4))
+            Node("plan-1", "root", "planner", null, start),
+            Node("impl-1", "root", "executor", null, start.AddSeconds(1)),
+            Node("impl-2", "root", "executor", null, start.AddSeconds(2)),
+            Node("plan-2", "root", "planner", null, start.AddSeconds(3))
         ], []);
     }
 

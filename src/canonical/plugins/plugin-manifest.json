@@ -104,11 +104,7 @@
       "skills": [
         "idd-factory-run",
         "idd-factory-decompose-task",
-        "idd-factory-execute-subtask",
-        "idd-factory-research",
-        "idd-factory-review-checkpoint",
-        "idd-factory-review-task",
-        "idd-factory-replan"
+        "idd-factory-execute-subtask"
       ],
       "roles": [],
       "skillRoleReferences": {},

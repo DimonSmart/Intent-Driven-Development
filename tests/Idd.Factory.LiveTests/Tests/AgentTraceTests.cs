@@ -36,17 +36,17 @@ public sealed class AgentTraceTests
         var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")); Directory.CreateDirectory(directory);
         try
         {
-            Write(directory, "root", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"root\",\"timestamp\":\"2026-01-01T00:00:00Z\"}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"collab_tool_call\",\"id\":\"spawn\",\"tool\":\"spawn_agent\",\"prompt\":\"Role:\\nfactory-step-coordinator\\nAction:\\nINITIALIZE\"}}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"collab_tool_call\",\"id\":\"spawn\",\"tool\":\"spawn_agent\",\"receiver_thread_ids\":[\"coordinator\"]}}}");
-            Write(directory, "coordinator", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"coordinator\",\"parent_thread_id\":\"root\"}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"message\",\"text\":\"unstructured child input\"}}}", "{\"timestamp\":\"2026-01-01T00:00:01Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"task_complete\",\"completed_at\":1767225601}} ");
-            Write(directory, "implementer", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"implementer\",\"parent_thread_id\":\"coordinator\"}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"message\",\"text\":\"Role:\\nimplementer\\n.idd/factory/current/001-code.active.md\"}}}");
+            Write(directory, "root", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"root\",\"timestamp\":\"2026-01-01T00:00:00Z\"}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"collab_tool_call\",\"id\":\"spawn\",\"tool\":\"spawn_agent\",\"prompt\":\"Role:\\nplanner\\nAction:\\nPLAN\"}}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"collab_tool_call\",\"id\":\"spawn\",\"tool\":\"spawn_agent\",\"receiver_thread_ids\":[\"planner\"]}}}");
+            Write(directory, "planner", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"planner\",\"parent_thread_id\":\"root\"}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"message\",\"text\":\"unstructured child input\"}}}", "{\"timestamp\":\"2026-01-01T00:00:01Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"task_complete\",\"completed_at\":1767225601}} ");
+            Write(directory, "executor", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"executor\",\"parent_thread_id\":\"planner\"}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"message\",\"text\":\"Role:\\nexecutor\\n.idd/factory/current/001-code.active.md\"}}}");
             Write(directory, "foreign", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"foreign\"}}");
             var trace = new AgentTraceBuilder().Build(directory, "root");
-            Assert.Equal(["root", "coordinator", "implementer"], trace.Agents.Select(agent => agent.ThreadId));
-            Assert.Equal("factory-step-coordinator", trace.Agents.Single(agent => agent.ThreadId == "coordinator").Role);
-            Assert.Equal("INITIALIZE", trace.Agents.Single(agent => agent.ThreadId == "coordinator").Action);
-            Assert.Equal("protocol-invalid", trace.Agents.Single(agent => agent.ThreadId == "coordinator").Status);
-            Assert.Equal("001-code", trace.Agents.Single(agent => agent.ThreadId == "implementer").WorkItem);
-            Assert.Null(trace.Agents.Single(agent => agent.ThreadId == "implementer").TotalTokens);
+            Assert.Equal(["root", "planner", "executor"], trace.Agents.Select(agent => agent.ThreadId));
+            Assert.Equal("planner", trace.Agents.Single(agent => agent.ThreadId == "planner").Role);
+            Assert.Equal("PLAN", trace.Agents.Single(agent => agent.ThreadId == "planner").Action);
+            Assert.Equal("protocol-invalid", trace.Agents.Single(agent => agent.ThreadId == "planner").Status);
+            Assert.Equal("001-code", trace.Agents.Single(agent => agent.ThreadId == "executor").WorkItem);
+            Assert.Null(trace.Agents.Single(agent => agent.ThreadId == "executor").TotalTokens);
         }
         finally { Directory.Delete(directory, true); }
     }
@@ -58,11 +58,11 @@ public sealed class AgentTraceTests
         try
         {
             Write(directory, "root", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"root\"}}");
-            Write(directory, "leaf", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"leaf\",\"parent_thread_id\":\"root\"}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"message\",\"text\":\"Read references/roles/checkpoint-reviewer.md and continue\"}}}");
+            Write(directory, "leaf", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"leaf\",\"parent_thread_id\":\"root\"}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"message\",\"text\":\"Role:\\nexecutor\"}}}");
 
             var leaf = new AgentTraceBuilder().Build(directory, "root").Agents.Single(agent => agent.ThreadId == "leaf");
 
-            Assert.Equal("checkpoint-reviewer", leaf.Role);
+            Assert.Equal("executor", leaf.Role);
         }
         finally { Directory.Delete(directory, true); }
     }
@@ -92,8 +92,8 @@ public sealed class AgentTraceTests
         var start = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
         var trace = new AgentTrace(2, "root", [
             new("root", null, "factory-root", null, null, "completed", start, null, null, 0, 0, null, null, null, null, null),
-            new("A000001", "root", "task-decomposer", null, null, "completed", start.AddSeconds(1), null, null, 1, 0, null, null, null, null, null),
-            new("A000002", "root", "implementer", "catalog", null, "completed", start.AddSeconds(2), null, null, 1, 0, null, null, null, null, null)
+            new("A000001", "root", "planner", null, null, "completed", start.AddSeconds(1), null, null, 1, 0, null, null, null, null, null),
+            new("A000002", "root", "executor", "catalog", null, "completed", start.AddSeconds(2), null, null, 1, 0, null, null, null, null, null)
         ], []);
 
         var mermaid = AgentTraceReportWriter.WriteMermaid(trace);

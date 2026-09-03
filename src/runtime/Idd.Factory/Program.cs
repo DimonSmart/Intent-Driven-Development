@@ -29,7 +29,7 @@ internal static class FactoryCli
             Console.InputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
             if (args.Length == 0 || args[0] is "-h" or "--help")
             {
-                Console.WriteLine("idd-factory run --workspace <path> (--request-file <path> | --request-stdin true)\nidd-factory continue --workspace <path> [--answer-file <path>] [--confirmation approve|decline] [--verification-result passed|failed]\nidd-factory cancel --workspace <path>");
+                Console.WriteLine("idd-factory run --workspace <path> (--request-file <path> | --request-stdin true)\nidd-factory continue --workspace <path> [--confirmation approve|decline] [--verification-result passed|failed]\nidd-factory cancel --workspace <path>");
                 return 0;
             }
 
@@ -62,7 +62,7 @@ internal static class FactoryCli
                 workspace,
                 configuration,
                 store,
-                new FactoryAgentExecutor(backend, new FactoryAgentResultValidator()),
+                new FactoryAgentExecutor(backend),
                 new VerificationEngine(workspace, current),
                 new FactoryEventWriter(current, clock),
                 clock);
@@ -96,7 +96,6 @@ internal static class FactoryCli
                     "run" => throw new ArgumentException("run requires exactly one request input: --request-file <path> or --request-stdin true."),
                     "continue" => await runtime.ContinueAsync(
                         cancellation.Token,
-                        options.TryGetValue("answer-file", out var answer) ? Path.GetFullPath(answer) : null,
                         options.TryGetValue("confirmation", out var confirmation) ? confirmation switch
                         {
                             "approve" => VerificationConfirmation.Approve,
@@ -177,7 +176,7 @@ internal static class FactoryCli
     private static int ExitCode(string outcome) => outcome switch
     {
         "COMPLETED" => 0,
-        "FOCUSED_HANDOFF" or "NEEDS_CLARIFICATION" or "INTENT_REQUIRED" or "BLOCKED" or "CANCELLED" or "CANCELLATION_REQUESTED" or
+        "BLOCKED" or "CANCELLED" or "CANCELLATION_REQUESTED" or
         "FACTORY_CONFIGURATION_CHANGED" or "FACTORY_ALREADY_RUNNING" or "VERIFICATION_CONFIRMATION_REQUIRED" or "VERIFICATION_RESULT_REQUIRED" => 2,
         "LEGACY_FACTORY_STATE" or "CORRUPT_FACTORY_STATE" => 3,
         _ => 1

@@ -78,7 +78,7 @@ public sealed class EfficiencyTelemetryTests
     public void DispatchAndWaitTelemetry_CapturesChildRoleSizesAndRepeatedWaits()
     {
         using var fixture = new RolloutFixture();
-        var prompt = "Role:\nimplementer\nWork item: 001-code\nRead references/roles/implementer.md";
+        var prompt = "Role:\nexecutor\nWork item: 001-code";
         fixture.Write("root", Meta("root", timestamp: "2026-01-01T00:00:00Z"),
             Tool("item.started", "spawn", "collab_tool_call", "spawn_agent", "in_progress", "2026-01-01T00:00:01Z", prompt: prompt),
             Tool("item.completed", "spawn", "collab_tool_call", "spawn_agent", "completed", "2026-01-01T00:00:02Z", children: ["child"]),
@@ -89,13 +89,12 @@ public sealed class EfficiencyTelemetryTests
         var trace = new AgentTraceBuilder().Build(fixture.Directory, "root");
         var child = trace.Agents.Single(agent => agent.ThreadId == "child");
         var root = trace.Agents.Single(agent => agent.ThreadId == "root");
-        Assert.Equal("implementer", child.Role);
+        Assert.Equal("executor", child.Role);
         Assert.Equal("001-code", child.WorkItem);
         Assert.Equal(prompt.Length, child.DispatchCharacters);
         Assert.Equal(Encoding.UTF8.GetByteCount(prompt), child.DispatchUtf8Bytes);
-        Assert.Contains(child.DispatchReferences!, reference => reference.Kind == "role");
         var spawn = Assert.Single(root.ToolCalls!, call => call.Tool == "spawn_agent");
-        Assert.Equal("implementer", spawn.ChildRole);
+        Assert.Equal("executor", spawn.ChildRole);
         Assert.Equal(prompt.Length, spawn.DispatchCharacters);
         Assert.Equal(Encoding.UTF8.GetByteCount(prompt), spawn.DispatchUtf8Bytes);
         var waits = root.ToolCalls!.Where(call => call.Tool == "wait_agent").ToArray();
@@ -109,7 +108,7 @@ public sealed class EfficiencyTelemetryTests
     public void AggregationAndReport_ExposeRolesGroupsHotspotsAndRequiredSections()
     {
         var root = Node("root", "factory-root", 100, 60, 2, reads: [new("refs/SKILL.md", 1, 10, 10), new("refs/SKILL.md", 2, 20, 20)]);
-        var worker = Node("worker", "implementer", 200, 50, 4, reads: [new("refs/SKILL.md", 1, 30, 30)]);
+        var worker = Node("worker", "executor", 200, 50, 4, reads: [new("refs/SKILL.md", 1, 30, 30)]);
         var telemetry = EfficiencyTelemetryBuilder.Build(new(2, "root", [root, worker], []), new() { WallTimeMs = 9000 });
 
         Assert.Equal(300, telemetry.Summary.InputTokens);
@@ -120,8 +119,8 @@ public sealed class EfficiencyTelemetryTests
         Assert.Equal(300, telemetry.EndToEndFactory.InputTokens);
         Assert.Equal(2, telemetry.Roles.Count);
         Assert.Equal(100, telemetry.Groups.Single(group => group.Group == "orchestration").InputTokens);
-        Assert.Equal(200, telemetry.Groups.Single(group => group.Group == "implementation").InputTokens);
-        Assert.Equal(0, telemetry.Groups.Single(group => group.Group == "research").Agents);
+        Assert.Equal(200, telemetry.Groups.Single(group => group.Group == "execution").InputTokens);
+        Assert.Equal(0, telemetry.Groups.Single(group => group.Group == "planning").Agents);
         var file = Assert.Single(telemetry.FileAccess);
         Assert.Equal(3, file.ReadCount);
         Assert.Equal(2, file.DistinctAgentCount);
@@ -136,7 +135,7 @@ public sealed class EfficiencyTelemetryTests
     public void SyntheticRootUsesOuterMetricsForEndToEndTotals()
     {
         var root = new AgentTraceNode("root", null, "factory-root", null, null, "completed", null, null, null, 0, 0, null, null, null, null, null);
-        var worker = Node("worker", "implementer", 200, 50, 4, reads: []);
+        var worker = Node("worker", "executor", 200, 50, 4, reads: []);
         var telemetry = EfficiencyTelemetryBuilder.Build(new(2, "root", [root, worker], []), new() { InputTokens = 100, CachedInputTokens = 60, OutputTokens = 20, ReasoningOutputTokens = 5, TotalTokens = 120 });
 
         Assert.Equal(100, telemetry.RootLauncher.InputTokens);
@@ -146,7 +145,7 @@ public sealed class EfficiencyTelemetryTests
     }
 
     [Theory]
-    [InlineData("refs\\roles\\implementer.md", "refs/roles/implementer.md")]
+    [InlineData("refs\\roles\\executor.md", "refs/roles/executor.md")]
     [InlineData("./refs/SKILL.md", "refs/SKILL.md")]
     public void NormalizePath_UnifiesSeparators(string input, string expected) => Assert.Equal(expected, CodexRolloutReader.NormalizePath(input));
 

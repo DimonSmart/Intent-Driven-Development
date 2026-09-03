@@ -140,7 +140,7 @@ public sealed class AgentTraceBuilder(CodexRolloutReader? reader = null)
     private static long? Fresh(long? input, long? cached) => input is not null && cached is not null && cached >= 0 && input >= cached ? input - cached : null;
     private static double? Percentage(long? part, long? total) => part is not null && total is > 0 && part >= 0 && part <= total ? 100d * part.Value / total.Value : null;
 
-    private static string? NormalizeRole(string? value) => value?.Trim().ToLowerInvariant() switch { "factory-root" or "task-decomposer" or "factory-step-coordinator" or "implementer" or "researcher" or "checkpoint-reviewer" or "final-reviewer" => value.Trim().ToLowerInvariant(), _ => null };
+    private static string? NormalizeRole(string? value) => value?.Trim().ToLowerInvariant() switch { "factory-root" or "planner" or "executor" => value.Trim().ToLowerInvariant(), _ => null };
     private static string? Role(string? text)
     {
         text ??= string.Empty;

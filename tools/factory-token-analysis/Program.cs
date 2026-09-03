@@ -317,13 +317,9 @@ internal static class Program
 
     private static string LaunchReason(string role, string workItem)
     {
-        if (role == "task-decomposer") return "decomposition";
-        if (role == "final-reviewer") return "final review";
-        if (role == "checkpoint-reviewer") return "checkpoint review";
-        if (role == "factory-replanner") return "replan";
-        if (role == "researcher") return string.IsNullOrWhiteSpace(workItem) ? "research" : $"research {workItem}";
-        if (role == "implementer")
-            return string.IsNullOrWhiteSpace(workItem) ? "implementation" : $"work item {workItem}";
+        if (role == "planner") return "planning";
+        if (role == "executor")
+            return string.IsNullOrWhiteSpace(workItem) ? "execution" : $"work item {workItem}";
         return role;
     }
 
@@ -333,9 +329,9 @@ internal static class Program
         if (metrics.FailedToolOutputChars > 0)
             anomalies.Add($"Failed commands produced {metrics.FailedToolOutputChars:N0} chars of context pollution.");
 
-        var finalReviewer = attempts.Where(x => x.Role == "final-reviewer").Sum(x => x.InputTokens);
-        if (metrics.InputTokens > 0 && finalReviewer > metrics.InputTokens * 0.30)
-            anomalies.Add($"Final reviewer consumed {finalReviewer * 100.0 / metrics.InputTokens:F1}% of gross input.");
+        var planning = attempts.Where(x => x.Role == "planner").Sum(x => x.InputTokens);
+        if (metrics.InputTokens > 0 && planning > metrics.InputTokens * 0.60)
+            anomalies.Add($"Planning consumed {planning * 100.0 / metrics.InputTokens:F1}% of gross input.");
 
         return anomalies.ToArray();
     }

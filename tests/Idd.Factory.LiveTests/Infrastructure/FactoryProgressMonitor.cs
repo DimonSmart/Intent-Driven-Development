@@ -60,7 +60,7 @@ public sealed class FactoryProgressMonitor(FactoryEvalWorkspace workspace)
                 "workflow-step-started" => $"workflow {Text("id") ?? Text("Id") ?? "unknown"} started",
                 "workflow-step-finished" => $"workflow {Text("id") ?? Text("Id") ?? "unknown"} {Text("outcome") ?? "finished"}",
                 "agent-dispatching" => $"{Text("attemptId")} {Text("role")} {Text("workItemId") ?? "task"} started",
-                "agent-completed" => $"{Text("attemptId")} {Text("role")} {Text("Outcome") ?? Text("outcome") ?? "unknown"}",
+                "agent-completed" => $"{Text("attemptId")} {Text("role")} completed",
                 "agent-result-reused" => $"{Text("attemptId")} {Text("role")} result reused",
                 "verification-started" => string.Join(' ', new[] { "verification", Text("verificationContext") ?? "unknown", Text("workItemId"), "started" }.Where(part => !string.IsNullOrWhiteSpace(part))),
                 "verification-completed" => $"verification {Text("verificationContext") ?? "unknown"} {Text("verificationStatus") ?? "completed"}",

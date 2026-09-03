@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Idd.Factory.Agents;
 using Idd.Factory.Configuration;
 using Idd.Factory.Domain;
@@ -22,69 +21,57 @@ internal static class FactoryRuntimeTestHarness
     {
         var current = Path.Combine(workspace, ".idd", "factory", "current");
         var clock = new FakeClock();
-        configuration ??= CreateConfiguration(allowed);
+        configuration ??= CreateConfiguration();
         return new FactoryRuntime(
             workspace,
             configuration,
             new FileFactoryStateStore(current, new FactoryStateValidator()),
-            new FactoryAgentExecutor(backend, new FactoryAgentResultValidator()),
+            new FactoryAgentExecutor(backend),
             verification ?? new VerificationEngine(workspace, current),
             new FactoryEventWriter(current, clock),
             clock);
     }
 
     public static FactoryConfiguration CreateConfiguration(IEnumerable<string>? allowed = null) => new(
-        1,
-        new FactoryLimits(4, 3, 5, 64),
-        new FinalReviewPolicy(true),
-        (allowed ?? new[] { "implementation", "research", "semantic-review" }).ToHashSet(StringComparer.Ordinal),
+        2,
+        new FactoryLimits(4, 12, 64),
         "test-factory.yaml",
         "test-config-hash");
 
     public static async Task<FactoryState> LoadState(string workspace) =>
         (await new FileFactoryStateStore(Path.Combine(workspace, ".idd", "factory", "current"), new FactoryStateValidator()).LoadAsync(default))!;
 
-    public static object Work(string id, string capability, int sequence = 1, string[]? dependencies = null, string? contract = null) => new
+    public static object Work(string id, string capability = "implementation", int sequence = 1, string[]? dependencies = null, string? contract = null) => new
     {
         capability,
-        task = contract ?? $"# {id}"
+        task = contract ?? id
     };
 
-    public static SemanticAgentResult Envelope(AgentInvocation invocation, string outcome, object? payload = null, string? reason = null)
+    public static string Envelope(AgentInvocation invocation, string outcome, object? payload = null, string? reason = null)
     {
-        var body = payload is null ? (JsonElement?)null : JsonSerializer.SerializeToElement(payload, FactoryJson.Options);
-        var tasks = outcome == "ready" && body is { ValueKind: JsonValueKind.Object } value && value.TryGetProperty("tasks", out var taskArray)
-            ? taskArray.Clone()
-            : (JsonElement?)null;
-        return new()
-        {
-            Outcome = outcome,
-            Summary = outcome == "completed" ? $"Completed {invocation.Capability} work." : null,
-            Tasks = tasks,
-            Reason = reason,
-            Payload = tasks is null ? body : null
-        };
+        if (invocation.Capability != "planning") return reason ?? $"Completed {invocation.WorkItemId ?? "assigned work"}.";
+        if (outcome != "ready") return string.Empty;
+        if (payload is null) return string.Empty;
+        var body = JsonSerializer.SerializeToElement(payload, FactoryJson.Options);
+        if (!body.TryGetProperty("tasks", out var tasks) || tasks.ValueKind != JsonValueKind.Array) return string.Empty;
+        return string.Join("\n\n", tasks.EnumerateArray().Select(task =>
+            $"# Task\n\n{task.GetProperty("task").GetString()!.Trim()}"));
     }
 }
 
 internal sealed class FakeAgentBackend : IAgentBackend
 {
-    private static readonly JsonSerializerOptions WireOptions = new(FactoryJson.Options)
-    {
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
-    private readonly Queue<Func<AgentInvocation, SemanticAgentResult>> results = new();
+    private readonly Queue<Func<AgentInvocation, string>> results = new();
     public List<AgentInvocation> Invocations { get; } = [];
 
-    public void Enqueue(Func<AgentInvocation, SemanticAgentResult> result) => results.Enqueue(result);
+    public void Enqueue(Func<AgentInvocation, string> result) => results.Enqueue(result);
 
     public Task<AgentRunHandle> StartAsync(AgentInvocation invocation, CancellationToken cancellationToken)
     {
         if (results.Count == 0) throw new InvalidOperationException($"No fake result queued for {invocation.Role}/{invocation.WorkItemId}.");
         Invocations.Add(invocation);
-        Directory.CreateDirectory(Path.GetDirectoryName(invocation.RawResultPath)!);
-        var result = results.Dequeue()(invocation);
-        File.WriteAllText(invocation.RawResultPath, JsonSerializer.Serialize(result, WireOptions));
+        Directory.CreateDirectory(Path.GetDirectoryName(invocation.SemanticOutputPath)!);
+        File.WriteAllText(invocation.SemanticOutputPath, results.Dequeue()(invocation));
         return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId));
     }
 

@@ -119,21 +119,21 @@ public sealed class BenchmarkRunner(string repositoryRoot, string benchmarkDirec
         var skillDirectory = Path.Combine(decompositionWorkspace, ".agents", "skills", "idd-factory-decompose-task");
         Directory.CreateDirectory(skillDirectory);
         File.Copy(Path.Combine(repositoryRoot, "src", "canonical", "skills", "idd-factory-decompose-task.md"), Path.Combine(skillDirectory, "SKILL.md"), overwrite: true);
-        var lastMessage = Path.Combine(telemetry, "factory-decomposer.result.json");
+        var lastMessage = Path.Combine(telemetry, "factory-planner.result.md");
         var prompt = $"""
 Use $idd-factory-decompose-task to decompose this benchmark task. This is an independent decomposition for replay, not a Factory runtime run.
 
 Run id: benchmark-{Guid.NewGuid():N}
-Attempt id: decomposition-1
-Role: task-decomposer
+Attempt id: planning-1
+Role: planner
 
 Original request:
 {task}
 
-Return only the version 1 worker envelope required by the skill. Use outcome ready and payload.workItems when decomposition succeeds.
+Return only the Markdown task sections required by the skill.
 """;
-        var metrics = await RunCodexAsync(decompositionWorkspace, telemetry, "factory-decomposer", prompt, lastMessage, sandbox: "read-only");
-        if (metrics.ExitCode != 0) throw new InvalidOperationException("Factory decomposer Codex invocation failed.");
+        var metrics = await RunCodexAsync(decompositionWorkspace, telemetry, "planner", prompt, lastMessage, sandbox: "read-only");
+        if (metrics.ExitCode != 0) throw new InvalidOperationException("Factory planner Codex invocation failed.");
         var workItems = ParseDecomposition(lastMessage);
         var capture = Path.Combine(runDirectory, "factory-decomposition");
         Directory.CreateDirectory(capture);
@@ -166,17 +166,13 @@ Return only the version 1 worker envelope required by the skill. Use outcome rea
         var workItems = new List<FactoryWorkItemRecord>();
         if (source is not null)
         {
-            var contracts = Directory.Exists(Path.Combine(source, "decomposition", "contracts"))
-                ? Path.Combine(source, "decomposition", "contracts")
-                : Path.Combine(source, "work-items");
-            var kinds = ReadFactoryKinds(source);
+            var contracts = Path.Combine(source, "work-items");
             if (Directory.Exists(contracts))
                 foreach (var file in Directory.EnumerateFiles(contracts, "*.md").Order(StringComparer.Ordinal))
                 {
                     var target = Path.Combine(capture, Path.GetFileName(file)); File.Copy(file, target, overwrite: true);
                     var content = File.ReadAllText(file); var id = Path.GetFileNameWithoutExtension(file);
-                    var typed = kinds.Values.FirstOrDefault(x => Path.GetFileName(x.ContractPath).Equals(Path.GetFileName(file), StringComparison.OrdinalIgnoreCase));
-                    workItems.Add(new(typed?.Id ?? id, typed?.Kind ?? "unknown", Title(content), Path.GetRelativePath(runDirectory, target).Replace('\\', '/')));
+                    workItems.Add(new(id, "implementation", Title(content), Path.GetRelativePath(runDirectory, target).Replace('\\', '/')));
                 }
         }
         var metrics = new List<InvocationMetrics>();
@@ -197,7 +193,7 @@ Return only the version 1 worker envelope required by the skill. Use outcome rea
         {
             var last = metrics[^1]; metrics[^1] = last with { ExitCode = result.ExitCode };
         }
-        var decompositionMetrics = metrics.Where(x => x.Role == "task-decomposer").ToArray();
+        var decompositionMetrics = metrics.Where(x => x.Role == "planner").ToArray();
         return (new FactoryDecompositionRecord(true, decompositionMetrics.Sum(x => x.InputTokens), decompositionMetrics.Sum(x => x.CachedInputTokens), decompositionMetrics.Sum(x => x.OutputTokens), workItems), metrics);
     }
 
@@ -245,15 +241,34 @@ Complete only the following work-item contract in the current workspace. You hav
 
     public static IReadOnlyList<GeneratedWorkItem> ParseDecomposition(string path)
     {
-        using var document = JsonDocument.Parse(File.ReadAllText(path));
-        var root = document.RootElement;
-        if (root.TryGetProperty("payload", out var payload)) root = payload;
-        if (!root.TryGetProperty("workItems", out var items) || items.ValueKind != JsonValueKind.Array) throw new InvalidDataException("Decomposer result does not contain payload.workItems.");
-        return items.EnumerateArray().Select((item, index) => new GeneratedWorkItem(
-            item.GetProperty("id").GetString() ?? $"WI-{index + 1:000}",
-            item.TryGetProperty("sequence", out var sequence) ? sequence.GetInt32() : index + 1,
-            item.GetProperty("kind").GetString() ?? "subtask",
-            item.GetProperty("contractMarkdown").GetString() ?? throw new InvalidDataException("Work item contractMarkdown is missing."))).ToArray();
+        var normalized = File.ReadAllText(path).TrimStart('\uFEFF').Replace("\r\n", "\n");
+        if (string.IsNullOrWhiteSpace(normalized)) return [];
+        var contracts = new List<string>();
+        List<string>? current = null;
+        foreach (var line in normalized.Split('\n'))
+        {
+            if (line == "# Task")
+            {
+                AddContract(contracts, current);
+                current = [];
+            }
+            else if (current is null)
+            {
+                if (!string.IsNullOrWhiteSpace(line)) throw new InvalidDataException("Planner output must contain only '# Task' sections.");
+            }
+            else current.Add(line);
+        }
+        AddContract(contracts, current);
+        if (contracts.Count == 0) throw new InvalidDataException("Planner output contains no task sections.");
+        return contracts.Select((contract, index) => new GeneratedWorkItem($"WI-{index + 1:000}", index + 1, "implementation", contract)).ToArray();
+    }
+
+    private static void AddContract(ICollection<string> contracts, List<string>? lines)
+    {
+        if (lines is null) return;
+        var contract = string.Join("\n", lines).Trim();
+        if (contract.Length == 0) throw new InvalidDataException("Planner task sections must be non-empty.");
+        contracts.Add(contract);
     }
 
     private static string? FindFactoryRunDirectory(string workspace)
@@ -262,18 +277,6 @@ Complete only the following work-item contract in the current workspace. You hav
         if (File.Exists(Path.Combine(current, "events.jsonl"))) return current;
         var results = Path.Combine(workspace, ".idd", "factory", "results");
         return Directory.Exists(results) ? Directory.EnumerateFiles(results, "events.jsonl", SearchOption.AllDirectories).Select(Path.GetDirectoryName).Where(x => x is not null).OrderByDescending(x => x, StringComparer.Ordinal).FirstOrDefault() : null;
-    }
-
-    private static IReadOnlyDictionary<string, FactoryManifestItem> ReadFactoryKinds(string source)
-    {
-        var path = Path.Combine(source, "decomposition", "decomposition.json");
-        if (!File.Exists(path)) return new Dictionary<string, FactoryManifestItem>();
-        using var document = JsonDocument.Parse(File.ReadAllText(path));
-        return document.RootElement.GetProperty("workItems").EnumerateArray().Select(item => new FactoryManifestItem(
-            item.GetProperty("id").GetString() ?? "unknown",
-            item.GetProperty("kind").GetString() ?? "unknown",
-            item.GetProperty("contractPath").GetString() ?? "unknown"))
-            .ToDictionary(item => item.Id, StringComparer.Ordinal);
     }
 
     private static string ReadFactoryRole(string attemptDirectory)
@@ -358,4 +361,3 @@ Complete only the following work-item contract in the current workspace. You hav
 }
 
 public sealed record GeneratedWorkItem(string Id, int Sequence, string Kind, string ContractMarkdown);
-public sealed record FactoryManifestItem(string Id, string Kind, string ContractPath);

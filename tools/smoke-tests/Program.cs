@@ -168,11 +168,7 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     {
         "idd-factory-run",
         "idd-factory-decompose-task",
-        "idd-factory-execute-subtask",
-        "idd-factory-research",
-        "idd-factory-review-checkpoint",
-        "idd-factory-review-task",
-        "idd-factory-replan"
+        "idd-factory-execute-subtask"
     })
     {
         ExpectFile(Path.Combine(factoryRoot, "skills", skill, "SKILL.md"));
@@ -209,12 +205,8 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
 
     foreach (var reference in new[]
     {
-        (Skill: "idd-factory-decompose-task", Role: "task-decomposer"),
-        (Skill: "idd-factory-execute-subtask", Role: "implementer"),
-        (Skill: "idd-factory-research", Role: "researcher"),
-        (Skill: "idd-factory-review-checkpoint", Role: "checkpoint-reviewer"),
-        (Skill: "idd-factory-review-task", Role: "final-reviewer"),
-        (Skill: "idd-factory-replan", Role: "factory-replanner")
+        (Skill: "idd-factory-decompose-task", Role: "planner"),
+        (Skill: "idd-factory-execute-subtask", Role: "executor")
     })
     {
         ExpectMissing(Path.Combine(
@@ -230,11 +222,7 @@ void CheckPlatformPlugins(string platform, string manifestDirectory)
     var workerSkills = new[]
     {
         "idd-factory-decompose-task",
-        "idd-factory-execute-subtask",
-        "idd-factory-research",
-        "idd-factory-review-checkpoint",
-        "idd-factory-review-task",
-        "idd-factory-replan"
+        "idd-factory-execute-subtask"
     };
 
     if (platform == "claude")
@@ -359,10 +347,11 @@ void CheckCanonicalFactoryNeutrality()
     }
 
     var decomposition = ReadText(Path.Combine(repoRoot, "src", "canonical", "skills", "idd-factory-decompose-task.md"));
-    ExpectContains(decomposition, "ordered work that remains to be done", "Canonical ordered planning contract");
-    ExpectContains(decomposition, "A complete up-front plan is not required", "Canonical partial planning contract");
-    ExpectContains(decomposition, "\"capability\": \"implementation\"", "Canonical flat task DTO contract");
-    ExpectContains(decomposition, "return IDs, sequence numbers, dependencies", "Canonical runtime-owned bookkeeping contract");
+    ExpectContains(decomposition, "all remaining tasks", "Canonical ordered planning contract");
+    ExpectContains(decomposition, "Stop before the", "Canonical bounded-batch contract");
+    ExpectContains(decomposition, "first task whose meaningful contract", "Canonical evidence boundary contract");
+    ExpectContains(decomposition, "# Task", "Canonical Markdown task contract");
+    ExpectContains(decomposition, "Do not choose capabilities", "Canonical runtime-owned bookkeeping contract");
 }
 
 void CheckFactoryRoleGeneration()
@@ -382,12 +371,8 @@ void CheckFactoryRoleGeneration()
 
     foreach (var (skill, role) in new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        ["idd-factory-decompose-task"] = "task-decomposer",
-        ["idd-factory-execute-subtask"] = "implementer",
-        ["idd-factory-research"] = "researcher",
-        ["idd-factory-review-checkpoint"] = "checkpoint-reviewer",
-        ["idd-factory-review-task"] = "final-reviewer",
-        ["idd-factory-replan"] = "factory-replanner"
+        ["idd-factory-decompose-task"] = "planner",
+        ["idd-factory-execute-subtask"] = "executor"
     })
     {
         foreach (var platform in new[] { "claude", "codex" })
@@ -397,15 +382,9 @@ void CheckFactoryRoleGeneration()
         }
     }
 
-    var implementerClaudeSkill = ReadFrontMatter(ReadText(Path.Combine(
+    var executorClaudeSkill = ReadFrontMatter(ReadText(Path.Combine(
         marketplaceRoot, "plugins", "claude", "idd-factory", "skills", "idd-factory-execute-subtask", "SKILL.md")));
-    ExpectContains(implementerClaudeSkill, "allowed-tools: [Read, Glob, Grep, Edit, Write, Bash]", "Claude implementer native tools");
-    var researchClaudeSkill = ReadFrontMatter(ReadText(Path.Combine(
-        marketplaceRoot, "plugins", "claude", "idd-factory", "skills", "idd-factory-research", "SKILL.md")));
-    ExpectContains(researchClaudeSkill, "allowed-tools: [Read, Glob, Grep]", "Claude researcher read-only native tools");
-    var reviewerClaudeSkill = ReadFrontMatter(ReadText(Path.Combine(
-        marketplaceRoot, "plugins", "claude", "idd-factory", "skills", "idd-factory-review-task", "SKILL.md")));
-    ExpectContains(reviewerClaudeSkill, "allowed-tools: [Read, Glob, Grep, Bash]", "Claude reviewer native tools");
+    ExpectContains(executorClaudeSkill, "allowed-tools: [Read, Glob, Grep, Edit, Write, Bash]", "Claude executor native tools");
 }
 
 void CheckCodexFactoryMetadata()

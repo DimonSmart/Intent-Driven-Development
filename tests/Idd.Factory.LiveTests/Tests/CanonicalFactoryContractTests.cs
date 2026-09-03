@@ -19,7 +19,7 @@ public sealed class CanonicalFactoryContractTests
     [Fact]
     public void FactoryWorkersHaveNoSeparateRoleContracts()
     {
-        foreach (var role in new[] { "task-decomposer.md", "implementer.md", "researcher.md", "checkpoint-reviewer.md", "final-reviewer.md" })
+        foreach (var role in new[] { "planner.md", "executor.md" })
             Assert.False(RepoFileExists("src", "canonical", "factory", "roles", role));
     }
 

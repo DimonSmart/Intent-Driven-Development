@@ -39,7 +39,7 @@ public sealed class CodexCliBackend : IAgentBackend
         catch (FileNotFoundException exception)
         { throw new AgentProtocolException("AGENT_BACKEND_UNAVAILABLE", $"Codex CLI could not be located: {exception.Message}"); }
 
-        var attemptDirectory = Path.GetDirectoryName(invocation.RawResultPath)!;
+        var attemptDirectory = Path.GetDirectoryName(invocation.SemanticOutputPath)!;
         var privateHome = PreparePrivateHome(invocation.RunId, invocation.AttemptId, invocation.SkillName);
         var codexHome = privateHome.Path;
         string skillInstructions;
@@ -94,7 +94,7 @@ public sealed class CodexCliBackend : IAgentBackend
         var prompt = BuildBootstrapPrompt(invocation, skillInstructions);
         await process.StandardInput.WriteAsync(prompt.AsMemory(), cancellationToken);
         await process.StandardInput.FlushAsync(cancellationToken); process.StandardInput.Close();
-        processes.Add(invocation.AttemptId, new(process, stdout, stderr, invocation.RawResultPath));
+        processes.Add(invocation.AttemptId, new(process, stdout, stderr, invocation.SemanticOutputPath));
         return new(invocation.AttemptId, process.Id, invocation.AttemptId);
     }
 
@@ -233,7 +233,7 @@ public sealed class CodexCliBackend : IAgentBackend
         arguments.AddRange(["--sandbox", Sandbox(invocation.ExecutionProfile), "-c", "approval_policy=\"never\"", "-c", "mcp_servers={}"]);
         if ((isWindows ?? OperatingSystem.IsWindows()) && !string.IsNullOrWhiteSpace(configuration.WindowsSandbox))
             arguments.AddRange(["-c", $"windows.sandbox=\"{configuration.WindowsSandbox}\""]);
-        arguments.AddRange(["--skip-git-repo-check", "-C", invocation.Workspace, "--output-last-message", invocation.RawResultPath, "-"]);
+        arguments.AddRange(["--skip-git-repo-check", "-C", invocation.Workspace, "--output-last-message", invocation.SemanticOutputPath, "-"]);
         return arguments;
     }
 
@@ -242,8 +242,8 @@ public sealed class CodexCliBackend : IAgentBackend
         if (string.IsNullOrWhiteSpace(skillInstructions))
             throw new ArgumentException("Factory-selected skill instructions cannot be empty.", nameof(skillInstructions));
         return $"Factory-selected role instructions ({invocation.SkillName}):\n\n{skillInstructions.Trim()}\n\nAssigned Factory work:\n\n{invocation.Input}\n\n" +
-            $"Return only one semantic JSON object as your final response. The backend captures it through the invocation-specific result channel; do not create or edit result artifacts yourself. " +
-            "Return outcome and only the outcome-specific fields defined by the selected skill. Do not return protocol or schema versions, run ID, attempt ID, role, capability, work-item ID, skill, execution profile, result path, or other runtime bookkeeping. " +
+            "Return only the human-readable Markdown requested by the selected skill. The backend captures the final response through the invocation-specific result channel; do not create or edit result artifacts yourself. " +
+            "Do not plan a subsequent Factory step, select another worker, or return runtime bookkeeping. " +
             "Do not mutate .idd/factory/current or .idd/intent. stdout is diagnostic only.";
     }
 
@@ -300,25 +300,14 @@ public sealed class CodexCliBackend : IAgentBackend
     {
         while (!cancellationToken.IsCancellationRequested)
         {
-            if (File.Exists(path))
-            {
-                try
-                {
-                    using var document = JsonDocument.Parse(await File.ReadAllTextAsync(path, cancellationToken));
-                    if (document.RootElement.ValueKind == JsonValueKind.Object) return true;
-                }
-                catch (JsonException) { }
-                catch (IOException) { }
-            }
+            if (File.Exists(path)) return true;
             await Task.Delay(100, cancellationToken);
         }
         return false;
     }
     private static bool IsCompleteResult(string path)
     {
-        if (!File.Exists(path)) return false;
-        try { using var document = JsonDocument.Parse(File.ReadAllText(path)); return document.RootElement.ValueKind == JsonValueKind.Object; }
-        catch (Exception exception) when (exception is JsonException or IOException) { return false; }
+        return File.Exists(path);
     }
     private static async Task CancelProcessAsync(Process process)
     { if (process.HasExited) return; try { process.CloseMainWindow(); await Task.Delay(1500); } catch { } if (!process.HasExited) process.Kill(true); await process.WaitForExitAsync(); }

@@ -48,7 +48,7 @@ Materialization is a transport normalization, not a semantic transformation:
   preparation and the request passed to Factory Runtime.
 
 The resulting Factory request must be self-contained: interpreting
-`request.md`, resuming the run, and performing final review must not require a
+`request.md`, resuming the run, and performing final verification must not require a
 host-local temporary attachment to still exist.
 
 Do not read the entire intent tree by default. Missing documentation is evidence

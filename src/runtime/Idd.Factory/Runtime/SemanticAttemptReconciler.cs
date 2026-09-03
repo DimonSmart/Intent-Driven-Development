@@ -9,8 +9,6 @@ internal sealed class SemanticAttemptReconciler(
     Func<FactoryState, PlannedWorkItem?, AgentInvocation, CancellationToken, Task> recoverWorkspaceChanges,
     Func<FactoryState, CancellationToken, Task> save)
 {
-    private readonly FactoryAgentResultValidator validator = new();
-
     public async Task ReconcileAsync(FactoryState state, CancellationToken cancellationToken)
     {
         var attemptId = state.CurrentAttemptId ?? state.Current?.CurrentAttemptId;
@@ -38,9 +36,9 @@ internal sealed class SemanticAttemptReconciler(
             return;
         }
 
-        if (File.Exists(invocation.RawResultPath))
+        if (File.Exists(invocation.SemanticOutputPath))
         {
-            await RecoverRawResultAsync(state, attemptId, directory, invocation, resultPath, cancellationToken);
+            await RecoverSemanticResultAsync(state, attemptId, directory, invocation, resultPath, cancellationToken);
             return;
         }
 
@@ -48,7 +46,7 @@ internal sealed class SemanticAttemptReconciler(
         await save(state, cancellationToken);
     }
 
-    private async Task RecoverRawResultAsync(
+    private async Task RecoverSemanticResultAsync(
         FactoryState state,
         string attemptId,
         string directory,
@@ -58,7 +56,7 @@ internal sealed class SemanticAttemptReconciler(
     {
         var telemetryPath = Path.Combine(directory, "process-telemetry.json");
         if (!File.Exists(telemetryPath))
-            throw new AgentProtocolException("ATTEMPT_RECOVERY_UNSAFE", $"Attempt '{attemptId}' has raw-result.json but no process-telemetry.json.");
+            throw new AgentProtocolException("ATTEMPT_RECOVERY_UNSAFE", $"Attempt '{attemptId}' has semantic output but no process telemetry.");
 
         AgentProcessResult? process;
         try
@@ -70,24 +68,17 @@ internal sealed class SemanticAttemptReconciler(
             throw new AgentProtocolException("ATTEMPT_RECOVERY_UNSAFE", $"Attempt '{attemptId}' has invalid process telemetry: {exception.Message}");
         }
         if (process is null || !process.CompleteResultObserved || process.TerminationKind == AgentTerminationKind.Cancelled)
-            throw new AgentProtocolException("ATTEMPT_RECOVERY_UNSAFE", $"Attempt '{attemptId}' does not have telemetry proving that a complete semantic result was observed.");
+            throw new AgentProtocolException("ATTEMPT_RECOVERY_UNSAFE", $"Attempt '{attemptId}' does not have telemetry proving that complete semantic output was observed.");
 
-        SemanticAgentResult semantic;
-        try
-        {
-            semantic = validator.ParseAndValidate(invocation, await File.ReadAllTextAsync(invocation.RawResultPath, cancellationToken));
-        }
-        catch (AgentProtocolException exception)
-        {
-            throw new AgentProtocolException(
-                exception.Code,
-                $"{exception.Message} Persisted attempt '{attemptId}' at '{directory}' was not promoted to authoritative result.json.");
-        }
+        var semantic = await File.ReadAllTextAsync(invocation.SemanticOutputPath, cancellationToken);
+        if (invocation.Capability == "implementation" && string.IsNullOrWhiteSpace(semantic))
+            throw new AgentProtocolException("MALFORMED_AGENT_RESULT", $"Executor result for attempt '{attemptId}' is empty.");
 
+        var relative = Path.GetRelativePath(currentDirectory, invocation.SemanticOutputPath).Replace('\\', '/');
         var persisted = new PersistedAttemptResult
         {
             Invocation = AttemptIdentity.From(invocation),
-            SemanticResult = semantic,
+            SemanticResultPath = relative,
             ReceivedAt = DateTimeOffset.UtcNow,
             TerminationKind = process.TerminationKind
         };
@@ -108,33 +99,37 @@ internal sealed class SemanticAttemptReconciler(
         await save(state, cancellationToken);
     }
 
-    internal static SemanticOperationKind ResolveOperation(AgentInvocation invocation) =>
-        FactoryCapabilityCatalog.ResolveSemanticOperation(invocation.Capability);
+    internal static SemanticOperationKind ResolveOperation(AgentInvocation invocation) => invocation.Capability switch
+    {
+        "planning" => SemanticOperationKind.Planning,
+        "implementation" => SemanticOperationKind.WorkItemExecution,
+        _ => throw new AgentProtocolException("UNKNOWN_CAPABILITY", $"Unknown Factory capability '{invocation.Capability}'.")
+    };
 
     internal static void ValidateIdentity(FactoryState state, string attemptId, AgentInvocation invocation, string? attemptDirectory = null)
     {
-        var expectedCapability = state.Current?.Capability ?? invocation.Capability;
-        var expectedContract = FactoryCapabilityCatalog.Resolve(expectedCapability);
-        var expectedAgent = expectedContract.Agent;
-        if (invocation.RunId != state.RunId
+        var expectedCapability = state.Current is null ? "planning" : "implementation";
+        var expectedAgent = FactoryCapabilityCatalog.Resolve(expectedCapability);
+        if (invocation.SchemaVersion != AgentInvocation.CurrentSchemaVersion
+            || invocation.RunId != state.RunId
             || invocation.AttemptId != attemptId
             || invocation.Capability != expectedCapability
             || invocation.Role != expectedAgent.Role
             || invocation.SkillName != expectedAgent.SkillName
             || invocation.ExecutionProfile != expectedAgent.ExecutionProfile
-            || invocation.SemanticResultSchema != SemanticResultContracts.SchemaForCapability(expectedCapability)
             || invocation.WorkItemId != state.Current?.Id)
             throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Persisted attempt {attemptId} identity is invalid.");
 
         if (state.PendingContinuation is { Kind: ContinuationKind.SemanticInvocation, Operation: not SemanticOperationKind.None } pending
-            && (pending.Operation != expectedContract.SemanticOperation || pending.WorkItemId != state.Current?.Id))
+            && (pending.Operation != ResolveOperation(invocation) || pending.WorkItemId != state.Current?.Id))
             throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Persisted attempt {attemptId} does not belong to the pending semantic operation.");
 
         if (attemptDirectory is not null)
         {
-            var expectedRawResult = Path.Combine(attemptDirectory, "raw-result.json");
-            if (!SamePath(expectedRawResult, invocation.RawResultPath))
-                throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Persisted attempt {attemptId} points to a raw result outside its exact attempt directory.");
+            var expectedName = expectedCapability == "planning" ? "planning-output.md" : "semantic-result.md";
+            var expectedOutput = Path.Combine(attemptDirectory, expectedName);
+            if (!SamePath(expectedOutput, invocation.SemanticOutputPath))
+                throw new AgentProtocolException("UNKNOWN_ATTEMPT", $"Persisted attempt {attemptId} points to semantic output outside its exact attempt directory.");
         }
     }
 

@@ -40,7 +40,7 @@ public sealed class FactoryMcpTests
         });
 
         var result = await new FactoryRuntimeProcessRunner(invoker)
-            .RunAsync(FactoryRuntimeCommand.Run, temp.Path, request, null, CancellationToken.None);
+            .RunAsync(FactoryRuntimeCommand.Run, temp.Path, request, CancellationToken.None);
 
         Assert.Equal("COMPLETED", result.FactoryOutcome);
         Assert.Null(invoker.Invocation!.StandardInput);
@@ -52,24 +52,6 @@ public sealed class FactoryMcpTests
         Assert.True(requestBytes!.Length >= 3);
         Assert.Equal(new byte[] { 0xEF, 0xBB, 0xBF }, requestBytes[..3]);
         Assert.Equal(FactoryRuntimeProcessRunner.ResolvePluginRoot(AppContext.BaseDirectory), ValueAfter(invoker.Invocation, "--plugin-root"));
-    }
-
-    [Fact]
-    public async Task ContinueAnswerUsesTemporaryUtf8FileAndCleansIt()
-    {
-        using var temp = new TestWorkspace();
-        string? answerPath = null;
-        const string answer = "Да, сохранить café и 漢字.";
-        var invoker = new RecordingInvoker(Outcome(), invocation =>
-        {
-            answerPath = ValueAfter(invocation, "--answer-file");
-            Assert.Equal(answer, File.ReadAllText(answerPath));
-        });
-
-        await new FactoryRuntimeProcessRunner(invoker).RunAsync(FactoryRuntimeCommand.Continue, temp.Path, null, answer, CancellationToken.None);
-
-        Assert.NotNull(answerPath);
-        Assert.False(File.Exists(answerPath));
     }
 
     [Fact]
@@ -175,7 +157,7 @@ public sealed class FactoryMcpTests
             RunId = "blocked-run",
             RunStatus = FactoryRunStatus.Blocked,
             Blocker = new("NEEDS_CLARIFICATION", "Choose one option.", "Continue with an answer."),
-            PendingContinuation = new(ContinuationKind.Clarification, null, null, "NEEDS_CLARIFICATION", true, SemanticOperationKind.Planning, "original input")
+            PendingContinuation = new(ContinuationKind.Terminal, null, null, "NEEDS_CLARIFICATION", false)
         };
         await new FileFactoryStateStore(current, new FactoryStateValidator()).CreateAsync(state, CancellationToken.None);
 
@@ -209,40 +191,6 @@ public sealed class FactoryMcpTests
         Assert.Equal(resultDirectory, status.ResultDirectory);
     }
 
-    [Fact]
-    public async Task PersistedClarificationStateCanContinueThroughCliTransportWithoutWorkflowDefinition()
-    {
-        using var temp = new TestWorkspace();
-        var current = Path.Combine(temp.Path, ".idd", "factory", "current");
-        Directory.CreateDirectory(current);
-        temp.Write(".idd/factory/current/request.md", "Task");
-        var packaged = Path.Combine(AppContext.BaseDirectory, "factory.yaml");
-        var configuration = new FactoryConfigurationLoader().Load(temp.Path, packaged);
-        var state = StateStoreTests.State() with
-        {
-            RunId = "transport-run",
-            FactoryConfigurationHash = configuration.Hash,
-            RunStatus = FactoryRunStatus.Blocked,
-            Blocker = new("NEEDS_CLARIFICATION", "Choose one option.", "Continue with an answer."),
-            PendingContinuation = new(ContinuationKind.Clarification, null, null, "NEEDS_CLARIFICATION", true, SemanticOperationKind.Planning, "original input")
-        };
-        await new FileFactoryStateStore(current, new FactoryStateValidator()).CreateAsync(state, CancellationToken.None);
-
-        var invocation = FactoryRuntimeProcessRunner.BuildInvocation(
-            FactoryRuntimeCommand.Continue,
-            temp.Path,
-            null,
-            null,
-            Path.Combine(AppContext.BaseDirectory, "idd-factory.dll"),
-            FactoryRuntimeProcessRunner.ResolvePluginRoot(AppContext.BaseDirectory));
-        var process = await new SystemFactoryProcessInvoker().RunAsync(invocation, CancellationToken.None);
-        var outcome = JsonSerializer.Deserialize<FactoryCliOutcome>(process.StandardOutput, FactoryJson.Options);
-
-        Assert.NotNull(outcome);
-        Assert.Equal("NEEDS_CLARIFICATION", outcome.FactoryOutcome);
-        Assert.Equal("transport-run", outcome.RunId);
-    }
-
     [Theory]
     [InlineData(0)]
     [InlineData(2)]
@@ -250,7 +198,7 @@ public sealed class FactoryMcpTests
     {
         using var temp = new TestWorkspace();
         var result = await new FactoryRuntimeProcessRunner(new RecordingInvoker(Outcome("BLOCKED", exitCode)))
-            .RunAsync(FactoryRuntimeCommand.Cancel, temp.Path, null, null, CancellationToken.None);
+            .RunAsync(FactoryRuntimeCommand.Cancel, temp.Path, null, CancellationToken.None);
 
         Assert.Equal("BLOCKED", result.FactoryOutcome);
     }

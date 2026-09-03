@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Idd.Factory.Domain;
 
 namespace Idd.Factory.Runtime;
@@ -9,31 +8,25 @@ public sealed partial class FactoryRuntime
 
     private async Task<FactoryCliOutcome?> PlanAsync(FactoryState state, CancellationToken cancellationToken)
     {
-        var replanning = state.PendingReplanTrigger is not null;
-        var initialPlanning = !state.InitialPlanningCompleted;
-        var incrementalPlanning = !initialPlanning && !replanning;
-        if (replanning && state.ReplanCount >= configuration.Limits.MaxReplans)
-            throw new AgentProtocolException("REPLAN_BUDGET_EXHAUSTED", "Semantic replan budget exhausted.");
-        if (incrementalPlanning && state.Completed.Count <= state.PlannedThroughCompletedCount)
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                "Incremental planning requires completed work that has not yet been incorporated into planning.");
+        if (state.Current is not null || state.Remaining.Count != 0)
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Planning requires an exhausted batch.");
+        if (state.PlanningCycleCount >= configuration.Limits.MaxPlanningCycles)
+            throw new AgentProtocolException("PLANNING_BUDGET_EXHAUSTED", "Factory planning-cycle budget exhausted.");
 
         var request = await File.ReadAllTextAsync(Path.Combine(currentDirectory, state.RequestPath), cancellationToken);
         var completed = await BuildCompletedContextAsync(state, cancellationToken);
-        var future = new[] { state.Current }
-            .Where(x => x is not null)
-            .Concat(state.Remaining)
-            .Select(x => new { x!.Capability, task = ReadContract(x.ContractPath) });
-        var trigger = replanning
-            ? JsonSerializer.Serialize(state.PendingReplanTrigger, FactoryJson.Options)
-            : initialPlanning
-                ? "initial request"
-                : $"new completed work since previous planning: {state.Completed.Count - state.PlannedThroughCompletedCount} item(s)";
+        var finalFailure = state.FinalVerificationPlanRevision == state.PlanRevision && !state.FinalVerificationPassed;
+        var trigger = state.PlanningCycleCount == 0
+            ? "Initial planning."
+            : finalFailure
+                ? "Strict final verification failed. Use the authoritative evidence below to determine the next correction batch."
+                : "The previous batch is exhausted. Reassess integrated product reality and determine the next batch.";
         var input =
-            $"Original request:\n{request}\n\nCompleted immutable work:\n{completed}\n\nCurrent planning trigger:\n{trigger}\n\nExisting future plan:\n{JsonSerializer.Serialize(future, FactoryJson.Options)}\n\n" +
-            "Factory planning boundary:\nIntent preparation is outside Factory runtime. Durable intent is read-only Factory input and never remaining Factory work. A normal new end-to-end run reaches planning only after required Intent Preflight. The original request remains unchanged, so any instruction in it to create or update durable intent is pre-runtime scope, not a Factory task. If current durable intent still lacks a required product decision, return intent-required rather than an intent-editing task.\n\n" +
-            "Return only the ordered work that remains to be done. Completed work is immutable and must not be reproduced. The first task executes first. Do not return IDs, dependencies, status, sequence, revisions, outlines, or mutation operations.";
+            $"Original request:\n{request}\n\nCurrent planning trigger:\n{trigger}\n\nCompleted immutable work:\n{completed}\n\n" +
+            $"Authoritative verification evidence references:\n{string.Join("\n", state.VerificationEvidenceRefs.Select(x => "- " + x))}\n\n" +
+            "Read current durable intent from .idd/intent and inspect the current repository directly. " +
+            "Materialize every task whose self-contained contract can be determined reliably now, in execution order. " +
+            "Stop at the first material uncertainty that requires evidence from this batch. If no semantic work remains, return an empty response.";
 
         var result = await InvokeSemanticAsync(
             state,
@@ -42,165 +35,17 @@ public sealed partial class FactoryRuntime
             input,
             SemanticOperationKind.Planning,
             cancellationToken);
-
-        if (result.Outcome != "ready")
-            return await HandleSemanticStopAsync(
-                state,
-                null,
-                result,
-                SemanticOperationKind.Planning,
-                input,
-                cancellationToken);
-
-        if (result.Tasks is not { ValueKind: JsonValueKind.Array } tasks)
-            throw new AgentProtocolException(
-                "MALFORMED_AGENT_RESULT",
-                "Planning ready result requires top-level tasks.");
-
+        var tasks = PlannerBatchParser.Parse(result.SemanticResult);
+        var reason = state.PlanningCycleCount == 0
+            ? "initial-planning"
+            : finalFailure ? "final-verification-replanning" : "batch-exhausted-replanning";
         await CreatePlanMutationService().ApplyPlanningResultAsync(
             state,
             tasks,
-            replanning,
-            initialPlanning,
+            reason,
             result.AttemptId,
             cancellationToken);
-
         return null;
-    }
-
-    private async Task<FactoryCliOutcome?> PrependAdditionalWorkAsync(
-        FactoryState state,
-        PlannedWorkItem source,
-        BoundSemanticAgentResult result,
-        CancellationToken cancellationToken)
-    {
-        if (result.Payload is not { } payload)
-            throw new AgentProtocolException(
-                "MALFORMED_AGENT_RESULT",
-                "additional-work-required requires a payload.");
-
-        await CreatePlanMutationService().PrependBeforeRetryAsync(
-            state,
-            source,
-            result,
-            payload,
-            "worker-additional-work",
-            false,
-            cancellationToken);
-
-        return null;
-    }
-
-    private async Task<FactoryCliOutcome?> PrependReviewCorrectionAsync(
-        FactoryState state,
-        PlannedWorkItem source,
-        BoundSemanticAgentResult result,
-        CancellationToken cancellationToken)
-    {
-        if (result.Payload is not { } correction)
-            throw new AgentProtocolException(
-                "MALFORMED_AGENT_RESULT",
-                "Review correction requires a payload.");
-
-        await CreatePlanMutationService().PrependBeforeRetryAsync(
-            state,
-            source,
-            result,
-            correction,
-            "review-correction",
-            true,
-            cancellationToken);
-
-        return null;
-    }
-
-    private async Task<FactoryCliOutcome?> RunFinalReviewAsync(
-        FactoryState state,
-        CancellationToken cancellationToken)
-    {
-        var request = await File.ReadAllTextAsync(
-            Path.Combine(currentDirectory, state.RequestPath),
-            cancellationToken);
-        var input =
-            $"Original Factory request:\n{request}\n\nCompleted work:\n{await BuildCompletedContextAsync(state, cancellationToken)}\n\nVerification evidence:\n{JsonSerializer.Serialize(state.VerificationEvidenceRefs, FactoryJson.Options)}\n\nReview the integrated result. Do not edit files.";
-        var result = await InvokeSemanticAsync(
-            state,
-            "final-review",
-            null,
-            input,
-            SemanticOperationKind.FinalReview,
-            cancellationToken);
-
-        if (result.Outcome == "approved")
-        {
-            state.FinalReview = new(
-                "approved",
-                $"attempts/{result.AttemptId}/result.json",
-                (state.FinalReview?.AttemptCount ?? 0) + 1,
-                state.PlanRevision);
-            state.PendingContinuation = null;
-            await SaveAsync(state, cancellationToken);
-            return null;
-        }
-
-        if (result.Outcome == "global-replan-required")
-        {
-            var resultRef = $"attempts/{result.AttemptId}/result.json";
-            state.PendingReplanTrigger = new(
-                "final-review",
-                null,
-                resultRef,
-                result.Reason,
-                result.Payload?.Clone(),
-                state.VerificationEvidenceRefs.ToList());
-            state.PendingContinuation = null;
-            state.Blocker = null;
-            state.FinalReview = new(
-                result.Outcome,
-                resultRef,
-                (state.FinalReview?.AttemptCount ?? 0) + 1,
-                null);
-            await SaveAsync(state, cancellationToken);
-            return null;
-        }
-
-        if (result.Outcome == "correction-required")
-        {
-            if (result.Payload is not { } correction)
-                throw new AgentProtocolException(
-                    "MALFORMED_AGENT_RESULT",
-                    "Final review correction requires a payload.");
-
-            await CreatePlanMutationService().ApplyFinalReviewCorrectionAsync(
-                state,
-                result,
-                correction,
-                cancellationToken);
-            return null;
-        }
-
-        if (result.Outcome == "additional-work-required")
-        {
-            if (result.Payload is not { } additionalWork)
-                throw new AgentProtocolException(
-                    "MALFORMED_AGENT_RESULT",
-                    "Final review additional work requires a payload.");
-
-            await CreatePlanMutationService().ApplyFinalReviewAdditionalWorkAsync(
-                state,
-                result,
-                additionalWork,
-                cancellationToken);
-            return null;
-        }
-
-        return await HandleSemanticStopAsync(
-            state,
-            null,
-            result,
-            SemanticOperationKind.FinalReview,
-            input,
-            cancellationToken);
     }
 
     private string ReadContract(string path) =>
@@ -223,7 +68,49 @@ public sealed partial class FactoryRuntime
     {
         state.FinalVerificationPassed = false;
         state.FinalVerificationPlanRevision = null;
-        if (state.FinalReview?.ReviewedPlanRevision != state.PlanRevision)
-            state.FinalReview = null;
+    }
+}
+
+internal static class PlannerBatchParser
+{
+    private const string TaskHeading = "# Task";
+
+    public static IReadOnlyList<string> Parse(string markdown)
+    {
+        var normalized = markdown.TrimStart('\uFEFF').Replace("\r\n", "\n");
+        if (string.IsNullOrWhiteSpace(normalized)) return [];
+
+        var lines = normalized.Split('\n');
+        var tasks = new List<string>();
+        List<string>? current = null;
+        foreach (var line in lines)
+        {
+            if (line == TaskHeading)
+            {
+                AddCurrent(tasks, current);
+                current = [];
+                continue;
+            }
+            if (current is null)
+            {
+                if (!string.IsNullOrWhiteSpace(line))
+                    throw new AgentProtocolException("MALFORMED_PLANNER_OUTPUT", "Planner output must be empty or consist only of '# Task' sections.");
+                continue;
+            }
+            current.Add(line);
+        }
+        AddCurrent(tasks, current);
+        if (tasks.Count == 0)
+            throw new AgentProtocolException("MALFORMED_PLANNER_OUTPUT", "Planner output contains no readable task sections.");
+        return tasks;
+    }
+
+    private static void AddCurrent(List<string> tasks, List<string>? current)
+    {
+        if (current is null) return;
+        var task = string.Join("\n", current).Trim();
+        if (task.Length == 0)
+            throw new AgentProtocolException("MALFORMED_PLANNER_OUTPUT", "Planner task sections must be non-empty.");
+        tasks.Add(task);
     }
 }

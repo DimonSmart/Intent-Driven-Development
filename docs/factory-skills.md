@@ -2,69 +2,31 @@
 
 ## Public entry point
 
-`idd-factory-run` is a transport-neutral launcher contract. The generated Codex
-skill uses the plugin's directly visible bundled `factory_run`,
-`factory_continue`, `factory_cancel`, and read-only `factory_status` MCP tools.
-The generated Claude skill uses the packaged CLI launcher. Neither form contains
-scheduling logic or dispatches agents itself.
+`idd-factory-run` performs Intent Preflight and then invokes the packaged
+deterministic runtime. The launcher does not schedule semantic work itself.
 
-For a new run, the launcher first performs the bounded Intent Preflight defined
-by the packaged `intent-preflight.md` reference. It classifies the unchanged
-request against relevant current intent, invokes the existing intent-change or
-new-document workflow when an end-to-end request already contains a complete
-product decision, validates coverage, and only then calls the runtime. This
-pre-runtime stage does not create Factory work items or alter scheduler state.
+## Semantic workers
 
-`INTENT_REQUIRED` therefore denotes a genuinely missing durable decision.
-Absence of a corresponding spec is not sufficient. Explicit
-`implementation-only` scope still forbids intent writes.
+- `idd-factory-decompose-task` is the sole planner. It returns ordered `# Task`
+  Markdown sections, or an empty response when nothing remains.
+- `idd-factory-execute-subtask` executes one immutable task and returns a
+  free-form human-readable report.
 
-The Codex launcher normally makes one blocking MCP call and never falls back to
-launching the runtime through a shell. Generated Factory MCP configuration uses
-a three-hour tool timeout because an end-to-end Factory run may legitimately
-span many semantic attempts and verification cycles.
+There are no research, checkpoint-review, final-review, or standalone replan
+skills in the Factory protocol. Research can be included in an ordinary task
+contract when it is necessary to make that task coherent; discoveries that
+change future work are evaluated by the next planner after batch exhaustion.
 
-A host/tool timeout is transport loss, not a Factory outcome. It does not prove
-that the runtime stopped. After a lost or timed-out blocking `factory_run` or
-`factory_continue` response, the Codex launcher may call `factory_status` once
-to distinguish an active owner from a persisted run that is safe to continue, a
-persisted blocker, or an already completed result. `factory_status` is strictly
-read-only and is not a scheduler or polling mechanism. While it reports
-`ACTIVE`, the launcher must not start or continue another runtime for the same
-workspace.
+Workers never return semantic control JSON. They do not select capabilities,
+IDs, retries, corrections, or transitions. Runtime owns materialization,
+ordering, verification, retry, recovery, persistence, and finalization.
 
-If the installed Codex host does not expose the bundled Factory tools, update to
-a supported host instead of using a polling loop.
-
-Example:
+Each attempt keeps semantic text separate from machine metadata:
 
 ```text
-Use idd-factory-run to implement the task described in ./ui-audit.md.
+invocation.json       runtime-owned invocation identity
+planning-output.md    planner-created batch document
+semantic-result.md    executor's task-specific report
+result.json           runtime-owned provenance and semantic-result path
+process-telemetry.json
 ```
-
-## Semantic worker skills
-
-- `idd-factory-decompose-task` returns all currently contractable remaining work in execution order and defers only work whose safe contract depends on evidence not yet available.
-- `idd-factory-execute-subtask` executes one focused workspace-writing implementation work item, including documentation changes when its contract requires them.
-- `idd-factory-research` performs one focused read-only research work item whose findings become completed-work context.
-- `idd-factory-review-checkpoint` independently reviews completed work at its ordered position.
-- `idd-factory-review-task` performs mandatory integrated final semantic review as a terminal orchestration phase.
-- `idd-factory-replan` is a legacy name for returning a complete replacement future list.
-
-Workers return identity-free semantic JSON through an invocation-specific
-backend channel. For the Codex backend, the captured body is retained as
-diagnostic `raw-result.json`. It contains only `outcome` and fields defined for
-that outcome; workers never return run, attempt, role, work-item, protocol,
-schema, result-path, or execution-profile bookkeeping.
-
-Runtime validates the raw body against the assigned capability and role, then
-atomically creates authoritative `result.json`. That persisted artifact has its
-own schema version, runtime-owned invocation provenance, the validated semantic
-result, receipt time, and backend-observed termination kind. Human-readable
-stdout and stderr remain diagnostics only. Workers do not own state mutations,
-authoritative verification, scheduling, retry, plan replacement, persistence,
-or filesystem finalization.
-
-The former `idd-factory-coordinate-step`, `factory-step-coordinator`, predefined
-global Factory workflow, and LLM-driven finalization are not part of the current
-plugin. `FactoryState.Completed`, `Current`, and `Remaining` are authoritative.

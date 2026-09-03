@@ -1,11 +1,11 @@
 # Factory Token Efficiency
 
-Factory is intended to add decomposition, isolation, deterministic verification, and independent review without making orchestration an uncontrolled token multiplier. Its token cost therefore needs to be understood as several scopes rather than one undifferentiated number:
+Factory is intended to add planning, isolation, and deterministic verification without making orchestration an uncontrolled token multiplier. Its token cost therefore needs to be understood as several scopes rather than one undifferentiated number:
 
 - the root launcher or transport;
 - semantic workers grouped by role and attempt;
 - the complete end-to-end Factory total;
-- tool activity, failures, retries, and corrective cycles that help explain the total.
+- tool activity, failures, retries, and repeated planning cycles that help explain the total.
 
 Gross input, cached input, new input, and output are reported separately. New input is calculated as gross input minus cached input only when both counters are available and consistent. Sequential tool batches are also important: many independent tool calls issued together represent one model/tool round rather than many sequential rounds.
 
@@ -68,7 +68,7 @@ The analysis also found costs that were not inherent to the base Codex worker:
 - Broad workspace inventories included `.idd/factory`, previous attempt logs, `bin`, and `obj`.
 - Workers tried Git commands in a workspace without `.git`.
 - Failed `git diff` calls emitted large help/error output that became context for later model rounds.
-- The final reviewer accumulated many tool results over several sequential batches.
+- Repeated semantic attempts accumulated many tool results over several sequential batches.
 
 In the observed run, failed shell commands alone produced roughly 61 KB of text. This matters because tool output is not paid only once: it remains in the conversation and can be re-sent on later rounds.
 
@@ -135,7 +135,7 @@ It also flags common context-pollution patterns such as:
 - Git failures caused by a non-Git workspace;
 - failed commands producing at least 10,000 characters;
 - five or more sequential tool batches;
-- a final reviewer consuming more than 30% of the run's gross input.
+- planning attempts consuming more than 60% of the run's gross input.
 
 These warnings are diagnostic signals, not proof of a defect. For example, a genuinely large repository may legitimately require more inspection.
 

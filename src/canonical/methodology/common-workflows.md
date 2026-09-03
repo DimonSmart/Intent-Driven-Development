@@ -404,20 +404,21 @@ product meaning; otherwise prefer the smallest focused implementation workflow.
 
 Use focused execution when one implementation pass can safely satisfy current
 intent. Use optional `idd-factory-run` only for coordinated multi-task
-implementation, sequencing, temporary planning, review gates, or high-risk
+implementation, sequencing, temporary planning, or high-risk
 preservation boundaries. Factory remains optional and must not become a
 dependency of `idd-intent`.
 
 The user's logical request defines the Factory Task. Text explicitly supplied
 through host-local pasted or attachment references is mechanically materialized
 without semantic rewriting before Factory starts. The resulting self-contained
-request is stored in `request.md`; recovery, planning, and final review must not
+request is stored in `request.md`; recovery and planning must not
 depend on the temporary host attachment remaining available. The packaged .NET
 Factory Runtime owns one resumable run under `.idd/factory/current/`;
 `state.json` is authoritative and stable work-item filenames do not encode
-status. Fresh semantic workers perform decomposition, implementation, selective
-checkpoint reviews, bounded replanning, and final review. Programmatic
-orchestration runs verification, prepares final result artifacts, and moves the
+status. A fresh planner creates each bounded batch and fresh executors perform
+its tasks sequentially. Executors report results without controlling future
+work. Programmatic orchestration runs verification, replans after exhausted
+batches, prepares final result artifacts, and moves the
 complete run directory to `.idd/factory/results/<timestamp>_<work-slug>/`. The
 completed result preserves state, events, attempts, verification evidence,
 commit-message handoff, and other diagnostics. `.idd/factory/current/` remains

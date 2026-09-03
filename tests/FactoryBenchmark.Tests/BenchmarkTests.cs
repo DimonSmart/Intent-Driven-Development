@@ -123,15 +123,16 @@ public sealed class BenchmarkTests
     }
 
     [Fact]
-    public void DecompositionParsing_ReadsWorkerEnvelope()
+    public void DecompositionParsing_ReadsPlannerMarkdown()
     {
         var path = System.IO.Path.GetTempFileName();
         try
         {
-            File.WriteAllText(path, "{\"payload\":{\"workItems\":[{\"id\":\"WI-001\",\"sequence\":1,\"kind\":\"subtask\",\"contractMarkdown\":\"# Work\"}]}}");
+            File.WriteAllText(path, "# Task\n\n# Work\n\n# Task\n\nSecond work item");
             var result = BenchmarkRunner.ParseDecomposition(path);
-            Assert.Single(result);
+            Assert.Equal(2, result.Count);
             Assert.Equal("WI-001", result[0].Id);
+            Assert.Equal("implementation", result[0].Kind);
         }
         finally { File.Delete(path); }
     }

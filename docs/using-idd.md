@@ -2,11 +2,11 @@
 
 Intent-Driven Development separates durable product intent from temporary implementation work.
 
-Use `idd-intent` for the normal workflow. Add optional `idd-factory` only when implementation benefits from explicit multi-step orchestration and independent review.
+Use `idd-intent` for the normal workflow. Add optional `idd-factory` when implementation benefits from explicit multi-step orchestration.
 
 In Factory, the original Request defines one complete Task. A Factory run
-decomposes the Task into Work items: bounded Subtasks and Review checkpoints.
-The final Task review validates the complete Task result.
+repeatedly plans bounded batches of tasks. Executors complete each task in order,
+and strict final verification validates the complete result.
 
 For project-specific commands, use `idd-verification-configure` to create `.idd/verification.yaml`. It assigns checks by `direct`, `subtask`, `checkpoint`, and `final` context without putting commands in product intent.
 

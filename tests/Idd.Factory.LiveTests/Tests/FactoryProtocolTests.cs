@@ -288,7 +288,7 @@ public sealed class FactoryProtocolTests
         Assert.Equal(@"C:\Tools\codex.exe", environment["IDD_FACTORY_CODEX_EXECUTABLE"]);
     }
 
-    private const string ValidFactoryResult = "{\"methodologyVersion\":\"1.0\",\"factoryOutcome\":\"COMPLETED\",\"completedWorkCount\":2,\"finalReviewVerdict\":\"approved\",\"verificationStatus\":\"passed\",\"commitMessagePath\":\"notes/commit-message.md\"}";
+    private const string ValidFactoryResult = "{\"schemaVersion\":4,\"methodologyVersion\":\"1.0\",\"factoryOutcome\":\"COMPLETED\",\"completedWorkCount\":2,\"verificationStatus\":\"passed\",\"commitMessagePath\":\"notes/commit-message.md\"}";
 
     private sealed class FactoryFixture : IDisposable
     {

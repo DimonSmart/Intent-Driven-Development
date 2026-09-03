@@ -18,12 +18,12 @@ public sealed class FactoryRuntimeTraceReaderTests
             Directory.CreateDirectory(Path.Combine(current, "attempts", "A000002"));
             File.WriteAllLines(Path.Combine(current, "events.jsonl"),
             [
-                Event("agent-dispatching", "A000001", "task-decomposer", null, "2026-01-01T00:00:00Z"),
-                Event("agent-completed", "A000001", "task-decomposer", null, "2026-01-01T00:00:01Z", "ready"),
-                Event("agent-dispatching", "A000002", "implementer", "catalog", "2026-01-01T00:00:02Z")
+                Event("agent-dispatching", "A000001", "planner", null, "2026-01-01T00:00:00Z"),
+                Event("agent-completed", "A000001", "planner", null, "2026-01-01T00:00:01Z"),
+                Event("agent-dispatching", "A000002", "executor", "catalog", "2026-01-01T00:00:02Z")
             ]);
             File.WriteAllText(Path.Combine(current, "attempts", "A000002", "result.json"),
-                JsonSerializer.Serialize(new { outcome = "blocked" }));
+                JsonSerializer.Serialize(new { schemaVersion = 3, attemptId = "A000002", semanticResultPath = "semantic-result.md" }));
             File.WriteAllLines(Path.Combine(current, "attempts", "A000002", "stdout.log"),
             [
                 "{\"type\":\"turn.started\"}",
@@ -39,10 +39,10 @@ public sealed class FactoryRuntimeTraceReaderTests
             Assert.Equal(3, trace.Agents.Count);
             Assert.Equal("interrupted", trace.Agents.Single(agent => agent.ThreadId == "root").Status);
             var incomplete = trace.Agents.Single(agent => agent.ThreadId == "A000002");
-            Assert.Equal("implementer", incomplete.Role);
+            Assert.Equal("executor", incomplete.Role);
             Assert.Equal("catalog", incomplete.WorkItem);
             Assert.Equal("result-produced", incomplete.Status);
-            Assert.Equal("blocked", incomplete.TerminalResult!.Kind);
+            Assert.Null(incomplete.TerminalResult);
             Assert.Equal(2, incomplete.ToolCallCount);
             Assert.Equal(1, incomplete.FileReadCount);
             Assert.Equal(1, incomplete.UniqueFileReadCount);
@@ -65,8 +65,8 @@ public sealed class FactoryRuntimeTraceReaderTests
             Directory.CreateDirectory(Path.Combine(current, "attempts", "A000001"));
             File.WriteAllLines(Path.Combine(current, "events.jsonl"),
             [
-                Event("agent-dispatching", "A000001", "checkpoint-reviewer", null, "2026-01-01T00:00:00Z"),
-                Event("agent-completed", "A000001", "checkpoint-reviewer", null, "2026-01-01T00:00:01Z", "approved")
+                Event("agent-dispatching", "A000001", "planner", null, "2026-01-01T00:00:00Z"),
+                Event("agent-completed", "A000001", "planner", null, "2026-01-01T00:00:01Z")
             ]);
             File.WriteAllLines(Path.Combine(current, "attempts", "A000001", "stdout.log"),
             [
@@ -103,21 +103,21 @@ public sealed class FactoryRuntimeTraceReaderTests
         {
             Directory.CreateDirectory(result);
             File.WriteAllText(Path.Combine(result, "events.jsonl"),
-                Event("agent-dispatching", "A000001", "final-reviewer", null, "2026-01-01T00:00:00Z") + Environment.NewLine);
+                Event("agent-dispatching", "A000001", "planner", null, "2026-01-01T00:00:00Z") + Environment.NewLine);
 
             var trace = FactoryRuntimeTraceReader.TryRead(workspace, "root")!;
 
-            Assert.Equal("final-reviewer", trace.Agents.Single(agent => agent.ThreadId == "A000001").Role);
+            Assert.Equal("planner", trace.Agents.Single(agent => agent.ThreadId == "A000001").Role);
         }
         finally { if (Directory.Exists(workspace)) Directory.Delete(workspace, true); }
     }
 
-    private static string Event(string type, string attemptId, string role, string? workItemId, string timestamp, string? outcome = null)
+    private static string Event(string type, string attemptId, string role, string? workItemId, string timestamp)
         => JsonSerializer.Serialize(new
         {
             schemaVersion = 1,
             timestamp,
             type,
-            data = new { attemptId, role, workItemId, Outcome = outcome }
+            data = new { attemptId, role, workItemId }
         });
 }

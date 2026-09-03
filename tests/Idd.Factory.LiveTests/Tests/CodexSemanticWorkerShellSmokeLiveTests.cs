@@ -2,6 +2,7 @@ using System.Text.Json;
 using Idd.Factory.Agents;
 using Idd.Factory.Domain;
 using Idd.Factory.LiveTests.Infrastructure;
+using Idd.Factory.Runtime;
 using Xunit;
 
 namespace Idd.Factory.LiveTests.Tests;
@@ -22,18 +23,17 @@ public sealed class CodexSemanticWorkerShellSmokeLiveTests
         Directory.CreateDirectory(intentDirectory);
         Directory.CreateDirectory(attemptDirectory);
         await File.WriteAllTextAsync(Path.Combine(intentDirectory, "IDD-0001.spec.md"), "# Catalog intent\n\nThe catalog supports durable file storage and automated behavioral verification.\n");
-        var resultPath = Path.Combine(attemptDirectory, "raw-result.json");
+        var resultPath = Path.Combine(attemptDirectory, "planning-output.md");
         var invocation = new AgentInvocation
         {
             RunId = "missing-policy-smoke",
             AttemptId = "NOPOLICY01",
             Capability = "planning",
-            Role = "task-decomposer",
+            Role = "planner",
             Workspace = workspace,
-            RawResultPath = resultPath,
+            SemanticOutputPath = resultPath,
             SkillName = "idd-factory-decompose-task",
             ExecutionProfile = AgentExecutionProfile.ReadOnly,
-            SemanticResultSchema = "planning-v1",
             Input = "Decompose this Factory request: implement durable file-backed catalog storage, add automated behavioral tests, and require successful repository build and test verification. The workspace intentionally has no .idd/verification.yaml. Do not create one and do not implement the task.",
             StartedAt = DateTimeOffset.UtcNow,
         };
@@ -42,14 +42,12 @@ public sealed class CodexSemanticWorkerShellSmokeLiveTests
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
         var handle = await backend.StartAsync(invocation, timeout.Token);
         var processResult = await backend.WaitAsync(handle, timeout.Token);
-        var result = JsonSerializer.Deserialize<SemanticAgentResult>(await File.ReadAllTextAsync(resultPath, timeout.Token), FactoryJson.Options);
+        var result = await File.ReadAllTextAsync(resultPath, timeout.Token);
 
         Assert.Equal(0, processResult.ExitCode);
-        Assert.NotNull(result);
-        Assert.Equal("ready", result.Outcome);
-        var workItems = result.Tasks!.Value.EnumerateArray().ToArray();
+        var workItems = PlannerBatchParser.Parse(result);
         Assert.NotEmpty(workItems);
-        Assert.All(workItems, item => Assert.False(item.TryGetProperty("verificationCheckIds", out _)));
+        Assert.DoesNotContain("capability", result, StringComparison.OrdinalIgnoreCase);
     }
 
     [LiveFactoryEvalFact]
@@ -62,19 +60,18 @@ public sealed class CodexSemanticWorkerShellSmokeLiveTests
         var workspace = Path.Combine(outputDirectory, "workspace");
         var attemptDirectory = Path.Combine(workspace, ".idd", "factory", "current", "attempts", "SMOKE0001");
         Directory.CreateDirectory(attemptDirectory);
-        var resultPath = Path.Combine(attemptDirectory, "raw-result.json");
+        var resultPath = Path.Combine(attemptDirectory, "planning-output.md");
         var invocation = new AgentInvocation
         {
             RunId = "sandbox-smoke",
             AttemptId = "SMOKE0001",
             Capability = "planning",
-            Role = "task-decomposer",
+            Role = "planner",
             Workspace = workspace,
-            RawResultPath = resultPath,
+            SemanticOutputPath = resultPath,
             SkillName = "idd-factory-decompose-task",
             ExecutionProfile = AgentExecutionProfile.ReadOnly,
-            SemanticResultSchema = "planning-v1",
-            Input = "This is an isolated transport smoke test. Execute the real shell command `Write-Output IDD_SANDBOX_OK`. Do not modify files. After it succeeds, return a valid planning semantic result; tasks may be empty because no Factory run will consume it.",
+            Input = "This is an isolated transport smoke test. Execute the real shell command `Write-Output IDD_SANDBOX_OK`. Do not modify files. After it succeeds, return an empty planning response because no Factory run will consume it.",
             StartedAt = DateTimeOffset.UtcNow,
         };
         var backend = CreateBackend(pluginRoot, codexExecutable, "sandbox-smoke");

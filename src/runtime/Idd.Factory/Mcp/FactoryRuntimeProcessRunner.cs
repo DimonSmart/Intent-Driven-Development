@@ -18,7 +18,6 @@ internal sealed class FactoryRuntimeProcessRunner(
         FactoryRuntimeCommand command,
         string workspace,
         string? request,
-        string? answer,
         CancellationToken cancellationToken)
     {
         ValidateWorkspace(workspace);
@@ -26,20 +25,14 @@ internal sealed class FactoryRuntimeProcessRunner(
             throw new ArgumentException("request is required.", nameof(request));
         if (command != FactoryRuntimeCommand.Run && request is not null)
             throw new ArgumentException("request is supported only for factory_run.", nameof(request));
-        if (command != FactoryRuntimeCommand.Continue && answer is not null)
-            throw new ArgumentException("answer is supported only for factory_continue.", nameof(answer));
-
         if (request is not null && InvalidUnicodeReason(request, "Factory request") is { } requestError)
             return new("INVALID_REQUEST_ENCODING", "unknown", requestError, "Resubmit the original request without corrupted Unicode replacement characters.", null);
-        if (answer is not null && InvalidUnicodeReason(answer, "Factory clarification answer") is { } answerError)
-            return new("INVALID_CLARIFICATION_ENCODING", "unknown", answerError, "Resubmit the clarification answer without corrupted Unicode replacement characters.", null);
 
         var runtimeAssembly = Path.Combine(AppContext.BaseDirectory, "idd-factory.dll");
         if (!File.Exists(runtimeAssembly))
             throw new FactoryTransportException("FACTORY_TRANSPORT_UNAVAILABLE", "The packaged Factory Runtime assembly is missing.");
         var pluginRoot = ResolvePluginRoot(AppContext.BaseDirectory);
         string? requestFile = null;
-        string? answerFile = null;
         try
         {
             if (request is not null)
@@ -47,13 +40,7 @@ internal sealed class FactoryRuntimeProcessRunner(
                 requestFile = Path.Combine(Path.GetTempPath(), $"idd-factory-request-{Guid.NewGuid():N}.md");
                 await File.WriteAllTextAsync(requestFile, request, TextUtf8, cancellationToken);
             }
-            if (answer is not null)
-            {
-                answerFile = Path.Combine(Path.GetTempPath(), $"idd-factory-answer-{Guid.NewGuid():N}.txt");
-                await File.WriteAllTextAsync(answerFile, answer, TextUtf8, cancellationToken);
-            }
-
-            var invocation = BuildInvocation(command, workspace, requestFile, answerFile, runtimeAssembly, pluginRoot);
+            var invocation = BuildInvocation(command, workspace, requestFile, runtimeAssembly, pluginRoot);
             FactoryProcessResult processResult;
             try
             {
@@ -85,7 +72,6 @@ internal sealed class FactoryRuntimeProcessRunner(
         finally
         {
             if (requestFile is not null) TryDeleteTemporaryFile(requestFile);
-            if (answerFile is not null) TryDeleteTemporaryFile(answerFile);
         }
     }
 
@@ -122,7 +108,6 @@ internal sealed class FactoryRuntimeProcessRunner(
         FactoryRuntimeCommand command,
         string workspace,
         string? requestFile,
-        string? answerFile,
         string runtimeAssembly,
         string pluginRoot)
     {
@@ -138,8 +123,6 @@ internal sealed class FactoryRuntimeProcessRunner(
             if (requestFile is null) throw new ArgumentException("requestFile is required for Factory run.", nameof(requestFile));
             arguments.AddRange(["--request-file", requestFile]);
         }
-        if (answerFile is not null)
-            arguments.AddRange(["--answer-file", answerFile]);
         return new(ResolveDotnetHost(), arguments, workspace, null);
     }
 

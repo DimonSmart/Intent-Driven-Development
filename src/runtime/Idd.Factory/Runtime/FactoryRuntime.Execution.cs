@@ -22,58 +22,24 @@ public sealed partial class FactoryRuntime
         var item = state.Current;
         if (item is null || item.Id != workItemId || state.CurrentPhase is not (CurrentWorkPhase.Ready or CurrentWorkPhase.Running))
             throw new AgentProtocolException("INVALID_DISPATCH", $"Work item {workItemId} is not Current executable work.");
-        FactoryCapabilityCatalog.ResolveWorkItem(item.Capability);
-        if (!configuration.AllowedCapabilities.Contains(item.Capability)) throw new AgentProtocolException("CAPABILITY_NOT_ALLOWED", $"Capability '{item.Capability}' is not allowed.");
         var reusable = state.CurrentAttemptId is { } attempt && File.Exists(Path.Combine(currentDirectory, "attempts", attempt, "result.json"));
-        if (!reusable && item.AttemptCount >= configuration.Limits.MaxAgentAttempts)
+        if (!reusable && item.AttemptCount >= configuration.Limits.MaxAttemptsPerTask)
             throw new AgentProtocolException("RETRY_BUDGET_EXHAUSTED", await BuildRetryBudgetExhaustedMessageAsync(item, cancellationToken));
 
         state.CurrentPhase = CurrentWorkPhase.Running;
         await SaveAsync(state, cancellationToken);
         var input = await BuildWorkInputAsync(state, item, cancellationToken);
-        var result = await InvokeSemanticAsync(state, item.Capability, item, input, SemanticOperationKind.WorkItemExecution, cancellationToken);
+        var result = await InvokeSemanticAsync(state, "implementation", item, input, SemanticOperationKind.WorkItemExecution, cancellationToken);
         item = state.Current ?? throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Current work disappeared during dispatch.");
-        item.LastResultRef = $"attempts/{result.AttemptId}/result.json";
-        item.LastSemanticOutcome = result.Outcome;
+        item.LastResultRef = result.SemanticResultPath;
         item.CurrentAttemptId = null;
 
-        switch (result.Outcome)
-        {
-            case "completed":
-                state.PendingContinuation = null;
-                state.Blocker = null;
-                if (RequiresVerification(item))
-                {
-                    state.CurrentPhase = CurrentWorkPhase.AwaitingVerification;
-                    await SaveAsync(state, cancellationToken);
-                }
-                else await CommitCurrentAsync(state, cancellationToken);
-                return null;
-            case "approved" when item.Capability == "semantic-review":
-                state.PendingContinuation = null;
-                state.Blocker = null;
-                await CommitCurrentAsync(state, cancellationToken);
-                return null;
-            case "additional-work-required":
-                return await PrependAdditionalWorkAsync(state, item, result, cancellationToken);
-            case "correction-required" when item.Capability == "semantic-review":
-                return await PrependReviewCorrectionAsync(state, item, result, cancellationToken);
-            case "global-replan-required":
-                state.PendingReplanTrigger = new(item.Capability, item.Id, item.LastResultRef, result.Reason, result.Payload?.Clone(), item.VerificationEvidenceRefs.ToList());
-                state.PendingContinuation = null;
-                state.Blocker = null;
-                state.CurrentPhase = CurrentWorkPhase.Ready;
-                await SaveAsync(state, cancellationToken);
-                return null;
-            case "intent-required" or "needs-clarification" or "blocked" or "focused-handoff":
-                return await HandleSemanticStopAsync(state, item, result, SemanticOperationKind.WorkItemExecution, input, cancellationToken);
-            default:
-                throw new AgentProtocolException("UNSUPPORTED_AGENT_OUTCOME", $"Outcome {result.Outcome} is not valid for capability {item.Capability}.");
-        }
+        state.PendingContinuation = null;
+        state.Blocker = null;
+        state.CurrentPhase = CurrentWorkPhase.AwaitingVerification;
+        await SaveAsync(state, cancellationToken);
+        return null;
     }
-
-    private static bool RequiresVerification(PlannedWorkItem item) =>
-        item.Capability == "implementation" || item.VerificationCheckIds.Count > 0 || item.VerificationExpectations.Count > 0;
 
     private async Task CommitCurrentAsync(FactoryState state, CancellationToken cancellationToken)
     {
@@ -81,15 +47,12 @@ public sealed partial class FactoryRuntime
         state.Completed.Add(new CompletedWorkItem
         {
             Id = item.Id,
-            Capability = item.Capability,
             ContractPath = item.ContractPath,
             ResultRef = item.LastResultRef,
             ChangedPaths = item.ChangedPaths.ToList(),
             VerificationEvidenceRefs = item.VerificationEvidenceRefs.ToList(),
             VerificationDecision = item.LastVerificationDecision
         });
-        if (item.PostCompletionRoute == PostCompletionRoute.FinalPipeline)
-            state.PlannedThroughCompletedCount = state.Completed.Count;
         state.Current = null;
         state.CurrentPhase = null;
         state.PlanRevision++;
@@ -97,9 +60,9 @@ public sealed partial class FactoryRuntime
         await SaveAsync(state, cancellationToken);
     }
 
-    private async Task<BoundSemanticAgentResult> InvokeSemanticAsync(FactoryState state, string capability, PlannedWorkItem? item, string input, SemanticOperationKind operation, CancellationToken cancellationToken)
+    private async Task<BoundSemanticResult> InvokeSemanticAsync(FactoryState state, string capability, PlannedWorkItem? item, string input, SemanticOperationKind operation, CancellationToken cancellationToken)
     {
-        var agent = FactoryCapabilityCatalog.Resolve(capability).Agent;
+        var agent = FactoryCapabilityCatalog.Resolve(capability);
         if (state.CurrentAttemptId is { } persistedAttempt)
         {
             var directory = Path.Combine(currentDirectory, "attempts", persistedAttempt);
@@ -128,12 +91,12 @@ public sealed partial class FactoryRuntime
 
         var attemptDirectory = Path.Combine(currentDirectory, "attempts", attemptId);
         Directory.CreateDirectory(attemptDirectory);
-        var rawResultPath = Path.Combine(attemptDirectory, "raw-result.json");
+        var semanticOutputPath = Path.Combine(attemptDirectory, capability == "planning" ? "planning-output.md" : "semantic-result.md");
         var invocationNew = new AgentInvocation
         {
             RunId = state.RunId, AttemptId = attemptId, Capability = capability, Role = agent.Role, WorkItemId = item?.Id,
-            Workspace = workspace, RawResultPath = rawResultPath, SkillName = agent.SkillName,
-            ExecutionProfile = agent.ExecutionProfile, SemanticResultSchema = SemanticResultContracts.SchemaForCapability(capability), Input = input, StartedAt = clock.UtcNow
+            Workspace = workspace, SemanticOutputPath = semanticOutputPath, SkillName = agent.SkillName,
+            ExecutionProfile = agent.ExecutionProfile, Input = input, StartedAt = clock.UtcNow
         };
         await WriteJsonAtomicallyAsync(Path.Combine(attemptDirectory, "invocation.json"), invocationNew, cancellationToken);
         if (agent.ExecutionProfile == AgentExecutionProfile.WorkspaceWrite) await PersistWorkspaceSnapshotAsync(state.RunId, attemptDirectory, cancellationToken);
@@ -145,7 +108,7 @@ public sealed partial class FactoryRuntime
         if (item is not null) item.CurrentAttemptId = null;
         state.PendingContinuation = null;
         await SaveAsync(state, cancellationToken);
-        await events.WriteAsync(state.RunId, "agent-completed", new { attemptId, capability, agent.Role, execution.Result.Outcome, execution.Process.TerminationKind }, cancellationToken);
+        await events.WriteAsync(state.RunId, "agent-completed", new { attemptId, capability, agent.Role, execution.Process.TerminationKind }, cancellationToken);
         return execution.Result;
     }
 
@@ -164,8 +127,13 @@ public sealed partial class FactoryRuntime
         var lines = new List<string>();
         foreach (var completed in state.Completed)
         {
-            lines.Add($"- {completed.Id} ({completed.Capability}), contract={completed.ContractPath}, result={completed.ResultRef ?? "none"}");
-            if (completed.ResultRef is not null) lines.Add("  " + await ReadResultSummaryAsync(completed.ResultRef, cancellationToken));
+            lines.Add($"## {completed.Id}");
+            lines.Add("Task contract:");
+            lines.Add(ReadContract(completed.ContractPath));
+            lines.Add("Semantic result:");
+            lines.Add(completed.ResultRef is null ? "none" : await ReadSemanticResultAsync(completed.ResultRef, cancellationToken));
+            lines.Add("Actual changed paths: " + (completed.ChangedPaths.Count == 0 ? "none" : string.Join(", ", completed.ChangedPaths)));
+            lines.Add("Verification evidence: " + (completed.VerificationEvidenceRefs.Count == 0 ? "none" : string.Join(", ", completed.VerificationEvidenceRefs)));
         }
         return string.Join("\n", lines);
     }
@@ -174,30 +142,16 @@ public sealed partial class FactoryRuntime
     {
         if (item.PriorResultRefs.Count == 0) return "none";
         var lines = new List<string>();
-        foreach (var reference in item.PriorResultRefs.TakeLast(3)) lines.Add($"- {reference}: {await ReadResultSummaryAsync(reference, cancellationToken)}");
+        foreach (var reference in item.PriorResultRefs.TakeLast(3)) lines.Add($"- {reference}:\n{await ReadSemanticResultAsync(reference, cancellationToken)}");
         return string.Join("\n", lines);
     }
 
-    private async Task<string> ReadResultSummaryAsync(string relative, CancellationToken cancellationToken)
+    private async Task<string> ReadSemanticResultAsync(string relative, CancellationToken cancellationToken)
     {
         var path = Path.Combine(currentDirectory, relative);
         if (!File.Exists(path)) return "missing result artifact";
-        try
-        {
-            var result = JsonSerializer.Deserialize<PersistedAttemptResult>(await File.ReadAllTextAsync(path, cancellationToken), FactoryJson.Options);
-            var semantic = result?.SemanticResult;
-            var summary = JsonSerializer.Serialize(new
-            {
-                semantic?.Outcome,
-                semantic?.Summary,
-                Concerns = semantic?.Concerns?.Take(8).ToArray(),
-                DeclaredChanges = semantic?.DeclaredChanges?.Take(8).ToArray(),
-                semantic?.Reason,
-                semantic?.Payload
-            }, FactoryJson.Options).Replace("\r\n", "\n").Trim();
-            return summary.Length <= 4000 ? summary : summary[..4000] + " [truncated]";
-        }
-        catch (JsonException) { return "invalid result artifact"; }
+        var result = (await File.ReadAllTextAsync(path, cancellationToken)).Replace("\r\n", "\n").Trim();
+        return result.Length <= 8000 ? result : result[..8000] + "\n[result truncated; see semantic artifact]";
     }
 
     private async Task<string> BuildVerificationObservationsAsync(PlannedWorkItem item, CancellationToken cancellationToken)
@@ -274,7 +228,7 @@ public sealed partial class FactoryRuntime
     private async Task RecoverWorkspaceChangesAsync(FactoryState state, PlannedWorkItem? item, AgentInvocation invocation, CancellationToken cancellationToken)
     {
         if (invocation.ExecutionProfile != AgentExecutionProfile.WorkspaceWrite) return;
-        var directory = Path.GetDirectoryName(invocation.RawResultPath)!;
+        var directory = Path.GetDirectoryName(invocation.SemanticOutputPath)!;
         var changesPath = Path.Combine(directory, "workspace-changes.json");
         WorkspaceChangesArtifact changes;
         if (File.Exists(changesPath)) changes = JsonSerializer.Deserialize<WorkspaceChangesArtifact>(await File.ReadAllTextAsync(changesPath, cancellationToken), FactoryJson.Options)!;
@@ -325,15 +279,20 @@ public sealed partial class FactoryRuntime
         File.Move(temporary, path, true);
     }
 
-    private static BoundSemanticAgentResult ValidatePersistedResult(AgentInvocation invocation, PersistedAttemptResult? persisted)
+    private BoundSemanticResult ValidatePersistedResult(AgentInvocation invocation, PersistedAttemptResult? persisted)
     {
         if (persisted is null || persisted.SchemaVersion != PersistedAttemptResult.CurrentSchemaVersion)
             throw new AgentProtocolException("UNSUPPORTED_ATTEMPT_RESULT_SCHEMA", "Persisted attempt result has an unsupported schema version.");
         var expected = AttemptIdentity.From(invocation);
         if (persisted.Invocation != expected)
             throw new AgentProtocolException("ATTEMPT_RESULT_IDENTITY_MISMATCH", "Persisted attempt result does not belong to its invocation.");
-        var semantic = new FactoryAgentResultValidator().Validate(invocation, persisted.SemanticResult);
-        return new BoundSemanticAgentResult(invocation.AttemptId, semantic);
+        var semanticPath = Path.Combine(currentDirectory, persisted.SemanticResultPath);
+        if (!File.Exists(semanticPath))
+            throw new AgentProtocolException("MISSING_AGENT_RESULT", "Persisted semantic result artifact is missing.");
+        var semantic = File.ReadAllText(semanticPath);
+        if (invocation.Capability == "implementation" && string.IsNullOrWhiteSpace(semantic))
+            throw new AgentProtocolException("MALFORMED_AGENT_RESULT", "Executor semantic result must contain human-readable text.");
+        return new BoundSemanticResult(invocation.AttemptId, semantic, persisted.SemanticResultPath);
     }
 
     private sealed record WorkspaceSnapshotArtifact(int SchemaVersion, SortedDictionary<string, string> Files);

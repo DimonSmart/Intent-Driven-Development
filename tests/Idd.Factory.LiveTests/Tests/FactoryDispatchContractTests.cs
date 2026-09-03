@@ -6,22 +6,22 @@ namespace Idd.Factory.LiveTests.Tests;
 public sealed class FactoryDispatchContractTests
 {
     [Fact]
-    public void ValidateRejectsCoordinatorDispatch()
+    public void ValidateRejectsUnknownSemanticRole()
     {
-        var violations = FactoryDispatchContract.Validate("factory-step-coordinator", "Role:\nfactory-step-coordinator\nAction:\nCONTINUE\n");
-        Assert.Contains(violations, violation => violation.Code == "COORDINATOR_FORBIDDEN");
+        var violations = FactoryDispatchContract.Validate("reviewer", "Role:\nreviewer\n");
+        Assert.Contains(violations, violation => violation.Code == "ROLE_FORBIDDEN");
     }
 
     [Fact]
     public void ValidateRejectsActionForSemanticWorker()
     {
-        var violations = FactoryDispatchContract.Validate("task-decomposer", "Role:\ntask-decomposer\nAction:\nINITIALIZE\n");
+        var violations = FactoryDispatchContract.Validate("planner", "Role:\nplanner\nAction:\nPLAN\n");
         Assert.Contains(violations, violation => violation.Code == "DISPATCH_ACTION_FORBIDDEN");
     }
 
     [Fact]
     public void ValidateAcceptsRoleOnlyDiagnosticPrompt()
     {
-        Assert.Empty(FactoryDispatchContract.Validate("task-decomposer", "Role:\ntask-decomposer\n"));
+        Assert.Empty(FactoryDispatchContract.Validate("planner", "Role:\nplanner\n"));
     }
 }
