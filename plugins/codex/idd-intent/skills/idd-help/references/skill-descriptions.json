@@ -151,55 +151,5 @@
         }
       }
     }
-  },
-  "idd-factory-research": {
-    "description": "Perform one focused read-only research work item in an isolated worker context and return findings for dependent graph work.",
-    "adapters": {
-      "claude": {
-        "frontmatter": {
-          "context": "fork",
-          "agent": "Explore",
-          "argument-hint": "[active research work-item path]",
-          "allowed-tools": ["Read", "Glob", "Grep"]
-        }
-      }
-    }
-  },
-  "idd-factory-review-checkpoint": {
-    "description": "Independently review one intermediate semantic-review graph work item over its covered completed work.",
-    "adapters": {
-      "claude": {
-        "frontmatter": {
-          "context": "fork",
-          "agent": "Explore",
-          "argument-hint": "[active review work-item path]",
-          "allowed-tools": ["Read", "Glob", "Grep", "Bash"]
-        }
-      }
-    }
-  },
-  "idd-factory-review-task": {
-    "description": "Independently review the integrated Factory result as read-only semantic-review graph work.",
-    "adapters": {
-      "claude": {
-        "frontmatter": {
-          "context": "fork",
-          "agent": "Explore",
-          "allowed-tools": ["Read", "Glob", "Grep", "Bash"]
-        }
-      }
-    }
-  },
-  "idd-factory-replan": {
-    "description": "Propose bounded semantic changes to remaining Factory graph work without mutating authoritative runtime state.",
-    "adapters": {
-      "claude": {
-        "frontmatter": {
-          "context": "fork",
-          "agent": "Explore",
-          "allowed-tools": ["Read", "Glob", "Grep"]
-        }
-      }
-    }
   }
 }

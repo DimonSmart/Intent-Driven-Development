@@ -15,11 +15,16 @@ finalization.
 
 Use this skill when the user explicitly invokes IDD Factory or when an
 end-to-end IDD route selects Factory for orchestrated implementation. Read
-`references/intent-preflight.md` completely before a new run or when handling a
-runtime `INTENT_REQUIRED` result. Treat it as the canonical preflight contract.
-Pass the complete user request to intent preparation and the platform launcher
-unchanged. The launcher must use the runtime packaged with this installed plugin
-instance and block until the runtime returns one structured Factory outcome.
+`references/intent-preflight.md` completely before a new run. Treat it as the
+canonical preflight contract.
+For a new run, build one self-contained logical request from the visible user
+request and the exact textual inputs explicitly supplied with it. Preserve all
+user-authored content exactly; mechanically materializing host-local attachment
+references such as `pasted-text.txt` is transport normalization, not a semantic rewrite. Use that same
+logical request for intent preparation and the new-run invocation.
+
+The launcher must use the runtime packaged with this installed plugin instance
+and block until the runtime returns one structured Factory outcome.
 
 ## New-run intent preflight
 
@@ -30,44 +35,55 @@ Before calling the runtime for a new run:
    of initial preflight.
 2. Resolve explicit requested scope. Explicit prohibitions on intent writes or
    implementation take precedence over Factory invocation.
-3. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and only relevant
-   current documents.
-4. Classify the request as `Covered`, `ExplicitIntentChange`,
-   `MissingIntentDecision`, or `ImplementationOnly`.
-5. For an allowed `ExplicitIntentChange`, invoke `idd-intent-change` with the
-   unchanged original request. Let it hand off to `idd-intent-new-document` when
-   normal ownership rules require a new spec, ADR, or spike.
-6. After any intent update, validate semantic coverage against the original
+3. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, only relevant current
+   documents, and any pasted or attached text explicitly supplied as part of
+   the user request. If the host exposes supplied text only through a local
+   request reference, resolve it before classification and materialize its exact
+   content into the logical request. The path or attachment marker itself is
+   transport metadata, not request semantics.
+4. Materialize supplied text losslessly. Prefer the host file/attachment reader.
+   If a host-local supplied-text file must be read directly, decode it as strict
+   UTF-8 rather than using shell-default or locale-dependent text decoding.
+   Reject invalid Unicode or U+FFFD replacement characters. Do not call Factory
+   with an unresolved host-local attachment envelope and do not expand arbitrary
+   file paths that were not explicitly supplied as request input.
+5. Compare every explicit durable claim in the materialized logical request with
+   relevant current intent, then classify it as `Covered`,
+   `ExplicitIntentChange`, `MissingIntentDecision`, or `ImplementationOnly`.
+   A clear request-side contradiction that supersedes current durable behavior
+   takes precedence over `Covered` and `ImplementationOnly`.
+6. For an allowed `ExplicitIntentChange`, invoke `idd-intent-change` with the
+   materialized logical request. Let it hand off to `idd-intent-new-document`
+   when normal ownership rules require a new spec, ADR, or spike.
+7. After any intent update, validate semantic coverage against that same logical
    request as defined by the required reference.
-7. Start Factory only for permitted `end-to-end` or `implementation-only` scope
+8. Start Factory only for permitted `end-to-end` or `implementation-only` scope
    when current intent covers the product semantics or the request is strictly
    `ImplementationOnly`.
 
 Do not call the runtime, create `.idd/factory/current/`, or create Factory work
-items while intent preparation is incomplete or blocked. Missing documentation
-alone is not `INTENT_REQUIRED`.
+items while intent preparation or request materialization is incomplete or
+blocked. Missing documentation alone is not `INTENT_REQUIRED`.
 
 ## Run, continue, and cancel
 
-- For a new run whose preflight is covered, start Factory with the exact user
-  request and resolved absolute workspace.
+- For a new run whose preflight is covered, invoke the packaged runtime's new-run
+  operation with the exact self-contained materialized logical request and
+  resolved absolute workspace. The persisted `request.md` must remain sufficient
+  after any host-local pasted or attachment file disappears.
+- If supplied request text cannot be read losslessly, do not start Factory.
+  Report an input transport/encoding failure; do not summarize around the lost
+  content or continue with replacement characters.
 - For an ordinary existing run, continue Factory without repeating initial
-  preflight or inventing a user answer.
-- When Factory returns `NEEDS_CLARIFICATION`, report the question, collect the
-  user's answer, and continue with that answer unchanged.
-- When Factory returns structured `INTENT_REQUIRED`, compare the missing durable
-  decisions with the unchanged original request and current intent. If the
-  request already resolves them and scope permits writes, use the existing
-  intent workflow outside Factory, validate coverage, and continue the exact
-  persisted operation. Otherwise report the genuinely missing decision and
-  pause for user input.
+  preflight, rematerializing host attachments, or inventing a user answer. The
+  persisted self-contained request is authoritative.
 - Cancellation is explicit. Warn that product changes are preserved; do not
   delete Factory state or revert code in the launcher.
 
 ## Boundaries
 
-- Do not select work items, inspect operational state, route reviews, apply
-  retries, create corrections, choose final review, or finalize files.
+- Do not select work items, inspect operational state, apply retries, create
+  corrections, choose future work, or finalize files.
 - Do not choose a next phase or maintain a second workflow model.
   `FactoryState.Completed`, `Current`, `Remaining`, and runtime-owned
   continuations are authoritative.
@@ -80,12 +96,13 @@ alone is not `INTENT_REQUIRED`.
 - Do not interpret output from semantic workers. Only the runtime outcome is the
   public machine result.
 - `FACTORY_CONFIGURATION_CHANGED`, `LEGACY_FACTORY_STATE`,
-  `CORRUPT_FACTORY_STATE`, and lock outcomes are terminal for the current
-  launcher attempt and must be reported exactly.
+  `CORRUPT_FACTORY_STATE`, `UNMATERIALIZED_REQUEST_INPUT`, and lock outcomes are
+  terminal for the current launcher attempt and must be reported exactly.
 
 ## Reporting
 
-Report separately:
+For a structured result returned by a new-run or continuation operation, report
+separately:
 
 ```text
 Factory outcome: <outcome>
@@ -97,9 +114,19 @@ Intent before/after hash: <hashes when available>
 Intent paths changed: <paths when present>
 ```
 
-When durable intent was updated from the original request before
-implementation, say so explicitly. After reporting the final structured runtime
-outcome, do not perform scheduler work outside the runtime.
+When a read-only runtime status operation is used after a lost or timed-out
+blocking response, its `status` is launcher/runtime ownership state, not a
+Factory outcome. Report it as `Factory status: <status>`. In particular,
+`ACTIVE` must never be reported as `Factory outcome: ACTIVE`: it means the run
+has not finished and no final Factory outcome is available yet. For `ACTIVE`,
+include the current work item, attempt, phase, completed/remaining counts,
+runtime operation, and start time when the status payload provides them, then
+report the returned reason and resume condition. Do not imply that the current
+semantic attempt has completed merely because the workspace remains owned.
+
+When durable intent was updated from the logical request before implementation,
+say so explicitly. After reporting the final structured runtime outcome, do not
+perform scheduler work outside the runtime.
 
 ## Codex launcher
 
@@ -115,8 +142,12 @@ it does not prove that the runtime stopped. If `factory_run` or
 `factory_continue` times out or loses its response, call
 `factory_status` once:
 
-- `ACTIVE`: the original runtime still owns the workspace; do not
-  call `factory_run` or `factory_continue`.
+- `ACTIVE`: the original runtime still owns the workspace; the run
+  has not finished and no Factory outcome is available yet. Report
+  this as `Factory status: ACTIVE`, never `Factory outcome: ACTIVE`.
+  Include current work item, attempt, phase, completed/remaining
+  counts, operation, and start time when returned. Do not call
+  `factory_run` or `factory_continue`.
 - `READY_TO_CONTINUE`: no runtime owns the workspace; resume the
   persisted run once with `factory_continue`.
 - `WAITING_FOR_CONTINUATION`: report the persisted Factory outcome,

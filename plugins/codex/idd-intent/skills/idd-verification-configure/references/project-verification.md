@@ -24,7 +24,7 @@ Do not add Markdown headings or fenced code blocks. Markdown content in
 
 `default.use` is required. A context may have either `use` or ordered `rules`. Rules with `paths` apply only when they cover the complete changed scope; the first matching rule wins. A rule without `paths` is a context fallback and goes last. If none matches, use `default`. Do not merge matching rules or introduce `kind`, `fast`, `standard`, `extended`, `manual`, components, or a rule language.
 
-Use changed paths for `direct`; contract scope plus actual changes for `subtask`; all `Covers` changes for `checkpoint`; and the Factory-run diff for `final`. A Subtask whose actual scope escapes its assigned rule returns `NEEDS_REPLAN`; it does not broaden verification itself.
+Use changed paths for `direct`; contract scope plus actual changes for `subtask`; all `Covers` changes for `checkpoint`; and the Factory-run diff for `final`. Unexpected task scope is recorded as runtime-observed change evidence and is assessed by the planner after the batch is exhausted.
 
 If `.idd/verification.yaml` is missing, continue with the repository/platform fallback: project script, Make/task-runner target, CI command, then the platform default. Report that fallback. Other files, including Markdown files under `.idd/`, do not affect policy discovery or fallback. An existing YAML policy must never silently fall back: invalid YAML, Markdown headings or fenced YAML, an unsupported version, or a schema error blocks policy loading and the current operation. Validate unknown contexts/checks, missing or dual `run`/`instructions`, `confirmation` without `run`, conflicting context `use`/`rules`, rules without `use`, missing `default`, and unsafe rule fallbacks.
 
@@ -34,9 +34,9 @@ For direct non-Factory implementation, completion requires conclusive evidence
 for every assigned check. Missing user action remains `Not verified` and blocks
 approval.
 
-For Factory execution, the deterministic Runtime owns mandatory `subtask`,
-`checkpoint`, and `final` verification. Semantic workers may run focused
+For Factory execution, the deterministic Runtime owns mandatory `subtask` and
+`final` verification. Semantic workers may run focused
 diagnostic commands, but those commands are not authoritative Factory evidence.
 The Runtime records every gate result, distinguishes ordinary failed checks from
-required user action and runner infrastructure failure, and invokes reviewers
-only after the corresponding mandatory gate passes.
+required user action and runner infrastructure failure. Failed subtask checks
+retry the same task; failed final checks trigger a new planning cycle.

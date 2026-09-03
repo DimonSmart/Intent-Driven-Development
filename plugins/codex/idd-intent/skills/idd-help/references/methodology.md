@@ -15,14 +15,14 @@ terminology must not trigger glossary maintenance.
 
 Use `idd-code-implement` for one focused implementation change covered by
 current intent. Use Factory workflows for temporary multi-task planning,
-sequencing, review gates, or coordinated execution across bounded tasks. Factory
+sequencing, or coordinated execution across bounded tasks. Factory
 may be selected automatically for those conditions, but it never becomes
 product intent and must stop when current intent is missing or insufficient.
 
 For Factory terminology, a Request is the original user instruction that
-defines one complete Task. A Factory run decomposes that Task into persisted
-Work items: Subtasks and Review checkpoints. Final Task review validates the
-complete Task result.
+defines one complete Task. A Factory planner repeatedly decomposes that Task
+into bounded ordered batches. Executors complete one task each, and strict
+runtime-owned final verification validates the integrated result.
 
 Guiding rule:
 

@@ -404,27 +404,31 @@ product meaning; otherwise prefer the smallest focused implementation workflow.
 
 Use focused execution when one implementation pass can safely satisfy current
 intent. Use optional `idd-factory-run` only for coordinated multi-task
-implementation, sequencing, temporary planning, review gates, or high-risk
+implementation, sequencing, temporary planning, or high-risk
 preservation boundaries. Factory remains optional and must not become a
 dependency of `idd-intent`.
 
-The original user request defines the Factory Task and is stored unchanged in
-`request.md`. The packaged .NET Factory Runtime owns one resumable run under
-`.idd/factory/current/`; `state.json` is authoritative and stable work-item
-filenames do not encode status. Fresh semantic workers perform decomposition,
-implementation, selective checkpoint reviews, bounded replanning, and final
-review. Programmatic orchestration runs verification, prepares final result
-artifacts, and moves the complete run directory to
-`.idd/factory/results/<timestamp>_<work-slug>/`. The completed result preserves
-state, events, attempts, verification evidence, commit-message handoff, and
-other diagnostics. `.idd/factory/current/` remains reserved for an active or
-resumable run. Neither directory is product intent, and both are ignored by
-default.
+The user's logical request defines the Factory Task. Text explicitly supplied
+through host-local pasted or attachment references is mechanically materialized
+without semantic rewriting before Factory starts. The resulting self-contained
+request is stored in `request.md`; recovery and planning must not
+depend on the temporary host attachment remaining available. The packaged .NET
+Factory Runtime owns one resumable run under `.idd/factory/current/`;
+`state.json` is authoritative and stable work-item filenames do not encode
+status. A fresh planner creates each bounded batch and fresh executors perform
+its tasks sequentially. Executors report results without controlling future
+work. Programmatic orchestration runs verification, replans after exhausted
+batches, prepares final result artifacts, and moves the
+complete run directory to `.idd/factory/results/<timestamp>_<work-slug>/`. The
+completed result preserves state, events, attempts, verification evidence,
+commit-message handoff, and other diagnostics. `.idd/factory/current/` remains
+reserved for an active or resumable run. Neither directory is product intent,
+and both are ignored by default.
 
 Before a new end-to-end Factory run, apply Intent Preflight:
 
 ```text
-original request + requested scope + relevant current intent
+materialized logical request + requested scope + relevant current intent
 -> Covered | ExplicitIntentChange | MissingIntentDecision | ImplementationOnly
 -> optional existing intent workflow
 -> semantic coverage validation
@@ -434,9 +438,9 @@ original request + requested scope + relevant current intent
 Missing or absent documentation is not by itself a missing product decision.
 When the request explicitly and unambiguously defines changed durable behavior,
 update current intent through `idd-intent-change` and, when ownership requires
-it, `idd-intent-new-document`, then start Factory with the same unchanged
-request. `implementation-only` scope forbids that intent update and must stop
-with `INTENT_REQUIRED` if current intent is insufficient.
+it, `idd-intent-new-document`, then start Factory with the same self-contained
+materialized logical request. `implementation-only` scope forbids that intent
+update and must stop with `INTENT_REQUIRED` if current intent is insufficient.
 
 Intent preparation finishes before `.idd/factory/current/` is created. It is
 not a Factory work item and does not change the deterministic
@@ -500,11 +504,11 @@ Verification configuration completes after the confirmed policy is written, or
 a deliberate review concludes that no change is required.
 
 For `end-to-end`, product changes complete after intent is updated and coverage
-is validated against the original request,
-implementation is performed, and `idd-code-check-implementation` verifies
-changed, removed, and preserved behavior. Implementation-only work completes
-after verification proves current intent was preserved. Normalization completes
-after semantic movement is checked and `idd-intent-lint` passes.
+is validated against the materialized logical request, implementation is
+performed, and `idd-code-check-implementation` verifies changed, removed, and
+preserved behavior. Implementation-only work completes after verification proves
+current intent was preserved. Normalization completes after semantic movement
+is checked and `idd-intent-lint` passes.
 
 Initialization completes after project-owned state and the managed instruction
 block are correct, even when bootstrap is declined.
