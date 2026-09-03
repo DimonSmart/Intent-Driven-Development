@@ -11,18 +11,33 @@ public sealed class BatchProtocolTests
     [Fact]
     public void PlannerMarkdownMaterializesOrderedTasks()
     {
-        var tasks = PlannerBatchParser.Parse("# Task\n\nImplement A.\n\n# Task\n\nImplement B.\nPreserve C.\n");
-        Assert.Equal(["Implement A.", "Implement B.\nPreserve C."], tasks);
+        var plan = PlannerBatchParser.Parse("# Task\n\nImplement A.\n\n# Task\n\nImplement B.\nPreserve C.\n");
+        Assert.Equal(["Implement A.", "Implement B.\nPreserve C."], plan);
+        Assert.Null(plan.Question);
     }
 
     [Fact]
-    public void EmptyPlannerOutputMeansNoRemainingWork() =>
-        Assert.Empty(PlannerBatchParser.Parse(" \r\n"));
+    public void PlannerMayReturnOneUserQuestionWhenNoTaskCanBeContracted()
+    {
+        var plan = PlannerBatchParser.Parse("# Question\n\nShould deletion be automatic or require confirmation?\n");
+        Assert.Empty(plan);
+        Assert.Equal("Should deletion be automatic or require confirmation?", plan.Question);
+    }
+
+    [Fact]
+    public void EmptyPlannerOutputMeansNoRemainingWork()
+    {
+        var plan = PlannerBatchParser.Parse(" \r\n");
+        Assert.Empty(plan);
+        Assert.Null(plan.Question);
+    }
 
     [Theory]
     [InlineData("Explanation only")]
     [InlineData("# Task\n\n")]
     [InlineData("# Task\nA\n# Task\n")]
+    [InlineData("# Question\nA?\n# Question\nB?")]
+    [InlineData("# Task\nA\n# Question\nB?")]
     public void MalformedPlannerOutputIsRejected(string output) =>
         Assert.Equal("MALFORMED_PLANNER_OUTPUT", Assert.Throws<AgentProtocolException>(() => PlannerBatchParser.Parse(output)).Code);
 
