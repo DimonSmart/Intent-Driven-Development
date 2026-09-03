@@ -39,16 +39,6 @@ public static class EfficiencyReportWriter
         text.AppendLine("|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
         foreach (var agent in data.Agents.OrderByDescending(agent => agent.InputTokens)) text.AppendLine($"| {Cell(Short(agent.ThreadId))} | {Cell(agent.Role)} | {Cell(agent.WorkItem ?? agent.Action)} | {Number(agent.InputTokens)} | {Number(agent.CachedInputTokens)} | {Number(agent.FreshInputTokens)} | {Percent(agent.CachedInputPercentage)} | {Number(agent.OutputTokens)} | {agent.ToolCallCount} | {agent.FailedToolCalls} | {agent.FileReads} | {agent.UniqueFileReads} | {agent.RepeatedFileReads} | {Duration(agent.WaitAgentMs)} |");
 
-        text.AppendLine("\n## Worker results\n");
-        var resultAgents = data.Agents.Where(agent => agent.TerminalResult is not null).ToArray();
-        if (resultAgents.Length == 0) text.AppendLine("None observed.");
-        else
-        {
-            text.AppendLine("| Thread | Role | Work item | Result | Detail |");
-            text.AppendLine("|---|---|---|---|---|");
-            foreach (var agent in resultAgents) text.AppendLine($"| {Cell(Short(agent.ThreadId))} | {Cell(agent.Role)} | {Cell(agent.WorkItem)} | {Cell(agent.TerminalResult!.Kind)} | {Cell(agent.TerminalResult.Detail)} |");
-        }
-
         text.AppendLine("\n## Token progression\n");
         foreach (var agent in data.Agents.Where(agent => agent.TokenProgression.Count > 0))
         {

@@ -4,7 +4,6 @@ public sealed class FactoryEvalMetrics
 {
     public int SchemaVersion { get; init; } = 1;
     public string? FactoryOutcome { get; set; }
-    public long ExpectedMinimumSpawnedAgents { get; init; } = 2;
     public string? ModelEffective { get; set; }
     public string? ReasoningEffortEffective { get; set; }
     public string? SessionId { get; set; }

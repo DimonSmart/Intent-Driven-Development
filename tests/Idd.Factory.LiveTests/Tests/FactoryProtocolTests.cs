@@ -131,17 +131,14 @@ public sealed class FactoryProtocolTests
     }
 
     [Fact]
-    public void CodexRun_PutsFinalOnlyResponseSchemaInPrompt()
+    public void CodexRun_IncludesFinalResponseSchemaInPrompt()
     {
         var caseDirectory = Path.Combine(RepositoryRootFinder.Find(), "tests", "Idd.Factory.LiveTests", "Cases", "TwoStepCatalog");
+        var schema = File.ReadAllText(Path.Combine(caseDirectory, "final-response.schema.json")).Trim();
 
         var prompt = LocalFactoryEvalEnvironment.BuildRunCodexPrompt(caseDirectory);
 
-        Assert.Contains("Use $idd-factory-run", prompt, StringComparison.Ordinal);
-        Assert.Contains("applies only to your final response", prompt, StringComparison.Ordinal);
-        Assert.Contains("Intermediate progress messages must remain natural-language progress", prompt, StringComparison.Ordinal);
-        Assert.Contains("\"schemaVersion\"", prompt, StringComparison.Ordinal);
-        Assert.Contains("\"factoryOutcome\"", prompt, StringComparison.Ordinal);
+        Assert.Contains(schema, prompt, StringComparison.Ordinal);
     }
 
     [Fact]

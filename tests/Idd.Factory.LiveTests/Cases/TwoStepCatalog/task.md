@@ -3,15 +3,9 @@ Use $idd-factory-run to implement the current product intent described in
 
 This is an IDD Factory evaluation.
 
-Organize the implementation as exactly two implementation Subtasks:
-
-1. Establish the reusable ProductCode normalization, validation, and equality contract.
-2. Integrate ProductCode into Catalog, duplicate detection, and Summary.
-
-The second Subtask depends on the public behavior established by the first.
-Create exactly one independent Review checkpoint after the first Subtask and before the second Subtask.
+Plan and execute the work according to the current Factory workflow. Do not assume a fixed number of tasks or semantic workers in advance.
 Do not change durable product intent, add external packages, or modify prepared tests except to repair an objective test infrastructure error.
-Complete all required verification and final integrated review.
+Complete the product work and all required verification.
 
 After the Factory attempt finishes or stops, return only one JSON object
 matching final-response.schema.json.

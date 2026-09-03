@@ -73,7 +73,6 @@ public static class FactoryRuntimeTraceReader
         public string Id { get; } = id;
         public string Role { get; set; } = "unknown";
         public string? WorkItem { get; set; }
-        public string? Outcome { get; set; }
         public DateTimeOffset? StartedAt { get; set; }
         public DateTimeOffset? CompletedAt { get; set; }
         public bool CompletionWasRecorded { get; set; }
@@ -177,7 +176,7 @@ public static class FactoryRuntimeTraceReader
             return new(Id, root, Role, WorkItem, null, status, StartedAt, CompletedAt, duration, TurnCount, ToolCallCount, Input, Cached, Output, Reasoning,
                 Input is not null && Output is not null ? Input + Output : null, fresh, cachePercentage, FailedToolCallCount, RejectedToolCallCount,
                 RetryOrFallbackCallCount, FileReadCount, UniqueFileReadCount, RepeatedFileReadCount, FileReadBytes, WaitAgentMs,
-                DispatchCharacters, DispatchUtf8Bytes, TokenProgression, ToolCalls, FileReads, DispatchReferences, null);
+                DispatchCharacters, DispatchUtf8Bytes, TokenProgression, ToolCalls, FileReads, DispatchReferences);
         }
 
         private static long? Number(JsonElement value, params string[] names)

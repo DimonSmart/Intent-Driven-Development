@@ -42,7 +42,6 @@ public sealed class FactoryRuntimeTraceReaderTests
             Assert.Equal("executor", incomplete.Role);
             Assert.Equal("catalog", incomplete.WorkItem);
             Assert.Equal("result-produced", incomplete.Status);
-            Assert.Null(incomplete.TerminalResult);
             Assert.Equal(2, incomplete.ToolCallCount);
             Assert.Equal(1, incomplete.FileReadCount);
             Assert.Equal(1, incomplete.UniqueFileReadCount);

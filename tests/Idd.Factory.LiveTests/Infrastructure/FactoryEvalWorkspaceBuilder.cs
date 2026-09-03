@@ -7,9 +7,6 @@ public sealed class FactoryEvalWorkspaceBuilder
     public FactoryEvalWorkspace Create(string repositoryRoot)
         => Create(repositoryRoot, "TwoStepCatalog", copyTemplate: true);
 
-    public FactoryEvalWorkspace CreateTelemetryProbe(string repositoryRoot)
-        => Create(repositoryRoot, "CodexSubagentTelemetry", copyTemplate: false);
-
     public FactoryEvalWorkspace CreateWorkspaceWriteProbe(string repositoryRoot, string discoveryId, string launchProfile)
     {
         var attemptId = $"{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"[..24];

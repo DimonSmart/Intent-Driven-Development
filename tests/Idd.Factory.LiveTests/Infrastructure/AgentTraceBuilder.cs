@@ -47,7 +47,7 @@ public sealed class AgentTraceBuilder(CodexRolloutReader? reader = null)
                         spawnParents.TryAdd(child.ThreadId, rollout.ThreadId);
                         if (included.TryAdd(child.ThreadId, child)) changed = true;
                     }
-                    else if (child.ParentThreadId is not null && !string.Equals(child.ParentThreadId, rollout.ThreadId, StringComparison.Ordinal)) diagnostics.Add(new("TRACE_PARENT_CONFLICT", "warning", "Session metadata takes precedence over the structured spawn event.", child.ThreadId, child.File));
+                    else if (!string.Equals(child.ParentThreadId, rollout.ThreadId, StringComparison.Ordinal)) diagnostics.Add(new("TRACE_PARENT_CONFLICT", "warning", "Session metadata takes precedence over the structured spawn event.", child.ThreadId, child.File));
                     if (analysis.SpawnPrompts.TryGetValue(childId, out var prompt)) spawnPrompts.TryAdd(childId, prompt);
                 }
             }
@@ -63,17 +63,10 @@ public sealed class AgentTraceBuilder(CodexRolloutReader? reader = null)
     private static AgentTraceNode ToNode(CodexRollout rollout, CodexRolloutAnalysis analysis, string rootThreadId, string? spawnParent, string? spawnPrompt, bool interrupted, ICollection<AgentTraceDiagnostic> diagnostics)
     {
         var role = rollout.ThreadId == rootThreadId ? "factory-root" : NormalizeRole(rollout.MetadataRole) ?? Role(spawnPrompt) ?? Role(analysis.DispatchMessage) ?? "unknown";
-        if (role == "unknown") diagnostics.Add(new("TRACE_ROLE_UNKNOWN", "info", "The Factory role could not be determined from rollout metadata or dispatch message.", rollout.ThreadId, rollout.File));
+        if (role == "unknown") diagnostics.Add(new("TRACE_ROLE_UNKNOWN", "info", "The Factory role could not be determined from rollout metadata or fallback telemetry.", rollout.ThreadId, rollout.File));
         var dispatch = spawnPrompt ?? analysis.DispatchMessage;
-        var action = FactoryDispatchContract.ReadAction(dispatch);
         var workItem = WorkItem(dispatch);
-        if (action == "INITIALIZE") workItem = null;
         var status = analysis.Status ?? (interrupted ? "interrupted" : "unknown");
-        var violations = FactoryDispatchContract.Validate(role, dispatch);
-        foreach (var violation in violations)
-            diagnostics.Add(new(violation.Code, "warning", violation.Message, rollout.ThreadId, rollout.File));
-        if (violations.Count > 0)
-            status = "protocol-invalid";
         var duration = rollout.StartedAt is not null && analysis.CompletedAt is not null ? (long?)(analysis.CompletedAt.Value - rollout.StartedAt.Value).TotalMilliseconds : null;
         var tokens = analysis.TokenUsage;
         var fresh = Fresh(tokens?.InputTokens, tokens?.CachedInputTokens);
@@ -88,9 +81,8 @@ public sealed class AgentTraceBuilder(CodexRolloutReader? reader = null)
         var turnCount = analysis.TurnCount > 0 ? analysis.TurnCount : codeMode.ModelTurns;
         var dispatchText = dispatch ?? string.Empty;
         var dispatchReferences = analysis.DispatchReferences.Concat(CodexRolloutReader.ReadDispatchReferences(spawnPrompt, rollout.WorkingDirectory)).DistinctBy(reference => reference.Path, StringComparer.OrdinalIgnoreCase).ToArray();
-        var terminalResult = CodexWorkerResultReader.TryRead(rollout, role, diagnostics);
-        return new(rollout.ThreadId, rollout.ThreadId == rootThreadId ? null : rollout.ParentThreadId ?? spawnParent, role, workItem, action, status, rollout.StartedAt, analysis.CompletedAt, duration, turnCount, analysis.ToolCallCount, tokens?.InputTokens, tokens?.CachedInputTokens, tokens?.OutputTokens, tokens?.ReasoningOutputTokens, tokens?.TotalTokens,
-            fresh, Percentage(tokens?.CachedInputTokens, tokens?.InputTokens), toolCalls.Count(call => call.IsFailure), toolCalls.Count(call => call.IsRejected), toolCalls.Count(call => call.IsRetryOrFallback), fileReads.Length, readsByPath.Count(), repeatedReads, fileReads.Sum(read => read.ReturnedBytes), waitMs, dispatchText.Length, Encoding.UTF8.GetByteCount(dispatchText), analysis.TokenProgression, toolCalls, fileReads, dispatchReferences, terminalResult);
+        return new(rollout.ThreadId, rollout.ThreadId == rootThreadId ? null : rollout.ParentThreadId ?? spawnParent, role, workItem, null, status, rollout.StartedAt, analysis.CompletedAt, duration, turnCount, analysis.ToolCallCount, tokens?.InputTokens, tokens?.CachedInputTokens, tokens?.OutputTokens, tokens?.ReasoningOutputTokens, tokens?.TotalTokens,
+            fresh, Percentage(tokens?.CachedInputTokens, tokens?.InputTokens), toolCalls.Count(call => call.IsFailure), toolCalls.Count(call => call.IsRejected), toolCalls.Count(call => call.IsRetryOrFallback), fileReads.Length, readsByPath.Count(), repeatedReads, fileReads.Sum(read => read.ReturnedBytes), waitMs, dispatchText.Length, Encoding.UTF8.GetByteCount(dispatchText), analysis.TokenProgression, toolCalls, fileReads, dispatchReferences);
     }
 
     private static void ApplyProcessToolFailureFallback(AgentTraceNode[] nodes, CodexRollout root, string rootThreadId, ICollection<AgentTraceDiagnostic> diagnostics)

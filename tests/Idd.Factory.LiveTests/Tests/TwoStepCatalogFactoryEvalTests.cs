@@ -196,23 +196,22 @@ public sealed class TwoStepCatalogFactoryEvalTests
             return;
         }
 
-        var byId = trace.Agents.ToDictionary(agent => agent.ThreadId, StringComparer.Ordinal);
-        var roleCounts = trace.Agents.GroupBy(agent => agent.Role, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
-        var expectedRoleCounts = new Dictionary<string, int>(StringComparer.Ordinal)
+        var allowedRoles = new HashSet<string>(["factory-root", "planner", "executor"], StringComparer.Ordinal);
+        assertions.Require(trace.Agents.All(agent => allowedRoles.Contains(agent.Role)), "Orchestration failure", "Semantic roles", $"Expected only factory-root, planner, and executor roles; actual roles: {string.Join(", ", trace.Agents.Select(agent => agent.Role).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal))}.");
+        assertions.Require(trace.Agents.Count(agent => agent.Role == "factory-root") == 1, "Orchestration failure", "Single runtime root", "Expected exactly one programmatic Factory root.");
+
+        var workers = trace.Agents.Where(agent => agent.Role != "factory-root").OrderBy(agent => agent.StartedAt).ThenBy(agent => agent.ThreadId, StringComparer.Ordinal).ToArray();
+        assertions.Require(workers.Length > 0 && workers.Any(agent => agent.Role == "planner") && workers.Any(agent => agent.Role == "executor"), "Orchestration failure", "Planning and execution observed", "Expected the run to contain planning and execution workers.");
+        assertions.Require(workers.All(agent => agent.ParentThreadId == trace.RootThreadId), "Orchestration failure", "Runtime topology", "Expected all semantic workers to be direct subprocesses of the programmatic Factory root; reviewer/coordinator paths are not allowed.");
+        assertions.Require(workers.All(agent => agent.Status == "completed"), "Orchestration failure", "Agent completion", "Expected every semantic subprocess worker to complete.");
+
+        var timestampsAvailable = workers.All(agent => agent.StartedAt is not null && agent.CompletedAt is not null);
+        assertions.Require(timestampsAvailable, "Orchestration failure", "Worker timing", "Expected runtime telemetry to contain start and completion timestamps for every semantic worker.");
+        if (timestampsAvailable)
         {
-            ["factory-root"] = 1,
-            ["planner"] = 2,
-            ["executor"] = 2
-        };
-        assertions.Require(roleCounts.Count == expectedRoleCounts.Count && expectedRoleCounts.All(expected => roleCounts.GetValueOrDefault(expected.Key) == expected.Value), "Orchestration failure", "Semantic roles", $"Expected roles {FormatCounts(expectedRoleCounts)}; actual roles {FormatCounts(roleCounts)}.");
-
-        var rootChildren = trace.Agents.Where(agent => agent.ParentThreadId == trace.RootThreadId).ToArray();
-        assertions.Require(rootChildren.Length == 4 && rootChildren.Count(agent => agent.Role == "planner") == 2 && rootChildren.Count(agent => agent.Role == "executor") == 2, "Orchestration failure", "Runtime topology", "Expected two planning and two execution subprocesses with no semantic coordinator or reviewer.");
-        assertions.Require(!trace.Agents.Any(agent => agent.Role == "factory-step-coordinator"), "Orchestration failure", "Coordinator absence", "Expected factory-step-coordinator count to be zero.");
-        assertions.Require(!trace.Agents.Any(agent => agent.Role == "factory-replanner"), "Orchestration failure", "Happy-path replan absence", "Expected factory-replanner count to be zero on the happy path.");
-        assertions.Require(trace.Agents.Where(agent => agent.Role != "factory-root").All(agent => agent.Status == "completed"), "Orchestration failure", "Agent completion", "Expected every semantic subprocess worker to complete.");
+            var sequential = workers.Zip(workers.Skip(1), (previous, next) => previous.CompletedAt <= next.StartedAt).All(value => value);
+            assertions.Require(sequential, "Orchestration failure", "Sequential execution", "Expected semantic workers to execute sequentially without overlap.");
+        }
     }
-
-    private static string FormatCounts(IReadOnlyDictionary<string, int> counts) => string.Join(", ", counts.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => $"{item.Key}={item.Value}"));
 
 }
