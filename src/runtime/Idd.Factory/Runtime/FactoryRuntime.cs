@@ -56,6 +56,8 @@ public sealed partial class FactoryRuntime(
         };
         await stateStore.CreateAsync(state, cancellationToken);
         await events.WriteAsync(state.RunId, "run-created", new { configurationHash = configuration.Hash }, cancellationToken);
+        var baselineStop = await RunRepositoryFallbackBaselineAsync(state, cancellationToken);
+        if (baselineStop is not null) return baselineStop;
         return await ExecuteLoopAsync(state, cancellationToken);
     }
 
@@ -75,6 +77,11 @@ public sealed partial class FactoryRuntime(
             var resolved = await ResolvePendingVerificationActionAsync(state, pending, confirmation, verificationPassed, cancellationToken);
             if (resolved is not null) return resolved;
         }
+        if (state.PlanningCycleCount == 0 && state.Current is null && state.PendingContinuation is null)
+        {
+            var baselineStop = await RunRepositoryFallbackBaselineAsync(state, cancellationToken);
+            if (baselineStop is not null) return baselineStop;
+        }
         state.Blocker = null;
         state.RunStatus = FactoryRunStatus.Running;
         if (state.Current is not null && state.CurrentPhase == CurrentWorkPhase.Blocked) state.CurrentPhase = CurrentWorkPhase.Ready;
@@ -90,6 +97,52 @@ public sealed partial class FactoryRuntime(
         state.PendingContinuation = new(ContinuationKind.Terminal, state.Current?.Id, null, "CANCELLED", false);
         await SaveAsync(state, cancellationToken);
         return new("CANCELLED", state.RunId, "Product changes and Factory diagnostics were preserved.");
+    }
+
+    private async Task<FactoryCliOutcome?> RunRepositoryFallbackBaselineAsync(FactoryState state, CancellationToken cancellationToken)
+    {
+        if (File.Exists(Path.Combine(workspace, ".idd", "verification.yaml"))) return null;
+
+        var baseline = await verification.RunContextAsync("final", cancellationToken);
+        RecordEvidence(state, null, baseline.Evidence);
+        var evidenceRefs = baseline.Evidence.Select(x => $"verification/{x.EvidenceId}.json").ToArray();
+        await events.WriteAsync(state.RunId, "repository-fallback-baseline", new { baseline.Status, evidenceRefs }, cancellationToken);
+
+        if (baseline.Status is VerificationStatus.Passed or VerificationStatus.NoChecks)
+        {
+            if (baseline.Evidence.Count > 0) await SaveAsync(state, cancellationToken);
+            return null;
+        }
+
+        var checkIds = baseline.Evidence.Select(x => x.CheckId).Distinct(StringComparer.Ordinal).ToArray();
+        var checkSummary = checkIds.Length == 0 ? "repository fallback" : string.Join(", ", checkIds);
+        var evidenceSummary = evidenceRefs.Length == 0 ? "none" : string.Join(", ", evidenceRefs);
+        var terminal = new PendingContinuation(ContinuationKind.Terminal, null, null, "BASELINE_VERIFICATION", false);
+
+        return baseline.Status switch
+        {
+            VerificationStatus.Failed => await StopAsync(
+                state,
+                "BASELINE_VERIFICATION_FAILED",
+                $"Repository fallback baseline failed before Factory planning. Failed checks: {checkSummary}. Evidence: {evidenceSummary}.",
+                "Fix the repository baseline, then cancel/restart the Factory run.",
+                cancellationToken,
+                terminal),
+            VerificationStatus.InfrastructureFailure => await StopAsync(
+                state,
+                "BASELINE_VERIFICATION_INFRASTRUCTURE_FAILURE",
+                $"Repository fallback baseline could not execute before Factory planning. Checks: {checkSummary}. Evidence: {evidenceSummary}.",
+                "Fix the verification infrastructure, then cancel/restart the Factory run.",
+                cancellationToken,
+                terminal),
+            _ => await StopAsync(
+                state,
+                "BASELINE_VERIFICATION_ACTION_REQUIRED",
+                $"Repository fallback baseline ended as {baseline.Status} before Factory planning.",
+                "Resolve the baseline verification condition, then cancel/restart the Factory run.",
+                cancellationToken,
+                terminal)
+        };
     }
 
     private async Task<FactoryCliOutcome> ExecuteLoopAsync(FactoryState state, CancellationToken cancellationToken)

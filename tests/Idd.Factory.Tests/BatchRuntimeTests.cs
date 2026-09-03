@@ -94,4 +94,54 @@ public sealed class BatchRuntimeTests
         Assert.Equal(3, backend.Invocations.Count(x => x.Capability == "planning"));
         Assert.True(File.Exists(Path.Combine(temp.Path, "marker.txt")));
     }
+
+    [Fact]
+    public async Task FailingRepositoryFallbackBaselineStopsBeforePlanning()
+    {
+        using var temp = new TestWorkspace();
+        WriteRepositoryFallback(temp, 7);
+        var backend = new FakeAgentBackend();
+
+        var outcome = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend)
+            .RunRequestAsync("Do not plan against a red repository.", "test", default);
+
+        Assert.Equal("BASELINE_VERIFICATION_FAILED", outcome.FactoryOutcome);
+        Assert.Contains("repository-fallback", outcome.Reason);
+        Assert.Empty(backend.Invocations);
+        var state = await FactoryRuntimeTestHarness.LoadState(temp.Path);
+        Assert.Equal(FactoryRunStatus.Blocked, state.RunStatus);
+        Assert.Equal("BASELINE_VERIFICATION_FAILED", state.Blocker!.Code);
+        Assert.NotNull(state.PendingContinuation);
+        Assert.False(state.PendingContinuation!.IsResumable);
+        Assert.Single(state.VerificationEvidenceRefs);
+    }
+
+    [Fact]
+    public async Task ExistingVerificationPolicySkipsRepositoryFallbackBaseline()
+    {
+        using var temp = new TestWorkspace();
+        WriteRepositoryFallback(temp, 7);
+        temp.Write(".idd/verification.yaml", "version: 1\nchecks: {}\ndefault:\n  use: []\n");
+        var backend = new FakeAgentBackend();
+        backend.Enqueue(_ => "");
+
+        var outcome = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend)
+            .RunRequestAsync("Use the configured verification policy.", "test", default);
+
+        Assert.Equal("COMPLETED", outcome.FactoryOutcome);
+        Assert.Single(backend.Invocations);
+        Assert.Equal("planning", backend.Invocations[0].Capability);
+    }
+
+    private static void WriteRepositoryFallback(TestWorkspace temp, int exitCode)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            temp.Write("scripts/Check.ps1", $"exit {exitCode}\n");
+            return;
+        }
+
+        var path = temp.Write("scripts/check.sh", $"#!/bin/sh\nexit {exitCode}\n");
+        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+    }
 }
