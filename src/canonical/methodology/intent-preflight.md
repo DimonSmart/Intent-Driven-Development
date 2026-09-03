@@ -18,8 +18,7 @@ Use:
 
 - the complete visible user request;
 - any pasted or attached textual content explicitly supplied by the user as part
-  of that request, including content that the host represents only by a
-  request-local file or attachment reference;
+  of that request;
 - requested scope;
 - `.idd/intent/README.md` and `.idd/intent/INDEX.md`;
 - only current intent documents relevant to the request;
@@ -38,7 +37,7 @@ Materialization is a transport normalization, not a semantic transformation:
 - preserve the supplied text exactly, including whitespace and Unicode, while
   replacing host-only attachment dependence with the exact content;
 - prefer the host's file/attachment reader when it provides the supplied text;
-  when a local text file such as Codex `pasted-text.txt` must be decoded, use
+- when a local text file such as Codex `pasted-text.txt` must be decoded, use
   strict UTF-8 rather than shell-default or locale-dependent decoding;
 - reject invalid Unicode or U+FFFD replacement characters instead of silently
   continuing with corrupted text;
@@ -48,8 +47,8 @@ Materialization is a transport normalization, not a semantic transformation:
   preparation and the request passed to Factory Runtime.
 
 The resulting Factory request must be self-contained: interpreting
-`request.md`, resuming the run, and performing final verification must not require a
-host-local temporary attachment to still exist.
+`request.md`, resuming the run, and performing final verification must not
+require a host-local temporary attachment to still exist.
 
 Do not read the entire intent tree by default. Missing documentation is evidence
 about storage, not proof that a product decision is missing.
@@ -68,21 +67,15 @@ Explicit scope limits override the normal meaning of an explicit
 ## Classification
 
 Classify the logical request relation to current intent as exactly one of:
+`Covered`, `ExplicitIntentChange`, `MissingIntentDecision`, or
+`ImplementationOnly`.
 
 Before choosing a relation, compare every explicit durable claim in the
-materialized logical request with the relevant current intent. An explicit
-claim that adds or supersedes observable behavior, a durable architecture
-boundary, or a platform/safety/compatibility constraint is
-`ExplicitIntentChange` when the request supplies the decision. Do not classify
-such a request as `Covered` merely because the surrounding feature already has
-an owning specification, and do not classify it as `ImplementationOnly` merely
-because the request also contains concrete implementation instructions.
-
-A concrete technical setting can be private implementation detail or durable
-intent depending on context. When current intent normatively fixes that setting
-as part of supported product/platform behavior and the request explicitly
-changes it to enable the requested behavior, the contradiction is a durable
-intent change and must be resolved before Factory starts.
+materialized logical request with the relevant current intent. An explicit claim
+that adds or supersedes observable behavior, a durable architecture boundary,
+or a platform/safety/compatibility constraint is `ExplicitIntentChange` when
+the request supplies the decision. Do not classify such a request as `Covered`
+merely because the surrounding feature already has an owning specification.
 
 ### `Covered`
 
@@ -94,14 +87,11 @@ start Factory immediately.
 
 The request explicitly defines new or changed durable product behavior and
 contains the decisions needed to record it safely. This includes clear changes
-that supersede current intent. A contradiction with old intent is not a blocker
-when the request unambiguously states the new authoritative behavior.
+that supersede current intent.
 
 For end-to-end or intent-only scope, invoke the existing `idd-intent-change`
-workflow with the materialized logical request, classification, scope, and
-relevant current intent. That workflow may hand off to
-`idd-intent-new-document` for a distinct owner, ADR, or spike. Do not reproduce
-document-ownership or formatting logic in preflight.
+workflow with the materialized logical request. That workflow may hand off to
+`idd-intent-new-document` for a distinct owner, ADR, or spike.
 
 For implementation-only scope, do not write intent; return `INTENT_REQUIRED`
 because the authorized durable source remains insufficient.
@@ -109,18 +99,8 @@ because the authorized durable source remains insufficient.
 ### `MissingIntentDecision`
 
 A durable product decision required for safe implementation cannot be
-determined from either the logical request or current intent. Return
-`INTENT_REQUIRED` only with a non-empty `missingIntentDecisions` payload. Each
-item contains:
-
-```text
-area
-whyBlocking
-requiredDecisions[]
-intentReferences[]
-recommendedNextWorkflow?
-```
-
+determined from either the logical request or current intent. Before a new run,
+return `INTENT_REQUIRED` with a concise description of the missing decisions.
 Do not use this result merely to ask that an already explicit request be copied
 into a specification.
 
@@ -139,7 +119,7 @@ implementation detail.
 
 Technical uncertainty is not automatically missing intent. When product and
 safety semantics are known but the implementation approach needs investigation,
-preflight succeeds and Factory may plan a `research` work item.
+preflight succeeds and Factory may plan implementation or research work.
 
 Use an intent-side spike only when research is required to choose durable
 product or architecture semantics themselves.
@@ -171,9 +151,9 @@ Factory. Validate that:
 - no other unresolved durable decision remains;
 - private implementation suggestions did not become normative product shape.
 
-Coverage produces `Covered` or `MissingIntentDecision`. Do not defer a coverage
-gap to a Factory worker. If the intent workflow or coverage check fails, do not
-start Factory or create Factory work items.
+Coverage produces `Covered` or `MissingIntentDecision`. Do not defer a known
+initial coverage gap to a Factory worker. If the intent workflow or coverage
+check fails, do not start Factory or create Factory work items.
 
 ## Evidence and recovery
 
@@ -192,16 +172,31 @@ An intent update completes before the runtime launcher is called. If the later
 runtime launch fails, keep the durable intent change; do not roll it back
 automatically.
 
-## Existing runs
+## Existing runs and planner questions
 
-Do not repeat initial preflight or rematerialize host attachments for an ordinary
-continue. A valid persisted run already owns a self-contained `request.md`.
-Runtime-level `INTENT_REQUIRED` remains valid when planning, research,
-implementation, or review discovers a genuinely missing durable decision.
+Do not repeat initial preflight or rematerialize host attachments for an
+ordinary continue. A valid persisted run already owns a self-contained
+`request.md`.
 
-When an existing run returns structured `missingIntentDecisions`, compare those
-decisions with the persisted logical Factory request and current intent. If the
-request already supplies them and scope permits intent writes, invoke the
-existing intent workflow, validate coverage, then continue the exact persisted
-Factory operation. If a decision is genuinely absent, ask the user and preserve
-the run. Factory implementation and research workers never edit intent.
+A running Factory may later reach `USER_DECISION_REQUIRED` only at a planning
+boundary after all currently contractable work is exhausted. This is not a
+worker-generated `intent-required` outcome. The planner supplies one concrete
+question because no next task can be safely contracted without a user decision.
+
+When the user answers:
+
+1. Treat the persisted planner question plus the user's exact answer as the
+   bounded semantic input for deciding whether durable intent changes.
+2. If the answer adds or changes durable product truth and scope permits intent
+   writes, invoke the ordinary `idd-intent-change` workflow and validate
+   coverage before resuming Factory.
+3. If the answer is only an implementation choice, do not write durable intent.
+4. Pass the user's exact answer to the same Factory run through
+   `factory_continue`. Runtime records it separately from immutable `request.md`
+   and the next planner receives it as evidence.
+5. If the user declines to continue, cancel the run. Do not invent an answer.
+
+The planner does not decide whether the answer belongs in intent, executors do
+not request this pause, and runtime does not interpret the answer's product
+meaning. This keeps the semantic decision in IDD while runtime owns only durable
+pause/resume mechanics.
