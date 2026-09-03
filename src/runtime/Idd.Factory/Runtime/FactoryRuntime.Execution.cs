@@ -169,24 +169,58 @@ public sealed partial class FactoryRuntime
         return result.Length <= 8000 ? result : result[..8000] + "\n[result truncated; see semantic artifact]";
     }
 
-    private async Task<string> BuildVerificationObservationsAsync(PlannedWorkItem item, CancellationToken cancellationToken)
+    internal async Task<string> BuildVerificationObservationsAsync(PlannedWorkItem item, CancellationToken cancellationToken)
     {
         var failures = await ReadFailedVerificationEvidenceAsync(item, cancellationToken);
         if (failures.Count == 0) return "none";
 
-        var observations = new List<string>();
-        foreach (var (reference, evidence) in failures)
+        var currentReferences = item.LastVerificationEvidenceRefs.Count == 0
+            ? failures.Select(x => x.Reference).ToHashSet(StringComparer.Ordinal)
+            : item.LastVerificationEvidenceRefs.ToHashSet(StringComparer.Ordinal);
+        var currentFailures = failures.Where(x => currentReferences.Contains(x.Reference)).ToList();
+        var historicalFailures = failures.Where(x => !currentReferences.Contains(x.Reference)).ToList();
+        var observations = new List<string> { "Current authoritative verification failures:" };
+
+        if (currentFailures.Count == 0)
         {
-            observations.Add($"- Check: {evidence.CheckId}");
-            observations.Add($"  Status: {evidence.Status}");
-            observations.Add($"  Exit code: {evidence.ExitCode}");
-            observations.Add($"  Evidence: {reference}");
-            observations.Add("");
-            observations.Add("  Relevant output:");
-            foreach (var line in BoundedVerificationOutput(evidence.Output).Replace("\r\n", "\n").Split('\n'))
-                observations.Add($"  {line}");
+            observations.Add("none");
         }
+        else
+        {
+            foreach (var failure in currentFailures)
+            {
+                AppendVerificationMetadata(observations, failure.Reference, failure.Evidence);
+                observations.Add("");
+                observations.Add("  Relevant output:");
+                foreach (var line in BoundedVerificationOutput(failure.Evidence.Output).Replace("\r\n", "\n").Split('\n'))
+                    observations.Add($"  {line}");
+            }
+        }
+
+        observations.Add("");
+        observations.Add("Historical verification failures:");
+        if (historicalFailures.Count == 0)
+        {
+            observations.Add("none");
+        }
+        else
+        {
+            foreach (var failure in historicalFailures)
+            {
+                AppendVerificationMetadata(observations, failure.Reference, failure.Evidence);
+                observations.Add("");
+            }
+        }
+
         return string.Join("\n", observations).TrimEnd();
+    }
+
+    private static void AppendVerificationMetadata(List<string> observations, string reference, VerificationEvidence evidence)
+    {
+        observations.Add($"- Check: {evidence.CheckId}");
+        observations.Add($"  Status: {evidence.Status}");
+        observations.Add($"  Exit code: {evidence.ExitCode}");
+        observations.Add($"  Evidence: {reference}");
     }
 
     private async Task<string> BuildRetryBudgetExhaustedMessageAsync(PlannedWorkItem item, CancellationToken cancellationToken)

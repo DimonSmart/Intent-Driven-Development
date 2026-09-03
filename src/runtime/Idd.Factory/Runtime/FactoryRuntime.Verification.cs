@@ -56,6 +56,8 @@ public sealed partial class FactoryRuntime
             {
                 var fallback = await verification.RunContextAsync(context, session.ChangedPaths, cancellationToken);
                 RecordEvidence(state, item, fallback.Evidence);
+                if (fallback.Status is VerificationStatus.Passed or VerificationStatus.NoChecks or VerificationStatus.Failed)
+                    RecordLastVerificationCycle(item, fallback.Evidence.Select(x => $"verification/{x.EvidenceId}.json"));
                 switch (fallback.Status)
                 {
                     case VerificationStatus.Passed:
@@ -92,6 +94,7 @@ public sealed partial class FactoryRuntime
                             $"Authoritative verification requires user action: {fallback.Status}.", fallback.Evidence, cancellationToken);
                 }
             }
+            RecordLastVerificationCycle(item, []);
             return await CompleteVerificationAsync(state, item, context, [], cancellationToken);
         }
 
@@ -140,6 +143,7 @@ public sealed partial class FactoryRuntime
             await SaveAsync(state, cancellationToken);
         }
 
+        RecordLastVerificationCycle(item, session.EvidenceRefs);
         return await CompleteVerificationAsync(state, item, context, session.FailedCheckIds, cancellationToken);
     }
 
@@ -308,6 +312,13 @@ public sealed partial class FactoryRuntime
         RecordEvidence(state, item, evidence);
         await SaveAsync(state, cancellationToken);
         return OutcomeFromBlocker(state, code);
+    }
+
+    private static void RecordLastVerificationCycle(PlannedWorkItem? item, IEnumerable<string> evidenceRefs)
+    {
+        if (item is null) return;
+        item.LastVerificationEvidenceRefs.Clear();
+        item.LastVerificationEvidenceRefs.AddRange(evidenceRefs.Distinct(StringComparer.Ordinal));
     }
 
     private static void RecordEvidence(FactoryState state, PlannedWorkItem? item, IEnumerable<VerificationEvidence> evidence)

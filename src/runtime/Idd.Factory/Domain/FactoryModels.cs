@@ -61,6 +61,7 @@ public sealed record PlannedWorkItem
     public List<string> VerificationCheckIds { get; init; } = [];
     public Dictionary<string, VerificationExpectation> VerificationExpectations { get; init; } = new(StringComparer.Ordinal);
     public List<string> VerificationEvidenceRefs { get; init; } = [];
+    public List<string> LastVerificationEvidenceRefs { get; init; } = [];
     public VerificationDecision LastVerificationDecision { get; set; }
     public string? LastResultRef { get; set; }
     public List<string> PriorResultRefs { get; init; } = [];
