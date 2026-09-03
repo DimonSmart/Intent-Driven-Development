@@ -30,6 +30,7 @@ public sealed partial class FactoryRuntime(
     private readonly string currentDirectory = Path.Combine(workspace, ".idd", "factory", "current");
     private readonly FactoryScheduler scheduler = new();
     private readonly FactoryStateValidator stateValidator = new();
+    private readonly PlannerMarkdownParser plannerMarkdownParser = new();
     private readonly PlanRevisionWriter planRevisions = new(Path.Combine(workspace, ".idd", "factory", "current"), clock);
 
     public async Task<FactoryCliOutcome> RunAsync(string requestPath, string methodologyVersion, CancellationToken cancellationToken) =>

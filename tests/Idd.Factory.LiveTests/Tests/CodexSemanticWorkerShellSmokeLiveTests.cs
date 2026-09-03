@@ -45,7 +45,7 @@ public sealed class CodexSemanticWorkerShellSmokeLiveTests
         var result = await File.ReadAllTextAsync(resultPath, timeout.Token);
 
         Assert.Equal(0, processResult.ExitCode);
-        var workItems = PlannerBatchParser.Parse(result);
+        var workItems = new PlannerMarkdownParser().Parse(result);
         Assert.NotEmpty(workItems);
         Assert.DoesNotContain("capability", result, StringComparison.OrdinalIgnoreCase);
     }

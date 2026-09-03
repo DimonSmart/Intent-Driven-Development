@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Text.Json;
 using Idd.Factory.Domain;
 
@@ -41,7 +40,7 @@ public sealed partial class FactoryRuntime
             input,
             SemanticOperationKind.Planning,
             cancellationToken);
-        var plan = PlannerBatchParser.Parse(result.SemanticResult);
+        var plan = plannerMarkdownParser.Parse(result.SemanticResult);
         if (plan.Question is not null)
         {
             state.PlanningCycleCount++;
@@ -116,79 +115,4 @@ public sealed partial class FactoryRuntime
         state.FinalVerificationPassed = false;
         state.FinalVerificationPlanRevision = null;
     }
-}
-
-internal sealed record PlannerBatchResult(IReadOnlyList<string> Tasks, string? Question) : IReadOnlyList<string>
-{
-    public int Count => Tasks.Count;
-    public string this[int index] => Tasks[index];
-    public IEnumerator<string> GetEnumerator() => Tasks.GetEnumerator();
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-}
-
-internal static class PlannerBatchParser
-{
-    private const string TaskHeading = "# Task";
-    private const string QuestionHeading = "# Question";
-
-    public static PlannerBatchResult Parse(string markdown)
-    {
-        var normalized = markdown.TrimStart('\uFEFF').Replace("\r\n", "\n");
-        if (string.IsNullOrWhiteSpace(normalized)) return new([], null);
-
-        var lines = normalized.Split('\n');
-        var tasks = new List<string>();
-        List<string>? current = null;
-        var currentKind = SectionKind.None;
-        string? question = null;
-        foreach (var line in lines)
-        {
-            if (line is TaskHeading or QuestionHeading)
-            {
-                Flush(tasks, ref question, current, currentKind);
-                current = [];
-                currentKind = line == TaskHeading ? SectionKind.Task : SectionKind.Question;
-                continue;
-            }
-            if (current is null)
-            {
-                if (!string.IsNullOrWhiteSpace(line))
-                    throw Malformed();
-                continue;
-            }
-            current.Add(line);
-        }
-        Flush(tasks, ref question, current, currentKind);
-        if (tasks.Count == 0 && question is null)
-            throw Malformed();
-        if (question is not null && tasks.Count > 0)
-            throw new AgentProtocolException("MALFORMED_PLANNER_OUTPUT", "Planner output cannot mix '# Task' sections with '# Question'. Execute safely contractable tasks first and ask only when no task can be contracted now.");
-        return new(tasks, question);
-    }
-
-    private static void Flush(List<string> tasks, ref string? question, List<string>? current, SectionKind kind)
-    {
-        if (current is null) return;
-        var text = string.Join("\n", current).Trim();
-        if (text.Length == 0)
-            throw new AgentProtocolException("MALFORMED_PLANNER_OUTPUT", "Planner sections must be non-empty.");
-        if (kind == SectionKind.Task)
-        {
-            tasks.Add(text);
-            return;
-        }
-        if (kind == SectionKind.Question)
-        {
-            if (question is not null)
-                throw new AgentProtocolException("MALFORMED_PLANNER_OUTPUT", "Planner output may contain only one '# Question' section.");
-            question = text;
-            return;
-        }
-        throw Malformed();
-    }
-
-    private static AgentProtocolException Malformed() =>
-        new("MALFORMED_PLANNER_OUTPUT", "Planner output must be empty, consist only of '# Task' sections, or contain exactly one '# Question' section.");
-
-    private enum SectionKind { None, Task, Question }
 }
