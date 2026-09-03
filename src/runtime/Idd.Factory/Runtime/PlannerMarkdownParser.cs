@@ -26,7 +26,7 @@ internal sealed class PlannerMarkdownParser
         var document = Markdown.Parse(normalized, Pipeline);
         var markers = document
             .OfType<HeadingBlock>()
-            .Where(heading => heading.Level == 1 && !heading.IsSetext)
+            .Where(heading => heading.Level == 1 && heading.Column == 0 && !heading.IsSetext)
             .Select(heading => TryCreateMarker(normalized, heading))
             .Where(marker => marker is not null)
             .Select(marker => marker!)
