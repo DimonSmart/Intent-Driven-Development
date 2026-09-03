@@ -70,6 +70,32 @@ public sealed partial class FactoryRuntime(
         catch (AgentProtocolException exception) { return await StopForAgentProtocolExceptionAsync(state, exception, cancellationToken); }
 
         if (state.PendingContinuation is { IsResumable: false }) return OutcomeFromBlocker(state, "TERMINAL_STOP");
+        if (state.PendingContinuation is
+            {
+                Kind: ContinuationKind.VerificationGate,
+                VerificationContext: "baseline",
+                VerificationStage: VerificationContinuationStage.AwaitingConfirmation
+            })
+        {
+            if (confirmation == VerificationConfirmation.None) return OutcomeFromBlocker(state, "VERIFICATION_CONFIRMATION_REQUIRED");
+            if (confirmation == VerificationConfirmation.Decline)
+            {
+                return await StopAsync(
+                    state,
+                    "VERIFICATION_DECLINED",
+                    "User declined running Factory with an already-failing repository fallback baseline.",
+                    "Fix the repository baseline, then cancel/restart the Factory run.",
+                    cancellationToken,
+                    new(ContinuationKind.Terminal, null, "baseline", "VERIFICATION_DECLINED", false));
+            }
+
+            state.RepositoryFallbackBaselineAccepted = true;
+            state.PendingContinuation = null;
+            state.Blocker = null;
+            state.RunStatus = FactoryRunStatus.Running;
+            await events.WriteAsync(state.RunId, "repository-fallback-baseline-accepted", new { }, cancellationToken);
+            await SaveAsync(state, cancellationToken);
+        }
         if (state.PendingContinuation is { Kind: ContinuationKind.VerificationGate, VerificationStage: VerificationContinuationStage.AwaitingConfirmation or VerificationContinuationStage.AwaitingManualResult } pending)
         {
             if (pending.VerificationStage == VerificationContinuationStage.AwaitingConfirmation && confirmation == VerificationConfirmation.None) return OutcomeFromBlocker(state, "VERIFICATION_CONFIRMATION_REQUIRED");
@@ -101,7 +127,7 @@ public sealed partial class FactoryRuntime(
 
     private async Task<FactoryCliOutcome?> RunRepositoryFallbackBaselineAsync(FactoryState state, CancellationToken cancellationToken)
     {
-        if (File.Exists(Path.Combine(workspace, ".idd", "verification.yaml"))) return null;
+        if (state.RepositoryFallbackBaselineAccepted || File.Exists(Path.Combine(workspace, ".idd", "verification.yaml"))) return null;
 
         var baseline = await verification.RunContextAsync("final", cancellationToken);
         RecordEvidence(state, null, baseline.Evidence);
@@ -117,17 +143,27 @@ public sealed partial class FactoryRuntime(
         var checkIds = baseline.Evidence.Select(x => x.CheckId).Distinct(StringComparer.Ordinal).ToArray();
         var checkSummary = checkIds.Length == 0 ? "repository fallback" : string.Join(", ", checkIds);
         var evidenceSummary = evidenceRefs.Length == 0 ? "none" : string.Join(", ", evidenceRefs);
-        var terminal = new PendingContinuation(ContinuationKind.Terminal, null, null, "BASELINE_VERIFICATION", false);
 
+        if (baseline.Status == VerificationStatus.Failed)
+        {
+            return await StopAsync(
+                state,
+                "VERIFICATION_CONFIRMATION_REQUIRED",
+                $"Repository fallback baseline already fails before Factory planning. Failed checks: {checkSummary}. Evidence: {evidenceSummary}. Repository-wide subtask verification cannot reliably attribute that failure to the current work item.",
+                "Fix the repository baseline and cancel/restart, or continue with --confirmation approve to accept the existing red baseline.",
+                cancellationToken,
+                new(
+                    ContinuationKind.VerificationGate,
+                    null,
+                    "baseline",
+                    "VERIFICATION_CONFIRMATION_REQUIRED",
+                    true,
+                    VerificationStage: VerificationContinuationStage.AwaitingConfirmation));
+        }
+
+        var terminal = new PendingContinuation(ContinuationKind.Terminal, null, null, "BASELINE_VERIFICATION", false);
         return baseline.Status switch
         {
-            VerificationStatus.Failed => await StopAsync(
-                state,
-                "BASELINE_VERIFICATION_FAILED",
-                $"Repository fallback baseline failed before Factory planning. Failed checks: {checkSummary}. Evidence: {evidenceSummary}.",
-                "Fix the repository baseline, then cancel/restart the Factory run.",
-                cancellationToken,
-                terminal),
             VerificationStatus.InfrastructureFailure => await StopAsync(
                 state,
                 "BASELINE_VERIFICATION_INFRASTRUCTURE_FAILURE",
@@ -247,6 +283,7 @@ public sealed partial class FactoryRuntime(
         state.Remaining.Clear(); state.Remaining.AddRange(candidate.Remaining); state.CurrentAttemptId = candidate.CurrentAttemptId; state.AttemptSequence = candidate.AttemptSequence;
         state.PlanningCycleCount = candidate.PlanningCycleCount;
         state.PlannedThroughCompletedCount = candidate.PlannedThroughCompletedCount;
+        state.RepositoryFallbackBaselineAccepted = candidate.RepositoryFallbackBaselineAccepted;
         state.FinalVerificationPassed = candidate.FinalVerificationPassed; state.FinalVerificationPlanRevision = candidate.FinalVerificationPlanRevision;
         state.Blocker = candidate.Blocker; state.PendingContinuation = candidate.PendingContinuation; state.PendingVerificationSession = candidate.PendingVerificationSession;
         state.FactoryRunChangedPaths.Clear(); state.FactoryRunChangedPaths.AddRange(candidate.FactoryRunChangedPaths);

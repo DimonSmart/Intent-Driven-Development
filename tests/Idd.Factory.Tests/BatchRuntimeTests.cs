@@ -96,24 +96,54 @@ public sealed class BatchRuntimeTests
     }
 
     [Fact]
-    public async Task FailingRepositoryFallbackBaselineStopsBeforePlanning()
+    public async Task FailingRepositoryFallbackBaselineRequiresConfirmationBeforePlanning()
     {
         using var temp = new TestWorkspace();
         WriteRepositoryFallback(temp, 7);
         var backend = new FakeAgentBackend();
 
         var outcome = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend)
-            .RunRequestAsync("Do not plan against a red repository.", "test", default);
+            .RunRequestAsync("Do not plan against a red repository without approval.", "test", default);
 
-        Assert.Equal("BASELINE_VERIFICATION_FAILED", outcome.FactoryOutcome);
+        Assert.Equal("VERIFICATION_CONFIRMATION_REQUIRED", outcome.FactoryOutcome);
         Assert.Contains("repository-fallback", outcome.Reason);
         Assert.Empty(backend.Invocations);
         var state = await FactoryRuntimeTestHarness.LoadState(temp.Path);
+        Assert.False(state.RepositoryFallbackBaselineAccepted);
         Assert.Equal(FactoryRunStatus.Blocked, state.RunStatus);
-        Assert.Equal("BASELINE_VERIFICATION_FAILED", state.Blocker!.Code);
+        Assert.Equal("VERIFICATION_CONFIRMATION_REQUIRED", state.Blocker!.Code);
         Assert.NotNull(state.PendingContinuation);
-        Assert.False(state.PendingContinuation!.IsResumable);
+        Assert.True(state.PendingContinuation!.IsResumable);
+        Assert.Equal("baseline", state.PendingContinuation.VerificationContext);
+        Assert.Equal(VerificationContinuationStage.AwaitingConfirmation, state.PendingContinuation.VerificationStage);
         Assert.Single(state.VerificationEvidenceRefs);
+    }
+
+    [Fact]
+    public async Task AcceptedRepositoryFallbackBaselineDoesNotRetrySubtaskAndKeepsFinalStrict()
+    {
+        using var temp = new TestWorkspace();
+        WriteRepositoryFallback(temp, 7);
+        var backend = new FakeAgentBackend();
+        backend.Enqueue(_ => "# Task\n\nImplement A.");
+        backend.Enqueue(_ => "Implemented A without changing the known repository baseline.");
+        backend.Enqueue(_ => "");
+        var runtime = FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend);
+
+        var initial = await runtime.RunRequestAsync("Implement A in an already-red repository.", "test", default);
+        Assert.Equal("VERIFICATION_CONFIRMATION_REQUIRED", initial.FactoryOutcome);
+
+        var outcome = await runtime.ContinueAsync(default, VerificationConfirmation.Approve);
+
+        Assert.Equal("FINAL_VERIFICATION_FAILED", outcome.FactoryOutcome);
+        Assert.Equal(2, backend.Invocations.Count(x => x.Capability == "planning"));
+        Assert.Single(backend.Invocations.Where(x => x.Capability == "implementation"));
+        var state = await FactoryRuntimeTestHarness.LoadState(temp.Path);
+        Assert.True(state.RepositoryFallbackBaselineAccepted);
+        Assert.Single(state.Completed);
+        Assert.Null(state.Current);
+        Assert.Equal("final", state.PendingContinuation!.VerificationContext);
+        Assert.Equal("FINAL_VERIFICATION_FAILED", state.Blocker!.Code);
     }
 
     [Fact]

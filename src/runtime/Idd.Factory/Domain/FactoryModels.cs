@@ -42,6 +42,7 @@ public sealed record FactoryState
     public int AttemptSequence { get; set; }
     public int PlanningCycleCount { get; set; }
     public int PlannedThroughCompletedCount { get; set; }
+    public bool RepositoryFallbackBaselineAccepted { get; set; }
     public bool FinalVerificationPassed { get; set; }
     public long? FinalVerificationPlanRevision { get; set; }
     public FactoryBlocker? Blocker { get; set; }

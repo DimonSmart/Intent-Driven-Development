@@ -62,6 +62,26 @@ public sealed partial class FactoryRuntime
                     case VerificationStatus.NoChecks:
                         return await CompleteVerificationAsync(state, item, context, [], cancellationToken);
                     case VerificationStatus.Failed:
+                        if (state.RepositoryFallbackBaselineAccepted && context == "subtask")
+                        {
+                            await events.WriteAsync(state.RunId, "repository-fallback-subtask-degraded", new
+                            {
+                                workItemId = item!.Id,
+                                evidenceRefs = fallback.Evidence.Select(x => $"verification/{x.EvidenceId}.json").ToArray()
+                            }, cancellationToken);
+                            return await CompleteVerificationAsync(state, item, context, [], cancellationToken);
+                        }
+                        if (state.RepositoryFallbackBaselineAccepted && context == "final")
+                        {
+                            return await BlockVerificationAsync(
+                                state,
+                                item,
+                                context,
+                                "FINAL_VERIFICATION_FAILED",
+                                "Strict final repository fallback still fails. The accepted red baseline suppresses subtask attribution only; final verification must pass before completion.",
+                                fallback.Evidence,
+                                cancellationToken);
+                        }
                         return await CompleteVerificationAsync(state, item, context,
                             fallback.Evidence.Where(x => x.Status == "failed").Select(x => x.CheckId).ToArray(), cancellationToken);
                     case VerificationStatus.InfrastructureFailure:
