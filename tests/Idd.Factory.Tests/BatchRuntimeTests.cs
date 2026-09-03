@@ -59,11 +59,14 @@ public sealed class BatchRuntimeTests
     public async Task FailedFinalVerificationFeedsANewPlanningCycle()
     {
         using var temp = new TestWorkspace();
-        temp.Write(".idd/verification.yaml", """
+        var markerCheck = OperatingSystem.IsWindows()
+            ? "if (Test-Path marker.txt) { exit 0 } else { exit 1 }"
+            : "test -f marker.txt";
+        temp.Write(".idd/verification.yaml", $$"""
             version: 1
             checks:
               final-check:
-                run: if (Test-Path marker.txt) { exit 0 } else { exit 1 }
+                run: {{markerCheck}}
             default:
               use: []
             final:
