@@ -65,7 +65,7 @@ Do not call the runtime, create `.idd/factory/current/`, or create Factory work
 items while intent preparation or request materialization is incomplete or
 blocked. Missing documentation alone is not `INTENT_REQUIRED`.
 
-## Run, continue, and cancel
+## Run, continue, user questions, and cancel
 
 - For a new run whose preflight is covered, invoke the packaged runtime's new-run
   operation with the exact self-contained materialized logical request and
@@ -77,6 +77,24 @@ blocked. Missing documentation alone is not `INTENT_REQUIRED`.
 - For an ordinary existing run, continue Factory without repeating initial
   preflight, rematerializing host attachments, or inventing a user answer. The
   persisted self-contained request is authoritative.
+- `USER_DECISION_REQUIRED` is a resumable planning-boundary pause. Report the
+  planner's question to the user exactly enough to preserve its semantic choice;
+  do not answer it yourself and do not create implementation work around the
+  missing decision.
+- When the user answers a pending planner question, evaluate that answer together
+  with the persisted question and current relevant intent. If the answer defines
+  or changes durable product truth and scope permits intent writes, use the
+  existing `idd-intent-change` workflow and validate coverage before resuming.
+  If the answer defines or changes durable product truth but the requested scope
+  forbids intent writes, do not pass the answer to Factory as an implementation
+  choice; leave the run paused and report that continuing requires an allowed
+  intent update or explicit cancellation. If the answer is only an
+  implementation choice, do not write durable intent. After any required intent
+  work is complete, pass the user's exact answer to `factory_continue` so the
+  same run records it and the next planner can use it. Do not rewrite
+  `request.md`.
+- If the user chooses not to continue, cancel the Factory run instead of
+  fabricating an answer. Cancellation preserves product changes and diagnostics.
 - Cancellation is explicit. Warn that product changes are preserved; do not
   delete Factory state or revert code in the launcher.
 
@@ -91,10 +109,11 @@ blocked. Missing documentation alone is not `INTENT_REQUIRED`.
   fresh semantic subprocess contexts through the runtime.
 - Do not weaken the worker sandbox to compensate for launcher constraints.
 - Do not mutate `.idd/factory/current/`. Durable intent may change only through
-  the existing intent workflows during allowed preflight or intent-gate
+  the existing intent workflows during allowed preflight or user-question
   recovery; Factory workers and the runtime do not edit it.
-- Do not interpret output from semantic workers. Only the runtime outcome is the
-  public machine result.
+- Do not interpret executor output for workflow control. A structured
+  `USER_DECISION_REQUIRED` result comes from runtime parsing of the planner's
+  bounded planning output, not from executor reports.
 - `FACTORY_CONFIGURATION_CHANGED`, `LEGACY_FACTORY_STATE`,
   `CORRUPT_FACTORY_STATE`, `UNMATERIALIZED_REQUEST_INPUT`, and lock outcomes are
   terminal for the current launcher attempt and must be reported exactly.
@@ -114,6 +133,9 @@ Intent before/after hash: <hashes when available>
 Intent paths changed: <paths when present>
 ```
 
+For `USER_DECISION_REQUIRED`, present the question and stop until the user
+answers or cancels. Do not report it as a terminal Factory failure.
+
 When a read-only runtime status operation is used after a lost or timed-out
 blocking response, its `status` is launcher/runtime ownership state, not a
 Factory outcome. Report it as `Factory status: <status>`. In particular,
@@ -124,9 +146,9 @@ runtime operation, and start time when the status payload provides them, then
 report the returned reason and resume condition. Do not imply that the current
 semantic attempt has completed merely because the workspace remains owned.
 
-When durable intent was updated from the logical request before implementation,
-say so explicitly. After reporting the final structured runtime outcome, do not
-perform scheduler work outside the runtime.
+When durable intent was updated from the logical request or from a user answer
+before resuming implementation, say so explicitly. After reporting the final
+structured runtime outcome, do not perform scheduler work outside the runtime.
 
 ## Codex launcher
 
