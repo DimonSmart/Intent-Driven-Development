@@ -147,6 +147,56 @@ public sealed class BatchRuntimeTests
     }
 
     [Fact]
+    public async Task VerificationDrivenRetryWithoutWorkspaceChangesStopsImmediately()
+    {
+        using var temp = new TestWorkspace();
+        temp.Write(".idd/verification.yaml", """
+            version: 1
+            checks:
+              subtask-fail:
+                run: exit 7
+            default:
+              use: []
+            subtask:
+              use:
+                - subtask-fail
+            final:
+              use: []
+            """);
+        var backend = new FakeAgentBackend();
+        backend.Enqueue(_ => "# Task\n\nImplement A.");
+        backend.Enqueue(_ =>
+        {
+            File.WriteAllText(Path.Combine(temp.Path, "first-change.txt"), "changed");
+            return "Initial implementation changed the workspace.";
+        });
+        backend.Enqueue(invocation =>
+        {
+            Assert.Contains("subtask-fail", invocation.Input);
+            return "Retry found no additional workspace change to make.";
+        });
+
+        var outcome = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend)
+            .RunRequestAsync("Implement A and verify it.", "test", default);
+
+        Assert.Equal("VERIFICATION_RETRY_NO_PROGRESS", outcome.FactoryOutcome);
+        Assert.Equal(2, backend.Invocations.Count(x => x.Capability == "implementation"));
+        var state = await FactoryRuntimeTestHarness.LoadState(temp.Path);
+        Assert.NotNull(state.Current);
+        Assert.Equal(2, state.Current!.AttemptCount);
+        Assert.Contains("first-change.txt", state.Current.ChangedPaths);
+        Assert.Equal(CurrentWorkPhase.Blocked, state.CurrentPhase);
+        Assert.Equal("VERIFICATION_RETRY_NO_PROGRESS", state.Blocker!.Code);
+        Assert.NotNull(state.PendingContinuation);
+        Assert.False(state.PendingContinuation!.IsResumable);
+        Assert.Single(state.Current.VerificationEvidenceRefs);
+
+        var retryAttempt = backend.Invocations.Last(x => x.Capability == "implementation").AttemptId;
+        using var changes = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(temp.Path, ".idd", "factory", "current", "attempts", retryAttempt, "workspace-changes.json")));
+        Assert.Equal(0, changes.RootElement.GetProperty("changedPaths").GetArrayLength());
+    }
+
+    [Fact]
     public async Task ExistingVerificationPolicySkipsRepositoryFallbackBaseline()
     {
         using var temp = new TestWorkspace();

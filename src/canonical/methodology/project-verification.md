@@ -45,4 +45,7 @@ The Runtime records every gate result, distinguishes ordinary failed checks from
 required user action and runner infrastructure failure. Failed subtask checks
 retry the same task and failed final checks trigger a new planning cycle, except
 for repository fallback after an explicitly accepted red baseline as described
-above.
+above. When a retry was caused by failed authoritative subtask verification and
+that retry produces no workspace changes, stop with
+`VERIFICATION_RETRY_NO_PROGRESS` before running verification again instead of
+spending additional semantic retry budget.

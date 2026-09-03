@@ -7,6 +7,8 @@ namespace Idd.Factory.Runtime;
 
 public sealed partial class FactoryRuntime
 {
+    private readonly WorkspaceChangeCalculator workspaceChangeCalculator = new();
+
     private async Task<FactoryCliOutcome?> SelectNextWorkAsync(FactoryState state, CancellationToken cancellationToken)
     {
         if (state.Current is not null || state.Remaining.Count == 0) throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Cannot select next work from the current state.");
@@ -25,6 +27,7 @@ public sealed partial class FactoryRuntime
         var reusable = state.CurrentAttemptId is { } attempt && File.Exists(Path.Combine(currentDirectory, "attempts", attempt, "result.json"));
         if (!reusable && item.AttemptCount >= configuration.Limits.MaxAttemptsPerTask)
             throw new AgentProtocolException("RETRY_BUDGET_EXHAUSTED", await BuildRetryBudgetExhaustedMessageAsync(item, cancellationToken));
+        var verificationDrivenRetry = item.LastVerificationDecision == VerificationDecision.UnexpectedFailure;
 
         state.CurrentPhase = CurrentWorkPhase.Running;
         await SaveAsync(state, cancellationToken);
@@ -33,6 +36,18 @@ public sealed partial class FactoryRuntime
         item = state.Current ?? throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Current work disappeared during dispatch.");
         item.LastResultRef = result.SemanticResultPath;
         item.CurrentAttemptId = null;
+
+        if (verificationDrivenRetry && !await AttemptChangedWorkspaceAsync(result.AttemptId, cancellationToken))
+        {
+            state.CurrentPhase = CurrentWorkPhase.Blocked;
+            return await StopAsync(
+                state,
+                "VERIFICATION_RETRY_NO_PROGRESS",
+                $"Work item {item.Id} was retried because authoritative verification failed, but retry attempt {result.AttemptId} produced no workspace changes.",
+                "Inspect the verification evidence and executor result, resolve the condition, then cancel/restart the Factory run.",
+                cancellationToken,
+                new(ContinuationKind.Terminal, item.Id, "subtask", "VERIFICATION_RETRY_NO_PROGRESS", false));
+        }
 
         state.PendingContinuation = null;
         state.Blocker = null;
@@ -225,6 +240,18 @@ public sealed partial class FactoryRuntime
     private async Task PersistWorkspaceSnapshotAsync(string runId, string attemptDirectory, CancellationToken cancellationToken) =>
         await WriteJsonAtomicallyAsync(Path.Combine(attemptDirectory, "workspace-before.json"), new WorkspaceSnapshotArtifact(1, await SnapshotWorkspaceAsync(runId, cancellationToken)), cancellationToken);
 
+    private async Task<bool> AttemptChangedWorkspaceAsync(string attemptId, CancellationToken cancellationToken)
+    {
+        var changesPath = Path.Combine(currentDirectory, "attempts", attemptId, "workspace-changes.json");
+        if (!File.Exists(changesPath))
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", $"Attempt {attemptId} has no workspace changes artifact.");
+        var changes = JsonSerializer.Deserialize<WorkspaceChangesArtifact>(await File.ReadAllTextAsync(changesPath, cancellationToken), FactoryJson.Options)
+            ?? throw new FactoryStateException("CORRUPT_FACTORY_STATE", $"Attempt {attemptId} has an invalid workspace changes artifact.");
+        if (changes.SchemaVersion != 1)
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", $"Attempt {attemptId} has an unsupported workspace changes schema.");
+        return changes.ChangedPaths.Count > 0;
+    }
+
     private async Task RecoverWorkspaceChangesAsync(FactoryState state, PlannedWorkItem? item, AgentInvocation invocation, CancellationToken cancellationToken)
     {
         if (invocation.ExecutionProfile != AgentExecutionProfile.WorkspaceWrite) return;
@@ -238,8 +265,7 @@ public sealed partial class FactoryRuntime
             if (!File.Exists(beforePath)) return;
             var before = JsonSerializer.Deserialize<WorkspaceSnapshotArtifact>(await File.ReadAllTextAsync(beforePath, cancellationToken), FactoryJson.Options)!;
             var after = await SnapshotWorkspaceAsync(state.RunId, cancellationToken);
-            changes = new(1, after.Where(x => !before.Files.TryGetValue(x.Key, out var prior) || prior != x.Value).Select(x => x.Key)
-                .Concat(before.Files.Keys.Where(path => !after.ContainsKey(path))).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToList());
+            changes = new(1, workspaceChangeCalculator.Calculate(before.Files, after).ToList());
             await WriteJsonAtomicallyAsync(changesPath, changes, cancellationToken);
         }
         foreach (var path in changes.ChangedPaths)
