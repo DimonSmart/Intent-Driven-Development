@@ -31,20 +31,21 @@ public sealed class AgentTraceTests
     }
 
     [Fact]
-    public void Builder_UsesMetadataEdgesAndDispatchRoleAndWorkItem()
+    public void Builder_UsesMetadataEdgesAndFallbackRoleAndWorkItem()
     {
         var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")); Directory.CreateDirectory(directory);
         try
         {
-            Write(directory, "root", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"root\",\"timestamp\":\"2026-01-01T00:00:00Z\"}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"collab_tool_call\",\"id\":\"spawn\",\"tool\":\"spawn_agent\",\"prompt\":\"Role:\\nplanner\\nAction:\\nPLAN\"}}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"collab_tool_call\",\"id\":\"spawn\",\"tool\":\"spawn_agent\",\"receiver_thread_ids\":[\"planner\"]}}}");
+            Write(directory, "root", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"root\",\"timestamp\":\"2026-01-01T00:00:00Z\"}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"collab_tool_call\",\"id\":\"spawn\",\"tool\":\"spawn_agent\",\"prompt\":\"Role:\\nplanner\"}}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"collab_tool_call\",\"id\":\"spawn\",\"tool\":\"spawn_agent\",\"receiver_thread_ids\":[\"planner\"]}}}");
             Write(directory, "planner", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"planner\",\"parent_thread_id\":\"root\"}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"message\",\"text\":\"unstructured child input\"}}}", "{\"timestamp\":\"2026-01-01T00:00:01Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"task_complete\",\"completed_at\":1767225601}} ");
             Write(directory, "executor", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"executor\",\"parent_thread_id\":\"planner\"}}", "{\"type\":\"response_item\",\"payload\":{\"item\":{\"type\":\"message\",\"text\":\"Role:\\nexecutor\\n.idd/factory/current/001-code.active.md\"}}}");
             Write(directory, "foreign", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"foreign\"}}");
             var trace = new AgentTraceBuilder().Build(directory, "root");
             Assert.Equal(["root", "planner", "executor"], trace.Agents.Select(agent => agent.ThreadId));
-            Assert.Equal("planner", trace.Agents.Single(agent => agent.ThreadId == "planner").Role);
-            Assert.Equal("PLAN", trace.Agents.Single(agent => agent.ThreadId == "planner").Action);
-            Assert.Equal("protocol-invalid", trace.Agents.Single(agent => agent.ThreadId == "planner").Status);
+            var planner = trace.Agents.Single(agent => agent.ThreadId == "planner");
+            Assert.Equal("planner", planner.Role);
+            Assert.Null(planner.Action);
+            Assert.Equal("completed", planner.Status);
             Assert.Equal("001-code", trace.Agents.Single(agent => agent.ThreadId == "executor").WorkItem);
             Assert.Null(trace.Agents.Single(agent => agent.ThreadId == "executor").TotalTokens);
         }
