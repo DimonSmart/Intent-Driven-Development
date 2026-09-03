@@ -8,10 +8,12 @@ namespace Idd.Factory.Tests;
 
 public sealed class BatchProtocolTests
 {
+    private readonly PlannerMarkdownParser parser = new();
+
     [Fact]
     public void PlannerMarkdownMaterializesOrderedTasks()
     {
-        var plan = PlannerBatchParser.Parse("# Task\n\nImplement A.\n\n# Task\n\nImplement B.\nPreserve C.\n");
+        var plan = parser.Parse("# Task\n\nImplement A.\n\n# Task\n\nImplement B.\nPreserve C.\n");
         Assert.Equal(["Implement A.", "Implement B.\nPreserve C."], plan);
         Assert.Null(plan.Question);
     }
@@ -19,7 +21,7 @@ public sealed class BatchProtocolTests
     [Fact]
     public void PlannerMayReturnOneUserQuestionWhenNoTaskCanBeContracted()
     {
-        var plan = PlannerBatchParser.Parse("# Question\n\nShould deletion be automatic or require confirmation?\n");
+        var plan = parser.Parse("# Question\n\nShould deletion be automatic or require confirmation?\n");
         Assert.Empty(plan);
         Assert.Equal("Should deletion be automatic or require confirmation?", plan.Question);
     }
@@ -27,9 +29,31 @@ public sealed class BatchProtocolTests
     [Fact]
     public void EmptyPlannerOutputMeansNoRemainingWork()
     {
-        var plan = PlannerBatchParser.Parse(" \r\n");
+        var plan = parser.Parse(" \r\n");
         Assert.Empty(plan);
         Assert.Null(plan.Question);
+    }
+
+    [Fact]
+    public void TaskHeadingInsideFencedCodeIsTaskContentNotAProtocolBoundary()
+    {
+        var plan = parser.Parse(
+            "# Task\n\nDocument the planner protocol.\n\n```markdown\n# Task\nThis is an example only.\n```\n\nKeep the example intact.\n\n# Task\n\nImplement the parser.");
+
+        Assert.Equal(2, plan.Count);
+        Assert.Contains("```markdown\n# Task\nThis is an example only.\n```", plan[0], StringComparison.Ordinal);
+        Assert.Contains("Keep the example intact.", plan[0], StringComparison.Ordinal);
+        Assert.Equal("Implement the parser.", plan[1]);
+    }
+
+    [Fact]
+    public void QuestionHeadingInsideBlockQuoteIsTaskContentNotAProtocolBoundary()
+    {
+        var plan = parser.Parse("# Task\n\nPreserve this example:\n\n> # Question\n> Example only.\n");
+
+        Assert.Single(plan);
+        Assert.Null(plan.Question);
+        Assert.Contains("> # Question", plan[0], StringComparison.Ordinal);
     }
 
     [Theory]
@@ -38,8 +62,10 @@ public sealed class BatchProtocolTests
     [InlineData("# Task\nA\n# Task\n")]
     [InlineData("# Question\nA?\n# Question\nB?")]
     [InlineData("# Task\nA\n# Question\nB?")]
+    [InlineData("Task\n====\n\nImplement A.")]
+    [InlineData("# Task #\n\nImplement A.")]
     public void MalformedPlannerOutputIsRejected(string output) =>
-        Assert.Equal("MALFORMED_PLANNER_OUTPUT", Assert.Throws<AgentProtocolException>(() => PlannerBatchParser.Parse(output)).Code);
+        Assert.Equal("MALFORMED_PLANNER_OUTPUT", Assert.Throws<AgentProtocolException>(() => parser.Parse(output)).Code);
 
     [Fact]
     public async Task ExecutorResultIsFreeFormTextAndMetadataOnlyReferencesIt()
