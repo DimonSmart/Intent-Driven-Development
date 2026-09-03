@@ -16,7 +16,7 @@ public sealed class UserQuestionRuntimeTests
             return "# Task\n\nImplement deletion with explicit confirmation.";
         });
         backend.Enqueue(_ => "Implemented the confirmed deletion behavior.");
-        backend.Enqueue(_ => "");
+        backend.Enqueue(_ => "# Done");
         var runtime = FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend);
 
         var paused = await runtime.RunRequestAsync("Implement deletion behavior.", "test", default);

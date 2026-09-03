@@ -179,9 +179,12 @@ The planner is the only semantic component that creates future work. Runtime
 assigns IDs, executes the whole current batch in order, observes actual changed
 paths, performs authoritative verification, retries the same immutable task on
 ordinary verification failure, and invokes planning again only after the batch
-is exhausted. Empty planning output leads to strict final verification. A final
-verification failure becomes evidence for another ordinary planning cycle; a
-success permits finalization without a mandatory semantic final reviewer.
+is exhausted. When semantic reassessment finds no remaining work, the planner
+returns exactly `# Done`; blank or whitespace-only planner output is malformed.
+Runtime mechanically maps validated `# Done` to the existing empty-batch
+representation and runs strict final verification. A final verification failure
+becomes evidence for another ordinary planning cycle; a success permits
+finalization without a mandatory semantic final reviewer.
 
 If planning instead reaches a real user decision boundary, the planner returns
 one human-readable question and no tasks. Runtime owns only the durable pause and

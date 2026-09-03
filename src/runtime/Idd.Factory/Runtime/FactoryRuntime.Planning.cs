@@ -31,8 +31,8 @@ public sealed partial class FactoryRuntime
             "Read current durable intent from .idd/intent and inspect the current repository directly. " +
             "Materialize every task whose self-contained contract can be determined reliably now, in execution order. " +
             "Stop at the first material uncertainty that requires evidence from this batch. " +
-            "If no task can be safely contracted because a missing user decision is required, return one '# Question' section. " +
-            "If no semantic work remains, return an empty response.";
+            "Return one or more '# Task' sections, or exactly one '# Question' section when a user decision is required, or exactly '# Done' when no semantic work remains. " +
+            "Do not mix these forms.";
 
         var result = await InvokeSemanticAsync(
             state,

@@ -39,7 +39,7 @@ public sealed class PlanningVerificationEvidenceTransportTests
             Assert.Contains("Verification evidence: .idd/factory/current/verification/", invocation.Input);
             Assert.DoesNotContain("Verification evidence: verification/", invocation.Input);
             Assert.DoesNotContain("\n- verification/", invocation.Input.Replace("\r\n", "\n"));
-            return "";
+            return "# Done";
         });
 
         var outcome = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend)
@@ -64,7 +64,7 @@ public sealed class PlanningVerificationEvidenceTransportTests
         using var temp = new TestWorkspace();
         await SeedFailedFinalPlanningStateAsync(temp, "verification/missing.json");
         var backend = new FakeAgentBackend();
-        backend.Enqueue(_ => "");
+        backend.Enqueue(_ => "# Done");
 
         var exception = await Assert.ThrowsAsync<FactoryStateException>(() =>
             FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend).ContinueAsync(default));
@@ -84,7 +84,7 @@ public sealed class PlanningVerificationEvidenceTransportTests
         temp.Write(".idd/outside.json", "{}");
         await SeedFailedFinalPlanningStateAsync(temp, "../../outside.json");
         var backend = new FakeAgentBackend();
-        backend.Enqueue(_ => "");
+        backend.Enqueue(_ => "# Done");
 
         var exception = await Assert.ThrowsAsync<FactoryStateException>(() =>
             FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend).ContinueAsync(default));
@@ -105,7 +105,7 @@ public sealed class PlanningVerificationEvidenceTransportTests
         backend.Enqueue(invocation =>
         {
             Assert.Contains("Authoritative verification evidence references:\n\n", invocation.Input.Replace("\r\n", "\n"));
-            return "";
+            return "# Done";
         });
 
         var outcome = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend).ContinueAsync(default);

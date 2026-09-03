@@ -61,12 +61,15 @@ Factory keeps at most one resumable run in `.idd/factory/current/`. The planner
 is the only semantic source of new work and materializes an ordered batch of
 stable task contracts. Runtime-owned `state.json` is the only status source.
 Executors return free-form semantic reports and never decide future workflow.
-After each exhausted batch Factory plans again. An empty plan starts strict
-final verification; success prepares final result artifacts and moves the complete
-run directory to `.idd/factory/results/<timestamp>_<work-slug>/`. The moved
-result retains the state, event log, attempts, verification evidence,
-commit-message handoff, and other diagnostics, while `.idd/factory/current/`
-remains reserved for an active or resumable run.
+After each exhausted batch Factory plans again. When semantic reassessment finds
+no remaining work, the planner returns exactly `# Done`; blank or whitespace-only
+planner output is malformed. Runtime mechanically maps validated `# Done` to the
+existing empty-batch representation and starts strict final verification.
+Success prepares final result artifacts and moves the complete run directory to
+`.idd/factory/results/<timestamp>_<work-slug>/`. The moved result retains the
+state, event log, attempts, verification evidence, commit-message handoff, and
+other diagnostics, while `.idd/factory/current/` remains reserved for an active
+or resumable run.
 
 Intent decisions are resolved by preflight before Factory creates run state.
 Intent changes never become Factory tasks.

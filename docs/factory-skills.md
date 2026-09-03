@@ -8,7 +8,9 @@ deterministic runtime. The launcher does not schedule semantic work itself.
 ## Semantic workers
 
 - `idd-factory-decompose-task` is the sole planner. It returns ordered `# Task`
-  Markdown sections, or an empty response when nothing remains.
+  Markdown sections, exactly one `# Question` when a user decision is required,
+  or exactly `# Done` after semantic reassessment finds nothing remains. Blank
+  or whitespace-only planner output is malformed.
 - `idd-factory-execute-subtask` executes one immutable task and returns a
   free-form human-readable report.
 
@@ -18,8 +20,11 @@ contract when it is necessary to make that task coherent; discoveries that
 change future work are evaluated by the next planner after batch exhaustion.
 
 Workers never return semantic control JSON. They do not select capabilities,
-IDs, retries, corrections, or transitions. Runtime owns materialization,
-ordering, verification, retry, recovery, persistence, and finalization.
+IDs, retries, corrections, or transitions. `# Done` is only the planner's
+minimal explicit no-more-work marker and is mechanically followed by existing
+strict final verification; it is not a Factory completion outcome. Runtime owns
+materialization, ordering, verification, retry, recovery, persistence, and
+finalization.
 
 Each attempt keeps semantic text separate from machine metadata:
 

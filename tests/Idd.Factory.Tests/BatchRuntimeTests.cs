@@ -13,7 +13,7 @@ public sealed class BatchRuntimeTests
         backend.Enqueue(_ => "# Task\n\nImplement A.\n\n# Task\n\nImplement B.");
         backend.Enqueue(_ => "Implemented A in the current product.");
         backend.Enqueue(_ => "Implemented B and preserved the surrounding behavior.");
-        backend.Enqueue(_ => "");
+        backend.Enqueue(_ => "# Done");
 
         var outcome = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend)
             .RunRequestAsync("Complete A and B.", "test", default);
@@ -38,7 +38,7 @@ public sealed class BatchRuntimeTests
         backend.Enqueue(_ => "Implemented B against the latest repository state.");
         backend.Enqueue(_ => "# Task\n\nImplement C discovered by the previous batch.");
         backend.Enqueue(_ => "Implemented C.");
-        backend.Enqueue(_ => "");
+        backend.Enqueue(_ => "# Done");
 
         var outcome = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend)
             .RunRequestAsync("Complete the integrated change.", "test", default);
@@ -74,7 +74,7 @@ public sealed class BatchRuntimeTests
                 - final-check
             """);
         var backend = new FakeAgentBackend();
-        backend.Enqueue(_ => "");
+        backend.Enqueue(_ => "# Done");
         backend.Enqueue(invocation =>
         {
             Assert.Contains("Strict final verification failed", invocation.Input);
@@ -85,7 +85,7 @@ public sealed class BatchRuntimeTests
             File.WriteAllText(Path.Combine(temp.Path, "marker.txt"), "ready");
             return "Created the missing marker.";
         });
-        backend.Enqueue(_ => "");
+        backend.Enqueue(_ => "# Done");
 
         var outcome = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend)
             .RunRequestAsync("Produce a final-verifiable marker.", "test", default);
@@ -93,6 +93,42 @@ public sealed class BatchRuntimeTests
         Assert.Equal("COMPLETED", outcome.FactoryOutcome);
         Assert.Equal(3, backend.Invocations.Count(x => x.Capability == "planning"));
         Assert.True(File.Exists(Path.Combine(temp.Path, "marker.txt")));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("\r\n  \r\n")]
+    public async Task BlankPlannerOutputIsRejectedBeforeFinalVerification(string plannerOutput)
+    {
+        using var temp = new TestWorkspace();
+        var finalCommand = OperatingSystem.IsWindows()
+            ? "Set-Content -Path final-ran.txt -Value ran"
+            : "touch final-ran.txt";
+        temp.Write(".idd/verification.yaml", $$"""
+            version: 1
+            checks:
+              final-sentinel:
+                run: {{finalCommand}}
+            default:
+              use: []
+            final:
+              use:
+                - final-sentinel
+            """);
+        var backend = new FakeAgentBackend();
+        backend.Enqueue(_ => plannerOutput);
+
+        var outcome = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend)
+            .RunRequestAsync("Do not accept a missing planner conclusion.", "test", default);
+
+        Assert.Equal("MALFORMED_PLANNER_OUTPUT", outcome.FactoryOutcome);
+        Assert.False(File.Exists(Path.Combine(temp.Path, "final-ran.txt")));
+        Assert.Single(backend.Invocations);
+        Assert.Equal("planning", backend.Invocations[0].Capability);
+        var state = await FactoryRuntimeTestHarness.LoadState(temp.Path);
+        Assert.False(state.FinalVerificationPassed);
+        Assert.Empty(state.Completed);
+        Assert.Empty(state.Remaining);
     }
 
     [Fact]
@@ -127,7 +163,7 @@ public sealed class BatchRuntimeTests
         var backend = new FakeAgentBackend();
         backend.Enqueue(_ => "# Task\n\nImplement A.");
         backend.Enqueue(_ => "Implemented A without changing the known repository baseline.");
-        backend.Enqueue(_ => "");
+        backend.Enqueue(_ => "# Done");
         var runtime = FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend);
 
         var initial = await runtime.RunRequestAsync("Implement A in an already-red repository.", "test", default);
@@ -203,7 +239,7 @@ public sealed class BatchRuntimeTests
         WriteRepositoryFallback(temp, 7);
         temp.Write(".idd/verification.yaml", "version: 1\nchecks: {}\ndefault:\n  use: []\n");
         var backend = new FakeAgentBackend();
-        backend.Enqueue(_ => "");
+        backend.Enqueue(_ => "# Done");
 
         var outcome = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend)
             .RunRequestAsync("Use the configured verification policy.", "test", default);

@@ -16,7 +16,8 @@ reassesses the original request against the current repository, durable intent,
 completed task results, actual changed paths, authoritative verification
 evidence, and prior user answers recorded by planning pauses.
 
-Normal planner output is human-readable Markdown:
+Normal planner output is human-readable Markdown and has exactly one logical
+form. For contractable work it returns one or more tasks:
 
 ```markdown
 # Task
@@ -30,9 +31,7 @@ Integrate it into the second already-understood area.
 
 Each `# Task` section becomes one immutable work-item contract. The planner
 returns every task that can be safely contracted now and stops at the first
-material uncertainty that depends on new evidence. An empty response means no
-semantic work remains. Planner output contains no capability, persistent ID,
-status, dependency, revision, outcome, or transition instruction.
+material uncertainty that depends on new evidence.
 
 If no task can be safely contracted because a decision must come from the user,
 the planner may instead return exactly one question:
@@ -43,8 +42,21 @@ the planner may instead return exactly one question:
 Should deleted records be restored automatically or only after confirmation?
 ```
 
-A question cannot be mixed with tasks. Runtime turns it mechanically into a
-resumable `USER_DECISION_REQUIRED` pause; it does not interpret the decision.
+If semantic reassessment finds no remaining work and no missing user decision,
+the planner returns exactly:
+
+```markdown
+# Done
+```
+
+`# Done` has no body and cannot be mixed with tasks or a question. Blank or
+whitespace-only planner output is malformed and is not a completion signal.
+Planner output contains no capability, persistent ID, status, dependency,
+revision, outcome, or transition instruction.
+
+A question cannot be mixed with tasks or `# Done`. Runtime turns it mechanically
+into a resumable `USER_DECISION_REQUIRED` pause; it does not interpret the
+decision.
 
 ## User decision
 
@@ -80,10 +92,11 @@ Required task verification is deterministic. Failure retries the same immutable
 task with its prior report and authoritative failure evidence. Planning is not
 invoked for an ordinary task-check failure.
 
-After the batch is exhausted, planning always runs again. If the planner emits
-neither tasks nor a question, strict final verification runs. A final failure
-becomes evidence for a new planning cycle; a final success permits finalization
-without a semantic final-review phase.
+After the batch is exhausted, planning always runs again. A validated exact
+`# Done` is mechanically mapped to the existing empty-batch representation and
+starts strict final verification. `# Done` itself never completes Factory. A
+final failure becomes evidence for a new planning cycle; a final success permits
+finalization without a semantic final-review phase.
 
 ## Persistence and recovery
 
@@ -93,8 +106,10 @@ artifacts are separate human-readable artifacts. `result.json` stores only
 runtime-owned provenance pointing to semantic artifacts.
 
 Recovery resumes the exact persisted planning, execution, verification, or
-user-question continuation. Completed history is immutable. Runtime budgets
-bound planning cycles, total work items, and attempts per task.
+user-question continuation. Completed history is immutable. Persisted planner
+output is validated under the current protocol, so an exact `# Done` may resume
+normally while a persisted blank result is malformed. Runtime budgets bound
+planning cycles, total work items, and attempts per task.
 
 The schema remains intentionally incompatible with active runs from the
 previous semantic-outcome protocol; such runs must be cancelled and restarted.

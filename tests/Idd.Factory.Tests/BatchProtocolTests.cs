@@ -27,11 +27,48 @@ public sealed class BatchProtocolTests
     }
 
     [Fact]
-    public void EmptyPlannerOutputMeansNoRemainingWork()
+    public void PlannerDoneMeansNoRemainingWork()
     {
-        var plan = parser.Parse(" \r\n");
+        var plan = parser.Parse("# Done\n");
         Assert.Empty(plan);
         Assert.Null(plan.Question);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    [InlineData("\n\n")]
+    public void BlankPlannerOutputIsRejected(string output) =>
+        Assert.Equal("MALFORMED_PLANNER_OUTPUT", Assert.Throws<AgentProtocolException>(() => parser.Parse(output)).Code);
+
+    [Fact]
+    public void PlannerDoneWithBodyIsRejected()
+    {
+        var error = Assert.Throws<AgentProtocolException>(() => parser.Parse("# Done\n\nEverything is complete."));
+        Assert.Equal("MALFORMED_PLANNER_OUTPUT", error.Code);
+    }
+
+    [Fact]
+    public void PlannerTaskAndDoneCannotBeMixed()
+    {
+        var error = Assert.Throws<AgentProtocolException>(() => parser.Parse("# Task\n\nImplement A.\n\n# Done\n"));
+        Assert.Equal("MALFORMED_PLANNER_OUTPUT", error.Code);
+    }
+
+    [Fact]
+    public void PlannerQuestionAndDoneCannotBeMixed()
+    {
+        var error = Assert.Throws<AgentProtocolException>(() => parser.Parse("# Question\n\nChoose A or B?\n\n# Done\n"));
+        Assert.Equal("MALFORMED_PLANNER_OUTPUT", error.Code);
+    }
+
+    [Fact]
+    public void PlannerMayReturnOnlyOneDoneMarker()
+    {
+        var error = Assert.Throws<AgentProtocolException>(() => parser.Parse("# Done\n\n# Done\n"));
+        Assert.Equal("MALFORMED_PLANNER_OUTPUT", error.Code);
     }
 
     [Fact]
@@ -47,6 +84,16 @@ public sealed class BatchProtocolTests
     }
 
     [Fact]
+    public void DoneHeadingInsideFencedCodeIsTaskContentNotAProtocolBoundary()
+    {
+        var plan = parser.Parse("# Task\n\nDocument this example:\n\n```markdown\n# Done\n```\n");
+
+        Assert.Single(plan);
+        Assert.Null(plan.Question);
+        Assert.Contains("```markdown\n# Done\n```", plan[0], StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void QuestionHeadingInsideBlockQuoteIsTaskContentNotAProtocolBoundary()
     {
         var plan = parser.Parse("# Task\n\nPreserve this example:\n\n> # Question\n> Example only.\n");
@@ -54,6 +101,24 @@ public sealed class BatchProtocolTests
         Assert.Single(plan);
         Assert.Null(plan.Question);
         Assert.Contains("> # Question", plan[0], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DoneHeadingInsideBlockQuoteIsTaskContentNotAProtocolBoundary()
+    {
+        var plan = parser.Parse("# Task\n\nPreserve this example:\n\n> # Done\n");
+
+        Assert.Single(plan);
+        Assert.Null(plan.Question);
+        Assert.Contains("> # Done", plan[0], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DoneAllowsBomAndLineEndingNormalization()
+    {
+        var plan = parser.Parse("\uFEFF# Done\r\n\r\n");
+        Assert.Empty(plan);
+        Assert.Null(plan.Question);
     }
 
     [Theory]
@@ -64,6 +129,12 @@ public sealed class BatchProtocolTests
     [InlineData("# Task\nA\n# Question\nB?")]
     [InlineData("Task\n====\n\nImplement A.")]
     [InlineData("# Task #\n\nImplement A.")]
+    [InlineData("Done")]
+    [InlineData("## Done")]
+    [InlineData("# done")]
+    [InlineData("# DONE")]
+    [InlineData("# Done #")]
+    [InlineData("Done\n====")]
     public void MalformedPlannerOutputIsRejected(string output) =>
         Assert.Equal("MALFORMED_PLANNER_OUTPUT", Assert.Throws<AgentProtocolException>(() => parser.Parse(output)).Code);
 

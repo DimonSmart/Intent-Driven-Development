@@ -4,6 +4,32 @@ This page records IDD changes that require action in repositories that already u
 
 Updating the installed plugins and migrating project-owned files are separate operations. Follow [Updating IDD](updating-idd.md) to refresh `idd-intent` and `idd-factory`. Then apply any relevant migration instructions below. Plugin updates do not automatically rewrite a repository's `.idd/intent/` directory.
 
+## 2026-09-03 — Explicit planner completion marker
+
+Planner completion is now explicit. When semantic reassessment finds no
+remaining work and no missing user decision, the planner must return exactly
+`# Done`. Blank or whitespace-only planner output is now
+`MALFORMED_PLANNER_OUTPUT` and never starts strict final verification.
+
+This is a controlled breaking change of the planner Markdown protocol:
+
+```text
+before: empty response = no remaining semantic work
+after:  # Done = no remaining semantic work
+        empty response = malformed planner output
+```
+
+`# Done` has no body and cannot be mixed with `# Task` or `# Question`. Runtime
+mechanically maps validated `# Done` to the existing empty-batch representation,
+then runs the existing strict final deterministic verification. It does not add
+a semantic completion field to `state.json`, a new runtime command, a final
+reviewer, or an extra LLM invocation.
+
+Update the packaged runtime and planner skill together. Persisted blank planner
+results are not treated as legacy completion evidence after the update; cancel
+and restart an affected run if it cannot resume under the new protocol. No
+runtime-state schema migration is required solely for this marker change.
+
 ## 2026-09-03 — Batch planning Factory Runtime
 
 Factory now runs a single semantic loop: a planner emits an ordered Markdown
