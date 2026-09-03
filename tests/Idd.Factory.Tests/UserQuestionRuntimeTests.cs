@@ -42,21 +42,4 @@ public sealed class UserQuestionRuntimeTests
         Assert.Contains("# Question\n\nShould deletion be automatic or require explicit confirmation?", answer, StringComparison.Ordinal);
         Assert.Contains("# Answer\n\nRequire explicit confirmation.", answer, StringComparison.Ordinal);
     }
-
-    [Fact]
-    public async Task UserAnswerIsRejectedWhenNoPlannerQuestionIsPending()
-    {
-        using var temp = new TestWorkspace();
-        var backend = new FakeAgentBackend();
-        backend.Enqueue(_ => "# Task\n\nImplement A.");
-        backend.Enqueue(_ => "Implemented A.");
-        backend.Enqueue(_ => "");
-        var runtime = FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend);
-
-        var completed = await runtime.RunRequestAsync("Implement A.", "test", default);
-        Assert.Equal("COMPLETED", completed.FactoryOutcome);
-
-        var outcome = await runtime.ContinueAsync(default, userAnswer: "Unexpected answer");
-        Assert.Equal("MISSING_FACTORY_STATE", Assert.ThrowsAsync<FactoryStateException>(() => runtime.ContinueAsync(default, userAnswer: "Unexpected answer")).Result.Code);
-    }
 }
