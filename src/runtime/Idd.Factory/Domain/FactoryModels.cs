@@ -105,7 +105,7 @@ public sealed record PendingVerificationSession(
     VerificationContinuationStage Stage);
 
 [JsonConverter(typeof(JsonStringEnumConverter<ContinuationKind>))]
-public enum ContinuationKind { SemanticInvocation, VerificationGate, Terminal }
+public enum ContinuationKind { SemanticInvocation, VerificationGate, UserQuestion, Terminal }
 [JsonConverter(typeof(JsonStringEnumConverter<VerificationContinuationStage>))]
 public enum VerificationContinuationStage { ExecuteCheck, AwaitingConfirmation, AwaitingManualResult }
 [JsonConverter(typeof(JsonStringEnumConverter<VerificationConfirmation>))]

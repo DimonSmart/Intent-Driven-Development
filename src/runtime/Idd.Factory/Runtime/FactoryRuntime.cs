@@ -61,13 +61,42 @@ public sealed partial class FactoryRuntime(
         return await ExecuteLoopAsync(state, cancellationToken);
     }
 
-    public async Task<FactoryCliOutcome> ContinueAsync(CancellationToken cancellationToken, VerificationConfirmation confirmation = VerificationConfirmation.None, bool? verificationPassed = null)
+    public async Task<FactoryCliOutcome> ContinueAsync(
+        CancellationToken cancellationToken,
+        VerificationConfirmation confirmation = VerificationConfirmation.None,
+        bool? verificationPassed = null,
+        string? userAnswer = null)
     {
         var state = await stateStore.LoadAsync(cancellationToken) ?? throw new FactoryStateException("MISSING_FACTORY_STATE", "No Factory run exists.");
         if (state.FactoryConfigurationHash != configuration.Hash) return new("FACTORY_CONFIGURATION_CHANGED", state.RunId, "Restore the pinned configuration or cancel and restart.");
         if (state.RunStatus == FactoryRunStatus.Cancelled) return new("CANCELLED", state.RunId);
         try { await ReconcileAsync(state, cancellationToken); }
         catch (AgentProtocolException exception) { return await StopForAgentProtocolExceptionAsync(state, exception, cancellationToken); }
+
+        if (state.PendingContinuation is { Kind: ContinuationKind.UserQuestion })
+        {
+            if (string.IsNullOrWhiteSpace(userAnswer)) return OutcomeFromBlocker(state, "USER_DECISION_REQUIRED");
+            ValidateUtf8Text(userAnswer, "INVALID_USER_ANSWER_ENCODING", "Factory user answer");
+            var question = state.Blocker?.Reason;
+            if (string.IsNullOrWhiteSpace(question))
+                throw new FactoryStateException("CORRUPT_FACTORY_STATE", "User-question continuation has no persisted question.");
+            await PersistPlanningAnswerAsync(question, userAnswer, cancellationToken);
+            state.PendingContinuation = new(
+                ContinuationKind.SemanticInvocation,
+                null,
+                null,
+                "PLANNING_AFTER_USER_ANSWER",
+                true,
+                SemanticOperationKind.Planning);
+            state.Blocker = null;
+            state.RunStatus = FactoryRunStatus.Running;
+            await events.WriteAsync(state.RunId, "user-answer-recorded", new { }, cancellationToken);
+            await SaveAsync(state, cancellationToken);
+        }
+        else if (userAnswer is not null)
+        {
+            return new("UNEXPECTED_USER_ANSWER", state.RunId, "The current Factory continuation is not waiting for a planner question.", "Continue without a user answer, or cancel the run.");
+        }
 
         if (state.PendingContinuation is { IsResumable: false }) return OutcomeFromBlocker(state, "TERMINAL_STOP");
         if (state.PendingContinuation is

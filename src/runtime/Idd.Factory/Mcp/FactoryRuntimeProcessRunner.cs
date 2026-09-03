@@ -17,30 +17,39 @@ internal sealed class FactoryRuntimeProcessRunner(
     public async Task<FactoryMcpResult> RunAsync(
         FactoryRuntimeCommand command,
         string workspace,
-        string? request,
+        string? input,
         CancellationToken cancellationToken)
     {
         ValidateWorkspace(workspace);
-        if (command == FactoryRuntimeCommand.Run && (request is null || request.Length == 0))
-            throw new ArgumentException("request is required.", nameof(request));
-        if (command != FactoryRuntimeCommand.Run && request is not null)
-            throw new ArgumentException("request is supported only for factory_run.", nameof(request));
-        if (request is not null && InvalidUnicodeReason(request, "Factory request") is { } requestError)
-            return new("INVALID_REQUEST_ENCODING", "unknown", requestError, "Resubmit the original request without corrupted Unicode replacement characters.", null);
+        if (command == FactoryRuntimeCommand.Run && (input is null || input.Length == 0))
+            throw new ArgumentException("request is required.", nameof(input));
+        if (command == FactoryRuntimeCommand.Cancel && input is not null)
+            throw new ArgumentException("input is not supported for factory_cancel.", nameof(input));
+        var inputLabel = command == FactoryRuntimeCommand.Run ? "Factory request" : "Factory user answer";
+        if (input is not null && InvalidUnicodeReason(input, inputLabel) is { } inputError)
+            return new(
+                command == FactoryRuntimeCommand.Run ? "INVALID_REQUEST_ENCODING" : "INVALID_USER_ANSWER_ENCODING",
+                "unknown",
+                inputError,
+                command == FactoryRuntimeCommand.Run
+                    ? "Resubmit the original request without corrupted Unicode replacement characters."
+                    : "Resubmit the user answer without corrupted Unicode replacement characters.",
+                null);
 
         var runtimeAssembly = Path.Combine(AppContext.BaseDirectory, "idd-factory.dll");
         if (!File.Exists(runtimeAssembly))
             throw new FactoryTransportException("FACTORY_TRANSPORT_UNAVAILABLE", "The packaged Factory Runtime assembly is missing.");
         var pluginRoot = ResolvePluginRoot(AppContext.BaseDirectory);
-        string? requestFile = null;
+        string? inputFile = null;
         try
         {
-            if (request is not null)
+            if (input is not null)
             {
-                requestFile = Path.Combine(Path.GetTempPath(), $"idd-factory-request-{Guid.NewGuid():N}.md");
-                await File.WriteAllTextAsync(requestFile, request, TextUtf8, cancellationToken);
+                var prefix = command == FactoryRuntimeCommand.Run ? "request" : "answer";
+                inputFile = Path.Combine(Path.GetTempPath(), $"idd-factory-{prefix}-{Guid.NewGuid():N}.md");
+                await File.WriteAllTextAsync(inputFile, input, TextUtf8, cancellationToken);
             }
-            var invocation = BuildInvocation(command, workspace, requestFile, runtimeAssembly, pluginRoot);
+            var invocation = BuildInvocation(command, workspace, inputFile, runtimeAssembly, pluginRoot);
             FactoryProcessResult processResult;
             try
             {
@@ -71,7 +80,7 @@ internal sealed class FactoryRuntimeProcessRunner(
         }
         finally
         {
-            if (requestFile is not null) TryDeleteTemporaryFile(requestFile);
+            if (inputFile is not null) TryDeleteTemporaryFile(inputFile);
         }
     }
 
@@ -107,7 +116,7 @@ internal sealed class FactoryRuntimeProcessRunner(
     internal static FactoryProcessInvocation BuildInvocation(
         FactoryRuntimeCommand command,
         string workspace,
-        string? requestFile,
+        string? inputFile,
         string runtimeAssembly,
         string pluginRoot)
     {
@@ -120,8 +129,12 @@ internal sealed class FactoryRuntimeProcessRunner(
         };
         if (command == FactoryRuntimeCommand.Run)
         {
-            if (requestFile is null) throw new ArgumentException("requestFile is required for Factory run.", nameof(requestFile));
-            arguments.AddRange(["--request-file", requestFile]);
+            if (inputFile is null) throw new ArgumentException("inputFile is required for Factory run.", nameof(inputFile));
+            arguments.AddRange(["--request-file", inputFile]);
+        }
+        else if (command == FactoryRuntimeCommand.Continue && inputFile is not null)
+        {
+            arguments.AddRange(["--answer-file", inputFile]);
         }
         return new(ResolveDotnetHost(), arguments, workspace, null);
     }
