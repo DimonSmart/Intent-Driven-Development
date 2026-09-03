@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Text.Json;
 using Idd.Factory.Domain;
 
 namespace Idd.Factory.Runtime;
@@ -116,7 +118,13 @@ public sealed partial class FactoryRuntime
     }
 }
 
-internal sealed record PlannerBatchResult(IReadOnlyList<string> Tasks, string? Question);
+internal sealed record PlannerBatchResult(IReadOnlyList<string> Tasks, string? Question) : IReadOnlyList<string>
+{
+    public int Count => Tasks.Count;
+    public string this[int index] => Tasks[index];
+    public IEnumerator<string> GetEnumerator() => Tasks.GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+}
 
 internal static class PlannerBatchParser
 {
