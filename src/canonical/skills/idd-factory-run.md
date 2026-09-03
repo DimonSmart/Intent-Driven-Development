@@ -80,9 +80,14 @@ blocked. Missing documentation alone is not `INTENT_REQUIRED`.
   with the persisted question and current relevant intent. If the answer defines
   or changes durable product truth and scope permits intent writes, use the
   existing `idd-intent-change` workflow and validate coverage before resuming.
-  If it is only an implementation choice, do not write durable intent. In either
-  case, pass the user's exact answer to `factory_continue` so the same run records
-  it and the next planner can use it. Do not rewrite `request.md`.
+  If the answer defines or changes durable product truth but the requested scope
+  forbids intent writes, do not pass the answer to Factory as an implementation
+  choice; leave the run paused and report that continuing requires an allowed
+  intent update or explicit cancellation. If the answer is only an
+  implementation choice, do not write durable intent. After any required intent
+  work is complete, pass the user's exact answer to `factory_continue` so the
+  same run records it and the next planner can use it. Do not rewrite
+  `request.md`.
 - If the user chooses not to continue, cancel the Factory run instead of
   fabricating an answer. Cancellation preserves product changes and diagnostics.
 - Cancellation is explicit. Warn that product changes are preserved; do not
