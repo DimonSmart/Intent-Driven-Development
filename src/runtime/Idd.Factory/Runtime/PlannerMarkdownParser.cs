@@ -64,11 +64,13 @@ internal sealed class PlannerMarkdownParser
 
     private static PlannerSectionMarker? TryCreateMarker(string markdown, HeadingBlock heading)
     {
-        if (heading.Span.Start < 0 || heading.Span.End < heading.Span.Start || heading.Span.End >= markdown.Length)
+        if (heading.Span.Start < 0 || heading.Span.Start >= markdown.Length)
             throw Malformed();
 
-        var source = markdown.Substring(heading.Span.Start, heading.Span.End - heading.Span.Start + 1);
-        var kind = source switch
+        var lineEnd = markdown.IndexOf('\n', heading.Span.Start);
+        if (lineEnd < 0) lineEnd = markdown.Length;
+        var sourceLine = markdown[heading.Span.Start..lineEnd];
+        var kind = sourceLine switch
         {
             TaskHeading => PlannerSectionKind.Task,
             QuestionHeading => PlannerSectionKind.Question,
@@ -76,7 +78,7 @@ internal sealed class PlannerMarkdownParser
         };
         return kind == PlannerSectionKind.None
             ? null
-            : new(heading.Span.Start, heading.Span.End + 1, kind);
+            : new(heading.Span.Start, lineEnd, kind);
     }
 
     private static string Normalize(string markdown) =>
