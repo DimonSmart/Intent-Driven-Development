@@ -13,10 +13,10 @@ unchanged original request and treats current `.idd/intent/` as read-only.
 
 The planner is the only semantic component that decides what work remains. It
 reassesses the original request against the current repository, durable intent,
-completed task results, actual changed paths, and authoritative verification
-evidence.
+completed task results, actual changed paths, authoritative verification
+evidence, and prior user answers recorded by planning pauses.
 
-Planner output is human-readable Markdown:
+Normal planner output is human-readable Markdown:
 
 ```markdown
 # Task
@@ -33,6 +33,32 @@ returns every task that can be safely contracted now and stops at the first
 material uncertainty that depends on new evidence. An empty response means no
 semantic work remains. Planner output contains no capability, persistent ID,
 status, dependency, revision, outcome, or transition instruction.
+
+If no task can be safely contracted because a decision must come from the user,
+the planner may instead return exactly one question:
+
+```markdown
+# Question
+
+Should deleted records be restored automatically or only after confirmation?
+```
+
+A question cannot be mixed with tasks. Runtime turns it mechanically into a
+resumable `USER_DECISION_REQUIRED` pause; it does not interpret the decision.
+
+## User decision
+
+The host presents the planner question to the user. If the answer changes
+durable product truth, the normal IDD intent workflow records and validates that
+change before Factory resumes. If it is only an implementation choice, intent
+remains unchanged.
+
+The exact answer is passed to `factory_continue`, stored separately from the
+immutable `request.md`, and supplied to the next planner. If the user chooses
+not to continue, the run is cancelled explicitly.
+
+Executors cannot request this pause and their free-form reports are never parsed
+for user-question, intent, correction, or replanning signals.
 
 ## Execution
 
@@ -55,20 +81,20 @@ task with its prior report and authoritative failure evidence. Planning is not
 invoked for an ordinary task-check failure.
 
 After the batch is exhausted, planning always runs again. If the planner emits
-no tasks, strict final verification runs. A final failure becomes evidence for
-a new planning cycle; a final success permits finalization without a semantic
-final-review phase.
+neither tasks nor a question, strict final verification runs. A final failure
+becomes evidence for a new planning cycle; a final success permits finalization
+without a semantic final-review phase.
 
 ## Persistence and recovery
 
 `.idd/factory/current/state.json` stores machine state. Task contracts,
-`planning-output.md`, and `semantic-result.md` are separate human-readable
-artifacts. `result.json` stores only runtime-owned provenance pointing to the
-semantic artifact.
+`planning-output.md`, `semantic-result.md`, and planning question/answer
+artifacts are separate human-readable artifacts. `result.json` stores only
+runtime-owned provenance pointing to semantic artifacts.
 
-Recovery resumes the exact persisted planning, execution, or verification
-operation. Completed history is immutable. Runtime budgets bound planning
-cycles, total work items, and attempts per task.
+Recovery resumes the exact persisted planning, execution, verification, or
+user-question continuation. Completed history is immutable. Runtime budgets
+bound planning cycles, total work items, and attempts per task.
 
-The new schema is intentionally incompatible with active runs from the previous
-semantic-outcome protocol; such runs must be cancelled and restarted.
+The schema remains intentionally incompatible with active runs from the
+previous semantic-outcome protocol; such runs must be cancelled and restarted.
