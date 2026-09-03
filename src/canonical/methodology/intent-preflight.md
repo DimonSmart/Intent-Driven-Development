@@ -190,11 +190,15 @@ When the user answers:
 2. If the answer adds or changes durable product truth and scope permits intent
    writes, invoke the ordinary `idd-intent-change` workflow and validate
    coverage before resuming Factory.
-3. If the answer is only an implementation choice, do not write durable intent.
-4. Pass the user's exact answer to the same Factory run through
-   `factory_continue`. Runtime records it separately from immutable `request.md`
-   and the next planner receives it as evidence.
-5. If the user declines to continue, cancel the run. Do not invent an answer.
+3. If the answer adds or changes durable product truth but scope forbids intent
+   writes, do not reinterpret it as an implementation-only choice and do not
+   resume Factory with that answer. Leave the run paused until an intent update
+   is permitted, or cancel it explicitly.
+4. If the answer is only an implementation choice, do not write durable intent.
+5. After any required intent update is complete, pass the user's exact answer to
+   the same Factory run through `factory_continue`. Runtime records it separately
+   from immutable `request.md` and the next planner receives it as evidence.
+6. If the user declines to continue, cancel the run. Do not invent an answer.
 
 The planner does not decide whether the answer belongs in intent, executors do
 not request this pause, and runtime does not interpret the answer's product
