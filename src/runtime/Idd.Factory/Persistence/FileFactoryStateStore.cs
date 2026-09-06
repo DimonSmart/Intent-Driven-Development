@@ -20,7 +20,7 @@ public sealed class FileFactoryStateStore(string currentDirectory, FactoryStateV
         if (!File.Exists(StatePath)) return null;
         try
         {
-            await using var schemaStream = File.OpenRead(StatePath);
+            await using var schemaStream = OpenReadWithDeleteSharing(StatePath);
             using var document = await JsonDocument.ParseAsync(schemaStream, cancellationToken: cancellationToken);
             if (!document.RootElement.TryGetProperty("schemaVersion", out var schemaNode) || !schemaNode.TryGetInt32(out var schemaVersion))
                 throw new FactoryStateException("CORRUPT_FACTORY_STATE", "state.json has no valid schemaVersion.");
@@ -70,9 +70,12 @@ public sealed class FileFactoryStateStore(string currentDirectory, FactoryStateV
             stream.Flush(true);
         }
         File.Move(temporaryPath, StatePath, true);
-        await using var verificationStream = File.OpenRead(StatePath);
+        await using var verificationStream = OpenReadWithDeleteSharing(StatePath);
         var persisted = await JsonSerializer.DeserializeAsync<FactoryState>(verificationStream, FactoryJson.Options, cancellationToken)
             ?? throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Atomic save verification failed.");
         validator.Validate(persisted);
     }
+
+    private static FileStream OpenReadWithDeleteSharing(string path) =>
+        new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan);
 }

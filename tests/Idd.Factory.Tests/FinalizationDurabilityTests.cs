@@ -85,6 +85,32 @@ public sealed class FinalizationDurabilityTests
         Assert.True(Directory.Exists(Path.Combine(result, "attempts")));
     }
 
+    [Fact]
+    public async Task FinalizationRetriesTransientWindowsDirectoryLock()
+    {
+        using var temp = new TestWorkspace();
+        var (state, current) = await PrepareFinalizableRunAsync(temp);
+        var eventsPath = Path.Combine(current, "events.jsonl");
+        using var blockingRead = new FileStream(eventsPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        Task release = Task.CompletedTask;
+        var handler = new FinalizeHandler(temp.Path, stage =>
+        {
+            if (stage != FinalizationStage.Prepared) return;
+            release = Task.Run(async () =>
+            {
+                await Task.Delay(100);
+                blockingRead.Dispose();
+            });
+        });
+
+        var result = await handler.FinalizeAsync(state, default);
+        if (OperatingSystem.IsWindows()) Assert.True(release.IsCompleted);
+        await release;
+
+        Assert.False(Directory.Exists(current));
+        Assert.True(File.Exists(Path.Combine(result, "factory-result.json")));
+    }
+
     private static async Task<(FactoryState State, string Current)> PrepareFinalizableRunAsync(TestWorkspace temp)
     {
         var current = Path.Combine(temp.Path, ".idd", "factory", "current");

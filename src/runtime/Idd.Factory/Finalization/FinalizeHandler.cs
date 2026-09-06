@@ -43,7 +43,7 @@ public sealed class FinalizeHandler
         // artifacts remain under current and FinalizeAsync can be retried. After it, the entire
         // completed run exists under results, including events.jsonl and all attempt diagnostics.
         cancellationToken.ThrowIfCancellationRequested();
-        Directory.Move(current, destination);
+        await MoveDirectoryAsync(current, destination, cancellationToken);
         transitionObserver?.Invoke(FinalizationStage.Committed);
         return destination;
     }
@@ -148,6 +148,26 @@ public sealed class FinalizeHandler
         !string.IsNullOrWhiteSpace(value)
         && value == Path.GetFileName(value)
         && value.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
+
+    private static async Task MoveDirectoryAsync(string source, string destination, CancellationToken cancellationToken)
+    {
+        const int maximumAttempts = 5;
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                Directory.Move(source, destination);
+                return;
+            }
+            catch (Exception exception) when (
+                OperatingSystem.IsWindows()
+                && attempt < maximumAttempts
+                && exception is IOException or UnauthorizedAccessException)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(50 * attempt), cancellationToken);
+            }
+        }
+    }
 
     private static string Slug(string value)
     {

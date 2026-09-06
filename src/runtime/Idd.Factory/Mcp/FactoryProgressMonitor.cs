@@ -92,7 +92,7 @@ internal sealed class FactoryMcpProgressMonitor(FactoryStatusReader statusReader
     {
         var path = EventPath(workspace);
         if (!File.Exists(path)) return ([], nextIndex);
-        var lines = await File.ReadAllLinesAsync(path, cancellationToken);
+        var lines = await ReadAllLinesSharedAsync(path, cancellationToken);
         if (lines.Length <= nextIndex) return ([], nextIndex);
         return (lines.Skip(nextIndex).ToArray(), lines.Length);
     }
@@ -185,7 +185,8 @@ internal sealed class FactoryMcpProgressMonitor(FactoryStatusReader statusReader
         {
             var path = Path.Combine(workspace, ".idd", "factory", "current", "state.json");
             if (!File.Exists(path)) return false;
-            using var document = JsonDocument.Parse(await File.ReadAllTextAsync(path, cancellationToken));
+            await using var stream = OpenReadWithDeleteSharing(path);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
             var root = document.RootElement;
             return root.TryGetProperty("planningCycleCount", out var cycles)
                 && cycles.TryGetInt32(out var count)
@@ -257,7 +258,8 @@ internal sealed class FactoryMcpProgressMonitor(FactoryStatusReader statusReader
         {
             var path = Path.Combine(workspace, ".idd", "factory", "current", "attempts", attemptId, "invocation.json");
             if (!File.Exists(path)) return (null, null);
-            using var document = JsonDocument.Parse(await File.ReadAllTextAsync(path, cancellationToken));
+            await using var stream = OpenReadWithDeleteSharing(path);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
             var root = document.RootElement;
             return (Text(root, "input", "Input"), Text(root, "workItemId", "WorkItemId"));
         }
@@ -329,6 +331,19 @@ internal sealed class FactoryMcpProgressMonitor(FactoryStatusReader statusReader
         elapsed.TotalHours >= 1
             ? $"{(int)elapsed.TotalHours}:{elapsed.Minutes:00}:{elapsed.Seconds:00}"
             : $"{elapsed.Minutes}:{elapsed.Seconds:00}";
+
+    private static async Task<string[]> ReadAllLinesSharedAsync(string path, CancellationToken cancellationToken)
+    {
+        await using var stream = OpenReadWithDeleteSharing(path);
+        using var reader = new StreamReader(stream);
+        var lines = new List<string>();
+        while (await reader.ReadLineAsync(cancellationToken) is { } line)
+            lines.Add(line);
+        return lines.ToArray();
+    }
+
+    private static FileStream OpenReadWithDeleteSharing(string path) =>
+        new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan);
 
     private static string EventPath(string workspace) =>
         Path.Combine(workspace, ".idd", "factory", "current", "events.jsonl");
