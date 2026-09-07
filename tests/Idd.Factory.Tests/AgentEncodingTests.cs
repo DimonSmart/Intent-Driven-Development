@@ -82,12 +82,22 @@ public sealed class AgentEncodingTests
     {
         if (OperatingSystem.IsWindows())
         {
-            var start = CodexCliBackend.CreateProcessStartInfo(
-                Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe",
-                workingDirectory);
-            start.ArgumentList.Add("/d");
-            start.ArgumentList.Add("/c");
-            start.ArgumentList.Add("chcp 65001>nul & echo Устранена & echo Ошибка 1>&2");
+            var powershell = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                "System32",
+                "WindowsPowerShell",
+                "v1.0",
+                "powershell.exe");
+            var start = CodexCliBackend.CreateProcessStartInfo(powershell, workingDirectory);
+            start.ArgumentList.Add("-NoLogo");
+            start.ArgumentList.Add("-NoProfile");
+            start.ArgumentList.Add("-NonInteractive");
+            start.ArgumentList.Add("-Command");
+            start.ArgumentList.Add(
+                "$stdout=[Convert]::FromBase64String('0KPRgdGC0YDQsNC90LXQvdCwDQo=');" +
+                "$stderr=[Convert]::FromBase64String('0J7RiNC40LHQutCwDQo=');" +
+                "$out=[Console]::OpenStandardOutput();$out.Write($stdout,0,$stdout.Length);$out.Flush();" +
+                "$err=[Console]::OpenStandardError();$err.Write($stderr,0,$stderr.Length);$err.Flush()");
             return start;
         }
 
