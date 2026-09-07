@@ -131,6 +131,47 @@ Intent paths changed: <paths when present>
 For `USER_DECISION_REQUIRED`, present the question and stop until the user
 answers or cancels. Do not report it as a terminal Factory failure.
 
+For `VERIFICATION_INFRASTRUCTURE_FAILURE` and
+`BASELINE_VERIFICATION_INFRASTRUCTURE_FAILURE`, trust the runtime's `Reason`,
+structured diagnostic payload, and `ResumeWhen`. Do not infer a different cause,
+reclassify the failure, or derive workflow state from stdout or stderr. Present
+the Factory outcome and reason, then report these diagnostic fields when present:
+
+```text
+Verification infrastructure failure
+Primary check: <primaryCheckId>
+Context: <context>
+Work item: <workItemId>
+Primary cause: <failureKind> at <failureStage>: <summary>
+Termination: requested=<requested>, entire process tree=<entireProcessTree>, succeeded=<succeeded>, error=<bounded error metadata>
+Evidence: <evidencePath>
+Stderr tail: <stderrTail>
+Full stderr: <stderrPath, only when the tail was truncated>
+Stdout tail: <stdoutTail>
+Full stdout: <stdoutPath, only when the tail was truncated>
+Resume when: <runtime-provided ResumeWhen>
+```
+
+Use the entry in `checks` whose `checkId` equals `primaryCheckId` for the primary
+cause and stream details. Omit absent or empty fields and stream sections. Never
+print an evidence or stream-log path when its payload field is null or absent.
+When termination is present, use only its exact `requested`, `entireProcessTree`,
+`succeeded`, and bounded `error` fields. If `metadataTruncated` is true or
+`omittedCheckCount` is nonzero, say compactly that diagnostic metadata or
+secondary entries were truncated; never infer that the primary entry was lost.
+Tails are bounded diagnostic
+excerpts: preserve their content, label them as tails, and never replace them
+with or append the full logs. When a non-empty tail represents truncated output
+and its per-stream path is present, point to that path so the user can inspect
+the full stream. Do not expose stack traces, environment data, secrets, or full
+log contents. If `checks` contains additional diagnostic entries, enumerate them
+compactly in payload order after the primary check, one short entry per check
+containing its check ID, `failureKind`/`failureStage`, and any non-null exit code and
+evidence path. Do not repeat shared outcome, reason, context, work item, or resume
+instructions, and do not expand additional tails unless needed to distinguish
+the diagnostics. Always finish with the runtime-provided `ResumeWhen` exactly
+enough to preserve its condition.
+
 When a read-only runtime status operation is used after a lost or timed-out
 blocking response, its `status` is launcher/runtime ownership state, not a
 Factory outcome. Report it as `Factory status: <status>`. In particular,

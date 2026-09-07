@@ -161,7 +161,7 @@ public sealed partial class FactoryRuntime(
 
         var baseline = await verification.RunContextAsync("final", cancellationToken);
         RecordEvidence(state, null, baseline.Evidence);
-        var evidenceRefs = baseline.Evidence.Select(x => $"verification/{x.EvidenceId}.json").ToArray();
+        var evidenceRefs = EvidenceReferences(baseline.Evidence).ToArray();
         await events.WriteAsync(state.RunId, "repository-fallback-baseline", new { baseline.Status, evidenceRefs }, cancellationToken);
 
         if (baseline.Status is VerificationStatus.Passed or VerificationStatus.NoChecks)
@@ -192,15 +192,22 @@ public sealed partial class FactoryRuntime(
         }
 
         var terminal = new PendingContinuation(ContinuationKind.Terminal, null, null, "BASELINE_VERIFICATION", false);
+        if (baseline.Status == VerificationStatus.InfrastructureFailure)
+        {
+            var diagnostic = CreateInfrastructureDiagnostic("BASELINE_VERIFICATION_INFRASTRUCTURE_FAILURE", "baseline", null, baseline.Evidence);
+            var payload = SerializeBoundedDiagnostic(diagnostic);
+            await WriteInfrastructureFailureEventAsync(state.RunId, diagnostic, cancellationToken);
+            return await StopAsync(
+                state,
+                diagnostic.Code,
+                BuildInfrastructureReason(diagnostic, baseline: true),
+                BuildInfrastructureResumeWhen(diagnostic, baseline: true),
+                cancellationToken,
+                terminal,
+                payload);
+        }
         return baseline.Status switch
         {
-            VerificationStatus.InfrastructureFailure => await StopAsync(
-                state,
-                "BASELINE_VERIFICATION_INFRASTRUCTURE_FAILURE",
-                $"Repository fallback baseline could not execute before Factory planning. Checks: {checkSummary}. Evidence: {evidenceSummary}.",
-                "Fix the verification infrastructure, then cancel/restart the Factory run.",
-                cancellationToken,
-                terminal),
             _ => await StopAsync(
                 state,
                 "BASELINE_VERIFICATION_ACTION_REQUIRED",

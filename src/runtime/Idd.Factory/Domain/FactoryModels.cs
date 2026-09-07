@@ -81,6 +81,43 @@ public sealed record CompletedWorkItem
 
 public sealed record FactoryBlocker(string Code, string Reason, string ResumeWhen, JsonElement? Payload = null);
 
+public sealed record VerificationInfrastructureDiagnosticPayload
+{
+    public const int CurrentSchemaVersion = 1;
+    public int SchemaVersion { get; init; } = CurrentSchemaVersion;
+    public required string Code { get; init; }
+    public required string Context { get; init; }
+    public string? WorkItemId { get; init; }
+    public required string PrimaryCheckId { get; init; }
+    public IReadOnlyList<VerificationInfrastructureCheckDiagnostic> Checks { get; init; } = [];
+    public bool MetadataTruncated { get; init; }
+    public int OmittedCheckCount { get; init; }
+}
+
+public sealed record VerificationInfrastructureCheckDiagnostic
+{
+    public required string CheckId { get; init; }
+    public required string EvidenceId { get; init; }
+    public string? EvidencePath { get; init; }
+    public required string FailureKind { get; init; }
+    public required string FailureStage { get; init; }
+    public required string Summary { get; init; }
+    public DateTimeOffset StartedAt { get; init; }
+    public DateTimeOffset FinishedAt { get; init; }
+    public long? DurationMilliseconds { get; init; }
+    public long? TimeoutMilliseconds { get; init; }
+    public bool TimedOut { get; init; }
+    public int? ExitCode { get; init; }
+    public VerificationDiagnosticStream Stdout { get; init; } = new(null, "", false);
+    public VerificationDiagnosticStream Stderr { get; init; } = new(null, "", false);
+    public VerificationTerminationDiagnostic? Termination { get; init; }
+    public int SecondaryIssueCount { get; init; }
+}
+
+public sealed record VerificationDiagnosticStream(string? Path, string Tail, bool Truncated);
+public sealed record VerificationTerminationDiagnostic(bool Requested, bool EntireProcessTree, bool? Succeeded, VerificationTerminationErrorDiagnostic? Error);
+public sealed record VerificationTerminationErrorDiagnostic(string? Type, string? Message);
+
 public sealed record PendingContinuation(
     ContinuationKind Kind,
     string? WorkItemId,

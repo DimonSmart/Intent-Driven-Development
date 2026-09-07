@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Idd.Factory.Domain;
+using Idd.Factory.Verification;
 
 namespace Idd.Factory.Runtime;
 
@@ -17,7 +18,7 @@ public sealed partial class FactoryRuntime
         var request = await File.ReadAllTextAsync(Path.Combine(currentDirectory, state.RequestPath), cancellationToken);
         var completed = await BuildPlanningCompletedContextAsync(state, cancellationToken);
         var userAnswers = await BuildPlanningAnswerContextAsync(cancellationToken);
-        var verificationEvidence = BuildPlanningVerificationEvidenceContext(state.VerificationEvidenceRefs);
+        var verificationEvidence = await BuildPlanningVerificationEvidenceContextAsync(state.VerificationEvidenceRefs, cancellationToken);
         var finalFailure = state.FinalVerificationPlanRevision == state.PlanRevision && !state.FinalVerificationPassed;
         var trigger = state.PlanningCycleCount == 0
             ? "Initial planning."
@@ -27,7 +28,7 @@ public sealed partial class FactoryRuntime
         var input =
             $"Original request:\n{request}\n\nCurrent planning trigger:\n{trigger}\n\nCompleted immutable work:\n{completed}\n\n" +
             $"User answers to earlier planning questions:\n{userAnswers}\n\n" +
-            $"Authoritative verification evidence references:\n{verificationEvidence}\n\n" +
+            $"Authoritative verification evidence summaries:\n{verificationEvidence}\n\n" +
             "Read current durable intent from .idd/intent and inspect the current repository directly. " +
             "Materialize every task whose self-contained contract can be determined reliably now, in execution order. " +
             "Stop at the first material uncertainty that requires evidence from this batch. " +
@@ -86,8 +87,34 @@ public sealed partial class FactoryRuntime
         return await BuildCompletedContextAsync(planningState, cancellationToken);
     }
 
-    private string BuildPlanningVerificationEvidenceContext(IEnumerable<string> references) =>
-        string.Join("\n", references.Select(reference => "- " + GetWorkspaceVisibleEvidencePath(reference)));
+    private async Task<string> BuildPlanningVerificationEvidenceContextAsync(
+        IEnumerable<string> references,
+        CancellationToken cancellationToken)
+    {
+        var summaries = new List<string>();
+        foreach (var reference in references)
+        {
+            var visiblePath = GetWorkspaceVisibleEvidencePath(reference);
+            VerificationEvidence evidence;
+            try
+            {
+                evidence = VerificationEngine.Read(await File.ReadAllTextAsync(Path.Combine(currentDirectory, reference), cancellationToken));
+            }
+            catch (JsonException exception)
+            {
+                throw new FactoryStateException("CORRUPT_FACTORY_STATE", $"Invalid authoritative verification evidence '{reference}': {exception.Message}");
+            }
+
+            summaries.Add($"- Check: {evidence.CheckId}");
+            summaries.Add($"  Status: {evidence.Status}");
+            summaries.Add($"  Exit code: {evidence.ExitCode?.ToString() ?? "unavailable"}");
+            summaries.Add($"  Evidence: {visiblePath}");
+            summaries.Add("  Bounded diagnostic output:");
+            foreach (var line in BoundedVerificationOutput(evidence).Replace("\r\n", "\n").Split('\n'))
+                summaries.Add($"  {line}");
+        }
+        return summaries.Count == 0 ? "none" : string.Join("\n", summaries);
+    }
 
     private string GetWorkspaceVisibleEvidencePath(string reference)
     {

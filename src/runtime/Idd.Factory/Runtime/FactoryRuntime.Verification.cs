@@ -1,10 +1,13 @@
 using Idd.Factory.Domain;
 using Idd.Factory.Verification;
+using System.Text;
+using System.Text.Json;
 
 namespace Idd.Factory.Runtime;
 
 public sealed partial class FactoryRuntime
 {
+    private static readonly JsonSerializerOptions DiagnosticJsonOptions = new(FactoryJson.Options) { WriteIndented = false };
     private async Task<FactoryCliOutcome?> RunVerificationAsync(
         FactoryState state,
         string? workItemId,
@@ -57,7 +60,7 @@ public sealed partial class FactoryRuntime
                 var fallback = await verification.RunContextAsync(context, session.ChangedPaths, cancellationToken);
                 RecordEvidence(state, item, fallback.Evidence);
                 if (fallback.Status is VerificationStatus.Passed or VerificationStatus.NoChecks or VerificationStatus.Failed)
-                    RecordLastVerificationCycle(item, fallback.Evidence.Select(x => $"verification/{x.EvidenceId}.json"));
+                    RecordLastVerificationCycle(item, EvidenceReferences(fallback.Evidence));
                 switch (fallback.Status)
                 {
                     case VerificationStatus.Passed:
@@ -69,7 +72,7 @@ public sealed partial class FactoryRuntime
                             await events.WriteAsync(state.RunId, "repository-fallback-subtask-degraded", new
                             {
                                 workItemId = item!.Id,
-                                evidenceRefs = fallback.Evidence.Select(x => $"verification/{x.EvidenceId}.json").ToArray()
+                                evidenceRefs = EvidenceReferences(fallback.Evidence).ToArray()
                             }, cancellationToken);
                             return await CompleteVerificationAsync(state, item, context, [], cancellationToken);
                         }
@@ -230,7 +233,7 @@ public sealed partial class FactoryRuntime
             NextCheckIndex = session.NextCheckIndex + 1,
             CompletedCheckIds = completed,
             FailedCheckIds = failures,
-            EvidenceRefs = session.EvidenceRefs.Concat(evidence.Select(x => $"verification/{x.EvidenceId}.json")).Distinct(StringComparer.Ordinal).ToList(),
+            EvidenceRefs = session.EvidenceRefs.Concat(EvidenceReferences(evidence)).Distinct(StringComparer.Ordinal).ToList(),
             PendingCheckId = null,
             PendingCheckDefinitionHash = null,
             Stage = VerificationContinuationStage.ExecuteCheck
@@ -306,12 +309,214 @@ public sealed partial class FactoryRuntime
         IEnumerable<VerificationEvidence> evidence,
         CancellationToken cancellationToken)
     {
+        var evidenceList = evidence.ToList();
         state.RunStatus = FactoryRunStatus.Blocked;
-        state.Blocker = new(code, reason, "Resolve the verification condition, then continue.");
+        JsonElement? payload = null;
+        var resumeWhen = "Resolve the verification condition, then continue.";
+        if (code == "VERIFICATION_INFRASTRUCTURE_FAILURE")
+        {
+            var diagnostic = CreateInfrastructureDiagnostic(code, context, item?.Id, evidenceList);
+            payload = SerializeBoundedDiagnostic(diagnostic);
+            reason = BuildInfrastructureReason(diagnostic, baseline: false);
+            resumeWhen = BuildInfrastructureResumeWhen(diagnostic, baseline: false);
+            await WriteInfrastructureFailureEventAsync(state.RunId, diagnostic, cancellationToken);
+        }
+        state.Blocker = new(code, reason, resumeWhen, payload);
         state.PendingContinuation = new(ContinuationKind.VerificationGate, item?.Id, context, code, true);
-        RecordEvidence(state, item, evidence);
+        RecordEvidence(state, item, evidenceList);
         await SaveAsync(state, cancellationToken);
         return OutcomeFromBlocker(state, code);
+    }
+
+    internal static VerificationInfrastructureDiagnosticPayload CreateInfrastructureDiagnostic(
+        string code, string context, string? workItemId, IReadOnlyList<VerificationEvidence> evidence)
+    {
+        var relevant = evidence.Where(x => x.Status == "infrastructure-failure" || x.PrimaryFailure is not null).ToList();
+        var primary = relevant.FirstOrDefault(x => x.PrimaryFailure is not null) ?? relevant.FirstOrDefault()
+            ?? new VerificationEvidence { CheckId = "unknown", EvidenceId = "unknown", Status = "infrastructure-failure" };
+        if (relevant.Count > 0)
+            relevant = relevant.OrderByDescending(x => ReferenceEquals(x, primary)).ToList();
+        return BoundDiagnostic(new VerificationInfrastructureDiagnosticPayload
+        {
+            Code = code,
+            Context = context,
+            WorkItemId = workItemId,
+            PrimaryCheckId = primary.CheckId,
+            Checks = relevant.Count == 0 ? [CreateCheckDiagnostic(primary)] : relevant.Select(CreateCheckDiagnostic).ToList()
+        });
+    }
+
+    private static VerificationInfrastructureCheckDiagnostic CreateCheckDiagnostic(VerificationEvidence evidence)
+    {
+        var failure = evidence.PrimaryFailure ?? new VerificationFailure("unknown", "execute", "Verification infrastructure failed without a primary diagnostic.");
+        return new()
+        {
+            CheckId = evidence.CheckId, EvidenceId = evidence.EvidenceId,
+            EvidencePath = evidence.EvidencePersisted ? PublicVerificationPath($"{evidence.EvidenceId}.json") : null,
+            FailureKind = failure.Kind, FailureStage = failure.Stage,
+            Summary = failure.Kind == "timeout" && evidence.TimeoutMilliseconds is not null
+                ? $"Verification check {BoundDiagnosticText(evidence.CheckId, 96)} timed out after {FormatDuration(evidence.TimeoutMilliseconds.Value)}."
+                : failure.Message,
+            StartedAt = evidence.StartedAt, FinishedAt = evidence.FinishedAt,
+            DurationMilliseconds = evidence.DurationMilliseconds, TimeoutMilliseconds = evidence.TimeoutMilliseconds,
+            TimedOut = evidence.TimedOut, ExitCode = evidence.ExitCode,
+            Stdout = new(PublicVerificationPath(evidence.Stdout.Path), evidence.Stdout.Tail, evidence.Stdout.Truncated),
+            Stderr = new(PublicVerificationPath(evidence.Stderr.Path), evidence.Stderr.Tail, evidence.Stderr.Truncated),
+            Termination = evidence.Termination is null ? null : new(evidence.Termination.Requested, evidence.Termination.EntireProcessTree,
+                evidence.Termination.Succeeded, evidence.Termination.Error is null ? null : new(evidence.Termination.Error.Type, evidence.Termination.Error.Message)),
+            SecondaryIssueCount = evidence.DiagnosticIssues.Count
+        };
+    }
+
+    internal static JsonElement SerializeBoundedDiagnostic(VerificationInfrastructureDiagnosticPayload diagnostic)
+    {
+        const int maximumBytes = 16 * 1024;
+        var candidate = BoundDiagnostic(diagnostic);
+        while (SerializedSize(candidate) > maximumBytes
+               && candidate.Checks.Any(x => x.Stdout.Tail.Length > 0 || x.Stderr.Tail.Length > 0))
+        {
+            candidate = candidate with
+            {
+                Checks = candidate.Checks.Select(x => x with
+                {
+                    Stdout = ReduceStreamTail(x.Stdout),
+                    Stderr = ReduceStreamTail(x.Stderr)
+                }).ToList()
+            };
+        }
+        if (SerializedSize(candidate) > maximumBytes)
+            candidate = candidate with { MetadataTruncated = true, Checks = candidate.Checks.Select(x => x with { Summary = BoundDiagnosticText(x.Summary, 64)!, Termination = x.Termination is null ? null : x.Termination with { Error = null } }).ToList() };
+        while (SerializedSize(candidate) > maximumBytes && candidate.Checks.Any(x => x.Summary.Length > 0))
+            candidate = candidate with { Checks = candidate.Checks.Select(x => x with { Summary = BoundDiagnosticText(x.Summary, Math.Max(0, x.Summary.Length / 2))! }).ToList() };
+        while (SerializedSize(candidate) > maximumBytes && candidate.Checks.Count > 1)
+            candidate = candidate with { MetadataTruncated = true, OmittedCheckCount = candidate.OmittedCheckCount + 1, Checks = candidate.Checks.Take(candidate.Checks.Count - 1).ToList() };
+
+        // The fixed caps below make a primary-only payload comfortably smaller than the limit.
+        // Keep this final reduction defensive so serialization never turns oversized diagnostics
+        // into a new infrastructure exception.
+        if (SerializedSize(candidate) > maximumBytes)
+        {
+            var primary = candidate.Checks[0];
+            candidate = candidate with
+            {
+                MetadataTruncated = true,
+                Code = BoundDiagnosticText(candidate.Code, 32)!,
+                Context = BoundDiagnosticText(candidate.Context, 32)!,
+                WorkItemId = BoundDiagnosticText(candidate.WorkItemId, 32),
+                PrimaryCheckId = BoundDiagnosticText(primary.CheckId, 64)!,
+                Checks = [primary with
+                {
+                    CheckId = BoundDiagnosticText(primary.CheckId, 64)!, EvidenceId = BoundDiagnosticText(primary.EvidenceId, 64)!, EvidencePath = null,
+                    FailureKind = BoundDiagnosticText(primary.FailureKind, 32)!, FailureStage = BoundDiagnosticText(primary.FailureStage, 32)!,
+                    Summary = BoundDiagnosticText(primary.Summary, 64)!, Stdout = new(null, "", true), Stderr = new(null, "", true),
+                    Termination = primary.Termination is null ? null : primary.Termination with { Error = null }
+                }]
+            };
+        }
+        return JsonSerializer.SerializeToElement(candidate, DiagnosticJsonOptions);
+    }
+
+    private static int SerializedSize(VerificationInfrastructureDiagnosticPayload diagnostic) =>
+        Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(diagnostic, DiagnosticJsonOptions));
+
+    private static VerificationDiagnosticStream ReduceStreamTail(VerificationDiagnosticStream stream) =>
+        stream.Tail.Length == 0 ? stream : stream with { Tail = RemoveTailPrefix(stream.Tail, Math.Max(1, stream.Tail.Length / 4)), Truncated = true };
+
+    private static VerificationInfrastructureDiagnosticPayload BoundDiagnostic(VerificationInfrastructureDiagnosticPayload diagnostic)
+    {
+        var boundedChecks = diagnostic.Checks.Select(x => x with
+        {
+            CheckId = BoundDiagnosticText(x.CheckId, 256)!, EvidenceId = BoundDiagnosticText(x.EvidenceId, 256)!,
+            EvidencePath = BoundDiagnosticText(x.EvidencePath, 512), FailureKind = BoundDiagnosticText(x.FailureKind, 64)!,
+            FailureStage = BoundDiagnosticText(x.FailureStage, 64)!, Summary = BoundDiagnosticText(x.Summary)!,
+            Stdout = x.Stdout with { Path = BoundDiagnosticText(x.Stdout.Path, 512) },
+            Stderr = x.Stderr with { Path = BoundDiagnosticText(x.Stderr.Path, 512) },
+            Termination = x.Termination is null ? null : x.Termination with
+            {
+                Error = x.Termination.Error is null ? null : x.Termination.Error with
+                { Type = BoundDiagnosticText(x.Termination.Error.Type, 128), Message = BoundDiagnosticText(x.Termination.Error.Message) }
+            }
+        }).ToList();
+        var primaryIndex = diagnostic.Checks.ToList().FindIndex(x => x.CheckId == diagnostic.PrimaryCheckId);
+        if (primaryIndex > 0) (boundedChecks[0], boundedChecks[primaryIndex]) = (boundedChecks[primaryIndex], boundedChecks[0]);
+        var metadataTruncated = diagnostic.MetadataTruncated || diagnostic.Code.Length > 128 || diagnostic.Context.Length > 128
+            || diagnostic.WorkItemId?.Length > 128 || diagnostic.Checks.Zip(boundedChecks).Any(pair => pair.First != pair.Second);
+        return diagnostic with
+        {
+            Code = BoundDiagnosticText(diagnostic.Code, 128)!, Context = BoundDiagnosticText(diagnostic.Context, 128)!,
+            WorkItemId = BoundDiagnosticText(diagnostic.WorkItemId, 128), PrimaryCheckId = boundedChecks[0].CheckId,
+            Checks = boundedChecks, MetadataTruncated = metadataTruncated
+        };
+    }
+
+    private static string? BoundDiagnosticText(string? value, int maximumCharacters = 256)
+    {
+        if (value is null || value.Length <= maximumCharacters) return value;
+        if (maximumCharacters == 0) return "";
+        var length = maximumCharacters;
+        if (char.IsHighSurrogate(value[length - 1])) length--;
+        return value[..length];
+    }
+
+    private static string RemoveTailPrefix(string value, int count)
+    {
+        var index = Math.Min(count, value.Length);
+        if (index < value.Length && char.IsLowSurrogate(value[index]) && index > 0) index++;
+        return value[index..];
+    }
+
+    private static string BuildInfrastructureReason(VerificationInfrastructureDiagnosticPayload diagnostic, bool baseline)
+    {
+        var primary = diagnostic.Checks[0];
+        var prefix = baseline ? "Repository fallback baseline verification" : $"Verification check {primary.CheckId}";
+        var exit = primary.ExitCode is null ? "" : $" Exit code: {primary.ExitCode}.";
+        var evidence = primary.EvidencePath is null ? " No evidence JSON was persisted." : $" Evidence: {primary.EvidencePath}.";
+        return $"{prefix} could not execute: {primary.FailureKind} at {primary.FailureStage}. {primary.Summary}{exit}{evidence}";
+    }
+
+    private static string BuildInfrastructureResumeWhen(VerificationInfrastructureDiagnosticPayload diagnostic, bool baseline)
+    {
+        var primary = diagnostic.Checks[0];
+        var condition = primary.FailureKind switch
+        {
+            "process-start-failure" => "Make the verification executable and working directory available",
+            "output-capture-failure" => "Restore writable verification log storage",
+            "evidence-persistence-failure" => "Restore writable verification evidence storage",
+            "timeout" => primary.TimeoutMilliseconds is null
+                ? $"Resolve the timeout for verification check {primary.CheckId}"
+                : $"Allow verification check {primary.CheckId} to finish within its configured {FormatDuration(primary.TimeoutMilliseconds.Value)} timeout",
+            "termination-failure" => "Ensure the timed-out verification process can be terminated",
+            _ => $"Resolve the {primary.FailureKind} failure at {primary.FailureStage}"
+        };
+        return baseline ? $"{condition}, then cancel/restart the Factory run." : $"{condition}, then call factory_continue.";
+    }
+
+    private static string FormatDuration(long milliseconds)
+    {
+        if (milliseconds >= 60_000 && milliseconds % 60_000 == 0)
+            return $"{milliseconds / 60_000} {(milliseconds == 60_000 ? "minute" : "minutes")}";
+        if (milliseconds >= 1_000 && milliseconds % 1_000 == 0)
+            return $"{milliseconds / 1_000} {(milliseconds == 1_000 ? "second" : "seconds")}";
+        return milliseconds < 1_000 ? $"{milliseconds} ms" : $"{milliseconds / 1000d:0.###} seconds";
+    }
+
+    private async Task WriteInfrastructureFailureEventAsync(string runId, VerificationInfrastructureDiagnosticPayload diagnostic, CancellationToken cancellationToken) =>
+        await events.WriteAsync(runId, "verification-infrastructure-failure", new
+        {
+            diagnostic.Code,
+            diagnostic.Context,
+            diagnostic.WorkItemId,
+            diagnostic.PrimaryCheckId,
+            checks = diagnostic.Checks.Select(x => new { x.CheckId, x.EvidenceId, x.EvidencePath, x.FailureKind, x.FailureStage, x.StartedAt, x.FinishedAt, x.DurationMilliseconds, x.TimeoutMilliseconds, x.TimedOut, stdoutPath = x.Stdout.Path, stdoutTruncated = x.Stdout.Truncated, stderrPath = x.Stderr.Path, stderrTruncated = x.Stderr.Truncated, x.ExitCode, x.Termination, x.SecondaryIssueCount }).ToArray()
+        }, cancellationToken);
+
+    private static string? PublicVerificationPath(string? path)
+    {
+        if (path is null) return null;
+        var normalized = path.Replace('\\', '/');
+        if (normalized.StartsWith(".idd/factory/current/", StringComparison.Ordinal)) return normalized;
+        if (normalized.StartsWith("verification/", StringComparison.Ordinal)) normalized = normalized["verification/".Length..];
+        return $".idd/factory/current/verification/{normalized}";
     }
 
     private static void RecordLastVerificationCycle(PlannedWorkItem? item, IEnumerable<string> evidenceRefs)
@@ -323,11 +528,14 @@ public sealed partial class FactoryRuntime
 
     private static void RecordEvidence(FactoryState state, PlannedWorkItem? item, IEnumerable<VerificationEvidence> evidence)
     {
-        foreach (var record in evidence)
+        foreach (var record in evidence.Where(x => x.EvidencePersisted))
         {
             var relative = $"verification/{record.EvidenceId}.json";
             if (item is not null && !item.VerificationEvidenceRefs.Contains(relative, StringComparer.Ordinal)) item.VerificationEvidenceRefs.Add(relative);
             if (!state.VerificationEvidenceRefs.Contains(relative, StringComparer.Ordinal)) state.VerificationEvidenceRefs.Add(relative);
         }
     }
+
+    private static IEnumerable<string> EvidenceReferences(IEnumerable<VerificationEvidence> evidence) =>
+        evidence.Where(x => x.EvidencePersisted).Select(x => $"verification/{x.EvidenceId}.json");
 }

@@ -39,6 +39,10 @@ public sealed class PlanningVerificationEvidenceTransportTests
             Assert.Contains("Verification evidence: .idd/factory/current/verification/", invocation.Input);
             Assert.DoesNotContain("Verification evidence: verification/", invocation.Input);
             Assert.DoesNotContain("\n- verification/", invocation.Input.Replace("\r\n", "\n"));
+            Assert.Contains("Authoritative verification evidence summaries:", invocation.Input);
+            Assert.Contains("Check: subtask-pass", invocation.Input);
+            Assert.Contains("Exit code: 0", invocation.Input);
+            Assert.Contains("Bounded diagnostic output:\n  none", invocation.Input.Replace("\r\n", "\n"));
             return "# Done";
         });
 
@@ -104,7 +108,7 @@ public sealed class PlanningVerificationEvidenceTransportTests
         var backend = new FakeAgentBackend();
         backend.Enqueue(invocation =>
         {
-            Assert.Contains("Authoritative verification evidence references:\n\n", invocation.Input.Replace("\r\n", "\n"));
+            Assert.Contains("Authoritative verification evidence summaries:\nnone\n", invocation.Input.Replace("\r\n", "\n"));
             return "# Done";
         });
 

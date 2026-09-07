@@ -24,8 +24,7 @@ public sealed class FinalizeHandler
 
         var current = Path.Combine(workspace, ".idd", "factory", "current");
         foreach (var reference in state.VerificationEvidenceRefs)
-            _ = JsonSerializer.Deserialize<VerificationEvidence>(await File.ReadAllTextAsync(Path.Combine(current, reference), cancellationToken), FactoryJson.Options)
-                ?? throw new InvalidOperationException($"Invalid verification evidence: {reference}");
+            _ = VerificationEngine.Read(await File.ReadAllTextAsync(Path.Combine(current, reference), cancellationToken));
 
         var request = await File.ReadAllTextAsync(Path.Combine(current, state.RequestPath), cancellationToken);
         var resultsRoot = Path.Combine(workspace, ".idd", "factory", "results");

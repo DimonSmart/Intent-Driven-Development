@@ -22,3 +22,6 @@ TestResults/
 # OS files
 .DS_Store
 Thumbs.db
+
+#IDD
+.idd/factory

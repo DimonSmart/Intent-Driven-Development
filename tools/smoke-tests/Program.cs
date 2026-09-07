@@ -385,6 +385,30 @@ void CheckFactoryRoleGeneration()
     var executorClaudeSkill = ReadFrontMatter(ReadText(Path.Combine(
         marketplaceRoot, "plugins", "claude", "idd-factory", "skills", "idd-factory-execute-subtask", "SKILL.md")));
     ExpectContains(executorClaudeSkill, "allowed-tools: [Read, Glob, Grep, Edit, Write, Bash]", "Claude executor native tools");
+
+    foreach (var platform in new[] { "claude", "codex" })
+    {
+        var runSkill = ReadText(Path.Combine(
+            marketplaceRoot, "plugins", platform, "idd-factory", "skills", "idd-factory-run", "SKILL.md"));
+        foreach (var (literal, description) in new[]
+        {
+            ("structured diagnostic payload", "structured diagnostic reporting"),
+            ("Primary check: <primaryCheckId>", "primary check reporting"),
+            ("Primary cause: <failureKind> at <failureStage>: <summary>", "consistent failure-stage reporting"),
+            ("Termination: requested=<requested>, entire process tree=<entireProcessTree>, succeeded=<succeeded>, error=<bounded error metadata>", "termination reporting contract"),
+            ("`metadataTruncated`", "diagnostic metadata truncation reporting"),
+            ("`omittedCheckCount`", "omitted diagnostic entry reporting"),
+            ("Full stderr: <stderrPath, only when the tail was truncated>", "stderr truncation pointer"),
+            ("Full stdout: <stdoutPath, only when the tail was truncated>", "stdout truncation pointer"),
+            ("Do not expose stack traces, environment data, secrets, or full", "diagnostic security boundary"),
+            ("Never\nprint an evidence or stream-log path when its payload field is null or absent", "nullable path omission"),
+            ("enumerate them\ncompactly in payload order", "additional diagnostic reporting"),
+            ("runtime-provided `ResumeWhen` exactly\nenough to preserve its condition", "runtime resume instruction")
+        })
+        {
+            ExpectContains(runSkill, literal, $"{platform} Factory run {description}");
+        }
+    }
 }
 
 void CheckCodexFactoryMetadata()

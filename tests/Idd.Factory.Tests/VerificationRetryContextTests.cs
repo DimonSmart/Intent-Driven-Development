@@ -269,16 +269,18 @@ public sealed class VerificationRetryContextTests
         var reference = $"verification/{evidenceId}.json";
         var path = Path.Combine(temp.Path, ".idd", "factory", "current", reference);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var evidence = new VerificationEvidence(
-            2,
+        var evidence = new
+        {
+            schemaVersion = 2,
             evidenceId,
             checkId,
-            "definition-hash",
-            EvidenceTime,
-            EvidenceTime.AddMilliseconds(1),
+            checkDefinitionHash = "definition-hash",
+            startedAt = EvidenceTime,
+            finishedAt = EvidenceTime.AddMilliseconds(1),
             exitCode,
             status,
-            output);
+            output
+        };
         await File.WriteAllTextAsync(path, JsonSerializer.Serialize(evidence, FactoryJson.Options));
         return reference;
     }

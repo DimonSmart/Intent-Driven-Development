@@ -192,7 +192,7 @@ public sealed partial class FactoryRuntime
                 AppendVerificationMetadata(observations, failure.Reference, failure.Evidence);
                 observations.Add("");
                 observations.Add("  Relevant output:");
-                foreach (var line in BoundedVerificationOutput(failure.Evidence.Output).Replace("\r\n", "\n").Split('\n'))
+                foreach (var line in BoundedVerificationOutput(failure.Evidence).Replace("\r\n", "\n").Split('\n'))
                     observations.Add($"  {line}");
             }
         }
@@ -219,7 +219,7 @@ public sealed partial class FactoryRuntime
     {
         observations.Add($"- Check: {evidence.CheckId}");
         observations.Add($"  Status: {evidence.Status}");
-        observations.Add($"  Exit code: {evidence.ExitCode}");
+        observations.Add($"  Exit code: {evidence.ExitCode?.ToString() ?? "unavailable"}");
         observations.Add($"  Evidence: {reference}");
     }
 
@@ -229,7 +229,7 @@ public sealed partial class FactoryRuntime
         if (failures.Count == 0) return $"{item.Id} exhausted its semantic attempt budget.";
 
         var (reference, evidence) = failures[^1];
-        return $"Work item {item.Id} could not pass authoritative verification after {item.AttemptCount} semantic attempts.\n\nFailed check:\n{evidence.CheckId}\n\nLatest verification output:\n{BoundedVerificationOutput(evidence.Output)}\n\nEvidence:\n{reference}";
+        return $"Work item {item.Id} could not pass authoritative verification after {item.AttemptCount} semantic attempts.\n\nFailed check:\n{evidence.CheckId}\n\nExit code:\n{(evidence.ExitCode?.ToString() ?? "unavailable")}\n\nLatest bounded verification tails:\n{BoundedVerificationOutput(evidence)}\n\nEvidence:\n{reference}";
     }
 
     private async Task<List<(string Reference, VerificationEvidence Evidence)>> ReadFailedVerificationEvidenceAsync(
@@ -243,17 +243,28 @@ public sealed partial class FactoryRuntime
             if (!File.Exists(path)) continue;
             try
             {
-                var evidence = JsonSerializer.Deserialize<VerificationEvidence>(await File.ReadAllTextAsync(path, cancellationToken), FactoryJson.Options);
-                if (evidence?.Status == "failed") failures.Add((reference, evidence));
+                var evidence = VerificationEngine.Read(await File.ReadAllTextAsync(path, cancellationToken));
+                if (evidence.Status == "failed") failures.Add((reference, evidence));
             }
             catch (JsonException) { }
         }
         return failures;
     }
 
-    private static string BoundedVerificationOutput(string output)
+    private static string BoundedVerificationOutput(VerificationEvidence evidence)
     {
         const int maximumBytes = 12 * 1024;
+        var sections = new List<string>();
+        if (evidence.SchemaVersion >= 3)
+        {
+            if (!string.IsNullOrEmpty(evidence.Stderr.Tail)) sections.Add($"stderr tail:\n{evidence.Stderr.Tail}");
+            if (!string.IsNullOrEmpty(evidence.Stdout.Tail)) sections.Add($"stdout tail:\n{evidence.Stdout.Tail}");
+        }
+        else if (!string.IsNullOrEmpty(evidence.Output))
+        {
+            sections.Add($"combined output (schema v2):\n{evidence.Output}");
+        }
+        var output = sections.Count == 0 ? "none" : string.Join("\n", sections);
         if (Encoding.UTF8.GetByteCount(output) <= maximumBytes) return output;
 
         var minimum = 0;
