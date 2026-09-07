@@ -42,9 +42,12 @@ public sealed class CodexCliBackend : IAgentBackend
         var attemptDirectory = Path.GetDirectoryName(invocation.SemanticOutputPath)!;
         var privateHome = PreparePrivateHome(invocation.RunId, invocation.AttemptId, invocation.SkillName);
         var codexHome = privateHome.Path;
+        var tempDirectory = Path.Combine(Path.GetTempPath(), "idd-factory", "codex-temp", invocation.RunId, invocation.AttemptId);
+        CleanupDirectory(tempDirectory);
+        Directory.CreateDirectory(tempDirectory);
         string skillInstructions;
         try { skillInstructions = ReadSkillInstructions(pluginRoot, invocation); }
-        catch { CleanupPrivateHome(codexHome); throw; }
+        catch { CleanupDirectory(codexHome); CleanupDirectory(tempDirectory); throw; }
         var stdoutPath = Path.Combine(attemptDirectory, "stdout.log");
         var stderrPath = Path.Combine(attemptDirectory, "stderr.log");
         var sqliteDirectory = Path.Combine(codexHome, "state");
@@ -61,14 +64,16 @@ public sealed class CodexCliBackend : IAgentBackend
         };
         start.Environment["CODEX_HOME"] = codexHome;
         start.Environment["CODEX_SQLITE_HOME"] = sqliteDirectory;
-        start.Environment["TEMP"] = Path.Combine(codexHome, "tmp");
-        start.Environment["TMP"] = Path.Combine(codexHome, "tmp");
+        start.Environment["TEMP"] = tempDirectory;
+        start.Environment["TMP"] = tempDirectory;
+        start.Environment["DOTNET_CLI_USE_MSBUILD_SERVER"] = "0";
+        start.Environment["MSBUILDUSESERVER"] = "0";
+        start.Environment["MSBUILDDISABLENODEREUSE"] = "1";
         var pathPreparation = CodexProcessEnvironment.PrepareSandboxCompatiblePath(
             start.Environment["PATH"] ?? string.Empty,
             OperatingSystem.IsWindows());
         if (OperatingSystem.IsWindows())
             start.Environment["PATH"] = pathPreparation.Path;
-        Directory.CreateDirectory(start.Environment["TEMP"]!);
         foreach (var argument in BuildArguments(invocation, executionConfiguration, resolvedCommand.PrefixArguments, OperatingSystem.IsWindows()))
             start.ArgumentList.Add(argument);
         await File.WriteAllTextAsync(
@@ -88,13 +93,13 @@ public sealed class CodexCliBackend : IAgentBackend
         var process = new Process { StartInfo = start, EnableRaisingEvents = true };
         try { if (!process.Start()) throw new AgentProtocolException("AGENT_BACKEND_UNAVAILABLE", "Codex CLI did not start."); }
         catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or FileNotFoundException)
-        { CleanupPrivateHome(codexHome); throw new AgentProtocolException("AGENT_BACKEND_UNAVAILABLE", $"Codex CLI could not start: {exception.Message}"); }
+        { CleanupDirectory(codexHome); CleanupDirectory(tempDirectory); throw new AgentProtocolException("AGENT_BACKEND_UNAVAILABLE", $"Codex CLI could not start: {exception.Message}"); }
         var stdout = CaptureAsync(process.StandardOutput, stdoutPath, cancellationToken);
         var stderr = CaptureAsync(process.StandardError, stderrPath, cancellationToken);
         var prompt = BuildBootstrapPrompt(invocation, skillInstructions);
         await process.StandardInput.WriteAsync(prompt.AsMemory(), cancellationToken);
         await process.StandardInput.FlushAsync(cancellationToken); process.StandardInput.Close();
-        processes.Add(invocation.AttemptId, new(process, stdout, stderr, invocation.SemanticOutputPath));
+        processes.Add(invocation.AttemptId, new(process, stdout, stderr, invocation.SemanticOutputPath, tempDirectory));
         return new(invocation.AttemptId, process.Id, invocation.AttemptId);
     }
 
@@ -102,6 +107,7 @@ public sealed class CodexCliBackend : IAgentBackend
     {
         if (!processes.Remove(handle.BackendHandle, out var running))
             return new(-1, "", "The backend handle is not active in this runtime process.", false, false, AgentTerminationKind.TransportFailure);
+        var cleanupTempDirectory = true;
         try
         {
             using var resultWatcherCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -134,6 +140,20 @@ public sealed class CodexCliBackend : IAgentBackend
             var termination = killRequired
                 ? AgentTerminationKind.ForcedAfterResult
                 : exitCode == 0 ? AgentTerminationKind.CleanExit : AgentTerminationKind.TransportFailure;
+            var incompleteCommandCount = CountIncompleteCommandExecutions(stdout);
+            if (incompleteCommandCount > 0)
+            {
+                cleanupTempDirectory = false;
+                completedResultWasObserved = false;
+                termination = AgentTerminationKind.TransportFailure;
+                var diagnostic = $"Agent exited with {incompleteCommandCount} incomplete shell command(s); temporary directory cleanup was skipped.";
+                stderr = string.IsNullOrWhiteSpace(stderr) ? diagnostic : stderr.TrimEnd() + Environment.NewLine + diagnostic;
+                if (File.Exists(running.ResultPath)) File.Delete(running.ResultPath);
+                await File.WriteAllTextAsync(
+                    Path.Combine(Path.GetDirectoryName(running.ResultPath)!, "stderr.log"),
+                    stderr,
+                    CancellationToken.None);
+            }
             return new AgentProcessResult(exitCode, stdout, stderr, completedResultWasObserved, killRequired, termination);
         }
         catch (OperationCanceledException)
@@ -143,20 +163,30 @@ public sealed class CodexCliBackend : IAgentBackend
             try { stdout = await running.Stdout; stderr = await running.Stderr; } catch (OperationCanceledException) { }
             return new(running.Process.HasExited ? running.Process.ExitCode : null, stdout, stderr, IsCompleteResult(running.ResultPath), true, AgentTerminationKind.Cancelled);
         }
-        finally { TryCleanupPrivateHome(running.Process.StartInfo.Environment["CODEX_HOME"]!); running.Process.Dispose(); }
+        finally
+        {
+            TryCleanupDirectory(running.Process.StartInfo.Environment["CODEX_HOME"]!, running.ResultPath);
+            if (cleanupTempDirectory) TryCleanupDirectory(running.TempDirectory, running.ResultPath);
+            running.Process.Dispose();
+        }
     }
 
     public async Task CancelAsync(AgentRunHandle handle, CancellationToken cancellationToken)
     {
         if (!processes.Remove(handle.BackendHandle, out var running)) return;
         try { await CancelProcessAsync(running.Process); await Task.WhenAll(running.Stdout, running.Stderr); }
-        finally { TryCleanupPrivateHome(running.Process.StartInfo.Environment["CODEX_HOME"]!); running.Process.Dispose(); }
+        finally
+        {
+            TryCleanupDirectory(running.Process.StartInfo.Environment["CODEX_HOME"]!, running.ResultPath);
+            TryCleanupDirectory(running.TempDirectory, running.ResultPath);
+            running.Process.Dispose();
+        }
     }
 
     private PrivateHome PreparePrivateHome(string runId, string attemptId, string selectedSkill)
     {
         var home = Path.Combine(Path.GetTempPath(), "idd-factory", "codex-private", runId, attemptId);
-        CleanupPrivateHome(home);
+        CleanupDirectory(home);
         Directory.CreateDirectory(home);
         var configuredHome = Environment.GetEnvironmentVariable("CODEX_HOME");
         var sourceHome = string.IsNullOrWhiteSpace(configuredHome)
@@ -243,8 +273,37 @@ public sealed class CodexCliBackend : IAgentBackend
             throw new ArgumentException("Factory-selected skill instructions cannot be empty.", nameof(skillInstructions));
         return $"Factory-selected role instructions ({invocation.SkillName}):\n\n{skillInstructions.Trim()}\n\nAssigned Factory work:\n\n{invocation.Input}\n\n" +
             "Return only the human-readable Markdown requested by the selected skill. The backend captures the final response through the invocation-specific result channel; do not create or edit result artifacts yourself. " +
+            "Do not return while a shell command is still running; wait for it to finish or terminate it first. " +
             "Do not plan a subsequent Factory step, select another worker, or return runtime bookkeeping. " +
             "Do not mutate .idd/factory/current or .idd/intent. stdout is diagnostic only.";
+    }
+
+    internal static int CountIncompleteCommandExecutions(string stdout)
+    {
+        var active = new HashSet<string>(StringComparer.Ordinal);
+        using var reader = new StringReader(stdout);
+        while (reader.ReadLine() is { } line)
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            try
+            {
+                using var document = JsonDocument.Parse(line);
+                var root = document.RootElement;
+                if (!root.TryGetProperty("type", out var eventType)
+                    || !root.TryGetProperty("item", out var item)
+                    || !item.TryGetProperty("id", out var idValue)
+                    || !item.TryGetProperty("type", out var itemType)
+                    || itemType.GetString() is not ("command_execution" or "local_shell_call"))
+                    continue;
+
+                var id = idValue.GetString();
+                if (string.IsNullOrWhiteSpace(id)) continue;
+                if (eventType.GetString() == "item.started") active.Add(id);
+                else if (eventType.GetString() == "item.completed") active.Remove(id);
+            }
+            catch (JsonException) { }
+        }
+        return active.Count;
     }
 
     internal static AgentAttemptTelemetry BuildTelemetry(
@@ -283,15 +342,24 @@ public sealed class CodexCliBackend : IAgentBackend
         return Directory.Exists(root) ? Directory.EnumerateDirectories(root).Count(path => File.Exists(Path.Combine(path, "SKILL.md"))) : 0;
     }
 
-    private static void CleanupPrivateHome(string home)
+    private static void CleanupDirectory(string path)
     {
-        if (Directory.Exists(home)) Directory.Delete(home, recursive: true);
+        if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
     }
 
-    private static void TryCleanupPrivateHome(string home)
+    private static void TryCleanupDirectory(string path, string resultPath)
     {
-        try { CleanupPrivateHome(home); }
-        catch (Exception exception) when (exception is UnauthorizedAccessException or IOException) { }
+        try { CleanupDirectory(path); }
+        catch (Exception exception) when (exception is UnauthorizedAccessException or IOException)
+        {
+            try
+            {
+                File.WriteAllText(
+                    Path.Combine(Path.GetDirectoryName(resultPath)!, "cleanup-warning.log"),
+                    $"{exception.GetType().Name}: {exception.Message}");
+            }
+            catch (Exception diagnosticException) when (diagnosticException is UnauthorizedAccessException or IOException) { }
+        }
     }
 
     private static async Task<string> CaptureAsync(StreamReader reader, string path, CancellationToken cancellationToken)
@@ -311,7 +379,7 @@ public sealed class CodexCliBackend : IAgentBackend
     }
     private static async Task CancelProcessAsync(Process process)
     { if (process.HasExited) return; try { process.CloseMainWindow(); await Task.Delay(1500); } catch { } if (!process.HasExited) process.Kill(true); await process.WaitForExitAsync(); }
-    private sealed record RunningProcess(Process Process, Task<string> Stdout, Task<string> Stderr, string ResultPath);
+    private sealed record RunningProcess(Process Process, Task<string> Stdout, Task<string> Stderr, string ResultPath, string TempDirectory);
     private sealed record PrivateHome(string Path, int InheritedSkillCount);
 }
 
