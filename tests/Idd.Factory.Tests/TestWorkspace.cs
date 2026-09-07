@@ -20,6 +20,22 @@ internal sealed class TestWorkspace : IDisposable
             }
         }
 
-        Directory.Delete(Path, true);
+        const int maxAttempts = 10;
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                Directory.Delete(Path, true);
+                return;
+            }
+            catch (IOException) when (OperatingSystem.IsWindows() && attempt < maxAttempts)
+            {
+                Thread.Sleep(50);
+            }
+            catch (UnauthorizedAccessException) when (OperatingSystem.IsWindows() && attempt < maxAttempts)
+            {
+                Thread.Sleep(50);
+            }
+        }
     }
 }
