@@ -176,6 +176,9 @@ public class VerificationEngine(string workspace, string currentDirectory)
         var started = DateTimeOffset.UtcNow;
         var shell = OperatingSystem.IsWindows() ? "powershell" : "/bin/sh";
         var info = new ProcessStartInfo(shell) { WorkingDirectory = workspace, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+        info.Environment["DOTNET_CLI_USE_MSBUILD_SERVER"] = "0";
+        info.Environment["MSBUILDUSESERVER"] = "0";
+        info.Environment["MSBUILDDISABLENODEREUSE"] = "1";
         if (OperatingSystem.IsWindows()) { info.ArgumentList.Add("-NoProfile"); info.ArgumentList.Add("-Command"); info.ArgumentList.Add(check.Run!); }
         else { info.ArgumentList.Add("-c"); info.ArgumentList.Add(check.Run!); }
         Process? startedProcess;
@@ -190,11 +193,26 @@ public class VerificationEngine(string workspace, string currentDirectory)
         try { await process.WaitForExitAsync(timeout.Token); }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            if (!process.HasExited) process.Kill(true);
+            await StopProcessTreeAsync(process);
             return await PersistAsync(id, check.Run!, started, -1, "infrastructure-failure", $"Check {id} timed out.", CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            await StopProcessTreeAsync(process);
+            throw;
         }
         var output = (await stdoutTask) + (await stderrTask);
         return await PersistAsync(id, check.Run!, started, process.ExitCode, process.ExitCode == 0 ? "passed" : "failed", output, cancellationToken);
+    }
+
+    private static async Task StopProcessTreeAsync(Process process)
+    {
+        try
+        {
+            if (!process.HasExited) process.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException) when (process.HasExited) { }
+        await process.WaitForExitAsync(CancellationToken.None);
     }
 
     private async Task<VerificationEvidence> PersistAsync(string id, string definition, DateTimeOffset started, int exitCode, string status, string output, CancellationToken cancellationToken)

@@ -77,6 +77,29 @@ public sealed class VerificationTests
         Assert.Equal(VerificationStatus.InfrastructureFailure, result.Status); Assert.Equal("infrastructure-failure", Assert.Single(result.Evidence).Status);
     }
 
+    [Fact] public async Task CancellationStopsTheRunningCheckProcess()
+    {
+        using var temp = new TestWorkspace();
+        string command = OperatingSystem.IsWindows()
+            ? "$PID | Set-Content -NoNewline verification.pid; Start-Sleep -Seconds 30"
+            : "echo $$ > verification.pid; sleep 30";
+        temp.Write(".idd/verification.yaml", $"version: 1\nchecks:\n  wait:\n    run: >-\n      {command}\n    timeout: 1m\ndefault:\n  use:\n    - wait\n");
+        var engine = new VerificationEngine(temp.Path, System.IO.Path.Combine(temp.Path, ".idd", "factory", "current"));
+        using var cancellation = new CancellationTokenSource();
+        var run = engine.RunAsync(["wait"], cancellation.Token);
+        string pidPath = System.IO.Path.Combine(temp.Path, "verification.pid");
+
+        for (var attempt = 0; attempt < 100 && !File.Exists(pidPath); attempt++)
+            await Task.Delay(25);
+        Assert.True(File.Exists(pidPath));
+        int pid = int.Parse(await File.ReadAllTextAsync(pidPath));
+
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+
+        Assert.False(IsProcessRunning(pid));
+    }
+
     [Theory]
     [InlineData("version: 2\nchecks: {}\ndefault:\n  use: []\n")]
     [InlineData("checks: {}\ndefault:\n  use: []\n")]
@@ -104,5 +127,18 @@ public sealed class VerificationTests
         var exception = await Assert.ThrowsAsync<VerificationException>(() => engine.RunSubtaskAsync([], default));
 
         Assert.Equal("INVALID_VERIFICATION_POLICY", exception.Code);
+    }
+
+    private static bool IsProcessRunning(int processId)
+    {
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(processId);
+            return !process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 }

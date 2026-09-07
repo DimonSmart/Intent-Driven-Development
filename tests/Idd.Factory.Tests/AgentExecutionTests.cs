@@ -47,5 +47,6 @@ public sealed class AgentExecutionTests
         var prompt = CodexCliBackend.BuildBootstrapPrompt(invocation, "instructions");
 
         Assert.Contains("Do not return while a shell command is still running", prompt, StringComparison.Ordinal);
+        Assert.Contains("--disable-build-servers -m:1", prompt, StringComparison.Ordinal);
     }
 }

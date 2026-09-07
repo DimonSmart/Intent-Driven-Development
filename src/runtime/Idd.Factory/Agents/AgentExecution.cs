@@ -274,6 +274,7 @@ public sealed class CodexCliBackend : IAgentBackend
         return $"Factory-selected role instructions ({invocation.SkillName}):\n\n{skillInstructions.Trim()}\n\nAssigned Factory work:\n\n{invocation.Input}\n\n" +
             "Return only the human-readable Markdown requested by the selected skill. The backend captures the final response through the invocation-specific result channel; do not create or edit result artifacts yourself. " +
             "Do not return while a shell command is still running; wait for it to finish or terminate it first. " +
+            "Run dotnet build and test commands with --disable-build-servers -m:1 to avoid leaving compiler or MSBuild workers behind. " +
             "Do not plan a subsequent Factory step, select another worker, or return runtime bookkeeping. " +
             "Do not mutate .idd/factory/current or .idd/intent. stdout is diagnostic only.";
     }
