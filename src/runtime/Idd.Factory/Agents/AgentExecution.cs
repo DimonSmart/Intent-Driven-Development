@@ -52,16 +52,7 @@ public sealed class CodexCliBackend : IAgentBackend
         var stderrPath = Path.Combine(attemptDirectory, "stderr.log");
         var sqliteDirectory = Path.Combine(codexHome, "state");
         Directory.CreateDirectory(sqliteDirectory);
-        var start = new ProcessStartInfo(resolvedCommand.Executable)
-        {
-            WorkingDirectory = invocation.Workspace,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardInputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+        var start = CreateProcessStartInfo(resolvedCommand.Executable, invocation.Workspace);
         start.Environment["CODEX_HOME"] = codexHome;
         start.Environment["CODEX_SQLITE_HOME"] = sqliteDirectory;
         start.Environment["TEMP"] = tempDirectory;
@@ -247,6 +238,25 @@ public sealed class CodexCliBackend : IAgentBackend
         _ => throw new ArgumentOutOfRangeException(nameof(profile), profile, null)
     };
 
+    internal static ProcessStartInfo CreateProcessStartInfo(string executable, string workingDirectory)
+    {
+        var utf8 = new UTF8Encoding(
+            encoderShouldEmitUTF8Identifier: false,
+            throwOnInvalidBytes: true);
+        return new ProcessStartInfo(executable)
+        {
+            WorkingDirectory = workingDirectory,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardInputEncoding = utf8,
+            StandardOutputEncoding = utf8,
+            StandardErrorEncoding = utf8,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+    }
+
     internal static IReadOnlyList<string> BuildArguments(
         AgentInvocation invocation,
         AgentExecutionConfiguration configuration,
@@ -363,7 +373,7 @@ public sealed class CodexCliBackend : IAgentBackend
         }
     }
 
-    private static async Task<string> CaptureAsync(StreamReader reader, string path, CancellationToken cancellationToken)
+    internal static async Task<string> CaptureAsync(StreamReader reader, string path, CancellationToken cancellationToken)
     { var text = await reader.ReadToEndAsync(cancellationToken); await File.WriteAllTextAsync(path, text, cancellationToken); return text; }
     private static async Task<bool> WaitForCompleteResultAsync(string path, CancellationToken cancellationToken)
     {
