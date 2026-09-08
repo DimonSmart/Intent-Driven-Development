@@ -20,7 +20,7 @@ public sealed class VerificationPromptTests
         var currentC = await WriteEvidenceAsync(temp, "V-current-c", "check-c", "failed", "CURRENT_C_FAILURE_OUTPUT", 1);
         var item = CreateItem([oldA, oldB, currentA, currentB, currentC], [currentA, currentB, currentC]);
 
-        var text = Normalize(await FactoryTestRuntime.Create(temp.Path, new ScriptedAgentBackend())
+        var text = Normalize(await FactoryTestRuntime.ContextReader(temp.Path)
             .BuildVerificationObservationsAsync(item, default));
         var current = Between(text, "Current authoritative verification failures:\n", "\n\nHistorical verification failures:");
         var historical = text[text.IndexOf("Historical verification failures:", StringComparison.Ordinal)..];
@@ -46,7 +46,7 @@ public sealed class VerificationPromptTests
         var current = await WriteEvidenceAsync(
             temp, "V-current", "check-a", "failed", "CURRENT_BEGIN_" + new string('C', 20_000) + "_CURRENT_TAIL_MUST_BE_TRUNCATED", 1);
 
-        var text = await FactoryTestRuntime.Create(temp.Path, new ScriptedAgentBackend())
+        var text = await FactoryTestRuntime.ContextReader(temp.Path)
             .BuildVerificationObservationsAsync(CreateItem([historical, current], [current]), default);
 
         Assert.Contains("CURRENT_BEGIN_", text, StringComparison.Ordinal);
