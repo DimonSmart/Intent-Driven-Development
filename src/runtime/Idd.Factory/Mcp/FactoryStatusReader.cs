@@ -46,7 +46,9 @@ internal sealed class FactoryStatusReader
                 RunId = "unknown",
                 FactoryOutcome = stateError.Code,
                 Reason = stateError.Message,
-                ResumeWhen = "Resolve the persisted Factory state problem before starting or continuing the workflow."
+                ResumeWhen = stateError.Code == "LEGACY_FACTORY_STATE"
+                    ? "Call factory_restart with the replacement request, or call factory_cancel to preserve and archive the legacy run without starting another one."
+                    : "Resolve the persisted Factory state problem before starting or continuing the workflow."
             };
         }
 

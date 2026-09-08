@@ -64,7 +64,7 @@ public sealed class FactoryMcpTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(new string?[] { "factory_cancel", "factory_continue", "factory_retry", "factory_run", "factory_status" }, names);
+        Assert.Equal(new string?[] { "factory_cancel", "factory_continue", "factory_restart", "factory_retry", "factory_run", "factory_status" }, names);
     }
 
     [Fact]
@@ -83,8 +83,26 @@ public sealed class FactoryMcpTests
         Assert.Equal("COMPLETED", result.FactoryOutcome);
     }
 
+    [Fact]
+    public async Task ProcessRunnerPassesExactReplacementRequestToRestartCommand()
+    {
+        using var temp = new TestWorkspace();
+        const string request = "Restart safely with the current runtime.";
+        var invoker = new RecordingInvoker(Outcome(), invocation =>
+        {
+            Assert.Contains("restart", invocation.Arguments);
+            Assert.Equal(request, File.ReadAllText(ValueAfter(invocation, "--request-file")));
+        });
+
+        var result = await new FactoryRuntimeProcessRunner(invoker)
+            .RunAsync(FactoryRuntimeCommand.Restart, temp.Path, request, CancellationToken.None);
+
+        Assert.Equal("COMPLETED", result.FactoryOutcome);
+    }
+
     [Theory]
     [InlineData(nameof(FactoryMcpTools.FactoryRunAsync))]
+    [InlineData(nameof(FactoryMcpTools.FactoryRestartAsync))]
     [InlineData(nameof(FactoryMcpTools.FactoryContinueAsync))]
     [InlineData(nameof(FactoryMcpTools.FactoryRetryAsync))]
     [InlineData(nameof(FactoryMcpTools.FactoryCancelAsync))]
@@ -162,6 +180,24 @@ public sealed class FactoryMcpTests
         Assert.Equal("READY_TO_CONTINUE", status.Status);
         Assert.Equal("interrupted-run", status.RunId);
         Assert.Contains("factory_continue", status.ResumeWhen!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StatusDirectsLegacyRunToCurrentRuntimeCancellationAndRestart()
+    {
+        using var temp = new TestWorkspace();
+        var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        Directory.CreateDirectory(current);
+        await File.WriteAllTextAsync(
+            Path.Combine(current, "state.json"),
+            """{"schemaVersion":10,"runId":"legacy-run"}""");
+
+        var status = await new FactoryStatusReader().ReadAsync(temp.Path, CancellationToken.None);
+
+        Assert.Equal("STATE_ERROR", status.Status);
+        Assert.Equal("LEGACY_FACTORY_STATE", status.FactoryOutcome);
+        Assert.Contains("factory_restart", status.ResumeWhen!, StringComparison.Ordinal);
+        Assert.Contains("factory_cancel", status.ResumeWhen!, StringComparison.Ordinal);
     }
 
     [Fact]

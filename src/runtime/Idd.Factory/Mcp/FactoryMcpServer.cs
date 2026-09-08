@@ -47,6 +47,15 @@ internal sealed class FactoryMcpTools(
         CancellationToken cancellationToken) =>
         RunWithProgressAsync(FactoryRuntimeCommand.Run, workspace, request, progress, cancellationToken);
 
+    [McpServerTool(Name = "factory_restart", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true, UseStructuredContent = true)]
+    [Description("Archive the active Factory run and start a new run with the supplied request under the current runtime. Product changes and prior diagnostics are preserved. This supports active state from an unsupported older schema without requiring the older plugin.")]
+    public Task<FactoryMcpResult> FactoryRestartAsync(
+        [Description("Absolute path to the target workspace.")] string workspace,
+        [Description("Complete Factory request text for the new run, passed unchanged as UTF-8.")] string request,
+        IProgress<ProgressNotificationValue> progress,
+        CancellationToken cancellationToken) =>
+        RunWithProgressAsync(FactoryRuntimeCommand.Restart, workspace, request, progress, cancellationToken);
+
     [McpServerTool(Name = "factory_continue", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true, UseStructuredContent = true)]
     [Description("Continue an explicitly requested IDD Factory workflow. When the current outcome is USER_DECISION_REQUIRED, pass the user's exact answer in answer. Progress notifications describe high-level runtime activity when the MCP client supplies a progress token. A host/tool timeout is transport loss, not a Factory outcome; use factory_status once before deciding whether another continue is safe.")]
     public Task<FactoryMcpResult> FactoryContinueAsync(
@@ -66,7 +75,7 @@ internal sealed class FactoryMcpTools(
         RunWithProgressAsync(FactoryRuntimeCommand.Retry, workspace, null, progress, cancellationToken, additionalAttempts);
 
     [McpServerTool(Name = "factory_cancel", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true, UseStructuredContent = true)]
-    [Description("Request explicit cancellation of an IDD Factory workflow while preserving its product changes.")]
+    [Description("Request explicit cancellation of an IDD Factory workflow while preserving product changes and archiving diagnostics. This also cancels active state from an unsupported older schema without requiring the older plugin.")]
     public Task<FactoryMcpResult> FactoryCancelAsync(
         [Description("Absolute path to the target workspace.")] string workspace,
         IProgress<ProgressNotificationValue> progress,

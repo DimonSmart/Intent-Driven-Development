@@ -29,7 +29,7 @@ internal static class FactoryCli
             Console.InputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
             if (args.Length == 0 || args[0] is "-h" or "--help")
             {
-                Console.WriteLine("idd-factory run --workspace <path> (--request-file <path> | --request-stdin true)\nidd-factory continue --workspace <path> [--answer-file <path>] [--confirmation approve|decline] [--verification-result passed|failed]\nidd-factory retry --workspace <path> --additional-attempts <1-10>\nidd-factory cancel --workspace <path>");
+                Console.WriteLine("idd-factory run --workspace <path> (--request-file <path> | --request-stdin true)\nidd-factory restart --workspace <path> (--request-file <path> | --request-stdin true)\nidd-factory continue --workspace <path> [--answer-file <path>] [--confirmation approve|decline] [--verification-result passed|failed]\nidd-factory retry --workspace <path> --additional-attempts <1-10>\nidd-factory cancel --workspace <path>");
                 return 0;
             }
 
@@ -88,13 +88,16 @@ internal static class FactoryCli
             var monitor = command == "cancel" ? Task.CompletedTask : MonitorCancellationAsync(cancellationMarker, cancellation, monitorStop.Token);
             try
             {
-                if (command == "run" && options.ContainsKey("request-file") == (options.GetValueOrDefault("request-stdin") == "true"))
-                    throw new ArgumentException("run requires exactly one request input: --request-file <path> or --request-stdin true.");
+                if ((command is "run" or "restart") && options.ContainsKey("request-file") == (options.GetValueOrDefault("request-stdin") == "true"))
+                    throw new ArgumentException($"{command} requires exactly one request input: --request-file <path> or --request-stdin true.");
                 outcome = command switch
                 {
                     "run" when options.ContainsKey("request-file") => await runtime.RunAsync(Path.GetFullPath(Required(options, "request-file")), ReadMethodologyVersion(pluginRoot), cancellation.Token),
                     "run" when options.GetValueOrDefault("request-stdin") == "true" => await runtime.RunRequestAsync(await Console.In.ReadToEndAsync(cancellation.Token), ReadMethodologyVersion(pluginRoot), cancellation.Token),
                     "run" => throw new ArgumentException("run requires exactly one request input: --request-file <path> or --request-stdin true."),
+                    "restart" when options.ContainsKey("request-file") => await runtime.RestartAsync(Path.GetFullPath(Required(options, "request-file")), ReadMethodologyVersion(pluginRoot), cancellation.Token),
+                    "restart" when options.GetValueOrDefault("request-stdin") == "true" => await runtime.RestartRequestAsync(await Console.In.ReadToEndAsync(cancellation.Token), ReadMethodologyVersion(pluginRoot), cancellation.Token),
+                    "restart" => throw new ArgumentException("restart requires exactly one request input: --request-file <path> or --request-stdin true."),
                     "continue" => await runtime.ContinueAsync(
                         cancellation.Token,
                         options.TryGetValue("confirmation", out var confirmation) ? confirmation switch

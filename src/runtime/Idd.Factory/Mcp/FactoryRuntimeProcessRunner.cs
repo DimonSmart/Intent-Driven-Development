@@ -4,7 +4,7 @@ using System.Text.Json;
 using Idd.Factory.Domain;
 using Idd.Factory.Runtime;
 
-internal enum FactoryRuntimeCommand { Run, Continue, Retry, Cancel }
+internal enum FactoryRuntimeCommand { Run, Restart, Continue, Retry, Cancel }
 
 internal sealed class FactoryRuntimeProcessRunner(
     IFactoryProcessInvoker processInvoker,
@@ -22,19 +22,20 @@ internal sealed class FactoryRuntimeProcessRunner(
         int? additionalAttempts = null)
     {
         ValidateWorkspace(workspace);
-        if (command == FactoryRuntimeCommand.Run && (input is null || input.Length == 0))
+        if ((command is FactoryRuntimeCommand.Run or FactoryRuntimeCommand.Restart) && (input is null || input.Length == 0))
             throw new ArgumentException("request is required.", nameof(input));
         if (command == FactoryRuntimeCommand.Cancel && input is not null)
             throw new ArgumentException("input is not supported for factory_cancel.", nameof(input));
         if (command == FactoryRuntimeCommand.Retry && (additionalAttempts is null || additionalAttempts < 1))
             throw new ArgumentException("additionalAttempts must be at least 1 for factory_retry.", nameof(additionalAttempts));
-        var inputLabel = command == FactoryRuntimeCommand.Run ? "Factory request" : "Factory user answer";
+        var requestCommand = command is FactoryRuntimeCommand.Run or FactoryRuntimeCommand.Restart;
+        var inputLabel = requestCommand ? "Factory request" : "Factory user answer";
         if (input is not null && InvalidUnicodeReason(input, inputLabel) is { } inputError)
             return new(
-                command == FactoryRuntimeCommand.Run ? "INVALID_REQUEST_ENCODING" : "INVALID_USER_ANSWER_ENCODING",
+                requestCommand ? "INVALID_REQUEST_ENCODING" : "INVALID_USER_ANSWER_ENCODING",
                 "unknown",
                 inputError,
-                command == FactoryRuntimeCommand.Run
+                requestCommand
                     ? "Resubmit the original request without corrupted Unicode replacement characters."
                     : "Resubmit the user answer without corrupted Unicode replacement characters.",
                 null);
@@ -48,7 +49,7 @@ internal sealed class FactoryRuntimeProcessRunner(
         {
             if (input is not null)
             {
-                var prefix = command == FactoryRuntimeCommand.Run ? "request" : "answer";
+                var prefix = requestCommand ? "request" : "answer";
                 inputFile = Path.Combine(Path.GetTempPath(), $"idd-factory-{prefix}-{Guid.NewGuid():N}.md");
                 await File.WriteAllTextAsync(inputFile, input, TextUtf8, cancellationToken);
             }
@@ -131,9 +132,9 @@ internal sealed class FactoryRuntimeProcessRunner(
             "--workspace", workspace,
             "--plugin-root", pluginRoot
         };
-        if (command == FactoryRuntimeCommand.Run)
+        if (command is FactoryRuntimeCommand.Run or FactoryRuntimeCommand.Restart)
         {
-            if (inputFile is null) throw new ArgumentException("inputFile is required for Factory run.", nameof(inputFile));
+            if (inputFile is null) throw new ArgumentException("inputFile is required for Factory run or restart.", nameof(inputFile));
             arguments.AddRange(["--request-file", inputFile]);
         }
         else if (command == FactoryRuntimeCommand.Continue && inputFile is not null)

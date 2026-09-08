@@ -97,6 +97,16 @@ blocked. Missing documentation alone is not `INTENT_REQUIRED`.
   fabricating an answer. Cancellation preserves product changes and diagnostics.
 - Cancellation is explicit. Warn that product changes are preserved; do not
   delete Factory state or revert code in the launcher.
+- If an active run uses an older unsupported state schema, do not reinstall the
+  older plugin and do not edit its state. Explain that cross-version continuation
+  is unavailable unless the current runtime provides an explicit migration. On
+  an explicit user request to restart, perform normal new-run intent preflight
+  for the self-contained replacement request and call `factory_restart`. The
+  current runtime atomically owns the recovery operation: it archives the
+  complete legacy run under `.idd/factory/cancelled/` without interpreting its
+  obsolete semantic fields, then starts the new run. Use `factory_cancel`
+  instead when the user wants to retire the old run without immediately starting
+  another one.
 
 ## Boundaries
 
@@ -114,9 +124,11 @@ blocked. Missing documentation alone is not `INTENT_REQUIRED`.
 - Do not interpret executor output for workflow control. A structured
   `USER_DECISION_REQUIRED` result comes from runtime parsing of the planner's
   bounded planning output, not from executor reports.
-- `FACTORY_CONFIGURATION_CHANGED`, `LEGACY_FACTORY_STATE`,
-  `CORRUPT_FACTORY_STATE`, `UNMATERIALIZED_REQUEST_INPUT`, and lock outcomes are
-  terminal for the current launcher attempt and must be reported exactly.
+- `FACTORY_CONFIGURATION_CHANGED`, `CORRUPT_FACTORY_STATE`,
+  `UNMATERIALIZED_REQUEST_INPUT`, and lock outcomes are terminal for the current
+  launcher attempt and must be reported exactly. `LEGACY_FACTORY_STATE` is
+  terminal for continuation but remains recoverable through explicit
+  current-runtime cancellation and a new run.
 
 ## Reporting
 
