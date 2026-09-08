@@ -85,12 +85,13 @@ public sealed class CodexCliBackend : IAgentBackend
         try { if (!process.Start()) throw new AgentProtocolException("AGENT_BACKEND_UNAVAILABLE", "Codex CLI did not start."); }
         catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or FileNotFoundException)
         { CleanupDirectory(codexHome); CleanupDirectory(tempDirectory); throw new AgentProtocolException("AGENT_BACKEND_UNAVAILABLE", $"Codex CLI could not start: {exception.Message}"); }
-        var stdout = CaptureAsync(process.StandardOutput, stdoutPath, cancellationToken);
-        var stderr = CaptureAsync(process.StandardError, stderrPath, cancellationToken);
+        var commandTracker = new CommandExecutionTracker();
+        var stdout = CaptureJsonLinesAsync(process.StandardOutput, stdoutPath, commandTracker, cancellationToken);
+        var stderr = CaptureLinesAsync(process.StandardError, stderrPath, cancellationToken);
         var prompt = BuildBootstrapPrompt(invocation, skillInstructions);
         await process.StandardInput.WriteAsync(prompt.AsMemory(), cancellationToken);
         await process.StandardInput.FlushAsync(cancellationToken); process.StandardInput.Close();
-        processes.Add(invocation.AttemptId, new(process, stdout, stderr, invocation.SemanticOutputPath, tempDirectory));
+        processes.Add(invocation.AttemptId, new(process, stdout, stderr, stdoutPath, stderrPath, invocation.SemanticOutputPath, tempDirectory, commandTracker));
         return new(invocation.AttemptId, process.Id, invocation.AttemptId);
     }
 
@@ -104,7 +105,32 @@ public sealed class CodexCliBackend : IAgentBackend
             using var resultWatcherCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             var processExit = running.Process.WaitForExitAsync(cancellationToken);
             var resultReady = WaitForCompleteResultAsync(running.ResultPath, resultWatcherCancellation.Token);
-            var first = await Task.WhenAny(processExit, resultReady);
+            var commandTimeout = WaitForCommandTimeoutAsync(
+                running.CommandTracker,
+                executionConfiguration.EffectiveCommandTimeout,
+                resultWatcherCancellation.Token);
+            var commandOverlap = WaitForCommandOverlapAsync(running.CommandTracker, resultWatcherCancellation.Token);
+            var first = await Task.WhenAny(processExit, resultReady, commandTimeout, commandOverlap);
+            if (first == commandOverlap)
+            {
+                var overlap = await commandOverlap;
+                cleanupTempDirectory = false;
+                resultWatcherCancellation.Cancel();
+                return await TerminateForCommandFailureAsync(
+                    running,
+                    BuildCommandOverlapDiagnostic(overlap),
+                    AgentTerminationKind.IncompleteCommand);
+            }
+            if (first == commandTimeout)
+            {
+                var timedOutCommand = await commandTimeout;
+                cleanupTempDirectory = false;
+                resultWatcherCancellation.Cancel();
+                return await TerminateForCommandFailureAsync(
+                    running,
+                    BuildCommandTimeoutDiagnostic(timedOutCommand, executionConfiguration.EffectiveCommandTimeout),
+                    AgentTerminationKind.CommandTimeout);
+            }
             var completedResultWasObserved = first == resultReady && await resultReady;
             if (!completedResultWasObserved && first == processExit)
             {
@@ -136,7 +162,7 @@ public sealed class CodexCliBackend : IAgentBackend
             {
                 cleanupTempDirectory = false;
                 completedResultWasObserved = false;
-                termination = AgentTerminationKind.TransportFailure;
+                termination = AgentTerminationKind.IncompleteCommand;
                 var diagnostic = BuildIncompleteCommandDiagnostic(incompleteCommands);
                 stderr = string.IsNullOrWhiteSpace(stderr) ? diagnostic : stderr.TrimEnd() + Environment.NewLine + diagnostic;
                 if (File.Exists(running.ResultPath)) File.Delete(running.ResultPath);
@@ -339,6 +365,18 @@ public sealed class CodexCliBackend : IAgentBackend
             + "Inspect stdout.log for the complete event stream. Temporary directory cleanup was skipped.";
     }
 
+    internal static string BuildCommandTimeoutDiagnostic(IncompleteCommandExecution command, TimeSpan timeout) =>
+        $"Shell command [{BoundDiagnosticValue(command.Id, 128)}] exceeded the semantic-command timeout "
+        + $"of {timeout:c}: {BoundDiagnosticValue(command.Command ?? "<command unavailable>", 512)}. "
+        + "The worker process tree was terminated, partial results are not trusted, and the temporary directory was preserved.";
+
+    internal static string BuildCommandOverlapDiagnostic(CommandExecutionOverlap overlap) =>
+        $"Shell command [{BoundDiagnosticValue(overlap.Started.Id, 128)}] started before "
+        + $"[{BoundDiagnosticValue(overlap.Active.Id, 128)}] completed. Active command: "
+        + $"{BoundDiagnosticValue(overlap.Active.Command ?? "<command unavailable>", 384)}. Later command: "
+        + $"{BoundDiagnosticValue(overlap.Started.Command ?? "<command unavailable>", 384)}. "
+        + "The worker process tree was terminated and partial results are not trusted.";
+
     private static string BoundDiagnosticValue(string value, int maximumLength)
     {
         var normalized = string.Join(" ", value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
@@ -360,7 +398,7 @@ public sealed class CodexCliBackend : IAgentBackend
         return new(invocation.Role, invocation.SkillName, "codex-cli", invocation.ExecutionProfile, "inline-skill", invocation.Input.Length,
             configuration.RequestedModel, configuration.RequestedReasoningEffort, "unknown", "unknown", skillSource, skillSourceVersion,
             capabilityPolicy.InheritUserSkills ? "inherit" : "isolated", CountProjectSkills(invocation.Workspace), inheritedUserSkillCount, capabilityPolicy.Profile,
-            windowsSandbox, windowsAppsPathEntriesRemoved);
+            windowsSandbox, windowsAppsPathEntriesRemoved, (long)configuration.EffectiveCommandTimeout.TotalMilliseconds);
     }
 
     private string ReadSkillSourceVersion()
@@ -403,6 +441,48 @@ public sealed class CodexCliBackend : IAgentBackend
 
     internal static async Task<string> CaptureAsync(StreamReader reader, string path, CancellationToken cancellationToken)
     { var text = await reader.ReadToEndAsync(cancellationToken); await File.WriteAllTextAsync(path, text, cancellationToken); return text; }
+    internal static async Task<string> CaptureJsonLinesAsync(StreamReader reader, string path, CommandExecutionTracker tracker, CancellationToken cancellationToken)
+    {
+        var text = new StringBuilder();
+        await using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
+        while (await reader.ReadLineAsync(cancellationToken) is { } line)
+        {
+            tracker.Observe(line, DateTimeOffset.UtcNow);
+            text.AppendLine(line);
+            await writer.WriteLineAsync(line.AsMemory(), cancellationToken);
+            await writer.FlushAsync(cancellationToken);
+        }
+        return text.ToString();
+    }
+    internal static async Task<string> CaptureLinesAsync(StreamReader reader, string path, CancellationToken cancellationToken)
+    {
+        var text = new StringBuilder();
+        await using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
+        while (await reader.ReadLineAsync(cancellationToken) is { } line)
+        {
+            text.AppendLine(line);
+            await writer.WriteLineAsync(line.AsMemory(), cancellationToken);
+            await writer.FlushAsync(cancellationToken);
+        }
+        return text.ToString();
+    }
+    private static async Task<IncompleteCommandExecution> WaitForCommandTimeoutAsync(CommandExecutionTracker tracker, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        if (timeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(timeout), "Semantic-command timeout must be positive.");
+        while (true)
+        {
+            if (tracker.FindTimedOut(DateTimeOffset.UtcNow, timeout) is { } command) return command;
+            await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(250, timeout.TotalMilliseconds)), cancellationToken);
+        }
+    }
+    private static async Task<CommandExecutionOverlap> WaitForCommandOverlapAsync(CommandExecutionTracker tracker, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            if (tracker.FindOverlap() is { } overlap) return overlap;
+            await Task.Delay(100, cancellationToken);
+        }
+    }
     private static async Task<bool> WaitForCompleteResultAsync(string path, CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
@@ -416,15 +496,110 @@ public sealed class CodexCliBackend : IAgentBackend
     {
         return File.Exists(path);
     }
-    private static async Task CancelProcessAsync(Process process)
-    { if (process.HasExited) return; try { process.CloseMainWindow(); await Task.Delay(1500); } catch { } if (!process.HasExited) process.Kill(true); await process.WaitForExitAsync(); }
-    private sealed record RunningProcess(Process Process, Task<string> Stdout, Task<string> Stderr, string ResultPath, string TempDirectory);
+    private static async Task<string> ReadCapturedOutputAsync(Task<string> capture, string path)
+    {
+        try { return await capture.WaitAsync(TimeSpan.FromSeconds(5)); }
+        catch (TimeoutException) { return File.Exists(path) ? await File.ReadAllTextAsync(path) : string.Empty; }
+    }
+    private static async Task<AgentProcessResult> TerminateForCommandFailureAsync(
+        RunningProcess running,
+        string diagnostic,
+        AgentTerminationKind terminationKind)
+    {
+        var terminated = await CancelProcessAsync(running.Process);
+        diagnostic += $" Process-tree termination succeeded: {terminated.ToString().ToLowerInvariant()}.";
+        var stdout = await ReadCapturedOutputAsync(running.Stdout, running.StdoutPath);
+        var stderr = await ReadCapturedOutputAsync(running.Stderr, running.StderrPath);
+        stderr = string.IsNullOrWhiteSpace(stderr) ? diagnostic : stderr.TrimEnd() + Environment.NewLine + diagnostic;
+        if (File.Exists(running.ResultPath)) File.Delete(running.ResultPath);
+        await File.WriteAllTextAsync(running.StderrPath, stderr, CancellationToken.None);
+        return new AgentProcessResult(
+            running.Process.HasExited ? running.Process.ExitCode : null,
+            stdout,
+            stderr,
+            false,
+            true,
+            terminationKind);
+    }
+    private static async Task<bool> CancelProcessAsync(Process process)
+    {
+        if (process.HasExited) return true;
+        try { process.CloseMainWindow(); await Task.Delay(1500); } catch { }
+        if (!process.HasExited)
+        {
+            try { process.Kill(true); }
+            catch (InvalidOperationException) when (process.HasExited) { }
+        }
+        if (!process.HasExited)
+        {
+            try { await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5)); }
+            catch (TimeoutException) { }
+        }
+        return process.HasExited;
+    }
+    private sealed record RunningProcess(Process Process, Task<string> Stdout, Task<string> Stderr, string StdoutPath, string StderrPath, string ResultPath, string TempDirectory, CommandExecutionTracker CommandTracker);
     private sealed record PrivateHome(string Path, int InheritedSkillCount);
 }
 
 public sealed record CodexCommand(string Executable, IReadOnlyList<string> PrefixArguments);
 
-internal sealed record IncompleteCommandExecution(string Id, string? Command);
+internal sealed record IncompleteCommandExecution(string Id, string? Command, DateTimeOffset? StartedAt = null);
+internal sealed record CommandExecutionOverlap(IncompleteCommandExecution Active, IncompleteCommandExecution Started);
+
+internal sealed class CommandExecutionTracker
+{
+    private readonly object gate = new();
+    private readonly Dictionary<string, IncompleteCommandExecution> active = new(StringComparer.Ordinal);
+    private CommandExecutionOverlap? overlap;
+
+    public void Observe(string line, DateTimeOffset observedAt)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(line);
+            var root = document.RootElement;
+            if (!root.TryGetProperty("type", out var eventType)
+                || !root.TryGetProperty("item", out var item)
+                || !item.TryGetProperty("id", out var idValue)
+                || !item.TryGetProperty("type", out var itemType)
+                || itemType.GetString() is not ("command_execution" or "local_shell_call"))
+                return;
+
+            var id = idValue.GetString();
+            if (string.IsNullOrWhiteSpace(id)) return;
+            lock (gate)
+            {
+                if (eventType.GetString() == "item.started")
+                {
+                    var command = item.TryGetProperty("command", out var commandValue)
+                        && commandValue.ValueKind == JsonValueKind.String
+                        ? commandValue.GetString()
+                        : null;
+                    var started = new IncompleteCommandExecution(id, string.IsNullOrWhiteSpace(command) ? null : command, observedAt);
+                    if (!active.ContainsKey(id) && active.Values.OrderBy(value => value.StartedAt).FirstOrDefault() is { } earlier)
+                        overlap ??= new(earlier, started);
+                    active[id] = started;
+                }
+                else if (eventType.GetString() == "item.completed") active.Remove(id);
+            }
+        }
+        catch (JsonException) { }
+    }
+
+    public IncompleteCommandExecution? FindTimedOut(DateTimeOffset now, TimeSpan timeout)
+    {
+        lock (gate)
+            return active.Values
+                .Where(command => command.StartedAt is not null && now - command.StartedAt >= timeout)
+                .OrderBy(command => command.StartedAt)
+                .FirstOrDefault();
+    }
+
+    public CommandExecutionOverlap? FindOverlap()
+    {
+        lock (gate) return overlap;
+    }
+}
 
 public static class CodexExecutableResolver
 {

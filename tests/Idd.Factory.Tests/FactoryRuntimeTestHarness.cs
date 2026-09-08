@@ -33,8 +33,8 @@ internal static class FactoryRuntimeTestHarness
     }
 
     public static FactoryConfiguration CreateConfiguration(IEnumerable<string>? allowed = null) => new(
-        2,
-        new FactoryLimits(4, 12, 64),
+        3,
+        new FactoryLimits(4, 12, 64, TimeSpan.FromMinutes(10)),
         "test-factory.yaml",
         "test-config-hash");
 
@@ -61,24 +61,37 @@ internal static class FactoryRuntimeTestHarness
 
 internal sealed class FakeAgentBackend : IAgentBackend
 {
-    private readonly Queue<Func<AgentInvocation, string>> results = new();
+    private readonly Queue<FakeResponse> results = new();
+    private readonly Dictionary<string, AgentProcessResult> active = new(StringComparer.Ordinal);
     public List<AgentInvocation> Invocations { get; } = [];
 
-    public void Enqueue(Func<AgentInvocation, string> result) => results.Enqueue(result);
+    public void Enqueue(Func<AgentInvocation, string> result) => results.Enqueue(new(invocation => result(invocation), SuccessfulProcess()));
+    public void EnqueueCommandFailure(AgentTerminationKind terminationKind, string diagnostic) =>
+        results.Enqueue(new(_ => null, new AgentProcessResult(0, "", diagnostic, false, terminationKind == AgentTerminationKind.CommandTimeout, terminationKind)));
 
     public Task<AgentRunHandle> StartAsync(AgentInvocation invocation, CancellationToken cancellationToken)
     {
         if (results.Count == 0) throw new InvalidOperationException($"No fake result queued for {invocation.Role}/{invocation.WorkItemId}.");
         Invocations.Add(invocation);
         Directory.CreateDirectory(Path.GetDirectoryName(invocation.SemanticOutputPath)!);
-        File.WriteAllText(invocation.SemanticOutputPath, results.Dequeue()(invocation));
+        var response = results.Dequeue();
+        var semanticResult = response.Result(invocation);
+        if (semanticResult is not null) File.WriteAllText(invocation.SemanticOutputPath, semanticResult);
+        if (!string.IsNullOrEmpty(response.Process.Stderr))
+            File.WriteAllText(Path.Combine(Path.GetDirectoryName(invocation.SemanticOutputPath)!, "stderr.log"), response.Process.Stderr);
+        active.Add(invocation.AttemptId, response.Process);
         return Task.FromResult(new AgentRunHandle(invocation.AttemptId, 1, invocation.AttemptId));
     }
 
     public Task<AgentProcessResult> WaitAsync(AgentRunHandle handle, CancellationToken cancellationToken) =>
-        Task.FromResult(new AgentProcessResult(0, "", "", true, false, AgentTerminationKind.CleanExit));
+        Task.FromResult(active.Remove(handle.AttemptId, out var process)
+            ? process
+            : new AgentProcessResult(-1, "", "Missing fake process.", false, false, AgentTerminationKind.TransportFailure));
 
     public Task CancelAsync(AgentRunHandle handle, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    private static AgentProcessResult SuccessfulProcess() => new(0, "", "", true, false, AgentTerminationKind.CleanExit);
+    private sealed record FakeResponse(Func<AgentInvocation, string?> Result, AgentProcessResult Process);
 }
 
 internal sealed class FakeClock : IClock

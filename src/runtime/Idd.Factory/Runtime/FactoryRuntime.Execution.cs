@@ -32,7 +32,16 @@ public sealed partial class FactoryRuntime
         state.CurrentPhase = CurrentWorkPhase.Running;
         await SaveAsync(state, cancellationToken);
         var input = await BuildWorkInputAsync(state, item, cancellationToken);
-        var result = await InvokeSemanticAsync(state, "implementation", item, input, SemanticOperationKind.WorkItemExecution, cancellationToken);
+        BoundSemanticResult result;
+        try
+        {
+            result = await InvokeSemanticAsync(state, "implementation", item, input, SemanticOperationKind.WorkItemExecution, cancellationToken);
+        }
+        catch (AgentProtocolException exception) when (exception.Code is "AGENT_COMMAND_TIMEOUT" or "AGENT_COMMAND_INCOMPLETE")
+        {
+            await PrepareCommandFailureRetryAsync(state, item, exception, cancellationToken);
+            return null;
+        }
         item = state.Current ?? throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Current work disappeared during dispatch.");
         item.LastResultRef = result.SemanticResultPath;
         item.CurrentAttemptId = null;
@@ -132,8 +141,51 @@ public sealed partial class FactoryRuntime
         var contract = await File.ReadAllTextAsync(Path.Combine(currentDirectory, item.ContractPath), cancellationToken);
         var completed = await BuildCompletedContextAsync(state, cancellationToken);
         var prior = await BuildPriorResultContextAsync(item, cancellationToken);
+        var priorCommandFailures = await BuildPriorCommandFailureContextAsync(item, cancellationToken);
         var verificationObservations = await BuildVerificationObservationsAsync(item, cancellationToken);
-        return $"Work item contract:\n{contract}\n\nRelevant completed work and results:\n{completed}\n\nPrevious attempts for this task:\n{prior}\n\nAuthoritative verification observations:\n{verificationObservations}\n\nUse a fresh semantic context. Do not rely on conversation history or internal planning state.";
+        return $"Work item contract:\n{contract}\n\nRelevant completed work and results:\n{completed}\n\nPrevious attempts for this task:\n{prior}\n\nPrevious shell-command failures for this task:\n{priorCommandFailures}\n\nAuthoritative verification observations:\n{verificationObservations}\n\nUse a fresh semantic context. Do not rely on conversation history or internal planning state.";
+    }
+
+    private async Task PrepareCommandFailureRetryAsync(FactoryState state, PlannedWorkItem item, AgentProtocolException exception, CancellationToken cancellationToken)
+    {
+        var attemptId = state.CurrentAttemptId ?? item.CurrentAttemptId
+            ?? throw new FactoryStateException("CORRUPT_FACTORY_STATE", "A shell-command failure has no current semantic attempt.");
+        var diagnosticReference = $"attempts/{attemptId}/stderr.log";
+        var diagnosticPath = Path.Combine(currentDirectory, diagnosticReference.Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(diagnosticPath))
+            await File.WriteAllTextAsync(diagnosticPath, exception.Message, HumanReadableUtf8, cancellationToken);
+        if (!item.PriorAttemptDiagnosticRefs.Contains(diagnosticReference, StringComparer.Ordinal))
+            item.PriorAttemptDiagnosticRefs.Add(diagnosticReference);
+
+        state.CurrentAttemptId = null;
+        item.CurrentAttemptId = null;
+        state.PendingContinuation = null;
+        state.Blocker = null;
+        state.CurrentPhase = CurrentWorkPhase.Ready;
+        await events.WriteAsync(state.RunId, "agent-command-failure-retry", new { attemptId, workItemId = item.Id, exception.Code, diagnosticReference }, cancellationToken);
+        await SaveAsync(state, cancellationToken);
+    }
+
+    private async Task<string> BuildPriorCommandFailureContextAsync(PlannedWorkItem item, CancellationToken cancellationToken)
+    {
+        if (item.PriorAttemptDiagnosticRefs.Count == 0) return "none";
+        var sections = new List<string>
+        {
+            "These attempts did not complete. Their test or command results are partial and must not be trusted. Diagnose and remove the hang before relying on a rerun."
+        };
+        foreach (var reference in item.PriorAttemptDiagnosticRefs.TakeLast(3))
+        {
+            var path = Path.Combine(currentDirectory, reference.Replace('/', Path.DirectorySeparatorChar));
+            var diagnostic = File.Exists(path) ? await File.ReadAllTextAsync(path, cancellationToken) : "missing diagnostic artifact";
+            sections.Add($"- {reference}:\n{BoundDiagnostic(diagnostic, 4096)}");
+        }
+        return string.Join("\n", sections);
+    }
+
+    private static string BoundDiagnostic(string value, int maximumLength)
+    {
+        var trimmed = value.Trim();
+        return trimmed.Length <= maximumLength ? trimmed : trimmed[..maximumLength] + "\n[diagnostic truncated; see local artifact]";
     }
 
     private async Task<string> BuildCompletedContextAsync(FactoryState state, CancellationToken cancellationToken)
@@ -226,7 +278,13 @@ public sealed partial class FactoryRuntime
     private async Task<string> BuildRetryBudgetExhaustedMessageAsync(PlannedWorkItem item, CancellationToken cancellationToken)
     {
         var failures = await ReadFailedVerificationEvidenceAsync(item, cancellationToken);
-        if (failures.Count == 0) return $"{item.Id} exhausted its semantic attempt budget.";
+        if (failures.Count == 0)
+        {
+            var diagnostic = await BuildPriorCommandFailureContextAsync(item, cancellationToken);
+            return diagnostic == "none"
+                ? $"{item.Id} exhausted its semantic attempt budget."
+                : $"Work item {item.Id} exhausted its semantic attempt budget after repeated shell-command failures.\n\n{diagnostic}";
+        }
 
         var (reference, evidence) = failures[^1];
         return $"Work item {item.Id} could not pass authoritative verification after {item.AttemptCount} semantic attempts.\n\nFailed check:\n{evidence.CheckId}\n\nExit code:\n{(evidence.ExitCode?.ToString() ?? "unavailable")}\n\nLatest bounded verification tails:\n{BoundedVerificationOutput(evidence)}\n\nEvidence:\n{reference}";

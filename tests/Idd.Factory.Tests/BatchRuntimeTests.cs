@@ -57,6 +57,35 @@ public sealed class BatchRuntimeTests
         Assert.Contains("Implement C", contracts[2]);
     }
 
+    [Theory]
+    [InlineData(AgentTerminationKind.CommandTimeout)]
+    [InlineData(AgentTerminationKind.IncompleteCommand)]
+    public async Task ShellCommandFailureRetriesTheSameTaskWithDiagnosticBeforeContinuingBatch(AgentTerminationKind terminationKind)
+    {
+        using var temp = new TestWorkspace();
+        var backend = new FakeAgentBackend();
+        backend.Enqueue(_ => "# Task\n\nImplement A.\n\n# Task\n\nImplement B.");
+        backend.EnqueueCommandFailure(terminationKind, "item_3 dotnet test did not complete");
+        backend.Enqueue(invocation =>
+        {
+            Assert.Equal("W000001", invocation.WorkItemId);
+            Assert.Contains("results are partial and must not be trusted", invocation.Input, StringComparison.Ordinal);
+            Assert.Contains("item_3 dotnet test did not complete", invocation.Input, StringComparison.Ordinal);
+            return "Diagnosed the hang and completed A.";
+        });
+        backend.Enqueue(_ => "Implemented B only after A completed.");
+        backend.Enqueue(_ => "# Done");
+
+        var outcome = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend)
+            .RunRequestAsync("Complete A and B without trusting hung checks.", "test", default);
+
+        Assert.Equal("COMPLETED", outcome.FactoryOutcome);
+        Assert.Equal(["W000001", "W000001", "W000002"],
+            backend.Invocations.Where(invocation => invocation.Capability == "implementation").Select(invocation => invocation.WorkItemId));
+        using var completed = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(outcome.ResultDirectory!, "completed-work.json")));
+        Assert.Equal(2, completed.RootElement.GetProperty("completed").GetArrayLength());
+    }
+
     [Fact]
     public async Task FailedFinalVerificationFeedsANewPlanningCycle()
     {
@@ -175,7 +204,7 @@ public sealed class BatchRuntimeTests
 
         Assert.Equal("FINAL_VERIFICATION_FAILED", outcome.FactoryOutcome);
         Assert.Equal(2, backend.Invocations.Count(x => x.Capability == "planning"));
-        Assert.Single(backend.Invocations.Where(x => x.Capability == "implementation"));
+        Assert.Single(backend.Invocations, x => x.Capability == "implementation");
         var state = await FactoryRuntimeTestHarness.LoadState(temp.Path);
         Assert.True(state.RepositoryFallbackBaselineAccepted);
         Assert.Single(state.Completed);

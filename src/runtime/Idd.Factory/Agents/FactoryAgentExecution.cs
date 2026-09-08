@@ -26,6 +26,10 @@ public sealed class FactoryAgentExecutor(IAgentBackend backend)
 
         if (process.TerminationKind == AgentTerminationKind.Cancelled)
             throw new OperationCanceledException(cancellationToken);
+        if (process.TerminationKind == AgentTerminationKind.CommandTimeout)
+            throw new AgentProtocolException("AGENT_COMMAND_TIMEOUT", BuildTransportFailureMessage(process));
+        if (process.TerminationKind == AgentTerminationKind.IncompleteCommand)
+            throw new AgentProtocolException("AGENT_COMMAND_INCOMPLETE", BuildTransportFailureMessage(process));
         if (process.TerminationKind == AgentTerminationKind.TransportFailure && !process.CompleteResultObserved)
             throw new AgentProtocolException("AGENT_TRANSPORT_FAILURE", BuildTransportFailureMessage(process));
         if (!File.Exists(invocation.SemanticOutputPath))

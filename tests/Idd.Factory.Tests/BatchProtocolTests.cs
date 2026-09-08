@@ -194,9 +194,10 @@ public sealed class BatchProtocolTests
     public void ConfigurationContainsOnlySemanticNeutralBudgets()
     {
         var configuration = FactoryRuntimeTestHarness.CreateConfiguration();
-        Assert.Equal(2, configuration.SchemaVersion);
+        Assert.Equal(3, configuration.SchemaVersion);
         Assert.Equal(4, configuration.Limits.MaxAttemptsPerTask);
         Assert.Equal(12, configuration.Limits.MaxPlanningCycles);
+        Assert.Equal(TimeSpan.FromMinutes(10), configuration.Limits.SemanticCommandTimeout);
         using var json = JsonDocument.Parse(JsonSerializer.Serialize(configuration, FactoryJson.Options));
         Assert.False(json.RootElement.TryGetProperty("finalReview", out _));
         Assert.False(json.RootElement.TryGetProperty("allowedCapabilities", out _));

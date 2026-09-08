@@ -24,7 +24,7 @@ public enum VerificationDecision { None, Ok, ExpectedFailure, UnexpectedFailure 
 
 public sealed record FactoryState
 {
-    public const int CurrentSchemaVersion = 10;
+    public const int CurrentSchemaVersion = 11;
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     public required string MethodologyVersion { get; init; }
     public required string RuntimeVersion { get; init; }
@@ -67,6 +67,7 @@ public sealed record PlannedWorkItem
     public VerificationDecision LastVerificationDecision { get; set; }
     public string? LastResultRef { get; set; }
     public List<string> PriorResultRefs { get; init; } = [];
+    public List<string> PriorAttemptDiagnosticRefs { get; init; } = [];
     public List<string> ChangedPaths { get; init; } = [];
 }
 
@@ -225,7 +226,7 @@ public sealed record BoundSemanticResult(string AttemptId, string SemanticResult
 
 public sealed record AgentRunHandle(string AttemptId, int ProcessId, string BackendHandle);
 [JsonConverter(typeof(JsonStringEnumConverter<AgentTerminationKind>))]
-public enum AgentTerminationKind { CleanExit, ForcedAfterResult, Cancelled, TransportFailure }
+public enum AgentTerminationKind { CleanExit, ForcedAfterResult, Cancelled, TransportFailure, CommandTimeout, IncompleteCommand }
 public sealed record AgentProcessResult(
     int? ExitCode,
     [property: JsonIgnore] string Stdout,
@@ -239,13 +240,19 @@ public sealed record AgentProcessResult(
     public int StdoutBytes => Encoding.UTF8.GetByteCount(Stdout ?? string.Empty);
     public int StderrBytes => Encoding.UTF8.GetByteCount(Stderr ?? string.Empty);
 }
-public sealed record AgentExecutionConfiguration(string? Model = null, string? ReasoningEffort = null, string? WindowsSandbox = null)
+public sealed record AgentExecutionConfiguration(
+    string? Model = null,
+    string? ReasoningEffort = null,
+    string? WindowsSandbox = null,
+    TimeSpan? CommandTimeout = null)
 {
+    public static readonly TimeSpan DefaultCommandTimeout = TimeSpan.FromMinutes(10);
     public string RequestedModel => string.IsNullOrWhiteSpace(Model) ? "default/unpinned" : Model;
     public string RequestedReasoningEffort => string.IsNullOrWhiteSpace(ReasoningEffort) ? "default/unpinned" : ReasoningEffort;
+    public TimeSpan EffectiveCommandTimeout => CommandTimeout ?? DefaultCommandTimeout;
 }
 public sealed record AgentCapabilityPolicy(bool InheritUserSkills, string Profile) { public static AgentCapabilityPolicy ProductionDefault { get; } = new(true, "production-default"); }
-public sealed record AgentAttemptTelemetry(string Role, string SkillName, string Backend, AgentExecutionProfile ExecutionProfile, string SkillInvocationMode, int InputChars, string RequestedModel, string RequestedReasoningEffort, string EffectiveModel, string EffectiveReasoningEffort, string SkillSource, string SkillSourceVersion, string UserSkillInheritancePolicy, int ProjectLocalSkillCount, int InheritedUserSkillCount, string CapabilityProfile, string? WindowsSandbox, int WindowsAppsPathEntriesRemoved);
+public sealed record AgentAttemptTelemetry(string Role, string SkillName, string Backend, AgentExecutionProfile ExecutionProfile, string SkillInvocationMode, int InputChars, string RequestedModel, string RequestedReasoningEffort, string EffectiveModel, string EffectiveReasoningEffort, string SkillSource, string SkillSourceVersion, string UserSkillInheritancePolicy, int ProjectLocalSkillCount, int InheritedUserSkillCount, string CapabilityProfile, string? WindowsSandbox, int WindowsAppsPathEntriesRemoved, long CommandTimeoutMilliseconds);
 public sealed record AgentExecutionResult(BoundSemanticResult Result, AgentProcessResult Process);
 public sealed record FactoryCliOutcome(string FactoryOutcome, string RunId, string? Reason = null, string? ResumeWhen = null, string? ResultDirectory = null, JsonElement? Payload = null);
 

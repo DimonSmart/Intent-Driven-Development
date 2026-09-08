@@ -54,7 +54,8 @@ internal static class FactoryCli
                 new AgentExecutionConfiguration(
                     Environment.GetEnvironmentVariable("IDD_FACTORY_MODEL"),
                     Environment.GetEnvironmentVariable("IDD_FACTORY_REASONING_EFFORT"),
-                    windowsSandbox),
+                    windowsSandbox,
+                    configuration.Limits.SemanticCommandTimeout),
                 new AgentCapabilityPolicy(
                     !string.Equals(Environment.GetEnvironmentVariable("IDD_FACTORY_INHERIT_USER_SKILLS"), "false", StringComparison.OrdinalIgnoreCase),
                     Environment.GetEnvironmentVariable("IDD_FACTORY_CAPABILITY_PROFILE") ?? "production-default"));

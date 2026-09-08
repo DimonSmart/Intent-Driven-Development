@@ -13,7 +13,8 @@ public sealed record FactoryConfiguration(
 public sealed record FactoryLimits(
     int MaxAttemptsPerTask,
     int MaxPlanningCycles,
-    int MaxWorkItems);
+    int MaxWorkItems,
+    TimeSpan SemanticCommandTimeout);
 
 public sealed class FactoryConfigurationLoader
 {
@@ -38,11 +39,13 @@ public static class FactoryConfigurationValidator
 {
     public static void Validate(FactoryConfiguration configuration)
     {
-        if (configuration.SchemaVersion != 2)
+        if (configuration.SchemaVersion != 3)
             throw new FactoryConfigurationException("UNSUPPORTED_FACTORY_CONFIGURATION_SCHEMA", $"Unsupported Factory configuration schema {configuration.SchemaVersion}.");
         if (configuration.Limits.MaxAttemptsPerTask is < 1 or > 10
             || configuration.Limits.MaxPlanningCycles is < 1 or > 50
-            || configuration.Limits.MaxWorkItems is < 1 or > 256)
+            || configuration.Limits.MaxWorkItems is < 1 or > 256
+            || configuration.Limits.SemanticCommandTimeout < TimeSpan.FromSeconds(1)
+            || configuration.Limits.SemanticCommandTimeout > TimeSpan.FromHours(1))
             throw new FactoryConfigurationException("INVALID_FACTORY_LIMITS", "Factory limits exceed runtime safety ceilings.");
     }
 }
@@ -61,11 +64,12 @@ internal static class RestrictedFactoryConfigurationYaml
             var schemaVersion = Number(RequiredScalar(root, "schemaVersion", "configuration"), "schemaVersion");
 
             var limitsNode = Mapping(RequiredMapping(root, "limits", "configuration"), "limits");
-            RejectUnknown(limitsNode, ["maxAttemptsPerTask", "maxPlanningCycles", "maxWorkItems"], "limits");
+            RejectUnknown(limitsNode, ["maxAttemptsPerTask", "maxPlanningCycles", "maxWorkItems", "semanticCommandTimeout"], "limits");
             var limits = new FactoryLimits(
                 Number(RequiredScalar(limitsNode, "maxAttemptsPerTask", "limits"), "maxAttemptsPerTask"),
                 Number(RequiredScalar(limitsNode, "maxPlanningCycles", "limits"), "maxPlanningCycles"),
-                Number(RequiredScalar(limitsNode, "maxWorkItems", "limits"), "maxWorkItems"));
+                Number(RequiredScalar(limitsNode, "maxWorkItems", "limits"), "maxWorkItems"),
+                Duration(RequiredScalar(limitsNode, "semanticCommandTimeout", "limits"), "semanticCommandTimeout"));
 
             return new FactoryConfiguration(schemaVersion, limits, sourcePath, "");
         }
@@ -108,6 +112,19 @@ internal static class RestrictedFactoryConfigurationYaml
 
     private static int Number(string value, string name) =>
         int.TryParse(value, out var result) ? result : throw new FactoryConfigurationException("INVALID_FACTORY_CONFIGURATION_YAML", $"{name} must be an integer.");
+
+    private static TimeSpan Duration(string value, string name)
+    {
+        if (value.Length < 2 || !int.TryParse(value[..^1], out var amount) || amount < 0)
+            throw new FactoryConfigurationException("INVALID_FACTORY_CONFIGURATION_YAML", $"{name} must use a non-negative integer followed by s, m, or h.");
+        return value[^1] switch
+        {
+            's' => TimeSpan.FromSeconds(amount),
+            'm' => TimeSpan.FromMinutes(amount),
+            'h' => TimeSpan.FromHours(amount),
+            _ => throw new FactoryConfigurationException("INVALID_FACTORY_CONFIGURATION_YAML", $"{name} must use a non-negative integer followed by s, m, or h.")
+        };
+    }
 
     private static void Invalid(string message) => throw new FactoryConfigurationException("INVALID_FACTORY_CONFIGURATION_YAML", message);
 }
