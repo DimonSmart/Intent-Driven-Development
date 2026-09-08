@@ -2,37 +2,46 @@ using System.Text.Json;
 
 namespace Idd.Factory.LiveTests.Infrastructure;
 
-public sealed record FactoryResult(JsonElement Json, string Path)
-{
-    public string? String(string name) => Json.TryGetProperty(name, out var value) ? value.GetString() : null;
-    public int? Int(string name) => Json.TryGetProperty(name, out var value) && value.TryGetInt32(out var result) ? result : null;
-}
-
-public sealed record FactoryResultReadResult(FactoryResult? Result, string? Error)
-{
-    public bool IsSuccess => Result is not null;
-}
+public sealed record FactoryRunResult(
+    string Outcome,
+    string MethodologyVersion,
+    int CompletedWorkCount,
+    string VerificationStatus,
+    string? CommitMessagePath,
+    string Path);
 
 public static class FactoryResultReader
 {
-    public static FactoryResultReadResult TryReadSingle(string workspace)
+    public static FactoryRunResult ReadSingle(string workspace)
     {
         var resultsDirectory = Path.Combine(workspace, ".idd", "factory", "results");
-        if (!Directory.Exists(resultsDirectory)) return new(null, "Factory results directory is missing.");
+        if (!Directory.Exists(resultsDirectory)) throw new InvalidOperationException("Factory results directory is missing.");
         var directories = Directory.GetDirectories(resultsDirectory);
-        if (directories.Length != 1) return new(null, $"Expected exactly one Factory result directory, but found {directories.Length}.");
+        if (directories.Length != 1) throw new InvalidOperationException($"Expected exactly one Factory result directory, but found {directories.Length}.");
         var path = Path.Combine(directories[0], "factory-result.json");
-        if (!File.Exists(path)) return new(null, "factory-result.json is missing.");
-        try
-        {
-            using var document = JsonDocument.Parse(File.ReadAllText(path));
-            if (document.RootElement.ValueKind != JsonValueKind.Object) return new(null, "factory-result.json root must be a JSON object.");
-            if (document.RootElement.EnumerateObject().Any(property => property.Value.ValueKind is JsonValueKind.Array or JsonValueKind.Object)) return new(null, "factory-result.json must be a flat JSON object.");
-            return new(new(document.RootElement.Clone(), path), null);
-        }
-        catch (JsonException exception)
-        {
-            return new(null, $"factory-result.json is invalid JSON: {exception.Message}");
-        }
+        if (!File.Exists(path)) throw new InvalidOperationException("factory-result.json is missing.");
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        var root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object) throw new InvalidOperationException("factory-result.json root must be an object.");
+        return new(
+            RequiredString(root, "factoryOutcome"),
+            RequiredString(root, "methodologyVersion"),
+            RequiredInt(root, "completedWorkCount"),
+            RequiredString(root, "verificationStatus"),
+            OptionalString(root, "commitMessagePath"),
+            path);
     }
+
+    private static string RequiredString(JsonElement root, string name) =>
+        root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString())
+            ? value.GetString()!
+            : throw new InvalidOperationException($"factory-result.json is missing string property '{name}'.");
+
+    private static int RequiredInt(JsonElement root, string name) =>
+        root.TryGetProperty(name, out var value) && value.TryGetInt32(out var result)
+            ? result
+            : throw new InvalidOperationException($"factory-result.json is missing integer property '{name}'.");
+
+    private static string? OptionalString(JsonElement root, string name) =>
+        root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 }

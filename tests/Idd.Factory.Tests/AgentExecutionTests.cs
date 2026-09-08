@@ -45,6 +45,14 @@ public sealed class AgentExecutionTests
         Assert.Contains("Temporary directory cleanup was skipped", diagnostic, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(AgentExecutionProfile.ReadOnly, "read-only")]
+    [InlineData(AgentExecutionProfile.WorkspaceWrite, "workspace-write")]
+    public void ExecutionProfilesMapDirectlyToCodexSandboxCapabilities(AgentExecutionProfile profile, string expectedSandbox)
+    {
+        Assert.Equal(expectedSandbox, CodexCliBackend.Sandbox(profile));
+    }
+
     [Fact]
     public void BootstrapPromptRequiresShellCommandsToFinish()
     {

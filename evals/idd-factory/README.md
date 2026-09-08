@@ -1,52 +1,28 @@
 # IDD Factory live eval
 
-This opt-in test measures a real IDD Factory run against a deterministic,
-minimal .NET project. It consumes Codex usage and requires an authenticated
-Codex CLI, Git, and a .NET 10 SDK.
+The opt-in LiveTests are a small real-host safety net. They consume Codex usage and require an authenticated Codex CLI, Git, and a .NET 10 SDK. Deterministic Factory behavior is covered by `Idd.Factory.Tests`; benchmark and efficiency research belongs to `tools/factory-benchmark`.
 
-It is deliberately separate from deterministic repository checks and release
-publication. It does not run during normal `dotnet test`, `scripts/Check.ps1`,
-or `publish-next-version.ps1`.
-
-Run the available real-model case explicitly:
+Run the main end-to-end case with:
 
 ```bat
 run-live-factory-evals.bat
 ```
 
-The batch launcher selects `unrestricted-runtime-launch`. On Windows the
-trusted Factory Runtime must run outside the parent Codex OS sandbox; the
-runtime itself applies `workspace-write` to implementers and `read-only` to
-decomposition and review workers, always with approvals disabled.
-
-The equivalent direct invocation is:
+Or directly:
 
 ```powershell
 $env:IDD_RUN_LIVE_FACTORY_EVALS = "1"
-$env:IDD_CODEX_LAUNCH_PROFILE = "unrestricted-runtime-launch"
 dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj `
-  --filter "FullyQualifiedName~TwoStepCatalogFactoryEvalTests" `
+  --filter "FullyQualifiedName~FactoryEndToEndLiveTests" `
   --logger "console;verbosity=detailed"
 ```
 
-Each invocation writes an immutable artifact directory under
-`artifacts/factory-evals/<run-id>/`. The evaluator creates an isolated
-`CODEX_HOME`, adds the generated marketplace with `codex plugin marketplace
-add`, installs `idd-factory` with `codex plugin add`, and launches the installed
-`idd-factory-run`. The fixture does not receive copied Factory skills or a
-project-local runtime. Artifacts include the generated marketplace, isolated
-plugin cache, fixture workspace, Codex JSONL event stream, live `progress.log`,
-process logs, metrics, assertions, and `report.md`.
+The end-to-end scenario creates an isolated `CODEX_HOME`, builds and installs the current generated IDD plugin, checks the prepared TwoStepCatalog baseline, and launches real Codex with the supported unrestricted outer profile. Factory Runtime still applies its production worker capabilities: implementation workers receive workspace-write while planning/review workers remain restricted.
 
-The test requests `gpt-5.6-luna` with low reasoning effort by default. Override
-it without fallback using `IDD_FACTORY_EVAL_MODEL` and
-`IDD_FACTORY_EVAL_REASONING_EFFORT`; use `IDD_FACTORY_EVAL_TIMEOUT_MINUTES` to
-change the 20-minute timeout and `IDD_FACTORY_EVAL_VERSION` to pin the generated
-methodology version. Re-run the same case with the same values to compare its
-artifacts.
+The same invocation checks the blocking transport contract from a deliberately tiny JSONL reader: exactly one `factory_run`, no `factory_status` polling, and no completed model turn while the blocking call is active. Product build/tests, Factory `COMPLETED`, completed work count, final verification, and preservation of durable intent are checked directly.
 
-The evaluator intentionally distinguishes product success from Factory-contract
-success: `Product PASS / Factory FAIL` is valuable evaluation evidence, not a
-release-publication failure. Exact semantic-role topology, retry behavior,
-worker configuration, token usage, and other real-model properties belong here
-rather than in the deterministic release path.
+A second `WorkspaceWriteLiveTests` smoke case can be run with the same opt-in to verify real Codex workspace-write behavior without running Factory.
+
+Each run preserves raw evidence under `artifacts/factory-evals/<run-id>/`: the workspace including Factory current/result data, Codex `events.jsonl`, stderr/final response, verification logs, progress log, and git status/diff. The suite no longer reconstructs rollout trees, agent traces, effective model/reasoning telemetry, efficiency metrics, launch-profile reports, or other derived diagnostics.
+
+Defaults are `gpt-5.6-luna`, low reasoning effort, and a 20-minute timeout. Override them with `IDD_FACTORY_EVAL_MODEL`, `IDD_FACTORY_EVAL_REASONING_EFFORT`, `IDD_FACTORY_EVAL_TIMEOUT_MINUTES`, and optionally `IDD_FACTORY_EVAL_VERSION`.
