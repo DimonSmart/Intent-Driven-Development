@@ -47,7 +47,7 @@ public sealed class StateStoreTests
     {
         using var document = JsonDocument.Parse(JsonSerializer.Serialize(State(), FactoryJson.Options));
         var root = document.RootElement;
-        Assert.Equal(11, FactoryState.CurrentSchemaVersion);
+        Assert.Equal(12, FactoryState.CurrentSchemaVersion);
         Assert.True(root.TryGetProperty("completed", out _));
         Assert.True(root.TryGetProperty("current", out _));
         Assert.True(root.TryGetProperty("remaining", out _));
