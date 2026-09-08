@@ -29,7 +29,7 @@ internal static class FactoryCli
             Console.InputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
             if (args.Length == 0 || args[0] is "-h" or "--help")
             {
-                Console.WriteLine("idd-factory run --workspace <path> (--request-file <path> | --request-stdin true)\nidd-factory continue --workspace <path> [--answer-file <path>] [--confirmation approve|decline] [--verification-result passed|failed]\nidd-factory cancel --workspace <path>");
+                Console.WriteLine("idd-factory run --workspace <path> (--request-file <path> | --request-stdin true)\nidd-factory continue --workspace <path> [--answer-file <path>] [--confirmation approve|decline] [--verification-result passed|failed]\nidd-factory retry --workspace <path> --additional-attempts <1-10>\nidd-factory cancel --workspace <path>");
                 return 0;
             }
 
@@ -111,6 +111,7 @@ internal static class FactoryCli
                         options.TryGetValue("answer-file", out var answerPath)
                             ? await File.ReadAllTextAsync(Path.GetFullPath(answerPath), cancellation.Token)
                             : null),
+                    "retry" => await runtime.RetryExhaustedAsync(ParseAdditionalAttempts(options), cancellation.Token),
                     "cancel" => await runtime.CancelAsync(cancellation.Token),
                     _ => throw new ArgumentException($"Unknown command '{command}'.")
                 };
@@ -158,6 +159,11 @@ internal static class FactoryCli
 
     private static string Required(IReadOnlyDictionary<string, string> options, string name) =>
         options.TryGetValue(name, out var value) && !string.IsNullOrWhiteSpace(value) ? value : throw new ArgumentException($"--{name} is required.");
+
+    private static int ParseAdditionalAttempts(IReadOnlyDictionary<string, string> options) =>
+        int.TryParse(Required(options, "additional-attempts"), out var value)
+            ? value
+            : throw new ArgumentException("--additional-attempts must be an integer.");
 
     private static string ReadMethodologyVersion(string pluginRoot)
     {

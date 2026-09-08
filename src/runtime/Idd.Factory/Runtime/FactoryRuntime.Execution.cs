@@ -25,7 +25,7 @@ public sealed partial class FactoryRuntime
         if (item is null || item.Id != workItemId || state.CurrentPhase is not (CurrentWorkPhase.Ready or CurrentWorkPhase.Running))
             throw new AgentProtocolException("INVALID_DISPATCH", $"Work item {workItemId} is not Current executable work.");
         var reusable = state.CurrentAttemptId is { } attempt && File.Exists(Path.Combine(currentDirectory, "attempts", attempt, "result.json"));
-        if (!reusable && item.AttemptCount >= configuration.Limits.MaxAttemptsPerTask)
+        if (!reusable && item.AttemptCount >= configuration.Limits.MaxAttemptsPerTask + item.AdditionalAttemptBudget)
             throw new AgentProtocolException("RETRY_BUDGET_EXHAUSTED", await BuildRetryBudgetExhaustedMessageAsync(item, cancellationToken));
         var verificationDrivenRetry = item.LastVerificationDecision == VerificationDecision.UnexpectedFailure;
 

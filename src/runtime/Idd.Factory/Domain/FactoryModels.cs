@@ -58,6 +58,7 @@ public sealed record PlannedWorkItem
     public required string Id { get; init; }
     public required string ContractPath { get; init; }
     public int AttemptCount { get; set; }
+    public int AdditionalAttemptBudget { get; set; }
     public string? CurrentAttemptId { get; set; }
     public List<string> VerificationCheckIds { get; init; } = [];
     public Dictionary<string, VerificationExpectation> VerificationExpectations { get; init; } = new(StringComparer.Ordinal);

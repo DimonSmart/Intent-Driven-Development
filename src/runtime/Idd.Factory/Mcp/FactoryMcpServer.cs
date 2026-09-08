@@ -56,6 +56,15 @@ internal sealed class FactoryMcpTools(
         CancellationToken cancellationToken = default) =>
         RunWithProgressAsync(FactoryRuntimeCommand.Continue, workspace, answer, progress, cancellationToken);
 
+    [McpServerTool(Name = "factory_retry", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true, UseStructuredContent = true)]
+    [Description("Explicitly extend the retry budget for the current work item after RETRY_BUDGET_EXHAUSTED, preserving all previous attempts and verification evidence. The maximum total is 10 attempts per work item.")]
+    public Task<FactoryMcpResult> FactoryRetryAsync(
+        [Description("Absolute path to the target workspace.")] string workspace,
+        [Description("Number of additional semantic attempts to permit for the exhausted current work item.")] int additionalAttempts,
+        IProgress<ProgressNotificationValue> progress,
+        CancellationToken cancellationToken) =>
+        RunWithProgressAsync(FactoryRuntimeCommand.Retry, workspace, null, progress, cancellationToken, additionalAttempts);
+
     [McpServerTool(Name = "factory_cancel", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true, UseStructuredContent = true)]
     [Description("Request explicit cancellation of an IDD Factory workflow while preserving its product changes.")]
     public Task<FactoryMcpResult> FactoryCancelAsync(
@@ -76,7 +85,8 @@ internal sealed class FactoryMcpTools(
         string workspace,
         string? request,
         IProgress<ProgressNotificationValue> progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? additionalAttempts = null)
     {
         var sequence = 0;
         void Report(string message)
@@ -103,7 +113,7 @@ internal sealed class FactoryMcpTools(
         FactoryMcpResult result;
         try
         {
-            result = await runner.RunAsync(command, workspace, request, cancellationToken);
+            result = await runner.RunAsync(command, workspace, request, cancellationToken, additionalAttempts);
         }
         finally
         {

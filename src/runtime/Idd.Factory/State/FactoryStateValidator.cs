@@ -15,7 +15,7 @@ public sealed class FactoryStateValidator
         if ((state.Current is null) != (state.CurrentPhase is null)) throw Error("Current and CurrentPhase must be set or cleared together.");
 
         var active = new[] { state.Current }.Where(x => x is not null).Concat(state.Remaining).Select(x => x!).ToArray();
-        if (active.Any(x => x.AttemptCount < 0)) throw Error("Work item attempt counts cannot be negative.");
+        if (active.Any(x => x.AttemptCount < 0 || x.AdditionalAttemptBudget < 0)) throw Error("Work item retry counters cannot be negative.");
 
         var all = state.Completed.Select(x => (x.Id, x.ContractPath))
             .Concat(state.Current is null ? [] : [(state.Current.Id, state.Current.ContractPath)])

@@ -64,12 +64,29 @@ public sealed class FactoryMcpTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(new string?[] { "factory_cancel", "factory_continue", "factory_run", "factory_status" }, names);
+        Assert.Equal(new string?[] { "factory_cancel", "factory_continue", "factory_retry", "factory_run", "factory_status" }, names);
+    }
+
+    [Fact]
+    public async Task ProcessRunnerPassesExplicitAdditionalAttemptsToRetryCommand()
+    {
+        using var temp = new TestWorkspace();
+        var invoker = new RecordingInvoker(Outcome(), invocation =>
+        {
+            Assert.Contains("retry", invocation.Arguments);
+            Assert.Equal("2", ValueAfter(invocation, "--additional-attempts"));
+        });
+
+        var result = await new FactoryRuntimeProcessRunner(invoker)
+            .RunAsync(FactoryRuntimeCommand.Retry, temp.Path, null, CancellationToken.None, additionalAttempts: 2);
+
+        Assert.Equal("COMPLETED", result.FactoryOutcome);
     }
 
     [Theory]
     [InlineData(nameof(FactoryMcpTools.FactoryRunAsync))]
     [InlineData(nameof(FactoryMcpTools.FactoryContinueAsync))]
+    [InlineData(nameof(FactoryMcpTools.FactoryRetryAsync))]
     [InlineData(nameof(FactoryMcpTools.FactoryCancelAsync))]
     public void BlockingMcpToolsAcceptProgressSink(string methodName)
     {

@@ -72,6 +72,11 @@ blocked. Missing documentation alone is not `INTENT_REQUIRED`.
 - For an ordinary existing run, continue Factory without repeating initial
   preflight, rematerializing host attachments, or inventing a user answer. The
   persisted self-contained request is authoritative.
+- When `RETRY_BUDGET_EXHAUSTED` blocks the current work item and the user
+  explicitly asks for more attempts, invoke `factory_retry` with the requested
+  additional attempt count. It resumes only that current immutable work item,
+  preserves prior attempts and verification evidence, and rejects totals above
+  ten attempts. Do not call it for another blocker or infer the user's consent.
 - `USER_DECISION_REQUIRED` is a resumable planning-boundary pause. Report the
   planner's question to the user exactly enough to preserve its semantic choice;
   do not answer it yourself and do not create implementation work around the

@@ -4,7 +4,7 @@ using System.Text.Json;
 using Idd.Factory.Domain;
 using Idd.Factory.Runtime;
 
-internal enum FactoryRuntimeCommand { Run, Continue, Cancel }
+internal enum FactoryRuntimeCommand { Run, Continue, Retry, Cancel }
 
 internal sealed class FactoryRuntimeProcessRunner(
     IFactoryProcessInvoker processInvoker,
@@ -18,13 +18,16 @@ internal sealed class FactoryRuntimeProcessRunner(
         FactoryRuntimeCommand command,
         string workspace,
         string? input,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? additionalAttempts = null)
     {
         ValidateWorkspace(workspace);
         if (command == FactoryRuntimeCommand.Run && (input is null || input.Length == 0))
             throw new ArgumentException("request is required.", nameof(input));
         if (command == FactoryRuntimeCommand.Cancel && input is not null)
             throw new ArgumentException("input is not supported for factory_cancel.", nameof(input));
+        if (command == FactoryRuntimeCommand.Retry && (additionalAttempts is null || additionalAttempts < 1))
+            throw new ArgumentException("additionalAttempts must be at least 1 for factory_retry.", nameof(additionalAttempts));
         var inputLabel = command == FactoryRuntimeCommand.Run ? "Factory request" : "Factory user answer";
         if (input is not null && InvalidUnicodeReason(input, inputLabel) is { } inputError)
             return new(
@@ -49,7 +52,7 @@ internal sealed class FactoryRuntimeProcessRunner(
                 inputFile = Path.Combine(Path.GetTempPath(), $"idd-factory-{prefix}-{Guid.NewGuid():N}.md");
                 await File.WriteAllTextAsync(inputFile, input, TextUtf8, cancellationToken);
             }
-            var invocation = BuildInvocation(command, workspace, inputFile, runtimeAssembly, pluginRoot);
+            var invocation = BuildInvocation(command, workspace, inputFile, runtimeAssembly, pluginRoot, additionalAttempts);
             FactoryProcessResult processResult;
             try
             {
@@ -118,7 +121,8 @@ internal sealed class FactoryRuntimeProcessRunner(
         string workspace,
         string? inputFile,
         string runtimeAssembly,
-        string pluginRoot)
+        string pluginRoot,
+        int? additionalAttempts = null)
     {
         var arguments = new List<string>
         {
@@ -135,6 +139,11 @@ internal sealed class FactoryRuntimeProcessRunner(
         else if (command == FactoryRuntimeCommand.Continue && inputFile is not null)
         {
             arguments.AddRange(["--answer-file", inputFile]);
+        }
+        else if (command == FactoryRuntimeCommand.Retry)
+        {
+            if (additionalAttempts is null) throw new ArgumentException("additionalAttempts is required for retry.", nameof(additionalAttempts));
+            arguments.AddRange(["--additional-attempts", additionalAttempts.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)]);
         }
         return new(ResolveDotnetHost(), arguments, workspace, null);
     }

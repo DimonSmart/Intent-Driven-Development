@@ -155,6 +155,41 @@ public sealed partial class FactoryRuntime(
         return new("CANCELLED", state.RunId, "Product changes and Factory diagnostics were preserved.");
     }
 
+    public async Task<FactoryCliOutcome> RetryExhaustedAsync(int additionalAttempts, CancellationToken cancellationToken)
+    {
+        var state = await stateStore.LoadAsync(cancellationToken) ?? throw new FactoryStateException("MISSING_FACTORY_STATE", "No Factory run exists.");
+        if (state.FactoryConfigurationHash != configuration.Hash) return new("FACTORY_CONFIGURATION_CHANGED", state.RunId, "Restore the pinned configuration or cancel and restart.");
+        if (additionalAttempts < 1) return new("INVALID_RETRY_ATTEMPTS", state.RunId, "additionalAttempts must be at least 1.");
+        if (state.RunStatus != FactoryRunStatus.Blocked
+            || state.Blocker?.Code != "RETRY_BUDGET_EXHAUSTED"
+            || state.PendingContinuation is not { Kind: ContinuationKind.Terminal }
+            || state.Current is null)
+            return new("RETRY_NOT_AVAILABLE", state.RunId, "The current run is not blocked by an exhausted work-item retry budget.", "Use factory_continue for a resumable continuation, or cancel and restart.");
+
+        var effectiveBudget = configuration.Limits.MaxAttemptsPerTask + state.Current.AdditionalAttemptBudget;
+        var availableAttempts = 10 - effectiveBudget;
+        if (additionalAttempts > availableAttempts)
+            return new("INVALID_RETRY_ATTEMPTS", state.RunId, $"Only {availableAttempts} additional attempts are available; Factory permits at most 10 attempts per work item.");
+        if (state.Current.AttemptCount < effectiveBudget)
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Retry-budget exhaustion was recorded before the current work item consumed its effective attempt budget.");
+
+        state.Current.AdditionalAttemptBudget += additionalAttempts;
+        state.CurrentPhase = CurrentWorkPhase.Ready;
+        state.CurrentAttemptId = null;
+        state.PendingContinuation = new(
+            ContinuationKind.SemanticInvocation,
+            state.Current.Id,
+            null,
+            "RETRY_AFTER_BUDGET_EXTENSION",
+            true,
+            SemanticOperationKind.WorkItemExecution);
+        state.Blocker = null;
+        state.RunStatus = FactoryRunStatus.Running;
+        await events.WriteAsync(state.RunId, "retry-budget-extended", new { workItemId = state.Current.Id, additionalAttempts, effectiveAttemptBudget = effectiveBudget + additionalAttempts }, cancellationToken);
+        await SaveAsync(state, cancellationToken);
+        return await ExecuteLoopAsync(state, cancellationToken);
+    }
+
     private async Task<FactoryCliOutcome?> RunRepositoryFallbackBaselineAsync(FactoryState state, CancellationToken cancellationToken)
     {
         if (state.RepositoryFallbackBaselineAccepted || File.Exists(Path.Combine(workspace, ".idd", "verification.yaml"))) return null;
@@ -290,7 +325,10 @@ public sealed partial class FactoryRuntime(
 
         var existing = state.PendingContinuation is { IsResumable: true } value ? value : null;
         var hard = exception.Code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal) || exception.Code is "UNKNOWN_CAPABILITY" or "INVALID_RUNTIME_STATE";
-        return await StopAsync(state, exception.Code, exception.Message, hard || existing is null ? "Cancel/restart after resolving the condition." : "Resolve the condition, then continue the exact operation.", cancellationToken,
+        var resume = exception.Code == "RETRY_BUDGET_EXHAUSTED"
+            ? "Resolve the condition, then call factory_retry with additional attempts (maximum 10 total), or cancel/restart."
+            : hard || existing is null ? "Cancel/restart after resolving the condition." : "Resolve the condition, then continue the exact operation.";
+        return await StopAsync(state, exception.Code, exception.Message, resume, cancellationToken,
             hard || existing is null ? new(ContinuationKind.Terminal, state.Current?.Id, null, exception.Code, false) : existing);
     }
 
