@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
+using Idd.Factory.Processes;
 
 namespace Idd.Factory.Verification;
 
@@ -13,6 +14,7 @@ internal sealed class VerificationRunner(
     private static readonly TimeSpan CleanupGrace = TimeSpan.FromSeconds(2);
     private const int TailBytes = 4 * 1024;
     private const int TailLines = 40;
+    private readonly ProcessSupervisor processSupervisor = ProcessSupervisor.Shared;
 
     public async Task<VerificationResult> RunPolicyChecksAsync(
         VerificationPolicy policy,
@@ -195,20 +197,21 @@ internal sealed class VerificationRunner(
             stderr,
             issues,
             captureCancellation.Token);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(check.Timeout);
         var timedOut = false;
         VerificationFailure? primary = null;
         VerificationTerminationOutcome? termination = null;
         try
         {
-            await process.WaitForExitAsync(timeout.Token);
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            timedOut = true;
-            primary = new("timeout", "execute", $"Check {id} timed out.");
-            termination = await StopProcessTreeAsync(process, issues);
+            var exited = await processSupervisor.WaitForExitAsync(
+                process,
+                check.Timeout,
+                cancellationToken);
+            if (!exited)
+            {
+                timedOut = true;
+                primary = new("timeout", "execute", $"Check {id} timed out.");
+                termination = await StopProcessTreeAsync(process, issues);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -343,15 +346,9 @@ internal sealed class VerificationRunner(
 
     private static async Task<bool> WaitForCleanupAsync(Task task)
     {
-        using var grace = new CancellationTokenSource(CleanupGrace);
         try
         {
-            await task.WaitAsync(grace.Token);
-            return true;
-        }
-        catch (OperationCanceledException) when (grace.IsCancellationRequested)
-        {
-            return false;
+            return await ProcessSupervisor.Shared.WaitAsync(task, CleanupGrace);
         }
         catch
         {
@@ -379,29 +376,32 @@ internal sealed class VerificationRunner(
                 issues.Add(VerificationDiagnostics.Issue("stream-log", $"open-{streamName}-log", exception));
         }
 
-        var buffer = new char[4096];
         try
         {
-            while (true)
-            {
-                var count = await reader.ReadAsync(buffer);
-                if (count == 0) break;
-                state.Append(buffer.AsSpan(0, count));
-                if (log is null) continue;
-                try
+            await processSupervisor.PumpAsync(
+                reader,
+                async (buffer, count, token) =>
                 {
-                    var bytes = Encoding.UTF8.GetBytes(buffer, 0, count);
-                    await log.WriteAsync(bytes, cancellationToken);
-                }
-                catch (Exception exception)
-                {
-                    state.Failure ??= exception;
-                    lock (issues)
-                        issues.Add(VerificationDiagnostics.Issue("stream-log", $"write-{streamName}-log", exception));
-                    try { await log.DisposeAsync(); } catch { }
-                    log = null;
-                }
-            }
+                    state.Append(buffer.AsSpan(0, count));
+                    if (log is null) return;
+                    try
+                    {
+                        var bytes = Encoding.UTF8.GetBytes(buffer, 0, count);
+                        await log.WriteAsync(bytes, token);
+                    }
+                    catch (Exception exception)
+                    {
+                        state.Failure ??= exception;
+                        lock (issues)
+                            issues.Add(VerificationDiagnostics.Issue(
+                                "stream-log",
+                                $"write-{streamName}-log",
+                                exception));
+                        try { await log.DisposeAsync(); } catch { }
+                        log = null;
+                    }
+                },
+                cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested) { }

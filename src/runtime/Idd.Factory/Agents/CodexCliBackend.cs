@@ -18,7 +18,7 @@ public sealed class CodexCliBackend : IAgentBackend
     private readonly AgentExecutionConfiguration executionConfiguration;
     private readonly AgentCapabilityPolicy capabilityPolicy;
     private readonly CodexHomePreparation homePreparation;
-    private readonly ProcessSupervisor processSupervisor = new();
+    private readonly ProcessSupervisor processSupervisor = ProcessSupervisor.Shared;
     private readonly Dictionary<string, RunningProcess> processes = new(StringComparer.Ordinal);
 
     public CodexCliBackend(
@@ -119,10 +119,11 @@ public sealed class CodexCliBackend : IAgentBackend
                 FactoryJson.Options),
             cancellationToken);
 
-        var process = new Process { StartInfo = start, EnableRaisingEvents = true };
+        Process? process;
         try
         {
-            if (!process.Start())
+            process = processSupervisor.Start(start);
+            if (process is null)
                 throw new AgentProtocolException(
                     "AGENT_BACKEND_UNAVAILABLE",
                     "Codex CLI did not start.");
@@ -182,7 +183,10 @@ public sealed class CodexCliBackend : IAgentBackend
         {
             using var resultWatcherCancellation =
                 CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            var processExit = running.Process.WaitForExitAsync(cancellationToken);
+            var processExit = processSupervisor.WaitForExitAsync(
+                running.Process,
+                timeout: null,
+                cancellationToken);
             var resultReady = WaitForCompleteResultAsync(
                 running.ResultPath,
                 resultWatcherCancellation.Token);
@@ -234,14 +238,11 @@ public sealed class CodexCliBackend : IAgentBackend
             var killRequired = false;
             if (completedResultWasObserved && !running.Process.HasExited)
             {
-                using var gracefulExit =
-                    CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                gracefulExit.CancelAfter(TimeSpan.FromSeconds(5));
-                try
-                {
-                    await running.Process.WaitForExitAsync(gracefulExit.Token);
-                }
-                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                var exited = await processSupervisor.WaitForExitAsync(
+                    running.Process,
+                    TimeSpan.FromSeconds(5),
+                    cancellationToken);
+                if (!exited)
                 {
                     killRequired = true;
                     await CancelProcessAsync(running.Process);
@@ -423,49 +424,32 @@ public sealed class CodexCliBackend : IAgentBackend
             windowsSandbox,
             windowsAppsPathEntriesRemoved);
 
-    internal static async Task<string> CaptureAsync(
+    internal static Task<string> CaptureAsync(
         StreamReader reader,
         string path,
-        CancellationToken cancellationToken)
-    {
-        var text = await reader.ReadToEndAsync(cancellationToken);
-        await File.WriteAllTextAsync(path, text, cancellationToken);
-        return text;
-    }
+        CancellationToken cancellationToken) =>
+        ProcessSupervisor.Shared.CaptureAsync(reader, path, cancellationToken);
 
-    internal static async Task<string> CaptureJsonLinesAsync(
+    internal static Task<string> CaptureJsonLinesAsync(
         StreamReader reader,
         string path,
         CommandExecutionTracker tracker,
-        CancellationToken cancellationToken)
-    {
-        var text = new StringBuilder();
-        await using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
-        while (await reader.ReadLineAsync(cancellationToken) is { } line)
-        {
-            tracker.Observe(line, DateTimeOffset.UtcNow);
-            text.AppendLine(line);
-            await writer.WriteLineAsync(line.AsMemory(), cancellationToken);
-            await writer.FlushAsync(cancellationToken);
-        }
-        return text.ToString();
-    }
+        CancellationToken cancellationToken) =>
+        ProcessSupervisor.Shared.CaptureLinesAsync(
+            reader,
+            path,
+            line => tracker.Observe(line, DateTimeOffset.UtcNow),
+            cancellationToken);
 
-    internal static async Task<string> CaptureLinesAsync(
+    internal static Task<string> CaptureLinesAsync(
         StreamReader reader,
         string path,
-        CancellationToken cancellationToken)
-    {
-        var text = new StringBuilder();
-        await using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
-        while (await reader.ReadLineAsync(cancellationToken) is { } line)
-        {
-            text.AppendLine(line);
-            await writer.WriteLineAsync(line.AsMemory(), cancellationToken);
-            await writer.FlushAsync(cancellationToken);
-        }
-        return text.ToString();
-    }
+        CancellationToken cancellationToken) =>
+        ProcessSupervisor.Shared.CaptureLinesAsync(
+            reader,
+            path,
+            observeLine: null,
+            cancellationToken);
 
     private static async Task<IncompleteCommandExecution> WaitForCommandTimeoutAsync(
         CommandExecutionTracker tracker,
@@ -515,14 +499,9 @@ public sealed class CodexCliBackend : IAgentBackend
         Task<string> capture,
         string path)
     {
-        try
-        {
-            return await capture.WaitAsync(TimeSpan.FromSeconds(5));
-        }
-        catch (TimeoutException)
-        {
-            return File.Exists(path) ? await File.ReadAllTextAsync(path) : string.Empty;
-        }
+        if (await ProcessSupervisor.Shared.WaitAsync(capture, TimeSpan.FromSeconds(5)))
+            return await capture;
+        return File.Exists(path) ? await File.ReadAllTextAsync(path) : string.Empty;
     }
 
     private async Task<AgentProcessResult> TerminateForCommandFailureAsync(

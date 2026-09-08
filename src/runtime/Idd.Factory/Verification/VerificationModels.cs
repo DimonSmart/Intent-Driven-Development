@@ -94,25 +94,15 @@ public sealed record VerificationDiagnosticIssue(
 
 internal sealed class VerificationRuntimeHooks
 {
-    internal Func<ProcessStartInfo, Process?> StartProcess { get; init; } = Process.Start;
+    internal Func<ProcessStartInfo, Process?> StartProcess { get; init; } =
+        static startInfo => ProcessSupervisor.Shared.Start(startInfo);
     internal Func<string, Stream> CreateLog { get; init; } = path =>
         new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read, 4096, FileOptions.Asynchronous);
     internal Func<string, string, CancellationToken, Task> WriteEvidence { get; init; } = File.WriteAllTextAsync;
-    internal Func<Task, TimeSpan, Task<bool>> WaitForDrain { get; init; } = static async (task, gracePeriod) =>
-    {
-        using var grace = new CancellationTokenSource(gracePeriod);
-        try
-        {
-            await task.WaitAsync(grace.Token);
-            return true;
-        }
-        catch (OperationCanceledException) when (grace.IsCancellationRequested)
-        {
-            return false;
-        }
-    };
+    internal Func<Task, TimeSpan, Task<bool>> WaitForDrain { get; init; } =
+        static (task, gracePeriod) => ProcessSupervisor.Shared.WaitAsync(task, gracePeriod);
     internal Func<Process, CancellationToken, Task> TerminateProcess { get; init; } =
-        static (process, token) => new ProcessSupervisor().TerminateProcessTreeAsync(process, token);
+        static (process, token) => ProcessSupervisor.Shared.TerminateProcessTreeAsync(process, token);
 }
 
 public enum VerificationStatus
