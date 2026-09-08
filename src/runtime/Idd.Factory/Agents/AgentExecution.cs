@@ -131,13 +131,13 @@ public sealed class CodexCliBackend : IAgentBackend
             var termination = killRequired
                 ? AgentTerminationKind.ForcedAfterResult
                 : exitCode == 0 ? AgentTerminationKind.CleanExit : AgentTerminationKind.TransportFailure;
-            var incompleteCommandCount = CountIncompleteCommandExecutions(stdout);
-            if (incompleteCommandCount > 0)
+            var incompleteCommands = FindIncompleteCommandExecutions(stdout);
+            if (incompleteCommands.Count > 0)
             {
                 cleanupTempDirectory = false;
                 completedResultWasObserved = false;
                 termination = AgentTerminationKind.TransportFailure;
-                var diagnostic = $"Agent exited with {incompleteCommandCount} incomplete shell command(s); temporary directory cleanup was skipped.";
+                var diagnostic = BuildIncompleteCommandDiagnostic(incompleteCommands);
                 stderr = string.IsNullOrWhiteSpace(stderr) ? diagnostic : stderr.TrimEnd() + Environment.NewLine + diagnostic;
                 if (File.Exists(running.ResultPath)) File.Delete(running.ResultPath);
                 await File.WriteAllTextAsync(
@@ -289,9 +289,9 @@ public sealed class CodexCliBackend : IAgentBackend
             "Do not mutate .idd/factory/current or .idd/intent. stdout is diagnostic only.";
     }
 
-    internal static int CountIncompleteCommandExecutions(string stdout)
+    internal static IReadOnlyList<IncompleteCommandExecution> FindIncompleteCommandExecutions(string stdout)
     {
-        var active = new HashSet<string>(StringComparer.Ordinal);
+        var active = new Dictionary<string, IncompleteCommandExecution>(StringComparer.Ordinal);
         using var reader = new StringReader(stdout);
         while (reader.ReadLine() is { } line)
         {
@@ -309,12 +309,40 @@ public sealed class CodexCliBackend : IAgentBackend
 
                 var id = idValue.GetString();
                 if (string.IsNullOrWhiteSpace(id)) continue;
-                if (eventType.GetString() == "item.started") active.Add(id);
+                if (eventType.GetString() == "item.started")
+                {
+                    var command = item.TryGetProperty("command", out var commandValue)
+                        && commandValue.ValueKind == JsonValueKind.String
+                        ? commandValue.GetString()
+                        : null;
+                    if (string.IsNullOrWhiteSpace(command)) command = null;
+                    active[id] = new(id, command);
+                }
                 else if (eventType.GetString() == "item.completed") active.Remove(id);
             }
             catch (JsonException) { }
         }
-        return active.Count;
+        return active.Values.ToArray();
+    }
+
+    internal static string BuildIncompleteCommandDiagnostic(IReadOnlyList<IncompleteCommandExecution> commands)
+    {
+        const int maximumReportedCommands = 3;
+        var descriptions = commands
+            .Take(maximumReportedCommands)
+            .Select(command => $"[{BoundDiagnosticValue(command.Id, 128)}] {BoundDiagnosticValue(command.Command ?? "<command unavailable>", 512)}");
+        var omitted = commands.Count > maximumReportedCommands
+            ? $"; {commands.Count - maximumReportedCommands} more omitted"
+            : string.Empty;
+        return $"Detected {commands.Count} incomplete shell command(s) after the agent exited. "
+            + $"Unmatched item.started event(s): {string.Join("; ", descriptions)}{omitted}. "
+            + "Inspect stdout.log for the complete event stream. Temporary directory cleanup was skipped.";
+    }
+
+    private static string BoundDiagnosticValue(string value, int maximumLength)
+    {
+        var normalized = string.Join(" ", value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return normalized.Length <= maximumLength ? normalized : normalized[..maximumLength] + "...";
     }
 
     internal static AgentAttemptTelemetry BuildTelemetry(
@@ -395,6 +423,8 @@ public sealed class CodexCliBackend : IAgentBackend
 }
 
 public sealed record CodexCommand(string Executable, IReadOnlyList<string> PrefixArguments);
+
+internal sealed record IncompleteCommandExecution(string Id, string? Command);
 
 public static class CodexExecutableResolver
 {

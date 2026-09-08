@@ -13,7 +13,7 @@ public sealed class AgentExecutionTests
             {"type":"item.completed","item":{"id":"command-1","type":"command_execution","status":"completed"}}
             """;
 
-        Assert.Equal(0, CodexCliBackend.CountIncompleteCommandExecutions(stdout));
+        Assert.Empty(CodexCliBackend.FindIncompleteCommandExecutions(stdout));
     }
 
     [Fact]
@@ -24,7 +24,25 @@ public sealed class AgentExecutionTests
             {"type":"item.completed","item":{"id":"message-1","type":"agent_message"}}
             """;
 
-        Assert.Equal(1, CodexCliBackend.CountIncompleteCommandExecutions(stdout));
+        var incomplete = Assert.Single(CodexCliBackend.FindIncompleteCommandExecutions(stdout));
+        Assert.Equal("command-1", incomplete.Id);
+        Assert.Null(incomplete.Command);
+    }
+
+    [Fact]
+    public void IncompleteShellCommandDiagnosticIdentifiesCommandAndLocalEvidence()
+    {
+        var stdout = """
+            {"type":"item.started","item":{"id":"item_7","type":"command_execution","command":"dotnet test tests/Desktop.Tests.csproj","status":"in_progress"}}
+            {"type":"item.completed","item":{"id":"message-1","type":"agent_message"}}
+            """;
+
+        var incomplete = CodexCliBackend.FindIncompleteCommandExecutions(stdout);
+        var diagnostic = CodexCliBackend.BuildIncompleteCommandDiagnostic(incomplete);
+
+        Assert.Contains("[item_7] dotnet test tests/Desktop.Tests.csproj", diagnostic, StringComparison.Ordinal);
+        Assert.Contains("Inspect stdout.log for the complete event stream", diagnostic, StringComparison.Ordinal);
+        Assert.Contains("Temporary directory cleanup was skipped", diagnostic, StringComparison.Ordinal);
     }
 
     [Fact]
