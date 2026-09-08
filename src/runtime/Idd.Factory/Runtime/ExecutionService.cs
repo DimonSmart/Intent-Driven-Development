@@ -7,13 +7,15 @@ internal enum FactoryExecutionResultKind
 {
     Completed,
     Retry,
+    RetryBudgetExhausted,
     VerificationRetryNoProgress
 }
 
 internal sealed record FactoryExecutionResult(
     FactoryExecutionResultKind Kind,
     string WorkItemId,
-    string? AttemptId = null);
+    string? AttemptId = null,
+    string? Detail = null);
 
 internal sealed class ExecutionService(
     FactoryRuntimeContext context,
@@ -49,9 +51,10 @@ internal sealed class ExecutionService(
             >= context.Configuration.Limits.MaxAttemptsPerTask
                + item.AdditionalAttemptBudget)
         {
-            throw new AgentProtocolException(
-                "RETRY_BUDGET_EXHAUSTED",
-                await contextReader.BuildRetryBudgetExhaustedMessageAsync(
+            return new(
+                FactoryExecutionResultKind.RetryBudgetExhausted,
+                item.Id,
+                Detail: await contextReader.BuildRetryBudgetExhaustedMessageAsync(
                     item,
                     cancellationToken));
         }

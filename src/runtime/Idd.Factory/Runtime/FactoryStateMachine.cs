@@ -171,6 +171,28 @@ internal sealed class FactoryStateMachine(
         CancellationToken cancellationToken)
     {
         var result = await planning.PlanAsync(state, cancellationToken);
+        if (result.Kind == PlanningResultKind.BudgetExhausted)
+        {
+            var outcome = await stop.ApplyAsync(
+                state,
+                new(
+                    "PLANNING_BUDGET_EXHAUSTED",
+                    result.Detail ?? "Factory planning-cycle budget exhausted.",
+                    "Cancel/restart after resolving the condition.",
+                    new(
+                        ContinuationKind.Terminal,
+                        null,
+                        null,
+                        "PLANNING_BUDGET_EXHAUSTED",
+                        false)),
+                cancellationToken);
+            return new(
+                FactoryRuntimeState.Planning,
+                FactoryRuntimeState.Blocked,
+                result.Reason,
+                outcome);
+        }
+
         if (result.Kind == PlanningResultKind.Question)
         {
             state.PlanningCycleCount++;
@@ -197,7 +219,7 @@ internal sealed class FactoryStateMachine(
             state,
             result.Tasks,
             result.Reason,
-            result.AttemptId,
+            result.AttemptId!,
             cancellationToken);
         return TransitionFromCurrent(FactoryRuntimeState.Planning, state, "planning-completed");
     }
@@ -223,6 +245,28 @@ internal sealed class FactoryStateMachine(
         var item = state.Current
             ?? throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Execution requires Current work.");
         var result = await execution.ExecuteAsync(state, item.Id, cancellationToken);
+
+        if (result.Kind == FactoryExecutionResultKind.RetryBudgetExhausted)
+        {
+            var outcome = await stop.ApplyAsync(
+                state,
+                new(
+                    "RETRY_BUDGET_EXHAUSTED",
+                    result.Detail ?? $"{item.Id} exhausted its semantic attempt budget.",
+                    "Resolve the condition, then call factory_retry with additional attempts (maximum 10 total), or cancel/restart.",
+                    new(
+                        ContinuationKind.Terminal,
+                        item.Id,
+                        null,
+                        "RETRY_BUDGET_EXHAUSTED",
+                        false)),
+                cancellationToken);
+            return new(
+                FactoryRuntimeState.Executing,
+                FactoryRuntimeState.Blocked,
+                "retry-budget-exhausted",
+                outcome);
+        }
 
         if (result.Kind == FactoryExecutionResultKind.VerificationRetryNoProgress)
         {

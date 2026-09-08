@@ -5,15 +5,17 @@ namespace Idd.Factory.Runtime;
 internal enum PlanningResultKind
 {
     Plan,
-    Question
+    Question,
+    BudgetExhausted
 }
 
 internal sealed record PlanningResult(
     PlanningResultKind Kind,
-    string AttemptId,
+    string? AttemptId,
     IReadOnlyList<string> Tasks,
     string? Question,
-    string Reason);
+    string Reason,
+    string? Detail = null);
 
 internal sealed class PlanningService(
     FactoryRuntimeContext context,
@@ -34,8 +36,12 @@ internal sealed class PlanningService(
 
         if (state.PlanningCycleCount >= context.Configuration.Limits.MaxPlanningCycles)
         {
-            throw new AgentProtocolException(
-                "PLANNING_BUDGET_EXHAUSTED",
+            return new(
+                PlanningResultKind.BudgetExhausted,
+                null,
+                [],
+                null,
+                "planning-budget-exhausted",
                 "Factory planning-cycle budget exhausted.");
         }
 
