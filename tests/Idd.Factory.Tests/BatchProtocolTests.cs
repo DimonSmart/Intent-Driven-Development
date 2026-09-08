@@ -169,26 +169,26 @@ public sealed class BatchProtocolTests
     }
 
     [Fact]
-    public void SchedulerPlansAfterEveryExhaustedBatchAndAfterFinalFailure()
+    public void StateMachineRoutesEveryExhaustedBatchAndFinalFailureToPlanning()
     {
-        var scheduler = new FactoryScheduler();
+        var stateMachine = StateMachineForRoutingOnly();
         var state = StateStoreTests.State();
-        Assert.Equal(FactoryCommandKind.Plan, scheduler.Decide(state).Kind);
+        Assert.Equal(FactoryRuntimeState.Planning, stateMachine.ResolveState(state));
 
         state.PlanningCycleCount = 1;
         state.Completed.Add(StateStoreTests.Completed("W000001"));
-        Assert.Equal(FactoryCommandKind.Plan, scheduler.Decide(state).Kind);
+        Assert.Equal(FactoryRuntimeState.Planning, stateMachine.ResolveState(state));
 
         state.PlannedThroughCompletedCount = 1;
         state.PlanRevision = 2;
-        Assert.Equal(FactoryCommandKind.RunFinalVerification, scheduler.Decide(state).Kind);
+        Assert.Equal(FactoryRuntimeState.FinalVerifying, stateMachine.ResolveState(state));
 
         state.FinalVerificationPlanRevision = 2;
         state.FinalVerificationPassed = false;
-        Assert.Equal(FactoryCommandKind.Plan, scheduler.Decide(state).Kind);
+        Assert.Equal(FactoryRuntimeState.Planning, stateMachine.ResolveState(state));
 
         state.FinalVerificationPassed = true;
-        Assert.Equal(FactoryCommandKind.Finalize, scheduler.Decide(state).Kind);
+        Assert.Equal(FactoryRuntimeState.Finalizing, stateMachine.ResolveState(state));
     }
 
     [Fact]
@@ -203,6 +203,9 @@ public sealed class BatchProtocolTests
         Assert.False(json.RootElement.TryGetProperty("finalReview", out _));
         Assert.False(json.RootElement.TryGetProperty("allowedCapabilities", out _));
     }
+
+    internal static FactoryStateMachine StateMachineForRoutingOnly() =>
+        new(null!, null!, null!, null!, null!, null!, null!);
 
     private static AgentInvocation Invocation(string workspace, string output) => new()
     {

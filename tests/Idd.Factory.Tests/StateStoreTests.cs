@@ -67,7 +67,9 @@ public sealed class StateStoreTests
         state.PlannedThroughCompletedCount = 1;
         await store.CreateAsync(state, default);
         var loaded = (await store.LoadAsync(default))!;
-        Assert.Equal(FactoryCommandKind.RunFinalVerification, new FactoryScheduler().Decide(loaded).Kind);
+        Assert.Equal(
+            FactoryRuntimeState.FinalVerifying,
+            BatchProtocolTests.StateMachineForRoutingOnly().ResolveState(loaded));
     }
 
     internal static FactoryState State() => new() { MethodologyVersion = "test", RuntimeVersion = "test", RunId = "run", FactoryConfigurationHash = "config-hash", RequestPath = "request.md" };
