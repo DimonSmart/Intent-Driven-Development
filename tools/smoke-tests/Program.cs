@@ -392,21 +392,32 @@ void CheckFactoryRoleGeneration()
             marketplaceRoot, "plugins", platform, "idd-factory", "skills", "idd-factory-run", "SKILL.md"));
         foreach (var (literal, description) in new[]
         {
-            ("structured diagnostic payload", "structured diagnostic reporting"),
-            ("Primary check: <primaryCheckId>", "primary check reporting"),
-            ("Primary cause: <failureKind> at <failureStage>: <summary>", "consistent failure-stage reporting"),
-            ("Termination: requested=<requested>, entire process tree=<entireProcessTree>, succeeded=<succeeded>, error=<bounded error metadata>", "termination reporting contract"),
-            ("`metadataTruncated`", "diagnostic metadata truncation reporting"),
-            ("`omittedCheckCount`", "omitted diagnostic entry reporting"),
-            ("Full stderr: <stderrPath, only when the tail was truncated>", "stderr truncation pointer"),
-            ("Full stdout: <stdoutPath, only when the tail was truncated>", "stdout truncation pointer"),
-            ("Do not expose stack traces, environment data, secrets, or full", "diagnostic security boundary"),
-            ("Never\nprint an evidence or stream-log path when its payload field is null or absent", "nullable path omission"),
-            ("enumerate them\ncompactly in payload order", "additional diagnostic reporting"),
-            ("runtime-provided `ResumeWhen` exactly\nenough to preserve its condition", "runtime resume instruction")
+            ("minimal primary-failure payload", "minimal verification diagnostic reporting"),
+            ("Check: <checkId>", "verification check reporting"),
+            ("Cause: <failureKind> at <failureStage>", "verification cause reporting"),
+            ("Evidence: <evidencePath, when present>", "verification evidence reporting"),
+            ("Reason: <runtime Reason>", "runtime reason reporting"),
+            ("Resume when: <runtime ResumeWhen>", "runtime resume reporting"),
+            ("inspect the referenced verification evidence", "authoritative detailed evidence guidance"),
+            ("must not analyze stdout or stderr\nto choose Factory workflow", "runtime-owned verification workflow")
         })
         {
             ExpectContains(runSkill, literal, $"{platform} Factory run {description}");
+        }
+
+        foreach (var obsolete in new[]
+        {
+            "Primary check: <primaryCheckId>",
+            "Primary cause: <failureKind> at <failureStage>: <summary>",
+            "Termination: requested=",
+            "`metadataTruncated`",
+            "`omittedCheckCount`",
+            "Full stderr:",
+            "Full stdout:"
+        })
+        {
+            if (runSkill.Contains(obsolete, StringComparison.Ordinal))
+                failures.Add($"{platform} Factory run still contains obsolete rich diagnostic contract '{obsolete}'.");
         }
     }
 }
