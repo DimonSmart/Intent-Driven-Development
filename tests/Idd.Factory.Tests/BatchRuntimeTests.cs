@@ -297,38 +297,45 @@ public sealed class BatchRuntimeTests
         var blocked = await runtime.RunRequestAsync("Exercise resumable verification diagnostics.", "test", default);
 
         Assert.Equal("VERIFICATION_INFRASTRUCTURE_FAILURE", blocked.FactoryOutcome);
-        Assert.NotNull(blocked.Payload);
-        Assert.True(System.Text.Encoding.UTF8.GetByteCount(blocked.Payload.Value.GetRawText()) <= 16 * 1024);
-        Assert.Equal("infrastructure-check", blocked.Payload.Value.GetProperty("primaryCheckId").GetString());
-        var check = Assert.Single(blocked.Payload.Value.GetProperty("checks").EnumerateArray());
-        Assert.Equal("timeout", check.GetProperty("failureKind").GetString());
-        Assert.Equal("execute", check.GetProperty("failureStage").GetString());
-        Assert.Contains("infrastructure-check", check.GetProperty("summary").GetString(), StringComparison.Ordinal);
-        Assert.Contains("3 seconds", check.GetProperty("summary").GetString(), StringComparison.Ordinal);
-        Assert.False(check.TryGetProperty("stage", out _));
-        Assert.Equal(".idd/factory/current/verification/" + check.GetProperty("evidenceId").GetString() + ".json", check.GetProperty("evidencePath").GetString());
-        Assert.StartsWith(".idd/factory/current/verification/", check.GetProperty("stdout").GetProperty("path").GetString(), StringComparison.Ordinal);
-        Assert.StartsWith(".idd/factory/current/verification/", check.GetProperty("stderr").GetProperty("path").GetString(), StringComparison.Ordinal);
-        Assert.True(check.GetProperty("stdout").GetProperty("truncated").GetBoolean());
-        Assert.True(check.GetProperty("stderr").GetProperty("truncated").GetBoolean());
-        var termination = check.GetProperty("termination");
-        Assert.True(termination.GetProperty("requested").GetBoolean());
-        Assert.True(termination.GetProperty("entireProcessTree").GetBoolean());
-        Assert.True(termination.GetProperty("succeeded").GetBoolean());
-        Assert.False(termination.TryGetProperty("attempted", out _));
-        Assert.False(termination.TryGetProperty("gracePeriodExpired", out _));
+        var payload = blocked.Payload!.Value;
+        Assert.Equal(6, payload.EnumerateObject().Count());
+        Assert.Equal("subtask", payload.GetProperty("context").GetString());
+        Assert.Equal("W000001", payload.GetProperty("workItemId").GetString());
+        Assert.Equal("infrastructure-check", payload.GetProperty("checkId").GetString());
+        Assert.Equal("timeout", payload.GetProperty("failureKind").GetString());
+        Assert.Equal("execute", payload.GetProperty("failureStage").GetString());
+        var evidencePath = payload.GetProperty("evidencePath").GetString();
+        Assert.NotNull(evidencePath);
+        Assert.StartsWith(".idd/factory/current/verification/", evidencePath, StringComparison.Ordinal);
+        Assert.False(payload.TryGetProperty("checks", out _));
+        Assert.False(payload.TryGetProperty("stdout", out _));
+        Assert.False(payload.TryGetProperty("termination", out _));
         Assert.Contains("infrastructure-check", blocked.Reason, StringComparison.Ordinal);
         Assert.Contains("3 seconds", blocked.Reason, StringComparison.Ordinal);
-        Assert.Contains("infrastructure-check", blocked.ResumeWhen, StringComparison.Ordinal);
-        Assert.Contains("3 seconds", blocked.ResumeWhen, StringComparison.Ordinal);
-        Assert.False(blocked.ResumeWhen!.Contains("restart", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("factory_continue", blocked.ResumeWhen, StringComparison.Ordinal);
+        Assert.DoesNotContain("restart", blocked.ResumeWhen, StringComparison.OrdinalIgnoreCase);
+
+        var evidenceFile = Path.Combine(temp.Path, evidencePath!.Replace('/', Path.DirectorySeparatorChar));
+        Assert.True(File.Exists(evidenceFile));
+        using (var evidence = JsonDocument.Parse(await File.ReadAllTextAsync(evidenceFile)))
+        {
+            var root = evidence.RootElement;
+            Assert.Equal("infrastructure-check", root.GetProperty("checkId").GetString());
+            Assert.True(root.GetProperty("timedOut").GetBoolean());
+            Assert.Equal(3000, root.GetProperty("timeoutMs").GetInt64());
+            Assert.True(root.TryGetProperty("durationMs", out _));
+            Assert.True(root.GetProperty("stdout").GetProperty("truncated").GetBoolean());
+            Assert.True(root.GetProperty("stderr").GetProperty("truncated").GetBoolean());
+            Assert.True(root.GetProperty("termination").GetProperty("requested").GetBoolean());
+            Assert.True(root.GetProperty("termination").GetProperty("entireProcessTree").GetBoolean());
+        }
+
         var state = await FactoryRuntimeTestHarness.LoadState(temp.Path);
-        Assert.Equal(JsonSerializer.Serialize(blocked.Payload.Value), JsonSerializer.Serialize(state.Blocker!.Payload!.Value));
+        Assert.Equal(JsonSerializer.Serialize(payload), JsonSerializer.Serialize(state.Blocker!.Payload!.Value));
         Assert.True(state.PendingContinuation!.IsResumable);
         Assert.Single(state.Current!.VerificationEvidenceRefs);
         var status = await new FactoryStatusReader().ReadAsync(temp.Path, default);
-        Assert.Equal(JsonSerializer.Serialize(blocked.Payload.Value), JsonSerializer.Serialize(status.Payload!.Value));
+        Assert.Equal(JsonSerializer.Serialize(payload), JsonSerializer.Serialize(status.Payload!.Value));
 
         File.WriteAllText(Path.Combine(temp.Path, "infra-ready.txt"), "ready");
         var completed = await runtime.ContinueAsync(default);
@@ -340,80 +347,7 @@ public sealed class BatchRuntimeTests
     }
 
     [Fact]
-    public void InfrastructureDiagnosticRepresentsMultipleEntriesAndBoundsMetadataAndTails()
-    {
-        var now = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
-        var records = Enumerable.Range(0, 8).Select(index => new VerificationEvidence
-        {
-            SchemaVersion = 3,
-            CheckId = $"check-{index}",
-            EvidenceId = $"V{index:D35}",
-            Status = "infrastructure-failure",
-            StartedAt = now,
-            FinishedAt = now.AddSeconds(1),
-            DurationMilliseconds = 1000,
-            TimeoutMilliseconds = 500,
-            TimedOut = true,
-            PrimaryFailure = new("timeout", "execute", new string('m', 4000)),
-            Stdout = new($".idd/factory/current/verification/V{index:D35}.stdout.log", 20000, new string('o', 5000), true),
-            Stderr = new($"verification/V{index:D35}.stderr.log", 20000, new string('e', 5000), true),
-            EvidencePersisted = index != 7
-        }).ToArray();
-
-        var diagnostic = FactoryRuntime.CreateInfrastructureDiagnostic("VERIFICATION_INFRASTRUCTURE_FAILURE", "subtask", "W000001", records);
-        var payload = FactoryRuntime.SerializeBoundedDiagnostic(diagnostic);
-
-        Assert.True(System.Text.Encoding.UTF8.GetByteCount(payload.GetRawText()) <= 16 * 1024);
-        var checks = payload.GetProperty("checks").EnumerateArray().ToArray();
-        Assert.Equal(records.Length, checks.Length);
-        Assert.All(checks, check =>
-        {
-            Assert.Equal("execute", check.GetProperty("failureStage").GetString());
-            Assert.True(check.GetProperty("stdout").GetProperty("truncated").GetBoolean());
-            Assert.True(check.GetProperty("stderr").GetProperty("truncated").GetBoolean());
-            Assert.StartsWith(".idd/factory/current/verification/", check.GetProperty("stdout").GetProperty("path").GetString(), StringComparison.Ordinal);
-            Assert.StartsWith(".idd/factory/current/verification/", check.GetProperty("stderr").GetProperty("path").GetString(), StringComparison.Ordinal);
-        });
-        Assert.Equal(JsonValueKind.Null, checks[^1].GetProperty("evidencePath").ValueKind);
-    }
-
-    [Fact]
-    public void InfrastructureDiagnosticCompactsAdversarialMetadataAndRetainsPrimaryWithoutThrowing()
-    {
-        var huge = string.Concat(Enumerable.Repeat("metadata-😀-", 5000));
-        var now = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
-        var records = Enumerable.Range(0, 200).Select(index => new VerificationEvidence
-        {
-            SchemaVersion = 3, CheckId = index == 0 ? "primary-" + huge : $"secondary-{index}-" + huge,
-            EvidenceId = $"evidence-{index}-" + huge, Status = "infrastructure-failure", StartedAt = now, FinishedAt = now,
-            PrimaryFailure = new(index == 0 ? "timeout" : "unknown", index == 0 ? "execute" : "capture-output", huge),
-            TimeoutMilliseconds = 1234, TimedOut = index == 0,
-            Stdout = new("verification/" + huge + ".stdout.log", 100000, huge, false),
-            Stderr = new("verification/" + huge + ".stderr.log", 100000, huge, false),
-            Termination = new(true, true, false, new("HugeException" + huge, huge, huge)),
-            EvidencePersisted = true
-        }).ToArray();
-
-        var diagnostic = FactoryRuntime.CreateInfrastructureDiagnostic(huge, huge, huge, records);
-        var payload = FactoryRuntime.SerializeBoundedDiagnostic(diagnostic);
-
-        Assert.True(System.Text.Encoding.UTF8.GetByteCount(payload.GetRawText()) <= 16 * 1024);
-        Assert.True(payload.GetProperty("metadataTruncated").GetBoolean());
-        Assert.True(payload.GetProperty("omittedCheckCount").GetInt32() > 0);
-        var primary = payload.GetProperty("checks")[0];
-        Assert.Equal("timeout", primary.GetProperty("failureKind").GetString());
-        Assert.Equal("execute", primary.GetProperty("failureStage").GetString());
-        Assert.True(primary.GetProperty("stdout").GetProperty("truncated").GetBoolean());
-        Assert.True(primary.GetProperty("stderr").GetProperty("truncated").GetBoolean());
-        var termination = primary.GetProperty("termination");
-        Assert.True(termination.GetProperty("requested").GetBoolean());
-        Assert.True(termination.GetProperty("entireProcessTree").GetBoolean());
-        Assert.False(termination.GetProperty("succeeded").GetBoolean());
-        Assert.True(termination.TryGetProperty("error", out _));
-    }
-
-    [Fact]
-    public async Task BaselineInfrastructureDiagnosticIsTerminalAndUsesCanonicalPayload()
+    public async Task BaselineInfrastructureDiagnosticIsTerminalAndUsesMinimalPayload()
     {
         using var temp = new TestWorkspace();
         var evidence = new VerificationEvidence
@@ -428,8 +362,16 @@ public sealed class BatchRuntimeTests
         var outcome = await runtime.RunRequestAsync("Exercise baseline diagnostics.", "test", default);
 
         Assert.Equal("BASELINE_VERIFICATION_INFRASTRUCTURE_FAILURE", outcome.FactoryOutcome);
+        var payload = outcome.Payload!.Value;
+        Assert.Equal(6, payload.EnumerateObject().Count());
+        Assert.Equal("baseline", payload.GetProperty("context").GetString());
+        Assert.Equal(JsonValueKind.Null, payload.GetProperty("workItemId").ValueKind);
+        Assert.Equal("repository-fallback", payload.GetProperty("checkId").GetString());
+        Assert.Equal("process-start-failure", payload.GetProperty("failureKind").GetString());
+        Assert.Equal("start", payload.GetProperty("failureStage").GetString());
+        Assert.Equal(JsonValueKind.Null, payload.GetProperty("evidencePath").ValueKind);
+        Assert.Contains("No verification evidence JSON was persisted", outcome.Reason, StringComparison.Ordinal);
         Assert.Contains("cancel/restart", outcome.ResumeWhen, StringComparison.Ordinal);
-        Assert.Equal(JsonValueKind.Null, Assert.Single(outcome.Payload!.Value.GetProperty("checks").EnumerateArray()).GetProperty("evidencePath").ValueKind);
         var state = await FactoryRuntimeTestHarness.LoadState(temp.Path);
         Assert.False(state.PendingContinuation!.IsResumable);
         Assert.Equal(JsonSerializer.Serialize(outcome.Payload), JsonSerializer.Serialize(state.Blocker!.Payload));
