@@ -229,14 +229,14 @@ public sealed partial class FactoryRuntime(
         var terminal = new PendingContinuation(ContinuationKind.Terminal, null, null, "BASELINE_VERIFICATION", false);
         if (baseline.Status == VerificationStatus.InfrastructureFailure)
         {
-            var diagnostic = CreateInfrastructureDiagnostic("BASELINE_VERIFICATION_INFRASTRUCTURE_FAILURE", "baseline", null, baseline.Evidence);
-            var payload = SerializeBoundedDiagnostic(diagnostic);
-            await WriteInfrastructureFailureEventAsync(state.RunId, diagnostic, cancellationToken);
+            var primary = SelectPrimaryInfrastructureFailure(baseline.Evidence);
+            var reference = CreateFailureReference("baseline", null, primary.Evidence, primary.Failure);
+            var payload = JsonSerializer.SerializeToElement(reference, FactoryJson.Options);
             return await StopAsync(
                 state,
-                diagnostic.Code,
-                BuildInfrastructureReason(diagnostic, baseline: true),
-                BuildInfrastructureResumeWhen(diagnostic, baseline: true),
+                "BASELINE_VERIFICATION_INFRASTRUCTURE_FAILURE",
+                BuildInfrastructureReason(primary.Evidence, primary.Failure, baseline: true),
+                BuildInfrastructureResumeWhen(primary.Evidence, primary.Failure, baseline: true),
                 cancellationToken,
                 terminal,
                 payload);
