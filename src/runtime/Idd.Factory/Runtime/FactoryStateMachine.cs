@@ -15,9 +15,10 @@ internal enum FactoryRuntimeState
     Blocked
 }
 
-// Kept as the diagnostic event vocabulary consumed by the MCP progress monitor.
-// Control-flow decisions are made by FactoryStateMachine, not by a scheduler.
-internal enum FactoryCommandKind
+// Kept as the diagnostic event vocabulary consumed by the MCP progress monitor
+// and as a compatibility surface. Control-flow decisions are made by
+// FactoryStateMachine, not by a scheduler.
+public enum FactoryCommandKind
 {
     Plan,
     ResumePendingOperation,
@@ -175,21 +176,14 @@ internal sealed class FactoryStateMachine(
             state.PlanningCycleCount++;
             state.PlannedThroughCompletedCount = state.Completed.Count;
             FactoryRuntimeContext.InvalidateFinalEvidence(state);
-            var payload = JsonSerializer.SerializeToElement(
-                new { question = result.Question },
-                FactoryJson.Options);
+            var payload = JsonSerializer.SerializeToElement(new { question = result.Question }, FactoryJson.Options);
             var outcome = await stop.ApplyAsync(
                 state,
                 new(
                     "USER_DECISION_REQUIRED",
                     result.Question!,
                     "Answer the planner question to continue this run, or cancel the Factory run.",
-                    new(
-                        ContinuationKind.UserQuestion,
-                        null,
-                        null,
-                        "USER_DECISION_REQUIRED",
-                        true),
+                    new(ContinuationKind.UserQuestion, null, null, "USER_DECISION_REQUIRED", true),
                     payload),
                 cancellationToken);
             return new(
@@ -205,10 +199,7 @@ internal sealed class FactoryStateMachine(
             result.Reason,
             result.AttemptId,
             cancellationToken);
-        return TransitionFromCurrent(
-            FactoryRuntimeState.Planning,
-            state,
-            "planning-completed");
+        return TransitionFromCurrent(FactoryRuntimeState.Planning, state, "planning-completed");
     }
 
     private async Task<FactoryTransition> SelectNextWorkAsync(
@@ -216,20 +207,13 @@ internal sealed class FactoryStateMachine(
         CancellationToken cancellationToken)
     {
         if (state.Current is not null || state.Remaining.Count == 0)
-        {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                "Cannot select next work from the current state.");
-        }
+            throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Cannot select next work from the current state.");
 
         state.Current = state.Remaining[0];
         state.Remaining.RemoveAt(0);
         state.CurrentPhase = CurrentWorkPhase.Ready;
         await context.SaveAsync(state, cancellationToken);
-        return TransitionFromCurrent(
-            FactoryRuntimeState.SelectingWork,
-            state,
-            "work-selected");
+        return TransitionFromCurrent(FactoryRuntimeState.SelectingWork, state, "work-selected");
     }
 
     private async Task<FactoryTransition> ExecuteWorkAsync(
@@ -237,9 +221,7 @@ internal sealed class FactoryStateMachine(
         CancellationToken cancellationToken)
     {
         var item = state.Current
-            ?? throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                "Execution requires Current work.");
+            ?? throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Execution requires Current work.");
         var result = await execution.ExecuteAsync(state, item.Id, cancellationToken);
 
         if (result.Kind == FactoryExecutionResultKind.VerificationRetryNoProgress)
@@ -251,12 +233,7 @@ internal sealed class FactoryStateMachine(
                     "VERIFICATION_RETRY_NO_PROGRESS",
                     $"Work item {item.Id} was retried because authoritative verification failed, but retry attempt {result.AttemptId} produced no workspace changes.",
                     "Inspect the verification evidence and executor result, resolve the condition, then cancel/restart the Factory run.",
-                    new(
-                        ContinuationKind.Terminal,
-                        item.Id,
-                        "subtask",
-                        "VERIFICATION_RETRY_NO_PROGRESS",
-                        false)),
+                    new(ContinuationKind.Terminal, item.Id, "subtask", "VERIFICATION_RETRY_NO_PROGRESS", false)),
                 cancellationToken);
             return new(
                 FactoryRuntimeState.Executing,
@@ -276,9 +253,7 @@ internal sealed class FactoryStateMachine(
         return TransitionFromCurrent(
             FactoryRuntimeState.Executing,
             state,
-            result.Kind == FactoryExecutionResultKind.Retry
-                ? "execution-retry"
-                : "execution-completed");
+            result.Kind == FactoryExecutionResultKind.Retry ? "execution-retry" : "execution-completed");
     }
 
     private async Task<FactoryTransition> ExecuteVerificationAsync(
@@ -288,11 +263,7 @@ internal sealed class FactoryStateMachine(
     {
         var verificationContext = final ? "final" : "subtask";
         var workItemId = final ? null : state.Current?.Id;
-        var result = await verification.RunAsync(
-            state,
-            workItemId,
-            verificationContext,
-            cancellationToken);
+        var result = await verification.RunAsync(state, workItemId, verificationContext, cancellationToken);
 
         if (result.Block is not null)
         {
@@ -320,9 +291,7 @@ internal sealed class FactoryStateMachine(
             ? null
             : state.Current is { } current && current.Id == result.WorkItemId
                 ? current
-                : throw new FactoryStateException(
-                    "CORRUPT_FACTORY_STATE",
-                    "Verification result no longer targets Current work.");
+                : throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Verification result no longer targets Current work.");
         if (item is not null)
             item.LastVerificationDecision = result.Decision;
         state.PendingVerificationSession = null;
@@ -343,12 +312,8 @@ internal sealed class FactoryStateMachine(
         }
         else if (item is not null)
         {
-            if (item.LastResultRef is not null
-                && !item.PriorResultRefs.Contains(item.LastResultRef, StringComparer.Ordinal))
-            {
+            if (item.LastResultRef is not null && !item.PriorResultRefs.Contains(item.LastResultRef, StringComparer.Ordinal))
                 item.PriorResultRefs.Add(item.LastResultRef);
-            }
-
             state.CurrentPhase = CurrentWorkPhase.Ready;
             state.PendingContinuation = null;
             state.Blocker = null;
@@ -378,14 +343,10 @@ internal sealed class FactoryStateMachine(
             cancellationToken);
     }
 
-    private async Task CommitCurrentAsync(
-        FactoryState state,
-        CancellationToken cancellationToken)
+    private async Task CommitCurrentAsync(FactoryState state, CancellationToken cancellationToken)
     {
         var item = state.Current
-            ?? throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                "Completion requires Current work.");
+            ?? throw new FactoryStateException("CORRUPT_FACTORY_STATE", "Completion requires Current work.");
         state.Completed.Add(new CompletedWorkItem
         {
             Id = item.Id,
@@ -407,11 +368,7 @@ internal sealed class FactoryStateMachine(
         CancellationToken cancellationToken)
     {
         var outcome = await finalization.FinalizeAsync(state, cancellationToken);
-        return new(
-            FactoryRuntimeState.Finalizing,
-            FactoryRuntimeState.Finalizing,
-            "finalized",
-            outcome);
+        return new(FactoryRuntimeState.Finalizing, FactoryRuntimeState.Finalizing, "finalized", outcome);
     }
 
     private async Task<FactoryTransition> ExecuteBlockedAsync(
