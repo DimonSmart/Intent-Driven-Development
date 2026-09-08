@@ -95,7 +95,7 @@ public sealed class CodexCliBackend : IAgentBackend
             OperatingSystem.IsWindows());
         if (OperatingSystem.IsWindows())
             start.Environment["PATH"] = pathPreparation.Path;
-        foreach (var argument in BuildArguments(
+        foreach (var argument in CodexCommandProtocol.BuildArguments(
                      invocation,
                      executionConfiguration,
                      resolvedCommand.PrefixArguments,
@@ -107,7 +107,7 @@ public sealed class CodexCliBackend : IAgentBackend
         await File.WriteAllTextAsync(
             Path.Combine(attemptDirectory, "attempt-telemetry.json"),
             JsonSerializer.Serialize(
-                BuildTelemetry(
+                CodexCommandProtocol.BuildTelemetry(
                     invocation,
                     executionConfiguration,
                     capabilityPolicy,
@@ -139,13 +139,17 @@ public sealed class CodexCliBackend : IAgentBackend
         }
 
         var commandTracker = new CommandExecutionTracker();
-        var stdout = CaptureJsonLinesAsync(
+        var stdout = processSupervisor.CaptureLinesAsync(
             process.StandardOutput,
             stdoutPath,
-            commandTracker,
+            line => commandTracker.Observe(line, DateTimeOffset.UtcNow),
             cancellationToken);
-        var stderr = CaptureLinesAsync(process.StandardError, stderrPath, cancellationToken);
-        var prompt = BuildBootstrapPrompt(invocation, skillInstructions);
+        var stderr = processSupervisor.CaptureLinesAsync(
+            process.StandardError,
+            stderrPath,
+            observeLine: null,
+            cancellationToken);
+        var prompt = CodexCommandProtocol.BuildBootstrapPrompt(invocation, skillInstructions);
         await process.StandardInput.WriteAsync(prompt.AsMemory(), cancellationToken);
         await process.StandardInput.FlushAsync(cancellationToken);
         process.StandardInput.Close();
@@ -210,7 +214,7 @@ public sealed class CodexCliBackend : IAgentBackend
                 resultWatcherCancellation.Cancel();
                 return await TerminateForCommandFailureAsync(
                     running,
-                    BuildCommandOverlapDiagnostic(overlap),
+                    CodexCommandProtocol.BuildCommandOverlapDiagnostic(overlap),
                     AgentTerminationKind.IncompleteCommand);
             }
 
@@ -221,7 +225,7 @@ public sealed class CodexCliBackend : IAgentBackend
                 resultWatcherCancellation.Cancel();
                 return await TerminateForCommandFailureAsync(
                     running,
-                    BuildCommandTimeoutDiagnostic(
+                    CodexCommandProtocol.BuildCommandTimeoutDiagnostic(
                         timedOutCommand,
                         executionConfiguration.EffectiveCommandTimeout),
                     AgentTerminationKind.CommandTimeout);
@@ -261,13 +265,13 @@ public sealed class CodexCliBackend : IAgentBackend
                 : exitCode == 0
                     ? AgentTerminationKind.CleanExit
                     : AgentTerminationKind.TransportFailure;
-            var incompleteCommands = FindIncompleteCommandExecutions(stdout);
+            var incompleteCommands = CodexCommandProtocol.FindIncompleteCommandExecutions(stdout);
             if (incompleteCommands.Count > 0)
             {
                 cleanupTempDirectory = false;
                 completedResultWasObserved = false;
                 termination = AgentTerminationKind.IncompleteCommand;
-                var diagnostic = BuildIncompleteCommandDiagnostic(incompleteCommands);
+                var diagnostic = CodexCommandProtocol.BuildIncompleteCommandDiagnostic(incompleteCommands);
                 stderr = string.IsNullOrWhiteSpace(stderr)
                     ? diagnostic
                     : stderr.TrimEnd() + Environment.NewLine + diagnostic;
@@ -341,18 +345,6 @@ public sealed class CodexCliBackend : IAgentBackend
         }
     }
 
-    internal static string ReadSkillInstructions(string pluginRoot, AgentInvocation invocation) =>
-        CodexHomePreparation.ReadSkillInstructions(pluginRoot, invocation);
-
-    internal static void ValidateSkillIdentity(string pluginRoot, AgentInvocation invocation) =>
-        CodexHomePreparation.ValidateSkillIdentity(pluginRoot, invocation);
-
-    internal static bool ShouldInheritSkill(string candidateSkill, string selectedFactorySkill) =>
-        CodexHomePreparation.ShouldInheritSkill(candidateSkill, selectedFactorySkill);
-
-    internal static string Sandbox(AgentExecutionProfile profile) =>
-        CodexCommandProtocol.Sandbox(profile);
-
     internal static ProcessStartInfo CreateProcessStartInfo(
         string executable,
         string workingDirectory)
@@ -373,83 +365,6 @@ public sealed class CodexCliBackend : IAgentBackend
             CreateNoWindow = true
         };
     }
-
-    internal static IReadOnlyList<string> BuildArguments(
-        AgentInvocation invocation,
-        AgentExecutionConfiguration configuration,
-        IReadOnlyList<string>? prefixArguments = null,
-        bool? isWindows = null) =>
-        CodexCommandProtocol.BuildArguments(
-            invocation,
-            configuration,
-            prefixArguments,
-            isWindows);
-
-    internal static string BuildBootstrapPrompt(
-        AgentInvocation invocation,
-        string skillInstructions) =>
-        CodexCommandProtocol.BuildBootstrapPrompt(invocation, skillInstructions);
-
-    internal static IReadOnlyList<IncompleteCommandExecution> FindIncompleteCommandExecutions(string stdout) =>
-        CodexCommandProtocol.FindIncompleteCommandExecutions(stdout);
-
-    internal static string BuildIncompleteCommandDiagnostic(
-        IReadOnlyList<IncompleteCommandExecution> commands) =>
-        CodexCommandProtocol.BuildIncompleteCommandDiagnostic(commands);
-
-    internal static string BuildCommandTimeoutDiagnostic(
-        IncompleteCommandExecution command,
-        TimeSpan timeout) =>
-        CodexCommandProtocol.BuildCommandTimeoutDiagnostic(command, timeout);
-
-    internal static string BuildCommandOverlapDiagnostic(CommandExecutionOverlap overlap) =>
-        CodexCommandProtocol.BuildCommandOverlapDiagnostic(overlap);
-
-    internal static AgentAttemptTelemetry BuildTelemetry(
-        AgentInvocation invocation,
-        AgentExecutionConfiguration? configuration = null,
-        AgentCapabilityPolicy? capabilityPolicy = null,
-        int inheritedUserSkillCount = 0,
-        string skillSourceVersion = "unknown",
-        string skillSource = "unknown",
-        string? windowsSandbox = null,
-        int windowsAppsPathEntriesRemoved = 0) =>
-        CodexCommandProtocol.BuildTelemetry(
-            invocation,
-            configuration,
-            capabilityPolicy,
-            inheritedUserSkillCount,
-            skillSourceVersion,
-            skillSource,
-            windowsSandbox,
-            windowsAppsPathEntriesRemoved);
-
-    internal static Task<string> CaptureAsync(
-        StreamReader reader,
-        string path,
-        CancellationToken cancellationToken) =>
-        ProcessSupervisor.Shared.CaptureAsync(reader, path, cancellationToken);
-
-    internal static Task<string> CaptureJsonLinesAsync(
-        StreamReader reader,
-        string path,
-        CommandExecutionTracker tracker,
-        CancellationToken cancellationToken) =>
-        ProcessSupervisor.Shared.CaptureLinesAsync(
-            reader,
-            path,
-            line => tracker.Observe(line, DateTimeOffset.UtcNow),
-            cancellationToken);
-
-    internal static Task<string> CaptureLinesAsync(
-        StreamReader reader,
-        string path,
-        CancellationToken cancellationToken) =>
-        ProcessSupervisor.Shared.CaptureLinesAsync(
-            reader,
-            path,
-            observeLine: null,
-            cancellationToken);
 
     private static async Task<IncompleteCommandExecution> WaitForCommandTimeoutAsync(
         CommandExecutionTracker tracker,

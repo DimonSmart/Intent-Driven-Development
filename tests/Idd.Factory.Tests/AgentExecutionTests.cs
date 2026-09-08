@@ -13,7 +13,7 @@ public sealed class AgentExecutionTests
             {"type":"item.completed","item":{"id":"command-1","type":"command_execution","status":"completed"}}
             """;
 
-        Assert.Empty(CodexCliBackend.FindIncompleteCommandExecutions(stdout));
+        Assert.Empty(CodexCommandProtocol.FindIncompleteCommandExecutions(stdout));
     }
 
     [Fact]
@@ -24,7 +24,7 @@ public sealed class AgentExecutionTests
             {"type":"item.completed","item":{"id":"message-1","type":"agent_message"}}
             """;
 
-        var incomplete = Assert.Single(CodexCliBackend.FindIncompleteCommandExecutions(stdout));
+        var incomplete = Assert.Single(CodexCommandProtocol.FindIncompleteCommandExecutions(stdout));
         Assert.Equal("command-1", incomplete.Id);
         Assert.Null(incomplete.Command);
     }
@@ -37,8 +37,8 @@ public sealed class AgentExecutionTests
             {"type":"item.completed","item":{"id":"message-1","type":"agent_message"}}
             """;
 
-        var incomplete = CodexCliBackend.FindIncompleteCommandExecutions(stdout);
-        var diagnostic = CodexCliBackend.BuildIncompleteCommandDiagnostic(incomplete);
+        var incomplete = CodexCommandProtocol.FindIncompleteCommandExecutions(stdout);
+        var diagnostic = CodexCommandProtocol.BuildIncompleteCommandDiagnostic(incomplete);
 
         Assert.Contains("[item_7] dotnet test tests/Desktop.Tests.csproj", diagnostic, StringComparison.Ordinal);
         Assert.Contains("Inspect stdout.log for the complete event stream", diagnostic, StringComparison.Ordinal);
@@ -50,7 +50,7 @@ public sealed class AgentExecutionTests
     [InlineData(AgentExecutionProfile.WorkspaceWrite, "workspace-write")]
     public void ExecutionProfilesMapDirectlyToCodexSandboxCapabilities(AgentExecutionProfile profile, string expectedSandbox)
     {
-        Assert.Equal(expectedSandbox, CodexCliBackend.Sandbox(profile));
+        Assert.Equal(expectedSandbox, CodexCommandProtocol.Sandbox(profile));
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public sealed class AgentExecutionTests
             StartedAt = DateTimeOffset.UtcNow
         };
 
-        var prompt = CodexCliBackend.BuildBootstrapPrompt(invocation, "instructions");
+        var prompt = CodexCommandProtocol.BuildBootstrapPrompt(invocation, "instructions");
 
         Assert.Contains("Do not return while a shell command is still running", prompt, StringComparison.Ordinal);
         Assert.Contains("--disable-build-servers -m:1", prompt, StringComparison.Ordinal);
@@ -95,7 +95,7 @@ public sealed class AgentExecutionTests
     [Fact]
     public void CommandTimeoutDiagnosticRejectsPartialResultsAndNamesTheCommand()
     {
-        var diagnostic = CodexCliBackend.BuildCommandTimeoutDiagnostic(
+        var diagnostic = CodexCommandProtocol.BuildCommandTimeoutDiagnostic(
             new IncompleteCommandExecution("item_3", "dotnet test tests/Desktop.Tests.csproj"),
             TimeSpan.FromMinutes(10));
 
@@ -116,7 +116,7 @@ public sealed class AgentExecutionTests
         var overlap = Assert.IsType<CommandExecutionOverlap>(tracker.FindOverlap());
         Assert.Equal("item_3", overlap.Active.Id);
         Assert.Equal("item_5", overlap.Started.Id);
-        var diagnostic = CodexCliBackend.BuildCommandOverlapDiagnostic(overlap);
+        var diagnostic = CodexCommandProtocol.BuildCommandOverlapDiagnostic(overlap);
         Assert.Contains("item_5", diagnostic, StringComparison.Ordinal);
         Assert.Contains("before [item_3] completed", diagnostic, StringComparison.Ordinal);
         Assert.Contains("partial results are not trusted", diagnostic, StringComparison.Ordinal);

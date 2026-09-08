@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using Idd.Factory.Agents;
+using Idd.Factory.Processes;
 
 namespace Idd.Factory.Tests;
 
@@ -30,7 +31,10 @@ public sealed class AgentEncodingTests
 
         try
         {
-            var captured = await CodexCliBackend.CaptureAsync(reader, path, CancellationToken.None);
+            var captured = await ProcessSupervisor.Shared.CaptureAsync(
+                reader,
+                path,
+                CancellationToken.None);
 
             Assert.Equal(text, captured);
             Assert.Equal(expectedBytes, await File.ReadAllBytesAsync(path));
@@ -56,8 +60,14 @@ public sealed class AgentEncodingTests
             Assert.True(process.Start());
             process.StandardInput.Close();
 
-            var stdoutTask = CodexCliBackend.CaptureAsync(process.StandardOutput, stdoutPath, CancellationToken.None);
-            var stderrTask = CodexCliBackend.CaptureAsync(process.StandardError, stderrPath, CancellationToken.None);
+            var stdoutTask = ProcessSupervisor.Shared.CaptureAsync(
+                process.StandardOutput,
+                stdoutPath,
+                CancellationToken.None);
+            var stderrTask = ProcessSupervisor.Shared.CaptureAsync(
+                process.StandardError,
+                stderrPath,
+                CancellationToken.None);
             await process.WaitForExitAsync();
             var stdout = await stdoutTask;
             var stderr = await stderrTask;
