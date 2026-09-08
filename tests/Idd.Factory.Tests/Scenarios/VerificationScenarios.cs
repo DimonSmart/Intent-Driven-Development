@@ -87,7 +87,7 @@ public sealed class VerificationScenarios
         result.ShouldExecute(task);
         Assert.True(result.State.RepositoryFallbackBaselineAccepted);
         Assert.Null(result.State.Current);
-        result.ShouldHaveContinuation(resumable: false, context: "final");
+        result.ShouldHaveContinuation(resumable: true, context: "final");
     }
 
     [Fact]
@@ -122,8 +122,7 @@ public sealed class VerificationScenarios
     {
         const string task = "Implement the product change.";
         using var scenario = FactoryScenario.Create();
-        var verification = new ResumableInfrastructureVerification(scenario.WorkspacePath);
-        scenario.WithVerification(verification)
+        scenario.WithVerification(new ResumableInfrastructureVerification(scenario.WorkspacePath))
             .Plan(task)
             .Execute(task, _ =>
             {
@@ -170,10 +169,16 @@ public sealed class VerificationScenarios
         result.ShouldHavePlanningCycles(1);
     }
 
-    private sealed class ResumableInfrastructureVerification(string workspace)
-        : VerificationEngine(workspace, Path.Combine(workspace, ".idd", "factory", "current"))
+    private sealed class ResumableInfrastructureVerification : VerificationEngine
     {
+        private readonly string workspace;
         private bool subtaskFailed;
+
+        public ResumableInfrastructureVerification(string workspace)
+            : base(workspace, Path.Combine(workspace, ".idd", "factory", "current"))
+        {
+            this.workspace = workspace;
+        }
 
         public override Task<VerificationResult> RunContextAsync(string context, CancellationToken cancellationToken) =>
             Task.FromResult(new VerificationResult(VerificationStatus.NoChecks, []));
@@ -196,9 +201,11 @@ public sealed class VerificationScenarios
         }
     }
 
-    private sealed class BaselineInfrastructureVerification(string workspace)
-        : VerificationEngine(workspace, Path.Combine(workspace, ".idd", "factory", "current"))
+    private sealed class BaselineInfrastructureVerification : VerificationEngine
     {
+        public BaselineInfrastructureVerification(string workspace)
+            : base(workspace, Path.Combine(workspace, ".idd", "factory", "current")) { }
+
         public override Task<VerificationResult> RunContextAsync(string context, CancellationToken cancellationToken) =>
             Task.FromResult(new VerificationResult(
                 VerificationStatus.InfrastructureFailure,
