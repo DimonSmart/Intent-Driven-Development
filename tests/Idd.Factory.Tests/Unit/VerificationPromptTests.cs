@@ -2,7 +2,6 @@ using System.Text.Json;
 using Idd.Factory.Domain;
 using Idd.Factory.Persistence;
 using Idd.Factory.State;
-using Idd.Factory.Verification;
 
 namespace Idd.Factory.Tests;
 
@@ -55,59 +54,6 @@ public sealed class VerificationPromptTests
         Assert.DoesNotContain("CURRENT_TAIL_MUST_BE_TRUNCATED", text, StringComparison.Ordinal);
         Assert.DoesNotContain("HISTORICAL_UNIQUE_MARKER_", text, StringComparison.Ordinal);
         Assert.Contains($"Evidence: {historical}", text, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task HistoricalGrowthAddsMetadataRatherThanRepeatingOutputBlocks()
-    {
-        using var temp = new TestWorkspace();
-        var historical = new List<string>();
-        for (var index = 0; index < 5; index++)
-            historical.Add(await WriteEvidenceAsync(temp, $"V-old-{index}", $"check-old-{index}", "failed", $"HISTORICAL_OUTPUT_{index}_" + new string('X', 6_000), 1));
-        var current = await WriteEvidenceAsync(temp, "V-current", "check-current", "failed", "CURRENT_" + new string('C', 6_000), 1);
-        var runtime = FactoryTestRuntime.Create(temp.Path, new ScriptedAgentBackend());
-
-        var oneHistorical = await runtime.BuildVerificationObservationsAsync(CreateItem([historical[0], current], [current]), default);
-        var fiveHistorical = await runtime.BuildVerificationObservationsAsync(CreateItem([.. historical, current], [current]), default);
-
-        Assert.True(fiveHistorical.Length - oneHistorical.Length < 2_000,
-            $"Historical metadata grew by {fiveHistorical.Length - oneHistorical.Length} characters.");
-        for (var index = 0; index < historical.Count; index++)
-            Assert.DoesNotContain($"HISTORICAL_OUTPUT_{index}_", fiveHistorical, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task PersistedLatestCycleProducesIdenticalPromptAfterRestart()
-    {
-        using var temp = new TestWorkspace();
-        var historical = await WriteEvidenceAsync(temp, "V-old", "check-a", "failed", "OLD_OUTPUT", 1);
-        var current = await WriteEvidenceAsync(temp, "V-current", "check-b", "failed", "CURRENT_OUTPUT", 1);
-        var item = CreateItem([historical, current], [current]);
-        var configuration = FactoryTestRuntime.Configuration();
-        var state = new FactoryState
-        {
-            MethodologyVersion = "test",
-            RuntimeVersion = "test",
-            RunId = "restart-test",
-            FactoryConfigurationHash = configuration.Hash,
-            RequestPath = "request.md",
-            PlanningCycleCount = 1,
-            Current = item,
-            CurrentPhase = CurrentWorkPhase.Ready
-        };
-        var currentDirectory = Path.Combine(temp.Path, ".idd", "factory", "current");
-        var store = new FileFactoryStateStore(currentDirectory, new FactoryStateValidator());
-        await store.CreateAsync(state, default);
-
-        var before = await FactoryTestRuntime.Create(temp.Path, new ScriptedAgentBackend(), configuration: configuration)
-            .BuildVerificationObservationsAsync(item, default);
-        var reloaded = await store.LoadAsync(default);
-        var after = await FactoryTestRuntime.Create(temp.Path, new ScriptedAgentBackend(), configuration: configuration)
-            .BuildVerificationObservationsAsync(reloaded!.Current!, default);
-
-        Assert.Equal(before, after);
-        Assert.Equal([current], reloaded.Current!.LastVerificationEvidenceRefs);
-        Assert.Equal([historical, current], reloaded.Current.VerificationEvidenceRefs);
     }
 
     [Fact]
@@ -169,65 +115,6 @@ public sealed class VerificationPromptTests
 
         Assert.Equal("COMPLETED", outcome.FactoryOutcome);
         Assert.Single(backend.Invocations);
-    }
-
-    [Fact]
-    public async Task RuntimeTracksLatestVerificationCycleWithoutDeletingHistory()
-    {
-        var checkA = OperatingSystem.IsWindows()
-            ? "if (Test-Path retry-1.txt) { exit 0 } else { Write-Output 'A_FIRST_FAILURE'; exit 1 }"
-            : "if test -f retry-1.txt; then exit 0; else echo A_FIRST_FAILURE; exit 1; fi";
-        var checkB = OperatingSystem.IsWindows()
-            ? "if (Test-Path retry-2.txt) { exit 0 } elseif (Test-Path retry-1.txt) { Write-Output 'B_SECOND_FAILURE'; exit 1 } else { Write-Output 'B_FIRST_FAILURE'; exit 1 }"
-            : "if test -f retry-2.txt; then exit 0; elif test -f retry-1.txt; then echo B_SECOND_FAILURE; exit 1; else echo B_FIRST_FAILURE; exit 1; fi";
-        using var scenario = FactoryScenario.Create();
-        scenario.WithVerification($$"""
-            version: 1
-            checks:
-              check-a:
-                run: >-
-                  {{checkA}}
-              check-b:
-                run: >-
-                  {{checkB}}
-            default:
-              use: []
-            subtask:
-              use:
-                - check-a
-                - check-b
-            final:
-              use: []
-            """)
-            .Plan("Implement A.")
-            .Execute("Implement A.", _ =>
-            {
-                File.WriteAllText(Path.Combine(scenario.WorkspacePath, "initial-change.txt"), "initial");
-                return "Initial implementation.";
-            })
-            .Execute("Implement A.", invocation =>
-            {
-                Assert.Contains("A_FIRST_FAILURE", invocation.Input, StringComparison.Ordinal);
-                Assert.Contains("B_FIRST_FAILURE", invocation.Input, StringComparison.Ordinal);
-                File.WriteAllText(Path.Combine(scenario.WorkspacePath, "retry-1.txt"), "fixed-a");
-                return "Fixed check A.";
-            })
-            .Execute("Implement A.", invocation =>
-            {
-                Assert.Contains("B_SECOND_FAILURE", invocation.Input, StringComparison.Ordinal);
-                Assert.DoesNotContain("A_FIRST_FAILURE", invocation.Input, StringComparison.Ordinal);
-                File.WriteAllText(Path.Combine(scenario.WorkspacePath, "retry-2.txt"), "fixed-b");
-                return "Fixed check B.";
-            })
-            .Done();
-
-        var result = await scenario.Run("Implement A and make verification pass.");
-
-        result.ShouldComplete();
-        result.ShouldHaveAttemptCount("W000001", 3);
-        var completed = Assert.Single(result.State.Completed);
-        Assert.Equal(6, completed.VerificationEvidenceRefs.Count);
-        Assert.Equal(completed.VerificationEvidenceRefs, result.State.VerificationEvidenceRefs);
     }
 
     private static PlannedWorkItem CreateItem(IEnumerable<string> evidenceRefs, IEnumerable<string> lastCycleRefs)

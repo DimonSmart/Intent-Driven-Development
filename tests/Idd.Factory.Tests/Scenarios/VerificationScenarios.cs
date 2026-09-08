@@ -122,7 +122,18 @@ public sealed class VerificationScenarios
     {
         const string task = "Implement the product change.";
         using var scenario = FactoryScenario.Create();
-        scenario.WithVerification(new ResumableInfrastructureVerification(scenario.WorkspacePath))
+        var starts = 0;
+        var hooks = new VerificationRuntimeHooks
+        {
+            StartProcess = info => starts++ == 0
+                ? throw new System.ComponentModel.Win32Exception("simulated infrastructure failure")
+                : System.Diagnostics.Process.Start(info)
+        };
+        scenario.WithVerification(VerificationPolicyFixture.SingleCheck("infrastructure-check", "exit 0", "subtask"))
+            .WithVerification(new VerificationEngine(
+                scenario.WorkspacePath,
+                Path.Combine(scenario.WorkspacePath, ".idd", "factory", "current"),
+                hooks))
             .Plan(task)
             .Execute(task, _ =>
             {
@@ -145,14 +156,22 @@ public sealed class VerificationScenarios
     public async Task BaselineInfrastructureFailureIsTerminal()
     {
         using var scenario = FactoryScenario.Create();
-        scenario.WithVerification(new BaselineInfrastructureVerification(scenario.WorkspacePath));
+        var hooks = new VerificationRuntimeHooks
+        {
+            StartProcess = _ => throw new System.ComponentModel.Win32Exception("simulated infrastructure failure")
+        };
+        scenario.WithRepositoryFallback(0)
+            .WithVerification(new VerificationEngine(
+                scenario.WorkspacePath,
+                Path.Combine(scenario.WorkspacePath, ".idd", "factory", "current"),
+                hooks));
 
         var result = await scenario.Run("Exercise baseline diagnostics.");
 
         result.ShouldBeBlockedBy("BASELINE_VERIFICATION_INFRASTRUCTURE_FAILURE");
         result.ShouldHaveNoAgentCalls();
         result.ShouldHaveContinuation(resumable: false);
-        Assert.Contains("No verification evidence JSON was persisted", result.Outcome.Reason, StringComparison.Ordinal);
+        result.ShouldHaveEvidence("repository-fallback");
     }
 
     [Fact]
@@ -168,60 +187,4 @@ public sealed class VerificationScenarios
         result.ShouldComplete();
         result.ShouldHavePlanningCycles(1);
     }
-
-    private sealed class ResumableInfrastructureVerification : VerificationEngine
-    {
-        private readonly string workspace;
-        private bool subtaskFailed;
-
-        public ResumableInfrastructureVerification(string workspace)
-            : base(workspace, Path.Combine(workspace, ".idd", "factory", "current"))
-        {
-            this.workspace = workspace;
-        }
-
-        public override Task<VerificationResult> RunContextAsync(string context, CancellationToken cancellationToken) =>
-            Task.FromResult(new VerificationResult(VerificationStatus.NoChecks, []));
-
-        public override Task<VerificationResult> RunContextAsync(
-            string context,
-            IEnumerable<string> changedPaths,
-            CancellationToken cancellationToken)
-        {
-            if (context != "subtask" || subtaskFailed)
-                return Task.FromResult(new VerificationResult(VerificationStatus.NoChecks, []));
-
-            subtaskFailed = true;
-            var evidence = InfrastructureEvidence("infrastructure-check", persisted: true);
-            var directory = Path.Combine(workspace, ".idd", "factory", "current", "verification");
-            Directory.CreateDirectory(directory);
-            File.WriteAllText(Path.Combine(directory, evidence.EvidenceId + ".json"),
-                System.Text.Json.JsonSerializer.Serialize(evidence, FactoryJson.Options));
-            return Task.FromResult(new VerificationResult(VerificationStatus.InfrastructureFailure, [evidence]));
-        }
-    }
-
-    private sealed class BaselineInfrastructureVerification : VerificationEngine
-    {
-        public BaselineInfrastructureVerification(string workspace)
-            : base(workspace, Path.Combine(workspace, ".idd", "factory", "current")) { }
-
-        public override Task<VerificationResult> RunContextAsync(string context, CancellationToken cancellationToken) =>
-            Task.FromResult(new VerificationResult(
-                VerificationStatus.InfrastructureFailure,
-                [InfrastructureEvidence("repository-fallback", persisted: false)]));
-    }
-
-    private static VerificationEvidence InfrastructureEvidence(string checkId, bool persisted) => new()
-    {
-        SchemaVersion = 3,
-        EvidenceId = "V-test-infrastructure-failure",
-        CheckId = checkId,
-        CheckDefinitionHash = "test",
-        StartedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z"),
-        FinishedAt = DateTimeOffset.Parse("2026-01-01T00:00:01Z"),
-        Status = "infrastructure-failure",
-        PrimaryFailure = new("process-start-failure", "start", "Shell could not start."),
-        EvidencePersisted = persisted
-    };
 }
