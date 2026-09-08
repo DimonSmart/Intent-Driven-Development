@@ -21,7 +21,7 @@ public sealed class VerificationPromptTests
         var currentC = await WriteEvidenceAsync(temp, "V-current-c", "check-c", "failed", "CURRENT_C_FAILURE_OUTPUT", 1);
         var item = CreateItem([oldA, oldB, currentA, currentB, currentC], [currentA, currentB, currentC]);
 
-        var text = Normalize(await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, new FakeAgentBackend())
+        var text = Normalize(await FactoryTestRuntime.Create(temp.Path, new ScriptedAgentBackend())
             .BuildVerificationObservationsAsync(item, default));
         var current = Between(text, "Current authoritative verification failures:\n", "\n\nHistorical verification failures:");
         var historical = text[text.IndexOf("Historical verification failures:", StringComparison.Ordinal)..];
@@ -47,7 +47,7 @@ public sealed class VerificationPromptTests
         var current = await WriteEvidenceAsync(
             temp, "V-current", "check-a", "failed", "CURRENT_BEGIN_" + new string('C', 20_000) + "_CURRENT_TAIL_MUST_BE_TRUNCATED", 1);
 
-        var text = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, new FakeAgentBackend())
+        var text = await FactoryTestRuntime.Create(temp.Path, new ScriptedAgentBackend())
             .BuildVerificationObservationsAsync(CreateItem([historical, current], [current]), default);
 
         Assert.Contains("CURRENT_BEGIN_", text, StringComparison.Ordinal);
@@ -65,7 +65,7 @@ public sealed class VerificationPromptTests
         for (var index = 0; index < 5; index++)
             historical.Add(await WriteEvidenceAsync(temp, $"V-old-{index}", $"check-old-{index}", "failed", $"HISTORICAL_OUTPUT_{index}_" + new string('X', 6_000), 1));
         var current = await WriteEvidenceAsync(temp, "V-current", "check-current", "failed", "CURRENT_" + new string('C', 6_000), 1);
-        var runtime = FactoryRuntimeTestHarness.CreateRuntime(temp.Path, new FakeAgentBackend());
+        var runtime = FactoryTestRuntime.Create(temp.Path, new ScriptedAgentBackend());
 
         var oneHistorical = await runtime.BuildVerificationObservationsAsync(CreateItem([historical[0], current], [current]), default);
         var fiveHistorical = await runtime.BuildVerificationObservationsAsync(CreateItem([.. historical, current], [current]), default);
@@ -83,7 +83,7 @@ public sealed class VerificationPromptTests
         var historical = await WriteEvidenceAsync(temp, "V-old", "check-a", "failed", "OLD_OUTPUT", 1);
         var current = await WriteEvidenceAsync(temp, "V-current", "check-b", "failed", "CURRENT_OUTPUT", 1);
         var item = CreateItem([historical, current], [current]);
-        var configuration = FactoryRuntimeTestHarness.CreateConfiguration();
+        var configuration = FactoryTestRuntime.Configuration();
         var state = new FactoryState
         {
             MethodologyVersion = "test",
@@ -99,10 +99,10 @@ public sealed class VerificationPromptTests
         var store = new FileFactoryStateStore(currentDirectory, new FactoryStateValidator());
         await store.CreateAsync(state, default);
 
-        var before = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, new FakeAgentBackend(), configuration: configuration)
+        var before = await FactoryTestRuntime.Create(temp.Path, new ScriptedAgentBackend(), configuration: configuration)
             .BuildVerificationObservationsAsync(item, default);
         var reloaded = await store.LoadAsync(default);
-        var after = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, new FakeAgentBackend(), configuration: configuration)
+        var after = await FactoryTestRuntime.Create(temp.Path, new ScriptedAgentBackend(), configuration: configuration)
             .BuildVerificationObservationsAsync(reloaded!.Current!, default);
 
         Assert.Equal(before, after);
@@ -143,10 +143,10 @@ public sealed class VerificationPromptTests
         using var temp = new TestWorkspace();
         if (evidenceReference.StartsWith("..", StringComparison.Ordinal)) temp.Write(".idd/outside.json", "{}");
         await SeedFailedFinalPlanningStateAsync(temp, evidenceReference);
-        var backend = new FakeAgentBackend();
+        var backend = new ScriptedAgentBackend();
 
         var error = await Assert.ThrowsAsync<FactoryStateException>(() =>
-            FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend).ContinueAsync(default));
+            FactoryTestRuntime.Create(temp.Path, backend).ContinueAsync(default));
 
         Assert.Equal("CORRUPT_FACTORY_STATE", error.Code);
         Assert.Contains(expectedMessage, error.Message, StringComparison.Ordinal);
@@ -158,14 +158,14 @@ public sealed class VerificationPromptTests
     {
         using var temp = new TestWorkspace();
         await SeedFailedFinalPlanningStateAsync(temp, null);
-        var backend = new FakeAgentBackend();
-        backend.Enqueue(invocation =>
+        var backend = new ScriptedAgentBackend();
+        backend.Reply(invocation =>
         {
             Assert.Contains("Authoritative verification evidence summaries:\nnone\n", Normalize(invocation.Input), StringComparison.Ordinal);
             return "# Done";
         });
 
-        var outcome = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend).ContinueAsync(default);
+        var outcome = await FactoryTestRuntime.Create(temp.Path, backend).ContinueAsync(default);
 
         Assert.Equal("COMPLETED", outcome.FactoryOutcome);
         Assert.Single(backend.Invocations);

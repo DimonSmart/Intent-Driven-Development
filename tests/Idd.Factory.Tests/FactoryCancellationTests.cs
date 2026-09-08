@@ -11,8 +11,8 @@ public sealed class FactoryCancellationTests
     public async Task CancellationArchivesCurrentRunAndAllowsANewRun()
     {
         using var temp = new TestWorkspace();
-        var backend = new FakeAgentBackend();
-        var runtime = FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend);
+        var backend = new ScriptedAgentBackend();
+        var runtime = FactoryTestRuntime.Create(temp.Path, backend);
         var current = Path.Combine(temp.Path, ".idd", "factory", "current");
         var store = new FileFactoryStateStore(current, new FactoryStateValidator());
         Directory.CreateDirectory(current);
@@ -26,8 +26,7 @@ public sealed class FactoryCancellationTests
         var archive = Assert.Single(Directory.GetDirectories(Path.Combine(temp.Path, ".idd", "factory", "cancelled")));
         Assert.Equal("old request", await File.ReadAllTextAsync(Path.Combine(archive, "request.md")));
         var archivedState = JsonSerializer.Deserialize<FactoryState>(
-            await File.ReadAllTextAsync(Path.Combine(archive, "state.json")),
-            FactoryJson.Options);
+            await File.ReadAllTextAsync(Path.Combine(archive, "state.json")), FactoryJson.Options);
         Assert.Equal(FactoryRunStatus.Cancelled, archivedState!.RunStatus);
         using (var cancellation = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(archive, "cancellation.json"))))
         {
@@ -35,9 +34,8 @@ public sealed class FactoryCancellationTests
             Assert.Equal("CANCELLED", cancellation.RootElement.GetProperty("factoryOutcome").GetString());
         }
 
-        backend.Enqueue(_ => "# Done");
-        var restarted = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend)
-            .RunRequestAsync("new request", "test", default);
+        backend.Reply("# Done");
+        var restarted = await FactoryTestRuntime.Create(temp.Path, backend).RunRequestAsync("new request", "test", default);
 
         Assert.Equal("COMPLETED", restarted.FactoryOutcome);
     }
@@ -59,8 +57,7 @@ public sealed class FactoryCancellationTests
             }
             """);
 
-        var outcome = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, new FakeAgentBackend())
-            .CancelAsync(default);
+        var outcome = await FactoryTestRuntime.Create(temp.Path, new ScriptedAgentBackend()).CancelAsync(default);
 
         Assert.Equal("CANCELLED", outcome.FactoryOutcome);
         Assert.Equal("legacy-run", outcome.RunId);
@@ -80,10 +77,10 @@ public sealed class FactoryCancellationTests
         Directory.CreateDirectory(current);
         await File.WriteAllTextAsync(Path.Combine(current, "request.md"), "legacy request");
         await File.WriteAllTextAsync(Path.Combine(current, "state.json"), """{"schemaVersion":10,"runId":"legacy-run"}""");
-        var backend = new FakeAgentBackend();
-        backend.Enqueue(_ => "# Done");
+        var backend = new ScriptedAgentBackend();
+        backend.Reply("# Done");
 
-        var outcome = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend)
+        var outcome = await FactoryTestRuntime.Create(temp.Path, backend)
             .RestartRequestAsync("replacement request", "test", default);
 
         Assert.Equal("COMPLETED", outcome.FactoryOutcome);

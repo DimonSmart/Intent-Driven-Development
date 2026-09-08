@@ -143,8 +143,8 @@ public sealed class BatchProtocolTests
     {
         using var temp = new TestWorkspace();
         var output = Path.Combine(temp.Path, ".idd", "factory", "current", "attempts", "A000001", "semantic-result.md");
-        var backend = new FakeAgentBackend();
-        backend.Enqueue(_ => "Changed the renderer.\n\nA platform constraint remains visible to the next planner.");
+        var backend = new ScriptedAgentBackend();
+        backend.Reply("Changed the renderer.\n\nA platform constraint remains visible to the next planner.");
         var invocation = Invocation(temp.Path, output);
 
         var execution = await new FactoryAgentExecutor(backend).ExecuteAsync(invocation, default);
@@ -161,9 +161,10 @@ public sealed class BatchProtocolTests
     {
         using var temp = new TestWorkspace();
         var output = Path.Combine(temp.Path, ".idd", "factory", "current", "attempts", "A000001", "semantic-result.md");
-        var backend = new FakeAgentBackend();
-        backend.Enqueue(_ => "");
-        var error = await Assert.ThrowsAsync<AgentProtocolException>(() => new FactoryAgentExecutor(backend).ExecuteAsync(Invocation(temp.Path, output), default));
+        var backend = new ScriptedAgentBackend();
+        backend.Reply("");
+        var error = await Assert.ThrowsAsync<AgentProtocolException>(() =>
+            new FactoryAgentExecutor(backend).ExecuteAsync(Invocation(temp.Path, output), default));
         Assert.Equal("MALFORMED_AGENT_RESULT", error.Code);
     }
 
@@ -193,7 +194,7 @@ public sealed class BatchProtocolTests
     [Fact]
     public void ConfigurationContainsOnlySemanticNeutralBudgets()
     {
-        var configuration = FactoryRuntimeTestHarness.CreateConfiguration();
+        var configuration = FactoryTestRuntime.Configuration();
         Assert.Equal(3, configuration.SchemaVersion);
         Assert.Equal(4, configuration.Limits.MaxAttemptsPerTask);
         Assert.Equal(12, configuration.Limits.MaxPlanningCycles);

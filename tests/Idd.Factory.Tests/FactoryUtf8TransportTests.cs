@@ -24,7 +24,7 @@ public sealed class FactoryUtf8TransportTests
     public async Task RuntimeRejectsUnmaterializedPastedRequestBeforeCreatingRun()
     {
         using var temp = new TestWorkspace();
-        var runtime = FactoryRuntimeTestHarness.CreateRuntime(temp.Path, new FakeAgentBackend());
+        var runtime = FactoryTestRuntime.Create(temp.Path, new ScriptedAgentBackend());
         var request = """
             # Files pasted by the user:
 
@@ -43,8 +43,8 @@ public sealed class FactoryUtf8TransportTests
     public async Task MaterializedUnicodeRequestIsPersistedWithoutExternalAttachmentDependency()
     {
         using var temp = new TestWorkspace();
-        var backend = new FakeAgentBackend();
-        backend.Enqueue(_ => "# Done");
+        var backend = new ScriptedAgentBackend();
+        backend.Reply("# Done");
         const string request = """
             Implement the supplied hover-marquee requirements.
 
@@ -54,7 +54,7 @@ public sealed class FactoryUtf8TransportTests
             Preserve café, Málaga, 漢字 and 🔒 exactly.
             """;
 
-        var outcome = await FactoryRuntimeTestHarness.CreateRuntime(temp.Path, backend)
+        var outcome = await FactoryTestRuntime.Create(temp.Path, backend)
             .RunRequestAsync(request, "test", CancellationToken.None);
 
         Assert.Equal("COMPLETED", outcome.FactoryOutcome);

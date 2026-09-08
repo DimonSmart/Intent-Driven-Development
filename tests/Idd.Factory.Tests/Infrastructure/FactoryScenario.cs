@@ -8,21 +8,20 @@ namespace Idd.Factory.Tests;
 internal sealed class FactoryScenario : IDisposable
 {
     private readonly TestWorkspace workspace = new();
-    private readonly FakeAgentBackend backend = new();
+    private readonly ScriptedAgentBackend backend = new();
     private VerificationEngine? verification;
     private FactoryRuntime? runtime;
 
     public static FactoryScenario Create() => new();
 
     public string WorkspacePath => workspace.Path;
-    public FakeAgentBackend Backend => backend;
-    public FactoryRuntime Runtime => runtime ??= FactoryRuntimeTestHarness.CreateRuntime(workspace.Path, backend, verification: verification);
+    public FactoryRuntime Runtime => runtime ??= FactoryTestRuntime.Create(workspace.Path, backend, verification: verification);
 
     public FactoryScenario Planner(string output) => Planner(_ => output);
 
     public FactoryScenario Planner(Func<AgentInvocation, string> response)
     {
-        backend.Enqueue(invocation =>
+        backend.Reply(invocation =>
         {
             Assert.Equal("planning", invocation.Capability);
             Assert.Equal("planner", invocation.Role);
@@ -42,7 +41,7 @@ internal sealed class FactoryScenario : IDisposable
 
     public FactoryScenario Execute(string task, Func<AgentInvocation, string> result)
     {
-        backend.Enqueue(invocation =>
+        backend.Reply(invocation =>
         {
             Assert.Equal("implementation", invocation.Capability);
             Assert.Equal("executor", invocation.Role);
@@ -57,7 +56,7 @@ internal sealed class FactoryScenario : IDisposable
 
     public FactoryScenario CommandFailure(AgentTerminationKind terminationKind, string diagnostic)
     {
-        backend.EnqueueCommandFailure(terminationKind, diagnostic);
+        backend.CommandFailure(terminationKind, diagnostic);
         return this;
     }
 
@@ -113,7 +112,7 @@ internal sealed class FactoryScenario : IDisposable
         var runDirectory = outcome.ResultDirectory ?? Path.Combine(workspace.Path, ".idd", "factory", "current");
         var state = JsonSerializer.Deserialize<FactoryState>(
             await File.ReadAllTextAsync(Path.Combine(runDirectory, "state.json")), FactoryJson.Options)!;
-        return new ScenarioResult(outcome, state, backend.Invocations.ToArray(), workspace.Path, runDirectory);
+        return new ScenarioResult(outcome, state, backend.Invocations.ToArray(), runDirectory);
     }
 
     public void Dispose() => workspace.Dispose();
@@ -123,13 +122,11 @@ internal sealed class ScenarioResult(
     FactoryCliOutcome outcome,
     FactoryState state,
     IReadOnlyList<AgentInvocation> invocations,
-    string workspacePath,
     string runDirectory)
 {
     public FactoryCliOutcome Outcome { get; } = outcome;
     public FactoryState State { get; } = state;
     public IReadOnlyList<AgentInvocation> Invocations { get; } = invocations;
-    public string WorkspacePath { get; } = workspacePath;
     public string RunDirectory { get; } = runDirectory;
 
     public void ShouldComplete() => Assert.Equal("COMPLETED", Outcome.FactoryOutcome);
