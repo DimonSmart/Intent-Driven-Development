@@ -18,13 +18,15 @@ internal sealed class FactoryScenario : IDisposable
     public FakeAgentBackend Backend => backend;
     public FactoryRuntime Runtime => runtime ??= FactoryRuntimeTestHarness.CreateRuntime(workspace.Path, backend, verification: verification);
 
-    public FactoryScenario Planner(string output)
+    public FactoryScenario Planner(string output) => Planner(_ => output);
+
+    public FactoryScenario Planner(Func<AgentInvocation, string> response)
     {
         backend.Enqueue(invocation =>
         {
             Assert.Equal("planning", invocation.Capability);
             Assert.Equal("planner", invocation.Role);
-            return output;
+            return response(invocation);
         });
         return this;
     }
@@ -33,7 +35,6 @@ internal sealed class FactoryScenario : IDisposable
         Planner(string.Join("\n\n", tasks.Select(task => $"# Task\n\n{task.Trim()}")));
 
     public FactoryScenario Question(string question) => Planner($"# Question\n\n{question.Trim()}");
-
     public FactoryScenario Done() => Planner("# Done");
 
     public FactoryScenario Execute(string task, string result = "Implemented the requested task.") =>
@@ -47,22 +48,10 @@ internal sealed class FactoryScenario : IDisposable
             Assert.Equal("executor", invocation.Role);
             Assert.NotNull(invocation.WorkItemId);
             var contract = File.ReadAllText(Path.Combine(
-                workspace.Path,
-                ".idd",
-                "factory",
-                "current",
-                "work-items",
-                invocation.WorkItemId!,
-                "contract.md"));
+                workspace.Path, ".idd", "factory", "current", "work-items", invocation.WorkItemId!, "contract.md"));
             Assert.Equal(task.Trim(), contract.Trim());
             return result(invocation);
         });
-        return this;
-    }
-
-    public FactoryScenario Agent(Func<AgentInvocation, string> result)
-    {
-        backend.Enqueue(result);
         return this;
     }
 
@@ -78,17 +67,26 @@ internal sealed class FactoryScenario : IDisposable
         return this;
     }
 
+    public FactoryScenario WithRepositoryFallback(int exitCode)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            workspace.Write("scripts/Check.ps1", $"exit {exitCode}\n");
+            return this;
+        }
+
+        var path = workspace.Write("scripts/check.sh", $"#!/bin/sh\nexit {exitCode}\n");
+        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        return this;
+    }
+
     public FactoryScenario WithVerification(string yaml)
     {
         workspace.Write(".idd/verification.yaml", yaml);
         return this;
     }
 
-    public FactoryScenario WithVerificationCheck(
-        string id,
-        string command,
-        string context = "subtask",
-        string? timeout = null) =>
+    public FactoryScenario WithVerificationCheck(string id, string command, string context = "subtask", string? timeout = null) =>
         WithVerification(VerificationPolicyFixture.SingleCheck(id, command, context, timeout));
 
     public FactoryScenario WithVerification(VerificationEngine engine)
@@ -114,8 +112,7 @@ internal sealed class FactoryScenario : IDisposable
     {
         var runDirectory = outcome.ResultDirectory ?? Path.Combine(workspace.Path, ".idd", "factory", "current");
         var state = JsonSerializer.Deserialize<FactoryState>(
-            await File.ReadAllTextAsync(Path.Combine(runDirectory, "state.json")),
-            FactoryJson.Options)!;
+            await File.ReadAllTextAsync(Path.Combine(runDirectory, "state.json")), FactoryJson.Options)!;
         return new ScenarioResult(outcome, state, backend.Invocations.ToArray(), workspace.Path, runDirectory);
     }
 
@@ -136,7 +133,6 @@ internal sealed class ScenarioResult(
     public string RunDirectory { get; } = runDirectory;
 
     public void ShouldComplete() => Assert.Equal("COMPLETED", Outcome.FactoryOutcome);
-
     public void ShouldStopWith(string code) => Assert.Equal(code, Outcome.FactoryOutcome);
 
     public void ShouldBeBlockedBy(string code)
@@ -166,9 +162,8 @@ internal sealed class ScenarioResult(
             .Select(reference => Path.Combine(RunDirectory, reference.Replace('/', Path.DirectorySeparatorChar)))
             .Where(File.Exists)
             .Select(path => VerificationEngine.Read(File.ReadAllText(path)))
-            .Where(item => item is not null)
             .ToArray();
-        Assert.Contains(evidence, item => item!.CheckId == checkId);
+        Assert.Contains(evidence, item => item.CheckId == checkId);
     }
 
     public void ShouldHaveContinuation(bool resumable, string? context = null)
