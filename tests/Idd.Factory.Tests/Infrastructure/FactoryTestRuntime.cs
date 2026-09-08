@@ -30,6 +30,18 @@ internal static class FactoryTestRuntime
             clock);
     }
 
+    public static FactoryContextReader ContextReader(string workspace)
+    {
+        var current = Path.Combine(workspace, ".idd", "factory", "current");
+        var clock = new FakeClock();
+        return new FactoryContextReader(new FactoryRuntimeContext(
+            workspace,
+            Configuration(),
+            new FileFactoryStateStore(current, new FactoryStateValidator()),
+            new FactoryEventWriter(current, clock),
+            clock));
+    }
+
     public static FactoryConfiguration Configuration() => new(
         3,
         new FactoryLimits(4, 12, 64, TimeSpan.FromMinutes(10)),
