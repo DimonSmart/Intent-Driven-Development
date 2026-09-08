@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json.Serialization;
+using Idd.Factory.Processes;
 
 namespace Idd.Factory.Verification;
 
@@ -110,12 +111,8 @@ internal sealed class VerificationRuntimeHooks
             return false;
         }
     };
-    internal Func<Process, CancellationToken, Task> TerminateProcess { get; init; } = static async (process, token) =>
-    {
-        if (!process.HasExited)
-            process.Kill(entireProcessTree: true);
-        await process.WaitForExitAsync(token);
-    };
+    internal Func<Process, CancellationToken, Task> TerminateProcess { get; init; } =
+        static (process, token) => new ProcessSupervisor().TerminateProcessTreeAsync(process, token);
 }
 
 public enum VerificationStatus
