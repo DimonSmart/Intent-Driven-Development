@@ -22,16 +22,16 @@ The split is part of the product contract, not an internal packaging detail. Dur
 ## Repository Layout
 
 ```text
-release tag               shared marketplace plugin version
-src/canonical/            canonical methodology, project intent assets, skills, and plugin model
-src/canonical/plugins/    canonical public plugin composition
-src/canonical/skills/     platform-neutral skill bodies and metadata
-src/runtime/Idd.Factory/  deterministic runtime and backend adapters
-src/adapters/claude/      Claude adapter configuration
-src/adapters/codex/       Codex adapter configuration
-tools/generate/           canonical model to native marketplace generator
-tools/smoke-tests/        marketplace smoke tests
-scripts/Check.ps1         local validation entry point
+release tag                       shared marketplace plugin version
+src/canonical/                    canonical methodology, project intent assets, skills, and plugin model
+src/canonical/plugins/            canonical public plugin composition
+src/canonical/skills/             platform-neutral skill bodies and metadata
+src/runtime/Idd.Factory/          deterministic runtime and backend adapters
+src/adapters/claude/              Claude adapter configuration
+src/adapters/codex/               Codex adapter configuration
+tools/generate/                   canonical model to native marketplace generator
+tests/Idd.Generation.Tests/       generated marketplace and generator contracts
+scripts/Check.ps1                 Fast / Live / Release validation entry point
 ```
 
 `artifacts/marketplace/` is local generated output and is ignored by Git. The main branch contains canonical source, not generated marketplace artifacts.
@@ -106,40 +106,63 @@ plugins/codex/idd-factory
 
 Claude marketplace rename metadata maps the legacy `idd-core` and unified `idd` names to `idd-intent`. `idd-factory` keeps its existing public name.
 
-## Local Validation
+## Validation
 
-Run:
+`scripts/Check.ps1` is the single validation entry point. It has three explicit modes.
+
+Fast validation is the normal development loop and is the default:
 
 ```powershell
 pwsh ./scripts/Check.ps1
+# equivalent:
+pwsh ./scripts/Check.ps1 -Mode Fast
 ```
 
-The check is deterministic and may be broad. It builds the repository tooling and runtime, runs the deterministic test suites, generates both marketplaces, verifies generator check mode, runs smoke tests, and verifies the release-publication script behavior. It never launches a real LLM Factory execution.
+Fast builds the solution once, runs ordinary Factory unit/scenario tests,
+benchmark tests, and generation tests. Generation tests own marketplace layout,
+adapter output, canonical-reference, metadata, generator `--check`, and
+idempotency contracts. Fast never enables real Codex/LLM live evaluations.
 
-When Claude CLI is available, also validate:
+Live validation is explicit and token-consuming:
 
-```bash
-claude plugin validate artifacts/marketplace
-claude plugin validate artifacts/marketplace/plugins/claude/idd-intent
-claude plugin validate artifacts/marketplace/plugins/claude/idd-factory
+```powershell
+pwsh ./scripts/Check.ps1 -Mode Live
 ```
+
+Live builds and runs `Idd.Factory.LiveTests` with
+`IDD_RUN_LIVE_FACTORY_EVALS=1`. `run-live-factory-evals.bat` is a convenience
+wrapper for the same entry point.
+
+Release validation extends Fast with release-only contracts:
+
+```powershell
+pwsh ./scripts/Check.ps1 -Mode Release -Version 1.2.3
+```
+
+Release additionally validates release scripts, performs final generation and
+`--check` for the exact release version, validates the publish layout, and runs
+Claude native plugin validation when the Claude CLI is available.
+
+All modes verify that validation itself does not change the repository working
+tree relative to its starting state. Release validation additionally requires a
+clean starting tree.
 
 ## Publication
 
 The release tag is the only release version source. Tags use `vMAJOR.MINOR.PATCH`.
 
-The maintenance flow deliberately separates CHECK, RELEASE, and EVAL:
+The maintenance flow deliberately separates FAST, RELEASE, and LIVE:
 
 ```text
-CHECK    deterministic repository validation
-RELEASE  deterministic artifact validation and publication
-EVAL     explicit real-LLM Factory evaluation
+FAST     deterministic development validation
+RELEASE  FAST plus deterministic release artifact contracts
+LIVE     explicit real-LLM Factory evaluation
 ```
 
-Before publishing, run the deterministic local check:
+Before publishing, run Fast validation:
 
 ```powershell
-pwsh ./scripts/Check.ps1
+pwsh ./scripts/Check.ps1 -Mode Fast
 ```
 
 Then publish the next patch tag:
@@ -155,10 +178,10 @@ repository, run tests, install plugins, invoke Codex, or run a live Factory
 evaluation. If tag push fails, the temporary local tag is removed.
 
 Tag publication runs `.github/workflows/publish-marketplace.yml`. That workflow
-is the deterministic RELEASE gate for the exact tagged revision: it runs
-`scripts/Check.ps1 -Version <tag version>`, validates the generated plugin
-layouts, builds the publish root, publishes the `marketplace` branch, and creates
-the GitHub release only after those checks succeed.
+is the deterministic RELEASE gate for the exact tagged revision: it calls
+`scripts/Check.ps1 -Mode Release -Version <tag version>`, builds the publish
+root, publishes the `marketplace` branch, and creates the GitHub release only
+after release validation succeeds.
 
 Real-model behavior is evaluated separately and never gates publication:
 
@@ -174,12 +197,8 @@ The publish workflow is:
 
 ```text
 Checkout
-Build Generator
-Generate Claude Plugins
-Generate Codex Plugins
-Validate Claude
-Validate Codex
-Run Smoke Tests
+Run Release Validation
+Build Publish Root
 Publish Marketplace Branch
 Create GitHub Release
 ```
