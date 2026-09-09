@@ -32,37 +32,9 @@ jobs:
           $version = $Matches.version
           "VERSION=$version" >> $env:GITHUB_OUTPUT
 
-      - name: Run full check
+      - name: Run release validation
         shell: pwsh
-        run: pwsh ./scripts/Check.ps1 -Version "${{ steps.version.outputs.VERSION }}"
-
-      - name: Validate Claude native plugin layout
-        shell: pwsh
-        run: |
-          if (Get-Command claude -ErrorAction SilentlyContinue) {
-            claude plugin validate artifacts/marketplace
-            claude plugin validate artifacts/marketplace/plugins/claude/idd-intent
-            claude plugin validate artifacts/marketplace/plugins/claude/idd-factory
-          } else {
-            Write-Host "Claude CLI is not available in CI; structural smoke tests already ran. Run documented Claude validation before release."
-          }
-
-      - name: Validate required publish paths
-        shell: pwsh
-        run: |
-          $required = @(
-            "artifacts/marketplace/.claude-plugin/marketplace.json",
-            "artifacts/marketplace/.agents/plugins/marketplace.json",
-            "artifacts/marketplace/plugins/claude/idd-intent",
-            "artifacts/marketplace/plugins/claude/idd-factory",
-            "artifacts/marketplace/plugins/codex/idd-intent",
-            "artifacts/marketplace/plugins/codex/idd-factory"
-          )
-          foreach ($path in $required) {
-            if (-not (Test-Path -LiteralPath $path)) {
-              throw "Missing required publish path: $path"
-            }
-          }
+        run: pwsh ./scripts/Check.ps1 -Mode Release -Version "${{ steps.version.outputs.VERSION }}"
 
       - name: Build publish root
         shell: bash

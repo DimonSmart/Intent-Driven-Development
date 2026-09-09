@@ -8,9 +8,10 @@ public sealed class VerificationProcessFailureTests
     public async Task TimeoutCapturesPartialOutputAndTerminationMetadata()
     {
         var command = OperatingSystem.IsWindows()
-            ? "[Console]::Out.WriteLine('partial'); [Console]::Out.Flush(); Start-Sleep -Seconds 5"
+            ? "[Console]::Out.WriteLine('partial'); [Console]::Out.Flush(); Start-Sleep -Seconds 10"
             : "printf partial; sleep 5";
-        using var test = new VerificationTestContext().WithCheck("timeout", command, timeout: "1s");
+        var timeout = OperatingSystem.IsWindows() ? "5s" : "1s";
+        using var test = new VerificationTestContext().WithCheck("timeout", command, timeout: timeout);
 
         var result = await test.Engine().RunAsync(["timeout"], default);
 

@@ -1,4 +1,4 @@
-name: IDD Smoke
+name: IDD Fast Validation
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  check-linux:
+  fast-linux:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,11 +19,11 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Run check
+      - name: Run fast validation
         shell: pwsh
-        run: pwsh ./scripts/Check.ps1 -Version 0.0.0
+        run: pwsh ./scripts/Check.ps1 -Mode Fast -Version 0.0.0
 
-  smoke:
+  fast-windows:
     runs-on: windows-latest
 
     steps:
@@ -35,19 +35,19 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Run check
+      - name: Run fast validation
         id: check
         shell: pwsh
         run: |
-          & pwsh ./scripts/Check.ps1 -Version 0.0.0 *> check.log
+          & pwsh ./scripts/Check.ps1 -Mode Fast -Version 0.0.0 *> check.log
           $exitCode = $LASTEXITCODE
           Get-Content check.log
           exit $exitCode
 
-      - name: Upload failed check log
+      - name: Upload failed validation log
         if: failure() && steps.check.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-check-log
+          name: fast-validation-log
           path: check.log
           if-no-files-found: error

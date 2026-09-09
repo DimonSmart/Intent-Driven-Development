@@ -1,6 +1,7 @@
+using Idd.Factory.Agents;
+
 namespace Idd.Factory.LiveTests.Infrastructure;
 
-internal sealed record CodexCommand(string Executable, IReadOnlyList<string> PrefixArguments);
 public sealed record CodexRunResult(ProcessResult Process, string Model, string ReasoningEffort);
 
 public sealed class CodexProcess(ProcessRunner processRunner)
@@ -13,7 +14,7 @@ public sealed class CodexProcess(ProcessRunner processRunner)
         var timeoutText = Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_TIMEOUT_MINUTES");
         var timeout = int.TryParse(timeoutText, out var minutes) && minutes > 0 ? TimeSpan.FromMinutes(minutes) : TimeSpan.FromMinutes(20);
         var prompt = BuildPrompt(workspace.CaseDirectory);
-        var command = ResolveCommand();
+        var command = CodexExecutableResolver.Resolve();
         var factoryCodexExecutable = factoryEnvironment ? PrepareSandboxFactoryCodexExecutable(command, workspace) : null;
         var environment = BuildEnvironment(workspace, model, reasoning, factoryEnvironment, factoryCodexExecutable);
         var arguments = BuildArguments(workspace, model, reasoning, sandboxMode);
@@ -27,28 +28,6 @@ public sealed class CodexProcess(ProcessRunner processRunner)
         {
             DeleteSandboxFactoryCodexFiles(factoryCodexExecutable);
         }
-    }
-
-    internal static CodexCommand ResolveCommand()
-    {
-        if (!OperatingSystem.IsWindows()) return new("codex", []);
-        var path = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
-        var directories = path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        foreach (var directory in directories)
-        {
-            var packageDirectory = Path.Combine(directory, "node_modules", "@openai", "codex", "node_modules");
-            if (!Directory.Exists(packageDirectory)) continue;
-            var native = Directory.EnumerateFiles(packageDirectory, "codex.exe", SearchOption.AllDirectories)
-                .FirstOrDefault(candidate => candidate.Contains("@openai" + Path.DirectorySeparatorChar + "codex-win32-", StringComparison.OrdinalIgnoreCase));
-            if (native is not null) return new(native, []);
-        }
-        foreach (var directory in directories)
-        {
-            var script = Path.Combine(directory, "node_modules", "@openai", "codex", "bin", "codex.js");
-            var node = Path.Combine(directory, "node.exe");
-            if (File.Exists(script) && File.Exists(node)) return new(node, [script]);
-        }
-        throw new FileNotFoundException("Could not locate the npm Codex CLI on PATH.");
     }
 
     private static IReadOnlyList<string> BuildArguments(LiveTestWorkspace workspace, string model, string reasoning, string sandboxMode) =>
@@ -87,7 +66,7 @@ public sealed class CodexProcess(ProcessRunner processRunner)
         environment["IDD_FACTORY_CAPABILITY_PROFILE"] = "release-eval-controlled";
         if (!string.IsNullOrWhiteSpace(factoryCodexExecutable)) environment["IDD_FACTORY_CODEX_EXECUTABLE"] = factoryCodexExecutable;
         if (OperatingSystem.IsWindows())
-            environment["PATH"] = Idd.Factory.Agents.CodexProcessEnvironment.PrepareSandboxCompatiblePath(Environment.GetEnvironmentVariable("PATH") ?? string.Empty, isWindows: true).Path;
+            environment["PATH"] = CodexProcessEnvironment.PrepareSandboxCompatiblePath(Environment.GetEnvironmentVariable("PATH") ?? string.Empty, isWindows: true).Path;
         return environment;
     }
 

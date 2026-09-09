@@ -1,10 +1,13 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using Idd.Factory.Processes;
 
 namespace Idd.Factory.Runtime;
 
 internal static class WorkspaceSnapshotFileEnumerator
 {
+    private static readonly ProcessSupervisor Supervisor = ProcessSupervisor.Shared;
+
     public static async Task<IReadOnlyList<string>> EnumerateAsync(string workspace, CancellationToken cancellationToken)
     {
         var gitFiles = await TryEnumerateGitVisibleFilesAsync(workspace, cancellationToken);
@@ -25,22 +28,21 @@ internal static class WorkspaceSnapshotFileEnumerator
         CancellationToken cancellationToken)
     {
         Process? process;
-        try { process = Process.Start(BuildGitStartInfo(workspace)); }
+        try { process = Supervisor.Start(BuildGitStartInfo(workspace)); }
         catch (Win32Exception) { return null; }
         if (process is null) return null;
 
         using (process)
         {
-            var stdoutTask = process.StandardOutput.ReadToEndAsync();
-            var stderrTask = process.StandardError.ReadToEndAsync();
+            var stdoutTask = Supervisor.CaptureAsync(process.StandardOutput, CancellationToken.None);
+            var stderrTask = Supervisor.CaptureAsync(process.StandardError, CancellationToken.None);
             try
             {
-                await process.WaitForExitAsync(cancellationToken);
+                await Supervisor.WaitForExitAsync(process, timeout: null, cancellationToken);
             }
             catch (OperationCanceledException)
             {
-                try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
-                catch (InvalidOperationException) { }
+                await Supervisor.TerminateProcessTreeAsync(process, CancellationToken.None);
                 await Task.WhenAll(stdoutTask, stderrTask);
                 throw;
             }

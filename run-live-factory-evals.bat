@@ -2,30 +2,23 @@
 setlocal EnableExtensions
 
 cd /d "%~dp0"
-set "PROJECT=tests\Idd.Factory.LiveTests\Idd.Factory.LiveTests.csproj"
 set "CONFIGURATION=Debug"
 set "FRAMEWORK=net10.0"
 set "TEST_DLL=%CD%\tests\Idd.Factory.LiveTests\bin\%CONFIGURATION%\%FRAMEWORK%\Idd.Factory.LiveTests.dll"
 
-set "IDD_RUN_LIVE_FACTORY_EVALS=1"
 if not defined IDD_FACTORY_EVAL_TIMEOUT_MINUTES set "IDD_FACTORY_EVAL_TIMEOUT_MINUTES=20"
 
-echo [%DATE% %TIME%] Starting IDD Factory live end-to-end test.
+echo [%DATE% %TIME%] Starting IDD Factory live tests.
 echo Codex timeout: %IDD_FACTORY_EVAL_TIMEOUT_MINUTES% minutes
 echo Live artifacts: %CD%\artifacts\factory-evals
 
 call :UnlockTestDll
 if errorlevel 1 exit /b %ERRORLEVEL%
 
-dotnet test "%PROJECT%" ^
-  --configuration "%CONFIGURATION%" ^
-  --filter "FullyQualifiedName~FactoryEndToEndLiveTests" ^
-  --nologo ^
-  --verbosity minimal ^
-  --logger "console;verbosity=detailed"
-
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\Check.ps1" -Mode Live
 set "TEST_EXIT_CODE=%ERRORLEVEL%"
-echo [%DATE% %TIME%] IDD Factory live test finished with exit code %TEST_EXIT_CODE%.
+
+echo [%DATE% %TIME%] IDD Factory live tests finished with exit code %TEST_EXIT_CODE%.
 exit /b %TEST_EXIT_CODE%
 
 :UnlockTestDll

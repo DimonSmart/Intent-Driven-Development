@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using Idd.Factory.Processes;
 
 namespace Idd.Factory.LiveTests.Infrastructure;
 
@@ -12,6 +13,7 @@ public sealed record ProcessResult(int ExitCode, DateTimeOffset StartedAtUtc, Da
 public sealed class ProcessRunner
 {
     private static readonly TimeSpan OutputDrainTimeout = TimeSpan.FromSeconds(5);
+    private readonly ProcessSupervisor processSupervisor = ProcessSupervisor.Shared;
 
     public async Task<ProcessResult> RunAsync(string executable, IReadOnlyList<string> arguments, string workingDirectory, string stdoutPath, string stderrPath, TimeSpan timeout, CancellationToken cancellationToken, string? standardInput = null, IReadOnlyDictionary<string, string>? environmentOverrides = null, string? completionSignalPath = null)
     {
@@ -22,75 +24,91 @@ public sealed class ProcessRunner
         if (environmentOverrides is not null)
             foreach (var (name, value) in environmentOverrides)
                 start.Environment[name] = value;
-        using var process = new Process { StartInfo = start, EnableRaisingEvents = true };
+
+        Process? process;
         var startedAt = DateTimeOffset.UtcNow;
-        try { process.Start(); }
-        catch (Exception exception) { throw new InvalidOperationException($"Could not start '{executable}'. Ensure it is installed and available on PATH.", exception); }
-        await using var stdout = new FileStream(stdoutPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
-        await using var stderr = new FileStream(stderrPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
-        using var outputCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var stdoutTask = process.StandardOutput.BaseStream.CopyToAsync(stdout, outputCancellation.Token);
-        var stderrTask = process.StandardError.BaseStream.CopyToAsync(stderr, outputCancellation.Token);
-        var stdinTask = standardInput is null ? Task.CompletedTask : WriteStandardInputAsync(process, standardInput, cancellationToken);
-        var timedOut = false;
-        var completionSignaled = false;
-        long? observedCompletionLength = null;
-        DateTimeOffset? completionStableSince = null;
-        var deadline = startedAt + timeout;
-        var processExit = process.WaitForExitAsync(CancellationToken.None);
         try
         {
-            while (!processExit.IsCompleted)
+            process = processSupervisor.Start(start);
+            if (process is null) throw new InvalidOperationException($"Could not start '{executable}'.");
+        }
+        catch (Exception exception)
+        {
+            throw new InvalidOperationException($"Could not start '{executable}'. Ensure it is installed and available on PATH.", exception);
+        }
+
+        using (process)
+        {
+            await using var stdout = new FileStream(stdoutPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+            await using var stderr = new FileStream(stderrPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+            using var outputCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var stdoutTask = processSupervisor.CopyAsync(process.StandardOutput.BaseStream, stdout, outputCancellation.Token);
+            var stderrTask = processSupervisor.CopyAsync(process.StandardError.BaseStream, stderr, outputCancellation.Token);
+            var stdinTask = standardInput is null ? Task.CompletedTask : WriteStandardInputAsync(process, standardInput, cancellationToken);
+            var timedOut = false;
+            var completionSignaled = false;
+            long? observedCompletionLength = null;
+            DateTimeOffset? completionStableSince = null;
+            var deadline = startedAt + timeout;
+            var processExit = processSupervisor.WaitForExitAsync(process, timeout: null, CancellationToken.None);
+
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var remaining = deadline - DateTimeOffset.UtcNow;
-                if (remaining <= TimeSpan.Zero)
+                while (!processExit.IsCompleted)
                 {
-                    timedOut = true;
-                    break;
-                }
-                if (completionSignalPath is not null && File.Exists(completionSignalPath))
-                {
-                    var length = new FileInfo(completionSignalPath).Length;
-                    if (length > 0 && observedCompletionLength == length)
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var remaining = deadline - DateTimeOffset.UtcNow;
+                    if (remaining <= TimeSpan.Zero)
                     {
-                        if (DateTimeOffset.UtcNow - completionStableSince >= TimeSpan.FromSeconds(2) && IsValidJson(completionSignalPath))
+                        timedOut = true;
+                        break;
+                    }
+                    if (completionSignalPath is not null && File.Exists(completionSignalPath))
+                    {
+                        var length = new FileInfo(completionSignalPath).Length;
+                        if (length > 0 && observedCompletionLength == length)
                         {
-                            completionSignaled = true;
-                            break;
+                            if (DateTimeOffset.UtcNow - completionStableSince >= TimeSpan.FromSeconds(2) && IsValidJson(completionSignalPath))
+                            {
+                                completionSignaled = true;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            observedCompletionLength = length;
+                            completionStableSince = DateTimeOffset.UtcNow;
                         }
                     }
-                    else
-                    {
-                        observedCompletionLength = length;
-                        completionStableSince = DateTimeOffset.UtcNow;
-                    }
+                    await Task.WhenAny(processExit, Task.Delay(TimeSpan.FromSeconds(Math.Min(1, remaining.TotalSeconds)), cancellationToken));
                 }
-                await Task.WhenAny(processExit, Task.Delay(TimeSpan.FromSeconds(Math.Min(1, remaining.TotalSeconds)), cancellationToken));
             }
+            catch (OperationCanceledException)
+            {
+                await processSupervisor.TerminateProcessTreeAsync(process, CancellationToken.None);
+                await processExit;
+                outputCancellation.Cancel();
+                throw;
+            }
+
+            if (timedOut || completionSignaled)
+            {
+                await processSupervisor.TerminateProcessTreeAsync(process, CancellationToken.None);
+                await processExit;
+            }
+
+            var drain = Task.WhenAll(stdoutTask, stderrTask);
+            if (!await processSupervisor.WaitAsync(drain, OutputDrainTimeout))
+            {
+                outputCancellation.Cancel();
+                try { await drain; }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            await stdinTask;
+            return new ProcessResult(process.ExitCode, startedAt, DateTimeOffset.UtcNow, timedOut, stdoutPath, stderrPath, completionSignaled);
         }
-        catch (OperationCanceledException)
-        {
-            if (!process.HasExited) process.Kill(entireProcessTree: true);
-            await processExit;
-            outputCancellation.Cancel();
-            throw;
-        }
-        if (timedOut || completionSignaled)
-        {
-            if (!process.HasExited) process.Kill(entireProcessTree: true);
-            await processExit;
-        }
-        try { await Task.WhenAll(stdoutTask, stderrTask).WaitAsync(OutputDrainTimeout); }
-        catch (TimeoutException)
-        {
-            outputCancellation.Cancel();
-            try { await Task.WhenAll(stdoutTask, stderrTask); }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
-        }
-        cancellationToken.ThrowIfCancellationRequested();
-        await stdinTask;
-        return new ProcessResult(process.ExitCode, startedAt, DateTimeOffset.UtcNow, timedOut, stdoutPath, stderrPath, completionSignaled);
     }
 
     private static bool IsValidJson(string path)

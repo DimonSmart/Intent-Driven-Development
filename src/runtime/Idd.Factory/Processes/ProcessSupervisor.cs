@@ -87,13 +87,24 @@ internal sealed class ProcessSupervisor
 
     public async Task<string> CaptureAsync(
         StreamReader reader,
+        CancellationToken cancellationToken) =>
+        await reader.ReadToEndAsync(cancellationToken);
+
+    public async Task<string> CaptureAsync(
+        StreamReader reader,
         string path,
         CancellationToken cancellationToken)
     {
-        var text = await reader.ReadToEndAsync(cancellationToken);
+        var text = await CaptureAsync(reader, cancellationToken);
         await File.WriteAllTextAsync(path, text, cancellationToken);
         return text;
     }
+
+    public Task CopyAsync(
+        Stream source,
+        Stream destination,
+        CancellationToken cancellationToken) =>
+        source.CopyToAsync(destination, cancellationToken);
 
     public async Task<string> CaptureLinesAsync(
         StreamReader reader,

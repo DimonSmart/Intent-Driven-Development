@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Idd.Factory.Domain;
+using Idd.Factory.Processes;
 using Idd.Factory.Runtime;
 
 internal enum FactoryRuntimeCommand { Run, Restart, Continue, Retry, Cancel }
@@ -187,6 +188,7 @@ internal interface IFactoryProcessInvoker
 internal sealed class SystemFactoryProcessInvoker(Action<int>? onProcessStarted = null) : IFactoryProcessInvoker
 {
     private static readonly UTF8Encoding TransportUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+    private readonly ProcessSupervisor processSupervisor = ProcessSupervisor.Shared;
 
     public async Task<FactoryProcessResult> RunAsync(FactoryProcessInvocation invocation, CancellationToken cancellationToken)
     {
@@ -202,10 +204,11 @@ internal sealed class SystemFactoryProcessInvoker(Action<int>? onProcessStarted 
         };
         foreach (var argument in invocation.Arguments) startInfo.ArgumentList.Add(argument);
 
-        using var process = new Process { StartInfo = startInfo };
+        Process? process;
         try
         {
-            if (!process.Start()) throw new InvalidOperationException("The packaged Factory Runtime process did not start.");
+            process = processSupervisor.Start(startInfo);
+            if (process is null) throw new InvalidOperationException("The packaged Factory Runtime process did not start.");
             onProcessStarted?.Invoke(process.Id);
         }
         catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or FileNotFoundException or InvalidOperationException)
@@ -213,27 +216,29 @@ internal sealed class SystemFactoryProcessInvoker(Action<int>? onProcessStarted 
             throw new FactoryTransportException("FACTORY_TRANSPORT_UNAVAILABLE", "The packaged Factory Runtime process did not start.", exception);
         }
 
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
-        var stderrTask = process.StandardError.ReadToEndAsync(CancellationToken.None);
-        try
+        using (process)
         {
-            if (invocation.StandardInput is not null)
+            var stdoutTask = processSupervisor.CaptureAsync(process.StandardOutput, CancellationToken.None);
+            var stderrTask = processSupervisor.CaptureAsync(process.StandardError, CancellationToken.None);
+            try
             {
-                await process.StandardInput.WriteAsync(invocation.StandardInput.AsMemory(), cancellationToken);
-                process.StandardInput.Close();
+                if (invocation.StandardInput is not null)
+                {
+                    await process.StandardInput.WriteAsync(invocation.StandardInput.AsMemory(), cancellationToken);
+                    process.StandardInput.Close();
+                }
+                await processSupervisor.WaitForExitAsync(process, timeout: null, cancellationToken);
             }
-            await process.WaitForExitAsync(cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            if (!process.HasExited) process.Kill(entireProcessTree: true);
-            await process.WaitForExitAsync(CancellationToken.None);
-            await Task.WhenAll(stdoutTask, stderrTask);
-            ReleaseRuntimeLockAfterForcedTermination(invocation, process.Id);
-            throw;
-        }
+            catch (OperationCanceledException)
+            {
+                await processSupervisor.TerminateProcessTreeAsync(process, CancellationToken.None);
+                await Task.WhenAll(stdoutTask, stderrTask);
+                ReleaseRuntimeLockAfterForcedTermination(invocation, process.Id);
+                throw;
+            }
 
-        return new(process.ExitCode, await stdoutTask, await stderrTask);
+            return new(process.ExitCode, await stdoutTask, await stderrTask);
+        }
     }
 
     internal static bool ReleaseRuntimeLockAfterForcedTermination(FactoryProcessInvocation invocation, int processId)
