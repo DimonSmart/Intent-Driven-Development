@@ -11,6 +11,9 @@
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\src\runtime\Idd.Factory\Processes\ProcessSupervisor.cs" Link="Shared\ProcessSupervisor.cs" />
+    <Compile Include="..\..\src\runtime\Idd.Factory\Agents\CodexExecutableResolver.cs" Link="Shared\CodexExecutableResolver.cs" />
+    <Compile Include="..\..\src\runtime\Idd.Factory\Agents\CodexProcessEnvironment.cs" Link="Shared\CodexProcessEnvironment.cs" />
     <InternalsVisibleTo Include="FactoryBenchmark.Tests" />
   </ItemGroup>
 </Project>

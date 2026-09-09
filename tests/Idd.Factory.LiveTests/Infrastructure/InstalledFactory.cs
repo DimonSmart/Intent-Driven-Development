@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Idd.Factory.Agents;
+using Idd.Factory.Processes;
 
 namespace Idd.Factory.LiveTests.Infrastructure;
 
@@ -8,6 +10,8 @@ public sealed record InstalledFactoryInfo(string InstalledPath, string Methodolo
 
 public sealed class InstalledFactory(ProcessRunner processRunner)
 {
+    private static readonly ProcessSupervisor Supervisor = ProcessSupervisor.Shared;
+
     public async Task<InstalledFactoryInfo> BuildAndInstallAsync(string repositoryRoot, LiveTestWorkspace workspace, CancellationToken cancellationToken)
     {
         var build = await processRunner.RunAsync("dotnet", ["build", "tools/generate/Generate.csproj", "--nologo"], repositoryRoot,
@@ -24,7 +28,7 @@ public sealed class InstalledFactory(ProcessRunner processRunner)
         RequireSuccess(generated, "Factory plugin generation");
 
         var environment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["CODEX_HOME"] = workspace.CodexHomeDirectory };
-        var codex = CodexProcess.ResolveCommand();
+        var codex = CodexExecutableResolver.Resolve();
         var marketplace = await processRunner.RunAsync(codex.Executable, codex.PrefixArguments.Concat(["plugin", "marketplace", "add", workspace.GeneratedMarketplaceDirectory, "--json"]).ToArray(), repositoryRoot,
             Path.Combine(workspace.VerificationDirectory, "plugin-marketplace-add.json"), Path.Combine(workspace.VerificationDirectory, "plugin-marketplace-add.stderr.log"), TimeSpan.FromMinutes(2), cancellationToken, environmentOverrides: environment);
         RequireSuccess(marketplace, "Codex marketplace add");
@@ -62,13 +66,40 @@ public sealed class InstalledFactory(ProcessRunner processRunner)
 
     private static async Task<string?> GitTextAsync(string repositoryRoot, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
     {
-        var start = new ProcessStartInfo("git") { WorkingDirectory = repositoryRoot, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+        var start = new ProcessStartInfo("git")
+        {
+            WorkingDirectory = repositoryRoot,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
-        using var process = Process.Start(start);
+
+        Process? process;
+        try { process = Supervisor.Start(start); }
+        catch (System.ComponentModel.Win32Exception) { return null; }
         if (process is null) return null;
-        var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        return process.ExitCode == 0 ? output.Trim() : null;
+
+        using (process)
+        {
+            var outputTask = Supervisor.CaptureAsync(process.StandardOutput, CancellationToken.None);
+            var errorTask = Supervisor.CaptureAsync(process.StandardError, CancellationToken.None);
+            try
+            {
+                await Supervisor.WaitForExitAsync(process, timeout: null, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                await Supervisor.TerminateProcessTreeAsync(process, CancellationToken.None);
+                await Task.WhenAll(outputTask, errorTask);
+                throw;
+            }
+
+            var output = await outputTask;
+            _ = await errorTask;
+            return process.ExitCode == 0 ? output.Trim() : null;
+        }
     }
 
     internal static void PrepareIsolatedCodexHome(string codexHome)
