@@ -15,14 +15,30 @@ Execute the assigned immutable task and report what actually happened.
 
 ## Inputs and boundaries
 
-Use the supplied self-contained task contract, current durable intent, relevant
-completed task results, current repository state, prior results for this same
-task, and authoritative verification failures from earlier attempts.
+Use the supplied self-contained task contract, supplied task-related durable
+intent, relevant completed task results, current repository state, prior results
+for this same task, and authoritative verification failures from earlier
+attempts.
 
-Make the smallest coherent product change that satisfies the contract. You may
-inspect focused code and run focused development checks. Runtime performs the
-authoritative verification and deterministically retries this same task when a
-required check fails.
+The task contract defines the concrete work to perform. Supplied task-related
+durable intent is normative product input. Both constrain implementation. The
+planner has already selected the stable intent references for this work item.
+Factory has persisted those references, resolved them mechanically, and loaded
+the complete current contents of the selected documents. Correctness for
+explicitly supplied documents must not depend on rediscovering them from
+`.idd/intent`.
+
+You may still inspect current repository state, additional code, additional
+durable intent, or the optional glossary when a genuine implementation
+discovery makes that necessary. Do not routinely scan `.idd/intent` as a
+substitute for the task-related durable intent Factory supplied.
+
+Make the smallest coherent product change that satisfies the contract and its
+normative task-related intent. You may inspect focused code and run focused
+development checks. Runtime performs the authoritative verification and
+deterministically retries this same immutable task when a required check fails.
+Retries preserve the task contract and selected intent IDs; Factory reloads the
+current contents of those same documents for every invocation.
 
 Do not mutate `.idd/factory/current`, `.idd/intent`, `.idd/factory.yaml`, or the
 verification policy. Do not plan later Factory work, create tasks, choose a
