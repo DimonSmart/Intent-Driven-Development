@@ -17,15 +17,25 @@ public sealed class FactoryStateValidator
         var active = new[] { state.Current }.Where(x => x is not null).Concat(state.Remaining).Select(x => x!).ToArray();
         if (active.Any(x => x.AttemptCount < 0 || x.AdditionalAttemptBudget < 0)) throw Error("Work item retry counters cannot be negative.");
 
-        var all = state.Completed.Select(x => (x.Id, x.ContractPath))
-            .Concat(state.Current is null ? [] : [(state.Current.Id, state.Current.ContractPath)])
-            .Concat(state.Remaining.Select(x => (x.Id, x.ContractPath))).ToArray();
+        var all = state.Completed.Select(x => (
+                Id: x.Id,
+                ContractPath: x.ContractPath,
+                TaskRelatedIntentIds: (IReadOnlyList<string>)x.TaskRelatedIntentIds))
+            .Concat(state.Current is null
+                ? []
+                : [(state.Current.Id, state.Current.ContractPath, (IReadOnlyList<string>)state.Current.TaskRelatedIntentIds)])
+            .Concat(state.Remaining.Select(x => (
+                Id: x.Id,
+                ContractPath: x.ContractPath,
+                TaskRelatedIntentIds: (IReadOnlyList<string>)x.TaskRelatedIntentIds)))
+            .ToArray();
         if (all.Any(x => string.IsNullOrWhiteSpace(x.Id))) throw Error("Every work item requires an ID.");
         if (all.Select(x => x.Id).Distinct(StringComparer.Ordinal).Count() != all.Length) throw Error("Work item IDs must be unique across Completed, Current, and Remaining.");
         foreach (var item in all)
         {
             if (string.IsNullOrWhiteSpace(item.ContractPath)) throw Error($"Work item {item.Id} has an incomplete contract.");
             ValidateContractPath(item.ContractPath, item.Id);
+            ValidateTaskRelatedIntentIds(item.Id, item.TaskRelatedIntentIds);
         }
         if (state.CurrentAttemptId is not null && state.Current is null && state.PendingContinuation?.Operation != SemanticOperationKind.Planning)
             throw Error("An active attempt without Current work must be planning.");
@@ -51,6 +61,17 @@ public sealed class FactoryStateValidator
             if (previous.Current is null || next.Completed[^1].Id != previous.Current.Id) throw Error("New completed work must be the previous Current task.");
             if (next.Current is not null) throw Error("Current must be cleared when it is committed to Completed.");
         }
+
+        var previousRelatedIntent = GetTaskRelatedIntentByWorkItem(previous);
+        var nextRelatedIntent = GetTaskRelatedIntentByWorkItem(next);
+        foreach (var (workItemId, previousIds) in previousRelatedIntent)
+        {
+            if (nextRelatedIntent.TryGetValue(workItemId, out var nextIds)
+                && !previousIds.SequenceEqual(nextIds, StringComparer.Ordinal))
+            {
+                throw Error($"Task-related durable intent for work item {workItemId} is immutable.");
+            }
+        }
     }
 
     private static void ValidateVerificationSession(PendingVerificationSession session)
@@ -69,6 +90,30 @@ public sealed class FactoryStateValidator
         {
             throw Error("Verification execute stage cannot retain pending-check metadata.");
         }
+    }
+
+    private static void ValidateTaskRelatedIntentIds(string workItemId, IReadOnlyList<string> ids)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var id in ids)
+        {
+            if (!DurableIntentId.IsCanonical(id))
+                throw Error($"Work item {workItemId} has invalid task-related durable intent ID '{id}'.");
+            if (!seen.Add(id))
+                throw Error($"Work item {workItemId} has duplicate task-related durable intent ID '{id}'.");
+        }
+    }
+
+    private static Dictionary<string, IReadOnlyList<string>> GetTaskRelatedIntentByWorkItem(FactoryState state)
+    {
+        var result = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        foreach (var item in state.Completed)
+            result[item.Id] = item.TaskRelatedIntentIds;
+        if (state.Current is not null)
+            result[state.Current.Id] = state.Current.TaskRelatedIntentIds;
+        foreach (var item in state.Remaining)
+            result[item.Id] = item.TaskRelatedIntentIds;
+        return result;
     }
 
     private static bool Equivalent(CompletedWorkItem left, CompletedWorkItem right) =>

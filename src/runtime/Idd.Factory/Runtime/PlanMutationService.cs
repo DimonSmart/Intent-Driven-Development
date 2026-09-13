@@ -7,13 +7,17 @@ internal sealed class PlanMutationService(
     FactoryRuntimeContext context,
     PlanRevisionWriter planRevisions)
 {
+    private readonly IntentDocumentResolver intentResolver = new(context.Workspace);
+
     public async Task ApplyAsync(
         FactoryState state,
-        IReadOnlyList<string> tasks,
+        IReadOnlyList<PlannerTaskDefinition> tasks,
         string reason,
         string sourceAttemptId,
         CancellationToken cancellationToken)
     {
+        ValidateTaskRelatedIntent(tasks);
+
         var previous = context.CloneState(state);
         var candidate = context.CloneState(state);
         candidate.Current = null;
@@ -52,12 +56,46 @@ internal sealed class PlanMutationService(
         await context.SaveAsync(state, cancellationToken);
     }
 
+    private void ValidateTaskRelatedIntent(IReadOnlyList<PlannerTaskDefinition> tasks)
+    {
+        foreach (var task in tasks)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var intentId in task.TaskRelatedIntentIds)
+            {
+                if (!DurableIntentId.IsCanonical(intentId))
+                {
+                    throw new AgentProtocolException(
+                        "MALFORMED_PLANNER_OUTPUT",
+                        $"Planner TaskRelatedIntent entry '{intentId}' is not a canonical IDD-NNNN identifier.");
+                }
+                if (!seen.Add(intentId))
+                {
+                    throw new AgentProtocolException(
+                        "MALFORMED_PLANNER_OUTPUT",
+                        $"Planner TaskRelatedIntent contains duplicate durable intent ID '{intentId}'.");
+                }
+
+                try
+                {
+                    _ = intentResolver.ResolvePath(intentId);
+                }
+                catch (IntentResolutionException exception)
+                {
+                    throw new AgentProtocolException(
+                        "MALFORMED_PLANNER_OUTPUT",
+                        $"Planner TaskRelatedIntent reference '{intentId}' is invalid: {exception.Message}");
+                }
+            }
+        }
+    }
+
     private static PlannedWorkItem CreatePlannedTask(
         FactoryState state,
-        string task,
+        PlannerTaskDefinition task,
         List<(string Path, string Content)> contracts)
     {
-        if (string.IsNullOrWhiteSpace(task))
+        if (string.IsNullOrWhiteSpace(task.Contract))
         {
             throw new AgentProtocolException(
                 "MALFORMED_PLANNER_OUTPUT",
@@ -66,7 +104,12 @@ internal sealed class PlanMutationService(
 
         var id = $"W{state.NextWorkItemNumber++:000000}";
         var path = $"work-items/{id}/contract.md";
-        contracts.Add((path, task.Trim() + Environment.NewLine));
-        return new PlannedWorkItem { Id = id, ContractPath = path };
+        contracts.Add((path, task.Contract.Trim() + Environment.NewLine));
+        return new PlannedWorkItem
+        {
+            Id = id,
+            ContractPath = path,
+            TaskRelatedIntentIds = task.TaskRelatedIntentIds.ToList()
+        };
     }
 }

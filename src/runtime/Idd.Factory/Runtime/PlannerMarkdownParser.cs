@@ -1,20 +1,28 @@
 using System.Collections;
+using Idd.Factory.Domain;
 using Markdig;
 using Markdig.Syntax;
 
 namespace Idd.Factory.Runtime;
 
-internal sealed record PlannerBatchResult(IReadOnlyList<string> Tasks, string? Question) : IReadOnlyList<string>
+internal sealed record PlannerTaskDefinition(
+    string Contract,
+    IReadOnlyList<string> TaskRelatedIntentIds);
+
+internal sealed record PlannerBatchResult(
+    IReadOnlyList<PlannerTaskDefinition> Tasks,
+    string? Question) : IReadOnlyList<string>
 {
     public int Count => Tasks.Count;
-    public string this[int index] => Tasks[index];
-    public IEnumerator<string> GetEnumerator() => Tasks.GetEnumerator();
+    public string this[int index] => Tasks[index].Contract;
+    public IEnumerator<string> GetEnumerator() => Tasks.Select(task => task.Contract).GetEnumerator();
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
 internal sealed class PlannerMarkdownParser
 {
     private const string TaskHeading = "# Task";
+    private const string TaskRelatedIntentHeading = "# TaskRelatedIntent";
     private const string QuestionHeading = "# Question";
     private const string DoneHeading = "# Done";
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().Build();
@@ -38,7 +46,7 @@ internal sealed class PlannerMarkdownParser
         if (markers.Length == 0 || !string.IsNullOrWhiteSpace(normalized[..markers[0].Start]))
             throw Malformed();
 
-        var tasks = new List<string>();
+        var tasks = new List<PlannerTaskDefinition>();
         string? question = null;
         var done = false;
         for (var index = 0; index < markers.Length; index++)
@@ -57,12 +65,31 @@ internal sealed class PlannerMarkdownParser
                 continue;
             }
 
+            if (marker.Kind == PlannerSectionKind.TaskRelatedIntent)
+            {
+                if (index == 0 || markers[index - 1].Kind != PlannerSectionKind.Task || tasks.Count == 0)
+                {
+                    throw new AgentProtocolException(
+                        "MALFORMED_PLANNER_OUTPUT",
+                        "Planner '# TaskRelatedIntent' must occur at most once immediately after the '# Task' it describes.");
+                }
+                if (index + 1 < markers.Length && markers[index + 1].Kind != PlannerSectionKind.Task)
+                {
+                    throw new AgentProtocolException(
+                        "MALFORMED_PLANNER_OUTPUT",
+                        "Planner '# TaskRelatedIntent' must be followed only by another '# Task' or the end of planner output.");
+                }
+
+                tasks[^1] = tasks[^1] with { TaskRelatedIntentIds = ParseTaskRelatedIntent(body) };
+                continue;
+            }
+
             if (body.Length == 0)
                 throw new AgentProtocolException("MALFORMED_PLANNER_OUTPUT", "Planner task and question sections must be non-empty.");
 
             if (marker.Kind == PlannerSectionKind.Task)
             {
-                tasks.Add(body);
+                tasks.Add(new(body, []));
                 continue;
             }
 
@@ -80,6 +107,47 @@ internal sealed class PlannerMarkdownParser
         return new(tasks, question);
     }
 
+    private static IReadOnlyList<string> ParseTaskRelatedIntent(string body)
+    {
+        if (body.Length == 0)
+        {
+            throw new AgentProtocolException(
+                "MALFORMED_PLANNER_OUTPUT",
+                "Planner '# TaskRelatedIntent' must contain at least one durable intent ID.");
+        }
+
+        var ids = body
+            .Split('\n')
+            .Select(line => line.Trim())
+            .Where(line => line.Length != 0)
+            .ToArray();
+        if (ids.Length == 0)
+        {
+            throw new AgentProtocolException(
+                "MALFORMED_PLANNER_OUTPUT",
+                "Planner '# TaskRelatedIntent' must contain at least one durable intent ID.");
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var id in ids)
+        {
+            if (!DurableIntentId.IsCanonical(id))
+            {
+                throw new AgentProtocolException(
+                    "MALFORMED_PLANNER_OUTPUT",
+                    $"Planner TaskRelatedIntent entry '{id}' must be exactly one canonical IDD-NNNN identifier per line.");
+            }
+            if (!seen.Add(id))
+            {
+                throw new AgentProtocolException(
+                    "MALFORMED_PLANNER_OUTPUT",
+                    $"Planner TaskRelatedIntent contains duplicate durable intent ID '{id}'.");
+            }
+        }
+
+        return ids;
+    }
+
     private static PlannerSectionMarker? TryCreateMarker(string markdown, HeadingBlock heading)
     {
         if (heading.Span.Start < 0 || heading.Span.Start >= markdown.Length)
@@ -91,6 +159,7 @@ internal sealed class PlannerMarkdownParser
         var kind = sourceLine switch
         {
             TaskHeading => PlannerSectionKind.Task,
+            TaskRelatedIntentHeading => PlannerSectionKind.TaskRelatedIntent,
             QuestionHeading => PlannerSectionKind.Question,
             DoneHeading => PlannerSectionKind.Done,
             _ => PlannerSectionKind.None
@@ -106,8 +175,8 @@ internal sealed class PlannerMarkdownParser
     private static AgentProtocolException Malformed() =>
         new(
             "MALFORMED_PLANNER_OUTPUT",
-            "Planner output must contain one or more exact '# Task' sections, exactly one non-empty '# Question' section, or exactly '# Done'. Blank planner output is not a completion signal.");
+            "Planner output must contain one or more exact '# Task' sections, exactly one non-empty '# Question' section, or exactly '# Done'. Optional '# TaskRelatedIntent' metadata may follow only its task. Blank planner output is not a completion signal.");
 
     private sealed record PlannerSectionMarker(int Start, int EndExclusive, PlannerSectionKind Kind);
-    private enum PlannerSectionKind { None, Task, Question, Done }
+    private enum PlannerSectionKind { None, Task, TaskRelatedIntent, Question, Done }
 }

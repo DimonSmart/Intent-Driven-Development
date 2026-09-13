@@ -24,6 +24,7 @@ internal sealed class ExecutionService(
 {
     private static readonly UTF8Encoding HumanReadableUtf8 =
         new(encoderShouldEmitUTF8Identifier: true, throwOnInvalidBytes: true);
+    private readonly IntentDocumentResolver intentResolver = new(context.Workspace);
 
     public async Task<FactoryExecutionResult> ExecuteAsync(
         FactoryState state,
@@ -62,9 +63,9 @@ internal sealed class ExecutionService(
         var verificationDrivenRetry =
             item.LastVerificationDecision == VerificationDecision.UnexpectedFailure;
 
+        var input = await BuildWorkInputAsync(state, item, cancellationToken);
         state.CurrentPhase = CurrentWorkPhase.Running;
         await context.SaveAsync(state, cancellationToken);
-        var input = await BuildWorkInputAsync(state, item, cancellationToken);
 
         BoundSemanticResult result;
         try
@@ -190,6 +191,7 @@ internal sealed class ExecutionService(
         var contract = await File.ReadAllTextAsync(
             Path.Combine(context.CurrentDirectory, item.ContractPath),
             cancellationToken);
+        var taskRelatedIntent = await BuildTaskRelatedIntentContextAsync(item, cancellationToken);
         var completed =
             await contextReader.BuildCompletedContextAsync(state, cancellationToken);
         var prior =
@@ -205,11 +207,48 @@ internal sealed class ExecutionService(
 
         return
             $"Work item contract:\n{contract}\n\n" +
+            $"Task-related durable intent:\n{taskRelatedIntent}\n\n" +
             $"Relevant completed work and results:\n{completed}\n\n" +
             $"Previous attempts for this task:\n{prior}\n\n" +
             $"Previous shell-command failures for this task:\n{priorCommandFailures}\n\n" +
             $"Authoritative verification observations:\n{verificationObservations}\n\n" +
+            "The task contract defines the concrete work. Supplied task-related durable intent is normative product input and both constrain implementation. " +
+            "Factory already selected, resolved, and loaded the explicitly referenced intent; correctness for it must not depend on rediscovering those files. " +
+            "Inspect the current repository and additional intent only when genuine implementation discovery requires it. " +
             "Use a fresh semantic context. Do not rely on conversation history or internal planning state.";
+    }
+
+    private async Task<string> BuildTaskRelatedIntentContextAsync(
+        PlannedWorkItem item,
+        CancellationToken cancellationToken)
+    {
+        if (item.TaskRelatedIntentIds.Count == 0)
+            return "none";
+
+        var builder = new StringBuilder();
+        foreach (var intentId in item.TaskRelatedIntentIds)
+        {
+            ResolvedIntentDocument document;
+            try
+            {
+                document = await intentResolver.ResolveAsync(intentId, cancellationToken);
+            }
+            catch (IntentResolutionException exception)
+            {
+                throw new AgentProtocolException(
+                    "TASK_RELATED_INTENT_UNRESOLVABLE",
+                    $"Work item {item.Id} has persisted durable intent reference '{intentId}' that no longer resolves uniquely: {exception.Message}");
+            }
+
+            if (builder.Length != 0)
+                builder.AppendLine();
+            builder.AppendLine($"--- {document.Id} ---");
+            builder.Append(document.Content);
+            if (!document.Content.EndsWith('\n'))
+                builder.AppendLine();
+        }
+
+        return builder.ToString().TrimEnd('\r', '\n');
     }
 
     private async Task PrepareCommandFailureRetryAsync(

@@ -24,7 +24,7 @@ public enum VerificationDecision { None, Ok, ExpectedFailure, UnexpectedFailure 
 
 public sealed record FactoryState
 {
-    public const int CurrentSchemaVersion = 12;
+    public const int CurrentSchemaVersion = 13;
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     public required string MethodologyVersion { get; init; }
     public required string RuntimeVersion { get; init; }
@@ -57,6 +57,7 @@ public sealed record PlannedWorkItem
 {
     public required string Id { get; init; }
     public required string ContractPath { get; init; }
+    public List<string> TaskRelatedIntentIds { get; init; } = [];
     public int AttemptCount { get; set; }
     public int AdditionalAttemptBudget { get; set; }
     public string? CurrentAttemptId { get; set; }
@@ -75,10 +76,26 @@ public sealed record CompletedWorkItem
 {
     public required string Id { get; init; }
     public required string ContractPath { get; init; }
+    public List<string> TaskRelatedIntentIds { get; init; } = [];
     public string? ResultRef { get; init; }
     public List<string> ChangedPaths { get; init; } = [];
     public List<string> VerificationEvidenceRefs { get; init; } = [];
     public VerificationDecision VerificationDecision { get; init; }
+}
+
+internal static class DurableIntentId
+{
+    public static bool IsCanonical(string? value)
+    {
+        if (value is null || value.Length != 8 || !value.StartsWith("IDD-", StringComparison.Ordinal))
+            return false;
+
+        for (var index = 4; index < value.Length; index++)
+            if (value[index] is < '0' or > '9')
+                return false;
+
+        return true;
+    }
 }
 
 public sealed record FactoryBlocker(string Code, string Reason, string ResumeWhen, JsonElement? Payload = null);

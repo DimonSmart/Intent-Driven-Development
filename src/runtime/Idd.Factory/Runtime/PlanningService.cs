@@ -12,7 +12,7 @@ internal enum PlanningResultKind
 internal sealed record PlanningResult(
     PlanningResultKind Kind,
     string? AttemptId,
-    IReadOnlyList<string> Tasks,
+    IReadOnlyList<PlannerTaskDefinition> Tasks,
     string? Question,
     string Reason,
     string? Detail = null);
@@ -66,8 +66,10 @@ internal sealed class PlanningService(
             $"Original request:\n{request}\n\nCurrent planning trigger:\n{trigger}\n\nCompleted immutable work:\n{completed}\n\n" +
             $"User answers to earlier planning questions:\n{userAnswers}\n\n" +
             $"Authoritative verification evidence summaries:\n{verificationEvidence}\n\n" +
-            "Read current durable intent from .idd/intent and inspect the current repository directly. " +
-            "Materialize every task whose self-contained contract can be determined reliably now, in execution order. " +
+            "Discover durable intent by reading .idd/intent/README.md and .idd/intent/INDEX.md first. " +
+            "Use the index to identify plausible current numbered intent documents and read only candidates needed for task semantics or relevance; do not load the complete intent store by default. " +
+            "For each task, select any existing stable IDD-NNNN intent IDs whose durable constraints materially affect that task and emit them as '# TaskRelatedIntent' metadata after the task contract. " +
+            "Inspect the current repository directly. Materialize every task whose self-contained contract can be determined reliably now, in execution order. " +
             "Stop at the first material uncertainty that requires evidence from this batch. " +
             "Return one or more '# Task' sections, or exactly one '# Question' section when a user decision is required, or exactly '# Done' when no semantic work remains. " +
             "Do not mix these forms.";
