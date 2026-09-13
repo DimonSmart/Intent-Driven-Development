@@ -4,6 +4,30 @@ This page records IDD changes that require action in repositories that already u
 
 Updating the installed plugins and migrating project-owned files are separate operations. Follow [Updating IDD](updating-idd.md) to refresh `idd-intent` and `idd-factory`. Then apply any relevant migration instructions below. Plugin updates do not automatically rewrite a repository's `.idd/intent/` directory.
 
+## 2026-09-13 — Task-related durable intent propagation
+
+Factory planner tasks may now include optional `# TaskRelatedIntent` metadata
+containing existing stable `IDD-NNNN` durable-intent IDs selected independently
+for that task. The planner owns semantic relevance selection. Runtime owns
+canonical-ID validation, unique direct-file resolution, persistence, retry and
+recovery preservation, and executor-context assembly.
+
+For every executor invocation Factory injects the complete current contents of
+exactly the selected intent documents between the task contract and completed-
+work context. The ordered selected IDs are immutable work-item metadata; intent
+contents are not copied into `contract.md` or state and are resolved again from
+current durable truth on every retry.
+
+This changes authoritative work-item state. Factory runtime schema is now 13.
+Active schema-12 state is treated as `LEGACY_FACTORY_STATE`; missing
+`TaskRelatedIntentIds` on an older active task is not silently interpreted as an
+empty authoritative selection. No implicit migration is provided. Cancel or
+restart an older active run under the existing legacy-state policy. Completed
+historical result directories remain unchanged.
+
+Task output without `# TaskRelatedIntent` remains valid and means an empty
+selected-intent set. `# Question` and `# Done` semantics are unchanged.
+
 ## 2026-09-03 — Explicit planner completion marker
 
 Planner completion is now explicit. When semantic reassessment finds no
