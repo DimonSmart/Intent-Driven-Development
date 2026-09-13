@@ -248,7 +248,7 @@ internal sealed class ExecutionService(
                 builder.AppendLine();
         }
 
-        return builder.ToString().TrimEnd('\r', '\n');
+        return builder.ToString();
     }
 
     private async Task PrepareCommandFailureRetryAsync(
