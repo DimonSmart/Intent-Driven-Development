@@ -213,7 +213,7 @@ internal sealed class ExecutionService(
             $"Previous shell-command failures for this task:\n{priorCommandFailures}\n\n" +
             $"Authoritative verification observations:\n{verificationObservations}\n\n" +
             "The task contract defines the concrete work. Supplied task-related durable intent is normative product input and both constrain implementation. " +
-            "Factory already selected, resolved, and loaded the explicitly referenced intent; correctness for it must not depend on rediscovering those files. " +
+            "The planner already selected the explicitly referenced intent; Factory persisted, resolved, and loaded it. Correctness for it must not depend on rediscovering those files. " +
             "Inspect the current repository and additional intent only when genuine implementation discovery requires it. " +
             "Use a fresh semantic context. Do not rely on conversation history or internal planning state.";
     }

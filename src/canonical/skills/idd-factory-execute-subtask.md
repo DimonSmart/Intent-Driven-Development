@@ -12,11 +12,12 @@ for this same task, and authoritative verification failures from earlier
 attempts.
 
 The task contract defines the concrete work to perform. Supplied task-related
-durable intent is normative product input. Both constrain implementation.
-Factory has already selected the persisted stable intent references for this
-work item, resolved them mechanically, and loaded the complete current contents
-of those selected documents. Correctness for explicitly supplied documents must
-not depend on rediscovering them from `.idd/intent`.
+durable intent is normative product input. Both constrain implementation. The
+planner has already selected the stable intent references for this work item.
+Factory has persisted those references, resolved them mechanically, and loaded
+the complete current contents of the selected documents. Correctness for
+explicitly supplied documents must not depend on rediscovering them from
+`.idd/intent`.
 
 You may still inspect current repository state, additional code, additional
 durable intent, or the optional glossary when a genuine implementation

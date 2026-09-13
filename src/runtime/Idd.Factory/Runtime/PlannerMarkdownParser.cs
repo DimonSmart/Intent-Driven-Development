@@ -53,7 +53,8 @@ internal sealed class PlannerMarkdownParser
         {
             var marker = markers[index];
             var bodyEnd = index + 1 < markers.Length ? markers[index + 1].Start : normalized.Length;
-            var body = normalized[marker.EndExclusive..bodyEnd].Trim();
+            var rawBody = normalized[marker.EndExclusive..bodyEnd];
+            var body = rawBody.Trim();
 
             if (marker.Kind == PlannerSectionKind.Done)
             {
@@ -80,7 +81,7 @@ internal sealed class PlannerMarkdownParser
                         "Planner '# TaskRelatedIntent' must be followed only by another '# Task' or the end of planner output.");
                 }
 
-                tasks[^1] = tasks[^1] with { TaskRelatedIntentIds = ParseTaskRelatedIntent(body) };
+                tasks[^1] = tasks[^1] with { TaskRelatedIntentIds = ParseTaskRelatedIntent(rawBody) };
                 continue;
             }
 
@@ -109,17 +110,9 @@ internal sealed class PlannerMarkdownParser
 
     private static IReadOnlyList<string> ParseTaskRelatedIntent(string body)
     {
-        if (body.Length == 0)
-        {
-            throw new AgentProtocolException(
-                "MALFORMED_PLANNER_OUTPUT",
-                "Planner '# TaskRelatedIntent' must contain at least one durable intent ID.");
-        }
-
         var ids = body
             .Split('\n')
-            .Select(line => line.Trim())
-            .Where(line => line.Length != 0)
+            .Where(line => !string.IsNullOrWhiteSpace(line))
             .ToArray();
         if (ids.Length == 0)
         {
@@ -135,7 +128,7 @@ internal sealed class PlannerMarkdownParser
             {
                 throw new AgentProtocolException(
                     "MALFORMED_PLANNER_OUTPUT",
-                    $"Planner TaskRelatedIntent entry '{id}' must be exactly one canonical IDD-NNNN identifier per line.");
+                    $"Planner TaskRelatedIntent entry '{id}' must be exactly one canonical IDD-NNNN identifier per line, without surrounding whitespace.");
             }
             if (!seen.Add(id))
             {

@@ -273,10 +273,9 @@ Complete only the following work-item contract in the current workspace. You hav
             }
             else if (inRelatedIntent)
             {
-                var id = line.Trim();
-                if (id.Length == 0) continue;
-                if (!IsCanonicalIntentId(id) || !relatedIntentIds.Add(id))
-                    throw new InvalidDataException("Planner '# TaskRelatedIntent' must contain unique canonical IDD-NNNN identifiers, one per non-empty line.");
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                if (!IsCanonicalIntentId(line) || !relatedIntentIds.Add(line))
+                    throw new InvalidDataException("Planner '# TaskRelatedIntent' must contain unique canonical IDD-NNNN identifiers, exactly one per non-empty line without surrounding whitespace.");
             }
             else if (current is null)
             {
