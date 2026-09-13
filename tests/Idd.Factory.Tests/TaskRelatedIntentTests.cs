@@ -119,7 +119,9 @@ public sealed class TaskRelatedIntentTests
         Assert.Null(result.State.Current);
         Assert.Empty(result.State.Remaining);
         Assert.Equal(1, result.State.NextWorkItemNumber);
-        Assert.False(Directory.Exists(Path.Combine(result.RunDirectory, "work-items")));
+        var workItemsDirectory = Path.Combine(result.RunDirectory, "work-items");
+        Assert.False(Directory.Exists(workItemsDirectory)
+                     && Directory.EnumerateFiles(workItemsDirectory, "contract.md", SearchOption.AllDirectories).Any());
     }
 
     [Fact]
@@ -153,6 +155,33 @@ public sealed class TaskRelatedIntentTests
         Assert.DoesNotContain("TaskRelatedIntent", contractFile, StringComparison.Ordinal);
         Assert.DoesNotContain(selectedConstraint, contractFile, StringComparison.Ordinal);
         Assert.Equal(["IDD-0012"], Assert.Single(result.State.Completed).TaskRelatedIntentIds);
+    }
+
+    [Fact]
+    public async Task MultipleSelectedDocumentsAreInjectedCompletelyInPlannerOrder()
+    {
+        const string contract = "Implement ordered intent case.";
+        const string firstDocument = "# IDD-0002\n\nFIRST-DOCUMENT-BEGIN\nline two\nFIRST-DOCUMENT-END\n";
+        const string secondDocument = "# IDD-0001\n\nSECOND-DOCUMENT-BEGIN\nline two\nSECOND-DOCUMENT-END\n";
+        using var scenario = FactoryScenario.Create()
+            .WithFile(".idd/intent/IDD-0001.spec-one.md", secondDocument)
+            .WithFile(".idd/intent/IDD-0002.spec-two.md", firstDocument)
+            .Planner($"# Task\n{contract}\n# TaskRelatedIntent\nIDD-0002\nIDD-0001")
+            .Execute(contract, invocation =>
+            {
+                var firstMarker = invocation.Input.IndexOf("--- IDD-0002 ---", StringComparison.Ordinal);
+                var secondMarker = invocation.Input.IndexOf("--- IDD-0001 ---", StringComparison.Ordinal);
+                Assert.True(firstMarker >= 0 && secondMarker > firstMarker);
+                Assert.Contains(firstDocument.Trim(), invocation.Input, StringComparison.Ordinal);
+                Assert.Contains(secondDocument.Trim(), invocation.Input, StringComparison.Ordinal);
+                return "Implemented.";
+            })
+            .Done();
+
+        var result = await scenario.Run();
+
+        result.ShouldComplete();
+        Assert.Equal(["IDD-0002", "IDD-0001"], Assert.Single(result.State.Completed).TaskRelatedIntentIds);
     }
 
     [Fact]
@@ -204,6 +233,75 @@ public sealed class TaskRelatedIntentTests
     }
 
     [Fact]
+    public async Task VerificationDrivenRetryPreservesExactSelection()
+    {
+        const string contract = "Implement verified change.";
+        using var scenario = FactoryScenario.Create();
+        scenario
+            .WithFile(".idd/intent/IDD-0008.spec-verified.md", "VERIFICATION-INTENT")
+            .WithVerificationCheck(
+                "fixed-check",
+                "pwsh -NoProfile -Command \"if (Test-Path 'fixed.txt') { exit 0 } else { exit 1 }\"")
+            .Planner($"# Task\n{contract}\n# TaskRelatedIntent\nIDD-0008")
+            .Execute(contract, invocation =>
+            {
+                Assert.Contains("--- IDD-0008 ---", invocation.Input, StringComparison.Ordinal);
+                File.WriteAllText(Path.Combine(scenario.WorkspacePath, "first-attempt.txt"), "first");
+                return "First implementation attempt.";
+            })
+            .Execute(contract, invocation =>
+            {
+                Assert.Contains("--- IDD-0008 ---", invocation.Input, StringComparison.Ordinal);
+                File.WriteAllText(Path.Combine(scenario.WorkspacePath, "fixed.txt"), "fixed");
+                return "Corrected from verification evidence.";
+            })
+            .Done();
+
+        var result = await scenario.Run();
+
+        result.ShouldComplete();
+        result.ShouldHaveAttemptCount("W000001", 2);
+        result.ShouldHavePlanningCycles(2);
+        Assert.Equal(["IDD-0008"], Assert.Single(result.State.Completed).TaskRelatedIntentIds);
+    }
+
+    [Fact]
+    public async Task RetryAfterBudgetExtensionReloadsCurrentIntentContentsWithoutReselection()
+    {
+        const string contract = "Implement current durable truth.";
+        const string intentPath = ".idd/intent/IDD-0009.spec-current.md";
+        using var scenario = FactoryScenario.Create()
+            .WithFile(intentPath, "ORIGINAL-INTENT-CONTENT")
+            .Planner($"# Task\n{contract}\n# TaskRelatedIntent\nIDD-0009")
+            .CommandFailure(AgentTerminationKind.CommandTimeout, "timeout 1")
+            .CommandFailure(AgentTerminationKind.CommandTimeout, "timeout 2")
+            .CommandFailure(AgentTerminationKind.CommandTimeout, "timeout 3")
+            .CommandFailure(AgentTerminationKind.CommandTimeout, "timeout 4")
+            .Execute(contract, invocation =>
+            {
+                Assert.Contains("UPDATED-INTENT-CONTENT", invocation.Input, StringComparison.Ordinal);
+                Assert.DoesNotContain("ORIGINAL-INTENT-CONTENT", invocation.Input, StringComparison.Ordinal);
+                return "Implemented after budget extension.";
+            })
+            .Done();
+
+        var exhausted = await scenario.Run();
+        exhausted.ShouldBeBlockedBy("RETRY_BUDGET_EXHAUSTED");
+        Assert.Equal(4, exhausted.Invocations.Count(x => x.WorkItemId == "W000001"));
+        Assert.All(
+            exhausted.Invocations.Where(x => x.WorkItemId == "W000001"),
+            invocation => Assert.Contains("ORIGINAL-INTENT-CONTENT", invocation.Input, StringComparison.Ordinal));
+
+        scenario.WithFile(intentPath, "UPDATED-INTENT-CONTENT");
+        var result = await scenario.RetryExhausted(1);
+
+        result.ShouldComplete();
+        result.ShouldHaveAttemptCount("W000001", 5);
+        result.ShouldHavePlanningCycles(2);
+        Assert.Equal(["IDD-0009"], Assert.Single(result.State.Completed).TaskRelatedIntentIds);
+    }
+
+    [Fact]
     public async Task StateRoundTripPreservesCurrentAndRemainingRelatedIntent()
     {
         using var temp = new TestWorkspace();
@@ -236,6 +334,35 @@ public sealed class TaskRelatedIntentTests
 
         Assert.Equal("CORRUPT_FACTORY_STATE", error.Code);
         Assert.Contains("immutable", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CompletedRelatedIntentSequenceIsImmutable()
+    {
+        using var temp = new TestWorkspace();
+        var store = new FileFactoryStateStore(temp.Path, new FactoryStateValidator());
+        var state = StateStoreTests.State();
+        state.Completed.Add(StateStoreTests.Completed("W000001") with { TaskRelatedIntentIds = ["IDD-0001"] });
+        await store.CreateAsync(state, default);
+
+        state.Completed[0].TaskRelatedIntentIds.Add("IDD-0002");
+        var error = await Assert.ThrowsAsync<FactoryStateException>(() => store.SaveAsync(state, 0, default));
+
+        Assert.Equal("CORRUPT_FACTORY_STATE", error.Code);
+    }
+
+    [Fact]
+    public async Task PreviousSchemaWithoutRelatedIntentMetadataRemainsLegacy()
+    {
+        using var temp = new TestWorkspace();
+        var path = Path.Combine(temp.Path, "state.json");
+        await File.WriteAllTextAsync(path,
+            "{\"schemaVersion\":12,\"remaining\":[{\"id\":\"W000001\",\"contractPath\":\"work-items/W000001/contract.md\"}]}");
+
+        var error = await Assert.ThrowsAsync<FactoryStateException>(() =>
+            new FileFactoryStateStore(temp.Path, new FactoryStateValidator()).LoadAsync(default));
+
+        Assert.Equal("LEGACY_FACTORY_STATE", error.Code);
     }
 
     [Fact]
