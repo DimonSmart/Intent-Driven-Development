@@ -17,13 +17,16 @@ internal sealed record PlanningResult(
     string Reason,
     string? Detail = null);
 
+internal sealed record PlanningPreparation(
+    string? Input,
+    PlanningResult? ImmediateResult);
+
 internal sealed class PlanningService(
     FactoryRuntimeContext context,
-    SemanticExecutionService semanticExecution,
     FactoryContextReader contextReader,
     PlannerMarkdownParser parser)
 {
-    public async Task<PlanningResult> PlanAsync(
+    public async Task<PlanningPreparation> PrepareAsync(
         FactoryState state,
         CancellationToken cancellationToken)
     {
@@ -37,12 +40,14 @@ internal sealed class PlanningService(
         if (state.PlanningCycleCount >= context.Configuration.Limits.MaxPlanningCycles)
         {
             return new(
-                PlanningResultKind.BudgetExhausted,
                 null,
-                [],
-                null,
-                "planning-budget-exhausted",
-                "Factory planning-cycle budget exhausted.");
+                new(
+                    PlanningResultKind.BudgetExhausted,
+                    null,
+                    [],
+                    null,
+                    "planning-budget-exhausted",
+                    "Factory planning-cycle budget exhausted."));
         }
 
         var request = await File.ReadAllTextAsync(
@@ -74,13 +79,11 @@ internal sealed class PlanningService(
             "Return one or more '# Task' sections, or exactly one '# Question' section when a user decision is required, or exactly '# Done' when no semantic work remains. " +
             "Do not mix these forms.";
 
-        var result = await semanticExecution.InvokeAsync(
-            state,
-            "planning",
-            null,
-            input,
-            SemanticOperationKind.Planning,
-            cancellationToken);
+        return new(input, null);
+    }
+
+    public PlanningResult ParseResult(FactoryState state, BoundSemanticResult result)
+    {
         var plan = parser.Parse(result.SemanticResult);
         if (plan.Question is not null)
         {
@@ -92,6 +95,8 @@ internal sealed class PlanningService(
                 "user-question");
         }
 
+        var finalFailure = state.FinalVerificationPlanRevision == state.PlanRevision
+                           && !state.FinalVerificationPassed;
         var reason = state.PlanningCycleCount == 0
             ? "initial-planning"
             : finalFailure
