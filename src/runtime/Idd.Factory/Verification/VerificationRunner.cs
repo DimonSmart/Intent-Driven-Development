@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using Idd.Factory.Processes;
@@ -14,7 +13,6 @@ internal sealed class VerificationRunner(
     private static readonly TimeSpan CleanupGrace = TimeSpan.FromSeconds(2);
     private const int TailBytes = 4 * 1024;
     private const int TailLines = 40;
-    private readonly ProcessSupervisor processSupervisor = ProcessSupervisor.Shared;
 
     public async Task<VerificationResult> RunPolicyChecksAsync(
         VerificationPolicy policy,
@@ -92,82 +90,17 @@ internal sealed class VerificationRunner(
         var evidenceId = VerificationEvidenceStore.NewEvidenceId();
         var issues = new List<VerificationDiagnosticIssue>();
         var shell = OperatingSystem.IsWindows() ? "powershell" : "/bin/sh";
-        var info = new ProcessStartInfo(shell)
+        var arguments = OperatingSystem.IsWindows()
+            ? new[] { "-NoProfile", "-Command", check.Run! }
+            : ["-c", check.Run!];
+        var environment = new Dictionary<string, string?>
         {
-            WorkingDirectory = workspace,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
+            ["DOTNET_CLI_USE_MSBUILD_SERVER"] = "0",
+            ["MSBUILDUSESERVER"] = "0",
+            ["MSBUILDDISABLENODEREUSE"] = "1"
         };
-        info.Environment["DOTNET_CLI_USE_MSBUILD_SERVER"] = "0";
-        info.Environment["MSBUILDUSESERVER"] = "0";
-        info.Environment["MSBUILDDISABLENODEREUSE"] = "1";
-        if (OperatingSystem.IsWindows())
-        {
-            info.ArgumentList.Add("-NoProfile");
-            info.ArgumentList.Add("-Command");
-            info.ArgumentList.Add(check.Run!);
-        }
-        else
-        {
-            info.ArgumentList.Add("-c");
-            info.ArgumentList.Add(check.Run!);
-        }
-
         var command = new VerificationCommandMetadata(Path.GetFileName(shell), ".");
-        Process? startedProcess;
-        try
-        {
-            startedProcess = hooks.StartProcess(info);
-        }
-        catch (Exception exception)
-        {
-            return await evidenceStore.PersistAsync(
-                NewEvidence(
-                    evidenceId,
-                    id,
-                    check.Run!,
-                    started,
-                    null,
-                    "infrastructure-failure",
-                    "",
-                    "",
-                    false,
-                    command,
-                    VerificationDiagnostics.Failure(
-                        "process-start-failure",
-                        "start",
-                        $"Could not start check {id}.",
-                        exception),
-                    null,
-                    issues,
-                    timeoutMilliseconds: (long)check.Timeout.TotalMilliseconds),
-                CancellationToken.None);
-        }
 
-        if (startedProcess is null)
-        {
-            return await evidenceStore.PersistAsync(
-                NewEvidence(
-                    evidenceId,
-                    id,
-                    check.Run!,
-                    started,
-                    null,
-                    "infrastructure-failure",
-                    "",
-                    "",
-                    false,
-                    command,
-                    new("process-start-failure", "start", $"Could not start check {id}."),
-                    null,
-                    issues,
-                    timeoutMilliseconds: (long)check.Timeout.TotalMilliseconds),
-                CancellationToken.None);
-        }
-
-        using var process = startedProcess;
         var directory = Path.Combine(currentDirectory, "verification");
         try
         {
@@ -182,78 +115,93 @@ internal sealed class VerificationRunner(
         var stderrFile = Path.Combine(directory, evidenceId + ".stderr.log");
         var stdout = new CaptureState();
         var stderr = new CaptureState();
-        using var captureCancellation = new CancellationTokenSource();
-        var stdoutTask = ConsumeAsync(
-            process.StandardOutput,
+        await using var stdoutSink = new VerificationOutputSink(
             stdoutFile,
             "stdout",
             stdout,
             issues,
-            captureCancellation.Token);
-        var stderrTask = ConsumeAsync(
-            process.StandardError,
+            hooks);
+        await using var stderrSink = new VerificationOutputSink(
             stderrFile,
             "stderr",
             stderr,
             issues,
-            captureCancellation.Token);
-        var timedOut = false;
-        VerificationFailure? primary = null;
-        VerificationTerminationOutcome? termination = null;
-        try
-        {
-            var exited = await processSupervisor.WaitForExitAsync(
-                process,
-                check.Timeout,
-                cancellationToken);
-            if (!exited)
+            hooks);
+
+        var result = await hooks.ProcessExecutor.RunAsync(
+            new(shell, arguments, workspace)
             {
-                timedOut = true;
-                primary = new("timeout", "execute", $"Check {id} timed out.");
-                termination = await StopProcessTreeAsync(process, issues);
-            }
-        }
-        catch (OperationCanceledException)
+                EnvironmentOverrides = environment,
+                Timeout = check.Timeout,
+                TerminationOptions = new(
+                    TryGracefulClose: false,
+                    GracefulCloseDelay: TimeSpan.Zero,
+                    TerminationTimeout: CleanupGrace),
+                OutputDrainTimeout = CleanupGrace,
+                StandardOutput = new()
+                {
+                    Capture = false,
+                    ChunkObserver = stdoutSink.AppendAsync
+                },
+                StandardError = new()
+                {
+                    Capture = false,
+                    ChunkObserver = stderrSink.AppendAsync
+                }
+            },
+            cancellationToken);
+
+        await stdoutSink.CompleteAsync();
+        await stderrSink.CompleteAsync();
+        stdout.Freeze();
+        stderr.Freeze();
+
+        if (result.CompletionReason == ProcessCompletionReason.Cancelled)
+            throw new OperationCanceledException(cancellationToken);
+
+        if (result.CompletionReason == ProcessCompletionReason.StartFailed)
         {
-            _ = await StopProcessTreeAsync(process, issues);
-            throw;
+            var exception = result.Failure ?? new InvalidOperationException($"Could not start check {id}.");
+            return await evidenceStore.PersistAsync(
+                NewEvidence(
+                    evidenceId,
+                    id,
+                    check.Run!,
+                    started,
+                    null,
+                    "infrastructure-failure",
+                    stdout.Tail,
+                    stderr.Tail,
+                    false,
+                    command,
+                    VerificationDiagnostics.Failure(
+                        "process-start-failure",
+                        "start",
+                        $"Could not start check {id}.",
+                        exception),
+                    null,
+                    issues,
+                    timeoutMilliseconds: (long)check.Timeout.TotalMilliseconds),
+                CancellationToken.None);
         }
-        catch (Exception exception)
+
+        VerificationFailure? primary = null;
+        var timedOut = result.CompletionReason == ProcessCompletionReason.TimedOut;
+        if (timedOut)
+            primary = new("timeout", "execute", $"Check {id} timed out.");
+        else if (result.CompletionReason == ProcessCompletionReason.InfrastructureFailed)
         {
+            var exception = result.Failure ?? new InvalidOperationException("Verification process infrastructure failed.");
             primary = VerificationDiagnostics.Failure(
                 "unknown",
                 "execute",
                 "Verification process failed unexpectedly.",
                 exception);
-            termination = await StopProcessTreeAsync(process, issues);
         }
 
-        var pumps = Task.WhenAll(stdoutTask, stderrTask);
-        if (!await hooks.WaitForDrain(pumps, CleanupGrace))
-        {
-            issues.Add(new(
-                "bounded-drain",
-                "drain-output",
-                "Output streams did not finish within the cleanup grace period."));
-            primary ??= new(
-                "output-capture-failure",
-                "capture-output",
-                "Verification output could not be drained completely.");
-            captureCancellation.Cancel();
-            process.StandardOutput.Dispose();
-            process.StandardError.Dispose();
-            if (!await WaitForCleanupAsync(pumps))
-            {
-                _ = pumps.ContinueWith(
-                    static task => _ = task.Exception,
-                    CancellationToken.None,
-                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
-                    TaskScheduler.Default);
-            }
-        }
+        var termination = MapTermination(result.Termination, issues);
+        ApplyProcessDiagnostics(result.Diagnostics, issues, ref primary);
 
-        stdout.Freeze();
-        stderr.Freeze();
         if (stdout.Failure is not null || stderr.Failure is not null)
         {
             primary ??= VerificationDiagnostics.Failure(
@@ -263,17 +211,9 @@ internal sealed class VerificationRunner(
                 stdout.Failure ?? stderr.Failure!);
         }
 
-        int? exitCode = null;
-        try
-        {
-            if (!timedOut && process.HasExited)
-                exitCode = process.ExitCode;
-        }
-        catch (Exception exception)
-        {
-            issues.Add(VerificationDiagnostics.Issue("exit-code", "inspect-process", exception));
-        }
-
+        var exitCode = result.CompletionReason == ProcessCompletionReason.Exited
+            ? result.ExitCode
+            : null;
         var status = primary is not null
             ? "infrastructure-failure"
             : exitCode == 0
@@ -304,128 +244,79 @@ internal sealed class VerificationRunner(
             CancellationToken.None);
     }
 
-    private async Task<VerificationTerminationOutcome> StopProcessTreeAsync(
-        Process process,
+    private static VerificationTerminationOutcome? MapTermination(
+        ProcessTerminationOutcome termination,
         List<VerificationDiagnosticIssue> issues)
     {
-        using var grace = new CancellationTokenSource(CleanupGrace);
-        try
+        if (!termination.Requested)
+            return null;
+
+        VerificationExceptionDetails? error = null;
+        if (termination.TimedOut)
         {
-            await hooks.TerminateProcess(process, grace.Token).WaitAsync(grace.Token);
-            return new(true, true, true);
-        }
-        catch (OperationCanceledException) when (grace.IsCancellationRequested)
-        {
+            error = new(
+                typeof(TimeoutException).FullName,
+                "Termination grace period expired.",
+                null);
             issues.Add(new(
                 "termination-timeout",
                 "terminate-process-tree",
                 "Process-tree termination exceeded the cleanup grace period."));
-            return new(
-                true,
-                true,
-                false,
-                new(typeof(TimeoutException).FullName, "Termination grace period expired.", null));
         }
-        catch (InvalidOperationException) when (process.HasExited)
+        else if (termination.Error is { } exception)
         {
-            return new(true, true, true);
-        }
-        catch (Exception exception)
-        {
+            error = new(
+                exception.GetType().FullName,
+                exception.Message,
+                exception.StackTrace);
             issues.Add(VerificationDiagnostics.Issue(
                 "termination-failure",
                 "terminate-process-tree",
                 exception));
-            return new(
-                true,
-                true,
-                false,
-                new(exception.GetType().FullName, exception.Message, exception.StackTrace));
         }
+
+        return new(true, true, termination.Succeeded, error);
     }
 
-    private static async Task<bool> WaitForCleanupAsync(Task task)
-    {
-        try
-        {
-            return await ProcessSupervisor.Shared.WaitAsync(task, CleanupGrace);
-        }
-        catch
-        {
-            return true;
-        }
-    }
-
-    private async Task ConsumeAsync(
-        StreamReader reader,
-        string path,
-        string streamName,
-        CaptureState state,
+    private static void ApplyProcessDiagnostics(
+        IReadOnlyList<ProcessExecutionDiagnostic> diagnostics,
         List<VerificationDiagnosticIssue> issues,
-        CancellationToken cancellationToken)
+        ref VerificationFailure? primary)
     {
-        Stream? log = null;
-        try
+        foreach (var diagnostic in diagnostics)
         {
-            log = hooks.CreateLog(path);
-        }
-        catch (Exception exception)
-        {
-            state.Failure = exception;
-            lock (issues)
-                issues.Add(VerificationDiagnostics.Issue("stream-log", $"open-{streamName}-log", exception));
-        }
-
-        try
-        {
-            await processSupervisor.PumpAsync(
-                reader,
-                async (buffer, count, token) =>
-                {
-                    state.Append(buffer.AsSpan(0, count));
-                    if (log is null) return;
-                    try
-                    {
-                        var bytes = Encoding.UTF8.GetBytes(buffer, 0, count);
-                        await log.WriteAsync(bytes, token);
-                    }
-                    catch (Exception exception)
-                    {
-                        state.Failure ??= exception;
-                        lock (issues)
-                            issues.Add(VerificationDiagnostics.Issue(
-                                "stream-log",
-                                $"write-{streamName}-log",
-                                exception));
-                        try { await log.DisposeAsync(); } catch { }
-                        log = null;
-                    }
-                },
-                cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested) { }
-        catch (Exception exception)
-        {
-            state.Failure ??= exception;
-            lock (issues)
-                issues.Add(VerificationDiagnostics.Issue("output-capture", $"read-{streamName}", exception));
-        }
-        finally
-        {
-            if (log is not null)
+            if (diagnostic.Kind == ProcessExecutionDiagnosticKinds.DrainTimeout)
             {
-                try
-                {
-                    await log.DisposeAsync();
-                    state.Persisted = true;
-                }
-                catch (Exception exception)
-                {
-                    state.Failure ??= exception;
-                    lock (issues)
-                        issues.Add(VerificationDiagnostics.Issue("stream-log", $"close-{streamName}-log", exception));
-                }
+                issues.Add(new(
+                    "bounded-drain",
+                    "drain-output",
+                    diagnostic.Message,
+                    diagnostic.Error?.GetType().FullName,
+                    diagnostic.Error?.StackTrace));
+                primary ??= new(
+                    "output-capture-failure",
+                    "capture-output",
+                    "Verification output could not be drained completely.");
+                continue;
+            }
+
+            if (diagnostic.Kind is ProcessExecutionDiagnosticKinds.OutputReadFailure
+                or ProcessExecutionDiagnosticKinds.OutputObserverFailure
+                or ProcessExecutionDiagnosticKinds.OutputFileFailure)
+            {
+                issues.Add(new(
+                    diagnostic.Kind == ProcessExecutionDiagnosticKinds.OutputFileFailure
+                        ? "stream-log"
+                        : "output-capture",
+                    diagnostic.Stage,
+                    diagnostic.Message,
+                    diagnostic.Error?.GetType().FullName,
+                    diagnostic.Error?.StackTrace));
+                primary ??= VerificationDiagnostics.Failure(
+                    "output-capture-failure",
+                    "capture-output",
+                    "One or more verification output streams could not be captured completely.",
+                    diagnostic.Error ?? new IOException(diagnostic.Message));
             }
         }
     }
@@ -480,6 +371,95 @@ internal sealed class VerificationRunner(
 
     private static string Hash(string value) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+
+    private sealed class VerificationOutputSink : IAsyncDisposable
+    {
+        private readonly string streamName;
+        private readonly CaptureState state;
+        private readonly List<VerificationDiagnosticIssue> issues;
+        private Stream? log;
+        private bool completed;
+
+        public VerificationOutputSink(
+            string path,
+            string streamName,
+            CaptureState state,
+            List<VerificationDiagnosticIssue> issues,
+            VerificationRuntimeHooks hooks)
+        {
+            this.streamName = streamName;
+            this.state = state;
+            this.issues = issues;
+            try
+            {
+                log = hooks.CreateLog(path);
+            }
+            catch (Exception exception)
+            {
+                state.Failure = exception;
+                lock (issues)
+                    issues.Add(VerificationDiagnostics.Issue(
+                        "stream-log",
+                        $"open-{streamName}-log",
+                        exception));
+            }
+        }
+
+        public async ValueTask AppendAsync(
+            ReadOnlyMemory<char> value,
+            CancellationToken cancellationToken)
+        {
+            state.Append(value.Span);
+            if (log is null)
+                return;
+
+            try
+            {
+                var bytes = Encoding.UTF8.GetBytes(value.Span.ToString());
+                await log.WriteAsync(bytes, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                state.Failure ??= exception;
+                lock (issues)
+                    issues.Add(VerificationDiagnostics.Issue(
+                        "stream-log",
+                        $"write-{streamName}-log",
+                        exception));
+                try { await log.DisposeAsync(); } catch { }
+                log = null;
+            }
+        }
+
+        public async Task CompleteAsync()
+        {
+            if (completed)
+                return;
+            completed = true;
+            if (log is null)
+                return;
+            try
+            {
+                await log.DisposeAsync();
+                state.Persisted = true;
+            }
+            catch (Exception exception)
+            {
+                state.Failure ??= exception;
+                lock (issues)
+                    issues.Add(VerificationDiagnostics.Issue(
+                        "stream-log",
+                        $"close-{streamName}-log",
+                        exception));
+            }
+            finally
+            {
+                log = null;
+            }
+        }
+
+        public async ValueTask DisposeAsync() => await CompleteAsync();
+    }
 
     private sealed class CaptureState
     {
