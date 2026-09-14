@@ -19,7 +19,7 @@ public sealed class ProcessRunner
         Directory.CreateDirectory(Path.GetDirectoryName(stdoutPath)!);
         var request = new ProcessExecutionRequest(executable, arguments, workingDirectory)
         {
-            EnvironmentOverrides = environmentOverrides,
+            EnvironmentOverrides = environmentOverrides?.ToDictionary(pair => pair.Key, pair => (string?)pair.Value, StringComparer.OrdinalIgnoreCase),
             StandardInput = standardInput,
             StandardInputEncoding = standardInput is null ? null : TransportUtf8,
             OutputDrainTimeout = TimeSpan.FromSeconds(5),

@@ -36,7 +36,9 @@ public sealed class CodexProcess(ProcessRunner processRunner)
         "--enable", "multi_agent", "--disable", "multi_agent_v2",
         "--disable", "apps", "--disable", "browser_use", "--disable", "code_mode_host",
         "-c", "agents.max_depth=2", "-c", "agents.max_threads=10",
-        "-c", "mcp_servers={}", "-c", "approval_policy=never", "-c", $"model_reasoning_effort={reasoning}",
+        // The outer Codex process hosts the installed Factory plugin. Do not override
+        // mcp_servers here: an empty request-level table hides the plugin's bundled MCP server.
+        "-c", "approval_policy=never", "-c", $"model_reasoning_effort={reasoning}",
         "--model", model, "--sandbox", "danger-full-access", "--cd", workspace.WorkspaceDirectory,
         "--output-last-message", workspace.LastMessagePath, "-"
     ];
