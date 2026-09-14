@@ -11,21 +11,6 @@ internal sealed partial class RuntimeVerificationService
         string verificationContext,
         CancellationToken cancellationToken)
     {
-        var candidate = context.CloneState(state);
-        var result = await RunCoreAsync(
-            candidate,
-            workItemId,
-            verificationContext,
-            cancellationToken);
-        return CaptureState(candidate, result);
-    }
-
-    private async Task<FactoryVerificationStepResult> RunCoreAsync(
-        FactoryState state,
-        string? workItemId,
-        string verificationContext,
-        CancellationToken cancellationToken)
-    {
         if (verificationContext is not ("subtask" or "final"))
         {
             throw new VerificationException(
@@ -47,6 +32,9 @@ internal sealed partial class RuntimeVerificationService
                 "Subtask verification requires a work item.");
         }
 
+        var evidenceRefs = state.VerificationEvidenceRefs.ToList();
+        var itemEvidenceRefs = item?.VerificationEvidenceRefs.ToList() ?? [];
+        var lastItemEvidenceRefs = item?.LastVerificationEvidenceRefs.ToList() ?? [];
         var session = state.PendingVerificationSession;
         if (session is null
             || session.Context != verificationContext
@@ -74,7 +62,7 @@ internal sealed partial class RuntimeVerificationService
 
             selected = selected.Distinct(StringComparer.Ordinal).ToList();
             verification.ValidateCheckIds(selected);
-            state.PendingVerificationSession = new PendingVerificationSession(
+            session = new PendingVerificationSession(
                 verificationContext,
                 item?.Id,
                 selected,
@@ -91,36 +79,40 @@ internal sealed partial class RuntimeVerificationService
                 selection.PolicyHash,
                 VerificationContinuationStage.ExecuteCheck);
 
-            // Return before executing any external verification operation. The state
-            // machine persists this cursor as the crash-safe checkpoint.
-            return FactoryVerificationStepResult.Pending(
-                verificationContext,
-                item?.Id);
+            // Persist the cursor in the state machine before the first external check.
+            return WithOperationState(
+                FactoryVerificationStepResult.Pending(verificationContext, item?.Id),
+                session,
+                evidenceRefs,
+                itemEvidenceRefs,
+                lastItemEvidenceRefs);
         }
 
         if (session.CheckIds.Count == 0)
         {
+            FactoryVerificationStepResult step;
             if (session.PolicyHash == "not-configured")
             {
                 var fallback = await verification.RunContextAsync(
                     verificationContext,
                     session.ChangedPaths,
                     cancellationToken);
-                RecordEvidence(state, item, fallback.Evidence);
+                AppendEvidenceRefs(evidenceRefs, item is null ? null : itemEvidenceRefs, fallback.Evidence);
                 if (fallback.Status is VerificationStatus.Passed
                     or VerificationStatus.NoChecks
                     or VerificationStatus.Failed)
                 {
-                    RecordLastVerificationCycle(
-                        item,
-                        EvidenceReferences(fallback.Evidence));
+                    lastItemEvidenceRefs = EvidenceReferences(fallback.Evidence)
+                        .Distinct(StringComparer.Ordinal)
+                        .ToList();
                 }
 
                 switch (fallback.Status)
                 {
                     case VerificationStatus.Passed:
                     case VerificationStatus.NoChecks:
-                        return Completed(state, item, verificationContext, []);
+                        step = Completed(item, verificationContext, []);
+                        break;
 
                     case VerificationStatus.Failed:
                         if (state.RepositoryFallbackBaselineAccepted
@@ -135,13 +127,14 @@ internal sealed partial class RuntimeVerificationService
                                     evidenceRefs = EvidenceReferences(fallback.Evidence).ToArray()
                                 },
                                 cancellationToken);
-                            return Completed(state, item, verificationContext, []);
+                            step = Completed(item, verificationContext, []);
+                            break;
                         }
 
                         if (state.RepositoryFallbackBaselineAccepted
                             && verificationContext == "final")
                         {
-                            return FactoryVerificationStepResult.Blocked(
+                            step = FactoryVerificationStepResult.Blocked(
                                 verificationContext,
                                 item?.Id,
                                 CreateVerificationBlock(
@@ -150,19 +143,20 @@ internal sealed partial class RuntimeVerificationService
                                     "FINAL_VERIFICATION_FAILED",
                                     "Strict final repository fallback still fails. The accepted red baseline suppresses subtask attribution only; final verification must pass before completion.",
                                     fallback.Evidence));
+                            break;
                         }
 
-                        return Completed(
-                            state,
+                        step = Completed(
                             item,
                             verificationContext,
                             fallback.Evidence
                                 .Where(x => x.Status == "failed")
                                 .Select(x => x.CheckId)
                                 .ToArray());
+                        break;
 
                     case VerificationStatus.InfrastructureFailure:
-                        return FactoryVerificationStepResult.Blocked(
+                        step = FactoryVerificationStepResult.Blocked(
                             verificationContext,
                             item?.Id,
                             CreateVerificationBlock(
@@ -171,9 +165,10 @@ internal sealed partial class RuntimeVerificationService
                                 "VERIFICATION_INFRASTRUCTURE_FAILURE",
                                 "Authoritative verification could not execute because of an infrastructure failure.",
                                 fallback.Evidence));
+                        break;
 
                     default:
-                        return FactoryVerificationStepResult.Blocked(
+                        step = FactoryVerificationStepResult.Blocked(
                             verificationContext,
                             item?.Id,
                             CreateVerificationBlock(
@@ -182,21 +177,34 @@ internal sealed partial class RuntimeVerificationService
                                 "VERIFICATION_ACTION_REQUIRED",
                                 $"Authoritative verification requires user action: {fallback.Status}.",
                                 fallback.Evidence));
+                        break;
                 }
             }
+            else
+            {
+                lastItemEvidenceRefs = [];
+                step = Completed(item, verificationContext, []);
+            }
 
-            RecordLastVerificationCycle(item, []);
-            return Completed(state, item, verificationContext, []);
+            return WithOperationState(
+                step,
+                session,
+                evidenceRefs,
+                itemEvidenceRefs,
+                lastItemEvidenceRefs);
         }
 
         if (session.NextCheckIndex >= session.CheckIds.Count)
         {
-            RecordLastVerificationCycle(item, session.EvidenceRefs);
-            return Completed(
-                state,
-                item,
-                verificationContext,
-                session.FailedCheckIds);
+            lastItemEvidenceRefs = session.EvidenceRefs
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            return WithOperationState(
+                Completed(item, verificationContext, session.FailedCheckIds),
+                session,
+                evidenceRefs,
+                itemEvidenceRefs,
+                lastItemEvidenceRefs);
         }
 
         var checkId = session.CheckIds[session.NextCheckIndex];
@@ -210,7 +218,7 @@ internal sealed partial class RuntimeVerificationService
             definitionHash,
             session.PolicyHash,
             cancellationToken);
-        RecordEvidence(state, item, result.Evidence);
+        AppendEvidenceRefs(evidenceRefs, item is null ? null : itemEvidenceRefs, result.Evidence);
 
         if (result.Status is VerificationStatus.ConfirmationRequired
             or VerificationStatus.ResultRequired)
@@ -223,7 +231,6 @@ internal sealed partial class RuntimeVerificationService
                     ? VerificationContinuationStage.AwaitingConfirmation
                     : VerificationContinuationStage.AwaitingManualResult
             };
-            state.PendingVerificationSession = session;
             var code = result.Status == VerificationStatus.ConfirmationRequired
                 ? "VERIFICATION_CONFIRMATION_REQUIRED"
                 : "VERIFICATION_RESULT_REQUIRED";
@@ -233,47 +240,62 @@ internal sealed partial class RuntimeVerificationService
             var resumeWhen = result.Status == VerificationStatus.ConfirmationRequired
                 ? "Continue with --confirmation approve or decline for this exact check."
                 : "Continue with --verification-result passed or failed for this exact check.";
-            return FactoryVerificationStepResult.Blocked(
-                verificationContext,
-                item?.Id,
-                new(
-                    code,
-                    reason,
-                    resumeWhen,
+            return WithOperationState(
+                FactoryVerificationStepResult.Blocked(
+                    verificationContext,
+                    item?.Id,
                     new(
-                        ContinuationKind.VerificationGate,
-                        item?.Id,
-                        verificationContext,
                         code,
-                        true,
-                        VerificationCheckId: checkId,
-                        VerificationStage: session.Stage)));
+                        reason,
+                        resumeWhen,
+                        new(
+                            ContinuationKind.VerificationGate,
+                            item?.Id,
+                            verificationContext,
+                            code,
+                            true,
+                            VerificationCheckId: checkId,
+                            VerificationStage: session.Stage))),
+                session,
+                evidenceRefs,
+                itemEvidenceRefs,
+                lastItemEvidenceRefs);
         }
 
         if (result.Status == VerificationStatus.InfrastructureFailure)
         {
-            return FactoryVerificationStepResult.Blocked(
-                verificationContext,
-                item?.Id,
-                CreateVerificationBlock(
-                    item,
+            return WithOperationState(
+                FactoryVerificationStepResult.Blocked(
                     verificationContext,
-                    "VERIFICATION_INFRASTRUCTURE_FAILURE",
-                    $"Check {checkId} could not execute because of an infrastructure failure.",
-                    result.Evidence));
+                    item?.Id,
+                    CreateVerificationBlock(
+                        item,
+                        verificationContext,
+                        "VERIFICATION_INFRASTRUCTURE_FAILURE",
+                        $"Check {checkId} could not execute because of an infrastructure failure.",
+                        result.Evidence)),
+                session,
+                evidenceRefs,
+                itemEvidenceRefs,
+                lastItemEvidenceRefs);
         }
 
         if (result.Status is not (VerificationStatus.Passed or VerificationStatus.Failed))
         {
-            return FactoryVerificationStepResult.Blocked(
-                verificationContext,
-                item?.Id,
-                CreateVerificationBlock(
-                    item,
+            return WithOperationState(
+                FactoryVerificationStepResult.Blocked(
                     verificationContext,
-                    "VERIFICATION_ACTION_REQUIRED",
-                    $"Check {checkId} ended as {result.Status}.",
-                    result.Evidence));
+                    item?.Id,
+                    CreateVerificationBlock(
+                        item,
+                        verificationContext,
+                        "VERIFICATION_ACTION_REQUIRED",
+                        $"Check {checkId} ended as {result.Status}.",
+                        result.Evidence)),
+                session,
+                evidenceRefs,
+                itemEvidenceRefs,
+                lastItemEvidenceRefs);
         }
 
         session = AdvanceVerificationSession(
@@ -281,21 +303,24 @@ internal sealed partial class RuntimeVerificationService
             checkId,
             result.Status == VerificationStatus.Failed,
             result.Evidence);
-        state.PendingVerificationSession = session;
-
         if (session.NextCheckIndex < session.CheckIds.Count)
         {
-            // Persist progress before the next external check.
-            return FactoryVerificationStepResult.Pending(
-                verificationContext,
-                item?.Id);
+            return WithOperationState(
+                FactoryVerificationStepResult.Pending(verificationContext, item?.Id),
+                session,
+                evidenceRefs,
+                itemEvidenceRefs,
+                lastItemEvidenceRefs);
         }
 
-        RecordLastVerificationCycle(item, session.EvidenceRefs);
-        return Completed(
-            state,
-            item,
-            verificationContext,
-            session.FailedCheckIds);
+        lastItemEvidenceRefs = session.EvidenceRefs
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        return WithOperationState(
+            Completed(item, verificationContext, session.FailedCheckIds),
+            session,
+            evidenceRefs,
+            itemEvidenceRefs,
+            lastItemEvidenceRefs);
     }
 }
