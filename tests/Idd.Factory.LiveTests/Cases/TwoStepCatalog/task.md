@@ -1,5 +1,5 @@
 Use $idd-factory-run to implement the current product intent described in
-.idd/intent/IDD-0001-mini-catalog.md.
+.idd/intent/IDD-0001.spec-mini-catalog.md.
 
 This is an IDD Factory evaluation.
 
