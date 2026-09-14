@@ -12,6 +12,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/FactoryBenchmark.Tests/FactoryBenchmark.Tests.csproj" />
+    <Project Path="tests/Idd.Factory.ProcessTestHelper/Idd.Factory.ProcessTestHelper.csproj" />
     <Project Path="tests/Idd.Factory.Tests/Idd.Factory.Tests.csproj" />
     <Project Path="tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj" />
     <Project Path="tests/Idd.Generation.Tests/Idd.Generation.Tests.csproj" />
