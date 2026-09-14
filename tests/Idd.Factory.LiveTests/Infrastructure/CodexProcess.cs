@@ -6,10 +6,7 @@ public sealed record CodexRunResult(ProcessResult Process, string Model, string 
 
 public sealed class CodexProcess(ProcessRunner processRunner)
 {
-    public Task<CodexRunResult> RunAsync(LiveTestWorkspace workspace, CancellationToken cancellationToken) =>
-        RunAsync(workspace, "danger-full-access", factoryEnvironment: true, cancellationToken);
-
-    private async Task<CodexRunResult> RunAsync(LiveTestWorkspace workspace, string sandboxMode, bool factoryEnvironment, CancellationToken cancellationToken)
+    public async Task<CodexRunResult> RunAsync(LiveTestWorkspace workspace, CancellationToken cancellationToken)
     {
         InstalledFactory.PrepareIsolatedCodexHome(workspace.CodexHomeDirectory);
         var model = Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_MODEL") ?? "gpt-5.6-luna";
@@ -18,9 +15,9 @@ public sealed class CodexProcess(ProcessRunner processRunner)
         var timeout = int.TryParse(timeoutText, out var minutes) && minutes > 0 ? TimeSpan.FromMinutes(minutes) : TimeSpan.FromMinutes(20);
         var prompt = BuildPrompt(workspace.CaseDirectory);
         var command = CodexExecutableResolver.Resolve();
-        var factoryCodexExecutable = factoryEnvironment ? PrepareSandboxFactoryCodexExecutable(command, workspace) : null;
-        var environment = BuildEnvironment(workspace, model, reasoning, factoryEnvironment, factoryCodexExecutable);
-        var arguments = BuildArguments(workspace, model, reasoning, sandboxMode);
+        var factoryCodexExecutable = PrepareSandboxFactoryCodexExecutable(command, workspace);
+        var environment = BuildEnvironment(workspace, model, reasoning, factoryCodexExecutable);
+        var arguments = BuildArguments(workspace, model, reasoning);
         try
         {
             var result = await processRunner.RunAsync(command.Executable, command.PrefixArguments.Concat(arguments).ToArray(), workspace.WorkspaceDirectory,
@@ -33,14 +30,14 @@ public sealed class CodexProcess(ProcessRunner processRunner)
         }
     }
 
-    private static IReadOnlyList<string> BuildArguments(LiveTestWorkspace workspace, string model, string reasoning, string sandboxMode) =>
+    private static IReadOnlyList<string> BuildArguments(LiveTestWorkspace workspace, string model, string reasoning) =>
     [
         "exec", "--json", "--ephemeral", "--ignore-rules",
         "--enable", "multi_agent", "--disable", "multi_agent_v2",
         "--disable", "apps", "--disable", "browser_use", "--disable", "code_mode_host",
         "-c", "agents.max_depth=2", "-c", "agents.max_threads=10",
         "-c", "mcp_servers={}", "-c", "approval_policy=never", "-c", $"model_reasoning_effort={reasoning}",
-        "--model", model, "--sandbox", sandboxMode, "--cd", workspace.WorkspaceDirectory,
+        "--model", model, "--sandbox", "danger-full-access", "--cd", workspace.WorkspaceDirectory,
         "--output-last-message", workspace.LastMessagePath, "-"
     ];
 
@@ -59,14 +56,20 @@ public sealed class CodexProcess(ProcessRunner processRunner)
             """;
     }
 
-    private static IReadOnlyDictionary<string, string> BuildEnvironment(LiveTestWorkspace workspace, string model, string reasoning, bool factoryEnvironment, string? factoryCodexExecutable)
+    private static IReadOnlyDictionary<string, string> BuildEnvironment(
+        LiveTestWorkspace workspace,
+        string model,
+        string reasoning,
+        string? factoryCodexExecutable)
     {
-        var environment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["CODEX_HOME"] = workspace.CodexHomeDirectory };
-        if (!factoryEnvironment) return environment;
-        environment["IDD_FACTORY_MODEL"] = model;
-        environment["IDD_FACTORY_REASONING_EFFORT"] = reasoning;
-        environment["IDD_FACTORY_INHERIT_USER_SKILLS"] = "false";
-        environment["IDD_FACTORY_CAPABILITY_PROFILE"] = "release-eval-controlled";
+        var environment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["CODEX_HOME"] = workspace.CodexHomeDirectory,
+            ["IDD_FACTORY_MODEL"] = model,
+            ["IDD_FACTORY_REASONING_EFFORT"] = reasoning,
+            ["IDD_FACTORY_INHERIT_USER_SKILLS"] = "false",
+            ["IDD_FACTORY_CAPABILITY_PROFILE"] = "release-eval-controlled"
+        };
         if (!string.IsNullOrWhiteSpace(factoryCodexExecutable)) environment["IDD_FACTORY_CODEX_EXECUTABLE"] = factoryCodexExecutable;
         if (OperatingSystem.IsWindows())
             environment["PATH"] = CodexProcessEnvironment.PrepareSandboxCompatiblePath(Environment.GetEnvironmentVariable("PATH") ?? string.Empty, isWindows: true).Path;
