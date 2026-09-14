@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Idd.Factory.Domain;
@@ -12,14 +11,17 @@ public sealed class CodexCliBackend : IAgentBackend
         TryGracefulClose: true,
         GracefulCloseDelay: TimeSpan.FromMilliseconds(1500),
         TerminationTimeout: TimeSpan.FromSeconds(5));
+    private static readonly UTF8Encoding TransportUtf8 = new(
+        encoderShouldEmitUTF8Identifier: false,
+        throwOnInvalidBytes: true);
 
     private readonly Lazy<CodexCommand> command;
     private readonly string pluginRoot;
     private readonly AgentExecutionConfiguration executionConfiguration;
     private readonly AgentCapabilityPolicy capabilityPolicy;
     private readonly CodexHomePreparation homePreparation;
-    private readonly ProcessSupervisor processSupervisor = ProcessSupervisor.Shared;
-    private readonly Dictionary<string, RunningProcess> processes = new(StringComparer.Ordinal);
+    private readonly ProcessExecutor processExecutor = ProcessExecutor.Shared;
+    private readonly Dictionary<string, RunningExecution> executions = new(StringComparer.Ordinal);
 
     public CodexCliBackend(
         string pluginRoot,
@@ -82,27 +84,26 @@ public sealed class CodexCliBackend : IAgentBackend
         var stderrPath = Path.Combine(attemptDirectory, "stderr.log");
         var sqliteDirectory = Path.Combine(codexHome, "state");
         Directory.CreateDirectory(sqliteDirectory);
-        var start = CreateProcessStartInfo(resolvedCommand.Executable, invocation.Workspace);
-        start.Environment["CODEX_HOME"] = codexHome;
-        start.Environment["CODEX_SQLITE_HOME"] = sqliteDirectory;
-        start.Environment["TEMP"] = tempDirectory;
-        start.Environment["TMP"] = tempDirectory;
-        start.Environment["DOTNET_CLI_USE_MSBUILD_SERVER"] = "0";
-        start.Environment["MSBUILDUSESERVER"] = "0";
-        start.Environment["MSBUILDDISABLENODEREUSE"] = "1";
         var pathPreparation = CodexProcessEnvironment.PrepareSandboxCompatiblePath(
-            start.Environment["PATH"] ?? string.Empty,
+            Environment.GetEnvironmentVariable("PATH") ?? string.Empty,
             OperatingSystem.IsWindows());
-        if (OperatingSystem.IsWindows())
-            start.Environment["PATH"] = pathPreparation.Path;
-        foreach (var argument in CodexCommandProtocol.BuildArguments(
-                     invocation,
-                     executionConfiguration,
-                     resolvedCommand.PrefixArguments,
-                     OperatingSystem.IsWindows()))
+        var environment = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
         {
-            start.ArgumentList.Add(argument);
-        }
+            ["CODEX_HOME"] = codexHome,
+            ["CODEX_SQLITE_HOME"] = sqliteDirectory,
+            ["TEMP"] = tempDirectory,
+            ["TMP"] = tempDirectory,
+            ["DOTNET_CLI_USE_MSBUILD_SERVER"] = "0",
+            ["MSBUILDUSESERVER"] = "0",
+            ["MSBUILDDISABLENODEREUSE"] = "1"
+        };
+        if (OperatingSystem.IsWindows())
+            environment["PATH"] = pathPreparation.Path;
+        var arguments = CodexCommandProtocol.BuildArguments(
+            invocation,
+            executionConfiguration,
+            resolvedCommand.PrefixArguments,
+            OperatingSystem.IsWindows());
 
         await File.WriteAllTextAsync(
             Path.Combine(attemptDirectory, "attempt-telemetry.json"),
@@ -119,59 +120,66 @@ public sealed class CodexCliBackend : IAgentBackend
                 FactoryJson.Options),
             cancellationToken);
 
-        Process? process;
+        var commandTracker = new CommandExecutionTracker();
+        var prompt = CodexCommandProtocol.BuildBootstrapPrompt(invocation, skillInstructions);
+        ProcessExecutionHandle process;
         try
         {
-            process = processSupervisor.Start(start);
-            if (process is null)
-                throw new AgentProtocolException(
-                    "AGENT_BACKEND_UNAVAILABLE",
-                    "Codex CLI did not start.");
+            process = await processExecutor.StartAsync(
+                new(resolvedCommand.Executable, arguments, invocation.Workspace)
+                {
+                    EnvironmentOverrides = environment,
+                    StandardInput = prompt,
+                    StandardInputEncoding = TransportUtf8,
+                    StandardOutputEncoding = TransportUtf8,
+                    StandardErrorEncoding = TransportUtf8,
+                    TerminationOptions = CodexTermination,
+                    OutputDrainTimeout = TimeSpan.FromSeconds(5),
+                    StandardOutput = new()
+                    {
+                        Capture = true,
+                        FilePath = stdoutPath,
+                        FileEncoding = TransportUtf8,
+                        LineObserver = line => commandTracker.Observe(line, DateTimeOffset.UtcNow)
+                    },
+                    StandardError = new()
+                    {
+                        Capture = true,
+                        FilePath = stderrPath,
+                        FileEncoding = TransportUtf8
+                    }
+                },
+                cancellationToken);
         }
-        catch (Exception exception) when (
-            exception is System.ComponentModel.Win32Exception or FileNotFoundException)
+        catch (ProcessExecutionException exception)
         {
             CodexHomePreparation.CleanupDirectory(codexHome);
             CodexHomePreparation.CleanupDirectory(tempDirectory);
+            if (exception.Result.CompletionReason == ProcessCompletionReason.Cancelled)
+                throw new OperationCanceledException(cancellationToken);
             throw new AgentProtocolException(
                 "AGENT_BACKEND_UNAVAILABLE",
-                $"Codex CLI could not start: {exception.Message}");
+                $"Codex CLI could not start: {exception.Result.Failure?.Message ?? exception.Message}");
         }
 
-        var commandTracker = new CommandExecutionTracker();
-        var stdout = processSupervisor.CaptureLinesAsync(
-            process.StandardOutput,
-            stdoutPath,
-            line => commandTracker.Observe(line, DateTimeOffset.UtcNow),
-            cancellationToken);
-        var stderr = processSupervisor.CaptureLinesAsync(
-            process.StandardError,
-            stderrPath,
-            observeLine: null,
-            cancellationToken);
-        var prompt = CodexCommandProtocol.BuildBootstrapPrompt(invocation, skillInstructions);
-        await process.StandardInput.WriteAsync(prompt.AsMemory(), cancellationToken);
-        await process.StandardInput.FlushAsync(cancellationToken);
-        process.StandardInput.Close();
-        processes.Add(
+        executions.Add(
             invocation.AttemptId,
             new(
                 process,
-                stdout,
-                stderr,
                 stdoutPath,
                 stderrPath,
                 invocation.SemanticOutputPath,
+                codexHome,
                 tempDirectory,
                 commandTracker));
-        return new(invocation.AttemptId, process.Id, invocation.AttemptId);
+        return new(invocation.AttemptId, process.ProcessId, invocation.AttemptId);
     }
 
     public async Task<AgentProcessResult> WaitAsync(
         AgentRunHandle handle,
         CancellationToken cancellationToken)
     {
-        if (!processes.Remove(handle.BackendHandle, out var running))
+        if (!executions.Remove(handle.BackendHandle, out var running))
         {
             return new(
                 -1,
@@ -187,8 +195,7 @@ public sealed class CodexCliBackend : IAgentBackend
         {
             using var resultWatcherCancellation =
                 CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            var processExit = processSupervisor.WaitForExitAsync(
-                running.Process,
+            var processExit = running.Process.WaitForExitAsync(
                 timeout: null,
                 cancellationToken);
             var resultReady = WaitForCompleteResultAsync(
@@ -242,14 +249,13 @@ public sealed class CodexCliBackend : IAgentBackend
             var killRequired = false;
             if (completedResultWasObserved && !running.Process.HasExited)
             {
-                var exited = await processSupervisor.WaitForExitAsync(
-                    running.Process,
+                var exited = await running.Process.WaitForExitAsync(
                     TimeSpan.FromSeconds(5),
                     cancellationToken);
                 if (!exited)
                 {
                     killRequired = true;
-                    await CancelProcessAsync(running.Process);
+                    await running.Process.TerminateAsync(CodexTermination);
                 }
             }
             else
@@ -257,9 +263,10 @@ public sealed class CodexCliBackend : IAgentBackend
                 await processExit;
             }
 
-            var stdout = await running.Stdout;
-            var stderr = await running.Stderr;
-            int? exitCode = running.Process.HasExited ? running.Process.ExitCode : null;
+            var technical = await running.Process.CompleteAsync();
+            var stdout = technical.StandardOutput;
+            var stderr = technical.StandardError;
+            var exitCode = technical.ExitCode;
             var termination = killRequired
                 ? AgentTerminationKind.ForcedAfterResult
                 : exitCode == 0
@@ -291,21 +298,12 @@ public sealed class CodexCliBackend : IAgentBackend
         }
         catch (OperationCanceledException)
         {
-            await CancelProcessAsync(running.Process);
-            string stdout = "";
-            string stderr = "";
-            try
-            {
-                stdout = await running.Stdout;
-                stderr = await running.Stderr;
-            }
-            catch (OperationCanceledException)
-            {
-            }
+            await running.Process.TerminateAsync(CodexTermination);
+            var technical = await running.Process.CompleteAsync(ProcessCompletionReason.Cancelled);
             return new(
-                running.Process.HasExited ? running.Process.ExitCode : null,
-                stdout,
-                stderr,
+                technical.ExitCode,
+                technical.StandardOutput,
+                technical.StandardError,
                 IsCompleteResult(running.ResultPath),
                 true,
                 AgentTerminationKind.Cancelled);
@@ -313,13 +311,13 @@ public sealed class CodexCliBackend : IAgentBackend
         finally
         {
             CodexHomePreparation.TryCleanupDirectory(
-                running.Process.StartInfo.Environment["CODEX_HOME"]!,
+                running.CodexHome,
                 running.ResultPath);
             if (cleanupTempDirectory)
                 CodexHomePreparation.TryCleanupDirectory(
                     running.TempDirectory,
                     running.ResultPath);
-            running.Process.Dispose();
+            await running.Process.DisposeAsync();
         }
     }
 
@@ -327,43 +325,22 @@ public sealed class CodexCliBackend : IAgentBackend
         AgentRunHandle handle,
         CancellationToken cancellationToken)
     {
-        if (!processes.Remove(handle.BackendHandle, out var running)) return;
+        if (!executions.Remove(handle.BackendHandle, out var running)) return;
         try
         {
-            await CancelProcessAsync(running.Process);
-            await Task.WhenAll(running.Stdout, running.Stderr);
+            await running.Process.TerminateAsync(CodexTermination);
+            await running.Process.CompleteAsync(ProcessCompletionReason.Cancelled);
         }
         finally
         {
             CodexHomePreparation.TryCleanupDirectory(
-                running.Process.StartInfo.Environment["CODEX_HOME"]!,
+                running.CodexHome,
                 running.ResultPath);
             CodexHomePreparation.TryCleanupDirectory(
                 running.TempDirectory,
                 running.ResultPath);
-            running.Process.Dispose();
+            await running.Process.DisposeAsync();
         }
-    }
-
-    internal static ProcessStartInfo CreateProcessStartInfo(
-        string executable,
-        string workingDirectory)
-    {
-        var utf8 = new UTF8Encoding(
-            encoderShouldEmitUTF8Identifier: false,
-            throwOnInvalidBytes: true);
-        return new ProcessStartInfo(executable)
-        {
-            WorkingDirectory = workingDirectory,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardInputEncoding = utf8,
-            StandardOutputEncoding = utf8,
-            StandardErrorEncoding = utf8,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
     }
 
     private static async Task<IncompleteCommandExecution> WaitForCommandTimeoutAsync(
@@ -410,31 +387,23 @@ public sealed class CodexCliBackend : IAgentBackend
 
     private static bool IsCompleteResult(string path) => File.Exists(path);
 
-    private static async Task<string> ReadCapturedOutputAsync(
-        Task<string> capture,
-        string path)
-    {
-        if (await ProcessSupervisor.Shared.WaitAsync(capture, TimeSpan.FromSeconds(5)))
-            return await capture;
-        return File.Exists(path) ? await File.ReadAllTextAsync(path) : string.Empty;
-    }
-
-    private async Task<AgentProcessResult> TerminateForCommandFailureAsync(
-        RunningProcess running,
+    private static async Task<AgentProcessResult> TerminateForCommandFailureAsync(
+        RunningExecution running,
         string diagnostic,
         AgentTerminationKind terminationKind)
     {
-        var terminated = await CancelProcessAsync(running.Process);
-        diagnostic += $" Process-tree termination succeeded: {terminated.ToString().ToLowerInvariant()}.";
-        var stdout = await ReadCapturedOutputAsync(running.Stdout, running.StdoutPath);
-        var stderr = await ReadCapturedOutputAsync(running.Stderr, running.StderrPath);
+        var termination = await running.Process.TerminateAsync(CodexTermination);
+        diagnostic += $" Process-tree termination succeeded: {termination.Succeeded.ToString().ToLowerInvariant()}.";
+        var technical = await running.Process.CompleteAsync();
+        var stdout = technical.StandardOutput;
+        var stderr = technical.StandardError;
         stderr = string.IsNullOrWhiteSpace(stderr)
             ? diagnostic
             : stderr.TrimEnd() + Environment.NewLine + diagnostic;
         if (File.Exists(running.ResultPath)) File.Delete(running.ResultPath);
         await File.WriteAllTextAsync(running.StderrPath, stderr, CancellationToken.None);
         return new AgentProcessResult(
-            running.Process.HasExited ? running.Process.ExitCode : null,
+            technical.ExitCode,
             stdout,
             stderr,
             false,
@@ -442,16 +411,12 @@ public sealed class CodexCliBackend : IAgentBackend
             terminationKind);
     }
 
-    private async Task<bool> CancelProcessAsync(Process process) =>
-        (await processSupervisor.TerminateAsync(process, CodexTermination)).Succeeded;
-
-    private sealed record RunningProcess(
-        Process Process,
-        Task<string> Stdout,
-        Task<string> Stderr,
+    private sealed record RunningExecution(
+        ProcessExecutionHandle Process,
         string StdoutPath,
         string StderrPath,
         string ResultPath,
+        string CodexHome,
         string TempDirectory,
         CommandExecutionTracker CommandTracker);
 }
