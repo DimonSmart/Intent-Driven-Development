@@ -24,7 +24,9 @@ subtask:
       use:
         - product-code-contract
 
-    - use:
+    - fallback: true
+      use:
+        - product-code-contract
         - catalog-integration
 
 checkpoint:
