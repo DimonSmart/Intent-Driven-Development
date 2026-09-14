@@ -38,7 +38,10 @@ public sealed class CodexProcess(ProcessRunner processRunner)
         // can merge authenticated remote plugin state over local plugin exposure, so keep
         // the live-eval host local-only and deterministic.
         "--enable", "plugins", "--disable", "remote_plugin",
-        "--disable", "apps", "--disable", "browser_use", "--disable", "code_mode_host",
+        // Current Codex routes tool-backed execution through codex-code-mode-host and fails
+        // closed when that host is disabled. The Windows live harness copies the companion
+        // host beside its sandbox-local Codex executable below.
+        "--disable", "apps", "--disable", "browser_use", "--enable", "code_mode_host",
         "-c", "agents.max_depth=2", "-c", "agents.max_threads=10",
         // The outer Codex process hosts the installed Factory plugin. Do not override
         // mcp_servers here: an empty request-level table hides the plugin's bundled MCP server.
