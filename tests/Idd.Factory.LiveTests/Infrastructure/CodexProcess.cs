@@ -27,6 +27,7 @@ public sealed class CodexProcess(ProcessRunner processRunner)
         finally
         {
             DeleteSandboxFactoryCodexFiles(factoryCodexExecutable);
+            await workspace.CleanupTemporaryDataAsync();
         }
     }
 
