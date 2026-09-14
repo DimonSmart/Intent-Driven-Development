@@ -29,35 +29,23 @@ public sealed class FactoryRuntime
         var contextReader = new FactoryContextReader(context);
         var planning = new PlanningService(
             context,
-            semanticExecution,
             contextReader,
             new PlannerMarkdownParser());
-        var execution = new ExecutionService(
-            context,
-            semanticExecution,
-            contextReader);
+        var execution = new ExecutionService(context, contextReader);
         var runtimeVerification = new RuntimeVerificationService(context, verification);
-        var stop = new FactoryStopService(context);
+        var stop = new FactoryStopService();
         var planMutation = new PlanMutationService(
             context,
             new PlanRevisionWriter(context.CurrentDirectory, clock));
-        var finalization = new FinalizationService(context);
         var stateMachine = new FactoryStateMachine(
             context,
             planning,
             planMutation,
             execution,
-            runtimeVerification,
-            finalization,
-            stop);
-        runs = new FactoryRunService(
-            context,
             semanticExecution,
-            planning,
-            execution,
             runtimeVerification,
-            stateMachine,
             stop);
+        runs = new FactoryRunService(context, stateMachine);
     }
 
     public async Task<FactoryCliOutcome> RunAsync(
