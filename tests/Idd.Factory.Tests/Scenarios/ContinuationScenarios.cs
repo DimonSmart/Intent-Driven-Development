@@ -31,6 +31,9 @@ public sealed class ContinuationScenarios
 
         var completed = await scenario.Continue(userAnswer: answer);
         completed.ShouldComplete();
+        Assert.Equal(
+            ["planning", "planning", "implementation", "planning"],
+            completed.Invocations.Select(invocation => invocation.Capability).ToArray());
         completed.ShouldExecute(task);
         completed.ShouldHavePlanningCycles(3);
         Assert.Contains(answer, completed.ReadArtifact("planning-answers/Q000001.md"), StringComparison.Ordinal);

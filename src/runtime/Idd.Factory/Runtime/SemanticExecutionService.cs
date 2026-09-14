@@ -3,38 +3,44 @@ using Idd.Factory.Domain;
 
 namespace Idd.Factory.Runtime;
 
+internal sealed record SemanticExecutionResult(
+    BoundSemanticResult Result,
+    IReadOnlyList<string> ChangedPaths);
+
 internal sealed class SemanticExecutionService(
     FactoryRuntimeContext context,
     FactoryAgentExecutor agentExecutor)
 {
     private readonly WorkspaceChangeCalculator workspaceChangeCalculator = new();
 
-    public Task ReconcileAsync(FactoryState state, CancellationToken cancellationToken) =>
+    public Task<SemanticAttemptRecoveryResult> InspectRecoveryAsync(
+        FactoryState state,
+        CancellationToken cancellationToken) =>
         new SemanticAttemptReconciler(
                 context.CurrentDirectory,
-                RecoverWorkspaceChangesAsync,
-                context.SaveAsync)
-            .ReconcileAsync(state, cancellationToken);
+                RecoverWorkspaceChangesAsync)
+            .AnalyzeAsync(state, cancellationToken);
 
-    public async Task<BoundSemanticResult> InvokeAsync(
+    public async Task<SemanticExecutionResult> InvokeAsync(
         FactoryState state,
         string capability,
         PlannedWorkItem? item,
         string input,
-        SemanticOperationKind operation,
+        string attemptId,
         CancellationToken cancellationToken)
     {
         var agent = FactoryCapabilityCatalog.Resolve(capability);
-        if (state.CurrentAttemptId is { } persistedAttempt)
+        var directory = Path.Combine(context.CurrentDirectory, "attempts", attemptId);
+        var invocationPath = Path.Combine(directory, "invocation.json");
+        var persistedResultPath = Path.Combine(directory, "result.json");
+
+        if (File.Exists(invocationPath) || File.Exists(persistedResultPath))
         {
-            var directory = Path.Combine(context.CurrentDirectory, "attempts", persistedAttempt);
-            var invocationPath = Path.Combine(directory, "invocation.json");
-            var persistedResultPath = Path.Combine(directory, "result.json");
             if (!File.Exists(invocationPath) || !File.Exists(persistedResultPath))
             {
                 throw new AgentProtocolException(
                     "UNKNOWN_ATTEMPT",
-                    $"Persisted attempt {persistedAttempt} cannot be resumed from its artifacts.");
+                    $"Persisted attempt {attemptId} cannot be resumed from its artifacts.");
             }
 
             var invocation = JsonSerializer.Deserialize<AgentInvocation>(
@@ -42,53 +48,27 @@ internal sealed class SemanticExecutionService(
                                  FactoryJson.Options)
                              ?? throw new AgentProtocolException(
                                  "UNKNOWN_ATTEMPT",
-                                 $"Attempt {persistedAttempt} has no valid invocation.");
-            if (invocation.RunId != state.RunId
-                || invocation.AttemptId != persistedAttempt
-                || invocation.Capability != capability
-                || invocation.Role != agent.Role
-                || invocation.WorkItemId != item?.Id)
-            {
-                throw new AgentProtocolException(
-                    "UNKNOWN_ATTEMPT",
-                    $"Attempt {persistedAttempt} does not belong to the current operation.");
-            }
-
-            await RecoverWorkspaceChangesAsync(state, item, invocation, cancellationToken);
+                                 $"Attempt {attemptId} has no valid invocation.");
+            ValidateInvocation(
+                state,
+                attemptId,
+                capability,
+                agent,
+                item,
+                invocation,
+                directory);
+            var changedPaths = await RecoverWorkspaceChangesAsync(invocation, cancellationToken);
             var persisted = JsonSerializer.Deserialize<PersistedAttemptResult>(
                 await File.ReadAllTextAsync(persistedResultPath, cancellationToken),
                 FactoryJson.Options);
-            var validated = ValidatePersistedResult(invocation, persisted);
-            state.CurrentAttemptId = null;
-            if (item is not null)
-                item.CurrentAttemptId = null;
-            state.PendingContinuation = null;
-            await context.SaveAsync(state, cancellationToken);
-            return validated;
+            return new(
+                ValidatePersistedResult(invocation, persisted),
+                changedPaths);
         }
 
-        var attemptId = $"A{++state.AttemptSequence:000000}";
-        state.CurrentAttemptId = attemptId;
-        if (item is not null)
-        {
-            item.CurrentAttemptId = attemptId;
-            item.AttemptCount++;
-        }
-
-        state.PendingContinuation = new(
-            ContinuationKind.SemanticInvocation,
-            item?.Id,
-            null,
-            operation.ToString().ToUpperInvariant(),
-            true,
-            operation,
-            input);
-        await context.SaveAsync(state, cancellationToken);
-
-        var attemptDirectory = Path.Combine(context.CurrentDirectory, "attempts", attemptId);
-        Directory.CreateDirectory(attemptDirectory);
+        Directory.CreateDirectory(directory);
         var semanticOutputPath = Path.Combine(
-            attemptDirectory,
+            directory,
             capability == "planning" ? "planning-output.md" : "semantic-result.md");
         var invocationNew = new AgentInvocation
         {
@@ -104,12 +84,9 @@ internal sealed class SemanticExecutionService(
             Input = input,
             StartedAt = context.Clock.UtcNow
         };
-        await WriteJsonAtomicallyAsync(
-            Path.Combine(attemptDirectory, "invocation.json"),
-            invocationNew,
-            cancellationToken);
+        await WriteJsonAtomicallyAsync(invocationPath, invocationNew, cancellationToken);
         if (agent.ExecutionProfile == AgentExecutionProfile.WorkspaceWrite)
-            await PersistWorkspaceSnapshotAsync(state.RunId, attemptDirectory, cancellationToken);
+            await PersistWorkspaceSnapshotAsync(state.RunId, directory, cancellationToken);
 
         await context.Events.WriteAsync(
             state.RunId,
@@ -118,65 +95,47 @@ internal sealed class SemanticExecutionService(
             cancellationToken);
 
         AgentExecutionResult execution;
+        IReadOnlyList<string> changedPathsAfterExecution;
         try
         {
             execution = await agentExecutor.ExecuteAsync(invocationNew, cancellationToken);
         }
         finally
         {
-            if (agent.ExecutionProfile == AgentExecutionProfile.WorkspaceWrite)
-            {
-                await RecoverWorkspaceChangesAsync(
-                    state,
-                    item,
-                    invocationNew,
-                    CancellationToken.None);
-            }
+            changedPathsAfterExecution = agent.ExecutionProfile == AgentExecutionProfile.WorkspaceWrite
+                ? await RecoverWorkspaceChangesAsync(invocationNew, CancellationToken.None)
+                : [];
         }
 
-        state.CurrentAttemptId = null;
-        if (item is not null)
-            item.CurrentAttemptId = null;
-        state.PendingContinuation = null;
-        await context.SaveAsync(state, cancellationToken);
         await context.Events.WriteAsync(
             state.RunId,
             "agent-completed",
             new { attemptId, capability, agent.Role, execution.Process.TerminationKind },
             cancellationToken);
-        return execution.Result;
+        return new(execution.Result, changedPathsAfterExecution);
     }
 
-    public async Task<bool> AttemptChangedWorkspaceAsync(
+    private static void ValidateInvocation(
+        FactoryState state,
         string attemptId,
-        CancellationToken cancellationToken)
+        string capability,
+        FactoryAgentContract agent,
+        PlannedWorkItem? item,
+        AgentInvocation invocation,
+        string directory)
     {
-        var changesPath = Path.Combine(
-            context.CurrentDirectory,
-            "attempts",
-            attemptId,
-            "workspace-changes.json");
-        if (!File.Exists(changesPath))
+        if (invocation.RunId != state.RunId
+            || invocation.AttemptId != attemptId
+            || invocation.Capability != capability
+            || invocation.Role != agent.Role
+            || invocation.WorkItemId != item?.Id)
         {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                $"Attempt {attemptId} has no workspace changes artifact.");
+            throw new AgentProtocolException(
+                "UNKNOWN_ATTEMPT",
+                $"Attempt {attemptId} does not belong to the current operation.");
         }
 
-        var changes = JsonSerializer.Deserialize<WorkspaceChangesArtifact>(
-                          await File.ReadAllTextAsync(changesPath, cancellationToken),
-                          FactoryJson.Options)
-                      ?? throw new FactoryStateException(
-                          "CORRUPT_FACTORY_STATE",
-                          $"Attempt {attemptId} has an invalid workspace changes artifact.");
-        if (changes.SchemaVersion != 1)
-        {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                $"Attempt {attemptId} has an unsupported workspace changes schema.");
-        }
-
-        return changes.ChangedPaths.Count > 0;
+        SemanticAttemptReconciler.ValidateIdentity(state, attemptId, invocation, directory);
     }
 
     private async Task PersistWorkspaceSnapshotAsync(
@@ -190,14 +149,12 @@ internal sealed class SemanticExecutionService(
                 await SnapshotWorkspaceAsync(runId, cancellationToken)),
             cancellationToken);
 
-    private async Task RecoverWorkspaceChangesAsync(
-        FactoryState state,
-        PlannedWorkItem? item,
+    private async Task<IReadOnlyList<string>> RecoverWorkspaceChangesAsync(
         AgentInvocation invocation,
         CancellationToken cancellationToken)
     {
         if (invocation.ExecutionProfile != AgentExecutionProfile.WorkspaceWrite)
-            return;
+            return [];
 
         var directory = Path.GetDirectoryName(invocation.SemanticOutputPath)!;
         var changesPath = Path.Combine(directory, "workspace-changes.json");
@@ -215,7 +172,7 @@ internal sealed class SemanticExecutionService(
         {
             var beforePath = Path.Combine(directory, "workspace-before.json");
             if (!File.Exists(beforePath))
-                return;
+                return [];
 
             var before = JsonSerializer.Deserialize<WorkspaceSnapshotArtifact>(
                              await File.ReadAllTextAsync(beforePath, cancellationToken),
@@ -223,20 +180,21 @@ internal sealed class SemanticExecutionService(
                          ?? throw new FactoryStateException(
                              "CORRUPT_FACTORY_STATE",
                              $"Attempt {invocation.AttemptId} has an invalid workspace snapshot artifact.");
-            var after = await SnapshotWorkspaceAsync(state.RunId, cancellationToken);
+            var after = await SnapshotWorkspaceAsync(invocation.RunId, cancellationToken);
             changes = new(
                 1,
                 workspaceChangeCalculator.Calculate(before.Files, after).ToList());
             await WriteJsonAtomicallyAsync(changesPath, changes, cancellationToken);
         }
 
-        foreach (var path in changes.ChangedPaths)
+        if (changes.SchemaVersion != 1)
         {
-            if (item is not null && !item.ChangedPaths.Contains(path, StringComparer.Ordinal))
-                item.ChangedPaths.Add(path);
-            if (!state.FactoryRunChangedPaths.Contains(path, StringComparer.Ordinal))
-                state.FactoryRunChangedPaths.Add(path);
+            throw new FactoryStateException(
+                "CORRUPT_FACTORY_STATE",
+                $"Attempt {invocation.AttemptId} has an unsupported workspace changes schema.");
         }
+
+        return changes.ChangedPaths;
     }
 
     private async Task<SortedDictionary<string, string>> SnapshotWorkspaceAsync(
