@@ -150,7 +150,6 @@ internal sealed class FactoryStateMachine(
                     question,
                     input.UserAnswer,
                     cancellationToken);
-                state.PendingContinuation = null;
                 state.Blocker = null;
                 state.RunStatus = FactoryRunStatus.Running;
                 await context.Events.WriteAsync(
@@ -158,7 +157,31 @@ internal sealed class FactoryStateMachine(
                     "user-answer-recorded",
                     new { },
                     cancellationToken);
-                await context.SaveAsync(state, cancellationToken);
+
+                var preparation = await planning.PrepareAsync(state, cancellationToken);
+                if (preparation.ImmediateResult is { } immediate)
+                {
+                    return await BlockAsync(
+                        state,
+                        new(
+                            "PLANNING_BUDGET_EXHAUSTED",
+                            immediate.Detail ?? "Factory planning-cycle budget exhausted.",
+                            "Cancel/restart after resolving the condition.",
+                            new(
+                                ContinuationKind.Terminal,
+                                null,
+                                null,
+                                "PLANNING_BUDGET_EXHAUSTED",
+                                false)),
+                        cancellationToken);
+                }
+
+                await StartSemanticAttemptAsync(
+                    state,
+                    null,
+                    SemanticOperationKind.Planning,
+                    preparation.Input!,
+                    cancellationToken);
             }
             else if (input.UserAnswer is not null)
             {
@@ -511,7 +534,6 @@ internal sealed class FactoryStateMachine(
             attemptId,
             cancellationToken);
         CompleteSemanticAttempt(state, null, semantic);
-        await context.SaveAsync(state, cancellationToken);
 
         var result = planning.ParseResult(state, semantic.Result);
         if (result.Kind == PlanningResultKind.Question)
@@ -1091,6 +1113,8 @@ internal sealed class FactoryStateMachine(
                 }
                 state.CurrentAttemptId = null;
                 state.PendingContinuation = null;
+                state.Blocker = null;
+                state.RunStatus = FactoryRunStatus.Running;
                 await context.SaveAsync(state, cancellationToken);
                 break;
 
@@ -1102,6 +1126,8 @@ internal sealed class FactoryStateMachine(
                 }
                 state.CurrentAttemptId = null;
                 state.PendingContinuation = null;
+                state.Blocker = null;
+                state.RunStatus = FactoryRunStatus.Running;
                 await context.SaveAsync(state, cancellationToken);
                 break;
 
