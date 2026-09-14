@@ -65,10 +65,10 @@ internal sealed partial class RuntimeVerificationService
                 : selection.CheckIds.ToList();
             if (item is not null)
             {
-                foreach (var checkId in item.VerificationExpectations.Keys)
+                foreach (var expectedCheckId in item.VerificationExpectations.Keys)
                 {
-                    if (!selected.Contains(checkId, StringComparer.Ordinal))
-                        selected.Add(checkId);
+                    if (!selected.Contains(expectedCheckId, StringComparer.Ordinal))
+                        selected.Add(expectedCheckId);
                 }
             }
 
