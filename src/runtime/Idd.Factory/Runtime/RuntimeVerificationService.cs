@@ -142,21 +142,17 @@ internal sealed partial class RuntimeVerificationService
                 terminal));
     }
 
-    private FactoryVerificationStepResult CaptureState(
-        FactoryState candidate,
-        FactoryVerificationStepResult result)
-    {
-        var item = result.WorkItemId is null
-            ? null
-            : candidate.Current is { } current && current.Id == result.WorkItemId
-                ? current
-                : null;
-        return result with
+    private static FactoryVerificationStepResult WithOperationState(
+        FactoryVerificationStepResult result,
+        PendingVerificationSession? session,
+        IReadOnlyList<string> evidenceRefs,
+        IReadOnlyList<string> workItemEvidenceRefs,
+        IReadOnlyList<string> lastWorkItemEvidenceRefs) =>
+        result with
         {
-            Session = candidate.PendingVerificationSession,
-            EvidenceRefs = candidate.VerificationEvidenceRefs.ToList(),
-            WorkItemEvidenceRefs = item?.VerificationEvidenceRefs.ToList() ?? [],
-            LastWorkItemEvidenceRefs = item?.LastVerificationEvidenceRefs.ToList() ?? []
+            Session = session,
+            EvidenceRefs = evidenceRefs,
+            WorkItemEvidenceRefs = workItemEvidenceRefs,
+            LastWorkItemEvidenceRefs = lastWorkItemEvidenceRefs
         };
-    }
 }
