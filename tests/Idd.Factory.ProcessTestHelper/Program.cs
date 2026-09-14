@@ -4,7 +4,6 @@ using System.Text;
 using System.Text.Json;
 
 Console.OutputEncoding = new UTF8Encoding(false);
-Console.ErrorEncoding = new UTF8Encoding(false);
 
 if (args.Length == 0)
     return 2;
