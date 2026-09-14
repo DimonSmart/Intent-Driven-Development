@@ -6,12 +6,7 @@ namespace Idd.Factory.Runtime;
 
 internal sealed class FactoryRunService(
     FactoryRuntimeContext context,
-    SemanticExecutionService semanticExecution,
-    PlanningService planning,
-    ExecutionService execution,
-    RuntimeVerificationService verification,
-    FactoryStateMachine stateMachine,
-    FactoryStopService stop)
+    FactoryStateMachine stateMachine)
 {
     private static readonly UTF8Encoding HumanReadableUtf8 =
         new(encoderShouldEmitUTF8Identifier: true, throwOnInvalidBytes: true);
@@ -56,10 +51,6 @@ internal sealed class FactoryRunService(
             "run-created",
             new { configurationHash = context.Configuration.Hash },
             cancellationToken);
-
-        var baselineBlock = await verification.RunBaselineAsync(state, cancellationToken);
-        if (baselineBlock is not null)
-            return await stop.ApplyAsync(state, baselineBlock, cancellationToken);
         return await stateMachine.RunAsync(state, cancellationToken);
     }
 
@@ -86,10 +77,7 @@ internal sealed class FactoryRunService(
         bool? verificationPassed,
         string? userAnswer)
     {
-        var state = await context.LoadAsync(cancellationToken)
-            ?? throw new FactoryStateException(
-                "MISSING_FACTORY_STATE",
-                "No Factory run exists.");
+        var state = await LoadCurrentStateAsync(cancellationToken);
         if (state.FactoryConfigurationHash != context.Configuration.Hash)
         {
             return new(
@@ -98,169 +86,25 @@ internal sealed class FactoryRunService(
                 "Restore the pinned configuration or cancel and restart.");
         }
 
-        if (state.RunStatus == FactoryRunStatus.Cancelled)
-            return new("CANCELLED", state.RunId);
-
-        try
+        if (userAnswer is not null)
         {
-            await semanticExecution.ReconcileAsync(state, cancellationToken);
-        }
-        catch (AgentProtocolException exception)
-        {
-            return await stop.StopForAgentProtocolExceptionAsync(
-                state,
-                exception,
-                cancellationToken);
-        }
-
-        if (state.PendingContinuation is { Kind: ContinuationKind.UserQuestion })
-        {
-            if (string.IsNullOrWhiteSpace(userAnswer))
-                return stop.OutcomeFromBlocker(state, "USER_DECISION_REQUIRED");
-
             ValidateUtf8Text(
                 userAnswer,
                 "INVALID_USER_ANSWER_ENCODING",
                 "Factory user answer");
-            var question = state.Blocker?.Reason;
-            if (string.IsNullOrWhiteSpace(question))
-            {
-                throw new FactoryStateException(
-                    "CORRUPT_FACTORY_STATE",
-                    "User-question continuation has no persisted question.");
-            }
-
-            await planning.PersistAnswerAsync(question, userAnswer, cancellationToken);
-            state.PendingContinuation = new(
-                ContinuationKind.SemanticInvocation,
-                null,
-                null,
-                "PLANNING_AFTER_USER_ANSWER",
-                true,
-                SemanticOperationKind.Planning);
-            state.Blocker = null;
-            state.RunStatus = FactoryRunStatus.Running;
-            await context.Events.WriteAsync(
-                state.RunId,
-                "user-answer-recorded",
-                new { },
-                cancellationToken);
-            await context.SaveAsync(state, cancellationToken);
-        }
-        else if (userAnswer is not null)
-        {
-            return new(
-                "UNEXPECTED_USER_ANSWER",
-                state.RunId,
-                "The current Factory continuation is not waiting for a planner question.",
-                "Continue without a user answer, or cancel the run.");
         }
 
-        if (state.PendingContinuation is { IsResumable: false })
-            return stop.OutcomeFromBlocker(state, "TERMINAL_STOP");
-
-        if (state.PendingContinuation is
-            {
-                Kind: ContinuationKind.VerificationGate,
-                VerificationContext: "baseline",
-                VerificationStage: VerificationContinuationStage.AwaitingConfirmation
-            })
-        {
-            if (confirmation == VerificationConfirmation.None)
-                return stop.OutcomeFromBlocker(state, "VERIFICATION_CONFIRMATION_REQUIRED");
-
-            if (confirmation == VerificationConfirmation.Decline)
-            {
-                return await stop.ApplyAsync(
-                    state,
-                    new(
-                        "VERIFICATION_DECLINED",
-                        "User declined running Factory with an already-failing repository fallback baseline.",
-                        "Fix the repository baseline, then cancel/restart the Factory run.",
-                        new(
-                            ContinuationKind.Terminal,
-                            null,
-                            "baseline",
-                            "VERIFICATION_DECLINED",
-                            false)),
-                    cancellationToken);
-            }
-
-            state.RepositoryFallbackBaselineAccepted = true;
-            state.PendingContinuation = null;
-            state.Blocker = null;
-            state.RunStatus = FactoryRunStatus.Running;
-            await context.Events.WriteAsync(
-                state.RunId,
-                "repository-fallback-baseline-accepted",
-                new { },
-                cancellationToken);
-            await context.SaveAsync(state, cancellationToken);
-        }
-
-        if (state.PendingContinuation is
-            {
-                Kind: ContinuationKind.VerificationGate,
-                VerificationStage: VerificationContinuationStage.AwaitingConfirmation
-                    or VerificationContinuationStage.AwaitingManualResult
-            } pending)
-        {
-            if (pending.VerificationStage == VerificationContinuationStage.AwaitingConfirmation
-                && confirmation == VerificationConfirmation.None)
-            {
-                return stop.OutcomeFromBlocker(
-                    state,
-                    "VERIFICATION_CONFIRMATION_REQUIRED");
-            }
-
-            if (pending.VerificationStage == VerificationContinuationStage.AwaitingManualResult
-                && verificationPassed is null)
-            {
-                return stop.OutcomeFromBlocker(
-                    state,
-                    "VERIFICATION_RESULT_REQUIRED");
-            }
-
-            var block = await verification.ResolvePendingActionAsync(
-                state,
-                confirmation,
-                verificationPassed,
-                cancellationToken);
-            if (block is not null)
-                return await stop.ApplyAsync(state, block, cancellationToken);
-        }
-
-        if (state.PlanningCycleCount == 0
-            && state.Current is null
-            && state.PendingContinuation is null)
-        {
-            var baselineBlock = await verification.RunBaselineAsync(
-                state,
-                cancellationToken);
-            if (baselineBlock is not null)
-                return await stop.ApplyAsync(state, baselineBlock, cancellationToken);
-        }
-
-        state.Blocker = null;
-        state.RunStatus = FactoryRunStatus.Running;
-        if (state.Current is not null
-            && state.CurrentPhase == CurrentWorkPhase.Blocked)
-        {
-            state.CurrentPhase = CurrentWorkPhase.Ready;
-        }
-
-        await context.SaveAsync(state, cancellationToken);
-        return await stateMachine.RunAsync(state, cancellationToken);
+        return await stateMachine.ContinueAsync(
+            state,
+            new(userAnswer, confirmation, verificationPassed),
+            cancellationToken);
     }
 
     public async Task<FactoryCliOutcome> RetryExhaustedAsync(
         int additionalAttempts,
         CancellationToken cancellationToken)
     {
-        var state = await context.LoadAsync(cancellationToken)
-            ?? throw new FactoryStateException(
-                "MISSING_FACTORY_STATE",
-                "No Factory run exists.");
+        var state = await LoadCurrentStateAsync(cancellationToken);
         if (state.FactoryConfigurationHash != context.Configuration.Hash)
         {
             return new(
@@ -269,13 +113,10 @@ internal sealed class FactoryRunService(
                 "Restore the pinned configuration or cancel and restart.");
         }
 
-        var invalid = await execution.ExtendRetryBudgetAsync(
+        return await stateMachine.RetryAsync(
             state,
             additionalAttempts,
             cancellationToken);
-        if (invalid is not null)
-            return invalid;
-        return await stateMachine.RunAsync(state, cancellationToken);
     }
 
     public async Task<FactoryCliOutcome> CancelAsync(
@@ -284,10 +125,7 @@ internal sealed class FactoryRunService(
         FactoryState state;
         try
         {
-            state = await context.LoadAsync(cancellationToken)
-                ?? throw new FactoryStateException(
-                    "MISSING_FACTORY_STATE",
-                    "No Factory run exists.");
+            state = await LoadCurrentStateAsync(cancellationToken);
         }
         catch (FactoryStateException exception) when (exception.Code == "LEGACY_FACTORY_STATE")
         {
@@ -299,33 +137,20 @@ internal sealed class FactoryRunService(
                 cancellationToken);
         }
 
-        if (state.RunStatus != FactoryRunStatus.Cancelled)
-        {
-            state.RunStatus = FactoryRunStatus.Cancelled;
-            state.Blocker = new(
-                "CANCELLED",
-                "The user cancelled the run.",
-                "Start a new Factory run.");
-            state.PendingContinuation = new(
-                ContinuationKind.Terminal,
-                state.Current?.Id,
-                null,
-                "CANCELLED",
-                false);
-            await context.Events.WriteAsync(
-                state.RunId,
-                "run-cancelled",
-                new { },
-                cancellationToken);
-            await context.SaveAsync(state, cancellationToken);
-        }
-
+        await stateMachine.CancelAsync(state, cancellationToken);
         return await ArchiveCancelledRunAsync(
             state.RunId,
             state.SchemaVersion,
             "The user cancelled the run.",
             cancellationToken);
     }
+
+    private async Task<FactoryState> LoadCurrentStateAsync(
+        CancellationToken cancellationToken) =>
+        await context.LoadAsync(cancellationToken)
+        ?? throw new FactoryStateException(
+            "MISSING_FACTORY_STATE",
+            "No Factory run exists.");
 
     private async Task<CancellationMetadata> ReadCancellationMetadataAsync(
         CancellationToken cancellationToken)
