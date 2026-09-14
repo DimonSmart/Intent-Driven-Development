@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Idd.Factory.Runtime;
 
 namespace Idd.Factory.Benchmark;
 
@@ -241,100 +242,17 @@ Complete only the following work-item contract in the current workspace. You hav
 
     public static IReadOnlyList<GeneratedWorkItem> ParseDecomposition(string path)
     {
-        var normalized = File.ReadAllText(path).TrimStart('\uFEFF').Replace("\r\n", "\n").Replace('\r', '\n');
-        if (string.IsNullOrWhiteSpace(normalized)) return [];
-        var contracts = new List<string>();
-        List<string>? current = null;
-        var inRelatedIntent = false;
-        var relatedIntentIds = new HashSet<string>(StringComparer.Ordinal);
-        char? fenceCharacter = null;
-        var fenceLength = 0;
+        var parsed = new PlannerMarkdownParser().Parse(File.ReadAllText(path));
+        if (parsed.Question is not null || parsed.Tasks.Count == 0)
+            throw new InvalidDataException("Benchmark decomposition must contain one or more planner tasks.");
 
-        foreach (var line in normalized.Split('\n'))
-        {
-            var inFenceBeforeLine = fenceCharacter is not null;
-            UpdateFence(line, ref fenceCharacter, ref fenceLength);
-            if (!inFenceBeforeLine && line == "# Task")
-            {
-                ValidateRelatedIntentSection(inRelatedIntent, relatedIntentIds);
-                inRelatedIntent = false;
-                relatedIntentIds.Clear();
-                AddContract(contracts, current);
-                current = [];
-            }
-            else if (!inFenceBeforeLine && line == "# TaskRelatedIntent")
-            {
-                if (current is null || inRelatedIntent)
-                    throw new InvalidDataException("Planner '# TaskRelatedIntent' must immediately follow one task contract.");
-                AddContract(contracts, current);
-                current = null;
-                inRelatedIntent = true;
-                relatedIntentIds.Clear();
-            }
-            else if (inRelatedIntent)
-            {
-                if (string.IsNullOrWhiteSpace(line)) continue;
-                if (!IsCanonicalIntentId(line) || !relatedIntentIds.Add(line))
-                    throw new InvalidDataException("Planner '# TaskRelatedIntent' must contain unique canonical IDD-NNNN identifiers, exactly one per non-empty line without surrounding whitespace.");
-            }
-            else if (current is null)
-            {
-                if (!string.IsNullOrWhiteSpace(line)) throw new InvalidDataException("Planner output must contain only '# Task' sections and their optional '# TaskRelatedIntent' metadata.");
-            }
-            else current.Add(line);
-        }
-
-        ValidateRelatedIntentSection(inRelatedIntent, relatedIntentIds);
-        AddContract(contracts, current);
-        if (contracts.Count == 0) throw new InvalidDataException("Planner output contains no task sections.");
-        return contracts.Select((contract, index) => new GeneratedWorkItem($"WI-{index + 1:000}", index + 1, "implementation", contract)).ToArray();
-    }
-
-    private static void ValidateRelatedIntentSection(bool present, IReadOnlyCollection<string> ids)
-    {
-        if (present && ids.Count == 0)
-            throw new InvalidDataException("Planner '# TaskRelatedIntent' must contain at least one durable intent ID.");
-    }
-
-    private static bool IsCanonicalIntentId(string value)
-    {
-        if (value.Length != 8 || !value.StartsWith("IDD-", StringComparison.Ordinal)) return false;
-        for (var index = 4; index < value.Length; index++)
-            if (value[index] is < '0' or > '9') return false;
-        return true;
-    }
-
-    private static void UpdateFence(string line, ref char? fenceCharacter, ref int fenceLength)
-    {
-        var indent = 0;
-        while (indent < line.Length && indent < 4 && line[indent] == ' ') indent++;
-        if (indent > 3 || indent >= line.Length) return;
-        var candidate = line[indent];
-        if (candidate is not ('`' or '~')) return;
-        var count = 0;
-        while (indent + count < line.Length && line[indent + count] == candidate) count++;
-        if (count < 3) return;
-
-        if (fenceCharacter is null)
-        {
-            fenceCharacter = candidate;
-            fenceLength = count;
-            return;
-        }
-
-        if (fenceCharacter == candidate && count >= fenceLength && string.IsNullOrWhiteSpace(line[(indent + count)..]))
-        {
-            fenceCharacter = null;
-            fenceLength = 0;
-        }
-    }
-
-    private static void AddContract(ICollection<string> contracts, List<string>? lines)
-    {
-        if (lines is null) return;
-        var contract = string.Join("\n", lines).Trim();
-        if (contract.Length == 0) throw new InvalidDataException("Planner task sections must be non-empty.");
-        contracts.Add(contract);
+        return parsed.Tasks
+            .Select((taskDefinition, index) => new GeneratedWorkItem(
+                $"WI-{index + 1:000}",
+                index + 1,
+                "implementation",
+                taskDefinition.Contract))
+            .ToArray();
     }
 
     private static string? FindFactoryRunDirectory(string workspace)
