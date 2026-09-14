@@ -7,7 +7,6 @@ namespace Idd.Factory.Runtime;
 internal sealed partial class RuntimeVerificationService
 {
     private static FactoryVerificationStepResult Completed(
-        FactoryState state,
         PlannedWorkItem? item,
         string verificationContext,
         IReadOnlyCollection<string> failedCheckIds) =>
@@ -216,33 +215,21 @@ internal sealed partial class RuntimeVerificationService
         return $".idd/factory/current/verification/{normalized}";
     }
 
-    internal static void RecordLastVerificationCycle(
-        PlannedWorkItem? item,
-        IEnumerable<string> evidenceRefs)
-    {
-        if (item is null)
-            return;
-        item.LastVerificationEvidenceRefs.Clear();
-        item.LastVerificationEvidenceRefs.AddRange(
-            evidenceRefs.Distinct(StringComparer.Ordinal));
-    }
-
-    internal static void RecordEvidence(
-        FactoryState state,
-        PlannedWorkItem? item,
+    private static void AppendEvidenceRefs(
+        List<string> stateEvidenceRefs,
+        List<string>? itemEvidenceRefs,
         IEnumerable<VerificationEvidence> evidence)
     {
-        foreach (var record in evidence.Where(x => x.EvidencePersisted))
+        foreach (var reference in EvidenceReferences(evidence))
         {
-            var relative = $"verification/{record.EvidenceId}.json";
-            if (item is not null
-                && !item.VerificationEvidenceRefs.Contains(relative, StringComparer.Ordinal))
+            if (itemEvidenceRefs is not null
+                && !itemEvidenceRefs.Contains(reference, StringComparer.Ordinal))
             {
-                item.VerificationEvidenceRefs.Add(relative);
+                itemEvidenceRefs.Add(reference);
             }
 
-            if (!state.VerificationEvidenceRefs.Contains(relative, StringComparer.Ordinal))
-                state.VerificationEvidenceRefs.Add(relative);
+            if (!stateEvidenceRefs.Contains(reference, StringComparer.Ordinal))
+                stateEvidenceRefs.Add(reference);
         }
     }
 
