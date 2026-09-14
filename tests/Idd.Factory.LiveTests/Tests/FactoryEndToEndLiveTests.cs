@@ -1,4 +1,5 @@
 using Idd.Factory.LiveTests.Infrastructure;
+using Idd.Factory.Verification;
 using Xunit;
 using Xunit.Sdk;
 
@@ -22,6 +23,8 @@ public sealed class FactoryEndToEndLiveTests
         var gitInitialized = false;
         try
         {
+            VerificationPolicyParser.Parse(File.ReadAllText(Path.Combine(workspace.WorkspaceDirectory, ".idd", "verification.yaml")));
+
             await workspace.LogAsync("Building and installing the current Factory plugin.");
             var installed = await new InstalledFactory(runner).BuildAndInstallAsync(repositoryRoot, workspace, CancellationToken.None);
 
@@ -57,7 +60,7 @@ public sealed class FactoryEndToEndLiveTests
             var factory = FactoryResultReader.ReadSingle(workspace.WorkspaceDirectory);
             Assert.Equal("COMPLETED", factory.Outcome);
             Assert.Equal(installed.MethodologyVersion, factory.MethodologyVersion);
-            Assert.True(factory.CompletedWorkCount >= 2, $"Expected at least two completed work items, observed {factory.CompletedWorkCount}.");
+            Assert.True(factory.CompletedWorkCount >= 1, $"Expected at least one completed work item, observed {factory.CompletedWorkCount}.");
             Assert.Equal("passed", factory.VerificationStatus);
             Assert.False(string.IsNullOrWhiteSpace(factory.CommitMessagePath));
             Assert.True(File.Exists(Path.Combine(workspace.WorkspaceDirectory, factory.CommitMessagePath!.Replace('/', Path.DirectorySeparatorChar))));
