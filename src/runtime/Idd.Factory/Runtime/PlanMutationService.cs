@@ -3,58 +3,64 @@ using Idd.Factory.Persistence;
 
 namespace Idd.Factory.Runtime;
 
+internal sealed record PreparedPlan(
+    IReadOnlyList<PlannedWorkItem> WorkItems,
+    long NextWorkItemNumber);
+
 internal sealed class PlanMutationService(
     FactoryRuntimeContext context,
     PlanRevisionWriter planRevisions)
 {
     private readonly IntentDocumentResolver intentResolver = new(context.Workspace);
 
-    public async Task ApplyAsync(
+    public async Task<PreparedPlan> PrepareAsync(
         FactoryState state,
         IReadOnlyList<PlannerTaskDefinition> tasks,
-        string reason,
-        string sourceAttemptId,
         CancellationToken cancellationToken)
     {
         ValidateTaskRelatedIntent(tasks);
 
-        var previous = context.CloneState(state);
-        var candidate = context.CloneState(state);
-        candidate.Current = null;
-        candidate.CurrentPhase = null;
-        candidate.Remaining.Clear();
-
-        var contracts = new List<(string Path, string Content)>();
+        var nextWorkItemNumber = state.NextWorkItemNumber;
+        var workItems = new List<PlannedWorkItem>(tasks.Count);
         foreach (var task in tasks)
-            candidate.Remaining.Add(CreatePlannedTask(candidate, task, contracts));
-
-        candidate.PlanningCycleCount++;
-        candidate.PlannedThroughCompletedCount = candidate.Completed.Count;
-        candidate.PendingContinuation = null;
-        candidate.Blocker = null;
-        candidate.RunStatus = FactoryRunStatus.Running;
-        candidate.PlanRevision++;
-        FactoryRuntimeContext.InvalidateFinalEvidence(candidate);
-
-        context.ValidateRuntimeState(candidate);
-        foreach (var contract in contracts)
         {
+            if (string.IsNullOrWhiteSpace(task.Contract))
+            {
+                throw new AgentProtocolException(
+                    "MALFORMED_PLANNER_OUTPUT",
+                    "Planned task text is required.");
+            }
+
+            var id = $"W{nextWorkItemNumber++:000000}";
+            var path = $"work-items/{id}/contract.md";
             await FactoryRuntimeContext.WriteRuntimeArtifactAtomicallyAsync(
-                Path.Combine(context.CurrentDirectory, contract.Path),
-                contract.Content,
+                Path.Combine(context.CurrentDirectory, path),
+                task.Contract.Trim() + Environment.NewLine,
                 cancellationToken);
+            workItems.Add(new PlannedWorkItem
+            {
+                Id = id,
+                ContractPath = path,
+                TaskRelatedIntentIds = task.TaskRelatedIntentIds.ToList()
+            });
         }
 
-        await planRevisions.WriteAsync(
+        return new(workItems, nextWorkItemNumber);
+    }
+
+    public Task WriteRevisionAsync(
+        FactoryState previous,
+        FactoryState next,
+        string reason,
+        string sourceAttemptId,
+        CancellationToken cancellationToken) =>
+        planRevisions.WriteAsync(
             previous,
-            candidate,
+            next,
             reason,
             sourceAttemptId,
             null,
             cancellationToken);
-        FactoryRuntimeContext.ApplyCandidate(state, candidate);
-        await context.SaveAsync(state, cancellationToken);
-    }
 
     private void ValidateTaskRelatedIntent(IReadOnlyList<PlannerTaskDefinition> tasks)
     {
@@ -88,28 +94,5 @@ internal sealed class PlanMutationService(
                 }
             }
         }
-    }
-
-    private static PlannedWorkItem CreatePlannedTask(
-        FactoryState state,
-        PlannerTaskDefinition task,
-        List<(string Path, string Content)> contracts)
-    {
-        if (string.IsNullOrWhiteSpace(task.Contract))
-        {
-            throw new AgentProtocolException(
-                "MALFORMED_PLANNER_OUTPUT",
-                "Planned task text is required.");
-        }
-
-        var id = $"W{state.NextWorkItemNumber++:000000}";
-        var path = $"work-items/{id}/contract.md";
-        contracts.Add((path, task.Contract.Trim() + Environment.NewLine));
-        return new PlannedWorkItem
-        {
-            Id = id,
-            ContractPath = path,
-            TaskRelatedIntentIds = task.TaskRelatedIntentIds.ToList()
-        };
     }
 }
