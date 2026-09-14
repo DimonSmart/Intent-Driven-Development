@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Idd.Factory.Processes;
 using Idd.Factory.Runtime;
 
 namespace Idd.Factory.Tests;
@@ -53,6 +54,28 @@ public sealed class WorkspaceSnapshotFileEnumeratorTests
         Assert.DoesNotContain(".vs/session.bin", relative);
     }
 
+    [Fact]
+    public async Task TimedOutGitEnumerationFallsBackToManagedEnumeration()
+    {
+        using var temp = new TestWorkspace();
+        temp.Write("visible.txt", "visible");
+        temp.Write(".vs/session.bin", "ignored");
+        var executor = new TimedOutExecutor();
+        var timeout = TimeSpan.FromMilliseconds(25);
+
+        var files = await WorkspaceSnapshotFileEnumerator.EnumerateAsync(
+            temp.Path,
+            default,
+            executor,
+            timeout);
+        var relative = RelativePaths(temp.Path, files);
+
+        Assert.Equal(timeout, executor.Request!.Timeout);
+        Assert.Equal("git", executor.Request.Executable);
+        Assert.Contains("visible.txt", relative);
+        Assert.DoesNotContain(".vs/session.bin", relative);
+    }
+
     private static string[] RelativePaths(string workspace, IReadOnlyList<string> files) =>
         files.Select(path => Path.GetRelativePath(workspace, path).Replace('\\', '/')).ToArray();
 
@@ -71,5 +94,25 @@ public sealed class WorkspaceSnapshotFileEnumeratorTests
         var stderr = process.StandardError.ReadToEnd();
         process.WaitForExit();
         Assert.True(process.ExitCode == 0, $"git {string.Join(' ', arguments)} failed: {stderr}");
+    }
+
+    private sealed class TimedOutExecutor : IProcessExecutor
+    {
+        public ProcessExecutionRequest? Request { get; private set; }
+
+        public Task<ProcessExecutionResult> RunAsync(
+            ProcessExecutionRequest request,
+            CancellationToken cancellationToken)
+        {
+            Request = request;
+            return Task.FromResult(new ProcessExecutionResult(
+                null,
+                null,
+                ProcessCompletionReason.TimedOut,
+                "",
+                "",
+                new ProcessTerminationOutcome(true, true),
+                []));
+        }
     }
 }

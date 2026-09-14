@@ -5,12 +5,27 @@ namespace Idd.Factory.Runtime;
 internal static class WorkspaceSnapshotFileEnumerator
 {
     private static readonly IProcessExecutor Executor = ProcessExecutor.Shared;
+    private static readonly TimeSpan GitEnumerationTimeout = TimeSpan.FromSeconds(10);
 
-    public static async Task<IReadOnlyList<string>> EnumerateAsync(
+    public static Task<IReadOnlyList<string>> EnumerateAsync(
         string workspace,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        EnumerateAsync(workspace, cancellationToken, Executor, GitEnumerationTimeout);
+
+    internal static async Task<IReadOnlyList<string>> EnumerateAsync(
+        string workspace,
+        CancellationToken cancellationToken,
+        IProcessExecutor executor,
+        TimeSpan gitEnumerationTimeout)
     {
-        var gitFiles = await TryEnumerateGitVisibleFilesAsync(workspace, cancellationToken);
+        if (gitEnumerationTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(gitEnumerationTimeout));
+
+        var gitFiles = await TryEnumerateGitVisibleFilesAsync(
+            workspace,
+            cancellationToken,
+            executor,
+            gitEnumerationTimeout);
         return gitFiles ?? Directory.EnumerateFiles(workspace, "*", SearchOption.AllDirectories)
             .Where(path => !ContainsDirectorySegment(workspace, path, ".vs"))
             .OrderBy(path => path, StringComparer.Ordinal)
@@ -25,13 +40,18 @@ internal static class WorkspaceSnapshotFileEnumerator
 
     private static async Task<IReadOnlyList<string>?> TryEnumerateGitVisibleFilesAsync(
         string workspace,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IProcessExecutor executor,
+        TimeSpan gitEnumerationTimeout)
     {
-        var result = await Executor.RunAsync(
+        var result = await executor.RunAsync(
             new(
                 "git",
                 ["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
-                workspace),
+                workspace)
+            {
+                Timeout = gitEnumerationTimeout
+            },
             cancellationToken);
 
         if (result.CompletionReason == ProcessCompletionReason.Cancelled)
