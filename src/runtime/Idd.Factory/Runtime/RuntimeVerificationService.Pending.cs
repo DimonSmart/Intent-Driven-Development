@@ -5,7 +5,22 @@ namespace Idd.Factory.Runtime;
 
 internal sealed partial class RuntimeVerificationService
 {
-    public async Task<FactoryBlockResult?> ResolvePendingActionAsync(
+    public async Task<FactoryVerificationStepResult> ResolvePendingActionAsync(
+        FactoryState state,
+        VerificationConfirmation confirmation,
+        bool? verificationPassed,
+        CancellationToken cancellationToken)
+    {
+        var candidate = context.CloneState(state);
+        var result = await ResolvePendingActionCoreAsync(
+            candidate,
+            confirmation,
+            verificationPassed,
+            cancellationToken);
+        return CaptureState(candidate, result);
+    }
+
+    private async Task<FactoryVerificationStepResult> ResolvePendingActionCoreAsync(
         FactoryState state,
         VerificationConfirmation confirmation,
         bool? verificationPassed,
@@ -41,25 +56,30 @@ internal sealed partial class RuntimeVerificationService
                 cancellationToken);
             RecordEvidence(state, item, declined.Evidence);
             state.PendingVerificationSession = null;
-            if (item is not null)
-                state.CurrentPhase = CurrentWorkPhase.Blocked;
-            return new(
-                "VERIFICATION_DECLINED",
-                $"User declined authoritative check {checkId}.",
-                "Cancel/restart the run when verification can be performed.",
+            return FactoryVerificationStepResult.Blocked(
+                session.Context,
+                item?.Id,
                 new(
-                    ContinuationKind.Terminal,
-                    item?.Id,
-                    session.Context,
                     "VERIFICATION_DECLINED",
-                    false));
+                    $"User declined authoritative check {checkId}.",
+                    "Cancel/restart the run when verification can be performed.",
+                    new(
+                        ContinuationKind.Terminal,
+                        item?.Id,
+                        session.Context,
+                        "VERIFICATION_DECLINED",
+                        false)));
         }
 
         VerificationResult result;
         if (session.Stage == VerificationContinuationStage.AwaitingConfirmation)
         {
             if (confirmation != VerificationConfirmation.Approve)
-                return null;
+            {
+                return FactoryVerificationStepResult.Pending(
+                    session.Context,
+                    item?.Id);
+            }
             result = await verification.RunCheckAsync(
                 checkId,
                 true,
@@ -71,7 +91,11 @@ internal sealed partial class RuntimeVerificationService
         else if (session.Stage == VerificationContinuationStage.AwaitingManualResult)
         {
             if (verificationPassed is null)
-                return null;
+            {
+                return FactoryVerificationStepResult.Pending(
+                    session.Context,
+                    item?.Id);
+            }
             result = await verification.RunCheckAsync(
                 checkId,
                 false,
@@ -90,22 +114,28 @@ internal sealed partial class RuntimeVerificationService
         RecordEvidence(state, item, result.Evidence);
         if (result.Status == VerificationStatus.InfrastructureFailure)
         {
-            return CreateVerificationBlock(
-                item,
+            return FactoryVerificationStepResult.Blocked(
                 session.Context,
-                "VERIFICATION_INFRASTRUCTURE_FAILURE",
-                $"Check {checkId} could not execute because of an infrastructure failure.",
-                result.Evidence);
+                item?.Id,
+                CreateVerificationBlock(
+                    item,
+                    session.Context,
+                    "VERIFICATION_INFRASTRUCTURE_FAILURE",
+                    $"Check {checkId} could not execute because of an infrastructure failure.",
+                    result.Evidence));
         }
 
         if (result.Status is not (VerificationStatus.Passed or VerificationStatus.Failed))
         {
-            return CreateVerificationBlock(
-                item,
+            return FactoryVerificationStepResult.Blocked(
                 session.Context,
-                "VERIFICATION_ACTION_REQUIRED",
-                $"Check {checkId} ended as {result.Status}.",
-                result.Evidence);
+                item?.Id,
+                CreateVerificationBlock(
+                    item,
+                    session.Context,
+                    "VERIFICATION_ACTION_REQUIRED",
+                    $"Check {checkId} ended as {result.Status}.",
+                    result.Evidence));
         }
 
         session = AdvanceVerificationSession(
@@ -119,15 +149,8 @@ internal sealed partial class RuntimeVerificationService
             Stage = VerificationContinuationStage.ExecuteCheck
         };
         state.PendingVerificationSession = session;
-        state.PendingContinuation = new(
-            ContinuationKind.VerificationGate,
-            item?.Id,
+        return FactoryVerificationStepResult.Pending(
             session.Context,
-            "VERIFICATION_GATE",
-            true);
-        state.Blocker = null;
-        state.RunStatus = FactoryRunStatus.Running;
-        await context.SaveAsync(state, cancellationToken);
-        return null;
+            item?.Id);
     }
 }
