@@ -48,13 +48,13 @@ internal sealed class PlanMutationService(
         return new(workItems, nextWorkItemNumber);
     }
 
-    public Task WriteRevisionAsync(
+    public async Task WriteRevisionAsync(
         FactoryState previous,
         FactoryState next,
         string reason,
         string sourceAttemptId,
         CancellationToken cancellationToken) =>
-        planRevisions.WriteAsync(
+        _ = await planRevisions.WriteAsync(
             previous,
             next,
             reason,
