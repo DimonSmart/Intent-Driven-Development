@@ -207,7 +207,7 @@ internal sealed class SystemFactoryProcessInvoker : IFactoryProcessInvoker
                 invocation.WorkingDirectory)
             {
                 StandardInput = invocation.StandardInput,
-                StandardInputEncoding = TransportUtf8,
+                StandardInputEncoding = invocation.StandardInput is null ? null : TransportUtf8,
                 StandardOutputEncoding = TransportUtf8,
                 StandardErrorEncoding = TransportUtf8
             },
