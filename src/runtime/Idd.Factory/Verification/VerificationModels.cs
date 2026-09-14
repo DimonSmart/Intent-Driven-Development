@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json.Serialization;
 using Idd.Factory.Processes;
 
@@ -94,15 +93,11 @@ public sealed record VerificationDiagnosticIssue(
 
 internal sealed class VerificationRuntimeHooks
 {
-    internal Func<ProcessStartInfo, Process?> StartProcess { get; init; } =
-        static startInfo => ProcessSupervisor.Shared.Start(startInfo);
+    internal IProcessExecutor ProcessExecutor { get; init; } =
+        Idd.Factory.Processes.ProcessExecutor.Shared;
     internal Func<string, Stream> CreateLog { get; init; } = path =>
         new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read, 4096, FileOptions.Asynchronous);
     internal Func<string, string, CancellationToken, Task> WriteEvidence { get; init; } = File.WriteAllTextAsync;
-    internal Func<Task, TimeSpan, Task<bool>> WaitForDrain { get; init; } =
-        static (task, gracePeriod) => ProcessSupervisor.Shared.WaitAsync(task, gracePeriod);
-    internal Func<Process, CancellationToken, Task> TerminateProcess { get; init; } =
-        static (process, token) => ProcessSupervisor.Shared.TerminateProcessTreeAsync(process, token);
 }
 
 public enum VerificationStatus
