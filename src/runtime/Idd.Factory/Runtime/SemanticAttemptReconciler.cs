@@ -84,7 +84,7 @@ internal sealed class SemanticAttemptReconciler(
             changedPaths);
     }
 
-    private static async Task RecoverSemanticResultAsync(
+    private async Task RecoverSemanticResultAsync(
         string attemptId,
         string directory,
         AgentInvocation invocation,
