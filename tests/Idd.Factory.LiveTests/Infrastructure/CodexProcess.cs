@@ -34,6 +34,10 @@ public sealed class CodexProcess(ProcessRunner processRunner)
     [
         "exec", "--json", "--ephemeral", "--ignore-rules",
         "--enable", "multi_agent", "--disable", "multi_agent_v2",
+        // This session must expose the locally installed IDD Factory plugin. Current Codex
+        // can merge authenticated remote plugin state over local plugin exposure, so keep
+        // the live-eval host local-only and deterministic.
+        "--enable", "plugins", "--disable", "remote_plugin",
         "--disable", "apps", "--disable", "browser_use", "--disable", "code_mode_host",
         "-c", "agents.max_depth=2", "-c", "agents.max_threads=10",
         // The outer Codex process hosts the installed Factory plugin. Do not override
