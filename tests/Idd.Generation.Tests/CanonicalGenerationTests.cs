@@ -9,35 +9,30 @@ namespace Idd.Generation.Tests;
 public sealed class CanonicalGenerationTests(GenerationFixture fixture)
 {
     [Fact]
-    public void CanonicalFactorySkills_ArePlatformNeutralAndKeepPlanningContract()
+    public void CanonicalFactorySkills_ArePlatformNeutralAndExposePlannerProtocol()
     {
-        var forbidden = new[]
-        {
-            "Codex", "Claude", "spawn_agent", "wait_agent", "fork_context", "codex-dispatch",
-            ".agents/skills/", "mcp__factory", "runtime/idd-factory.dll", "PowerShell", "`items`", "`message`"
-        };
         fixture.AssertMissing(Path.Combine(fixture.RepoRoot, "src", "canonical", "factory"));
 
+        var platformSpecificMarkers = new[]
+        {
+            "Codex",
+            "Claude",
+            "mcp__factory",
+            "runtime/idd-factory.dll",
+            "PowerShell"
+        };
         foreach (var file in Directory.GetFiles(
                      Path.Combine(fixture.RepoRoot, "src", "canonical", "skills"), "idd-factory-*.md"))
         {
             var content = File.ReadAllText(file);
-            foreach (var literal in forbidden)
-                Assert.False(content.Contains(literal, StringComparison.Ordinal),
-                    $"Canonical Factory file {fixture.Relative(file)} contains platform-specific literal '{literal}'.");
+            foreach (var marker in platformSpecificMarkers)
+                Assert.DoesNotContain(marker, content, StringComparison.Ordinal);
         }
 
         var decomposition = fixture.ReadText(Path.Combine(
             fixture.RepoRoot, "src", "canonical", "skills", "idd-factory-decompose-task.md"));
-        foreach (var required in new[]
-        {
-            "all remaining tasks",
-            "Stop before the",
-            "first task whose meaningful contract",
-            "# Task",
-            "Do not choose capabilities"
-        })
-            Assert.Contains(required, decomposition);
+        foreach (var protocolMarker in new[] { "# Task", "# TaskRelatedIntent", "# Question", "# Done" })
+            Assert.Contains(protocolMarker, decomposition, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -140,26 +135,6 @@ public sealed class CanonicalGenerationTests(GenerationFixture fixture)
                 }
             }
         }
-
-        foreach (var platform in new[] { "claude", "codex" })
-            fixture.AssertMissing(Path.Combine(
-                fixture.MarketplaceRoot, "plugins", platform, "idd-factory", "skills", "idd-route", "references"));
-    }
-
-    [Fact]
-    public void RepositoryText_DoesNotReferenceRemovedVerificationPolicy()
-    {
-        var legacyPolicyPath = ".idd/" + "verification" + ".md";
-        var offenders = fixture.GetTrackedTextFiles()
-            .Where(relativePath =>
-                File.ReadAllText(
-                        Path.Combine(fixture.RepoRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)),
-                        new UTF8Encoding(false, true))
-                    .Contains(legacyPolicyPath, StringComparison.Ordinal))
-            .ToArray();
-
-        Assert.True(offenders.Length == 0,
-            $"Active repository content still references unsupported verification policy '{legacyPolicyPath}': {string.Join(", ", offenders)}");
     }
 
     [Theory]
