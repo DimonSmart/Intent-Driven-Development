@@ -124,6 +124,14 @@ internal sealed class FactoryMcpTools(
         {
             result = await runner.RunAsync(command, workspace, request, cancellationToken, additionalAttempts);
         }
+        catch (FactoryTransportException exception)
+        {
+            // The MCP SDK intentionally hides messages from arbitrary exceptions. Transport
+            // failures are part of this adapter's contract, so expose a bounded diagnostic
+            // through McpException while keeping the call an MCP tool error rather than a
+            // Factory workflow outcome.
+            throw new McpException(FormatTransportFailure(exception), exception);
+        }
         finally
         {
             monitorCancellation.Cancel();
@@ -133,6 +141,23 @@ internal sealed class FactoryMcpTools(
 
         Report(FormatFinalProgress(result));
         return result;
+    }
+
+    internal static string FormatTransportFailure(FactoryTransportException exception)
+    {
+        const int diagnosticLimit = 2048;
+        var messages = new List<string>();
+        for (Exception? current = exception; current is not null && messages.Count < 4; current = current.InnerException)
+        {
+            if (string.IsNullOrWhiteSpace(current.Message)) continue;
+            if (messages.Count > 0 && string.Equals(messages[^1], current.Message, StringComparison.Ordinal)) continue;
+            messages.Add(current.Message);
+        }
+
+        var diagnostic = string.Join(" Cause: ", messages);
+        return diagnostic.Length <= diagnosticLimit
+            ? diagnostic
+            : diagnostic[..diagnosticLimit] + "...";
     }
 
     internal static string FormatActiveProgress(FactoryStatusResult status, DateTimeOffset now)
