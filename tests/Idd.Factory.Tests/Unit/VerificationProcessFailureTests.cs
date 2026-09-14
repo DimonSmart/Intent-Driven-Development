@@ -31,7 +31,9 @@ public sealed class VerificationProcessFailureTests
         using var test = new VerificationTestContext().WithCheck("check", "exit 0");
         var hooks = new VerificationRuntimeHooks
         {
-            StartProcess = _ => throw new System.ComponentModel.Win32Exception("simulated start failure")
+            ProcessExecutor = new StubProcessExecutor((_, _) => Task.FromResult(
+                StubProcessExecutor.StartFailure(
+                    new System.ComponentModel.Win32Exception("simulated start failure"))))
         };
 
         var result = await test.Engine(hooks).RunAsync(["check"], default);
@@ -79,7 +81,11 @@ public sealed class VerificationProcessFailureTests
         var starts = 0;
         var hooks = new VerificationRuntimeHooks
         {
-            StartProcess = _ => { starts++; throw new IOException("cannot start"); }
+            ProcessExecutor = new StubProcessExecutor((_, _) =>
+            {
+                starts++;
+                return Task.FromResult(StubProcessExecutor.StartFailure(new IOException("cannot start")));
+            })
         };
 
         var result = await test.Engine(hooks).RunAsync(["first", "second"], default);
