@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Idd.Factory.Agents;
@@ -10,7 +9,7 @@ public sealed record InstalledFactoryInfo(string InstalledPath, string Methodolo
 
 public sealed class InstalledFactory(ProcessRunner processRunner)
 {
-    private static readonly ProcessSupervisor Supervisor = ProcessSupervisor.Shared;
+    private static readonly IProcessExecutor Executor = ProcessExecutor.Shared;
 
     public async Task<InstalledFactoryInfo> BuildAndInstallAsync(string repositoryRoot, LiveTestWorkspace workspace, CancellationToken cancellationToken)
     {
@@ -66,40 +65,14 @@ public sealed class InstalledFactory(ProcessRunner processRunner)
 
     private static async Task<string?> GitTextAsync(string repositoryRoot, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
     {
-        var start = new ProcessStartInfo("git")
-        {
-            WorkingDirectory = repositoryRoot,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        foreach (var argument in arguments) start.ArgumentList.Add(argument);
-
-        Process? process;
-        try { process = Supervisor.Start(start); }
-        catch (System.ComponentModel.Win32Exception) { return null; }
-        if (process is null) return null;
-
-        using (process)
-        {
-            var outputTask = Supervisor.CaptureAsync(process.StandardOutput, CancellationToken.None);
-            var errorTask = Supervisor.CaptureAsync(process.StandardError, CancellationToken.None);
-            try
-            {
-                await Supervisor.WaitForExitAsync(process, timeout: null, cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                await Supervisor.TerminateProcessTreeAsync(process, CancellationToken.None);
-                await Task.WhenAll(outputTask, errorTask);
-                throw;
-            }
-
-            var output = await outputTask;
-            _ = await errorTask;
-            return process.ExitCode == 0 ? output.Trim() : null;
-        }
+        var result = await Executor.RunAsync(
+            new("git", arguments, repositoryRoot),
+            cancellationToken);
+        if (result.CompletionReason == ProcessCompletionReason.Cancelled)
+            throw new OperationCanceledException(cancellationToken);
+        return result.CompletionReason == ProcessCompletionReason.Exited && result.ExitCode == 0
+            ? result.StandardOutput.Trim()
+            : null;
     }
 
     internal static void PrepareIsolatedCodexHome(string codexHome)
