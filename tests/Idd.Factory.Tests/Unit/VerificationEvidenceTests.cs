@@ -74,7 +74,9 @@ public sealed class VerificationEvidenceTests
         using var test = new VerificationTestContext().WithCheck("check", "exit 0");
         var hooks = new VerificationRuntimeHooks
         {
-            StartProcess = _ => throw new System.ComponentModel.Win32Exception("start exploded")
+            ProcessExecutor = new StubProcessExecutor((_, _) => Task.FromResult(
+                StubProcessExecutor.StartFailure(
+                    new System.ComponentModel.Win32Exception("start exploded"))))
         };
 
         var evidence = Assert.Single((await test.Engine(hooks).RunAsync(["check"], default)).Evidence);
