@@ -9,7 +9,11 @@ internal sealed record FactoryVerificationStepResult(
     string? WorkItemId,
     VerificationDecision Decision,
     IReadOnlyCollection<string> FailedCheckIds,
-    FactoryBlockResult? Block = null)
+    FactoryBlockResult? Block = null,
+    PendingVerificationSession? Session = null,
+    IReadOnlyList<string>? EvidenceRefs = null,
+    IReadOnlyList<string>? WorkItemEvidenceRefs = null,
+    IReadOnlyList<string>? LastWorkItemEvidenceRefs = null)
 {
     public static FactoryVerificationStepResult Completed(
         string context,
@@ -18,12 +22,23 @@ internal sealed record FactoryVerificationStepResult(
         IReadOnlyCollection<string> failedCheckIds) =>
         new(context, workItemId, decision, failedCheckIds);
 
+    public static FactoryVerificationStepResult Pending(
+        string context,
+        string? workItemId) =>
+        new(context, workItemId, VerificationDecision.None, []);
+
     public static FactoryVerificationStepResult Blocked(
         string context,
         string? workItemId,
         FactoryBlockResult block) =>
         new(context, workItemId, VerificationDecision.None, [], block);
 }
+
+internal sealed record FactoryBaselineVerificationResult(
+    bool Required,
+    VerificationStatus Status,
+    IReadOnlyList<string> EvidenceRefs,
+    FactoryBlockResult? Block = null);
 
 internal sealed partial class RuntimeVerificationService
 {
@@ -38,18 +53,17 @@ internal sealed partial class RuntimeVerificationService
         this.verification = verification;
     }
 
-    public async Task<FactoryBlockResult?> RunBaselineAsync(
+    public async Task<FactoryBaselineVerificationResult> RunBaselineAsync(
         FactoryState state,
         CancellationToken cancellationToken)
     {
         if (state.RepositoryFallbackBaselineAccepted
             || File.Exists(Path.Combine(context.Workspace, ".idd", "verification.yaml")))
         {
-            return null;
+            return new(false, VerificationStatus.NoChecks, []);
         }
 
         var baseline = await verification.RunContextAsync("final", cancellationToken);
-        RecordEvidence(state, null, baseline.Evidence);
         var evidenceRefs = EvidenceReferences(baseline.Evidence).ToArray();
         await context.Events.WriteAsync(
             state.RunId,
@@ -58,11 +72,7 @@ internal sealed partial class RuntimeVerificationService
             cancellationToken);
 
         if (baseline.Status is VerificationStatus.Passed or VerificationStatus.NoChecks)
-        {
-            if (baseline.Evidence.Count > 0)
-                await context.SaveAsync(state, cancellationToken);
-            return null;
-        }
+            return new(true, baseline.Status, evidenceRefs);
 
         var checkIds = baseline.Evidence
             .Select(x => x.CheckId)
@@ -78,16 +88,20 @@ internal sealed partial class RuntimeVerificationService
         if (baseline.Status == VerificationStatus.Failed)
         {
             return new(
-                "VERIFICATION_CONFIRMATION_REQUIRED",
-                $"Repository fallback baseline already fails before Factory planning. Failed checks: {checkSummary}. Evidence: {evidenceSummary}. Repository-wide subtask verification cannot reliably attribute that failure to the current work item.",
-                "Fix the repository baseline and cancel/restart, or continue with --confirmation approve to accept the existing red baseline.",
+                true,
+                baseline.Status,
+                evidenceRefs,
                 new(
-                    ContinuationKind.VerificationGate,
-                    null,
-                    "baseline",
                     "VERIFICATION_CONFIRMATION_REQUIRED",
-                    true,
-                    VerificationStage: VerificationContinuationStage.AwaitingConfirmation));
+                    $"Repository fallback baseline already fails before Factory planning. Failed checks: {checkSummary}. Evidence: {evidenceSummary}. Repository-wide subtask verification cannot reliably attribute that failure to the current work item.",
+                    "Fix the repository baseline and cancel/restart, or continue with --confirmation approve to accept the existing red baseline.",
+                    new(
+                        ContinuationKind.VerificationGate,
+                        null,
+                        "baseline",
+                        "VERIFICATION_CONFIRMATION_REQUIRED",
+                        true,
+                        VerificationStage: VerificationContinuationStage.AwaitingConfirmation)));
         }
 
         var terminal = new PendingContinuation(
@@ -106,18 +120,43 @@ internal sealed partial class RuntimeVerificationService
                 primary.Failure);
             var payload = JsonSerializer.SerializeToElement(reference, FactoryJson.Options);
             return new(
-                "BASELINE_VERIFICATION_INFRASTRUCTURE_FAILURE",
-                BuildInfrastructureReason(primary.Evidence, primary.Failure, baseline: true),
-                BuildInfrastructureResumeWhen(primary.Evidence, primary.Failure, baseline: true),
-                terminal,
-                payload);
+                true,
+                baseline.Status,
+                evidenceRefs,
+                new(
+                    "BASELINE_VERIFICATION_INFRASTRUCTURE_FAILURE",
+                    BuildInfrastructureReason(primary.Evidence, primary.Failure, baseline: true),
+                    BuildInfrastructureResumeWhen(primary.Evidence, primary.Failure, baseline: true),
+                    terminal,
+                    payload));
         }
 
         return new(
-            "BASELINE_VERIFICATION_ACTION_REQUIRED",
-            $"Repository fallback baseline ended as {baseline.Status} before Factory planning.",
-            "Resolve the baseline verification condition, then cancel/restart the Factory run.",
-            terminal);
+            true,
+            baseline.Status,
+            evidenceRefs,
+            new(
+                "BASELINE_VERIFICATION_ACTION_REQUIRED",
+                $"Repository fallback baseline ended as {baseline.Status} before Factory planning.",
+                "Resolve the baseline verification condition, then cancel/restart the Factory run.",
+                terminal));
     }
 
+    private FactoryVerificationStepResult CaptureState(
+        FactoryState candidate,
+        FactoryVerificationStepResult result)
+    {
+        var item = result.WorkItemId is null
+            ? null
+            : candidate.Current is { } current && current.Id == result.WorkItemId
+                ? current
+                : null;
+        return result with
+        {
+            Session = candidate.PendingVerificationSession,
+            EvidenceRefs = candidate.VerificationEvidenceRefs.ToList(),
+            WorkItemEvidenceRefs = item?.VerificationEvidenceRefs.ToList() ?? [],
+            LastWorkItemEvidenceRefs = item?.LastVerificationEvidenceRefs.ToList() ?? []
+        };
+    }
 }
