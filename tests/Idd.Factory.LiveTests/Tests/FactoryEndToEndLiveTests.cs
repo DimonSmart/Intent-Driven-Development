@@ -16,6 +16,8 @@ public sealed class FactoryEndToEndLiveTests
     {
         var repositoryRoot = LiveTestWorkspace.FindRepositoryRoot();
         var workspace = LiveTestWorkspace.CreateTwoStepCatalog(repositoryRoot);
+        Console.WriteLine($"Factory live workspace: {workspace.WorkspaceDirectory}");
+        Console.Out.Flush();
         var runner = new ProcessRunner();
         var gitInitialized = false;
         try

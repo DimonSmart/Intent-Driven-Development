@@ -23,7 +23,8 @@ public sealed record LiveTestWorkspace(
     public static LiveTestWorkspace CreateTwoStepCatalog(string repositoryRoot)
     {
         var runId = $"{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"[..24];
-        var runDirectory = Path.Combine(repositoryRoot, "artifacts", "factory-evals", runId);
+        var evalsDirectory = Path.Combine(repositoryRoot, "artifacts", "factory-evals");
+        var runDirectory = Path.Combine(evalsDirectory, runId);
         var caseDirectory = Path.Combine(repositoryRoot, "tests", "Idd.Factory.LiveTests", "Cases", "TwoStepCatalog");
         var workspace = new LiveTestWorkspace(
             runDirectory,
@@ -36,6 +37,7 @@ public sealed record LiveTestWorkspace(
         Directory.CreateDirectory(workspace.VerificationDirectory);
         CopyDirectory(Path.Combine(caseDirectory, "Template"), workspace.WorkspaceDirectory);
         File.Copy(Path.Combine(caseDirectory, "task.md"), Path.Combine(runDirectory, "task.md"));
+        File.WriteAllText(Path.Combine(evalsDirectory, "current-workspace.txt"), workspace.WorkspaceDirectory + Environment.NewLine);
         return workspace;
     }
 
