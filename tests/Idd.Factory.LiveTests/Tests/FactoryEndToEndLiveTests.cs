@@ -40,6 +40,20 @@ public sealed class FactoryEndToEndLiveTests
             Assert.False(codex.Process.TimedOut);
             Assert.True(codex.Process.ExitCode == 0 || codex.Process.CompletionSignaled, $"Codex exit={codex.Process.ExitCode}. See {workspace.StderrPath}.");
 
+            var trace = MinimalCodexTraceReader.Read(workspace.EventsPath);
+            var resultsDirectory = Path.Combine(workspace.WorkspaceDirectory, ".idd", "factory", "results");
+            if (!Directory.Exists(resultsDirectory))
+            {
+                throw new XunitException($"""
+                    Factory results directory is missing.
+                    Observed factory_run calls: {trace.FactoryRunCalls}; factory_status calls: {trace.FactoryStatusCalls}.
+                    Codex last message:
+                    {ReadDiagnosticFile(workspace.LastMessagePath)}
+                    Codex stderr:
+                    {ReadDiagnosticFile(workspace.StderrPath)}
+                    """);
+            }
+
             var factory = FactoryResultReader.ReadSingle(workspace.WorkspaceDirectory);
             Assert.Equal("COMPLETED", factory.Outcome);
             Assert.Equal(installed.MethodologyVersion, factory.MethodologyVersion);
@@ -48,7 +62,6 @@ public sealed class FactoryEndToEndLiveTests
             Assert.False(string.IsNullOrWhiteSpace(factory.CommitMessagePath));
             Assert.True(File.Exists(Path.Combine(workspace.WorkspaceDirectory, factory.CommitMessagePath!.Replace('/', Path.DirectorySeparatorChar))));
 
-            var trace = MinimalCodexTraceReader.Read(workspace.EventsPath);
             Assert.Equal(1, trace.FactoryRunCalls);
             Assert.Equal(0, trace.FactoryStatusCalls);
             Assert.Equal(0, trace.ModelTurnsDuringFactoryRun);
@@ -75,6 +88,14 @@ public sealed class FactoryEndToEndLiveTests
         {
             if (gitInitialized) await workspace.CaptureGitEvidenceAsync(runner);
         }
+    }
+
+    private static string ReadDiagnosticFile(string path)
+    {
+        if (!File.Exists(path)) return "<missing>";
+        var text = File.ReadAllText(path).Trim();
+        const int maxLength = 4000;
+        return text.Length <= maxLength ? text : "..." + text[^maxLength..];
     }
 
     private static void AssertProtectedInputsUnchanged(LiveTestWorkspace workspace)
