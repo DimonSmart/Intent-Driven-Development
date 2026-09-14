@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Idd.Factory.Domain;
@@ -185,60 +184,55 @@ internal interface IFactoryProcessInvoker
     Task<FactoryProcessResult> RunAsync(FactoryProcessInvocation invocation, CancellationToken cancellationToken);
 }
 
-internal sealed class SystemFactoryProcessInvoker(Action<int>? onProcessStarted = null) : IFactoryProcessInvoker
+internal sealed class SystemFactoryProcessInvoker : IFactoryProcessInvoker
 {
     private static readonly UTF8Encoding TransportUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
-    private readonly ProcessSupervisor processSupervisor = ProcessSupervisor.Shared;
+    private readonly IProcessExecutor processExecutor;
 
-    public async Task<FactoryProcessResult> RunAsync(FactoryProcessInvocation invocation, CancellationToken cancellationToken)
+    public SystemFactoryProcessInvoker() : this(ProcessExecutor.Shared) { }
+
+    internal SystemFactoryProcessInvoker(IProcessExecutor processExecutor)
     {
-        var startInfo = new ProcessStartInfo(invocation.Executable)
-        {
-            WorkingDirectory = invocation.WorkingDirectory,
-            UseShellExecute = false,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardInputEncoding = TransportUtf8,
-            CreateNoWindow = true
-        };
-        foreach (var argument in invocation.Arguments) startInfo.ArgumentList.Add(argument);
+        this.processExecutor = processExecutor;
+    }
 
-        Process? process;
-        try
-        {
-            process = processSupervisor.Start(startInfo);
-            if (process is null) throw new InvalidOperationException("The packaged Factory Runtime process did not start.");
-            onProcessStarted?.Invoke(process.Id);
-        }
-        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or FileNotFoundException or InvalidOperationException)
-        {
-            throw new FactoryTransportException("FACTORY_TRANSPORT_UNAVAILABLE", "The packaged Factory Runtime process did not start.", exception);
-        }
-
-        using (process)
-        {
-            var stdoutTask = processSupervisor.CaptureAsync(process.StandardOutput, CancellationToken.None);
-            var stderrTask = processSupervisor.CaptureAsync(process.StandardError, CancellationToken.None);
-            try
+    public async Task<FactoryProcessResult> RunAsync(
+        FactoryProcessInvocation invocation,
+        CancellationToken cancellationToken)
+    {
+        var result = await processExecutor.RunAsync(
+            new(
+                invocation.Executable,
+                invocation.Arguments,
+                invocation.WorkingDirectory)
             {
-                if (invocation.StandardInput is not null)
-                {
-                    await process.StandardInput.WriteAsync(invocation.StandardInput.AsMemory(), cancellationToken);
-                    process.StandardInput.Close();
-                }
-                await processSupervisor.WaitForExitAsync(process, timeout: null, cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                await processSupervisor.TerminateProcessTreeAsync(process, CancellationToken.None);
-                await Task.WhenAll(stdoutTask, stderrTask);
-                ReleaseRuntimeLockAfterForcedTermination(invocation, process.Id);
-                throw;
-            }
+                StandardInput = invocation.StandardInput,
+                StandardInputEncoding = TransportUtf8,
+                StandardOutputEncoding = TransportUtf8,
+                StandardErrorEncoding = TransportUtf8
+            },
+            cancellationToken);
 
-            return new(process.ExitCode, await stdoutTask, await stderrTask);
+        if (result.CompletionReason == ProcessCompletionReason.Cancelled)
+        {
+            if (result.ProcessId is { } processId && result.Termination.Requested)
+                ReleaseRuntimeLockAfterForcedTermination(invocation, processId);
+            throw new OperationCanceledException(cancellationToken);
         }
+
+        if (result.CompletionReason is ProcessCompletionReason.StartFailed
+            or ProcessCompletionReason.InfrastructureFailed)
+        {
+            throw new FactoryTransportException(
+                "FACTORY_TRANSPORT_UNAVAILABLE",
+                "The packaged Factory Runtime process did not start or complete its transport lifecycle.",
+                result.Failure);
+        }
+
+        return new(
+            result.ExitCode ?? -1,
+            result.StandardOutput,
+            result.StandardError);
     }
 
     internal static bool ReleaseRuntimeLockAfterForcedTermination(FactoryProcessInvocation invocation, int processId)
