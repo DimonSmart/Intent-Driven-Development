@@ -100,7 +100,7 @@ public sealed class FactoryEndToEndLiveTests
 
     private static void AssertProtectedInputsUnchanged(LiveTestWorkspace workspace)
     {
-        foreach (var relative in new[] { Path.Combine(".idd", "intent", "IDD-0001-mini-catalog.md"), Path.Combine(".idd", "verification.yaml") })
+        foreach (var relative in new[] { Path.Combine(".idd", "intent", "IDD-0001.spec-mini-catalog.md"), Path.Combine(".idd", "verification.yaml") })
         {
             var expected = File.ReadAllText(Path.Combine(workspace.CaseDirectory, "Template", relative));
             var actual = File.ReadAllText(Path.Combine(workspace.WorkspaceDirectory, relative));
