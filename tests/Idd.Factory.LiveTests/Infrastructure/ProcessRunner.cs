@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Idd.Factory.Processes;
@@ -12,45 +11,51 @@ public sealed record ProcessResult(int ExitCode, DateTimeOffset StartedAtUtc, Da
 
 public sealed class ProcessRunner
 {
-    private static readonly TimeSpan OutputDrainTimeout = TimeSpan.FromSeconds(5);
-    private readonly ProcessSupervisor processSupervisor = ProcessSupervisor.Shared;
+    private static readonly UTF8Encoding TransportUtf8 = new(encoderShouldEmitUTF8Identifier: false);
+    private readonly ProcessExecutor processExecutor = ProcessExecutor.Shared;
 
     public async Task<ProcessResult> RunAsync(string executable, IReadOnlyList<string> arguments, string workingDirectory, string stdoutPath, string stderrPath, TimeSpan timeout, CancellationToken cancellationToken, string? standardInput = null, IReadOnlyDictionary<string, string>? environmentOverrides = null, string? completionSignalPath = null)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(stdoutPath)!);
-        var start = new ProcessStartInfo(executable) { WorkingDirectory = workingDirectory, RedirectStandardInput = standardInput is not null, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
-        if (standardInput is not null) start.StandardInputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
-        foreach (var argument in arguments) start.ArgumentList.Add(argument);
-        if (environmentOverrides is not null)
-            foreach (var (name, value) in environmentOverrides)
-                start.Environment[name] = value;
+        var request = new ProcessExecutionRequest(executable, arguments, workingDirectory)
+        {
+            EnvironmentOverrides = environmentOverrides,
+            StandardInput = standardInput,
+            StandardInputEncoding = standardInput is null ? null : TransportUtf8,
+            OutputDrainTimeout = TimeSpan.FromSeconds(5),
+            StandardOutput = new()
+            {
+                Capture = false,
+                FilePath = stdoutPath
+            },
+            StandardError = new()
+            {
+                Capture = false,
+                FilePath = stderrPath
+            }
+        };
 
-        Process? process;
         var startedAt = DateTimeOffset.UtcNow;
+        ProcessExecutionHandle process;
         try
         {
-            process = processSupervisor.Start(start);
-            if (process is null) throw new InvalidOperationException($"Could not start '{executable}'.");
+            process = await processExecutor.StartAsync(request, cancellationToken);
         }
-        catch (Exception exception)
+        catch (ProcessExecutionException exception)
         {
+            if (exception.Result.CompletionReason == ProcessCompletionReason.Cancelled)
+                throw new OperationCanceledException(cancellationToken);
             throw new InvalidOperationException($"Could not start '{executable}'. Ensure it is installed and available on PATH.", exception);
         }
 
-        using (process)
+        await using (process)
         {
-            await using var stdout = new FileStream(stdoutPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
-            await using var stderr = new FileStream(stderrPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
-            using var outputCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            var stdoutTask = processSupervisor.CopyAsync(process.StandardOutput.BaseStream, stdout, outputCancellation.Token);
-            var stderrTask = processSupervisor.CopyAsync(process.StandardError.BaseStream, stderr, outputCancellation.Token);
-            var stdinTask = standardInput is null ? Task.CompletedTask : WriteStandardInputAsync(process, standardInput, cancellationToken);
             var timedOut = false;
             var completionSignaled = false;
             long? observedCompletionLength = null;
             DateTimeOffset? completionStableSince = null;
             var deadline = startedAt + timeout;
-            var processExit = processSupervisor.WaitForExitAsync(process, timeout: null, CancellationToken.None);
+            var processExit = process.WaitForExitAsync(timeout: null, CancellationToken.None);
 
             try
             {
@@ -85,29 +90,27 @@ public sealed class ProcessRunner
             }
             catch (OperationCanceledException)
             {
-                await processSupervisor.TerminateProcessTreeAsync(process, CancellationToken.None);
-                await processExit;
-                outputCancellation.Cancel();
+                await process.TerminateAsync();
+                await process.CompleteAsync(ProcessCompletionReason.Cancelled);
                 throw;
             }
 
             if (timedOut || completionSignaled)
-            {
-                await processSupervisor.TerminateProcessTreeAsync(process, CancellationToken.None);
+                await process.TerminateAsync();
+            else
                 await processExit;
-            }
 
-            var drain = Task.WhenAll(stdoutTask, stderrTask);
-            if (!await processSupervisor.WaitAsync(drain, OutputDrainTimeout))
-            {
-                outputCancellation.Cancel();
-                try { await drain; }
-                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
-            }
-
+            var technical = await process.CompleteAsync(
+                timedOut ? ProcessCompletionReason.TimedOut : ProcessCompletionReason.Exited);
             cancellationToken.ThrowIfCancellationRequested();
-            await stdinTask;
-            return new ProcessResult(process.ExitCode, startedAt, DateTimeOffset.UtcNow, timedOut, stdoutPath, stderrPath, completionSignaled);
+            return new ProcessResult(
+                technical.ExitCode ?? -1,
+                startedAt,
+                DateTimeOffset.UtcNow,
+                timedOut,
+                stdoutPath,
+                stderrPath,
+                completionSignaled);
         }
     }
 
@@ -121,11 +124,5 @@ public sealed class ProcessRunner
         }
         catch (JsonException) { return false; }
         catch (IOException) { return false; }
-    }
-
-    private static async Task WriteStandardInputAsync(Process process, string input, CancellationToken cancellationToken)
-    {
-        await process.StandardInput.WriteAsync(input.AsMemory(), cancellationToken);
-        process.StandardInput.Close();
     }
 }
