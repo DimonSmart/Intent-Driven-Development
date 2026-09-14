@@ -3,6 +3,7 @@ using System.Text.Json;
 using Idd.Factory.Configuration;
 using Idd.Factory.Domain;
 using Idd.Factory.Persistence;
+using Idd.Factory.Processes;
 using Idd.Factory.Runtime;
 using Idd.Factory.State;
 using ModelContextProtocol;
@@ -52,6 +53,28 @@ public sealed class FactoryMcpTests
         Assert.True(requestBytes!.Length >= 3);
         Assert.Equal(new byte[] { 0xEF, 0xBB, 0xBF }, requestBytes[..3]);
         Assert.Equal(FactoryRuntimeProcessRunner.ResolvePluginRoot(AppContext.BaseDirectory), ValueAfter(invoker.Invocation, "--plugin-root"));
+    }
+
+    [Fact]
+    public async Task ProcessInvokerDoesNotConfigureStdinEncodingWithoutRedirectedInput()
+    {
+        using var temp = new TestWorkspace();
+        var executor = new RecordingProcessExecutor();
+        var invocation = new FactoryProcessInvocation(
+            "dotnet",
+            ["idd-factory.dll", "run"],
+            temp.Path,
+            null);
+
+        var result = await new SystemFactoryProcessInvoker(executor)
+            .RunAsync(invocation, CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.NotNull(executor.Request);
+        Assert.Null(executor.Request!.StandardInput);
+        Assert.Null(executor.Request.StandardInputEncoding);
+        Assert.NotNull(executor.Request.StandardOutputEncoding);
+        Assert.NotNull(executor.Request.StandardErrorEncoding);
     }
 
     [Fact]
@@ -275,6 +298,26 @@ public sealed class FactoryMcpTests
             Invocation = invocation;
             inspect?.Invoke(invocation);
             return Task.FromResult(result);
+        }
+    }
+
+    private sealed class RecordingProcessExecutor : IProcessExecutor
+    {
+        public ProcessExecutionRequest? Request { get; private set; }
+
+        public Task<ProcessExecutionResult> RunAsync(
+            ProcessExecutionRequest request,
+            CancellationToken cancellationToken)
+        {
+            Request = request;
+            return Task.FromResult(new ProcessExecutionResult(
+                Environment.ProcessId,
+                0,
+                ProcessCompletionReason.Exited,
+                "",
+                "",
+                ProcessTerminationOutcome.NotRequested,
+                []));
         }
     }
 }
