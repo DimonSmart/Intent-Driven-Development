@@ -10,5 +10,6 @@
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4"><PrivateAssets>all</PrivateAssets></PackageReference>
     <ProjectReference Include="..\..\src\runtime\Idd.Factory\Idd.Factory.csproj" />
+    <ProjectReference Include="..\Idd.Factory.ProcessTestHelper\Idd.Factory.ProcessTestHelper.csproj" />
   </ItemGroup>
 </Project>
