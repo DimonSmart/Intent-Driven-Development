@@ -1,4 +1,5 @@
 using Idd.Factory.Domain;
+using Idd.Factory.Processes;
 using Idd.Factory.Verification;
 
 namespace Idd.Factory.Tests;
@@ -125,9 +126,15 @@ public sealed class VerificationScenarios
         var starts = 0;
         var hooks = new VerificationRuntimeHooks
         {
-            StartProcess = info => starts++ == 0
-                ? throw new System.ComponentModel.Win32Exception("simulated infrastructure failure")
-                : System.Diagnostics.Process.Start(info)
+            ProcessExecutor = new StubProcessExecutor(async (request, token) =>
+            {
+                if (starts++ == 0)
+                {
+                    return StubProcessExecutor.StartFailure(
+                        new System.ComponentModel.Win32Exception("simulated infrastructure failure"));
+                }
+                return await ProcessExecutor.Shared.RunAsync(request, token);
+            })
         };
         scenario.WithVerification(VerificationPolicyFixture.SingleCheck("infrastructure-check", "exit 0", "subtask"))
             .WithVerification(new VerificationEngine(
@@ -158,7 +165,9 @@ public sealed class VerificationScenarios
         using var scenario = FactoryScenario.Create();
         var hooks = new VerificationRuntimeHooks
         {
-            StartProcess = _ => throw new System.ComponentModel.Win32Exception("simulated infrastructure failure")
+            ProcessExecutor = new StubProcessExecutor((_, _) => Task.FromResult(
+                StubProcessExecutor.StartFailure(
+                    new System.ComponentModel.Win32Exception("simulated infrastructure failure"))))
         };
         scenario.WithRepositoryFallback(0)
             .WithVerification(new VerificationEngine(
