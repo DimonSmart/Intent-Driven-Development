@@ -25,7 +25,7 @@ The scenario creates an isolated `CODEX_HOME`, builds and installs the current g
 
 `CODEX_HOME`, Codex plugin/cache data, and the generated marketplace are created under the OS temporary directory and deleted after the outer Codex process finishes. They are intentionally not retained under `artifacts/factory-evals` because they are reproducible infrastructure rather than diagnostic evidence. If cleanup cannot complete because files remain locked, the run keeps only a small `temporary-cleanup-warning.txt` pointing to the temporary directory.
 
-The evaluation requires at least one completed work item but does not pin the planner to an exact decomposition or an exact number of semantic turns.
+The scenario intentionally requires at least two sequential implementation work items. The first establishes `ProductCode`; the second integrates that completed abstraction into `Catalog`. The evaluation requires `CompletedWorkCount >= 2` and also inspects the persisted executor invocation for the second completed work item to prove that Factory passed the first work item's completed metadata and semantic result through `Relevant completed work and results`. Additional work items remain allowed when the workflow genuinely requires them.
 
 The same invocation checks the blocking transport contract: exactly one `factory_run`, no `factory_status` polling, and no completed model turn while the blocking call is active. It also checks Factory `COMPLETED`, final verification `passed`, independent final build/tests, the expected product change, and preservation of durable intent and protected scenario inputs.
 

@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Idd.Factory.Domain;
 using Idd.Factory.LiveTests.Infrastructure;
 using Idd.Factory.Verification;
 using Xunit;
@@ -60,7 +62,8 @@ public sealed class FactoryEndToEndLiveTests
             var factory = FactoryResultReader.ReadSingle(workspace.WorkspaceDirectory);
             Assert.Equal("COMPLETED", factory.Outcome);
             Assert.Equal(installed.MethodologyVersion, factory.MethodologyVersion);
-            Assert.True(factory.CompletedWorkCount >= 1, $"Expected at least one completed work item, observed {factory.CompletedWorkCount}.");
+            Assert.True(factory.CompletedWorkCount >= 2, $"Expected at least two completed work items, observed {factory.CompletedWorkCount}.");
+            AssertSequentialWorkHandoff(factory.Path);
             Assert.Equal("passed", factory.VerificationStatus);
             Assert.False(string.IsNullOrWhiteSpace(factory.CommitMessagePath));
             Assert.True(File.Exists(Path.Combine(workspace.WorkspaceDirectory, factory.CommitMessagePath!.Replace('/', Path.DirectorySeparatorChar))));
@@ -99,6 +102,51 @@ public sealed class FactoryEndToEndLiveTests
         var text = File.ReadAllText(path).Trim();
         const int maxLength = 4000;
         return text.Length <= maxLength ? text : "..." + text[^maxLength..];
+    }
+
+    private static void AssertSequentialWorkHandoff(string factoryResultPath)
+    {
+        var resultDirectory = Path.GetDirectoryName(factoryResultPath)
+            ?? throw new XunitException("Factory result directory could not be resolved.");
+        var completedWorkPath = Path.Combine(resultDirectory, "completed-work.json");
+        Assert.True(File.Exists(completedWorkPath), "completed-work.json is missing from the Factory result.");
+
+        using var completedDocument = JsonDocument.Parse(File.ReadAllText(completedWorkPath));
+        var completed = completedDocument.RootElement.GetProperty("completed").EnumerateArray()
+            .Select(item => new
+            {
+                Id = item.GetProperty("id").GetString() ?? string.Empty,
+                ResultRef = item.GetProperty("resultRef").GetString() ?? string.Empty
+            })
+            .ToArray();
+        Assert.True(completed.Length >= 2, $"Expected at least two persisted completed work items, observed {completed.Length}.");
+        Assert.False(string.IsNullOrWhiteSpace(completed[0].Id));
+        Assert.False(string.IsNullOrWhiteSpace(completed[0].ResultRef));
+        Assert.False(string.IsNullOrWhiteSpace(completed[1].Id));
+        Assert.NotEqual(completed[0].Id, completed[1].Id);
+
+        var attemptsDirectory = Path.Combine(resultDirectory, "attempts");
+        var secondInvocation = Directory.GetFiles(attemptsDirectory, "invocation.json", SearchOption.AllDirectories)
+            .Select(path => JsonSerializer.Deserialize<AgentInvocation>(File.ReadAllText(path), FactoryJson.Options)
+                            ?? throw new XunitException($"Invalid invocation artifact: {path}"))
+            .Where(invocation => invocation.Capability == "implementation" && invocation.WorkItemId == completed[1].Id)
+            .OrderBy(invocation => invocation.StartedAt)
+            .FirstOrDefault()
+            ?? throw new XunitException($"No executor invocation found for second completed work item {completed[1].Id}.");
+
+        var firstSemanticResultPath = Path.Combine(
+            resultDirectory,
+            completed[0].ResultRef.Replace('/', Path.DirectorySeparatorChar));
+        Assert.True(File.Exists(firstSemanticResultPath), $"Semantic result for first work item is missing: {completed[0].ResultRef}.");
+        var firstSemanticResult = File.ReadAllText(firstSemanticResultPath).Trim();
+        Assert.False(string.IsNullOrWhiteSpace(firstSemanticResult), "First work item semantic result is empty.");
+
+        Assert.True(
+            secondInvocation.Input.Contains($"## {completed[0].Id}", StringComparison.Ordinal),
+            $"Second executor input does not contain completed-work metadata for {completed[0].Id}.");
+        Assert.True(
+            secondInvocation.Input.Contains(firstSemanticResult, StringComparison.Ordinal),
+            $"Second executor input does not contain the semantic result of {completed[0].Id}.");
     }
 
     private static void AssertProtectedInputsUnchanged(LiveTestWorkspace workspace)
