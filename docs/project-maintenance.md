@@ -129,9 +129,11 @@ Live validation is explicit and token-consuming:
 pwsh ./scripts/Check.ps1 -Mode Live
 ```
 
-Live builds and runs `Idd.Factory.LiveTests` with
-`IDD_RUN_LIVE_FACTORY_EVALS=1`. `run-live-factory-evals.bat` is a convenience
-wrapper for the same entry point.
+Live builds `Idd.Factory.LiveTests`, enables `IDD_RUN_LIVE_FACTORY_EVALS=1`,
+and runs only `Category=LiveFactoryEval`. The category currently selects the
+single Factory end-to-end evaluation. Ordinary `[Fact]` tests in the LiveTests
+project are not selected by Live mode. `run-live-factory-evals.bat` is a
+convenience wrapper for the same entry point.
 
 Release validation extends Fast with release-only contracts:
 
@@ -190,7 +192,8 @@ run-live-factory-evals.bat
 ```
 
 The live eval consumes Codex usage and checks installed-plugin execution,
-semantic orchestration, worker behavior, and evaluation telemetry. See
+semantic orchestration, the blocking Factory transport contract, final product
+behavior, and protected-input preservation. See
 [`evals/idd-factory/README.md`](../evals/idd-factory/README.md).
 
 The publish workflow is:

@@ -89,7 +89,7 @@ function Invoke-LiveValidation {
 
     try {
         Invoke-CheckedNative -FilePath "dotnet" -Arguments @("build", "tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj", "--nologo")
-        Invoke-CheckedNative -FilePath "dotnet" -Arguments @("test", "tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj", "--no-build", "--nologo")
+        Invoke-CheckedNative -FilePath "dotnet" -Arguments @("test", "tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj", "--no-build", "--nologo", "--filter", "Category=LiveFactoryEval")
     }
     finally {
         $env:IDD_RUN_LIVE_FACTORY_EVALS = $previousLive

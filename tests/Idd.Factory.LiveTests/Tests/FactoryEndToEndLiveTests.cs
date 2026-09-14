@@ -15,7 +15,7 @@ public sealed class FactoryEndToEndLiveTests
     public async Task TwoStepCatalog_CompletesThroughOneBlockingFactoryCall()
     {
         var repositoryRoot = LiveTestWorkspace.FindRepositoryRoot();
-        var workspace = LiveTestWorkspace.CreateCase(repositoryRoot, "TwoStepCatalog", copyTemplate: true);
+        var workspace = LiveTestWorkspace.CreateTwoStepCatalog(repositoryRoot);
         var runner = new ProcessRunner();
         var gitInitialized = false;
         try
@@ -34,7 +34,7 @@ public sealed class FactoryEndToEndLiveTests
             Assert.NotEqual(0, baselineCatalog.ExitCode);
 
             await workspace.LogAsync("Starting real Codex -> installed plugin -> factory_run -> Factory Runtime execution.");
-            var codex = await new CodexProcess(runner).RunAsync(workspace, "danger-full-access", factoryEnvironment: true, CancellationToken.None);
+            var codex = await new CodexProcess(runner).RunAsync(workspace, CancellationToken.None);
             Assert.False(codex.Process.TimedOut);
             Assert.True(codex.Process.ExitCode == 0 || codex.Process.CompletionSignaled, $"Codex exit={codex.Process.ExitCode}. See {workspace.StderrPath}.");
 

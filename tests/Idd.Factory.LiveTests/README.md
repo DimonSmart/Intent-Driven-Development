@@ -1,16 +1,27 @@
 # Idd.Factory.LiveTests
 
-This project is intentionally a small safety net around behavior that requires a real Codex host or real OS sandbox/process integration. Deterministic Factory state, scheduling, parsing, retry, persistence, MCP mapping, and process-termination behavior belong in `Idd.Factory.Tests`.
+This project contains one intentionally expensive, token-consuming Factory end-to-end evaluation:
 
-The ordinary live suite contains two token-consuming scenarios:
+`FactoryEndToEndLiveTests.TwoStepCatalog_CompletesThroughOneBlockingFactoryCall`
 
-- `FactoryEndToEndLiveTests`: installs the generated plugin and runs the TwoStepCatalog case through real Codex, `factory_run`, Factory Runtime, semantic workers, final product verification, and the blocking-transport assertions.
-- `WorkspaceWriteLiveTests`: proves the supported `workspace-write` Codex launch can create and modify real workspace files.
+The scenario installs the generated current Factory plugin and runs the prepared `TwoStepCatalog` workspace through a real Codex host, real `factory_run`, production Factory Runtime, real semantic workers, and the configured semantic model. The task is deliberately multi-step and the evaluation requires at least two completed work items.
 
-Blocking transport is deliberately asserted from the same TwoStepCatalog invocation: one `factory_run`, zero `factory_status` calls, and zero completed model turns while `factory_run` is active. `MinimalCodexTraceReader` reads only those events.
+Run it manually with:
 
-Cancellation/process-tree cleanup does not have a separate token-consuming Codex scenario. Production termination behavior is exercised directly and deterministically by `Idd.Factory.Tests` (including `BatchRuntimeTests` termination diagnostics and MCP/runtime process tests), which provides a cheaper and more precise regression signal.
+```bat
+run-live-factory-evals.bat
+```
 
-On failure the run directory under `artifacts/factory-evals/` retains raw evidence: Codex `events.jsonl`, stderr and final response, Factory current/result state, verification command output, progress log, and git status/diff. LiveTests intentionally generate no agent-trace, efficiency, rollout, launch-profile, or derived report artifacts.
+`Check.ps1 -Mode Live` enables `IDD_RUN_LIVE_FACTORY_EVALS=1` and selects only:
 
-Before this simplification, the LiveTests source had 31 Infrastructure files, 7 Models files, 2 Environment files, and 18 test source files. The target structure removes the Models and Environments layers and keeps only a handful of process/workspace/install/trace helpers plus the two real live scenarios.
+```text
+Category=LiveFactoryEval
+```
+
+A normal `[Fact]` added to this project is therefore not part of the token-consuming live run. Without the live opt-in, `LiveFactoryEvalFact` remains skipped.
+
+The evaluation checks observable behavior: the prepared product baseline does not yet satisfy the requested behavior, Factory reaches `COMPLETED`, at least two work items complete, final verification passes, independent final build/tests pass, and durable intent plus protected verification input remain unchanged. It also keeps the public blocking transport assertions: one `factory_run`, no `factory_status` polling, and no completed model turn while the blocking call is active.
+
+Process execution, cancellation, timeout, process-tree termination, transport, workflow/state transitions, retries, continuation, persistence/recovery, verification mechanics, intent propagation, and other mechanical contracts belong in deterministic `Idd.Factory.Tests`. LiveTests should not grow separate real-model scenarios for behavior that can be checked reliably without an LLM.
+
+On failure, raw evidence is retained under `artifacts/factory-evals/<run-id>/`, including the workspace, Factory current/result state, Codex `events.jsonl`, stderr/final response, verification logs, progress log, and git status/diff.

@@ -6,7 +6,10 @@ public sealed record CodexRunResult(ProcessResult Process, string Model, string 
 
 public sealed class CodexProcess(ProcessRunner processRunner)
 {
-    public async Task<CodexRunResult> RunAsync(LiveTestWorkspace workspace, string sandboxMode, bool factoryEnvironment, CancellationToken cancellationToken)
+    public Task<CodexRunResult> RunAsync(LiveTestWorkspace workspace, CancellationToken cancellationToken) =>
+        RunAsync(workspace, "danger-full-access", factoryEnvironment: true, cancellationToken);
+
+    private async Task<CodexRunResult> RunAsync(LiveTestWorkspace workspace, string sandboxMode, bool factoryEnvironment, CancellationToken cancellationToken)
     {
         InstalledFactory.PrepareIsolatedCodexHome(workspace.CodexHomeDirectory);
         var model = Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_MODEL") ?? "gpt-5.6-luna";

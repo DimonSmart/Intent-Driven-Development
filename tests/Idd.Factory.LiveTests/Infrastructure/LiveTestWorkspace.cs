@@ -20,11 +20,11 @@ public sealed record LiveTestWorkspace(
         throw new DirectoryNotFoundException("Could not locate the Intent-Driven-Development repository root.");
     }
 
-    public static LiveTestWorkspace CreateCase(string repositoryRoot, string caseName, bool copyTemplate)
+    public static LiveTestWorkspace CreateTwoStepCatalog(string repositoryRoot)
     {
         var runId = $"{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"[..24];
         var runDirectory = Path.Combine(repositoryRoot, "artifacts", "factory-evals", runId);
-        var caseDirectory = Path.Combine(repositoryRoot, "tests", "Idd.Factory.LiveTests", "Cases", caseName);
+        var caseDirectory = Path.Combine(repositoryRoot, "tests", "Idd.Factory.LiveTests", "Cases", "TwoStepCatalog");
         var workspace = new LiveTestWorkspace(
             runDirectory,
             Path.Combine(runDirectory, "workspace"),
@@ -34,15 +34,8 @@ public sealed record LiveTestWorkspace(
         Directory.CreateDirectory(workspace.RunDirectory);
         Directory.CreateDirectory(workspace.WorkspaceDirectory);
         Directory.CreateDirectory(workspace.VerificationDirectory);
-        if (copyTemplate) CopyDirectory(Path.Combine(caseDirectory, "Template"), workspace.WorkspaceDirectory);
+        CopyDirectory(Path.Combine(caseDirectory, "Template"), workspace.WorkspaceDirectory);
         File.Copy(Path.Combine(caseDirectory, "task.md"), Path.Combine(runDirectory, "task.md"));
-        return workspace;
-    }
-
-    public static LiveTestWorkspace CreateWorkspaceWriteProbe(string repositoryRoot)
-    {
-        var workspace = CreateCase(repositoryRoot, "CodexWorkspaceWriteProbe", copyTemplate: false);
-        File.WriteAllText(Path.Combine(workspace.WorkspaceDirectory, "existing.txt"), "WORKSPACE_UPDATE_PENDING");
         return workspace;
     }
 
