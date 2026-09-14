@@ -5,28 +5,26 @@ namespace Idd.Factory.Runtime;
 
 internal enum FactoryExecutionResultKind
 {
-    Completed,
-    Retry,
-    RetryBudgetExhausted,
-    VerificationRetryNoProgress
+    Ready,
+    RetryBudgetExhausted
 }
 
-internal sealed record FactoryExecutionResult(
+internal sealed record FactoryExecutionPreparation(
     FactoryExecutionResultKind Kind,
     string WorkItemId,
-    string? AttemptId = null,
+    string? Input = null,
+    bool VerificationDrivenRetry = false,
     string? Detail = null);
 
 internal sealed class ExecutionService(
     FactoryRuntimeContext context,
-    SemanticExecutionService semanticExecution,
     FactoryContextReader contextReader)
 {
     private static readonly UTF8Encoding HumanReadableUtf8 =
         new(encoderShouldEmitUTF8Identifier: true, throwOnInvalidBytes: true);
     private readonly IntentDocumentResolver intentResolver = new(context.Workspace);
 
-    public async Task<FactoryExecutionResult> ExecuteAsync(
+    public async Task<FactoryExecutionPreparation> PrepareAsync(
         FactoryState state,
         string workItemId,
         CancellationToken cancellationToken)
@@ -60,128 +58,40 @@ internal sealed class ExecutionService(
                     cancellationToken));
         }
 
-        var verificationDrivenRetry =
-            item.LastVerificationDecision == VerificationDecision.UnexpectedFailure;
-
-        var input = await BuildWorkInputAsync(state, item, cancellationToken);
-        state.CurrentPhase = CurrentWorkPhase.Running;
-        await context.SaveAsync(state, cancellationToken);
-
-        BoundSemanticResult result;
-        try
-        {
-            result = await semanticExecution.InvokeAsync(
-                state,
-                "implementation",
-                item,
-                input,
-                SemanticOperationKind.WorkItemExecution,
-                cancellationToken);
-        }
-        catch (AgentProtocolException exception) when (
-            exception.Code is "AGENT_COMMAND_TIMEOUT" or "AGENT_COMMAND_INCOMPLETE")
-        {
-            await PrepareCommandFailureRetryAsync(
-                state,
-                item,
-                exception,
-                cancellationToken);
-            return new(FactoryExecutionResultKind.Retry, item.Id);
-        }
-
-        item = state.Current
-               ?? throw new FactoryStateException(
-                   "CORRUPT_FACTORY_STATE",
-                   "Current work disappeared during dispatch.");
-        item.LastResultRef = result.SemanticResultPath;
-        item.CurrentAttemptId = null;
-
-        if (verificationDrivenRetry
-            && !await semanticExecution.AttemptChangedWorkspaceAsync(
-                result.AttemptId,
-                cancellationToken))
-        {
-            return new(
-                FactoryExecutionResultKind.VerificationRetryNoProgress,
-                item.Id,
-                result.AttemptId);
-        }
-
         return new(
-            FactoryExecutionResultKind.Completed,
+            FactoryExecutionResultKind.Ready,
             item.Id,
-            result.AttemptId);
+            await BuildWorkInputAsync(state, item, cancellationToken),
+            item.LastVerificationDecision == VerificationDecision.UnexpectedFailure);
     }
 
-    public async Task<FactoryCliOutcome?> ExtendRetryBudgetAsync(
-        FactoryState state,
-        int additionalAttempts,
+    public async Task<string> PersistCommandFailureDiagnosticAsync(
+        string attemptId,
+        AgentProtocolException exception,
         CancellationToken cancellationToken)
     {
-        if (additionalAttempts < 1)
+        var diagnosticReference = $"attempts/{attemptId}/stderr.log";
+        var diagnosticPath = Path.Combine(
+            context.CurrentDirectory,
+            diagnosticReference.Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(diagnosticPath))
         {
-            return new(
-                "INVALID_RETRY_ATTEMPTS",
-                state.RunId,
-                "additionalAttempts must be at least 1.");
+            Directory.CreateDirectory(Path.GetDirectoryName(diagnosticPath)!);
+            await File.WriteAllTextAsync(
+                diagnosticPath,
+                exception.Message,
+                HumanReadableUtf8,
+                cancellationToken);
         }
 
-        if (state.RunStatus != FactoryRunStatus.Blocked
-            || state.Blocker?.Code != "RETRY_BUDGET_EXHAUSTED"
-            || state.PendingContinuation is not { Kind: ContinuationKind.Terminal }
-            || state.Current is null)
-        {
-            return new(
-                "RETRY_NOT_AVAILABLE",
-                state.RunId,
-                "The current run is not blocked by an exhausted work-item retry budget.",
-                "Use factory_continue for a resumable continuation, or cancel and restart.");
-        }
-
-        var effectiveBudget =
-            context.Configuration.Limits.MaxAttemptsPerTask
-            + state.Current.AdditionalAttemptBudget;
-        var availableAttempts = 10 - effectiveBudget;
-        if (additionalAttempts > availableAttempts)
-        {
-            return new(
-                "INVALID_RETRY_ATTEMPTS",
-                state.RunId,
-                $"Only {availableAttempts} additional attempts are available; Factory permits at most 10 attempts per work item.");
-        }
-
-        if (state.Current.AttemptCount < effectiveBudget)
-        {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                "Retry-budget exhaustion was recorded before the current work item consumed its effective attempt budget.");
-        }
-
-        state.Current.AdditionalAttemptBudget += additionalAttempts;
-        state.CurrentPhase = CurrentWorkPhase.Ready;
-        state.CurrentAttemptId = null;
-        state.PendingContinuation = new(
-            ContinuationKind.SemanticInvocation,
-            state.Current.Id,
-            null,
-            "RETRY_AFTER_BUDGET_EXTENSION",
-            true,
-            SemanticOperationKind.WorkItemExecution);
-        state.Blocker = null;
-        state.RunStatus = FactoryRunStatus.Running;
-        await context.Events.WriteAsync(
-            state.RunId,
-            "retry-budget-extended",
-            new
-            {
-                workItemId = state.Current.Id,
-                additionalAttempts,
-                effectiveAttemptBudget = effectiveBudget + additionalAttempts
-            },
-            cancellationToken);
-        await context.SaveAsync(state, cancellationToken);
-        return null;
+        return diagnosticReference;
     }
+
+    public int AvailableAdditionalAttempts(PlannedWorkItem item) =>
+        10 - (context.Configuration.Limits.MaxAttemptsPerTask + item.AdditionalAttemptBudget);
+
+    public int EffectiveAttemptBudget(PlannedWorkItem item) =>
+        context.Configuration.Limits.MaxAttemptsPerTask + item.AdditionalAttemptBudget;
 
     private async Task<string> BuildWorkInputAsync(
         FactoryState state,
@@ -249,55 +159,5 @@ internal sealed class ExecutionService(
         }
 
         return builder.ToString();
-    }
-
-    private async Task PrepareCommandFailureRetryAsync(
-        FactoryState state,
-        PlannedWorkItem item,
-        AgentProtocolException exception,
-        CancellationToken cancellationToken)
-    {
-        var attemptId = state.CurrentAttemptId
-                        ?? item.CurrentAttemptId
-                        ?? throw new FactoryStateException(
-                            "CORRUPT_FACTORY_STATE",
-                            "A shell-command failure has no current semantic attempt.");
-        var diagnosticReference = $"attempts/{attemptId}/stderr.log";
-        var diagnosticPath = Path.Combine(
-            context.CurrentDirectory,
-            diagnosticReference.Replace('/', Path.DirectorySeparatorChar));
-        if (!File.Exists(diagnosticPath))
-        {
-            await File.WriteAllTextAsync(
-                diagnosticPath,
-                exception.Message,
-                HumanReadableUtf8,
-                cancellationToken);
-        }
-
-        if (!item.PriorAttemptDiagnosticRefs.Contains(
-                diagnosticReference,
-                StringComparer.Ordinal))
-        {
-            item.PriorAttemptDiagnosticRefs.Add(diagnosticReference);
-        }
-
-        state.CurrentAttemptId = null;
-        item.CurrentAttemptId = null;
-        state.PendingContinuation = null;
-        state.Blocker = null;
-        state.CurrentPhase = CurrentWorkPhase.Ready;
-        await context.Events.WriteAsync(
-            state.RunId,
-            "agent-command-failure-retry",
-            new
-            {
-                attemptId,
-                workItemId = item.Id,
-                exception.Code,
-                diagnosticReference
-            },
-            cancellationToken);
-        await context.SaveAsync(state, cancellationToken);
     }
 }
