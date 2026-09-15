@@ -33,7 +33,7 @@ public sealed class FactoryRuntime
             new PlannerMarkdownParser());
         var execution = new ExecutionService(context, contextReader);
         var runtimeVerification = new RuntimeVerificationService(context, verification);
-        var stop = new FactoryStopService();
+        var stop = new FactoryStopService(context);
         var planMutation = new PlanMutationService(
             context,
             new PlanRevisionWriter(context.CurrentDirectory, clock));
