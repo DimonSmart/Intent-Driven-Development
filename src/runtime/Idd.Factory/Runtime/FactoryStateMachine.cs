@@ -689,12 +689,31 @@ internal sealed class FactoryStateMachine(
                 cancellationToken);
         }
         catch (AgentProtocolException exception) when (
-            exception.Code is "AGENT_COMMAND_TIMEOUT" or "AGENT_COMMAND_INCOMPLETE")
+            TechnicalFailureClassifier.Classify(
+                SemanticOperationKind.WorkItemExecution,
+                exception) == TechnicalFailureClassification.RestartableTechnicalFailure)
         {
+            var failedChangedPaths = await semanticExecution.RecoverFailedAttemptWorkspaceChangesAsync(
+                state,
+                item,
+                attemptId,
+                CancellationToken.None);
+            ApplyChangedPaths(state, item, failedChangedPaths);
+
             var diagnosticReference = await execution.PersistCommandFailureDiagnosticAsync(
                 attemptId,
                 exception,
-                cancellationToken);
+                CancellationToken.None);
+            var boundedMessage = exception.Message.Length <= 4096
+                ? exception.Message
+                : exception.Message[..4096] + " [truncated]";
+            var failure = new TechnicalFailureDiagnostic(
+                attemptId,
+                exception.Code,
+                diagnosticReference,
+                boundedMessage);
+            if (!item.PriorTechnicalFailures.Any(x => x.FailedAttemptId == attemptId))
+                item.PriorTechnicalFailures.Add(failure);
             if (!item.PriorAttemptDiagnosticRefs.Contains(
                     diagnosticReference,
                     StringComparer.Ordinal))
@@ -702,27 +721,63 @@ internal sealed class FactoryStateMachine(
                 item.PriorAttemptDiagnosticRefs.Add(diagnosticReference);
             }
 
+            item.NextInvocationKind = WorkItemInvocationKind.TechnicalRestart;
             state.CurrentAttemptId = null;
             item.CurrentAttemptId = null;
             state.PendingContinuation = null;
             state.Blocker = null;
+            state.RunStatus = FactoryRunStatus.Running;
             state.CurrentPhase = CurrentWorkPhase.Ready;
+
+            var technicalRestartBudget = context.Configuration.Limits.MaxTechnicalRestartsPerTask;
+            if (item.TechnicalRestartCount >= technicalRestartBudget)
+            {
+                await context.Events.WriteAsync(
+                    state.RunId,
+                    "technical-restart-budget-exhausted",
+                    new
+                    {
+                        workItemId = item.Id,
+                        failedAttemptId = attemptId,
+                        failureCode = exception.Code,
+                        diagnosticReference,
+                        technicalRestartCount = item.TechnicalRestartCount,
+                        technicalRestartBudget
+                    },
+                    CancellationToken.None);
+                var budgetException = new AgentProtocolException(
+                    "TECHNICAL_RESTART_BUDGET_EXHAUSTED",
+                    $"Work item {item.Id} exhausted its technical restart budget ({item.TechnicalRestartCount}/{technicalRestartBudget}) after {exception.Code} in {attemptId}. Diagnostic: {diagnosticReference}.");
+                var outcome = await BlockAsync(
+                    state,
+                    stop.FromAgentProtocolException(state, budgetException),
+                    CancellationToken.None);
+                return new(
+                    FactoryRuntimeState.Executing,
+                    FactoryRuntimeState.Blocked,
+                    "technical-restart-budget-exhausted",
+                    outcome);
+            }
+
             await context.Events.WriteAsync(
                 state.RunId,
-                "agent-command-failure-retry",
+                "technical-restart-scheduled",
                 new
                 {
-                    attemptId,
                     workItemId = item.Id,
-                    exception.Code,
+                    failedAttemptId = attemptId,
+                    failureCode = exception.Code,
+                    semanticAttemptNumber = item.SemanticAttemptCount,
+                    technicalRestartNumber = item.TechnicalRestartCount + 1,
+                    technicalRestartBudget,
                     diagnosticReference
                 },
-                cancellationToken);
-            await context.SaveAsync(state, cancellationToken);
+                CancellationToken.None);
+            await context.SaveAsync(state, CancellationToken.None);
             return TransitionFromCurrent(
                 FactoryRuntimeState.Executing,
                 state,
-                "execution-retry");
+                "technical-restart-scheduled");
         }
 
         CompleteSemanticAttempt(state, item, semantic);
