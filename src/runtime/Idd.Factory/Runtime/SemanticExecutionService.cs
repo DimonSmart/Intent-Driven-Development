@@ -21,116 +21,47 @@ internal sealed class SemanticExecutionService(
                 RecoverWorkspaceChangesAsync)
             .AnalyzeAsync(state, cancellationToken);
 
-    public async Task<SemanticExecutionResult> InvokeAsync(
+    public Task<SemanticExecutionResult> InvokeAsync(
         FactoryState state,
         string capability,
         PlannedWorkItem? item,
         string input,
         string attemptId,
+        CancellationToken cancellationToken) =>
+        InvokeSingleAsync(
+            state,
+            capability,
+            item,
+            input,
+            attemptId,
+            cancellationToken);
+
+    public async Task<IReadOnlyList<string>> RecoverFailedAttemptWorkspaceChangesAsync(
+        FactoryState state,
+        PlannedWorkItem item,
+        string attemptId,
         CancellationToken cancellationToken)
     {
-        var currentAttemptId = attemptId;
-        var currentInput = input;
-        var changedPaths = new HashSet<string>(StringComparer.Ordinal);
+        var directory = Path.Combine(context.CurrentDirectory, "attempts", attemptId);
+        var invocationPath = Path.Combine(directory, "invocation.json");
+        if (!File.Exists(invocationPath))
+            return [];
 
-        while (true)
-        {
-            try
-            {
-                var result = await InvokeSingleAsync(
-                    state,
-                    capability,
-                    item,
-                    currentInput,
-                    currentAttemptId,
-                    cancellationToken);
-                foreach (var path in result.ChangedPaths)
-                    changedPaths.Add(path);
-                return new(result.Result, changedPaths.OrderBy(x => x, StringComparer.Ordinal).ToArray());
-            }
-            catch (AgentProtocolException exception) when (
-                item is not null
-                && TechnicalFailureClassifier.Classify(
-                    SemanticOperationKind.WorkItemExecution,
-                    exception) == TechnicalFailureClassification.RestartableTechnicalFailure)
-            {
-                var failedAttemptId = currentAttemptId;
-                var failedChangedPaths = await RecoverAttemptWorkspaceChangesAsync(
-                    state,
-                    item,
-                    failedAttemptId,
-                    CancellationToken.None);
-                foreach (var path in failedChangedPaths)
-                    changedPaths.Add(path);
-                ApplyChangedPaths(state, item, failedChangedPaths);
-
-                var diagnosticReference = await PersistTechnicalFailureDiagnosticAsync(
-                    failedAttemptId,
-                    exception,
-                    CancellationToken.None);
-                var failure = new TechnicalFailureDiagnostic(
-                    failedAttemptId,
-                    exception.Code,
-                    diagnosticReference,
-                    BoundDiagnostic(exception.Message));
-                if (!item.PriorTechnicalFailures.Any(x => x.FailedAttemptId == failedAttemptId))
-                    item.PriorTechnicalFailures.Add(failure);
-                if (!item.PriorAttemptDiagnosticRefs.Contains(diagnosticReference, StringComparer.Ordinal))
-                    item.PriorAttemptDiagnosticRefs.Add(diagnosticReference);
-
-                item.NextInvocationKind = WorkItemInvocationKind.TechnicalRestart;
-                state.CurrentAttemptId = null;
-                item.CurrentAttemptId = null;
-                state.PendingContinuation = null;
-                state.Blocker = null;
-                state.RunStatus = FactoryRunStatus.Running;
-                state.CurrentPhase = CurrentWorkPhase.Ready;
-                await context.SaveAsync(state, CancellationToken.None);
-
-                var technicalRestartBudget = context.Configuration.Limits.MaxTechnicalRestartsPerTask;
-                if (item.TechnicalRestartCount >= technicalRestartBudget)
-                {
-                    await context.Events.WriteAsync(
-                        state.RunId,
-                        "technical-restart-budget-exhausted",
-                        new
-                        {
-                            workItemId = item.Id,
-                            failedAttemptId,
-                            failureCode = exception.Code,
-                            diagnosticReference,
-                            technicalRestartCount = item.TechnicalRestartCount,
-                            technicalRestartBudget
-                        },
-                        CancellationToken.None);
-                    throw new AgentProtocolException(
-                        "TECHNICAL_RESTART_BUDGET_EXHAUSTED",
-                        BuildTechnicalRestartBudgetExhaustedMessage(item, failure, technicalRestartBudget));
-                }
-
-                await context.Events.WriteAsync(
-                    state.RunId,
-                    "technical-restart-scheduled",
-                    new
-                    {
-                        workItemId = item.Id,
-                        failedAttemptId,
-                        failureCode = exception.Code,
-                        semanticAttemptNumber = item.SemanticAttemptCount,
-                        technicalRestartNumber = item.TechnicalRestartCount + 1,
-                        technicalRestartBudget,
-                        diagnosticReference
-                    },
-                    CancellationToken.None);
-
-                currentInput = AppendTechnicalFailureDiagnostic(input, failure);
-                currentAttemptId = await StartTechnicalRestartAsync(
-                    state,
-                    item,
-                    currentInput,
-                    cancellationToken);
-            }
-        }
+        var invocation = JsonSerializer.Deserialize<AgentInvocation>(
+                             await File.ReadAllTextAsync(invocationPath, cancellationToken),
+                             FactoryJson.Options)
+                         ?? throw new AgentProtocolException(
+                             "UNKNOWN_ATTEMPT",
+                             $"Attempt {attemptId} has no valid invocation.");
+        ValidateInvocation(
+            state,
+            attemptId,
+            "implementation",
+            FactoryCapabilityCatalog.Resolve("implementation"),
+            item,
+            invocation,
+            directory);
+        return await RecoverWorkspaceChangesAsync(invocation, cancellationToken);
     }
 
     private async Task<SemanticExecutionResult> InvokeSingleAsync(
@@ -260,113 +191,6 @@ internal sealed class SemanticExecutionService(
             new { attemptId, capability, agent.Role, execution.Process.TerminationKind },
             cancellationToken);
         return new(execution.Result, changedPathsAfterExecution);
-    }
-
-    private async Task<string> StartTechnicalRestartAsync(
-        FactoryState state,
-        PlannedWorkItem item,
-        string input,
-        CancellationToken cancellationToken)
-    {
-        var attemptId = $"A{++state.AttemptSequence:000000}";
-        state.CurrentAttemptId = attemptId;
-        item.CurrentAttemptId = attemptId;
-        item.AttemptCount++;
-        state.CurrentPhase = CurrentWorkPhase.Running;
-        state.PendingContinuation = new(
-            ContinuationKind.SemanticInvocation,
-            item.Id,
-            null,
-            SemanticOperationKind.WorkItemExecution.ToString().ToUpperInvariant(),
-            true,
-            SemanticOperationKind.WorkItemExecution,
-            input);
-        await context.SaveAsync(state, cancellationToken);
-        return attemptId;
-    }
-
-    private async Task<IReadOnlyList<string>> RecoverAttemptWorkspaceChangesAsync(
-        FactoryState state,
-        PlannedWorkItem item,
-        string attemptId,
-        CancellationToken cancellationToken)
-    {
-        var directory = Path.Combine(context.CurrentDirectory, "attempts", attemptId);
-        var invocationPath = Path.Combine(directory, "invocation.json");
-        if (!File.Exists(invocationPath))
-            return [];
-
-        var invocation = JsonSerializer.Deserialize<AgentInvocation>(
-                             await File.ReadAllTextAsync(invocationPath, cancellationToken),
-                             FactoryJson.Options)
-                         ?? throw new AgentProtocolException(
-                             "UNKNOWN_ATTEMPT",
-                             $"Attempt {attemptId} has no valid invocation.");
-        ValidateInvocation(
-            state,
-            attemptId,
-            "implementation",
-            FactoryCapabilityCatalog.Resolve("implementation"),
-            item,
-            invocation,
-            directory);
-        return await RecoverWorkspaceChangesAsync(invocation, cancellationToken);
-    }
-
-    private async Task<string> PersistTechnicalFailureDiagnosticAsync(
-        string attemptId,
-        AgentProtocolException exception,
-        CancellationToken cancellationToken)
-    {
-        var diagnosticReference = $"attempts/{attemptId}/stderr.log";
-        var diagnosticPath = Path.Combine(
-            context.CurrentDirectory,
-            diagnosticReference.Replace('/', Path.DirectorySeparatorChar));
-        if (!File.Exists(diagnosticPath))
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(diagnosticPath)!);
-            await File.WriteAllTextAsync(diagnosticPath, BoundDiagnostic(exception.Message), cancellationToken);
-        }
-        return diagnosticReference;
-    }
-
-    private static string AppendTechnicalFailureDiagnostic(
-        string originalInput,
-        TechnicalFailureDiagnostic failure) =>
-        originalInput +
-        "\n\nTechnical restart context:\n" +
-        $"Previous executor invocation {failure.FailedAttemptId} ended with {failure.FailureCode}.\n" +
-        $"Diagnostic artifact: {failure.DiagnosticReference}\n" +
-        $"Bounded diagnostic message: {failure.Message}\n" +
-        "Continue the same immutable work item against the current workspace. Do not treat partial semantic output from the failed invocation as a trusted prior result.";
-
-    private static string BuildTechnicalRestartBudgetExhaustedMessage(
-        PlannedWorkItem item,
-        TechnicalFailureDiagnostic failure,
-        int budget) =>
-        $"Work item {item.Id} exhausted its technical restart budget ({item.TechnicalRestartCount}/{budget}) after {failure.FailureCode} in {failure.FailedAttemptId}. Diagnostic: {failure.DiagnosticReference}.";
-
-    private static string BoundDiagnostic(string message)
-    {
-        const int maximumLength = 4096;
-        var trimmed = message.Trim();
-        return trimmed.Length <= maximumLength
-            ? trimmed
-            : trimmed[..maximumLength] + " [truncated]";
-    }
-
-    private static void ApplyChangedPaths(
-        FactoryState state,
-        PlannedWorkItem item,
-        IEnumerable<string> changedPaths)
-    {
-        foreach (var path in changedPaths)
-        {
-            if (!item.ChangedPaths.Contains(path, StringComparer.Ordinal))
-                item.ChangedPaths.Add(path);
-            if (!state.FactoryRunChangedPaths.Contains(path, StringComparer.Ordinal))
-                state.FactoryRunChangedPaths.Add(path);
-        }
     }
 
     private static void ValidateInvocation(
