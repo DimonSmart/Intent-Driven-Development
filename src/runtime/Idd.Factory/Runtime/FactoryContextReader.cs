@@ -147,22 +147,36 @@ internal sealed class FactoryContextReader(FactoryRuntimeContext context)
         PlannedWorkItem item,
         CancellationToken cancellationToken)
     {
-        if (item.PriorAttemptDiagnosticRefs.Count == 0)
+        if (item.PriorTechnicalFailures.Count == 0 && item.PriorAttemptDiagnosticRefs.Count == 0)
             return "none";
 
         var sections = new List<string>
         {
-            "These attempts did not complete. Their test or command results are partial and must not be trusted. Diagnose and remove the hang before relying on a rerun."
+            "These executor invocations ended in technical failures and did not produce trusted semantic results. Their filesystem effects may still be present in the current workspace."
         };
-        foreach (var reference in item.PriorAttemptDiagnosticRefs.TakeLast(3))
+
+        if (item.PriorTechnicalFailures.Count > 0)
         {
-            var path = Path.Combine(
-                context.CurrentDirectory,
-                reference.Replace('/', Path.DirectorySeparatorChar));
-            var diagnostic = File.Exists(path)
-                ? await File.ReadAllTextAsync(path, cancellationToken)
-                : "missing diagnostic artifact";
-            sections.Add($"- {reference}:\n{BoundDiagnostic(diagnostic, 4096)}");
+            foreach (var failure in item.PriorTechnicalFailures.TakeLast(3))
+            {
+                var diagnostic = await ReadTechnicalDiagnosticAsync(
+                    failure.DiagnosticReference,
+                    failure.Message,
+                    cancellationToken);
+                sections.Add(
+                    $"- Failed invocation: {failure.FailedAttemptId}\n" +
+                    $"  Failure code: {failure.FailureCode}\n" +
+                    $"  Diagnostic: {failure.DiagnosticReference}\n" +
+                    $"  Bounded message:\n{BoundDiagnostic(diagnostic, 4096)}");
+            }
+        }
+        else
+        {
+            foreach (var reference in item.PriorAttemptDiagnosticRefs.TakeLast(3))
+            {
+                var diagnostic = await ReadTechnicalDiagnosticAsync(reference, "missing diagnostic artifact", cancellationToken);
+                sections.Add($"- {reference}:\n{BoundDiagnostic(diagnostic, 4096)}");
+            }
         }
 
         return string.Join("\n", sections);
@@ -247,15 +261,10 @@ internal sealed class FactoryContextReader(FactoryRuntimeContext context)
     {
         var failures = await ReadFailedVerificationEvidenceAsync(item, cancellationToken);
         if (failures.Count == 0)
-        {
-            var diagnostic = await BuildPriorCommandFailureContextAsync(item, cancellationToken);
-            return diagnostic == "none"
-                ? $"{item.Id} exhausted its semantic attempt budget."
-                : $"Work item {item.Id} exhausted its semantic attempt budget after repeated shell-command failures.\n\n{diagnostic}";
-        }
+            return $"{item.Id} exhausted its semantic attempt budget after {item.SemanticAttemptCount} semantic attempts.";
 
         var (reference, evidence) = failures[^1];
-        return $"Work item {item.Id} could not pass authoritative verification after {item.AttemptCount} semantic attempts.\n\n" +
+        return $"Work item {item.Id} could not pass authoritative verification after {item.SemanticAttemptCount} semantic attempts.\n\n" +
                $"Failed check:\n{evidence.CheckId}\n\n" +
                $"Exit code:\n{(evidence.ExitCode?.ToString() ?? "unavailable")}\n\n" +
                $"Latest bounded verification tails:\n{BoundedVerificationOutput(evidence)}\n\n" +
@@ -342,6 +351,19 @@ internal sealed class FactoryContextReader(FactoryRuntimeContext context)
         }
 
         return failures;
+    }
+
+    private async Task<string> ReadTechnicalDiagnosticAsync(
+        string reference,
+        string fallback,
+        CancellationToken cancellationToken)
+    {
+        var path = Path.Combine(
+            context.CurrentDirectory,
+            reference.Replace('/', Path.DirectorySeparatorChar));
+        return File.Exists(path)
+            ? await File.ReadAllTextAsync(path, cancellationToken)
+            : fallback;
     }
 
     private string RelativePath(string path) =>
