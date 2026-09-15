@@ -1,0 +1,70 @@
+name: Temporary semantic retry progress fix
+
+on:
+  push:
+    branches:
+      - semantic-technical-restart
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[progress-fix-bot]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: semantic-technical-restart
+          fetch-depth: 0
+      - name: Apply semantic retry progress patch
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              file = Path(path)
+              text = file.read_text(encoding='utf-8')
+              if text.count(old) != 1:
+                  raise RuntimeError(f'{path}: expected one match, got {text.count(old)}')
+              file.write_text(text.replace(old, new), encoding='utf-8', newline='\n')
+
+          replace_once(
+              'src/runtime/Idd.Factory/Domain/FactoryModels.cs',
+              '''public sealed record TechnicalFailureDiagnostic(\n    string FailedAttemptId,\n    string FailureCode,\n    string DiagnosticReference,\n    string Message);''',
+              '''public sealed record TechnicalFailureDiagnostic(\n    string FailedAttemptId,\n    string FailureCode,\n    string DiagnosticReference,\n    string Message,\n    int SemanticAttemptNumber,\n    List<string> ChangedPaths);''')
+
+          replace_once(
+              'src/runtime/Idd.Factory/Runtime/FactoryStateMachine.cs',
+              '''            var failure = new TechnicalFailureDiagnostic(\n                attemptId,\n                exception.Code,\n                diagnosticReference,\n                boundedMessage);''',
+              '''            var failure = new TechnicalFailureDiagnostic(\n                attemptId,\n                exception.Code,\n                diagnosticReference,\n                boundedMessage,\n                item.SemanticAttemptCount,\n                failedChangedPaths.ToList());''')
+
+          replace_once(
+              'src/runtime/Idd.Factory/Runtime/FactoryStateMachine.cs',
+              '''        CompleteSemanticAttempt(state, item, semantic);\n        item.LastResultRef = semantic.Result.SemanticResultPath;\n\n        if (verificationDrivenRetry && semantic.ChangedPaths.Count == 0)''',
+              '''        var verificationRetryMadeProgress = semantic.ChangedPaths.Count != 0\n            || item.PriorTechnicalFailures.Any(x =>\n                x.SemanticAttemptNumber == item.SemanticAttemptCount\n                && x.ChangedPaths.Count != 0);\n\n        CompleteSemanticAttempt(state, item, semantic);\n        item.LastResultRef = semantic.Result.SemanticResultPath;\n\n        if (verificationDrivenRetry && !verificationRetryMadeProgress)''')
+
+          replace_once(
+              'src/runtime/Idd.Factory/Runtime/SemanticAttemptReconciler.cs',
+              '''            var technicalFailure = await TryReadRestartableTechnicalFailureAsync(\n                attemptId,\n                directory,\n                cancellationToken);''',
+              '''            var technicalFailure = await TryReadRestartableTechnicalFailureAsync(\n                attemptId,\n                directory,\n                invocation,\n                changedPaths,\n                cancellationToken);''')
+
+          replace_once(
+              'src/runtime/Idd.Factory/Runtime/SemanticAttemptReconciler.cs',
+              '''    private async Task<TechnicalFailureDiagnostic?> TryReadRestartableTechnicalFailureAsync(\n        string attemptId,\n        string directory,\n        CancellationToken cancellationToken)''',
+              '''    private async Task<TechnicalFailureDiagnostic?> TryReadRestartableTechnicalFailureAsync(\n        string attemptId,\n        string directory,\n        AgentInvocation invocation,\n        IReadOnlyList<string> changedPaths,\n        CancellationToken cancellationToken)''')
+
+          replace_once(
+              'src/runtime/Idd.Factory/Runtime/SemanticAttemptReconciler.cs',
+              '''        return new(attemptId, failureCode, diagnosticReference, message);''',
+              '''        return new(\n            attemptId,\n            failureCode,\n            diagnosticReference,\n            message,\n            invocation.SemanticAttemptNumber!.Value,\n            changedPaths.ToList());''')
+          PY
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/runtime/Idd.Factory/Domain/FactoryModels.cs src/runtime/Idd.Factory/Runtime/FactoryStateMachine.cs src/runtime/Idd.Factory/Runtime/SemanticAttemptReconciler.cs
+          git commit -m "[progress-fix-bot] Preserve semantic retry progress across technical restarts"
+          git push origin HEAD:semantic-technical-restart
