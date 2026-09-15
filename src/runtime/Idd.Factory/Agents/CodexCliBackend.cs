@@ -14,12 +14,15 @@ public sealed class CodexCliBackend : IAgentBackend
     private static readonly UTF8Encoding TransportUtf8 = new(
         encoderShouldEmitUTF8Identifier: false,
         throwOnInvalidBytes: true);
+    private static readonly TimeSpan DefaultPostResultGrace = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan MaximumWaitPollInterval = TimeSpan.FromMilliseconds(100);
 
     private readonly Lazy<CodexCommand> command;
     private readonly string pluginRoot;
     private readonly AgentExecutionConfiguration executionConfiguration;
     private readonly AgentCapabilityPolicy capabilityPolicy;
     private readonly CodexHomePreparation homePreparation;
+    private readonly TimeSpan postResultGrace;
     private readonly ProcessExecutor processExecutor = ProcessExecutor.Shared;
     private readonly Dictionary<string, RunningExecution> executions = new(StringComparer.Ordinal);
 
@@ -28,10 +31,29 @@ public sealed class CodexCliBackend : IAgentBackend
         string? executable = null,
         AgentExecutionConfiguration? executionConfiguration = null,
         AgentCapabilityPolicy? capabilityPolicy = null)
+        : this(
+            pluginRoot,
+            executable,
+            executionConfiguration,
+            capabilityPolicy,
+            DefaultPostResultGrace)
     {
+    }
+
+    internal CodexCliBackend(
+        string pluginRoot,
+        string? executable,
+        AgentExecutionConfiguration? executionConfiguration,
+        AgentCapabilityPolicy? capabilityPolicy,
+        TimeSpan postResultGrace)
+    {
+        if (postResultGrace <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(postResultGrace));
+
         this.pluginRoot = Path.GetFullPath(pluginRoot);
         this.executionConfiguration = executionConfiguration ?? new();
         this.capabilityPolicy = capabilityPolicy ?? AgentCapabilityPolicy.ProductionDefault;
+        this.postResultGrace = postResultGrace;
         homePreparation = new CodexHomePreparation(this.pluginRoot, this.capabilityPolicy);
         command = new Lazy<CodexCommand>(() =>
             executable is null ? CodexExecutableResolver.Resolve() : new(executable, []));
@@ -193,77 +215,71 @@ public sealed class CodexCliBackend : IAgentBackend
         var cleanupTempDirectory = true;
         try
         {
-            using var resultWatcherCancellation =
-                CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            var processExit = running.Process.WaitForExitAsync(
-                timeout: null,
-                cancellationToken);
-            var resultReady = WaitForCompleteResultAsync(
-                running.ResultPath,
-                resultWatcherCancellation.Token);
-            var commandTimeout = WaitForCommandTimeoutAsync(
-                running.CommandTracker,
-                executionConfiguration.EffectiveCommandTimeout,
-                resultWatcherCancellation.Token);
-            var commandOverlap = WaitForCommandOverlapAsync(
-                running.CommandTracker,
-                resultWatcherCancellation.Token);
-            var first = await Task.WhenAny(
-                processExit,
-                resultReady,
-                commandTimeout,
-                commandOverlap);
-
-            if (first == commandOverlap)
-            {
-                var overlap = await commandOverlap;
-                cleanupTempDirectory = false;
-                resultWatcherCancellation.Cancel();
-                return await TerminateForCommandFailureAsync(
-                    running,
-                    CodexCommandProtocol.BuildCommandOverlapDiagnostic(overlap),
-                    AgentTerminationKind.IncompleteCommand);
-            }
-
-            if (first == commandTimeout)
-            {
-                var timedOutCommand = await commandTimeout;
-                cleanupTempDirectory = false;
-                resultWatcherCancellation.Cancel();
-                return await TerminateForCommandFailureAsync(
-                    running,
-                    CodexCommandProtocol.BuildCommandTimeoutDiagnostic(
-                        timedOutCommand,
-                        executionConfiguration.EffectiveCommandTimeout),
-                    AgentTerminationKind.CommandTimeout);
-            }
-
-            var completedResultWasObserved = first == resultReady && await resultReady;
-            if (!completedResultWasObserved && first == processExit)
-            {
-                await processExit;
-                completedResultWasObserved = IsCompleteResult(running.ResultPath);
-            }
-            resultWatcherCancellation.Cancel();
-
+            var completedResultWasObserved = false;
             var killRequired = false;
-            if (completedResultWasObserved && !running.Process.HasExited)
+            DateTimeOffset? quiescentSince = null;
+            var commandTimeout = executionConfiguration.EffectiveCommandTimeout;
+            if (commandTimeout <= TimeSpan.Zero)
+                throw new ArgumentOutOfRangeException(
+                    nameof(commandTimeout),
+                    "Semantic-command timeout must be positive.");
+            var waitPollInterval = TimeSpan.FromMilliseconds(
+                Math.Max(1, Math.Min(MaximumWaitPollInterval.TotalMilliseconds, commandTimeout.TotalMilliseconds)));
+
+            while (true)
             {
-                var exited = await running.Process.WaitForExitAsync(
-                    TimeSpan.FromSeconds(5),
-                    cancellationToken);
-                if (!exited)
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (running.Process.HasExited)
+                    break;
+
+                var now = DateTimeOffset.UtcNow;
+                if (running.CommandTracker.FindTimedOut(now, commandTimeout) is { } timedOutCommand)
                 {
-                    killRequired = true;
-                    await running.Process.TerminateAsync(CodexTermination);
+                    cleanupTempDirectory = false;
+                    return await TerminateForCommandFailureAsync(
+                        running,
+                        CodexCommandProtocol.BuildCommandTimeoutDiagnostic(
+                            timedOutCommand,
+                            commandTimeout),
+                        AgentTerminationKind.CommandTimeout);
                 }
-            }
-            else
-            {
-                await processExit;
+
+                if (!completedResultWasObserved && IsCompleteResult(running.ResultPath))
+                    completedResultWasObserved = true;
+
+                if (completedResultWasObserved)
+                {
+                    if (running.CommandTracker.GetActive().Count > 0)
+                    {
+                        quiescentSince = null;
+                    }
+                    else
+                    {
+                        quiescentSince ??= now;
+                        if (now - quiescentSince >= postResultGrace)
+                        {
+                            if (running.Process.HasExited)
+                                break;
+                            if (running.CommandTracker.GetActive().Count > 0)
+                            {
+                                quiescentSince = null;
+                            }
+                            else
+                            {
+                                killRequired = true;
+                                await running.Process.TerminateAsync(CodexTermination);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                await Task.Delay(waitPollInterval, cancellationToken);
             }
 
             var technical = await running.Process.CompleteAsync();
+            completedResultWasObserved |= IsCompleteResult(running.ResultPath);
             var stdout = technical.StandardOutput;
             var stderr = technical.StandardError;
             var exitCode = technical.ExitCode;
@@ -272,7 +288,8 @@ public sealed class CodexCliBackend : IAgentBackend
                 : exitCode == 0
                     ? AgentTerminationKind.CleanExit
                     : AgentTerminationKind.TransportFailure;
-            var incompleteCommands = CodexCommandProtocol.FindIncompleteCommandExecutions(stdout);
+
+            var incompleteCommands = running.CommandTracker.GetActive();
             if (incompleteCommands.Count > 0)
             {
                 cleanupTempDirectory = false;
@@ -341,48 +358,6 @@ public sealed class CodexCliBackend : IAgentBackend
                 running.ResultPath);
             await running.Process.DisposeAsync();
         }
-    }
-
-    private static async Task<IncompleteCommandExecution> WaitForCommandTimeoutAsync(
-        CommandExecutionTracker tracker,
-        TimeSpan timeout,
-        CancellationToken cancellationToken)
-    {
-        if (timeout <= TimeSpan.Zero)
-            throw new ArgumentOutOfRangeException(
-                nameof(timeout),
-                "Semantic-command timeout must be positive.");
-        while (true)
-        {
-            if (tracker.FindTimedOut(DateTimeOffset.UtcNow, timeout) is { } command)
-                return command;
-            await Task.Delay(
-                TimeSpan.FromMilliseconds(Math.Min(250, timeout.TotalMilliseconds)),
-                cancellationToken);
-        }
-    }
-
-    private static async Task<CommandExecutionOverlap> WaitForCommandOverlapAsync(
-        CommandExecutionTracker tracker,
-        CancellationToken cancellationToken)
-    {
-        while (true)
-        {
-            if (tracker.FindOverlap() is { } overlap) return overlap;
-            await Task.Delay(100, cancellationToken);
-        }
-    }
-
-    private static async Task<bool> WaitForCompleteResultAsync(
-        string path,
-        CancellationToken cancellationToken)
-    {
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            if (File.Exists(path)) return true;
-            await Task.Delay(100, cancellationToken);
-        }
-        return false;
     }
 
     private static bool IsCompleteResult(string path) => File.Exists(path);
