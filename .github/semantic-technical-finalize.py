@@ -21,10 +21,6 @@ def replace_once(path: str, old: str, new: str) -> None:
 # before its fluent declaration has completed.
 replace_once(
     "tests/Idd.Factory.Tests/TaskRelatedIntentTests.cs",
-    'File.WriteAllText(Path.Combine(scenario.WorkspacePath, "first-attempt.txt"), "first");',
-    'File.WriteAllText(Path.Combine(invocation.Workspace, "first-attempt.txt"), "first");')
-replace_once(
-    "tests/Idd.Factory.Tests/TaskRelatedIntentTests.cs",
     'File.WriteAllText(Path.Combine(scenario.WorkspacePath, "semantic-retry-ready.txt"), "ready");',
     'File.WriteAllText(Path.Combine(invocation.Workspace, "semantic-retry-ready.txt"), "ready");')
 replace_once(

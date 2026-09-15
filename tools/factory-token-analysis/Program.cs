@@ -75,7 +75,7 @@ internal static class Program
             await File.ReadAllTextAsync(baselinePath), JsonOptions)
             ?? throw new InvalidDataException($"Cannot parse baseline: {baselinePath}");
 
-        if (baseline.SchemaVersion != 1)
+        if (baseline.SchemaVersion != 2)
             throw new InvalidDataException($"Unsupported baseline schema version: {baseline.SchemaVersion}");
 
         var comparison = Compare(report, baseline);
@@ -92,7 +92,7 @@ internal static class Program
         var output = args[0];
         var reports = args[1..].Select(path => AnalyzeRun(ResolveRunDirectory(path))).ToArray();
         var baseline = new BaselineDocument(
-            1,
+            2,
             DateTimeOffset.UtcNow,
             reports.Length,
             reports.Select(x => x.RunDirectory).ToArray(),
@@ -121,6 +121,10 @@ internal static class Program
 
         var metrics = new RunMetrics(
             attempts.Length,
+            attempts.Count(x => x.Role == "executor"
+                && !string.IsNullOrWhiteSpace(x.WorkItem)
+                && !string.Equals(x.InvocationKind, "TechnicalRestart", StringComparison.Ordinal)),
+            attempts.Count(x => string.Equals(x.InvocationKind, "TechnicalRestart", StringComparison.Ordinal)),
             attempts.Sum(x => x.ToolBatches),
             attempts.Sum(x => x.Commands),
             attempts.Sum(x => x.ToolOutputChars),
@@ -155,7 +159,10 @@ internal static class Program
         var userSkills = Int64(telemetry, "inheritedUserSkillCount");
         var projectSkills = Int64(telemetry, "projectLocalSkillCount");
         var workItem = String(invocation, "workItemId");
-        var launchReason = LaunchReason(role, workItem);
+        var invocationKind = String(invocation, "invocationKind");
+        var semanticAttempt = Int64(invocation, "semanticAttemptNumber");
+        var technicalRestart = Int64(invocation, "technicalRestartNumber");
+        var launchReason = LaunchReason(role, workItem, invocationKind);
 
         long inputTokens = 0;
         long cachedInputTokens = 0;
@@ -246,6 +253,9 @@ internal static class Program
             model,
             skillVersion,
             workItem,
+            invocationKind,
+            semanticAttempt,
+            technicalRestart,
             launchReason,
             inputChars,
             userSkills,
@@ -315,11 +325,14 @@ internal static class Program
             ?? throw new DirectoryNotFoundException($"No completed Factory runs found under {resultsDirectory}.");
     }
 
-    private static string LaunchReason(string role, string workItem)
+    private static string LaunchReason(string role, string workItem, string invocationKind)
     {
         if (role == "planner") return "planning";
         if (role == "executor")
-            return string.IsNullOrWhiteSpace(workItem) ? "execution" : $"work item {workItem}";
+        {
+            var target = string.IsNullOrWhiteSpace(workItem) ? "execution" : $"work item {workItem}";
+            return string.IsNullOrWhiteSpace(invocationKind) ? target : $"{target} / {invocationKind}";
+        }
         return role;
     }
 
@@ -340,21 +353,24 @@ internal static class Program
     {
         Console.WriteLine($"Factory token analysis: {report.RunDirectory}");
         Console.WriteLine();
-        Console.WriteLine("Attempt  Role             Reason                    InChars Batches Cmds ToolChars FailChars    Input   Cached      New Output Seconds");
-        Console.WriteLine("-------  ---------------  ------------------------ ------- ------- ---- --------- --------- -------- -------- -------- ------ -------");
+        Console.WriteLine("Attempt  Role      WorkItem  Kind             Sem Tech  InChars Batches Cmds ToolChars FailChars    Input   Cached      New Output Seconds");
+        Console.WriteLine("-------  --------  --------  --------------- ---- ---- ------- ------- ---- --------- --------- -------- -------- -------- ------ -------");
 
         foreach (var item in report.Attempts)
         {
             Console.WriteLine(
-                $"{item.AttemptId,-7}  {Trim(item.Role, 15),-15}  {Trim(item.LaunchReason, 24),-24} " +
-                $"{item.InputChars,7} {item.ToolBatches,7} {item.Commands,4} {item.ToolOutputChars,9} {item.FailedToolOutputChars,9} " +
-                $"{item.InputTokens,8} {item.CachedInputTokens,8} {item.NewInputTokens,8} {item.OutputTokens,6} {FormatSeconds(item.Seconds),7}");
+                $"{item.AttemptId,-7}  {Trim(item.Role, 8),-8}  {Trim(item.WorkItem, 8),-8}  {Trim(item.InvocationKind, 15),-15} " +
+                $"{item.SemanticAttempt,4} {item.TechnicalRestart,4} {item.InputChars,7} {item.ToolBatches,7} {item.Commands,4} " +
+                $"{item.ToolOutputChars,9} {item.FailedToolOutputChars,9} {item.InputTokens,8} {item.CachedInputTokens,8} " +
+                $"{item.NewInputTokens,8} {item.OutputTokens,6} {FormatSeconds(item.Seconds),7}");
         }
 
         var metrics = report.Metrics;
         var cacheRatio = metrics.InputTokens == 0 ? 0 : metrics.CachedInputTokens * 100.0 / metrics.InputTokens;
         Console.WriteLine();
+        Console.WriteLine($"Agent invocations : {metrics.AgentInvocations}");
         Console.WriteLine($"Semantic attempts : {metrics.SemanticAttempts}");
+        Console.WriteLine($"Technical restarts: {metrics.TechnicalRestarts}");
         Console.WriteLine($"Tool batches      : {metrics.ToolBatches}");
         Console.WriteLine($"Commands          : {metrics.Commands}");
         Console.WriteLine($"Gross input       : {metrics.InputTokens:N0}");
@@ -450,7 +466,9 @@ internal static class Program
     }
 
     private static RunMetrics MedianMetrics(RunMetrics[] values) => new(
+        Median(values.Select(x => x.AgentInvocations)),
         Median(values.Select(x => x.SemanticAttempts)),
+        Median(values.Select(x => x.TechnicalRestarts)),
         Median(values.Select(x => x.ToolBatches)),
         Median(values.Select(x => x.Commands)),
         Median(values.Select(x => x.ToolOutputChars)),
@@ -554,6 +572,9 @@ internal sealed record AttemptReport(
     string Model,
     string SkillVersion,
     string WorkItem,
+    string InvocationKind,
+    long SemanticAttempt,
+    long TechnicalRestart,
     string LaunchReason,
     long InputChars,
     long InheritedUserSkills,
@@ -572,7 +593,9 @@ internal sealed record AttemptReport(
     string[] Anomalies);
 
 internal sealed record RunMetrics(
+    long AgentInvocations,
     long SemanticAttempts,
+    long TechnicalRestarts,
     long ToolBatches,
     long Commands,
     long ToolOutputChars,

@@ -281,21 +281,21 @@ public sealed class TaskRelatedIntentTests
             .Execute(contract, invocation =>
             {
                 Assert.Contains("ORIGINAL-INTENT-CONTENT", invocation.Input, StringComparison.Ordinal);
-                File.WriteAllText(Path.Combine(scenario.WorkspacePath, "first-attempt.txt"), "first");
+                File.WriteAllText(Path.Combine(invocation.Workspace, "first-attempt.txt"), "first");
                 return "First semantic implementation attempt.";
             })
             .Execute(contract, invocation =>
             {
                 Assert.Contains("UPDATED-INTENT-CONTENT", invocation.Input, StringComparison.Ordinal);
                 Assert.DoesNotContain("ORIGINAL-INTENT-CONTENT", invocation.Input, StringComparison.Ordinal);
-                File.WriteAllText(Path.Combine(scenario.WorkspacePath, "semantic-retry-ready.txt"), "ready");
+                File.WriteAllText(Path.Combine(invocation.Workspace, "semantic-retry-ready.txt"), "ready");
                 return "Implemented after semantic budget extension.";
             })
             .Done();
 
         var exhausted = await scenario.Run();
         exhausted.ShouldBeBlockedBy("RETRY_BUDGET_EXHAUSTED");
-        Assert.Single(exhausted.Invocations.Where(x => x.WorkItemId == "W000001"));
+        Assert.Single(exhausted.Invocations, x => x.WorkItemId == "W000001");
         Assert.Equal(1, exhausted.State.Current!.SemanticAttemptCount);
         Assert.Equal(0, exhausted.State.Current.TechnicalRestartCount);
 

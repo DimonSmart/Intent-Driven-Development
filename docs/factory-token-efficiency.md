@@ -27,7 +27,7 @@ It analyzes the persisted Factory result artifacts only; it does not call a mode
 
 A controlled Bubble Sort smoke run on August 14, 2026 used Codex CLI `0.148.0-alpha.15` with semantic workers on `gpt-5.6-luna`.
 
-The completed Factory run contained six semantic attempts and reported:
+The completed Factory run contained six agent invocations and reported:
 
 ```text
 gross input        566,339
@@ -78,9 +78,9 @@ The selected Factory worker skill is intentionally not exposed to that worker th
 
 Do not use a single absolute token limit. Track both token and structural metrics.
 
-The analyzer reports per attempt:
+The analyzer reports per executor/planner invocation:
 
-- role, skill, work item, and launch reason;
+- role, skill, work item, invocation kind, semantic-attempt number, technical-restart number, and launch reason;
 - dynamic Factory input size;
 - sequential tool batches;
 - shell command count;
@@ -92,11 +92,14 @@ The analyzer reports per attempt:
 - output tokens;
 - duration.
 
-It also aggregates the same cost by role.
+It also aggregates the same cost by role. Run-level structural metrics now distinguish
+`AgentInvocations`, `SemanticAttempts`, and `TechnicalRestarts`. Planner invocations
+are agent invocations but are not work-item semantic attempts; a Technical Restart
+is an executor invocation but is not a new semantic attempt.
 
 The most useful regression signals are:
 
-1. **Semantic attempts** — unexpected workers are expensive because every worker starts a fresh Codex agent.
+1. **Agent invocations / semantic attempts / technical restarts** — unexpected workers are expensive because every worker starts a fresh Codex agent, while the split identifies whether cost came from new implementation reasoning or execution-layer instability.
 2. **Tool batches** — a proxy for sequential model/tool rounds. Parallel tool calls in one batch are much cheaper than the same calls spread across separate rounds. `file_change` and `command_execution` events are included; other future tool types may require extending the analyzer.
 3. **New input tokens** — useful for detecting genuinely new context independent of cache reuse.
 4. **Gross input tokens** — useful for detecting round explosion.
@@ -158,7 +161,7 @@ dotnet run --project tools/factory-token-analysis -- baseline factory-token-base
   C:\FactoryRuns\run-3
 ```
 
-The baseline stores the median of the structural and token metrics. Median is preferred to mean because one unusual agent trajectory should not redefine the expected cost.
+The baseline stores the median of the structural and token metrics. Baseline schema 2 records agent invocations, semantic attempts, and technical restarts separately; recreate older schema-1 baselines because their `SemanticAttempts` field counted invocation directories rather than the new semantic identity. Median is preferred to mean because one unusual agent trajectory should not redefine the expected cost.
 
 The baseline also records the requested model set and Factory skill versions. A mismatch is reported as a comparability note.
 
@@ -202,7 +205,9 @@ For example:
 For that reason, treat these together as the primary efficiency contract:
 
 ```text
+agent invocations
 semantic attempts
+technical restarts
 tool batches
 gross input
 new input
