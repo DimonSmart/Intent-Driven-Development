@@ -42,9 +42,16 @@ internal static class FactoryTestRuntime
             clock));
     }
 
-    public static FactoryConfiguration Configuration() => new(
-        3,
-        new FactoryLimits(4, 12, 64, TimeSpan.FromMinutes(10)),
+    public static FactoryConfiguration Configuration(
+        int maxAttemptsPerTask = 4,
+        int maxTechnicalRestartsPerTask = 1) => new(
+        4,
+        new FactoryLimits(
+            maxAttemptsPerTask,
+            maxTechnicalRestartsPerTask,
+            12,
+            64,
+            TimeSpan.FromMinutes(10)),
         "test-factory.yaml",
         "test-config-hash");
 }
