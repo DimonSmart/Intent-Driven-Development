@@ -1,0 +1,33 @@
+name: Temporary semantic technical finalize
+
+on:
+  push:
+    branches:
+      - semantic-technical-restart
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: ${{ !contains(github.event.head_commit.message, '[finalize-bot]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: semantic-technical-restart
+          fetch-depth: 0
+      - name: Apply final source and documentation changes
+        run: python .github/semantic-technical-finalize.py
+      - name: Commit final changes
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No finalize changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "[finalize-bot] Complete semantic retry and technical restart split"
+          git push origin HEAD:semantic-technical-restart
