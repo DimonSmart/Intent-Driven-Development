@@ -10,7 +10,7 @@ internal sealed record FactoryBlockResult(
     PendingContinuation Continuation,
     JsonElement? Payload = null);
 
-internal sealed class FactoryStopService
+internal sealed class FactoryStopService(FactoryRuntimeContext context)
 {
     public FactoryCliOutcome OutcomeFromBlocker(FactoryState state, string fallback) =>
         new(
@@ -53,13 +53,13 @@ internal sealed class FactoryStopService
                 : existing);
     }
 
-    private static FactoryBlockResult TechnicalRestartBudgetExhausted(
+    private FactoryBlockResult TechnicalRestartBudgetExhausted(
         FactoryState state,
         AgentProtocolException exception)
     {
         var item = state.Current;
         var failure = item?.PriorTechnicalFailures.LastOrDefault();
-        var payload = item is null || failure is null
+        JsonElement? payload = item is null || failure is null
             ? null
             : JsonSerializer.SerializeToElement(
                 new
@@ -69,7 +69,7 @@ internal sealed class FactoryStopService
                     failureCode = failure.FailureCode,
                     diagnosticReference = failure.DiagnosticReference,
                     technicalRestartCount = item.TechnicalRestartCount,
-                    technicalRestartBudget = item.TechnicalRestartCount
+                    technicalRestartBudget = context.Configuration.Limits.MaxTechnicalRestartsPerTask
                 },
                 FactoryJson.Options);
 
