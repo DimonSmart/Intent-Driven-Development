@@ -1,0 +1,29 @@
+name: cross-toolchain-failure-domains
+description: Decomposer-focused regression scenario for oversized greenfield work spanning independent toolchains and infrastructure failure domains.
+
+model: gpt-5.6-luna
+
+reasoning:
+  effort: high
+
+repeat: 1
+timeoutMinutes: 30
+windowsSandbox: elevated
+task: task.md
+
+idealWorkItems:
+  - work-items/001-backend-foundation.md
+  - work-items/002-database.md
+  - work-items/003-frontend.md
+  - work-items/004-local-orchestration.md
+  - work-items/005-publishing.md
+
+acceptance:
+  command: powershell
+  arguments:
+    - -NoProfile
+    - -Command
+    - exit 0
+
+modes:
+  - factory-split-replay

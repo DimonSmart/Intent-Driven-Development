@@ -36,6 +36,25 @@ public sealed class CanonicalGenerationTests(GenerationFixture fixture)
     }
 
     [Fact]
+    public void CanonicalFactoryDecomposer_DefinesBoundedWorkItemSizingContract()
+    {
+        var decomposition = fixture.ReadText(Path.Combine(
+            fixture.RepoRoot, "src", "canonical", "skills", "idd-factory-decompose-task.md"));
+
+        foreach (var semanticMarker in new[]
+        {
+            "bounded failure domain",
+            "independently verifiable outcome",
+            "stable intermediate repository states",
+            "Do not split work mechanically",
+            "Materialize every task that can be contracted reliably"
+        })
+        {
+            Assert.Contains(semanticMarker, decomposition, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void CanonicalRoleReader_PreservesToolsAndRejectsInvalidRoles()
     {
         var root = Path.Combine(Path.GetTempPath(), "idd-role-reader-" + Guid.NewGuid().ToString("N"));
