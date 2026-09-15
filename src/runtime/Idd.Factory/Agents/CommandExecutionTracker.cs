@@ -7,15 +7,10 @@ internal sealed record IncompleteCommandExecution(
     string? Command,
     DateTimeOffset? StartedAt = null);
 
-internal sealed record CommandExecutionOverlap(
-    IncompleteCommandExecution Active,
-    IncompleteCommandExecution Started);
-
 internal sealed class CommandExecutionTracker
 {
     private readonly object gate = new();
     private readonly Dictionary<string, IncompleteCommandExecution> active = new(StringComparer.Ordinal);
-    private CommandExecutionOverlap? overlap;
 
     public void Observe(string line, DateTimeOffset observedAt)
     {
@@ -40,14 +35,16 @@ internal sealed class CommandExecutionTracker
                         && commandValue.ValueKind == JsonValueKind.String
                         ? commandValue.GetString()
                         : null;
-                    var started = new IncompleteCommandExecution(
-                        id,
-                        string.IsNullOrWhiteSpace(command) ? null : command,
-                        observedAt);
-                    if (!active.ContainsKey(id)
-                        && active.Values.OrderBy(value => value.StartedAt).FirstOrDefault() is { } earlier)
-                        overlap ??= new(earlier, started);
-                    active[id] = started;
+                    if (string.IsNullOrWhiteSpace(command)) command = null;
+
+                    if (active.TryGetValue(id, out var existing))
+                    {
+                        if (existing.Command is null && command is not null)
+                            active[id] = existing with { Command = command };
+                        return;
+                    }
+
+                    active[id] = new(id, command, observedAt);
                 }
                 else if (eventType.GetString() == "item.completed")
                 {
@@ -67,12 +64,19 @@ internal sealed class CommandExecutionTracker
             return active.Values
                 .Where(command => command.StartedAt is not null && now - command.StartedAt >= timeout)
                 .OrderBy(command => command.StartedAt)
+                .ThenBy(command => command.Id, StringComparer.Ordinal)
                 .FirstOrDefault();
         }
     }
 
-    public CommandExecutionOverlap? FindOverlap()
+    public IReadOnlyList<IncompleteCommandExecution> GetActive()
     {
-        lock (gate) return overlap;
+        lock (gate)
+        {
+            return active.Values
+                .OrderBy(command => command.StartedAt)
+                .ThenBy(command => command.Id, StringComparer.Ordinal)
+                .ToArray();
+        }
     }
 }
