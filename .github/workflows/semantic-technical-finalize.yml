@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   finalize:
+    # This helper is removed after the finalization commit succeeds.
     if: ${{ !contains(github.event.head_commit.message, '[finalize-bot]') }}
     runs-on: ubuntu-latest
     steps:
