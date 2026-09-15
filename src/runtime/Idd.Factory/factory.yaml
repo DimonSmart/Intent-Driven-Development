@@ -1,7 +1,8 @@
-schemaVersion: 3
+schemaVersion: 4
 
 limits:
   maxAttemptsPerTask: 4
+  maxTechnicalRestartsPerTask: 1
   maxPlanningCycles: 12
   maxWorkItems: 64
   semanticCommandTimeout: 10m
