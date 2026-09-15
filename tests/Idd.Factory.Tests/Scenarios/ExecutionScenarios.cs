@@ -49,8 +49,7 @@ public sealed class ExecutionScenarios
             .CommandFailure(terminationKind, "item_3 dotnet test did not complete")
             .Execute("Implement A.", invocation =>
             {
-                Assert.Contains("Technical restart context", invocation.Input, StringComparison.Ordinal);
-                Assert.Contains("must not be trusted", invocation.Input, StringComparison.Ordinal);
+                Assert.Contains("did not produce trusted semantic results", invocation.Input, StringComparison.Ordinal);
                 Assert.Contains("item_3 dotnet test did not complete", invocation.Input, StringComparison.Ordinal);
                 return "Diagnosed the hang and completed A.";
             })
