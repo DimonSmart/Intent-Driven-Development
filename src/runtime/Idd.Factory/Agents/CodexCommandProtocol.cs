@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Idd.Factory.Domain;
 
 namespace Idd.Factory.Agents;
@@ -68,47 +67,6 @@ internal static class CodexCommandProtocol
             + "Do not mutate .idd/factory/current or .idd/intent. stdout is diagnostic only.";
     }
 
-    public static IReadOnlyList<IncompleteCommandExecution> FindIncompleteCommandExecutions(string stdout)
-    {
-        var active = new Dictionary<string, IncompleteCommandExecution>(StringComparer.Ordinal);
-        using var reader = new StringReader(stdout);
-        while (reader.ReadLine() is { } line)
-        {
-            if (string.IsNullOrWhiteSpace(line)) continue;
-            try
-            {
-                using var document = JsonDocument.Parse(line);
-                var root = document.RootElement;
-                if (!root.TryGetProperty("type", out var eventType)
-                    || !root.TryGetProperty("item", out var item)
-                    || !item.TryGetProperty("id", out var idValue)
-                    || !item.TryGetProperty("type", out var itemType)
-                    || itemType.GetString() is not ("command_execution" or "local_shell_call"))
-                    continue;
-
-                var id = idValue.GetString();
-                if (string.IsNullOrWhiteSpace(id)) continue;
-                if (eventType.GetString() == "item.started")
-                {
-                    var command = item.TryGetProperty("command", out var commandValue)
-                        && commandValue.ValueKind == JsonValueKind.String
-                        ? commandValue.GetString()
-                        : null;
-                    if (string.IsNullOrWhiteSpace(command)) command = null;
-                    active[id] = new(id, command);
-                }
-                else if (eventType.GetString() == "item.completed")
-                {
-                    active.Remove(id);
-                }
-            }
-            catch (JsonException)
-            {
-            }
-        }
-        return active.Values.ToArray();
-    }
-
     public static string BuildIncompleteCommandDiagnostic(
         IReadOnlyList<IncompleteCommandExecution> commands)
     {
@@ -131,13 +89,6 @@ internal static class CodexCommandProtocol
         $"Shell command [{BoundDiagnosticValue(command.Id, 128)}] exceeded the semantic-command timeout "
         + $"of {timeout:c}: {BoundDiagnosticValue(command.Command ?? "<command unavailable>", 512)}. "
         + "The worker process tree was terminated, partial results are not trusted, and the temporary directory was preserved.";
-
-    public static string BuildCommandOverlapDiagnostic(CommandExecutionOverlap overlap) =>
-        $"Shell command [{BoundDiagnosticValue(overlap.Started.Id, 128)}] started before "
-        + $"[{BoundDiagnosticValue(overlap.Active.Id, 128)}] completed. Active command: "
-        + $"{BoundDiagnosticValue(overlap.Active.Command ?? "<command unavailable>", 384)}. Later command: "
-        + $"{BoundDiagnosticValue(overlap.Started.Command ?? "<command unavailable>", 384)}. "
-        + "The worker process tree was terminated and partial results are not trusted.";
 
     public static AgentAttemptTelemetry BuildTelemetry(
         AgentInvocation invocation,
