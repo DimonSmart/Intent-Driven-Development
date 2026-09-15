@@ -148,8 +148,8 @@ public sealed class TechnicalRestartScenarios
             .Execute(task, invocation =>
             {
                 Assert.Contains("AGENT_TRANSPORT_FAILURE", invocation.Input, StringComparison.Ordinal);
-                Assert.Contains("Diagnostic artifact:", invocation.Input, StringComparison.Ordinal);
-                Assert.Contains("must not be trusted", invocation.Input, StringComparison.Ordinal);
+                Assert.Contains("Diagnostic:", invocation.Input, StringComparison.Ordinal);
+                Assert.Contains("did not produce trusted semantic results", invocation.Input, StringComparison.Ordinal);
                 return "Completed after technical restart.";
             })
             .Done();
