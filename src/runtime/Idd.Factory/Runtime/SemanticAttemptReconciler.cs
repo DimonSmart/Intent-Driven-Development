@@ -77,6 +77,32 @@ internal sealed class SemanticAttemptReconciler(
                 changedPaths);
         }
 
+        if (operation == SemanticOperationKind.WorkItemExecution && state.Current is { } item)
+        {
+            var technicalFailure = await TryReadRestartableTechnicalFailureAsync(
+                attemptId,
+                directory,
+                invocation,
+                changedPaths,
+                cancellationToken);
+            if (technicalFailure is not null)
+            {
+                item.NextInvocationKind = WorkItemInvocationKind.TechnicalRestart;
+                if (!item.PriorTechnicalFailures.Any(x => x.FailedAttemptId == attemptId))
+                    item.PriorTechnicalFailures.Add(technicalFailure);
+                if (!item.PriorAttemptDiagnosticRefs.Contains(
+                        technicalFailure.DiagnosticReference,
+                        StringComparer.Ordinal))
+                {
+                    item.PriorAttemptDiagnosticRefs.Add(technicalFailure.DiagnosticReference);
+                }
+            }
+            else
+            {
+                item.NextInvocationKind = WorkItemInvocationKind.SemanticRetry;
+            }
+        }
+
         return new(
             SemanticAttemptRecoveryKind.InterruptedWithoutResult,
             attemptId,
@@ -142,6 +168,56 @@ internal sealed class SemanticAttemptReconciler(
         await WriteJsonAtomicallyAsync(resultPath, persisted, cancellationToken);
     }
 
+    private async Task<TechnicalFailureDiagnostic?> TryReadRestartableTechnicalFailureAsync(
+        string attemptId,
+        string directory,
+        AgentInvocation invocation,
+        IReadOnlyList<string> changedPaths,
+        CancellationToken cancellationToken)
+    {
+        var telemetryPath = Path.Combine(directory, "process-telemetry.json");
+        if (!File.Exists(telemetryPath))
+            return null;
+
+        AgentProcessResult? process;
+        try
+        {
+            process = JsonSerializer.Deserialize<AgentProcessResult>(
+                await File.ReadAllTextAsync(telemetryPath, cancellationToken),
+                FactoryJson.Options);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+
+        if (process is null || process.CompleteResultObserved)
+            return null;
+
+        var failureCode = process.TerminationKind switch
+        {
+            AgentTerminationKind.CommandTimeout => "AGENT_COMMAND_TIMEOUT",
+            AgentTerminationKind.IncompleteCommand => "AGENT_COMMAND_INCOMPLETE",
+            AgentTerminationKind.TransportFailure => "AGENT_TRANSPORT_FAILURE",
+            _ => null
+        };
+        if (failureCode is null)
+            return null;
+
+        var diagnosticReference = $"attempts/{attemptId}/stderr.log";
+        var diagnosticPath = Path.Combine(currentDirectory, diagnosticReference.Replace('/', Path.DirectorySeparatorChar));
+        var message = File.Exists(diagnosticPath)
+            ? BoundDiagnostic(await File.ReadAllTextAsync(diagnosticPath, cancellationToken))
+            : $"Recovered {failureCode} from persisted process telemetry.";
+        return new(
+            attemptId,
+            failureCode,
+            diagnosticReference,
+            message,
+            invocation.SemanticAttemptNumber!.Value,
+            changedPaths.ToList());
+    }
+
     internal static SemanticOperationKind ResolveOperation(AgentInvocation invocation) =>
         invocation.Capability switch
         {
@@ -174,6 +250,26 @@ internal sealed class SemanticAttemptReconciler(
                 $"Persisted attempt {attemptId} identity is invalid.");
         }
 
+        if (state.Current is { } item)
+        {
+            if (invocation.InvocationKind != item.CurrentInvocationKind
+                || invocation.SemanticAttemptNumber != item.SemanticAttemptCount
+                || invocation.TechnicalRestartNumber != item.TechnicalRestartCount)
+            {
+                throw new AgentProtocolException(
+                    "UNKNOWN_ATTEMPT",
+                    $"Persisted attempt {attemptId} work-item invocation metadata is invalid.");
+            }
+        }
+        else if (invocation.InvocationKind is not null
+                 || invocation.SemanticAttemptNumber is not null
+                 || invocation.TechnicalRestartNumber is not null)
+        {
+            throw new AgentProtocolException(
+                "UNKNOWN_ATTEMPT",
+                $"Persisted planning attempt {attemptId} contains work-item invocation metadata.");
+        }
+
         if (state.PendingContinuation is
             {
                 Kind: ContinuationKind.SemanticInvocation,
@@ -200,6 +296,15 @@ internal sealed class SemanticAttemptReconciler(
                     $"Persisted attempt {attemptId} points to semantic output outside its exact attempt directory.");
             }
         }
+    }
+
+    private static string BoundDiagnostic(string value)
+    {
+        const int maximumLength = 4096;
+        var trimmed = value.Trim();
+        return trimmed.Length <= maximumLength
+            ? trimmed
+            : trimmed[..maximumLength] + " [truncated]";
     }
 
     private static bool SamePath(string left, string right) =>

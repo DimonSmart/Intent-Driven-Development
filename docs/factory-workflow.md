@@ -147,16 +147,30 @@ does not depend on executor rediscovery. An unexpected discovery is simply part
 of its report. Runtime completes the current batch, then the planner evaluates
 the integrated state.
 
-Runtime records actual changed paths, attempts, timestamps, exit codes, and
-verification evidence independently of the worker report.
+Runtime records actual changed paths, executor invocation identities, semantic-attempt
+and technical-restart counters, timestamps, exit codes, and verification evidence
+independently of the worker report.
 
 ## Verification and completion
 
-Required task verification is deterministic. Failure retries the same immutable
-task with its prior report and authoritative failure evidence. The same ordered
-`TaskRelatedIntentIds` are preserved for ordinary retries, verification retries,
-command-timeout/incomplete-command retries, and retry-budget extension. Planning
-is not invoked for an ordinary task-check failure.
+Required task verification is deterministic. An unexpected authoritative
+verification failure schedules a **Semantic Retry** of the same immutable task
+with its prior trusted result and failure evidence. This starts a new semantic
+attempt and consumes `maxAttemptsPerTask`. Planning is not invoked for that retry.
+
+A restartable implementation execution-layer failure instead schedules a
+**Technical Restart**. `AGENT_COMMAND_TIMEOUT`, `AGENT_COMMAND_INCOMPLETE`, and a
+transport failure without an already observed complete trusted result are the
+restartable allowlist. The next executor receives bounded technical diagnostics
+and runs against the current workspace with a new unique `AttemptId`, but it keeps
+the same semantic-attempt number and does not consume `maxAttemptsPerTask`. Its
+cumulative `TechnicalRestartCount` consumes the independent
+`maxTechnicalRestartsPerTask` budget. Exhaustion stops with
+`TECHNICAL_RESTART_BUDGET_EXHAUSTED`. Arbitrary protocol failures are not
+automatically Technical Restarts.
+
+Both Semantic Retry and Technical Restart preserve exactly the same ordered
+`TaskRelatedIntentIds`; neither invokes the planner to reconsider relevance.
 
 After the batch is exhausted, planning always runs again. A validated exact
 `# Done` is mechanically mapped to the existing empty-batch representation and
@@ -179,12 +193,16 @@ references, and retry never reruns semantic relevance selection for an existing
 work item. Later planning cycles may select different intent for newly created
 tasks; existing task definitions and completed history remain immutable.
 
-Factory state schema 13 introduces persisted related-intent metadata and is
-intentionally incompatible with active schema-12 runs. Missing metadata on an
-older active work item is not interpreted as an authoritative empty set. The
-existing legacy cancellation/restart policy applies; no implicit migration is
+Factory state schema 14 persists separate `SemanticAttemptCount`,
+`TechnicalRestartCount`, `AdditionalSemanticAttemptBudget`, and the exact
+`NextInvocationKind` (`Initial`, `SemanticRetry`, or `TechnicalRestart`) in
+addition to related-intent metadata. This reason is saved before a replacement
+executor starts, so process recovery cannot reinterpret a scheduled Technical
+Restart as a Semantic Retry. Active older-schema runs follow the existing
+`LEGACY_FACTORY_STATE` cancellation/restart policy; no implicit migration is
 introduced.
 
 Persisted planner output is validated under the current protocol, so an exact
 `# Done` may resume normally while a persisted blank result is malformed.
-Runtime budgets bound planning cycles, total work items, and attempts per task.
+Runtime budgets independently bound planning cycles, total work items, semantic
+attempts per task, and technical restarts per task.

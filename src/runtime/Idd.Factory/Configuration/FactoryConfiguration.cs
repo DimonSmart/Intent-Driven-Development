@@ -12,6 +12,7 @@ public sealed record FactoryConfiguration(
 
 public sealed record FactoryLimits(
     int MaxAttemptsPerTask,
+    int MaxTechnicalRestartsPerTask,
     int MaxPlanningCycles,
     int MaxWorkItems,
     TimeSpan SemanticCommandTimeout);
@@ -39,9 +40,10 @@ public static class FactoryConfigurationValidator
 {
     public static void Validate(FactoryConfiguration configuration)
     {
-        if (configuration.SchemaVersion != 3)
+        if (configuration.SchemaVersion != 4)
             throw new FactoryConfigurationException("UNSUPPORTED_FACTORY_CONFIGURATION_SCHEMA", $"Unsupported Factory configuration schema {configuration.SchemaVersion}.");
         if (configuration.Limits.MaxAttemptsPerTask is < 1 or > 10
+            || configuration.Limits.MaxTechnicalRestartsPerTask is < 0 or > 3
             || configuration.Limits.MaxPlanningCycles is < 1 or > 50
             || configuration.Limits.MaxWorkItems is < 1 or > 256
             || configuration.Limits.SemanticCommandTimeout < TimeSpan.FromSeconds(1)
@@ -64,9 +66,10 @@ internal static class RestrictedFactoryConfigurationYaml
             var schemaVersion = Number(RequiredScalar(root, "schemaVersion", "configuration"), "schemaVersion");
 
             var limitsNode = Mapping(RequiredMapping(root, "limits", "configuration"), "limits");
-            RejectUnknown(limitsNode, ["maxAttemptsPerTask", "maxPlanningCycles", "maxWorkItems", "semanticCommandTimeout"], "limits");
+            RejectUnknown(limitsNode, ["maxAttemptsPerTask", "maxTechnicalRestartsPerTask", "maxPlanningCycles", "maxWorkItems", "semanticCommandTimeout"], "limits");
             var limits = new FactoryLimits(
                 Number(RequiredScalar(limitsNode, "maxAttemptsPerTask", "limits"), "maxAttemptsPerTask"),
+                Number(RequiredScalar(limitsNode, "maxTechnicalRestartsPerTask", "limits"), "maxTechnicalRestartsPerTask"),
                 Number(RequiredScalar(limitsNode, "maxPlanningCycles", "limits"), "maxPlanningCycles"),
                 Number(RequiredScalar(limitsNode, "maxWorkItems", "limits"), "maxWorkItems"),
                 Duration(RequiredScalar(limitsNode, "semanticCommandTimeout", "limits"), "semanticCommandTimeout"));

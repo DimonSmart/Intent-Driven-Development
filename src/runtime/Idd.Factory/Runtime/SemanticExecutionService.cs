@@ -21,7 +21,50 @@ internal sealed class SemanticExecutionService(
                 RecoverWorkspaceChangesAsync)
             .AnalyzeAsync(state, cancellationToken);
 
-    public async Task<SemanticExecutionResult> InvokeAsync(
+    public Task<SemanticExecutionResult> InvokeAsync(
+        FactoryState state,
+        string capability,
+        PlannedWorkItem? item,
+        string input,
+        string attemptId,
+        CancellationToken cancellationToken) =>
+        InvokeSingleAsync(
+            state,
+            capability,
+            item,
+            input,
+            attemptId,
+            cancellationToken);
+
+    public async Task<IReadOnlyList<string>> RecoverFailedAttemptWorkspaceChangesAsync(
+        FactoryState state,
+        PlannedWorkItem item,
+        string attemptId,
+        CancellationToken cancellationToken)
+    {
+        var directory = Path.Combine(context.CurrentDirectory, "attempts", attemptId);
+        var invocationPath = Path.Combine(directory, "invocation.json");
+        if (!File.Exists(invocationPath))
+            return [];
+
+        var invocation = JsonSerializer.Deserialize<AgentInvocation>(
+                             await File.ReadAllTextAsync(invocationPath, cancellationToken),
+                             FactoryJson.Options)
+                         ?? throw new AgentProtocolException(
+                             "UNKNOWN_ATTEMPT",
+                             $"Attempt {attemptId} has no valid invocation.");
+        ValidateInvocation(
+            state,
+            attemptId,
+            "implementation",
+            FactoryCapabilityCatalog.Resolve("implementation"),
+            item,
+            invocation,
+            directory);
+        return await RecoverWorkspaceChangesAsync(invocation, cancellationToken);
+    }
+
+    private async Task<SemanticExecutionResult> InvokeSingleAsync(
         FactoryState state,
         string capability,
         PlannedWorkItem? item,
@@ -77,6 +120,9 @@ internal sealed class SemanticExecutionService(
             Capability = capability,
             Role = agent.Role,
             WorkItemId = item?.Id,
+            InvocationKind = item?.CurrentInvocationKind,
+            SemanticAttemptNumber = item?.SemanticAttemptCount,
+            TechnicalRestartNumber = item?.TechnicalRestartCount,
             Workspace = context.Workspace,
             SemanticOutputPath = semanticOutputPath,
             SkillName = agent.SkillName,
@@ -88,10 +134,42 @@ internal sealed class SemanticExecutionService(
         if (agent.ExecutionProfile == AgentExecutionProfile.WorkspaceWrite)
             await PersistWorkspaceSnapshotAsync(state.RunId, directory, cancellationToken);
 
+        if (item is not null)
+        {
+            var eventName = invocationNew.InvocationKind == WorkItemInvocationKind.TechnicalRestart
+                ? "technical-restart-started"
+                : "semantic-attempt-started";
+            await context.Events.WriteAsync(
+                state.RunId,
+                eventName,
+                new
+                {
+                    workItemId = item.Id,
+                    attemptId,
+                    failedAttemptId = invocationNew.InvocationKind == WorkItemInvocationKind.TechnicalRestart
+                        ? item.PriorTechnicalFailures.LastOrDefault()?.FailedAttemptId
+                        : null,
+                    invocationKind = invocationNew.InvocationKind,
+                    semanticAttemptNumber = invocationNew.SemanticAttemptNumber,
+                    technicalRestartNumber = invocationNew.TechnicalRestartNumber,
+                    technicalRestartBudget = context.Configuration.Limits.MaxTechnicalRestartsPerTask
+                },
+                cancellationToken);
+        }
+
         await context.Events.WriteAsync(
             state.RunId,
             "agent-dispatching",
-            new { attemptId, capability, agent.Role, workItemId = item?.Id },
+            new
+            {
+                attemptId,
+                capability,
+                agent.Role,
+                workItemId = item?.Id,
+                invocationKind = invocationNew.InvocationKind,
+                semanticAttemptNumber = invocationNew.SemanticAttemptNumber,
+                technicalRestartNumber = invocationNew.TechnicalRestartNumber
+            },
             cancellationToken);
 
         AgentExecutionResult execution;
@@ -133,6 +211,26 @@ internal sealed class SemanticExecutionService(
             throw new AgentProtocolException(
                 "UNKNOWN_ATTEMPT",
                 $"Attempt {attemptId} does not belong to the current operation.");
+        }
+
+        if (item is null)
+        {
+            if (invocation.InvocationKind is not null
+                || invocation.SemanticAttemptNumber is not null
+                || invocation.TechnicalRestartNumber is not null)
+            {
+                throw new AgentProtocolException(
+                    "UNKNOWN_ATTEMPT",
+                    $"Planning attempt {attemptId} contains work-item invocation metadata.");
+            }
+        }
+        else if (invocation.InvocationKind != item.CurrentInvocationKind
+                 || invocation.SemanticAttemptNumber != item.SemanticAttemptCount
+                 || invocation.TechnicalRestartNumber != item.TechnicalRestartCount)
+        {
+            throw new AgentProtocolException(
+                "UNKNOWN_ATTEMPT",
+                $"Attempt {attemptId} work-item invocation metadata does not match persisted state.");
         }
 
         SemanticAttemptReconciler.ValidateIdentity(state, attemptId, invocation, directory);

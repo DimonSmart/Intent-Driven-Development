@@ -41,14 +41,15 @@ public sealed class ExecutionScenarios
     [Theory]
     [InlineData(AgentTerminationKind.CommandTimeout)]
     [InlineData(AgentTerminationKind.IncompleteCommand)]
-    public async Task CommandFailureRetriesTheSameTaskBeforeContinuing(AgentTerminationKind terminationKind)
+    [InlineData(AgentTerminationKind.TransportFailure)]
+    public async Task TechnicalFailureRestartsTheSameSemanticAttemptBeforeContinuing(AgentTerminationKind terminationKind)
     {
         using var scenario = FactoryScenario.Create()
             .Plan("Implement A.", "Implement B.")
             .CommandFailure(terminationKind, "item_3 dotnet test did not complete")
             .Execute("Implement A.", invocation =>
             {
-                Assert.Contains("results are partial and must not be trusted", invocation.Input, StringComparison.Ordinal);
+                Assert.Contains("did not produce trusted semantic results", invocation.Input, StringComparison.Ordinal);
                 Assert.Contains("item_3 dotnet test did not complete", invocation.Input, StringComparison.Ordinal);
                 return "Diagnosed the hang and completed A.";
             })
@@ -60,5 +61,16 @@ public sealed class ExecutionScenarios
         result.ShouldComplete();
         result.ShouldExecute("Implement A.", "Implement A.", "Implement B.");
         result.ShouldHaveAttemptCount("W000001", 2);
+
+        var invocations = result.Invocations
+            .Where(x => x.WorkItemId == "W000001")
+            .ToArray();
+        Assert.Equal(WorkItemInvocationKind.Initial, invocations[0].InvocationKind);
+        Assert.Equal(WorkItemInvocationKind.TechnicalRestart, invocations[1].InvocationKind);
+        Assert.Equal(1, invocations[0].SemanticAttemptNumber);
+        Assert.Equal(1, invocations[1].SemanticAttemptNumber);
+        Assert.Equal(0, invocations[0].TechnicalRestartNumber);
+        Assert.Equal(1, invocations[1].TechnicalRestartNumber);
+        Assert.NotEqual(invocations[0].AttemptId, invocations[1].AttemptId);
     }
 }

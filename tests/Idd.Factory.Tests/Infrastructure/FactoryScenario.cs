@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Idd.Factory.Configuration;
 using Idd.Factory.Domain;
 using Idd.Factory.Runtime;
 using Idd.Factory.Verification;
@@ -10,12 +11,13 @@ internal sealed class FactoryScenario : IDisposable
     private readonly TestWorkspace workspace = new();
     private readonly ScriptedAgentBackend backend = new();
     private VerificationEngine? verification;
+    private FactoryConfiguration? configuration;
     private FactoryRuntime? runtime;
 
     public static FactoryScenario Create() => new();
 
     public string WorkspacePath => workspace.Path;
-    public FactoryRuntime Runtime => runtime ??= FactoryTestRuntime.Create(workspace.Path, backend, verification: verification);
+    public FactoryRuntime Runtime => runtime ??= FactoryTestRuntime.Create(workspace.Path, backend, configuration, verification);
 
     public FactoryScenario Planner(string output) => Planner(_ => output);
 
@@ -57,6 +59,51 @@ internal sealed class FactoryScenario : IDisposable
     public FactoryScenario CommandFailure(AgentTerminationKind terminationKind, string diagnostic)
     {
         backend.CommandFailure(terminationKind, diagnostic);
+        return this;
+    }
+
+    public FactoryScenario CommandFailure(
+        AgentTerminationKind terminationKind,
+        string diagnostic,
+        Action<AgentInvocation> beforeFailure)
+    {
+        backend.CommandFailure(terminationKind, diagnostic, beforeFailure);
+        return this;
+    }
+
+    public FactoryScenario TransportTerminationAfterResult(string task, string result = "Implemented the requested task.")
+    {
+        backend.TransportTerminationAfterResult(invocation =>
+        {
+            Assert.Equal("implementation", invocation.Capability);
+            var contract = File.ReadAllText(Path.Combine(
+                workspace.Path,
+                ".idd",
+                "factory",
+                "current",
+                "work-items",
+                invocation.WorkItemId!,
+                "contract.md"));
+            Assert.Equal(task.Trim(), contract.Trim());
+            return result;
+        });
+        return this;
+    }
+
+    public FactoryScenario MissingResult()
+    {
+        backend.MissingResult();
+        return this;
+    }
+
+    public FactoryScenario WithLimits(
+        int maxAttemptsPerTask = 4,
+        int maxTechnicalRestartsPerTask = 1)
+    {
+        Assert.Null(runtime);
+        configuration = FactoryTestRuntime.Configuration(
+            maxAttemptsPerTask,
+            maxTechnicalRestartsPerTask);
         return this;
     }
 

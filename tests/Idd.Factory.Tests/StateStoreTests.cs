@@ -43,11 +43,56 @@ public sealed class StateStoreTests
     }
 
     [Fact]
-    public void StateHasNoSemanticControlOrReviewFields()
+    public void StatePersistsSeparateSemanticAndTechnicalInvocationState()
+    {
+        var state = State();
+        state.Current = Planned("W000001") with
+        {
+            SemanticAttemptCount = 2,
+            TechnicalRestartCount = 1,
+            AdditionalSemanticAttemptBudget = 3,
+            NextInvocationKind = WorkItemInvocationKind.TechnicalRestart
+        };
+        state.CurrentPhase = CurrentWorkPhase.Ready;
+
+        using var document = JsonDocument.Parse(JsonSerializer.Serialize(state, FactoryJson.Options));
+        var root = document.RootElement;
+        var current = root.GetProperty("current");
+
+        Assert.Equal(14, FactoryState.CurrentSchemaVersion);
+        Assert.Equal(2, current.GetProperty("semanticAttemptCount").GetInt32());
+        Assert.Equal(1, current.GetProperty("technicalRestartCount").GetInt32());
+        Assert.Equal(3, current.GetProperty("additionalSemanticAttemptBudget").GetInt32());
+        Assert.Equal("TechnicalRestart", current.GetProperty("nextInvocationKind").GetString());
+        Assert.False(current.TryGetProperty("attemptCount", out _));
+        Assert.False(current.TryGetProperty("additionalAttemptBudget", out _));
+    }
+
+    [Fact]
+    public void PersistedNextInvocationKindWinsOverVerificationHistoryOnReload()
+    {
+        var state = State();
+        state.Current = Planned("W000001") with
+        {
+            SemanticAttemptCount = 1,
+            TechnicalRestartCount = 0,
+            LastVerificationDecision = VerificationDecision.UnexpectedFailure,
+            NextInvocationKind = WorkItemInvocationKind.TechnicalRestart
+        };
+        state.CurrentPhase = CurrentWorkPhase.Ready;
+
+        var json = JsonSerializer.Serialize(state, FactoryJson.Options);
+        var loaded = JsonSerializer.Deserialize<FactoryState>(json, FactoryJson.Options)!;
+
+        Assert.Equal(VerificationDecision.UnexpectedFailure, loaded.Current!.LastVerificationDecision);
+        Assert.Equal(WorkItemInvocationKind.TechnicalRestart, loaded.Current.NextInvocationKind);
+    }
+
+    [Fact]
+    public void StateHasNoObsoleteSemanticControlOrReviewFields()
     {
         using var document = JsonDocument.Parse(JsonSerializer.Serialize(State(), FactoryJson.Options));
         var root = document.RootElement;
-        Assert.Equal(13, FactoryState.CurrentSchemaVersion);
         Assert.True(root.TryGetProperty("completed", out _));
         Assert.True(root.TryGetProperty("current", out _));
         Assert.True(root.TryGetProperty("remaining", out _));

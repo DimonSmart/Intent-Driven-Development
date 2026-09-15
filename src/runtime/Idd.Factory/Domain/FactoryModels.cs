@@ -22,9 +22,12 @@ public enum VerificationExpectation
 [JsonConverter(typeof(JsonStringEnumConverter<VerificationDecision>))]
 public enum VerificationDecision { None, Ok, ExpectedFailure, UnexpectedFailure }
 
+[JsonConverter(typeof(JsonStringEnumConverter<WorkItemInvocationKind>))]
+public enum WorkItemInvocationKind { Initial, SemanticRetry, TechnicalRestart }
+
 public sealed record FactoryState
 {
-    public const int CurrentSchemaVersion = 13;
+    public const int CurrentSchemaVersion = 14;
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     public required string MethodologyVersion { get; init; }
     public required string RuntimeVersion { get; init; }
@@ -55,22 +58,85 @@ public sealed record FactoryState
 
 public sealed record PlannedWorkItem
 {
+    private string? currentAttemptId;
+    private VerificationDecision lastVerificationDecision;
+
     public required string Id { get; init; }
     public required string ContractPath { get; init; }
     public List<string> TaskRelatedIntentIds { get; init; } = [];
-    public int AttemptCount { get; set; }
-    public int AdditionalAttemptBudget { get; set; }
-    public string? CurrentAttemptId { get; set; }
+    public int SemanticAttemptCount { get; set; }
+    public int TechnicalRestartCount { get; set; }
+    public int AdditionalSemanticAttemptBudget { get; set; }
+
+    [JsonIgnore]
+    public int AttemptCount
+    {
+        get => InvocationCounterKind == WorkItemInvocationKind.TechnicalRestart
+            ? TechnicalRestartCount
+            : SemanticAttemptCount;
+        set
+        {
+            if (InvocationCounterKind == WorkItemInvocationKind.TechnicalRestart)
+                TechnicalRestartCount = value;
+            else
+                SemanticAttemptCount = value;
+        }
+    }
+
+    [JsonIgnore]
+    public int AdditionalAttemptBudget
+    {
+        get => AdditionalSemanticAttemptBudget;
+        set => AdditionalSemanticAttemptBudget = value;
+    }
+
+    public string? CurrentAttemptId
+    {
+        get => currentAttemptId;
+        set
+        {
+            currentAttemptId = value;
+            if (value is null)
+                CurrentInvocationKind = null;
+            else
+                CurrentInvocationKind ??= NextInvocationKind;
+        }
+    }
+
     public List<string> VerificationCheckIds { get; init; } = [];
     public Dictionary<string, VerificationExpectation> VerificationExpectations { get; init; } = new(StringComparer.Ordinal);
     public List<string> VerificationEvidenceRefs { get; init; } = [];
     public List<string> LastVerificationEvidenceRefs { get; init; } = [];
-    public VerificationDecision LastVerificationDecision { get; set; }
+
+    public VerificationDecision LastVerificationDecision
+    {
+        get => lastVerificationDecision;
+        set
+        {
+            lastVerificationDecision = value;
+            if (value == VerificationDecision.UnexpectedFailure && currentAttemptId is null)
+                NextInvocationKind = WorkItemInvocationKind.SemanticRetry;
+        }
+    }
+
+    public WorkItemInvocationKind NextInvocationKind { get; set; } = WorkItemInvocationKind.Initial;
+    public WorkItemInvocationKind? CurrentInvocationKind { get; set; }
     public string? LastResultRef { get; set; }
     public List<string> PriorResultRefs { get; init; } = [];
+    public List<TechnicalFailureDiagnostic> PriorTechnicalFailures { get; init; } = [];
     public List<string> PriorAttemptDiagnosticRefs { get; init; } = [];
     public List<string> ChangedPaths { get; init; } = [];
+
+    private WorkItemInvocationKind InvocationCounterKind => CurrentInvocationKind ?? NextInvocationKind;
 }
+
+public sealed record TechnicalFailureDiagnostic(
+    string FailedAttemptId,
+    string FailureCode,
+    string DiagnosticReference,
+    string Message,
+    int SemanticAttemptNumber,
+    List<string> ChangedPaths);
 
 public sealed record CompletedWorkItem
 {
@@ -167,13 +233,16 @@ public static class FactoryCapabilityCatalog
 
 public sealed record AgentInvocation
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     public required string RunId { get; init; }
     public required string AttemptId { get; init; }
     public required string Capability { get; init; }
     public required string Role { get; init; }
     public string? WorkItemId { get; init; }
+    public WorkItemInvocationKind? InvocationKind { get; init; }
+    public int? SemanticAttemptNumber { get; init; }
+    public int? TechnicalRestartNumber { get; init; }
     public required string Workspace { get; init; }
     public required string SemanticOutputPath { get; init; }
     public required string SkillName { get; init; }

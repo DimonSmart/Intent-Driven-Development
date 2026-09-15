@@ -10,7 +10,7 @@ internal sealed record FactoryBlockResult(
     PendingContinuation Continuation,
     JsonElement? Payload = null);
 
-internal sealed class FactoryStopService
+internal sealed class FactoryStopService(FactoryRuntimeContext context)
 {
     public FactoryCliOutcome OutcomeFromBlocker(FactoryState state, string fallback) =>
         new(
@@ -32,6 +32,9 @@ internal sealed class FactoryStopService
         FactoryState state,
         AgentProtocolException exception)
     {
+        if (exception.Code == "TECHNICAL_RESTART_BUDGET_EXHAUSTED")
+            return TechnicalRestartBudgetExhausted(state, exception);
+
         var existing = state.PendingContinuation is { IsResumable: true } value ? value : null;
         var hard = exception.Code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal)
             || exception.Code is "UNKNOWN_CAPABILITY" or "INVALID_RUNTIME_STATE";
@@ -48,5 +51,38 @@ internal sealed class FactoryStopService
             hard || existing is null
                 ? new(ContinuationKind.Terminal, state.Current?.Id, null, exception.Code, false)
                 : existing);
+    }
+
+    private FactoryBlockResult TechnicalRestartBudgetExhausted(
+        FactoryState state,
+        AgentProtocolException exception)
+    {
+        var item = state.Current;
+        var failure = item?.PriorTechnicalFailures.LastOrDefault();
+        JsonElement? payload = item is null || failure is null
+            ? null
+            : JsonSerializer.SerializeToElement(
+                new
+                {
+                    workItemId = item.Id,
+                    failedAttemptId = failure.FailedAttemptId,
+                    failureCode = failure.FailureCode,
+                    diagnosticReference = failure.DiagnosticReference,
+                    technicalRestartCount = item.TechnicalRestartCount,
+                    technicalRestartBudget = context.Configuration.Limits.MaxTechnicalRestartsPerTask
+                },
+                FactoryJson.Options);
+
+        return new(
+            exception.Code,
+            exception.Message,
+            "Cancel/restart after resolving the execution-layer instability.",
+            new(
+                ContinuationKind.Terminal,
+                item?.Id,
+                null,
+                exception.Code,
+                false),
+            payload);
     }
 }

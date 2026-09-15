@@ -270,34 +270,46 @@ public sealed class TaskRelatedIntentTests
     {
         const string contract = "Implement current durable truth.";
         const string intentPath = ".idd/intent/IDD-0009.spec-current.md";
+        var semanticCheck = OperatingSystem.IsWindows()
+            ? "if (Test-Path semantic-retry-ready.txt) { exit 0 } else { exit 1 }"
+            : "test -f semantic-retry-ready.txt";
         using var scenario = FactoryScenario.Create()
+            .WithLimits(maxAttemptsPerTask: 1)
             .WithFile(intentPath, "ORIGINAL-INTENT-CONTENT")
+            .WithVerificationCheck("semantic-retry-check", semanticCheck)
             .Planner($"# Task\n{contract}\n# TaskRelatedIntent\nIDD-0009")
-            .CommandFailure(AgentTerminationKind.CommandTimeout, "timeout 1")
-            .CommandFailure(AgentTerminationKind.CommandTimeout, "timeout 2")
-            .CommandFailure(AgentTerminationKind.CommandTimeout, "timeout 3")
-            .CommandFailure(AgentTerminationKind.CommandTimeout, "timeout 4")
+            .Execute(contract, invocation =>
+            {
+                Assert.Contains("ORIGINAL-INTENT-CONTENT", invocation.Input, StringComparison.Ordinal);
+                File.WriteAllText(Path.Combine(invocation.Workspace, "first-attempt.txt"), "first");
+                return "First semantic implementation attempt.";
+            })
             .Execute(contract, invocation =>
             {
                 Assert.Contains("UPDATED-INTENT-CONTENT", invocation.Input, StringComparison.Ordinal);
                 Assert.DoesNotContain("ORIGINAL-INTENT-CONTENT", invocation.Input, StringComparison.Ordinal);
-                return "Implemented after budget extension.";
+                File.WriteAllText(Path.Combine(invocation.Workspace, "semantic-retry-ready.txt"), "ready");
+                return "Implemented after semantic budget extension.";
             })
             .Done();
 
         var exhausted = await scenario.Run();
         exhausted.ShouldBeBlockedBy("RETRY_BUDGET_EXHAUSTED");
-        Assert.Equal(4, exhausted.Invocations.Count(x => x.WorkItemId == "W000001"));
-        Assert.All(
-            exhausted.Invocations.Where(x => x.WorkItemId == "W000001"),
-            invocation => Assert.Contains("ORIGINAL-INTENT-CONTENT", invocation.Input, StringComparison.Ordinal));
+        Assert.Single(exhausted.Invocations, x => x.WorkItemId == "W000001");
+        Assert.Equal(1, exhausted.State.Current!.SemanticAttemptCount);
+        Assert.Equal(0, exhausted.State.Current.TechnicalRestartCount);
 
         scenario.WithFile(intentPath, "UPDATED-INTENT-CONTENT");
         var result = await scenario.RetryExhausted(1);
 
         result.ShouldComplete();
-        result.ShouldHaveAttemptCount("W000001", 5);
+        result.ShouldHaveAttemptCount("W000001", 2);
         result.ShouldHavePlanningCycles(2);
+        var invocations = result.Invocations.Where(x => x.WorkItemId == "W000001").ToArray();
+        Assert.Equal(WorkItemInvocationKind.Initial, invocations[0].InvocationKind);
+        Assert.Equal(WorkItemInvocationKind.SemanticRetry, invocations[1].InvocationKind);
+        Assert.Equal(2, invocations[1].SemanticAttemptNumber);
+        Assert.Equal(0, invocations[1].TechnicalRestartNumber);
         Assert.Equal(["IDD-0009"], Assert.Single(result.State.Completed).TaskRelatedIntentIds);
     }
 
