@@ -45,10 +45,21 @@ internal sealed class ExecutionService(
                 "attempts",
                 attempt,
                 "result.json"));
+
         if (!reusable
-            && item.AttemptCount
+            && item.NextInvocationKind == WorkItemInvocationKind.TechnicalRestart
+            && item.TechnicalRestartCount >= context.Configuration.Limits.MaxTechnicalRestartsPerTask)
+        {
+            throw new AgentProtocolException(
+                "TECHNICAL_RESTART_BUDGET_EXHAUSTED",
+                BuildTechnicalRestartBudgetExhaustedMessage(item));
+        }
+
+        if (!reusable
+            && item.NextInvocationKind != WorkItemInvocationKind.TechnicalRestart
+            && item.SemanticAttemptCount
             >= context.Configuration.Limits.MaxAttemptsPerTask
-               + item.AdditionalAttemptBudget)
+               + item.AdditionalSemanticAttemptBudget)
         {
             return new(
                 FactoryExecutionResultKind.RetryBudgetExhausted,
@@ -62,7 +73,7 @@ internal sealed class ExecutionService(
             FactoryExecutionResultKind.Ready,
             item.Id,
             await BuildWorkInputAsync(state, item, cancellationToken),
-            item.LastVerificationDecision == VerificationDecision.UnexpectedFailure);
+            item.NextInvocationKind == WorkItemInvocationKind.SemanticRetry);
     }
 
     public async Task<string> PersistCommandFailureDiagnosticAsync(
@@ -88,10 +99,10 @@ internal sealed class ExecutionService(
     }
 
     public int AvailableAdditionalAttempts(PlannedWorkItem item) =>
-        10 - (context.Configuration.Limits.MaxAttemptsPerTask + item.AdditionalAttemptBudget);
+        10 - (context.Configuration.Limits.MaxAttemptsPerTask + item.AdditionalSemanticAttemptBudget);
 
     public int EffectiveAttemptBudget(PlannedWorkItem item) =>
-        context.Configuration.Limits.MaxAttemptsPerTask + item.AdditionalAttemptBudget;
+        context.Configuration.Limits.MaxAttemptsPerTask + item.AdditionalSemanticAttemptBudget;
 
     private async Task<string> BuildWorkInputAsync(
         FactoryState state,
@@ -106,7 +117,7 @@ internal sealed class ExecutionService(
             await contextReader.BuildCompletedContextAsync(state, cancellationToken);
         var prior =
             await contextReader.BuildPriorResultContextAsync(item, cancellationToken);
-        var priorCommandFailures =
+        var priorTechnicalFailures =
             await contextReader.BuildPriorCommandFailureContextAsync(
                 item,
                 cancellationToken);
@@ -119,13 +130,21 @@ internal sealed class ExecutionService(
             $"Work item contract:\n{contract}\n\n" +
             $"Task-related durable intent:\n{taskRelatedIntent}\n\n" +
             $"Relevant completed work and results:\n{completed}\n\n" +
-            $"Previous attempts for this task:\n{prior}\n\n" +
-            $"Previous shell-command failures for this task:\n{priorCommandFailures}\n\n" +
+            $"Previous semantic results for this task:\n{prior}\n\n" +
+            $"Previous technical execution failures for this task:\n{priorTechnicalFailures}\n\n" +
             $"Authoritative verification observations:\n{verificationObservations}\n\n" +
             "The task contract defines the concrete work. Supplied task-related durable intent is normative product input and both constrain implementation. " +
             "The planner already selected the explicitly referenced intent; Factory persisted, resolved, and loaded it. Correctness for it must not depend on rediscovering those files. " +
             "Inspect the current repository and additional intent only when genuine implementation discovery requires it. " +
             "Use a fresh semantic context. Do not rely on conversation history or internal planning state.";
+    }
+
+    private string BuildTechnicalRestartBudgetExhaustedMessage(PlannedWorkItem item)
+    {
+        var failure = item.PriorTechnicalFailures.LastOrDefault();
+        return failure is null
+            ? $"Work item {item.Id} exhausted its technical restart budget ({item.TechnicalRestartCount}/{context.Configuration.Limits.MaxTechnicalRestartsPerTask})."
+            : $"Work item {item.Id} exhausted its technical restart budget ({item.TechnicalRestartCount}/{context.Configuration.Limits.MaxTechnicalRestartsPerTask}) after {failure.FailureCode} in {failure.FailedAttemptId}. Diagnostic: {failure.DiagnosticReference}.";
     }
 
     private async Task<string> BuildTaskRelatedIntentContextAsync(
