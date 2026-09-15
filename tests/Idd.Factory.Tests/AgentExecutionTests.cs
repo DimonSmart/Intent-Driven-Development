@@ -6,39 +6,69 @@ namespace Idd.Factory.Tests;
 public sealed class AgentExecutionTests
 {
     [Fact]
-    public void CompletedShellCommandIsNotReportedAsIncomplete()
+    public void SequentialShellCommandsLeaveNoActiveCommands()
     {
-        var stdout = """
-            {"type":"item.started","item":{"id":"command-1","type":"command_execution","status":"in_progress"}}
-            {"type":"item.completed","item":{"id":"command-1","type":"command_execution","status":"completed"}}
-            """;
+        var tracker = new CommandExecutionTracker();
+        var started = DateTimeOffset.Parse("2026-09-08T12:00:00Z");
 
-        Assert.Empty(CodexCommandProtocol.FindIncompleteCommandExecutions(stdout));
+        tracker.Observe(Start("A", "dotnet build"), started);
+        Assert.Equal("A", Assert.Single(tracker.GetActive()).Id);
+        tracker.Observe(Complete("A"), started.AddSeconds(1));
+        Assert.Empty(tracker.GetActive());
+
+        tracker.Observe(Start("B", "dotnet test"), started.AddSeconds(2));
+        Assert.Equal("B", Assert.Single(tracker.GetActive()).Id);
+        tracker.Observe(Complete("B"), started.AddSeconds(3));
+        Assert.Empty(tracker.GetActive());
     }
 
     [Fact]
-    public void StartedShellCommandWithoutCompletionIsReportedAsIncomplete()
+    public void OverlappingShellCommandsAreTrackedIndependently()
     {
-        var stdout = """
-            {"type":"item.started","item":{"id":"command-1","type":"command_execution","status":"in_progress"}}
-            {"type":"item.completed","item":{"id":"message-1","type":"agent_message"}}
-            """;
+        var tracker = new CommandExecutionTracker();
+        var started = DateTimeOffset.Parse("2026-09-08T12:00:00Z");
 
-        var incomplete = Assert.Single(CodexCommandProtocol.FindIncompleteCommandExecutions(stdout));
-        Assert.Equal("command-1", incomplete.Id);
-        Assert.Null(incomplete.Command);
+        tracker.Observe(Start("A", "long command"), started);
+        tracker.Observe(Start("B", "short command"), started.AddSeconds(1));
+
+        Assert.Equal(new[] { "A", "B" }, tracker.GetActive().Select(command => command.Id));
+
+        tracker.Observe(Complete("B"), started.AddSeconds(2));
+        Assert.Equal("A", Assert.Single(tracker.GetActive()).Id);
+
+        tracker.Observe(Complete("A"), started.AddSeconds(3));
+        Assert.Empty(tracker.GetActive());
     }
 
     [Fact]
-    public void IncompleteShellCommandDiagnosticIdentifiesCommandAndLocalEvidence()
+    public void ThreeParallelShellCommandsKeepStableActiveState()
     {
-        var stdout = """
-            {"type":"item.started","item":{"id":"item_7","type":"command_execution","command":"dotnet test tests/Desktop.Tests.csproj","status":"in_progress"}}
-            {"type":"item.completed","item":{"id":"message-1","type":"agent_message"}}
-            """;
+        var tracker = new CommandExecutionTracker();
+        var started = DateTimeOffset.Parse("2026-09-08T12:00:00Z");
 
-        var incomplete = CodexCommandProtocol.FindIncompleteCommandExecutions(stdout);
-        var diagnostic = CodexCommandProtocol.BuildIncompleteCommandDiagnostic(incomplete);
+        tracker.Observe(Start("A", "a"), started);
+        tracker.Observe(Start("B", "b"), started.AddSeconds(1));
+        tracker.Observe(Start("C", "c"), started.AddSeconds(2));
+        Assert.Equal(new[] { "A", "B", "C" }, tracker.GetActive().Select(command => command.Id));
+
+        tracker.Observe(Complete("B"), started.AddSeconds(3));
+        Assert.Equal(new[] { "A", "C" }, tracker.GetActive().Select(command => command.Id));
+        tracker.Observe(Complete("A"), started.AddSeconds(4));
+        Assert.Equal("C", Assert.Single(tracker.GetActive()).Id);
+        tracker.Observe(Complete("C"), started.AddSeconds(5));
+        Assert.Empty(tracker.GetActive());
+    }
+
+    [Fact]
+    public void IncompleteShellCommandDiagnosticIdentifiesFinalActiveCommands()
+    {
+        var tracker = new CommandExecutionTracker();
+        var started = DateTimeOffset.Parse("2026-09-08T12:00:00Z");
+        tracker.Observe(
+            Start("item_7", "dotnet test tests/Desktop.Tests.csproj"),
+            started);
+
+        var diagnostic = CodexCommandProtocol.BuildIncompleteCommandDiagnostic(tracker.GetActive());
 
         Assert.Contains("[item_7] dotnet test tests/Desktop.Tests.csproj", diagnostic, StringComparison.Ordinal);
         Assert.Contains("Inspect stdout.log for the complete event stream", diagnostic, StringComparison.Ordinal);
@@ -81,15 +111,85 @@ public sealed class AgentExecutionTests
     {
         var tracker = new CommandExecutionTracker();
         var started = DateTimeOffset.Parse("2026-09-08T12:00:00Z");
-        tracker.Observe("""{"type":"item.started","item":{"id":"item_3","type":"command_execution","command":"dotnet test","status":"in_progress"}}""", started);
+        tracker.Observe(Start("A", "long"), started);
+        tracker.Observe(Start("B", "later"), started.AddMinutes(3));
 
         Assert.Null(tracker.FindTimedOut(started.AddMinutes(9), TimeSpan.FromMinutes(10)));
-        var timedOut = Assert.IsType<IncompleteCommandExecution>(tracker.FindTimedOut(started.AddMinutes(10), TimeSpan.FromMinutes(10)));
-        Assert.Equal("item_3", timedOut.Id);
-        Assert.Equal("dotnet test", timedOut.Command);
+        var timedOut = Assert.IsType<IncompleteCommandExecution>(
+            tracker.FindTimedOut(started.AddMinutes(10), TimeSpan.FromMinutes(10)));
+        Assert.Equal("A", timedOut.Id);
 
-        tracker.Observe("""{"type":"item.completed","item":{"id":"item_3","type":"command_execution","status":"completed"}}""", started.AddMinutes(10));
-        Assert.Null(tracker.FindTimedOut(started.AddHours(1), TimeSpan.FromMinutes(10)));
+        tracker.Observe(Complete("A"), started.AddMinutes(10));
+        Assert.Null(tracker.FindTimedOut(started.AddMinutes(12), TimeSpan.FromMinutes(10)));
+        Assert.Equal(
+            "B",
+            Assert.IsType<IncompleteCommandExecution>(
+                tracker.FindTimedOut(started.AddMinutes(13), TimeSpan.FromMinutes(10))).Id);
+    }
+
+    [Fact]
+    public void DuplicateStartedDoesNotExtendTimeoutAndCanFillMissingCommandText()
+    {
+        var tracker = new CommandExecutionTracker();
+        var started = DateTimeOffset.Parse("2026-09-08T12:00:00Z");
+
+        tracker.Observe(Start("A", null), started);
+        tracker.Observe(Start("A", "dotnet test"), started.AddMinutes(5));
+
+        var active = Assert.Single(tracker.GetActive());
+        Assert.Equal(started, active.StartedAt);
+        Assert.Equal("dotnet test", active.Command);
+        Assert.Null(tracker.FindTimedOut(started.AddMinutes(9), TimeSpan.FromMinutes(10)));
+        Assert.Equal(
+            "A",
+            Assert.IsType<IncompleteCommandExecution>(
+                tracker.FindTimedOut(started.AddMinutes(10), TimeSpan.FromMinutes(10))).Id);
+    }
+
+    [Fact]
+    public void CompletedThenStartedAgainUsesNewStartTime()
+    {
+        var tracker = new CommandExecutionTracker();
+        var first = DateTimeOffset.Parse("2026-09-08T12:00:00Z");
+        var second = first.AddMinutes(2);
+
+        tracker.Observe(Start("A", "first"), first);
+        tracker.Observe(Complete("A"), first.AddMinutes(1));
+        tracker.Observe(Start("A", "second"), second);
+
+        var active = Assert.Single(tracker.GetActive());
+        Assert.Equal(second, active.StartedAt);
+        Assert.Equal("second", active.Command);
+    }
+
+    [Fact]
+    public void UnknownAndDuplicateCompletedEventsAreTolerated()
+    {
+        var tracker = new CommandExecutionTracker();
+        var started = DateTimeOffset.Parse("2026-09-08T12:00:00Z");
+
+        tracker.Observe(Complete("unknown"), started);
+        tracker.Observe(Start("A", "command"), started.AddSeconds(1));
+        tracker.Observe(Complete("A"), started.AddSeconds(2));
+        tracker.Observe(Complete("A"), started.AddSeconds(3));
+
+        Assert.Empty(tracker.GetActive());
+    }
+
+    [Fact]
+    public void ActiveSnapshotIsDeterministicAndIndependentFromTrackerStorage()
+    {
+        var tracker = new CommandExecutionTracker();
+        var started = DateTimeOffset.Parse("2026-09-08T12:00:00Z");
+        tracker.Observe(Start("B", "b"), started);
+        tracker.Observe(Start("A", "a"), started);
+
+        var snapshot = tracker.GetActive();
+        tracker.Observe(Complete("A"), started.AddSeconds(1));
+        tracker.Observe(Complete("B"), started.AddSeconds(1));
+
+        Assert.Equal(new[] { "A", "B" }, snapshot.Select(command => command.Id));
+        Assert.Empty(tracker.GetActive());
     }
 
     [Fact]
@@ -105,20 +205,12 @@ public sealed class AgentExecutionTests
         Assert.Contains("process tree was terminated", diagnostic, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void CommandTrackerReportsStartingAnotherCommandBeforeTheFirstCompletes()
+    private static string Start(string id, string? command)
     {
-        var tracker = new CommandExecutionTracker();
-        var started = DateTimeOffset.Parse("2026-09-08T12:00:00Z");
-        tracker.Observe("""{"type":"item.started","item":{"id":"item_3","type":"command_execution","command":"dotnet test","status":"in_progress"}}""", started);
-        tracker.Observe("""{"type":"item.started","item":{"id":"item_5","type":"command_execution","command":"git diff --check","status":"in_progress"}}""", started.AddSeconds(30));
-
-        var overlap = Assert.IsType<CommandExecutionOverlap>(tracker.FindOverlap());
-        Assert.Equal("item_3", overlap.Active.Id);
-        Assert.Equal("item_5", overlap.Started.Id);
-        var diagnostic = CodexCommandProtocol.BuildCommandOverlapDiagnostic(overlap);
-        Assert.Contains("item_5", diagnostic, StringComparison.Ordinal);
-        Assert.Contains("before [item_3] completed", diagnostic, StringComparison.Ordinal);
-        Assert.Contains("partial results are not trusted", diagnostic, StringComparison.Ordinal);
+        var commandJson = command is null ? string.Empty : $",\"command\":\"{command}\"";
+        return $"{{\"type\":\"item.started\",\"item\":{{\"id\":\"{id}\",\"type\":\"command_execution\"{commandJson},\"status\":\"in_progress\"}}}}";
     }
+
+    private static string Complete(string id) =>
+        $"{{\"type\":\"item.completed\",\"item\":{{\"id\":\"{id}\",\"type\":\"command_execution\",\"status\":\"completed\"}}}}";
 }
