@@ -2,6 +2,9 @@
 artifacts/
 TestResults/
 evals/
+.angular/
+.cache/
+dist/
 
 # .NET build output
 **/bin/
