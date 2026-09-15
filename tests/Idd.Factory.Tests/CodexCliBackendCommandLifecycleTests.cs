@@ -117,7 +117,7 @@ public sealed class CodexCliBackendCommandLifecycleTests : IDisposable
         Directory.CreateDirectory(attemptDirectory);
 
         var backend = new CodexCliBackend(
-            RepositoryRoot(),
+            CreatePluginRoot(),
             HelperExecutable(),
             new AgentExecutionConfiguration(
                 Model: scenario,
@@ -143,6 +143,17 @@ public sealed class CodexCliBackendCommandLifecycleTests : IDisposable
         var handle = await backend.StartAsync(invocation, cancellation.Token);
         var process = await backend.WaitAsync(handle, cancellation.Token);
         return new(process, resultPath);
+    }
+
+    private string CreatePluginRoot()
+    {
+        var pluginRoot = Path.Combine(directory, "plugin");
+        var skillDirectory = Path.Combine(pluginRoot, "skills", "idd-factory-execute-subtask");
+        Directory.CreateDirectory(skillDirectory);
+        File.WriteAllText(
+            Path.Combine(skillDirectory, "SKILL.md"),
+            "# Test executor skill\n\nExecute the assigned test scenario.");
+        return pluginRoot;
     }
 
     private static string HelperExecutable()
