@@ -1,6 +1,7 @@
 # Generated artifacts
 artifacts/
 TestResults/
+evals/
 
 # .NET build output
 **/bin/
