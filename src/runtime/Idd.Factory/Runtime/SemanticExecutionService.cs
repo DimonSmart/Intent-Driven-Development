@@ -249,6 +249,9 @@ internal sealed class SemanticExecutionService(
             || x.Equals("bin", StringComparison.OrdinalIgnoreCase)
             || x.Equals("obj", StringComparison.OrdinalIgnoreCase)
             || x.Equals("node_modules", StringComparison.OrdinalIgnoreCase)
+            || x.Equals(".angular", StringComparison.OrdinalIgnoreCase)
+            || x.Equals(".cache", StringComparison.OrdinalIgnoreCase)
+            || x.Equals("dist", StringComparison.OrdinalIgnoreCase)
             || x.Equals("TestResults", StringComparison.OrdinalIgnoreCase));
     }
 
