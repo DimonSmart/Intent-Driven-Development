@@ -6,6 +6,8 @@ This project contains one intentionally expensive, token-consuming Factory end-t
 
 The scenario installs the generated current Factory plugin and runs the prepared `TwoStepCatalog` workspace through a real Codex host, real `factory_run`, production Factory Runtime, real semantic workers, and the configured semantic model. The task is deliberately multi-step and the evaluation requires at least two completed work items.
 
+The workspace also contains an executor-discovery efficiency fixture. After the baseline Git commit, the harness creates 600 ignored files under `src/MiniCatalog/obj/idd-discovery-noise` plus one untracked non-ignored probe under `src/MiniCatalog`. The executor must use Git-visible, scoped discovery rather than broad physical recursive scans. The evaluation reads executor `stdout.log` command events, rejects broad recursive discovery and ignore-bypassing searches, verifies scoped `git ls-files --cached --others --exclude-standard` usage, and checks that ignored noise does not inflate Git discovery output. A compact `executor-discovery-evidence.json` records the observed commands and per-command output sizes; the raw attempt logs remain authoritative.
+
 Run it manually with:
 
 ```bat
@@ -24,4 +26,4 @@ The evaluation checks observable behavior: the prepared product baseline does no
 
 Process execution, cancellation, timeout, process-tree termination, transport, workflow/state transitions, retries, continuation, persistence/recovery, verification mechanics, intent propagation, and other mechanical contracts belong in deterministic `Idd.Factory.Tests`. LiveTests should not grow separate real-model scenarios for behavior that can be checked reliably without an LLM.
 
-On failure, raw evidence is retained under `artifacts/factory-evals/<run-id>/`, including the workspace, Factory current/result state, Codex `events.jsonl`, stderr/final response, verification logs, progress log, and git status/diff.
+On failure, raw evidence is retained under `artifacts/factory-evals/<run-id>/`, including the workspace, Factory current/result state, Codex `events.jsonl`, stderr/final response, verification logs, progress log, executor discovery evidence, and git status/diff.

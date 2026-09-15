@@ -32,6 +32,7 @@ public sealed class FactoryEndToEndLiveTests
 
             await InitializeGitAsync(runner, workspace);
             gitInitialized = true;
+            await ExecutorDiscoveryEvaluation.PrepareAsync(runner, workspace);
             await workspace.LogAsync("Checking the prepared product baseline.");
             await RequireSuccessAsync(runner, workspace, "dotnet", ["restore", "MiniCatalog.sln"], "baseline-restore", TimeSpan.FromMinutes(3));
             await RequireSuccessAsync(runner, workspace, "dotnet", ["build", "MiniCatalog.sln", "--no-restore"], "baseline-build", TimeSpan.FromMinutes(2));
@@ -65,6 +66,7 @@ public sealed class FactoryEndToEndLiveTests
             Assert.True(factory.CompletedWorkCount >= 2, $"Expected at least two completed work items, observed {factory.CompletedWorkCount}.");
             AssertSequentialWorkHandoff(factory.Path);
             Assert.Equal("passed", factory.VerificationStatus);
+            ExecutorDiscoveryEvaluation.AssertEfficientDiscovery(factory.Path, workspace);
             Assert.False(string.IsNullOrWhiteSpace(factory.CommitMessagePath));
             Assert.True(File.Exists(Path.Combine(workspace.WorkspaceDirectory, factory.CommitMessagePath!.Replace('/', Path.DirectorySeparatorChar))));
 
