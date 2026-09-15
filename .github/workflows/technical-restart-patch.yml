@@ -1,0 +1,33 @@
+name: Temporary technical restart patch
+
+on:
+  push:
+    branches:
+      - semantic-technical-restart
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[patch-bot]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: semantic-technical-restart
+          fetch-depth: 0
+      - name: Apply targeted source patches
+        run: python .github/technical-restart-patch.py
+      - name: Commit patched files
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No patch changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/runtime/Idd.Factory/Runtime/FactoryStateMachine.cs tests/Idd.Factory.Tests/TaskRelatedIntentTests.cs tests/Idd.Factory.Tests/BatchProtocolTests.cs
+          git commit -m "[patch-bot] Apply semantic and technical retry state-machine changes"
+          git push origin HEAD:semantic-technical-restart
