@@ -68,9 +68,41 @@ internal sealed class ScriptedAgentBackend : IAgentBackend
         results.Enqueue(new(invocation => result(invocation), SuccessfulProcess()));
 
     public void CommandFailure(AgentTerminationKind terminationKind, string diagnostic) =>
+        CommandFailure(terminationKind, diagnostic, _ => { });
+
+    public void CommandFailure(
+        AgentTerminationKind terminationKind,
+        string diagnostic,
+        Action<AgentInvocation> beforeFailure) =>
+        results.Enqueue(new(
+            invocation =>
+            {
+                beforeFailure(invocation);
+                return null;
+            },
+            new AgentProcessResult(
+                0,
+                "",
+                diagnostic,
+                false,
+                terminationKind == AgentTerminationKind.CommandTimeout,
+                terminationKind)));
+
+    public void TransportTerminationAfterResult(Func<AgentInvocation, string> result) =>
+        results.Enqueue(new(
+            invocation => result(invocation),
+            new AgentProcessResult(
+                0,
+                "",
+                "transport ended after complete semantic result",
+                true,
+                false,
+                AgentTerminationKind.TransportFailure)));
+
+    public void MissingResult() =>
         results.Enqueue(new(
             _ => null,
-            new AgentProcessResult(0, "", diagnostic, false, terminationKind == AgentTerminationKind.CommandTimeout, terminationKind)));
+            SuccessfulProcess()));
 
     public Task<AgentRunHandle> StartAsync(AgentInvocation invocation, CancellationToken cancellationToken)
     {
