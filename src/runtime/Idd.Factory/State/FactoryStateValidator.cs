@@ -15,7 +15,18 @@ public sealed class FactoryStateValidator
         if ((state.Current is null) != (state.CurrentPhase is null)) throw Error("Current and CurrentPhase must be set or cleared together.");
 
         var active = new[] { state.Current }.Where(x => x is not null).Concat(state.Remaining).Select(x => x!).ToArray();
-        if (active.Any(x => x.AttemptCount < 0 || x.AdditionalAttemptBudget < 0)) throw Error("Work item retry counters cannot be negative.");
+        if (active.Any(x => x.SemanticAttemptCount < 0
+                            || x.TechnicalRestartCount < 0
+                            || x.AdditionalSemanticAttemptBudget < 0))
+            throw Error("Work item semantic and technical retry counters cannot be negative.");
+        if (active.Any(x => (x.CurrentAttemptId is null) != (x.CurrentInvocationKind is null)))
+            throw Error("Current work-item invocation identity and kind must be set or cleared together.");
+        if (state.Remaining.Any(x => x.CurrentAttemptId is not null || x.CurrentInvocationKind is not null))
+            throw Error("Remaining work cannot have an active executor invocation.");
+        if (state.Current is { } current
+            && state.CurrentAttemptId is not null
+            && current.CurrentAttemptId != state.CurrentAttemptId)
+            throw Error("Current work-item attempt identity must match Factory attempt identity.");
 
         var all = state.Completed.Select(x => (
                 Id: x.Id,
