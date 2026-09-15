@@ -711,7 +711,9 @@ internal sealed class FactoryStateMachine(
                 attemptId,
                 exception.Code,
                 diagnosticReference,
-                boundedMessage);
+                boundedMessage,
+                item.SemanticAttemptCount,
+                failedChangedPaths.ToList());
             if (!item.PriorTechnicalFailures.Any(x => x.FailedAttemptId == attemptId))
                 item.PriorTechnicalFailures.Add(failure);
             if (!item.PriorAttemptDiagnosticRefs.Contains(
@@ -780,10 +782,15 @@ internal sealed class FactoryStateMachine(
                 "technical-restart-scheduled");
         }
 
+        var verificationRetryMadeProgress = semantic.ChangedPaths.Count != 0
+            || item.PriorTechnicalFailures.Any(x =>
+                x.SemanticAttemptNumber == item.SemanticAttemptCount
+                && x.ChangedPaths.Count != 0);
+
         CompleteSemanticAttempt(state, item, semantic);
         item.LastResultRef = semantic.Result.SemanticResultPath;
 
-        if (verificationDrivenRetry && semantic.ChangedPaths.Count == 0)
+        if (verificationDrivenRetry && !verificationRetryMadeProgress)
         {
             state.CurrentPhase = CurrentWorkPhase.Blocked;
             var outcome = await BlockAsync(

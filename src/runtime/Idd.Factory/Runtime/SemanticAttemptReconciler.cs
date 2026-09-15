@@ -82,6 +82,8 @@ internal sealed class SemanticAttemptReconciler(
             var technicalFailure = await TryReadRestartableTechnicalFailureAsync(
                 attemptId,
                 directory,
+                invocation,
+                changedPaths,
                 cancellationToken);
             if (technicalFailure is not null)
             {
@@ -169,6 +171,8 @@ internal sealed class SemanticAttemptReconciler(
     private async Task<TechnicalFailureDiagnostic?> TryReadRestartableTechnicalFailureAsync(
         string attemptId,
         string directory,
+        AgentInvocation invocation,
+        IReadOnlyList<string> changedPaths,
         CancellationToken cancellationToken)
     {
         var telemetryPath = Path.Combine(directory, "process-telemetry.json");
@@ -205,7 +209,13 @@ internal sealed class SemanticAttemptReconciler(
         var message = File.Exists(diagnosticPath)
             ? BoundDiagnostic(await File.ReadAllTextAsync(diagnosticPath, cancellationToken))
             : $"Recovered {failureCode} from persisted process telemetry.";
-        return new(attemptId, failureCode, diagnosticReference, message);
+        return new(
+            attemptId,
+            failureCode,
+            diagnosticReference,
+            message,
+            invocation.SemanticAttemptNumber!.Value,
+            changedPaths.ToList());
     }
 
     internal static SemanticOperationKind ResolveOperation(AgentInvocation invocation) =>

@@ -134,7 +134,9 @@ public sealed record TechnicalFailureDiagnostic(
     string FailedAttemptId,
     string FailureCode,
     string DiagnosticReference,
-    string Message);
+    string Message,
+    int SemanticAttemptNumber,
+    List<string> ChangedPaths);
 
 public sealed record CompletedWorkItem
 {
