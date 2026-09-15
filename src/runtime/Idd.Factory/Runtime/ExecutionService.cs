@@ -73,7 +73,7 @@ internal sealed class ExecutionService(
             FactoryExecutionResultKind.Ready,
             item.Id,
             await BuildWorkInputAsync(state, item, cancellationToken),
-            item.NextInvocationKind == WorkItemInvocationKind.SemanticRetry);
+            item.LastVerificationDecision == VerificationDecision.UnexpectedFailure);
     }
 
     public async Task<string> PersistCommandFailureDiagnosticAsync(
