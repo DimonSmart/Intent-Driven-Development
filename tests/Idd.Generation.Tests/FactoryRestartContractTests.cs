@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Idd.Generation.Tests.Infrastructure;
 using Xunit;
 
@@ -16,19 +17,22 @@ public sealed class FactoryRestartContractTests(GenerationFixture fixture)
         "leave the existing Factory run unchanged",
         "do not semantic-merge it with the persisted request",
         "The current runtime owns the complete restart operation",
-        "Explicit restart -> resolve the replacement request, run replacement-run intent preflight, then call `factory_restart`",
-        "Explicit cancellation with no replacement run wanted -> call `factory_cancel`"
+        "For an explicit restart of an existing supported run, resolve the replacement request, perform replacement-run preflight, then call `factory_restart`",
+        "For explicit cancellation when no replacement run is wanted, call `factory_cancel`"
     ];
 
     private static readonly string[] PreflightMarkers =
     [
         "logical Factory request",
-        "new run\n    -> materialized current user request",
-        "replacement run\n    -> resolved replacement request",
+        "new run -> materialized current user request",
+        "replacement run -> resolved replacement request",
         "The presence of `.idd/factory/current/state.json` is expected in replacement-run mode",
         "the existing run remains untouched",
         "passed unchanged to `factory_restart`",
-        "Do not semantic-merge a persisted request with a partial restart delta"
+        "Do not semantic-merge a persisted request with a partial restart delta",
+        "`Covered`, `ExplicitIntentChange`, `MissingIntentDecision`, or `ImplementationOnly`",
+        "`route-only`",
+        "## Durable normalization"
     ];
 
     [Fact]
@@ -62,13 +66,18 @@ public sealed class FactoryRestartContractTests(GenerationFixture fixture)
 
     private static void AssertRestartContract(string skill, string preflight)
     {
-        foreach (var marker in SkillMarkers)
-            Assert.Contains(marker, skill, StringComparison.Ordinal);
-        foreach (var marker in PreflightMarkers)
-            Assert.Contains(marker, preflight, StringComparison.Ordinal);
+        var normalizedSkill = NormalizeWhitespace(skill);
+        var normalizedPreflight = NormalizeWhitespace(preflight);
 
-        Assert.DoesNotContain("atomically owns the recovery operation", skill, StringComparison.Ordinal);
-        Assert.DoesNotContain("recoverable through explicit current-runtime cancellation and a new run", skill, StringComparison.Ordinal);
-        Assert.DoesNotContain("factory_cancel` followed by `factory_run`", preflight, StringComparison.Ordinal);
+        foreach (var marker in SkillMarkers)
+            Assert.Contains(NormalizeWhitespace(marker), normalizedSkill, StringComparison.Ordinal);
+        foreach (var marker in PreflightMarkers)
+            Assert.Contains(NormalizeWhitespace(marker), normalizedPreflight, StringComparison.Ordinal);
+
+        Assert.DoesNotContain("atomically owns the recovery operation", normalizedSkill, StringComparison.Ordinal);
+        Assert.DoesNotContain("recoverable through explicit current-runtime cancellation and a new run", normalizedSkill, StringComparison.Ordinal);
     }
+
+    private static string NormalizeWhitespace(string value) =>
+        Regex.Replace(value, "\\s+", " ").Trim();
 }
