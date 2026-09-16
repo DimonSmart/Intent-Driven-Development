@@ -47,15 +47,13 @@ This run-level `factory_restart` is distinct from executor **Technical Restart**
 which is an internal retry kind within one existing run. Do not change or
 reinterpret Technical Restart behavior here.
 
-## MCP dependency and blocking transport
+## Runtime dependency and blocking transport
 
-- Codex requires the bundled `idd-factory` MCP server configured by the plugin.
-  If `factory_run`, `factory_restart`, `factory_continue`, `factory_retry`,
+- Use the packaged Factory runtime exposed by the installed platform adapter. If
+  `factory_run`, `factory_restart`, `factory_continue`, `factory_retry`,
   `factory_cancel`, and `factory_status` are unavailable, stop and report that
-  the Factory MCP dependency is unavailable. Do not replace it with shell
+  the packaged Factory dependency is unavailable. Do not replace it with shell
   invocation, generic subagents, or manual orchestration.
-- Claude uses the packaged Factory launcher supplied by its adapter. Follow the
-  same run-level semantics even when the transport surface differs.
 - Factory runtime operations are blocking. Progress notifications, when
   supported by the host, are informational only and do not change the outcome
   contract.
