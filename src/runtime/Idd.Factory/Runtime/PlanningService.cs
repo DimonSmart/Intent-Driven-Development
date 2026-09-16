@@ -74,8 +74,10 @@ internal sealed class PlanningService(
             "Discover durable intent by reading .idd/intent/README.md and .idd/intent/INDEX.md first. " +
             "Use the index to identify plausible current numbered intent documents and read only candidates needed for task semantics or relevance; do not load the complete intent store by default. " +
             "For each task, select any existing stable IDD-NNNN intent IDs whose durable constraints materially affect that task and emit them as '# TaskRelatedIntent' metadata after the task contract. " +
+            "For each task, independently select only already-Completed stable work-item IDs whose semantic results are genuinely needed by that executor and emit them as '# RelevantCompletedWork' metadata after '# TaskRelatedIntent' when present. " +
+            "Do not select completed work merely because it came earlier, has similar paths, or might be useful; current repository state is the primary source of implemented reality. " +
             "Inspect the current repository directly. Materialize every task whose self-contained contract can be determined reliably now, in execution order. " +
-            "Stop at the first material uncertainty that requires evidence from this batch. " +
+            "Stop at the first task whose meaningful contract or required semantic context depends on evidence from a task in this batch that is not Completed yet. " +
             "Return one or more '# Task' sections, or exactly one '# Question' section when a user decision is required, or exactly '# Done' when no semantic work remains. " +
             "Do not mix these forms.";
 

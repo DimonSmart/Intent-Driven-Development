@@ -114,7 +114,7 @@ internal sealed class ExecutionService(
             cancellationToken);
         var taskRelatedIntent = await BuildTaskRelatedIntentContextAsync(item, cancellationToken);
         var completed =
-            await contextReader.BuildCompletedContextAsync(state, cancellationToken);
+            await contextReader.BuildExecutorCompletedContextAsync(item, state, cancellationToken);
         var prior =
             await contextReader.BuildPriorResultContextAsync(item, cancellationToken);
         var priorTechnicalFailures =
@@ -135,6 +135,7 @@ internal sealed class ExecutionService(
             $"Authoritative verification observations:\n{verificationObservations}\n\n" +
             "The task contract defines the concrete work. Supplied task-related durable intent is normative product input and both constrain implementation. " +
             "The planner already selected the explicitly referenced intent; Factory persisted, resolved, and loaded it. Correctness for it must not depend on rediscovering those files. " +
+            "Supplied relevant completed work is the planner-selected subset of previous semantic results needed by this task, not the complete Factory history; current repository state remains the primary source of implemented reality. " +
             "Inspect the current repository and additional intent only when genuine implementation discovery requires it. " +
             "Use a fresh semantic context. Do not rely on conversation history or internal planning state.";
     }

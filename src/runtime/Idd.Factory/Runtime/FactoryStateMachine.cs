@@ -1021,6 +1021,7 @@ internal sealed class FactoryStateMachine(
             Id = item.Id,
             ContractPath = item.ContractPath,
             TaskRelatedIntentIds = item.TaskRelatedIntentIds.ToList(),
+            RelevantCompletedWorkIds = item.RelevantCompletedWorkIds.ToList(),
             ResultRef = item.LastResultRef,
             ChangedPaths = item.ChangedPaths.ToList(),
             VerificationEvidenceRefs = item.VerificationEvidenceRefs.ToList(),

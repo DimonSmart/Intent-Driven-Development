@@ -31,14 +31,16 @@ public sealed class FactoryStateValidator
         var all = state.Completed.Select(x => (
                 Id: x.Id,
                 ContractPath: x.ContractPath,
-                TaskRelatedIntentIds: (IReadOnlyList<string>)x.TaskRelatedIntentIds))
+                TaskRelatedIntentIds: (IReadOnlyList<string>)x.TaskRelatedIntentIds,
+                RelevantCompletedWorkIds: (IReadOnlyList<string>)x.RelevantCompletedWorkIds))
             .Concat(state.Current is null
                 ? []
-                : [(state.Current.Id, state.Current.ContractPath, (IReadOnlyList<string>)state.Current.TaskRelatedIntentIds)])
+                : [(state.Current.Id, state.Current.ContractPath, (IReadOnlyList<string>)state.Current.TaskRelatedIntentIds, (IReadOnlyList<string>)state.Current.RelevantCompletedWorkIds)])
             .Concat(state.Remaining.Select(x => (
                 Id: x.Id,
                 ContractPath: x.ContractPath,
-                TaskRelatedIntentIds: (IReadOnlyList<string>)x.TaskRelatedIntentIds)))
+                TaskRelatedIntentIds: (IReadOnlyList<string>)x.TaskRelatedIntentIds,
+                RelevantCompletedWorkIds: (IReadOnlyList<string>)x.RelevantCompletedWorkIds)))
             .ToArray();
         if (all.Any(x => string.IsNullOrWhiteSpace(x.Id))) throw Error("Every work item requires an ID.");
         if (all.Select(x => x.Id).Distinct(StringComparer.Ordinal).Count() != all.Length) throw Error("Work item IDs must be unique across Completed, Current, and Remaining.");
@@ -47,7 +49,9 @@ public sealed class FactoryStateValidator
             if (string.IsNullOrWhiteSpace(item.ContractPath)) throw Error($"Work item {item.Id} has an incomplete contract.");
             ValidateContractPath(item.ContractPath, item.Id);
             ValidateTaskRelatedIntentIds(item.Id, item.TaskRelatedIntentIds);
+            ValidateRelevantCompletedWorkIds(item.Id, item.RelevantCompletedWorkIds);
         }
+        ValidateRelevantCompletedWorkReferences(state);
         if (state.CurrentAttemptId is not null && state.Current is null && state.PendingContinuation?.Operation != SemanticOperationKind.Planning)
             throw Error("An active attempt without Current work must be planning.");
         if (state.PendingVerificationSession is { WorkItemId: not null } session && state.Current?.Id != session.WorkItemId) throw Error("Subtask verification must target Current work.");
@@ -83,6 +87,17 @@ public sealed class FactoryStateValidator
                 throw Error($"Task-related durable intent for work item {workItemId} is immutable.");
             }
         }
+
+        var previousRelevantCompletedWork = GetRelevantCompletedWorkByWorkItem(previous);
+        var nextRelevantCompletedWork = GetRelevantCompletedWorkByWorkItem(next);
+        foreach (var (workItemId, previousIds) in previousRelevantCompletedWork)
+        {
+            if (nextRelevantCompletedWork.TryGetValue(workItemId, out var nextIds)
+                && !previousIds.SequenceEqual(nextIds, StringComparer.Ordinal))
+            {
+                throw Error($"Relevant completed work selection for work item {workItemId} is immutable.");
+            }
+        }
     }
 
     private static void ValidateVerificationSession(PendingVerificationSession session)
@@ -115,6 +130,48 @@ public sealed class FactoryStateValidator
         }
     }
 
+    private static void ValidateRelevantCompletedWorkIds(string workItemId, IReadOnlyList<string> ids)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var id in ids)
+        {
+            if (!WorkItemId.IsCanonical(id))
+                throw Error($"Work item {workItemId} has invalid relevant completed work ID '{id}'.");
+            if (!seen.Add(id))
+                throw Error($"Work item {workItemId} has duplicate relevant completed work ID '{id}'.");
+        }
+    }
+
+    private static void ValidateRelevantCompletedWorkReferences(FactoryState state)
+    {
+        var completedIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in state.Completed)
+        {
+            foreach (var reference in item.RelevantCompletedWorkIds)
+            {
+                if (!completedIds.Contains(reference))
+                    throw Error($"Completed work item {item.Id} references '{reference}', which was not completed before it.");
+            }
+            completedIds.Add(item.Id);
+        }
+
+        if (state.Current is not null)
+            ValidateActiveRelevantReferences(state.Current, completedIds);
+        foreach (var item in state.Remaining)
+            ValidateActiveRelevantReferences(item, completedIds);
+    }
+
+    private static void ValidateActiveRelevantReferences(
+        PlannedWorkItem item,
+        IReadOnlySet<string> completedIds)
+    {
+        foreach (var reference in item.RelevantCompletedWorkIds)
+        {
+            if (!completedIds.Contains(reference))
+                throw Error($"Work item {item.Id} references relevant completed work '{reference}' that is not in Completed history.");
+        }
+    }
+
     private static Dictionary<string, IReadOnlyList<string>> GetTaskRelatedIntentByWorkItem(FactoryState state)
     {
         var result = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
@@ -124,6 +181,18 @@ public sealed class FactoryStateValidator
             result[state.Current.Id] = state.Current.TaskRelatedIntentIds;
         foreach (var item in state.Remaining)
             result[item.Id] = item.TaskRelatedIntentIds;
+        return result;
+    }
+
+    private static Dictionary<string, IReadOnlyList<string>> GetRelevantCompletedWorkByWorkItem(FactoryState state)
+    {
+        var result = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        foreach (var item in state.Completed)
+            result[item.Id] = item.RelevantCompletedWorkIds;
+        if (state.Current is not null)
+            result[state.Current.Id] = state.Current.RelevantCompletedWorkIds;
+        foreach (var item in state.Remaining)
+            result[item.Id] = item.RelevantCompletedWorkIds;
         return result;
     }
 

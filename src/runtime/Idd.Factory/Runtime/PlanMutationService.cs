@@ -19,6 +19,7 @@ internal sealed class PlanMutationService(
         CancellationToken cancellationToken)
     {
         ValidateTaskRelatedIntent(tasks);
+        ValidateRelevantCompletedWork(state, tasks);
 
         var nextWorkItemNumber = state.NextWorkItemNumber;
         var workItems = new List<PlannedWorkItem>(tasks.Count);
@@ -41,7 +42,8 @@ internal sealed class PlanMutationService(
             {
                 Id = id,
                 ContractPath = path,
-                TaskRelatedIntentIds = task.TaskRelatedIntentIds.ToList()
+                TaskRelatedIntentIds = task.TaskRelatedIntentIds.ToList(),
+                RelevantCompletedWorkIds = task.RelevantCompletedWorkIds.ToList()
             });
         }
 
@@ -91,6 +93,41 @@ internal sealed class PlanMutationService(
                     throw new AgentProtocolException(
                         "MALFORMED_PLANNER_OUTPUT",
                         $"Planner TaskRelatedIntent reference '{intentId}' is invalid: {exception.Message}");
+                }
+            }
+        }
+    }
+
+    private static void ValidateRelevantCompletedWork(
+        FactoryState state,
+        IReadOnlyList<PlannerTaskDefinition> tasks)
+    {
+        var completedIds = state.Completed
+            .Select(item => item.Id)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var task in tasks)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var workItemId in task.RelevantCompletedWorkIds)
+            {
+                if (!WorkItemId.IsCanonical(workItemId))
+                {
+                    throw new AgentProtocolException(
+                        "MALFORMED_PLANNER_OUTPUT",
+                        $"Planner RelevantCompletedWork entry '{workItemId}' is not a canonical WNNNNNN identifier.");
+                }
+                if (!seen.Add(workItemId))
+                {
+                    throw new AgentProtocolException(
+                        "MALFORMED_PLANNER_OUTPUT",
+                        $"Planner RelevantCompletedWork contains duplicate work-item ID '{workItemId}'.");
+                }
+                if (!completedIds.Contains(workItemId))
+                {
+                    throw new AgentProtocolException(
+                        "MALFORMED_PLANNER_OUTPUT",
+                        $"Planner RelevantCompletedWork reference '{workItemId}' is invalid because it was not already Completed when this planning cycle began.");
                 }
             }
         }

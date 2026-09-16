@@ -59,7 +59,7 @@ public sealed class StateStoreTests
         var root = document.RootElement;
         var current = root.GetProperty("current");
 
-        Assert.Equal(14, FactoryState.CurrentSchemaVersion);
+        Assert.Equal(15, FactoryState.CurrentSchemaVersion);
         Assert.Equal(2, current.GetProperty("semanticAttemptCount").GetInt32());
         Assert.Equal(1, current.GetProperty("technicalRestartCount").GetInt32());
         Assert.Equal(3, current.GetProperty("additionalSemanticAttemptBudget").GetInt32());

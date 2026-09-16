@@ -7,7 +7,8 @@ namespace Idd.Factory.Runtime;
 
 internal sealed record PlannerTaskDefinition(
     string Contract,
-    IReadOnlyList<string> TaskRelatedIntentIds);
+    IReadOnlyList<string> TaskRelatedIntentIds,
+    IReadOnlyList<string> RelevantCompletedWorkIds);
 
 internal sealed record PlannerBatchResult(
     IReadOnlyList<PlannerTaskDefinition> Tasks,
@@ -23,6 +24,7 @@ internal sealed class PlannerMarkdownParser
 {
     private const string TaskHeading = "# Task";
     private const string TaskRelatedIntentHeading = "# TaskRelatedIntent";
+    private const string RelevantCompletedWorkHeading = "# RelevantCompletedWork";
     private const string QuestionHeading = "# Question";
     private const string DoneHeading = "# Done";
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().Build();
@@ -74,14 +76,36 @@ internal sealed class PlannerMarkdownParser
                         "MALFORMED_PLANNER_OUTPUT",
                         "Planner '# TaskRelatedIntent' must occur at most once immediately after the '# Task' it describes.");
                 }
+                if (index + 1 < markers.Length
+                    && markers[index + 1].Kind is not (PlannerSectionKind.RelevantCompletedWork or PlannerSectionKind.Task))
+                {
+                    throw new AgentProtocolException(
+                        "MALFORMED_PLANNER_OUTPUT",
+                        "Planner '# TaskRelatedIntent' must be followed only by '# RelevantCompletedWork', another '# Task', or the end of planner output.");
+                }
+
+                tasks[^1] = tasks[^1] with { TaskRelatedIntentIds = ParseTaskRelatedIntent(rawBody) };
+                continue;
+            }
+
+            if (marker.Kind == PlannerSectionKind.RelevantCompletedWork)
+            {
+                if (index == 0
+                    || markers[index - 1].Kind is not (PlannerSectionKind.Task or PlannerSectionKind.TaskRelatedIntent)
+                    || tasks.Count == 0)
+                {
+                    throw new AgentProtocolException(
+                        "MALFORMED_PLANNER_OUTPUT",
+                        "Planner '# RelevantCompletedWork' must occur at most once after the '# Task' it describes and after '# TaskRelatedIntent' when both metadata sections are present.");
+                }
                 if (index + 1 < markers.Length && markers[index + 1].Kind != PlannerSectionKind.Task)
                 {
                     throw new AgentProtocolException(
                         "MALFORMED_PLANNER_OUTPUT",
-                        "Planner '# TaskRelatedIntent' must be followed only by another '# Task' or the end of planner output.");
+                        "Planner '# RelevantCompletedWork' must be followed only by another '# Task' or the end of planner output.");
                 }
 
-                tasks[^1] = tasks[^1] with { TaskRelatedIntentIds = ParseTaskRelatedIntent(rawBody) };
+                tasks[^1] = tasks[^1] with { RelevantCompletedWorkIds = ParseRelevantCompletedWork(rawBody) };
                 continue;
             }
 
@@ -90,7 +114,7 @@ internal sealed class PlannerMarkdownParser
 
             if (marker.Kind == PlannerSectionKind.Task)
             {
-                tasks.Add(new(body, []));
+                tasks.Add(new(body, [], []));
                 continue;
             }
 
@@ -110,10 +134,7 @@ internal sealed class PlannerMarkdownParser
 
     private static IReadOnlyList<string> ParseTaskRelatedIntent(string body)
     {
-        var ids = body
-            .Split('\n')
-            .Where(line => !string.IsNullOrWhiteSpace(line))
-            .ToArray();
+        var ids = ParseNonEmptyLines(body);
         if (ids.Length == 0)
         {
             throw new AgentProtocolException(
@@ -141,6 +162,41 @@ internal sealed class PlannerMarkdownParser
         return ids;
     }
 
+    private static IReadOnlyList<string> ParseRelevantCompletedWork(string body)
+    {
+        var ids = ParseNonEmptyLines(body);
+        if (ids.Length == 0)
+        {
+            throw new AgentProtocolException(
+                "MALFORMED_PLANNER_OUTPUT",
+                "Planner '# RelevantCompletedWork' must contain at least one completed work-item ID.");
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var id in ids)
+        {
+            if (!WorkItemId.IsCanonical(id))
+            {
+                throw new AgentProtocolException(
+                    "MALFORMED_PLANNER_OUTPUT",
+                    $"Planner RelevantCompletedWork entry '{id}' must be exactly one canonical WNNNNNN identifier per line, without surrounding whitespace.");
+            }
+            if (!seen.Add(id))
+            {
+                throw new AgentProtocolException(
+                    "MALFORMED_PLANNER_OUTPUT",
+                    $"Planner RelevantCompletedWork contains duplicate work-item ID '{id}'.");
+            }
+        }
+
+        return ids;
+    }
+
+    private static string[] ParseNonEmptyLines(string body) =>
+        body.Split('\n')
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .ToArray();
+
     private static PlannerSectionMarker? TryCreateMarker(string markdown, HeadingBlock heading)
     {
         if (heading.Span.Start < 0 || heading.Span.Start >= markdown.Length)
@@ -153,6 +209,7 @@ internal sealed class PlannerMarkdownParser
         {
             TaskHeading => PlannerSectionKind.Task,
             TaskRelatedIntentHeading => PlannerSectionKind.TaskRelatedIntent,
+            RelevantCompletedWorkHeading => PlannerSectionKind.RelevantCompletedWork,
             QuestionHeading => PlannerSectionKind.Question,
             DoneHeading => PlannerSectionKind.Done,
             _ => PlannerSectionKind.None
@@ -168,8 +225,8 @@ internal sealed class PlannerMarkdownParser
     private static AgentProtocolException Malformed() =>
         new(
             "MALFORMED_PLANNER_OUTPUT",
-            "Planner output must contain one or more exact '# Task' sections, exactly one non-empty '# Question' section, or exactly '# Done'. Optional '# TaskRelatedIntent' metadata may follow only its task. Blank planner output is not a completion signal.");
+            "Planner output must contain one or more exact '# Task' sections, exactly one non-empty '# Question' section, or exactly '# Done'. Optional '# TaskRelatedIntent' and '# RelevantCompletedWork' metadata may follow only their task in that order. Blank planner output is not a completion signal.");
 
     private sealed record PlannerSectionMarker(int Start, int EndExclusive, PlannerSectionKind Kind);
-    private enum PlannerSectionKind { None, Task, TaskRelatedIntent, Question, Done }
+    private enum PlannerSectionKind { None, Task, TaskRelatedIntent, RelevantCompletedWork, Question, Done }
 }

@@ -27,7 +27,7 @@ public enum WorkItemInvocationKind { Initial, SemanticRetry, TechnicalRestart }
 
 public sealed record FactoryState
 {
-    public const int CurrentSchemaVersion = 14;
+    public const int CurrentSchemaVersion = 15;
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     public required string MethodologyVersion { get; init; }
     public required string RuntimeVersion { get; init; }
@@ -64,6 +64,7 @@ public sealed record PlannedWorkItem
     public required string Id { get; init; }
     public required string ContractPath { get; init; }
     public List<string> TaskRelatedIntentIds { get; init; } = [];
+    public List<string> RelevantCompletedWorkIds { get; init; } = [];
     public int SemanticAttemptCount { get; set; }
     public int TechnicalRestartCount { get; set; }
     public int AdditionalSemanticAttemptBudget { get; set; }
@@ -143,6 +144,7 @@ public sealed record CompletedWorkItem
     public required string Id { get; init; }
     public required string ContractPath { get; init; }
     public List<string> TaskRelatedIntentIds { get; init; } = [];
+    public List<string> RelevantCompletedWorkIds { get; init; } = [];
     public string? ResultRef { get; init; }
     public List<string> ChangedPaths { get; init; } = [];
     public List<string> VerificationEvidenceRefs { get; init; } = [];
@@ -161,6 +163,21 @@ internal static class DurableIntentId
                 return false;
 
         return true;
+    }
+}
+
+internal static class WorkItemId
+{
+    public static bool IsCanonical(string? value)
+    {
+        if (value is null || value.Length != 7 || value[0] != 'W')
+            return false;
+
+        for (var index = 1; index < value.Length; index++)
+            if (value[index] is < '0' or > '9')
+                return false;
+
+        return value != "W000000";
     }
 }
 

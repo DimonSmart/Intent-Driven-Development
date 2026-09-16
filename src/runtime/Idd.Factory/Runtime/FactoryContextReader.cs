@@ -27,34 +27,33 @@ internal sealed class FactoryContextReader(FactoryRuntimeContext context)
             completed.VerificationEvidenceRefs.AddRange(visiblePaths);
         }
 
-        return await BuildCompletedContextAsync(planningState, cancellationToken);
+        return await BuildPlanningCompletedHistoryContextAsync(planningState, cancellationToken);
     }
 
-    public async Task<string> BuildCompletedContextAsync(
+    public async Task<string> BuildExecutorCompletedContextAsync(
+        PlannedWorkItem item,
         FactoryState state,
         CancellationToken cancellationToken)
     {
-        if (state.Completed.Count == 0)
+        if (item.RelevantCompletedWorkIds.Count == 0)
             return "none";
 
+        var completedById = state.Completed.ToDictionary(completed => completed.Id, StringComparer.Ordinal);
         var lines = new List<string>();
-        foreach (var completed in state.Completed)
+        foreach (var workItemId in item.RelevantCompletedWorkIds)
         {
+            if (!completedById.TryGetValue(workItemId, out var completed))
+            {
+                throw new FactoryStateException(
+                    "CORRUPT_FACTORY_STATE",
+                    $"Work item {item.Id} references relevant completed work '{workItemId}' that is not present in Completed history.");
+            }
+
             lines.Add($"## {completed.Id}");
-            lines.Add("Task contract:");
-            lines.Add(ReadContract(completed.ContractPath));
             lines.Add("Semantic result:");
             lines.Add(completed.ResultRef is null
                 ? "none"
                 : await ReadSemanticResultAsync(completed.ResultRef, cancellationToken));
-            lines.Add("Actual changed paths: " + (
-                completed.ChangedPaths.Count == 0
-                    ? "none"
-                    : string.Join(", ", completed.ChangedPaths)));
-            lines.Add("Verification evidence: " + (
-                completed.VerificationEvidenceRefs.Count == 0
-                    ? "none"
-                    : string.Join(", ", completed.VerificationEvidenceRefs)));
         }
 
         return string.Join("\n", lines);
@@ -324,6 +323,36 @@ internal sealed class FactoryContextReader(FactoryRuntimeContext context)
         }
 
         return output[..minimum] + "\n[verification output truncated; see evidence artifact]";
+    }
+
+    private async Task<string> BuildPlanningCompletedHistoryContextAsync(
+        FactoryState state,
+        CancellationToken cancellationToken)
+    {
+        if (state.Completed.Count == 0)
+            return "none";
+
+        var lines = new List<string>();
+        foreach (var completed in state.Completed)
+        {
+            lines.Add($"## {completed.Id}");
+            lines.Add("Task contract:");
+            lines.Add(ReadContract(completed.ContractPath));
+            lines.Add("Semantic result:");
+            lines.Add(completed.ResultRef is null
+                ? "none"
+                : await ReadSemanticResultAsync(completed.ResultRef, cancellationToken));
+            lines.Add("Actual changed paths: " + (
+                completed.ChangedPaths.Count == 0
+                    ? "none"
+                    : string.Join(", ", completed.ChangedPaths)));
+            lines.Add("Verification evidence: " + (
+                completed.VerificationEvidenceRefs.Count == 0
+                    ? "none"
+                    : string.Join(", ", completed.VerificationEvidenceRefs)));
+        }
+
+        return string.Join("\n", lines);
     }
 
     private async Task<List<(string Reference, VerificationEvidence Evidence)>> ReadFailedVerificationEvidenceAsync(
