@@ -1,8 +1,12 @@
 # Intent Preflight
 
-Intent Preflight is the bounded semantic entry stage for a Factory run. It determines whether durable intent is ready before either a new run or a replacement run is created.
+Intent Preflight is the bounded entry stage for an end-to-end Factory request.
+It determines whether durable intent is ready before a new Factory run or a
+replacement Factory run is created. It is not a Factory work item, a planner
+phase, or a second runtime.
 
-Intent Preflight operates on an already resolved **logical Factory request**. The caller decides which request is authoritative before invoking preflight:
+Intent Preflight operates on an already resolved **logical Factory request**.
+The caller decides which request is authoritative before invoking preflight:
 
 ```text
 new run
@@ -12,127 +16,280 @@ replacement run
     -> resolved replacement request
 ```
 
-The current visible user message is therefore not automatically the semantic request for every preflight. A control command such as `restart Factory` may select replacement-run mode without itself becoming the replacement request.
+The current visible user message is therefore not automatically the semantic
+request for every preflight. A control command such as `restart Factory` may
+select replacement-run mode without itself becoming the replacement request.
 
-## Modes
+The logical Factory request remains authoritative. Preserve all user-authored
+request text and all explicitly supplied textual request inputs exactly. A host
+may represent supplied text using a request-local attachment or pasted-file
+reference; that reference is transport metadata, not durable request semantics.
+Before Factory starts, mechanically materialize such supplied text into one
+self-contained logical request. Do not substitute a route summary,
+implementation plan, paraphrase, or semantic rewrite.
+
+## Preflight modes
 
 ### New-run mode
 
-New-run mode applies only when the launcher is creating a Factory run and no active run exists. The launcher is responsible for checking existing-run state before invoking this mode.
+New-run mode applies only when the launcher is creating a Factory run and no
+active run exists. The launcher is responsible for checking
+`.idd/factory/current/state.json` before invoking this mode. If active state
+exists, the launcher follows existing-run rules instead of entering new-run
+preflight.
 
-The logical Factory request is the current user request after lossless materialization of user-supplied pasted or attached content that belongs to that request.
+The logical Factory request is the current user request after lossless
+materialization of user-supplied pasted or attached text that belongs to that
+request.
 
 ### Replacement-run mode
 
-Replacement-run mode applies only after the user explicitly chooses restart and the launcher has already resolved one complete self-contained replacement request.
+Replacement-run mode applies only after the user explicitly chooses restart and
+the launcher has already resolved one complete self-contained replacement
+request.
 
-The presence of `.idd/factory/current/state.json` is expected in replacement-run mode and must not make Intent Preflight route back to existing-run handling. Preflight does not cancel, archive, migrate, deserialize, or otherwise mutate the existing Factory run.
+The presence of `.idd/factory/current/state.json` is expected in replacement-run
+mode and must not route preflight back to existing-run handling. Intent Preflight
+does not cancel, archive, migrate, deserialize, or otherwise mutate the existing
+Factory run.
 
-Replacement-run mode uses exactly the same semantic classification, intent-update, and coverage-validation rules as new-run mode. The only difference is the source and lifecycle of the logical Factory request.
+Replacement-run mode uses exactly the same requested-scope, classification,
+intent-update, durable-normalization, and coverage-validation rules as new-run
+mode. Only the source and lifecycle of the logical Factory request differ.
 
-If replacement-run preflight blocks or fails, the existing run remains untouched and no restart/cancel operation is implied.
+If replacement-run preflight blocks or fails, the existing run remains untouched
+and no `factory_restart` or `factory_cancel` operation is implied.
 
 ## Inputs
 
-Intent Preflight receives:
+Use:
 
 - the complete logical Factory request selected by the caller;
-- current repository state;
-- current durable intent under `.idd/intent/`;
-- any exact pasted/attached content already materialized as part of that logical request;
-- repository-local IDD configuration relevant to intent validation.
+- any pasted or attached textual content explicitly supplied by the user as part
+  of that request;
+- requested scope;
+- `.idd/intent/README.md` and `.idd/intent/INDEX.md`;
+- only current intent documents relevant to the request;
+- an existing route result when one is already available.
 
-Treat the supplied logical Factory request as authoritative for preflight. Do not substitute chat memory, planner output, work-item history, executor output, legacy semantic state, or a control command for that request.
+For a new run, resolve and read request-supplied pasted or attached text when the
+visible request contains only a reference to it. For a replacement run, operate
+on the complete replacement request resolved by the launcher; if that complete
+request itself contains user-supplied pasted or attached text, materialize that
+text by the same lossless rules before classification. A reference or local path
+is transport metadata, not a substitute for the supplied semantic content.
 
-Transport resolution is lossless preparation, not semantic interpretation. When the logical request refers to user-supplied pasted or attached text that is part of the request, resolve the exact supplied text before classification. Do not summarize, paraphrase, reconstruct, or silently omit it.
+Treat the selected logical Factory request together with exact resolved supplied
+content as authoritative for preflight. Do not substitute chat memory, planner
+output, work-item history, executor output, legacy semantic state, or a restart
+control command for that request.
+
+Materialization is a transport normalization, not a semantic transformation:
+
+- expand only text explicitly supplied by the user as request input; never read
+  arbitrary local or repository files merely because a path appears in text;
+- preserve the supplied text exactly, including whitespace and Unicode, while
+  replacing host-only attachment dependence with the exact content;
+- prefer the host's file/attachment reader when it provides the supplied text;
+- when a local text file such as Codex `pasted-text.txt` must be decoded, use
+  strict UTF-8 rather than shell-default or locale-dependent decoding;
+- reject invalid Unicode or U+FFFD replacement characters instead of silently
+  continuing with corrupted text;
+- if supplied request text cannot be resolved losslessly, stop before runtime
+  creation or replacement and report the input transport problem;
+- the same materialized logical request is the semantic source for intent
+  preparation and the request passed to Factory Runtime.
+
+The resulting Factory request must be self-contained: interpreting
+`request.md`, resuming the run, and performing final verification must not
+require a host-local temporary attachment to still exist.
+
+Do not read the entire intent tree by default. Missing documentation is evidence
+about storage, not proof that a product decision is missing.
+
+## Requested scope
+
+- `route-only`: report the route; do not prepare intent or start Factory.
+- `intent-only`: prepare and validate intent; do not start Factory.
+- `implementation-only`: never change `.idd/intent`. Start Factory only when
+  current intent is sufficient; otherwise return `INTENT_REQUIRED`.
+- `end-to-end`: prepare intent when necessary, validate it, then start Factory.
+
+Explicit scope limits override the normal meaning of an explicit
+`idd-factory-run` invocation. In replacement-run mode, a scope that forbids
+starting Factory also forbids invoking `factory_restart`; the existing run stays
+untouched.
 
 ## Classification
 
-Classify the logical Factory request before creating or replacing a Factory run.
+Classify the logical request relation to current intent as exactly one of:
+`Covered`, `ExplicitIntentChange`, `MissingIntentDecision`, or
+`ImplementationOnly`.
 
-### `IntentChanging`
+Before choosing a relation, compare every explicit durable claim in the
+materialized logical request with the relevant current intent. An explicit claim
+that adds or supersedes observable behavior, a durable architecture boundary,
+or a platform/safety/compatibility constraint is `ExplicitIntentChange` when
+the request supplies the decision. Do not classify such a request as `Covered`
+merely because the surrounding feature already has an owning specification.
 
-Use when fulfilling the request would add, remove, or change durable product truth, including product behavior, public contracts, compatibility promises, user-visible semantics, long-lived architectural boundaries, or explicit durable constraints.
+### `Covered`
 
-Required result before Factory starts:
+Current durable intent already contains enough product meaning for the request.
+Do not write intent. An end-to-end or permitted implementation-only request may
+start Factory immediately.
 
-1. Update current durable intent using the normal IDD intent workflow.
-2. Validate the updated intent mechanically.
-3. Re-evaluate coverage against the same logical Factory request.
-4. Start Factory only when the current intent explicitly covers the changed truth.
+### `ExplicitIntentChange`
 
-### `IntentPreserving`
+The request explicitly defines new or changed durable product behavior and
+contains the decisions needed to record it safely. This includes clear changes
+that supersede current intent.
 
-Use when the request changes implementation while preserving existing durable product truth, for example a localized refactoring, bug fix whose expected behavior is already explicit, test addition that does not alter product semantics, or mechanical implementation work under an existing contract.
+For end-to-end or intent-only scope, invoke the existing `idd-intent-change`
+workflow with the materialized logical request. That workflow may hand off to
+`idd-intent-new-document` for a distinct owner, ADR, or spike.
 
-Do not create speculative intent merely because Factory will modify code. Existing durable intent must still be sufficient to constrain the requested work where durable truth is relevant.
+For implementation-only scope, do not write intent; return `INTENT_REQUIRED`
+because the authorized durable source remains insufficient.
 
-### `Ambiguous`
+### `MissingIntentDecision`
 
-Use when it is not safe to determine whether the request changes durable truth or when the intended durable semantics are insufficiently specified.
+A durable product decision required for safe implementation cannot be
+determined from either the logical request or current intent. Before a new or
+replacement run, return `INTENT_REQUIRED` with a concise description of the
+missing decisions. Do not use this result merely to ask that an already explicit
+request be copied into a specification.
 
-Do not create or replace a Factory run. Ask the user the smallest question needed to resolve the ambiguity, or use the ordinary IDD clarification workflow where appropriate.
+### `ImplementationOnly`
+
+The request changes implementation but not product truth: for example, a
+refactor, cleanup, dependency update, or a bug fix whose expected behavior is
+already determined. Do not write intent. Start Factory when scope permits.
+
+`ImplementationOnly` requires that all requested product behavior and durable
+constraints are already established by current intent. It is not a fallback for
+a request that introduces or supersedes durable semantics alongside
+implementation detail.
+
+## Product decisions and technical research
+
+Technical uncertainty is not automatically missing intent. When product and
+safety semantics are known but the implementation approach needs investigation,
+preflight succeeds and Factory may plan implementation or research work.
+
+Use an intent-side spike only when research is required to choose durable
+product or architecture semantics themselves.
+
+## Durable normalization
+
+When preparing intent, retain durable truth only:
+
+- observable behavior and interaction semantics;
+- domain and public contracts;
+- durable architecture boundaries;
+- safety, compatibility, and platform constraints;
+- non-goals, acceptance criteria, and meaningful verification scenarios.
+
+Do not automatically retain private type or method names, source layout,
+constructor signatures, dependency-injection wiring, implementation order,
+temporary workarounds, task lists, build commands, test method names, progress,
+or other proposed private implementation shape.
 
 ## Coverage validation
 
-After classification and any required intent update, validate coverage against the exact same logical Factory request that will be passed to Runtime.
+After any intent write, and before Factory creation or replacement, compare the
+resulting current intent with the same materialized logical request that will be
+passed to Factory. Validate that:
 
-Coverage is semantic, not keyword-based. The goal is to establish that every durable product truth needed to constrain the requested implementation is represented in current intent.
+- the main requested behavior is owned by current intent;
+- material non-goals, safety, durability, and compatibility constraints remain;
+- adjacent current intent is not internally contradictory;
+- no other unresolved durable decision remains;
+- private implementation suggestions did not become normative product shape.
 
-For `IntentChanging`, coverage must include the changed durable truth before Factory starts.
-
-For `IntentPreserving`, coverage must be sufficient to keep implementation within current durable truth. Do not invent missing product semantics merely to make preflight pass.
-
-If coverage cannot be established without a user decision, stop before Factory state mutation and request that decision.
+Coverage produces `Covered` or `MissingIntentDecision`. Do not defer a known
+initial coverage gap to a Factory worker. If the intent workflow or coverage
+check fails, do not start or replace Factory and do not create Factory work
+items.
 
 ## Request identity
 
 Preflight and Runtime must operate on the same logical Factory request.
 
-- For a new run, the materialized current user request that passed preflight is passed unchanged to `factory_run`.
-- For a replacement run, the resolved replacement request that passed preflight is passed unchanged to `factory_restart`.
+- For a new run, the materialized current user request that passed preflight is
+  passed unchanged to `factory_run`.
+- For a replacement run, the resolved replacement request that passed preflight
+  is passed unchanged to `factory_restart`.
 - Do not classify one request and invoke Runtime with another.
 - Do not append launcher-only operational wording after preflight.
-- Do not semantic-merge a persisted request with a partial restart delta inside Intent Preflight.
+- Do not semantic-merge a persisted request with a partial restart delta inside
+  Intent Preflight.
 
-The launcher, not Intent Preflight, is responsible for resolving whether a replacement request comes from an explicitly supplied complete request or persisted `.idd/factory/current/request.md`.
+The launcher, not Intent Preflight, is responsible for resolving whether a
+replacement request comes from an explicitly supplied complete request or the
+persisted `.idd/factory/current/request.md`.
 
-## Existing runs and continuation
+## Evidence and recovery
 
-Ordinary `factory_continue` does not repeat initial Intent Preflight. The existing run already owns its persisted request and workflow state.
+Keep preflight evidence outside product specifications. Report, when available:
 
-When a planner question is answered during continuation, apply the normal IDD rule to the answer itself: if the answer changes durable product truth, update and validate intent before continuing; if it is only a local implementation decision, do not write durable intent.
+```text
+Intent preparation:
+  mode: new-run | replacement-run
+  status: unchanged | updated | blocked
+  beforeHash: <intent tree hash>
+  afterHash: <intent tree hash>
+  changedPaths: [...]
+  source: logical-factory-request
+```
 
-An explicit run-level restart is not ordinary continuation. It resolves a replacement request and invokes this contract in replacement-run mode before `factory_restart`.
+An intent update completes before the runtime launcher is called. If the later
+runtime launch or restart fails, keep the durable intent change; do not roll it
+back automatically.
 
-## Mechanical validation
+## Existing runs and planner questions
 
-Intent Preflight may use deterministic checks to validate intent structure, canonical IDs, document shape, or other repository-defined lint rules. Mechanical code should enforce mechanical invariants; it must not replace semantic classification or semantic coverage judgment.
+Do not repeat initial preflight or rematerialize host attachments for an
+ordinary continue. A valid persisted run already owns a self-contained
+`request.md`.
 
-Conversely, do not spend semantic reasoning on facts that deterministic code can establish reliably.
+An explicit run-level restart is not ordinary continuation. The launcher first
+resolves the complete replacement request, then invokes this contract in
+replacement-run mode. The active state file remains expected throughout that
+preflight, and the existing run remains untouched until preflight succeeds.
 
-## Evidence
+A running Factory may later reach `USER_DECISION_REQUIRED` only at a planning
+boundary after all currently contractable work is exhausted. This is not a
+worker-generated `intent-required` outcome. The planner supplies one concrete
+question because no next task can be safely contracted without a user decision.
 
-Keep the preflight result concise and tied to the logical Factory request. A useful internal record contains:
+When the user answers:
 
-- mode: `new-run` or `replacement-run`;
-- classification: `IntentChanging`, `IntentPreserving`, or `Ambiguous`;
-- relevant current intent IDs;
-- whether intent was updated;
-- validation result;
-- coverage conclusion;
-- source: `logical-factory-request`.
+1. Treat the persisted planner question plus the user's exact answer as the
+   bounded semantic input for deciding whether durable intent changes.
+2. If the answer adds or changes durable product truth and scope permits intent
+   writes, invoke the ordinary `idd-intent-change` workflow and validate
+   coverage before resuming Factory.
+3. If the answer adds or changes durable product truth but scope forbids intent
+   writes, do not reinterpret it as an implementation-only choice and do not
+   resume Factory with that answer. Leave the run paused until an intent update
+   is permitted, or cancel it explicitly.
+4. If the answer is only an implementation choice, do not write durable intent.
+5. After any required intent update is complete, pass the user's exact answer to
+   the same Factory run through `factory_continue`. Runtime records it separately
+   from immutable `request.md` and the next planner receives it as evidence.
+6. If the user declines to continue, cancel the run. Do not invent an answer.
 
-Do not persist a second semantic copy of the request merely for preflight evidence. Factory Runtime remains responsible for its own authoritative `request.md` once the run is created.
+The planner does not decide whether the answer belongs in intent, executors do
+not request this pause, and runtime does not interpret the answer's product
+meaning. This keeps the semantic decision in IDD while runtime owns only durable
+pause/resume mechanics.
 
-## Non-goals
+## Boundaries
 
-Intent Preflight does not:
-
-- create, continue, restart, cancel, or archive Factory state;
-- resolve a replacement request from legacy semantic fields;
-- migrate legacy Factory state;
-- reconstruct a request from planner/work-item/executor history;
-- merge an old request with an incomplete semantic delta;
-- move semantic preflight into Runtime;
-- change executor Technical Restart semantics.
+Intent Preflight does not create, continue, restart, cancel, archive, or migrate
+Factory state. It does not resolve a replacement request from legacy semantic
+fields, reconstruct a request from planner/work-item/executor history, or merge
+an old request with an incomplete semantic delta. Runtime remains responsible
+for authoritative Factory state transitions, and executor **Technical Restart**
+semantics are unchanged.
