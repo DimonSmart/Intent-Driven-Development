@@ -2,13 +2,23 @@
 
 ## Purpose
 
-Launch, continue, restart, or cancel an explicit IDD Factory workflow while keeping semantic intent preparation outside the deterministic runtime.
+Prepare durable intent when an end-to-end request explicitly defines new product
+truth, then launch, continue, restart, or cancel the packaged deterministic IDD
+Factory Runtime. The runtime, not this skill or an LLM coordinator, owns
+authoritative linear work state, scheduling, verification, retries, plan
+replacement, restart state transitions, and finalization.
 
-Use this skill when the user explicitly asks to run Factory, continue an existing Factory run, restart it, answer a Factory planner question, cancel it, or inspect its status after transport loss.
+Use this skill when the user explicitly invokes IDD Factory, when an end-to-end
+IDD route selects Factory for orchestrated implementation, or when the user
+explicitly asks to continue, restart, or cancel an existing Factory run. Read
+`references/intent-preflight.md` completely before any new-run or replacement-run
+preflight. Treat it as the canonical requested-scope, classification, intent-
+update, normalization, and coverage contract.
 
-Read `references/intent-preflight.md` completely before any new-run or replacement-run intent preflight. Treat it as the canonical classification, intent-update, and coverage contract. This skill decides which logical Factory request is preflighted and which run-level Runtime operation is invoked; it does not duplicate the shared semantic rules.
+The launcher must use the runtime packaged with this installed plugin instance
+and block until the runtime returns one structured Factory outcome.
 
-## Runtime boundary
+## Run-level operation model
 
 The launcher/skill owns semantic preparation:
 
@@ -30,55 +40,82 @@ factory_cancel
     + no replacement run
 ```
 
-Do not implement restart as `factory_cancel` followed by `factory_run`. Do not call `factory_cancel` before `factory_restart`.
+Do not implement restart as `factory_cancel` followed by `factory_run`. Do not
+call `factory_cancel` before `factory_restart`.
 
-This run-level `factory_restart` is distinct from executor **Technical Restart**, which is an internal retry kind within one existing run. Do not change or reinterpret Technical Restart behavior here.
+This run-level `factory_restart` is distinct from executor **Technical Restart**,
+which is an internal retry kind within one existing run. Do not change or
+reinterpret Technical Restart behavior here.
 
-## MCP dependency
+## MCP dependency and blocking transport
 
-- Codex requires the bundled `idd-factory` MCP server configured by the plugin. If `factory_run`, `factory_restart`, `factory_continue`, `factory_retry`, `factory_cancel`, and `factory_status` are unavailable, stop and report that the Factory MCP dependency is unavailable. Do not replace it with shell invocation, generic subagents, or manual orchestration.
-- Claude uses the packaged Factory launcher supplied by its adapter. Follow the same run-level semantics even when the transport surface differs.
-- Factory runtime operations are blocking. Progress notifications, when supported by the host, are informational only and do not change the outcome contract.
-
-## Materialize a new-run request
-
-For a genuinely new run, the logical Factory request is the current user request together with any user-supplied pasted or attached source content that is part of that request.
-
-Before preflight or `factory_run`, materialize that logical request losslessly into self-contained text:
-
-- Resolve user-supplied pasted/attached text from the platform attachment surface when needed.
-- Preserve the exact supplied text; do not summarize or semantically rewrite it.
-- Do not pass host-local attachment paths, placeholder envelopes, upload IDs, or chat-memory references as the Factory request.
-- Do not add launcher commentary, inferred requirements, or implementation decisions to the request.
-
-The same materialized new-run request must be the request checked by intent preflight and the request passed to `factory_run`.
+- Codex requires the bundled `idd-factory` MCP server configured by the plugin.
+  If `factory_run`, `factory_restart`, `factory_continue`, `factory_retry`,
+  `factory_cancel`, and `factory_status` are unavailable, stop and report that
+  the Factory MCP dependency is unavailable. Do not replace it with shell
+  invocation, generic subagents, or manual orchestration.
+- Claude uses the packaged Factory launcher supplied by its adapter. Follow the
+  same run-level semantics even when the transport surface differs.
+- Factory runtime operations are blocking. Progress notifications, when
+  supported by the host, are informational only and do not change the outcome
+  contract.
+- If a blocking tool call is interrupted or times out at the host/tool layer, do
+  not infer Factory failure and do not immediately invoke another mutating
+  operation. Call `factory_status` once to determine whether Runtime is still
+  active or a durable outcome was persisted. If it is still active, report that
+  state instead of polling or starting another operation.
 
 ## New-run intent preflight
 
-New-run preflight is used only when there is no active Factory run.
+For a genuinely new run, build one self-contained logical request from the
+visible user request and the exact textual inputs explicitly supplied with it.
+Preserve all user-authored content exactly. Mechanically materializing host-local
+attachment references such as `pasted-text.txt` is transport normalization, not
+a semantic rewrite.
 
-Before starting a new run:
+Before calling Runtime for a new run:
 
-1. Check whether `.idd/factory/current/state.json` exists.
-2. If it exists, do **not** perform new-run preflight. Follow the existing-run rules below instead.
-3. If it does not exist, materialize the current user request as the logical Factory request.
-4. Apply the canonical Intent Preflight from `references/intent-preflight.md` in **new-run** mode to that request.
-5. If preflight blocks, do not create Factory state.
-6. If preflight succeeds, call `factory_run` with exactly the preflighted request.
+1. Determine whether `.idd/factory/current/state.json` exists without reading or
+   changing runtime-owned state.
+2. If it exists, do **not** perform new-run preflight. Follow existing-run rules.
+3. If it does not exist, materialize the complete current user request losslessly
+   as the logical Factory request. Prefer the host file/attachment reader. When a
+   host-local supplied-text file must be decoded directly, use strict UTF-8,
+   reject invalid Unicode or U+FFFD, and do not expand arbitrary file paths that
+   were not explicitly supplied as request input.
+4. Apply `references/intent-preflight.md` in **new-run** mode to that request.
+   The reference owns requested-scope, classification, intent-update, durable-
+   normalization, and coverage rules; do not create a second copy of them here.
+5. If preflight blocks, do not call Runtime, create
+   `.idd/factory/current/`, or create Factory work items.
+6. If preflight succeeds and scope permits implementation, invoke the packaged
+   Runtime new-run operation with exactly the same self-contained logical request
+   and resolved absolute workspace.
+
+The persisted `request.md` must remain sufficient after any host-local pasted or
+attachment file disappears. Missing documentation alone is not
+`INTENT_REQUIRED`.
 
 ## Resolve a replacement request
 
-An explicit restart always requires one complete, self-contained replacement request before replacement-run preflight begins.
+An explicit restart always requires one complete, self-contained replacement
+request before replacement-run preflight begins.
 
 ### Full replacement request supplied
 
-If the user explicitly supplies a complete self-contained replacement request, materialize it losslessly and use it. The exact same request must be used for replacement-run preflight and `factory_restart`.
+If the user explicitly supplies a complete self-contained replacement request,
+materialize it losslessly and use it. The exact same request must be used for
+replacement-run preflight and `factory_restart`.
 
-An explicit complete replacement request does not depend on the old `.idd/factory/current/request.md`. Missing or unreadable old request text therefore does not block restart in this case.
+An explicitly supplied complete replacement request does not depend on the old
+`.idd/factory/current/request.md`. Missing or unreadable old request text does
+not block restart in this case.
 
 ### Restart without changed product or implementation semantics
 
-For an operational restart command such as `restart Factory`, `restart current run`, `restart on the new version`, or `restart with the current runtime`, when the user does not supply new product/implementation semantics, read:
+For an operational command such as `restart Factory`, `restart current run`,
+`restart on the new version`, or `restart with the current runtime`, when the
+user does not supply new product/implementation semantics, read:
 
 ```text
 .idd/factory/current/request.md
@@ -86,19 +123,30 @@ For an operational restart command such as `restart Factory`, `restart current r
 
 and use its complete text as the replacement request.
 
-Treat `request.md` as the persisted original logical request. Do not reconstruct the replacement request from model memory, chat history, planner output, work items, executor output, completed results, or obsolete semantic fields in legacy `state.json`. Operational restart wording does not become part of the replacement request unless it actually changes the requested product/implementation semantics.
+Treat `request.md` as the persisted original logical request. Do not reconstruct
+the replacement request from model memory, chat history, planner output, work
+items, executor output, completed results, or obsolete semantic fields in legacy
+`state.json`. Operational restart wording does not become part of the
+replacement request unless it actually changes the requested product or
+implementation semantics.
 
-If the persisted request is missing, unreadable, corrupted, or cannot satisfy the same lossless-text requirements as an ordinary Factory request, do not restart and do not archive the existing run. Ask the user for a complete replacement request.
+If the persisted request is missing, unreadable, corrupted, or cannot satisfy
+the same lossless-text requirements as an ordinary Factory request, do not
+restart and do not archive the existing run. Ask the user for a complete
+replacement request.
 
 ### Partial semantic modification
 
-If the user supplies only a semantic delta, for example `restart, but now the API must not change`, and the message is not itself a complete self-contained replacement request, do not semantic-merge it with the persisted request and do not reconstruct a new request. Ask the user for the complete replacement request instead.
+If the user supplies only a semantic delta, for example `restart, but now the API
+must not change`, and the message is not itself a complete self-contained
+replacement request, do not semantic-merge it with the persisted request and do
+not reconstruct a new request. Ask the user for the complete replacement
+request instead.
 
 ## Replacement-run intent preflight
 
-Replacement-run preflight is used only after the user explicitly chooses restart and the complete replacement request has been resolved.
-
-The sequence is:
+Replacement-run preflight is used only after the user explicitly chooses restart
+and the complete replacement request has been resolved.
 
 ```text
 explicit restart
@@ -107,98 +155,193 @@ explicit restart
 -> factory_restart(replacement request)
 ```
 
-Apply the canonical Intent Preflight from `references/intent-preflight.md` in **replacement-run** mode to the resolved replacement request. It uses the same semantic classification, intent-update, and coverage-validation rules as new-run preflight.
+Apply `references/intent-preflight.md` in **replacement-run** mode to the
+resolved replacement request. It uses the same requested-scope, classification,
+intent-update, durable-normalization, and coverage rules as new-run preflight.
 
-The presence of `.idd/factory/current/state.json` is expected in replacement-run preflight. Do not route replacement-run preflight back to existing-run handling merely because `state.json` exists, and do not require a preliminary `factory_cancel`.
+The presence of `.idd/factory/current/state.json` is expected in replacement-run
+preflight. Do not route replacement-run preflight back to existing-run handling
+merely because `state.json` exists, and do not require a preliminary
+`factory_cancel`.
 
-Until replacement-run preflight succeeds, leave the existing Factory run unchanged: do not call `factory_restart`, do not call `factory_cancel`, and do not archive or edit current Factory state.
+Until replacement-run preflight succeeds, leave the existing Factory run
+unchanged: do not call `factory_restart`, do not call `factory_cancel`, and do
+not archive or edit current Factory state.
 
-The request passed to `factory_restart` must be byte-for-byte the same logical request that passed replacement-run preflight after required lossless materialization. Never preflight one request and restart with another.
+The request passed to `factory_restart` must be the same complete losslessly
+materialized logical request that passed replacement-run preflight. Never
+preflight one request and restart with another.
 
-## Existing supported run
+## Run, continue, user questions, restart, and cancel
 
-When `.idd/factory/current/state.json` belongs to the supported current schema, distinguish continuation, restart, and cancellation:
-
-- Ordinary continuation -> call `factory_continue`.
-- Explicit restart -> resolve the replacement request, run replacement-run intent preflight, then call `factory_restart`.
-- Explicit cancellation with no replacement run wanted -> call `factory_cancel`.
-- Do not interpret an explicit restart as ordinary continuation.
-- Do not restart automatically without an explicit user request.
-
-When the Runtime reports `USER_DECISION_REQUIRED`, present the exact planner question and stop. On the user's next answer:
-
-1. If the answer changes durable product truth, use the normal IDD intent workflow to update and validate intent first.
-2. If the answer is only a local implementation choice, do not create durable intent for it.
-3. After any required intent update succeeds, pass the user's exact answer to `factory_continue`.
-4. If the user does not want to continue, `factory_cancel` is the explicit terminal operation and starts no replacement run.
-
-Do not fabricate an answer to a planner question.
+- For a new run whose preflight succeeds and scope permits implementation,
+  invoke the packaged Runtime new-run operation with the exact self-contained
+  logical request.
+- If supplied request text cannot be read losslessly, do not start or restart
+  Factory. Report an input transport/encoding failure; do not summarize around
+  the lost content or continue with replacement characters.
+- For an ordinary existing supported run, continue Factory without repeating
+  initial preflight, rematerializing host attachments, or inventing a user
+  answer. The persisted self-contained request is authoritative.
+- For an explicit restart of an existing supported run, resolve the replacement
+  request, perform replacement-run preflight, then call `factory_restart`.
+- For explicit cancellation when no replacement run is wanted, call
+  `factory_cancel`. Cancellation preserves product changes and diagnostics and
+  starts no replacement run.
+- When `RETRY_BUDGET_EXHAUSTED` blocks the current work item and the user
+  explicitly asks for more attempts, invoke `factory_retry` with the requested
+  additional attempt count. It resumes only that current immutable work item,
+  preserves prior attempts and verification evidence, and rejects totals above
+  ten attempts. Do not call it for another blocker or infer the user's consent.
+- `USER_DECISION_REQUIRED` is a resumable planning-boundary pause. Report the
+  planner's question to the user exactly enough to preserve its semantic choice;
+  do not answer it yourself and do not create implementation work around the
+  missing decision.
+- When the user answers a pending planner question, evaluate that answer together
+  with the persisted question and current relevant intent. If the answer defines
+  or changes durable product truth and scope permits intent writes, use the
+  existing `idd-intent-change` workflow and validate coverage before resuming.
+  If the answer defines or changes durable product truth but the requested scope
+  forbids intent writes, do not pass the answer to Factory as an implementation
+  choice; leave the run paused and report that continuing requires an allowed
+  intent update or explicit cancellation. If the answer is only an
+  implementation choice, do not write durable intent. After any required intent
+  work is complete, pass the user's exact answer to `factory_continue` so the
+  same run records it and the next planner can use it. Do not rewrite
+  `request.md`.
+- If the user chooses not to continue, cancel the Factory run instead of
+  fabricating an answer.
+- Cancellation is explicit. Warn that product changes are preserved; do not
+  delete Factory state or revert code in the launcher.
 
 ## `LEGACY_FACTORY_STATE`
 
-An active run written by an unsupported older state schema cannot be continued by the current Runtime unless an explicit migration exists for that exact schema. Do not reinstall the old plugin automatically, deserialize the legacy semantic state as the current schema, edit it, or infer remaining work from it.
+If an active run uses an older unsupported state schema, do not reinstall the
+older plugin automatically and do not edit its state. Cross-version continuation
+is unavailable unless the current Runtime provides an explicit migration for
+that exact source schema.
 
-It is allowed to detect that a legacy run exists and to read `.idd/factory/current/request.md` as the persisted original user request. Do not use obsolete semantic fields in legacy `state.json` to restore the request, continue workflow state, determine remaining work, build a replacement request, or migrate state.
+It is allowed to determine that a legacy run exists and to read
+`.idd/factory/current/request.md` as the persisted original user request. Do not
+use obsolete semantic fields in legacy `state.json` to restore the request,
+continue workflow state, determine remaining work, build a replacement request,
+or migrate state.
 
-Handle explicit user choices as follows:
+Handle the user's explicit choice as follows:
 
 ```text
-user asks to continue
+continue
     -> continuation unavailable
     -> ask for restart or cancellation decision
 
-user asks to restart
+restart
     -> resolve replacement request
     -> replacement-run intent preflight
     -> factory_restart
 
-user asks to cancel
+cancel
     -> factory_cancel
 ```
 
-For restart: The current runtime owns the complete restart operation. It archives the existing run, preserving product changes and diagnostics, and then starts the replacement run with the supplied request. This is a sequential Runtime operation; do not promise transactional atomicity, rollback, or restoration of the old active run if replacement creation later fails.
+For restart: The current runtime owns the complete restart operation. It archives
+the complete existing run, preserving product changes and diagnostics, and then
+starts the replacement run with the supplied request. This is a sequential
+Runtime operation; do not promise transactional atomicity, rollback, or
+restoration of the old active run if replacement creation later fails.
 
-For cancellation, `factory_cancel` archives the old run without starting a replacement.
-
-## Blocking call and transport loss
-
-For Codex MCP operations:
-
-- Treat a structured Factory response as the authoritative outcome.
-- If a blocking tool call is interrupted or times out at the host/tool layer, do not infer Factory failure and do not immediately invoke another mutating operation.
-- Call `factory_status` once to determine whether the Runtime is still active or whether a durable outcome was persisted.
-- If status says Runtime execution is still active, report that state rather than polling in a loop or starting another operation.
-- If status returns a durable blocker, surface its `Reason` and `ResumeWhen` without rewriting the run state.
-
-## Retry budget exhaustion
-
-`factory_retry` is only for an explicit user choice to extend the semantic retry budget after `RETRY_BUDGET_EXHAUSTED`. It is not a run-level restart and does not replace `factory_restart`.
-
-When offered by the Runtime, preserve its stated maximum and pass the requested additional attempt count unchanged.
-
-## Cancellation
-
-Cancellation is explicit and destructive to the active Factory slot while preserving product changes and diagnostic history. Use `factory_cancel` only when no immediate replacement run is wanted.
-
-Do not delete `.idd/factory/current/` manually, revert product changes, or rewrite state in the launcher.
-
-## Outcome reporting
-
-Report the structured Runtime outcome directly:
-
-- `COMPLETED`: summarize the result directory and completed work at a high level.
-- `USER_DECISION_REQUIRED`: present the exact question and continuation requirement.
-- `RETRY_BUDGET_EXHAUSTED`: present the retry option or explicit restart/cancel alternatives from Runtime guidance.
-- `LEGACY_FACTORY_STATE`: explain that continuation is unavailable; an explicit restart uses `factory_restart`, while cancellation without replacement uses `factory_cancel`.
-- Other blockers: report the persisted reason and recovery instruction without inventing a state transition.
-
-Do not conflate run-level restart with executor Technical Restart in user-facing reporting.
+For cancellation, `factory_cancel` archives the legacy run without starting a
+replacement. Do not call it as a prerequisite for `factory_restart`.
 
 ## Boundaries
 
-- Intent Preflight remains semantic launcher work; Runtime does not resolve replacement requests or mutate durable intent.
-- Runtime remains the sole owner of Factory orchestration and restart state transitions.
-- `factory_restart` is the public run-level replacement operation for both supported and legacy active runs.
-- `factory_cancel` archives an active run without creating a replacement.
-- Cross-version continuation is unavailable without an explicit migration for the exact source schema.
-- No implicit legacy-state migration, semantic reconstruction, semantic merge, launcher-level `cancel + run`, transactional rollback, or changes to executor Technical Restart are introduced by this workflow.
+- Do not select work items, inspect operational state, apply retries, create
+  corrections, choose future work, or finalize files.
+- Do not choose a next phase or maintain a second workflow model.
+  `FactoryState.Completed`, `Current`, `Remaining`, and runtime-owned
+  continuations are authoritative.
+- Do not spawn semantic or coordinator agents. The packaged backend creates
+  fresh semantic subprocess contexts through the runtime.
+- Do not weaken the worker sandbox to compensate for launcher constraints.
+- Do not mutate `.idd/factory/current/`. Durable intent may change only through
+  the existing intent workflows during allowed preflight or user-question
+  recovery; Factory workers and the runtime do not edit it. Reading persisted
+  `request.md` to resolve an explicit restart does not mutate Factory state.
+- Do not interpret executor output for workflow control. A structured
+  `USER_DECISION_REQUIRED` result comes from runtime parsing of the planner's
+  bounded planning output, not from executor reports.
+- `FACTORY_CONFIGURATION_CHANGED`, `CORRUPT_FACTORY_STATE`,
+  `UNMATERIALIZED_REQUEST_INPUT`, and lock outcomes are terminal for the current
+  launcher attempt and must be reported exactly.
+- `LEGACY_FACTORY_STATE` is terminal for continuation. Explicit restart uses
+  `factory_restart`; explicit cancellation without replacement uses
+  `factory_cancel`.
+- Intent Preflight remains semantic launcher work. Runtime does not resolve
+  replacement requests, classify intent, or mutate durable intent.
+- Do not add implicit legacy-state migration, semantic reconstruction, semantic
+  merge, launcher-level `cancel + run`, transactional restart rollback, or
+  changes to executor Technical Restart.
+
+## Reporting
+
+For a structured result returned by a new-run, restart, continuation, retry, or
+cancellation operation, report separately:
+
+```text
+Factory outcome: <outcome>
+Reason: <reason when present>
+Resume when: <condition when present>
+Result directory: <path when present>
+Intent preparation: unchanged | updated | blocked
+Intent before/after hash: <hashes when available>
+Intent paths changed: <paths when present>
+```
+
+For `USER_DECISION_REQUIRED`, present the question and stop until the user
+answers or cancels. Do not report it as a terminal Factory failure.
+
+For `LEGACY_FACTORY_STATE`, explain that continuation is unavailable. If the
+user wants a replacement run, the route is replacement-request resolution,
+replacement-run preflight, then `factory_restart`. If no replacement run is
+wanted, the route is `factory_cancel`. Do not present both operations as a
+required sequence.
+
+For `VERIFICATION_INFRASTRUCTURE_FAILURE` and
+`BASELINE_VERIFICATION_INFRASTRUCTURE_FAILURE`, trust the runtime's `Reason`,
+minimal primary-failure payload, and `ResumeWhen`. Do not infer a different
+cause, reclassify the failure, or derive workflow state from stdout or stderr.
+Report the runtime classification directly:
+
+```text
+Verification infrastructure failure
+Check: <checkId>
+Cause: <failureKind> at <failureStage>
+Evidence: <evidencePath, when present>
+Reason: <runtime Reason>
+Resume when: <runtime ResumeWhen>
+```
+
+The payload is only a reference to the primary failure. Do not expect or
+reconstruct `checks`, stream tails or paths, timing, termination details,
+metadata truncation state, or secondary diagnostic entries from transport.
+When detailed diagnosis is needed, inspect the referenced verification evidence
+instead. Treat that persisted evidence as authoritative for stdout/stderr,
+full-log references, timing, exception details, termination outcome, and
+secondary diagnostic issues. The launcher/LLM must not analyze stdout or stderr
+to choose Factory workflow; runtime classification and continuation semantics
+remain authoritative. Omit `Evidence` when `evidencePath` is null. Preserve the
+runtime-provided `Reason` and `ResumeWhen` without inventing a different recovery
+route.
+
+When a read-only runtime status operation is used after a lost or timed-out
+blocking response, its `status` is launcher/runtime ownership state, not a
+Factory outcome. Report it as `Factory status: <status>`. In particular,
+`ACTIVE` must never be reported as `Factory outcome: ACTIVE`: it means the run
+has not finished and no final Factory outcome is available yet. For `ACTIVE`,
+include the current work item, attempt, phase, completed/remaining counts,
+runtime operation, and start time when the status payload provides them, then
+report the returned reason and resume condition. Do not imply that the current
+semantic attempt has completed merely because the workspace remains owned.
+
+When durable intent was updated from the logical request or from a user answer
+before resuming implementation, say so explicitly. After reporting the final
+structured runtime outcome, do not perform scheduler work outside the runtime.
