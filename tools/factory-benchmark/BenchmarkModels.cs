@@ -12,7 +12,6 @@ public sealed class BenchmarkDefinition
     public int TimeoutMinutes { get; set; } = 20;
     public string WindowsSandbox { get; set; } = "elevated";
     public string Task { get; set; } = "task.md";
-    public List<string> IdealWorkItems { get; set; } = [];
     public AcceptanceDefinition Acceptance { get; set; } = new();
     public List<string> Modes { get; set; } = [];
 }
@@ -28,11 +27,8 @@ public sealed class AcceptanceDefinition
 public static class BenchmarkModes
 {
     public const string Direct = "direct";
-    public const string StructuredSingle = "structured-single";
-    public const string ManualIsolated = "manual-isolated";
-    public const string FactorySplitReplay = "factory-split-replay";
     public const string Factory = "factory";
-    public static readonly IReadOnlyList<string> All = [Direct, StructuredSingle, ManualIsolated, FactorySplitReplay, Factory];
+    public static readonly IReadOnlyList<string> All = [Direct, Factory];
 }
 
 public sealed record BenchmarkOptions(
@@ -120,30 +116,19 @@ public sealed record EnvironmentRecord(
     IReadOnlyDictionary<string, string> SkillVersions);
 
 public sealed record FactoryWorkItemRecord(string Id, string Kind, string Title, string ContractPath);
-public sealed record FactoryDecompositionRecord(bool SharedWithFactoryRun, long InputTokens, long CachedInputTokens, long OutputTokens, IReadOnlyList<FactoryWorkItemRecord> WorkItems);
+public sealed record FactoryDecompositionRecord(long InputTokens, long CachedInputTokens, long OutputTokens, IReadOnlyList<FactoryWorkItemRecord> WorkItems);
 
 public sealed record ModeAggregate(
     int Runs,
     int SuccessfulRuns,
     double SuccessRate,
     AggregateMetrics? Median,
-    AggregateMetrics? Minimum,
-    AggregateMetrics? Maximum,
     long? MedianCodexProcessCount,
     long? MedianAgentDurationMilliseconds,
     long? MedianAcceptanceDurationMilliseconds,
     long? MedianTotalDurationMilliseconds);
 
-public sealed record ComparisonReport(
-    long? StructuringOverhead,
-    long? IsolationOverhead,
-    long? DecompositionChoiceOverhead,
-    long? FactoryOrchestrationOverhead,
-    long? TotalFactoryOverhead,
-    double? FactoryToDirect,
-    double? ManualIsolatedToDirect,
-    double? FactorySplitReplayToDirect,
-    double? FactoryToFactorySplitReplay);
+public sealed record ComparisonReport(long? FactoryOverhead, double? FactoryToDirect);
 
 public sealed class BenchmarkReport
 {

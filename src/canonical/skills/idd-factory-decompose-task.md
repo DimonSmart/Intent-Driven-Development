@@ -68,53 +68,38 @@ infer relevance from paths, filenames, strings, keywords, project types,
 embeddings, result size, or execution order. Conversely, do not perform runtime
 bookkeeping that deterministic code can perform reliably.
 
-## Work-item sizing and failure domains
+## Work-item sizing and locality
 
-Each task should normally describe one coherent implementation result with a
-bounded failure domain that a single executor can reasonably implement and
-verify within one semantic attempt. Prefer a useful independently verifiable
-outcome over a contract that bundles several otherwise independent results.
+Prefer the smallest independently useful and independently verifiable
+implementation result that leaves the repository in a valid stable state.
+Do not make a task larger merely to reduce the number of Factory work items.
 
-Prefer separate tasks when parts of the work have independently meaningful
-outcomes and substantially independent verification paths, failure or
-troubleshooting domains, toolchains, infrastructure prerequisites, or
-implementation lifecycles. A particularly strong signal for a task boundary is
-the combination of an independently useful result, independent verification,
-and an independent failure or troubleshooting domain. No single signal requires
-a mechanical split; make the boundary decision semantically from the whole
-change.
+When several task boundaries are semantically valid, prefer the one that gives
+each executor a smaller and more coherent implementation and troubleshooting
+scope. Prefer separate tasks when parts are independently useful, independently
+verifiable, leave the repository valid after each part, have meaningfully
+separate failure or troubleshooting domains, or require noticeably different
+repository context or durable intent.
 
-Use stable intermediate repository states as natural task boundaries. A
-completed task becomes repository reality for later executors, so do not keep
-independently verifiable work together merely because every contract is already
-known. Apply this sizing rule across the complete contractable batch: do not
-return only one small task merely to force replanning when later tasks are also
-reliably contractable now. Conversely, still stop before the first task whose
-meaningful contract or required semantic context depends on evidence this batch
-has not produced yet.
+Do not split work mechanically by file, directory, layer, technology, class,
+method, acceptance criterion, intent count, contract length, or estimated token
+cost. Keep changes together when splitting them would create incomplete,
+artificial, or practically unusable intermediate results. An endpoint, its DTO,
+validation, service implementation, registration, and automated tests may
+therefore remain one task when together they form one finished capability.
 
-Different ecosystems or infrastructure are useful sizing signals only when they
-create meaningfully separate implementation, verification, or troubleshooting
-paths. For example, backend creation, frontend scaffolding, database
-provisioning, orchestration, production publishing, and unrelated verification
-should not be combined into one task merely because all of them can already be
-contracted. Failure in one such area should not unnecessarily force one
-executor to retain and diagnose several unrelated implementation areas.
+Apply these boundaries across the complete contractable batch. Smaller work
+items must not create extra planning cycles when later sibling contracts are
+already known. Materialize those siblings in the same planner invocation and
+stop only before work whose meaningful contract or required semantic context
+depends on evidence that an earlier task has not produced yet. Merely executing
+against repository state produced by an earlier sibling is not a reason to stop
+the batch when the later contract is already known.
 
-Do not split work mechanically by file, directory, technology, architectural
-layer, acceptance criterion, class, method, or implementation step. Several
-files, layers, or technologies may belong to one task when they form one small,
-coherent, practically inseparable capability with one meaningful verification
-path. An endpoint, its service implementation, DTO contract, registration, and
-automated tests may therefore remain one task when together they form one
-finished backend capability.
-
-The goal is not the smallest possible task. The goal is one coherent result
-with a bounded failure domain and an independently verifiable outcome. Do not
-invent dependency graphs, sizing metadata, or runtime heuristics to enforce this
-semantic judgment. In particular, do not infer task size from counts of files,
-directories, technologies, tokens, acceptance criteria, tool names, or contract
-length; deterministic Factory bookkeeping remains a runtime responsibility.
+Do not create separate tasks only to run tests, re-check a completed
+implementation, review an already implemented capability, or repeat verification
+that Factory runtime already owns. Tests needed to verify a capability normally
+belong in the task that implements that capability.
 
 ## Task-related durable intent
 
@@ -123,6 +108,12 @@ numbered intent document when its durable constraints materially affect correct
 implementation of that specific task. Do not include a document merely because
 it belongs to the same product, is broadly related to the subsystem, may be
 useful background, or is needed by another task in the same batch.
+
+A broad or semantically heterogeneous `TaskRelatedIntent` set is a reason to
+reconsider whether the task contains several independent capabilities. It is
+not a numeric split condition. Never split because an intent count crosses a
+threshold, and never copy the related-intent set of a larger source task into
+all child tasks automatically.
 
 The task contract must remain self-contained about the concrete work to perform.
 `TaskRelatedIntent` adds normative durable constraints; it does not replace the

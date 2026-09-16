@@ -25,8 +25,6 @@ public static class BenchmarkDefinitionLoader
         if (definition.WindowsSandbox is not ("elevated" or "unelevated"))
             throw new InvalidDataException("Benchmark windowsSandbox must be 'elevated' or 'unelevated'.");
         RequireFile(directory, definition.Task, "task");
-        foreach (var item in definition.IdealWorkItems) RequireFile(directory, item, "ideal work item");
-        if (definition.IdealWorkItems.Count == 0) throw new InvalidDataException("At least one idealWorkItem is required.");
         if (string.IsNullOrWhiteSpace(definition.Acceptance.Command)) throw new InvalidDataException("Acceptance command is required.");
         if (definition.Modes.Count == 0) throw new InvalidDataException("At least one mode is required.");
         foreach (var mode in definition.Modes)
@@ -74,7 +72,7 @@ public static class BenchmarkCliParser
         return new(Path.GetFullPath(args[1]), repeat, model, output is null ? null : Path.GetFullPath(output), modes, keep, timeout, windowsSandbox, force);
     }
 
-    public const string Usage = "Usage: factory-benchmark run <benchmark-directory> [--repeat N] [--model MODEL] [--output PATH] [--modes mode1,mode2] [--keep-workspaces] [--timeout-minutes N] [--windows-sandbox elevated|unelevated] [--force]";
+    public const string Usage = "Usage: factory-benchmark run <benchmark-directory> [--repeat N] [--model MODEL] [--output PATH] [--modes direct,factory] [--keep-workspaces] [--timeout-minutes N] [--windows-sandbox elevated|unelevated] [--force]";
     private static string Value(string[] args, ref int index) => ++index < args.Length ? args[index] : throw new ArgumentException($"Missing value for {args[index - 1]}.");
     private static int PositiveInt(string value, string name) => int.TryParse(value, out var result) && result > 0 ? result : throw new ArgumentException($"--{name} must be a positive integer.");
 

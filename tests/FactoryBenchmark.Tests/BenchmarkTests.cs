@@ -18,6 +18,12 @@ public sealed class BenchmarkTests
     }
 
     [Fact]
+    public void BenchmarkModes_ContainOnlyDirectAndFactory()
+    {
+        Assert.Equal(["direct", "factory"], BenchmarkModes.All);
+    }
+
+    [Fact]
     public void CliParsing_ReadsAllOptions()
     {
         using var fixture = BenchmarkFixture.Create();
@@ -28,6 +34,13 @@ public sealed class BenchmarkTests
         Assert.True(result.KeepWorkspaces);
         Assert.Equal("elevated", result.WindowsSandbox);
         Assert.True(result.Force);
+    }
+
+    [Fact]
+    public void CliParsing_RejectsRemovedBenchmarkModes()
+    {
+        using var fixture = BenchmarkFixture.Create();
+        Assert.Throws<ArgumentException>(() => BenchmarkCliParser.Parse(["run", fixture.Path, "--modes", "structured-single"]));
     }
 
     [Theory]
@@ -54,8 +67,7 @@ public sealed class BenchmarkTests
     [Fact]
     public void JsonlAnalysis_DetectsParallelToolsAsOneBatchAndSequentialToolAsNext()
     {
-        var result = Analyze(
-            Start("a"), Start("b"), Complete("a"), Complete("b"), Start("c"), Complete("c"));
+        var result = Analyze(Start("a"), Start("b"), Complete("a"), Complete("b"), Start("c"), Complete("c"));
         Assert.Equal(2, result.ToolBatches);
         Assert.Equal(3, result.Commands);
     }
@@ -88,53 +100,44 @@ public sealed class BenchmarkTests
     }
 
     [Fact]
-    public void OverheadCalculations_UseModeMedians()
+    public void DirectFactoryComparison_UsesModeMedians()
     {
         var modes = new Dictionary<string, ModeAggregate>
         {
-            ["direct"] = Mode(10), ["structured-single"] = Mode(15), ["manual-isolated"] = Mode(25), ["factory-split-replay"] = Mode(40), ["factory"] = Mode(60)
+            ["direct"] = Mode(10),
+            ["factory"] = Mode(60)
         };
         var result = BenchmarkStatistics.Compare(modes);
-        Assert.Equal(5, result.StructuringOverhead);
-        Assert.Equal(10, result.IsolationOverhead);
-        Assert.Equal(15, result.DecompositionChoiceOverhead);
-        Assert.Equal(20, result.FactoryOrchestrationOverhead);
+        Assert.Equal(50, result.FactoryOverhead);
         Assert.Equal(6, result.FactoryToDirect);
     }
 
     [Fact]
-    public void ReportGeneration_ContainsMetricsAndDecomposition()
+    public void ReportGeneration_ContainsPrimaryMetricsAndDirectFactoryComparison()
     {
-        var run = Run(true, 10, 0);
-        var environment = run.Environment;
-        var aggregate = BenchmarkStatistics.Aggregate([run]);
+        var directRun = Run(true, 10, 0);
+        var factoryRun = Run(true, 20, 0, "factory");
+        var environment = directRun.Environment;
+        var directAggregate = BenchmarkStatistics.Aggregate([directRun]);
+        var factoryAggregate = BenchmarkStatistics.Aggregate([factoryRun]);
+        var aggregates = new Dictionary<string, ModeAggregate>
+        {
+            ["direct"] = directAggregate,
+            ["factory"] = factoryAggregate
+        };
         var report = new BenchmarkReport
         {
             Benchmark = "fixture", Environment = environment, Repeats = 1,
-            Modes = new Dictionary<string, IReadOnlyList<BenchmarkRunResult>> { ["direct"] = [run] },
-            Aggregates = new Dictionary<string, ModeAggregate> { ["direct"] = aggregate },
-            Comparisons = BenchmarkStatistics.Compare(new Dictionary<string, ModeAggregate> { ["direct"] = aggregate }),
+            Modes = new Dictionary<string, IReadOnlyList<BenchmarkRunResult>> { ["direct"] = [directRun], ["factory"] = [factoryRun] },
+            Aggregates = aggregates,
+            Comparisons = BenchmarkStatistics.Compare(aggregates),
             ComparabilityWarnings = [], TotalBenchmarkDurationMilliseconds = 1
         };
         var markdown = ReportWriter.Markdown(report);
         Assert.Contains("Factory Benchmark Report", markdown);
+        Assert.Contains("Agent invocations", markdown);
         Assert.Contains("Gross input", markdown);
-        Assert.Contains("Derived observed overhead", markdown);
-    }
-
-    [Fact]
-    public void DecompositionParsing_ReadsPlannerMarkdown()
-    {
-        var path = System.IO.Path.GetTempFileName();
-        try
-        {
-            File.WriteAllText(path, "# Task\n\n# Work\n\n# Task\n\nSecond work item");
-            var result = BenchmarkRunner.ParseDecomposition(path);
-            Assert.Equal(2, result.Count);
-            Assert.Equal("WI-001", result[0].Id);
-            Assert.Equal("implementation", result[0].Kind);
-        }
-        finally { File.Delete(path); }
+        Assert.Contains("Direct vs Factory", markdown);
     }
 
     [Fact]
@@ -184,9 +187,9 @@ public sealed class BenchmarkTests
     private static string Complete(string id) => $"{{\"type\":\"item.completed\",\"item\":{{\"id\":\"{id}\",\"type\":\"command_execution\",\"status\":\"completed\"}}}}";
     private static InvocationMetrics Invocation(long input, long cached, long output) => new(input, cached, input - cached, output, 1, 1, 0, 0, 0, 1, 0, "test", "events.jsonl");
 
-    private static BenchmarkRunResult Run(bool successful, long input, int acceptanceExit) => new()
+    private static BenchmarkRunResult Run(bool successful, long input, int acceptanceExit, string mode = "direct") => new()
     {
-        Mode = "direct", Iteration = 1, Status = successful ? "SUCCESS" : "FAILED", Successful = successful,
+        Mode = mode, Iteration = 1, Status = successful ? "SUCCESS" : "FAILED", Successful = successful,
         Invocations = [Invocation(input, 0, 1)], Metrics = AggregateMetrics.From([Invocation(input, 0, 1)]),
         Acceptance = new(acceptanceExit, 1, "out", "err"), AgentDurationMilliseconds = 1, TotalDurationMilliseconds = 2, CodexProcessCount = 1,
         Environment = new("os", "dotnet", "codex", "factory", "plugin", "model", "high", null, "elevated", "git", false, "hash", DateTimeOffset.UnixEpoch, new Dictionary<string, string>())
@@ -195,7 +198,7 @@ public sealed class BenchmarkTests
     private static ModeAggregate Mode(long gross)
     {
         var metrics = new AggregateMetrics(gross, 0, gross, 0, 0, 0, 0, 0, 0);
-        return new(1, 1, 1, metrics, metrics, metrics, 1, 1, 1, 1);
+        return new(1, 1, 1, metrics, 1, 1, 1, 1);
     }
 
     private sealed class BenchmarkFixture(string path) : IDisposable
@@ -204,9 +207,8 @@ public sealed class BenchmarkTests
         public static BenchmarkFixture Create()
         {
             var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "factory-benchmark-tests", Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(System.IO.Path.Combine(path, "work-items"));
+            Directory.CreateDirectory(path);
             File.WriteAllText(System.IO.Path.Combine(path, "task.md"), "task");
-            File.WriteAllText(System.IO.Path.Combine(path, "work-items", "one.md"), "work");
             File.WriteAllText(System.IO.Path.Combine(path, "benchmark.yaml"), """
 name: fixture
 model: model
@@ -216,8 +218,6 @@ repeat: 1
 timeoutMinutes: 1
 windowsSandbox: elevated
 task: task.md
-idealWorkItems:
-  - work-items/one.md
 acceptance:
   command: test
 modes:

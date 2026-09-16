@@ -8,16 +8,12 @@
     <RootNamespace>Idd.Factory.Benchmark</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Markdig" Version="1.3.2" />
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\..\src\runtime\Idd.Factory\Processes\ProcessSupervisor.cs" Link="Shared\ProcessSupervisor.cs" />
     <Compile Include="..\..\src\runtime\Idd.Factory\Agents\CodexExecutableResolver.cs" Link="Shared\CodexExecutableResolver.cs" />
     <Compile Include="..\..\src\runtime\Idd.Factory\Agents\CodexProcessEnvironment.cs" Link="Shared\CodexProcessEnvironment.cs" />
-    <Compile Include="..\..\src\runtime\Idd.Factory\Agents\AgentBackendContracts.cs" Link="Shared\PlannerProtocol\AgentBackendContracts.cs" />
-    <Compile Include="..\..\src\runtime\Idd.Factory\Domain\FactoryModels.cs" Link="Shared\PlannerProtocol\FactoryModels.cs" />
-    <Compile Include="..\..\src\runtime\Idd.Factory\Runtime\PlannerMarkdownParser.cs" Link="Shared\PlannerProtocol\PlannerMarkdownParser.cs" />
     <Using Include="Idd.Factory.Agents" />
     <InternalsVisibleTo Include="FactoryBenchmark.Tests" />
   </ItemGroup>

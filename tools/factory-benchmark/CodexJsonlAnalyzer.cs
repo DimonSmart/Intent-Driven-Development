@@ -93,8 +93,6 @@ public static class BenchmarkStatistics
         var successful = runs.Where(x => x.Successful).ToArray();
         return new(runs.Count, successful.Length, runs.Count == 0 ? 0 : (double)successful.Length / runs.Count,
             successful.Length == 0 ? null : Metric(successful, Median),
-            successful.Length == 0 ? null : Metric(successful, values => values.Min()),
-            successful.Length == 0 ? null : Metric(successful, values => values.Max()),
             successful.Length == 0 ? null : Median(successful.Select(x => (long)x.CodexProcessCount)),
             successful.Length == 0 ? null : Median(successful.Select(x => x.AgentDurationMilliseconds)),
             successful.Length == 0 ? null : Median(successful.Select(x => x.Acceptance.DurationMilliseconds)),
@@ -103,12 +101,11 @@ public static class BenchmarkStatistics
 
     public static ComparisonReport Compare(IReadOnlyDictionary<string, ModeAggregate> modes)
     {
-        long? Value(string mode) => modes.GetValueOrDefault(mode)?.Median?.GrossInputTokens;
-        static long? Difference(long? right, long? left) => right is not null && left is not null ? right - left : null;
-        static double? Ratio(long? numerator, long? denominator) => numerator is not null && denominator is > 0 ? (double)numerator / denominator : null;
-        var b0 = Value(BenchmarkModes.Direct); var b1 = Value(BenchmarkModes.StructuredSingle); var b2 = Value(BenchmarkModes.ManualIsolated);
-        var b3 = Value(BenchmarkModes.FactorySplitReplay); var b4 = Value(BenchmarkModes.Factory);
-        return new(Difference(b1, b0), Difference(b2, b1), Difference(b3, b2), Difference(b4, b3), Difference(b4, b0), Ratio(b4, b0), Ratio(b2, b0), Ratio(b3, b0), Ratio(b4, b3));
+        var direct = modes.GetValueOrDefault(BenchmarkModes.Direct)?.Median?.GrossInputTokens;
+        var factory = modes.GetValueOrDefault(BenchmarkModes.Factory)?.Median?.GrossInputTokens;
+        var overhead = direct is not null && factory is not null ? factory - direct : null;
+        var ratio = factory is not null && direct is > 0 ? (double)factory / direct : null;
+        return new(overhead, ratio);
     }
 
     private static AggregateMetrics Metric(IReadOnlyList<BenchmarkRunResult> values, Func<IEnumerable<long>, long> selector) =>

@@ -36,17 +36,19 @@ public sealed class CanonicalGenerationTests(GenerationFixture fixture)
     }
 
     [Fact]
-    public void CanonicalFactoryDecomposer_DefinesBoundedWorkItemSizingContract()
+    public void CanonicalFactoryDecomposer_DefinesLocalEfficiencyAwareSizingContract()
     {
         var decomposition = fixture.ReadText(Path.Combine(
             fixture.RepoRoot, "src", "canonical", "skills", "idd-factory-decompose-task.md"));
 
         foreach (var semanticMarker in new[]
         {
-            "bounded failure domain",
-            "independently verifiable outcome",
-            "stable intermediate repository states",
+            "smallest independently useful and independently verifiable",
+            "Do not make a task larger merely to reduce the number of Factory work items",
+            "smaller and more coherent implementation and troubleshooting",
             "Do not split work mechanically",
+            "broad or semantically heterogeneous `TaskRelatedIntent` set",
+            "Tests needed to verify a capability normally belong in the task",
             "Materialize every task that can be contracted reliably"
         })
         {

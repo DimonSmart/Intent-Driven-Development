@@ -1,8 +1,6 @@
 using System.Diagnostics;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Idd.Factory.Runtime;
 
 namespace Idd.Factory.Benchmark;
 
@@ -39,23 +37,12 @@ public sealed class BenchmarkRunner(string repositoryRoot, string benchmarkDirec
                 case BenchmarkModes.Direct:
                     invocations.Add(await RunCodexAsync(workspace, telemetry, "direct", DirectPrompt()));
                     break;
-                case BenchmarkModes.StructuredSingle:
-                    invocations.Add(await RunCodexAsync(workspace, telemetry, "structured-single", StructuredPrompt()));
-                    break;
-                case BenchmarkModes.ManualIsolated:
-                    foreach (var item in ReadIdealWorkItems()) invocations.Add(await RunCodexAsync(workspace, telemetry, item.Name, WorkerPrompt(item.Content)));
-                    break;
-                case BenchmarkModes.FactorySplitReplay:
-                    (decomposition, var splitMetrics, var contracts) = await DecomposeAsync(runDirectory, telemetry);
-                    invocations.Add(splitMetrics);
-                    foreach (var item in contracts.Where(x => x.Kind == "subtask").OrderBy(x => x.Sequence))
-                        invocations.Add(await RunCodexAsync(workspace, telemetry, item.Id, WorkerPrompt(item.ContractMarkdown)));
-                    break;
                 case BenchmarkModes.Factory:
                     (decomposition, var factoryMetrics) = await RunFactoryAsync(workspace, runDirectory, telemetry);
                     invocations.AddRange(factoryMetrics);
                     break;
-                default: throw new InvalidOperationException($"Unsupported mode '{mode}'.");
+                default:
+                    throw new InvalidOperationException($"Unsupported mode '{mode}'.");
             }
 
             var acceptanceWorkspace = WorkspaceManager.CreateAcceptanceSnapshot(workspace);
@@ -113,38 +100,6 @@ public sealed class BenchmarkRunner(string repositoryRoot, string benchmarkDirec
         return CodexJsonlAnalyzer.Analyze(eventsPath, result.Duration, result.ExitCode, role);
     }
 
-    private async Task<(FactoryDecompositionRecord, InvocationMetrics, IReadOnlyList<GeneratedWorkItem>)> DecomposeAsync(string runDirectory, string telemetry)
-    {
-        var decompositionWorkspace = Path.Combine(runDirectory, "decomposition-workspace");
-        Directory.CreateDirectory(decompositionWorkspace);
-        var skillDirectory = Path.Combine(decompositionWorkspace, ".agents", "skills", "idd-factory-decompose-task");
-        Directory.CreateDirectory(skillDirectory);
-        File.Copy(Path.Combine(repositoryRoot, "src", "canonical", "skills", "idd-factory-decompose-task.md"), Path.Combine(skillDirectory, "SKILL.md"), overwrite: true);
-        var lastMessage = Path.Combine(telemetry, "factory-planner.result.md");
-        var prompt = $"""
-Use $idd-factory-decompose-task to decompose this benchmark task. This is an independent decomposition for replay, not a Factory runtime run.
-
-Run id: benchmark-{Guid.NewGuid():N}
-Attempt id: planning-1
-Role: planner
-
-Original request:
-{task}
-
-Return only the Markdown task sections required by the skill.
-""";
-        var metrics = await RunCodexAsync(decompositionWorkspace, telemetry, "planner", prompt, lastMessage, sandbox: "read-only");
-        if (metrics.ExitCode != 0) throw new InvalidOperationException("Factory planner Codex invocation failed.");
-        var workItems = ParseDecomposition(lastMessage);
-        var capture = Path.Combine(runDirectory, "factory-decomposition");
-        Directory.CreateDirectory(capture);
-        foreach (var item in workItems) await File.WriteAllTextAsync(Path.Combine(capture, $"{Sanitize(item.Id)}.md"), item.ContractMarkdown);
-        var record = new FactoryDecompositionRecord(false, metrics.InputTokens, metrics.CachedInputTokens, metrics.OutputTokens,
-            workItems.Select(x => new FactoryWorkItemRecord(x.Id, x.Kind, Title(x.ContractMarkdown), $"factory-decomposition/{Sanitize(x.Id)}.md")).ToArray());
-        if (!options.KeepWorkspaces) Directory.Delete(decompositionWorkspace, recursive: true);
-        return (record, metrics, workItems);
-    }
-
     private async Task<(FactoryDecompositionRecord, IReadOnlyList<InvocationMetrics>)> RunFactoryAsync(string workspace, string runDirectory, string telemetry)
     {
         var pluginRoot = Path.Combine(repositoryRoot, "artifacts", "marketplace", "plugins", "codex", "idd-factory");
@@ -171,8 +126,10 @@ Return only the Markdown task sections required by the skill.
             if (Directory.Exists(contracts))
                 foreach (var file in Directory.EnumerateFiles(contracts, "*.md").Order(StringComparer.Ordinal))
                 {
-                    var target = Path.Combine(capture, Path.GetFileName(file)); File.Copy(file, target, overwrite: true);
-                    var content = File.ReadAllText(file); var id = Path.GetFileNameWithoutExtension(file);
+                    var target = Path.Combine(capture, Path.GetFileName(file));
+                    File.Copy(file, target, overwrite: true);
+                    var content = File.ReadAllText(file);
+                    var id = Path.GetFileNameWithoutExtension(file);
                     workItems.Add(new(id, "implementation", Title(content), Path.GetRelativePath(runDirectory, target).Replace('\\', '/')));
                 }
         }
@@ -182,7 +139,8 @@ Return only the Markdown task sections required by the skill.
         if (attemptsDirectory is not null && Directory.Exists(attemptsDirectory))
             foreach (var stdout in Directory.EnumerateFiles(attemptsDirectory, "stdout.log", SearchOption.AllDirectories))
             {
-                var destination = UniquePath(telemetry, "factory-worker", ".jsonl"); File.Copy(stdout, destination, overwrite: true);
+                var destination = UniquePath(telemetry, "factory-worker", ".jsonl");
+                File.Copy(stdout, destination, overwrite: true);
                 var stderr = Path.Combine(Path.GetDirectoryName(stdout)!, "stderr.log");
                 if (File.Exists(stderr)) File.Copy(stderr, Path.ChangeExtension(destination, ".stderr.log"), overwrite: true);
                 var attemptId = Path.GetFileName(Path.GetDirectoryName(stdout)!);
@@ -192,10 +150,15 @@ Return only the Markdown task sections required by the skill.
             metrics.Add(new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, result.ExitCode, "factory-runtime", Path.Combine(telemetry, "factory-runtime.stdout.log"), result.ExitCode == 0 ? null : (result.Stderr + result.Stdout).Trim()));
         else
         {
-            var last = metrics[^1]; metrics[^1] = last with { ExitCode = result.ExitCode };
+            var last = metrics[^1];
+            metrics[^1] = last with { ExitCode = result.ExitCode };
         }
         var decompositionMetrics = metrics.Where(x => x.Role == "planner").ToArray();
-        return (new FactoryDecompositionRecord(true, decompositionMetrics.Sum(x => x.InputTokens), decompositionMetrics.Sum(x => x.CachedInputTokens), decompositionMetrics.Sum(x => x.OutputTokens), workItems), metrics);
+        return (new FactoryDecompositionRecord(
+            decompositionMetrics.Sum(x => x.InputTokens),
+            decompositionMetrics.Sum(x => x.CachedInputTokens),
+            decompositionMetrics.Sum(x => x.OutputTokens),
+            workItems), metrics);
     }
 
     private async Task<AcceptanceResult> RunAcceptanceAsync(string workspace, string runDirectory)
@@ -206,8 +169,10 @@ Return only the Markdown task sections required by the skill.
             return File.Exists(fixturePath) ? Path.GetFullPath(fixturePath) : argument;
         }).ToArray();
         var result = await ProcessExecution.RunAsync(definition.Acceptance.Command, args, workspace, timeout);
-        var stdout = Path.Combine(runDirectory, "acceptance.stdout.log"); var stderr = Path.Combine(runDirectory, "acceptance.stderr.log");
-        await File.WriteAllTextAsync(stdout, result.Stdout); await File.WriteAllTextAsync(stderr, result.Stderr);
+        var stdout = Path.Combine(runDirectory, "acceptance.stdout.log");
+        var stderr = Path.Combine(runDirectory, "acceptance.stderr.log");
+        await File.WriteAllTextAsync(stdout, result.Stdout);
+        await File.WriteAllTextAsync(stderr, result.Stderr);
         return new(result.ExitCode, (long)result.Duration.TotalMilliseconds, stdout, stderr);
     }
 
@@ -219,48 +184,18 @@ Do not use IDD Factory, Factory skills, decomposition agents, reviewers, or the 
 {task}
 """;
 
-    private string StructuredPrompt() => $"""
-Complete the following task in this workspace. Do not use IDD Factory, Factory skills, child agents, or fresh contexts.
-
-Original task:
-{task}
-
-The work is structured into these ordered work items:
-
-{string.Join("\n\n", ReadIdealWorkItems().Select((item, index) => $"{index + 1}. {item.Content}"))}
-
-Complete all work items in order in this same session.
-""";
-
-    private static string WorkerPrompt(string contract) => $"""
-Complete only the following work-item contract in the current workspace. You have no prior worker conversation. Inspect the current workspace as needed. Do not use IDD Factory, Factory skills, child agents, reviewers, or the Factory runtime.
-
-{contract}
-""";
-
-    private IReadOnlyList<(string Name, string Content)> ReadIdealWorkItems() => definition.IdealWorkItems.Select(path => (Path.GetFileNameWithoutExtension(path), File.ReadAllText(Path.Combine(benchmarkDirectory, path)))).ToArray();
-
-    public static IReadOnlyList<GeneratedWorkItem> ParseDecomposition(string path)
-    {
-        var parsed = new PlannerMarkdownParser().Parse(File.ReadAllText(path));
-        if (parsed.Question is not null || parsed.Tasks.Count == 0)
-            throw new InvalidDataException("Benchmark decomposition must contain one or more planner tasks.");
-
-        return parsed.Tasks
-            .Select((taskDefinition, index) => new GeneratedWorkItem(
-                $"WI-{index + 1:000}",
-                index + 1,
-                "implementation",
-                taskDefinition.Contract))
-            .ToArray();
-    }
-
     private static string? FindFactoryRunDirectory(string workspace)
     {
         var current = Path.Combine(workspace, ".idd", "factory", "current");
         if (File.Exists(Path.Combine(current, "events.jsonl"))) return current;
         var results = Path.Combine(workspace, ".idd", "factory", "results");
-        return Directory.Exists(results) ? Directory.EnumerateFiles(results, "events.jsonl", SearchOption.AllDirectories).Select(Path.GetDirectoryName).Where(x => x is not null).OrderByDescending(x => x, StringComparer.Ordinal).FirstOrDefault() : null;
+        return Directory.Exists(results)
+            ? Directory.EnumerateFiles(results, "events.jsonl", SearchOption.AllDirectories)
+                .Select(Path.GetDirectoryName)
+                .Where(x => x is not null)
+                .OrderByDescending(x => x, StringComparer.Ordinal)
+                .FirstOrDefault()
+            : null;
     }
 
     private static string ReadFactoryRole(string attemptDirectory)
@@ -272,7 +207,10 @@ Complete only the following work-item contract in the current workspace. You hav
             using var document = JsonDocument.Parse(File.ReadAllText(path));
             return document.RootElement.TryGetProperty("role", out var role) ? role.GetString() ?? "factory-worker" : "factory-worker";
         }
-        catch (JsonException) { return "factory-worker"; }
+        catch (JsonException)
+        {
+            return "factory-worker";
+        }
     }
 
     private static Dictionary<string, TimeSpan> ReadFactoryAttemptDurations(string source)
@@ -293,9 +231,12 @@ Complete only the following work-item contract in the current workspace. You hav
                 var timestamp = timestampNode.GetDateTimeOffset();
                 var type = root.GetProperty("type").GetString();
                 if (type == "agent-dispatching") starts[id] = timestamp;
-                if (type is "agent-completed" or "agent-result-reused" && starts.TryGetValue(id, out var started) && timestamp >= started) durations[id] = timestamp - started;
+                if (type is "agent-completed" or "agent-result-reused" && starts.TryGetValue(id, out var started) && timestamp >= started)
+                    durations[id] = timestamp - started;
             }
-            catch (Exception exception) when (exception is JsonException or InvalidOperationException or FormatException) { }
+            catch (Exception exception) when (exception is JsonException or InvalidOperationException or FormatException)
+            {
+            }
         }
         return durations;
     }
@@ -310,7 +251,11 @@ Complete only the following work-item contract in the current workspace. You hav
     {
         for (var attempt = 0; attempt < 6; attempt++)
         {
-            try { Directory.Delete(workspace, recursive: true); return true; }
+            try
+            {
+                Directory.Delete(workspace, recursive: true);
+                return true;
+            }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
                 if (attempt == 5) return false;
@@ -322,12 +267,14 @@ Complete only the following work-item contract in the current workspace. You hav
 
     private static string UniquePath(string directory, string prefix, string extension)
     {
-        var path = Path.Combine(directory, prefix + extension); var index = 1;
+        var path = Path.Combine(directory, prefix + extension);
+        var index = 1;
         while (File.Exists(path)) path = Path.Combine(directory, $"{prefix}-{++index:00}{extension}");
         return path;
     }
 
     private static string Sanitize(string value) => string.Concat(value.Select(character => Path.GetInvalidFileNameChars().Contains(character) ? '-' : character));
+
     private static string Title(string markdown)
     {
         var lines = markdown.Split('\n').Select(line => line.Trim()).Where(line => line.Length > 0).ToArray();
@@ -337,11 +284,12 @@ Complete only the following work-item contract in the current workspace. You hav
             .Skip(1).FirstOrDefault(line => !line.StartsWith('#')) ?? lines.FirstOrDefault(line => !line.StartsWith('#')) ?? "untitled";
         return title.Length <= 160 ? title : title[..157] + "...";
     }
+
     private static string FailureSummary(IEnumerable<InvocationMetrics> invocations, AcceptanceResult acceptance)
     {
         var failed = invocations.FirstOrDefault(x => x.ExitCode != 0);
-        return failed is null ? $"Acceptance failed with exit code {acceptance.ExitCode}." : failed.Error ?? $"Codex invocation '{failed.Role}' failed with exit code {failed.ExitCode}.";
+        return failed is null
+            ? $"Acceptance failed with exit code {acceptance.ExitCode}."
+            : failed.Error ?? $"Codex invocation '{failed.Role}' failed with exit code {failed.ExitCode}.";
     }
 }
-
-public sealed record GeneratedWorkItem(string Id, int Sequence, string Kind, string ContractMarkdown);
