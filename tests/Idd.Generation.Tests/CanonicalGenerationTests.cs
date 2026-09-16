@@ -174,7 +174,7 @@ public sealed class CanonicalGenerationTests(GenerationFixture fixture)
     [InlineData("/file.md")]
     [InlineData(@"\file.md")]
     [InlineData("//server/share/file.md")]
-    [InlineData(@"\\server\share/file.md")]
+    [InlineData(@"\\server\share\file.md")]
     [InlineData("../file.md")]
     [InlineData("folder//file.md")]
     [InlineData("./file.md")]
