@@ -2,28 +2,27 @@ using System.ComponentModel;
 using System.Reflection;
 using System.Text.Json;
 using Idd.Factory.Domain;
-using ModelContextProtocol.Protocol;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using ModelContextProtocol;
 using ModelContextProtocol.Server;
-
-namespace Idd.Factory.Mcp;
 
 internal static class FactoryMcpServer
 {
-    public static async Task<int> RunAsync(CancellationToken cancellationToken)
+    public static async Task<int> RunAsync(CancellationToken cancellationToken = default)
     {
-        var builder = Microsoft.Extensions.Hosting.Host.CreateEmptyApplicationBuilder(null);
+        var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
+        builder.Logging.AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace);
+        builder.Services.AddSingleton<IFactoryProcessInvoker, SystemFactoryProcessInvoker>();
+        builder.Services.AddSingleton<FactoryRuntimeProcessRunner>();
+        builder.Services.AddSingleton<FactoryStatusReader>();
+        builder.Services.AddSingleton<FactoryMcpProgressMonitor>();
         builder.Services
-            .AddSingleton<FactoryRuntimeProcessRunner>()
-            .AddSingleton<FactoryStatusReader>()
-            .AddSingleton<FactoryMcpProgressMonitor>();
-        builder.Services
-            .AddMcpServer(options =>
+            .AddMcpServer(options => options.ServerInfo = new()
             {
-                options.ServerInfo = new Implementation
-                {
-                    Name = "idd-factory",
-                    Version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown"
-                };
+                Name = "idd-factory",
+                Version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown"
             })
             .WithStdioServerTransport()
             .WithTools<FactoryMcpTools>();
@@ -144,21 +143,56 @@ internal sealed class FactoryMcpTools(
         return result;
     }
 
-    private static string FormatFinalProgress(FactoryMcpResult result)
+    internal static string FormatTransportFailure(FactoryTransportException exception)
     {
-        var suffix = string.IsNullOrWhiteSpace(result.WorkItemId)
-            ? string.Empty
-            : $" {result.WorkItemId}";
-        return $"Factory {result.FactoryOutcome}{suffix}";
+        const int diagnosticLimit = 2048;
+        var messages = new List<string>();
+        for (Exception? current = exception; current is not null && messages.Count < 4; current = current.InnerException)
+        {
+            if (string.IsNullOrWhiteSpace(current.Message)) continue;
+            if (messages.Count > 0 && string.Equals(messages[^1], current.Message, StringComparison.Ordinal)) continue;
+            messages.Add(current.Message);
+        }
+
+        var diagnostic = string.Join(" Cause: ", messages);
+        return diagnostic.Length <= diagnosticLimit
+            ? diagnostic
+            : diagnostic[..diagnosticLimit] + "...";
     }
 
-    private static string FormatTransportFailure(FactoryTransportException exception)
+    internal static string FormatActiveProgress(FactoryStatusResult status, DateTimeOffset now)
     {
-        var diagnostic = string.IsNullOrWhiteSpace(exception.ProcessDiagnostic)
-            ? "no process diagnostic was captured"
-            : exception.ProcessDiagnostic;
-        if (diagnostic.Length > 1024)
-            diagnostic = diagnostic[..1024] + " [truncated]";
-        return $"{exception.Message} {diagnostic}";
+        var activity = status.CurrentWorkItemId is { Length: > 0 } workItem
+            ? $"work item {workItem}"
+            : "runtime work";
+        if (status.CurrentAttemptId is { Length: > 0 } attempt)
+            activity += $", attempt {attempt}";
+        if (status.CurrentPhase is { Length: > 0 } phase)
+            activity += $", {phase.ToLowerInvariant()}";
+
+        var elapsed = status.RuntimeStartedAt is { } startedAt && now >= startedAt
+            ? $"; runtime active {FormatElapsed(now - startedAt)}"
+            : string.Empty;
+        return $"Factory {status.RuntimeOperation ?? "run"}: {activity}; completed {status.CompletedWorkCount}, remaining {status.RemainingWorkCount}{elapsed}.";
     }
+
+    private static string FormatElapsed(TimeSpan elapsed) =>
+        elapsed.TotalHours >= 1
+            ? $"{(int)elapsed.TotalHours}:{elapsed.Minutes:00}:{elapsed.Seconds:00}"
+            : $"{elapsed.Minutes}:{elapsed.Seconds:00}";
+
+    internal static string FormatFinalProgress(FactoryMcpResult result) => result.FactoryOutcome switch
+    {
+        "COMPLETED" => "Factory completed",
+        "CANCELLED" => "Factory cancelled",
+        _ => $"Factory blocked: {result.FactoryOutcome}"
+    };
 }
+
+internal sealed record FactoryMcpResult(
+    string FactoryOutcome,
+    string RunId,
+    string? Reason,
+    string? ResumeWhen,
+    string? ResultDirectory,
+    JsonElement? Payload = null);
