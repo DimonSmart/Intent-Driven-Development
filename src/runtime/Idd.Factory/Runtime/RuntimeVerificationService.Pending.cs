@@ -54,7 +54,7 @@ internal sealed partial class RuntimeVerificationService
                     new(
                         "VERIFICATION_DECLINED",
                         $"User declined authoritative check {checkId}.",
-                        "Cancel/restart the run when verification can be performed.",
+                        "Use factory_restart to replace the run when verification can be performed, or factory_cancel if no replacement run is wanted.",
                         new(
                             ContinuationKind.Terminal,
                             item?.Id,

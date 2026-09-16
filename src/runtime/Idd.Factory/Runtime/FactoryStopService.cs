@@ -39,9 +39,9 @@ internal sealed class FactoryStopService(FactoryRuntimeContext context)
         var hard = exception.Code.EndsWith("_BUDGET_EXHAUSTED", StringComparison.Ordinal)
             || exception.Code is "UNKNOWN_CAPABILITY" or "INVALID_RUNTIME_STATE";
         var resume = exception.Code == "RETRY_BUDGET_EXHAUSTED"
-            ? "Resolve the condition, then call factory_retry with additional attempts (maximum 10 total), or cancel/restart."
+            ? "Resolve the condition, then call factory_retry with additional attempts (maximum 10 total), use factory_restart to replace the run, or factory_cancel if no replacement run is wanted."
             : hard || existing is null
-                ? "Cancel/restart after resolving the condition."
+                ? "Resolve the condition, then use factory_restart to replace the run, or factory_cancel if no replacement run is wanted."
                 : "Resolve the condition, then continue the exact operation.";
 
         return new(
@@ -76,7 +76,7 @@ internal sealed class FactoryStopService(FactoryRuntimeContext context)
         return new(
             exception.Code,
             exception.Message,
-            "Cancel/restart after resolving the execution-layer instability.",
+            "Resolve the execution-layer instability, then use factory_restart to replace the run, or factory_cancel if no replacement run is wanted.",
             new(
                 ContinuationKind.Terminal,
                 item?.Id,

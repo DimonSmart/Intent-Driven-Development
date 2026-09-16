@@ -6,8 +6,8 @@ IDD Factory is a deterministic, resumable orchestrator built around one loop:
 plan batch -> execute batch -> plan again
 ```
 
-Intent preparation happens before runtime creation. Factory receives the
-unchanged original request and treats current `.idd/intent/` as read-only.
+Intent preparation happens before runtime creation or replacement. Factory receives the
+unchanged preflighted logical request and treats current `.idd/intent/` as read-only.
 
 ## Planning
 
@@ -193,14 +193,25 @@ references, and retry never reruns semantic relevance selection for an existing
 work item. Later planning cycles may select different intent for newly created
 tasks; existing task definitions and completed history remain immutable.
 
+An explicit run-level restart is different from continuation. The launcher first
+resolves one complete replacement request and completes replacement-run Intent
+Preflight without modifying the active run. It then calls `factory_restart` with
+that exact request. Runtime owns the complete restart operation: it archives the
+existing run and starts the replacement. `factory_cancel` instead archives the
+existing run without starting a replacement; it is not a prerequisite for
+`factory_restart`.
+
 Factory state schema 14 persists separate `SemanticAttemptCount`,
 `TechnicalRestartCount`, `AdditionalSemanticAttemptBudget`, and the exact
 `NextInvocationKind` (`Initial`, `SemanticRetry`, or `TechnicalRestart`) in
 addition to related-intent metadata. This reason is saved before a replacement
 executor starts, so process recovery cannot reinterpret a scheduled Technical
-Restart as a Semantic Retry. Active older-schema runs follow the existing
-`LEGACY_FACTORY_STATE` cancellation/restart policy; no implicit migration is
-introduced.
+Restart as a Semantic Retry. Active older-schema runs surface
+`LEGACY_FACTORY_STATE`; cross-version continuation is unavailable without an
+explicit migration for the exact source schema. An explicit restart uses the
+same `factory_restart` replacement path as a supported active run, while an
+explicit cancellation uses `factory_cancel`. No implicit migration or semantic
+interpretation of obsolete legacy state is introduced.
 
 Persisted planner output is validated under the current protocol, so an exact
 `# Done` may resume normally while a persisted blank result is malformed.

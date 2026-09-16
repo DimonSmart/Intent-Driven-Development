@@ -166,7 +166,7 @@ internal sealed class FactoryStateMachine(
                         new(
                             "PLANNING_BUDGET_EXHAUSTED",
                             immediate.Detail ?? "Factory planning-cycle budget exhausted.",
-                            "Cancel/restart after resolving the condition.",
+                            "Resolve the condition, then use factory_restart to replace the run, or factory_cancel if no replacement run is wanted.",
                             new(
                                 ContinuationKind.Terminal,
                                 null,
@@ -216,7 +216,7 @@ internal sealed class FactoryStateMachine(
                         new(
                             "VERIFICATION_DECLINED",
                             "User declined running Factory with an already-failing repository fallback baseline.",
-                            "Fix the repository baseline, then cancel/restart the Factory run.",
+                            "Fix the repository baseline, then use factory_restart to replace the run, or factory_cancel if no replacement run is wanted.",
                             new(
                                 ContinuationKind.Terminal,
                                 null,
@@ -321,7 +321,7 @@ internal sealed class FactoryStateMachine(
                 "RETRY_NOT_AVAILABLE",
                 state.RunId,
                 "The current run is not blocked by an exhausted work-item retry budget.",
-                "Use factory_continue for a resumable continuation, or cancel and restart.");
+                "Use factory_continue for a resumable continuation, factory_restart to replace the run, or factory_cancel if no replacement run is wanted.");
         }
 
         var effectiveBudget = execution.EffectiveAttemptBudget(state.Current);
@@ -502,7 +502,7 @@ internal sealed class FactoryStateMachine(
                     new(
                         "PLANNING_BUDGET_EXHAUSTED",
                         immediate.Detail ?? "Factory planning-cycle budget exhausted.",
-                        "Cancel/restart after resolving the condition.",
+                        "Resolve the condition, then use factory_restart to replace the run, or factory_cancel if no replacement run is wanted.",
                         new(
                             ContinuationKind.Terminal,
                             null,
@@ -798,7 +798,7 @@ internal sealed class FactoryStateMachine(
                 new(
                     "VERIFICATION_RETRY_NO_PROGRESS",
                     $"Work item {item.Id} was retried because authoritative verification failed, but retry attempt {attemptId} produced no workspace changes.",
-                    "Inspect the verification evidence and executor result, resolve the condition, then cancel/restart the Factory run.",
+                    "Inspect the verification evidence and executor result, resolve the condition, then use factory_restart to replace the run, or factory_cancel if no replacement run is wanted.",
                     new(
                         ContinuationKind.Terminal,
                         item.Id,
@@ -834,7 +834,7 @@ internal sealed class FactoryStateMachine(
             new(
                 "RETRY_BUDGET_EXHAUSTED",
                 detail ?? $"{item.Id} exhausted its semantic attempt budget.",
-                "Resolve the condition, then call factory_retry with additional attempts (maximum 10 total), or cancel/restart.",
+                "Resolve the condition, then call factory_retry with additional attempts (maximum 10 total), use factory_restart to replace the run, or factory_cancel if no replacement run is wanted.",
                 new(
                     ContinuationKind.Terminal,
                     item.Id,
@@ -1093,7 +1093,7 @@ internal sealed class FactoryStateMachine(
             new(
                 "FACTORY_BLOCKED",
                 "No deterministic action is applicable.",
-                "Resolve the blocker or cancel/restart.",
+                "Resolve the blocker, then use factory_restart to replace the run, or factory_cancel if no replacement run is wanted.",
                 new(
                     ContinuationKind.Terminal,
                     state.Current?.Id,

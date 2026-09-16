@@ -24,7 +24,7 @@ internal sealed class FactoryRunService(
             return new(
                 "RUN_EXISTS",
                 "unknown",
-                "Use continue or cancel for the existing Factory run.");
+                "Use factory_continue for a resumable existing run, factory_restart to replace it, or factory_cancel if no replacement run is wanted.");
         }
 
         Directory.CreateDirectory(context.CurrentDirectory);
@@ -83,7 +83,7 @@ internal sealed class FactoryRunService(
             return new(
                 "FACTORY_CONFIGURATION_CHANGED",
                 state.RunId,
-                "Restore the pinned configuration or cancel and restart.");
+                "Restore the pinned configuration, use factory_restart to replace the run, or use factory_cancel if no replacement run is wanted.");
         }
 
         if (userAnswer is not null)
@@ -110,7 +110,7 @@ internal sealed class FactoryRunService(
             return new(
                 "FACTORY_CONFIGURATION_CHANGED",
                 state.RunId,
-                "Restore the pinned configuration or cancel and restart.");
+                "Restore the pinned configuration, use factory_restart to replace the run, or use factory_cancel if no replacement run is wanted.");
         }
 
         return await stateMachine.RetryAsync(

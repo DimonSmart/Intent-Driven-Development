@@ -94,7 +94,7 @@ internal sealed partial class RuntimeVerificationService
                 new(
                     "VERIFICATION_CONFIRMATION_REQUIRED",
                     $"Repository fallback baseline already fails before Factory planning. Failed checks: {checkSummary}. Evidence: {evidenceSummary}. Repository-wide subtask verification cannot reliably attribute that failure to the current work item.",
-                    "Fix the repository baseline and cancel/restart, or continue with --confirmation approve to accept the existing red baseline.",
+                    "Fix the repository baseline and use factory_restart to replace the run, or continue with --confirmation approve to accept the existing red baseline. Use factory_cancel only if no replacement run is wanted.",
                     new(
                         ContinuationKind.VerificationGate,
                         null,
@@ -138,7 +138,7 @@ internal sealed partial class RuntimeVerificationService
             new(
                 "BASELINE_VERIFICATION_ACTION_REQUIRED",
                 $"Repository fallback baseline ended as {baseline.Status} before Factory planning.",
-                "Resolve the baseline verification condition, then cancel/restart the Factory run.",
+                "Resolve the baseline verification condition, then use factory_restart to replace the run, or factory_cancel if no replacement run is wanted.",
                 terminal));
     }
 

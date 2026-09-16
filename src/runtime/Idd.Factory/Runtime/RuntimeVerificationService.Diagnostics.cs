@@ -173,7 +173,7 @@ internal sealed partial class RuntimeVerificationService
             _ => $"Resolve the {failure.Kind} failure at {failure.Stage}"
         };
         return baseline
-            ? $"{condition}, then cancel/restart the Factory run."
+            ? $"{condition}, then use factory_restart to replace the Factory run, or factory_cancel if no replacement run is wanted."
             : $"{condition}, then call factory_continue.";
     }
 

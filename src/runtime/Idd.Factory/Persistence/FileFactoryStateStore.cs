@@ -27,7 +27,7 @@ public sealed class FileFactoryStateStore(string currentDirectory, FactoryStateV
             if (schemaVersion != FactoryState.CurrentSchemaVersion)
                 throw new FactoryStateException(
                     "LEGACY_FACTORY_STATE",
-                    $"Active Factory state uses schema {schemaVersion}; this runtime uses schema {FactoryState.CurrentSchemaVersion}. This state cannot continue without an explicit migration; restart it with the current runtime, or cancel it and start a new run.");
+                    $"Active Factory state uses schema {schemaVersion}; this runtime uses schema {FactoryState.CurrentSchemaVersion}. This state cannot continue without an explicit migration. Use factory_restart with a complete replacement request, or use factory_cancel if no replacement run is wanted.");
 
             var state = document.RootElement.Deserialize<FactoryState>(FactoryJson.Options)
                 ?? throw new FactoryStateException("CORRUPT_FACTORY_STATE", "state.json is empty.");
