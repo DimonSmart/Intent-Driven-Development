@@ -2,27 +2,28 @@ using System.ComponentModel;
 using System.Reflection;
 using System.Text.Json;
 using Idd.Factory.Domain;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using ModelContextProtocol;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+
+namespace Idd.Factory.Mcp;
 
 internal static class FactoryMcpServer
 {
-    public static async Task<int> RunAsync(CancellationToken cancellationToken = default)
+    public static async Task<int> RunAsync(CancellationToken cancellationToken)
     {
-        var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
-        builder.Logging.AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace);
-        builder.Services.AddSingleton<IFactoryProcessInvoker, SystemFactoryProcessInvoker>();
-        builder.Services.AddSingleton<FactoryRuntimeProcessRunner>();
-        builder.Services.AddSingleton<FactoryStatusReader>();
-        builder.Services.AddSingleton<FactoryMcpProgressMonitor>();
+        var builder = Microsoft.Extensions.Hosting.Host.CreateEmptyApplicationBuilder(null);
         builder.Services
-            .AddMcpServer(options => options.ServerInfo = new()
+            .AddSingleton<FactoryRuntimeProcessRunner>()
+            .AddSingleton<FactoryStatusReader>()
+            .AddSingleton<FactoryMcpProgressMonitor>();
+        builder.Services
+            .AddMcpServer(options =>
             {
-                Name = "idd-factory",
-                Version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown"
+                options.ServerInfo = new Implementation
+                {
+                    Name = "idd-factory",
+                    Version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown"
+                };
             })
             .WithStdioServerTransport()
             .WithTools<FactoryMcpTools>();
@@ -75,7 +76,7 @@ internal sealed class FactoryMcpTools(
         RunWithProgressAsync(FactoryRuntimeCommand.Retry, workspace, null, progress, cancellationToken, additionalAttempts);
 
     [McpServerTool(Name = "factory_cancel", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true, UseStructuredContent = true)]
-    [Description("Request explicit cancellation of an IDD Factory workflow while preserving product changes and archiving diagnostics. This also cancels active state from an unsupported older schema without requiring the older plugin.")]
+    [Description("Request explicit cancellation of an IDD Factory workflow while preserving product changes and archiving diagnostics, without starting a replacement run. This also cancels active state from an unsupported older schema without requiring the older plugin.")]
     public Task<FactoryMcpResult> FactoryCancelAsync(
         [Description("Absolute path to the target workspace.")] string workspace,
         IProgress<ProgressNotificationValue> progress,
@@ -143,56 +144,21 @@ internal sealed class FactoryMcpTools(
         return result;
     }
 
-    internal static string FormatTransportFailure(FactoryTransportException exception)
+    private static string FormatFinalProgress(FactoryMcpResult result)
     {
-        const int diagnosticLimit = 2048;
-        var messages = new List<string>();
-        for (Exception? current = exception; current is not null && messages.Count < 4; current = current.InnerException)
-        {
-            if (string.IsNullOrWhiteSpace(current.Message)) continue;
-            if (messages.Count > 0 && string.Equals(messages[^1], current.Message, StringComparison.Ordinal)) continue;
-            messages.Add(current.Message);
-        }
-
-        var diagnostic = string.Join(" Cause: ", messages);
-        return diagnostic.Length <= diagnosticLimit
-            ? diagnostic
-            : diagnostic[..diagnosticLimit] + "...";
+        var suffix = string.IsNullOrWhiteSpace(result.WorkItemId)
+            ? string.Empty
+            : $" {result.WorkItemId}";
+        return $"Factory {result.FactoryOutcome}{suffix}";
     }
 
-    internal static string FormatActiveProgress(FactoryStatusResult status, DateTimeOffset now)
+    private static string FormatTransportFailure(FactoryTransportException exception)
     {
-        var activity = status.CurrentWorkItemId is { Length: > 0 } workItem
-            ? $"work item {workItem}"
-            : "runtime work";
-        if (status.CurrentAttemptId is { Length: > 0 } attempt)
-            activity += $", attempt {attempt}";
-        if (status.CurrentPhase is { Length: > 0 } phase)
-            activity += $", {phase.ToLowerInvariant()}";
-
-        var elapsed = status.RuntimeStartedAt is { } startedAt && now >= startedAt
-            ? $"; runtime active {FormatElapsed(now - startedAt)}"
-            : string.Empty;
-        return $"Factory {status.RuntimeOperation ?? "run"}: {activity}; completed {status.CompletedWorkCount}, remaining {status.RemainingWorkCount}{elapsed}.";
+        var diagnostic = string.IsNullOrWhiteSpace(exception.ProcessDiagnostic)
+            ? "no process diagnostic was captured"
+            : exception.ProcessDiagnostic;
+        if (diagnostic.Length > 1024)
+            diagnostic = diagnostic[..1024] + " [truncated]";
+        return $"{exception.Message} {diagnostic}";
     }
-
-    private static string FormatElapsed(TimeSpan elapsed) =>
-        elapsed.TotalHours >= 1
-            ? $"{(int)elapsed.TotalHours}:{elapsed.Minutes:00}:{elapsed.Seconds:00}"
-            : $"{elapsed.Minutes}:{elapsed.Seconds:00}";
-
-    internal static string FormatFinalProgress(FactoryMcpResult result) => result.FactoryOutcome switch
-    {
-        "COMPLETED" => "Factory completed",
-        "CANCELLED" => "Factory cancelled",
-        _ => $"Factory blocked: {result.FactoryOutcome}"
-    };
 }
-
-internal sealed record FactoryMcpResult(
-    string FactoryOutcome,
-    string RunId,
-    string? Reason,
-    string? ResumeWhen,
-    string? ResultDirectory,
-    JsonElement? Payload = null);
