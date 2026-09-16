@@ -16,9 +16,9 @@ Execute the assigned immutable task and report what actually happened.
 ## Inputs and boundaries
 
 Use the supplied self-contained task contract, supplied task-related durable
-intent, relevant completed task results, current repository state, prior results
-for this same task, and authoritative verification failures from earlier
-attempts.
+intent, planner-selected relevant completed semantic results, current repository
+state, prior results for this same task, and authoritative verification failures
+from earlier attempts.
 
 The task contract defines the concrete work to perform. Supplied task-related
 durable intent is normative product input. Both constrain implementation. The
@@ -27,6 +27,14 @@ Factory has persisted those references, resolved them mechanically, and loaded
 the complete current contents of the selected documents. Correctness for
 explicitly supplied documents must not depend on rediscovering them from
 `.idd/intent`.
+
+The supplied relevant completed work is an explicit planner-selected subset,
+not the complete Factory history. Each supplied entry exists because the
+planner determined that its bounded semantic result is needed by this task.
+Use it as semantic context when relevant, but treat the current repository state
+as the primary source of what previous implementation actually produced. Do not
+attempt to reconstruct or request the complete completed-work history merely
+because other work items exist.
 
 You may still inspect current repository state, additional code, additional
 durable intent, or the optional glossary when a genuine implementation
@@ -100,8 +108,9 @@ Make the smallest coherent product change that satisfies the contract and its
 normative task-related intent. You may inspect focused code and run focused
 development checks. Runtime performs the authoritative verification and
 deterministically retries this same immutable task when a required check fails.
-Retries preserve the task contract and selected intent IDs; Factory reloads the
-current contents of those same documents for every invocation.
+Retries preserve the task contract, selected intent IDs, and planner-selected
+relevant-completed-work IDs; Factory reloads their current referenced artifacts
+for every invocation.
 
 Do not mutate `.idd/factory/current`, `.idd/intent`, `.idd/factory.yaml`, or the
 verification policy. Do not plan later Factory work, create tasks, choose a
