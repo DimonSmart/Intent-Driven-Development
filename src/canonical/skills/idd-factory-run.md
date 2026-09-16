@@ -156,7 +156,7 @@ user asks to cancel
     -> factory_cancel
 ```
 
-For restart, the current runtime owns the complete restart operation. It archives the existing run, preserving product changes and diagnostics, and then starts the replacement run with the supplied request. This is a sequential Runtime operation; do not promise transactional atomicity, rollback, or restoration of the old active run if replacement creation later fails.
+For restart: The current runtime owns the complete restart operation. It archives the existing run, preserving product changes and diagnostics, and then starts the replacement run with the supplied request. This is a sequential Runtime operation; do not promise transactional atomicity, rollback, or restoration of the old active run if replacement creation later fails.
 
 For cancellation, `factory_cancel` archives the old run without starting a replacement.
 
