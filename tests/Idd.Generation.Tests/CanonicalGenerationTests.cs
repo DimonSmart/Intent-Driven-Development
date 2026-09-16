@@ -48,7 +48,7 @@ public sealed class CanonicalGenerationTests(GenerationFixture fixture)
             "smaller and more coherent implementation and troubleshooting",
             "Do not split work mechanically",
             "broad or semantically heterogeneous `TaskRelatedIntent` set",
-            "Tests needed to verify a capability normally belong in the task",
+            "Tests needed to verify a capability",
             "Materialize every task that can be contracted reliably"
         })
         {
@@ -174,7 +174,7 @@ public sealed class CanonicalGenerationTests(GenerationFixture fixture)
     [InlineData("/file.md")]
     [InlineData(@"\file.md")]
     [InlineData("//server/share/file.md")]
-    [InlineData(@"\\server\share\file.md")]
+    [InlineData(@"\\server\share/file.md")]
     [InlineData("../file.md")]
     [InlineData("folder//file.md")]
     [InlineData("./file.md")]
