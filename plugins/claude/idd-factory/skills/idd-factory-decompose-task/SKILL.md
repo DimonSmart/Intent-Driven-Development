@@ -65,6 +65,53 @@ runtime transitions. Referencing already-existing stable `IDD-NNNN` durable-
 intent IDs is different from choosing runtime identity and is explicitly part
 of the planner's semantic responsibility.
 
+## Work-item sizing and failure domains
+
+Each task should normally describe one coherent implementation result with a
+bounded failure domain that a single executor can reasonably implement and
+verify within one semantic attempt. Prefer a useful independently verifiable
+outcome over a contract that bundles several otherwise independent results.
+
+Prefer separate tasks when parts of the work have independently meaningful
+outcomes and substantially independent verification paths, failure or
+troubleshooting domains, toolchains, infrastructure prerequisites, or
+implementation lifecycles. A particularly strong signal for a task boundary is
+the combination of an independently useful result, independent verification,
+and an independent failure or troubleshooting domain. No single signal requires
+a mechanical split; make the boundary decision semantically from the whole
+change.
+
+Use stable intermediate repository states as natural task boundaries. A
+completed task becomes repository reality for later executors, so do not keep
+independently verifiable work together merely because every contract is already
+known. Apply this sizing rule across the complete contractable batch: do not
+return only one small task merely to force replanning when later tasks are also
+reliably contractable now. Conversely, still stop before the first task whose
+meaningful contract depends on evidence this batch has not produced yet.
+
+Different ecosystems or infrastructure are useful sizing signals only when they
+create meaningfully separate implementation, verification, or troubleshooting
+paths. For example, backend creation, frontend scaffolding, database
+provisioning, orchestration, production publishing, and unrelated verification
+should not be combined into one task merely because all of them can already be
+contracted. Failure in one such area should not unnecessarily force one
+executor to retain and diagnose several unrelated implementation areas.
+
+Do not split work mechanically by file, directory, technology, architectural
+layer, acceptance criterion, class, method, or implementation step. Several
+files, layers, or technologies may belong to one task when they form one small,
+coherent, practically inseparable capability with one meaningful verification
+path. An endpoint, its service implementation, DTO contract, registration, and
+automated tests may therefore remain one task when together they form one
+finished backend capability.
+
+The goal is not the smallest possible task. The goal is one coherent result
+with a bounded failure domain and an independently verifiable outcome. Do not
+invent dependency graphs, sizing metadata, or runtime heuristics to enforce this
+semantic judgment. In particular, do not infer task size from counts of files,
+directories, technologies, tokens, acceptance criteria, tool names, or contract
+length; deterministic Factory bookkeeping remains a runtime responsibility.
+
 ## Task-related durable intent
 
 Select related durable intent independently for every task. Include a current
