@@ -11,7 +11,7 @@ internal sealed class SemanticExecutionService(
     FactoryRuntimeContext context,
     FactoryAgentExecutor agentExecutor)
 {
-    private readonly WorkspaceChangeCalculator workspaceChangeCalculator = new();
+    private readonly GitWorkspaceChangeTracker workspaceTracker = new(context.Workspace);
     private readonly ExternalBackendBlockerCoordinator externalBlockerCoordinator = new(context);
 
     public Task<SemanticAttemptRecoveryResult> InspectRecoveryAsync(
@@ -132,9 +132,39 @@ internal sealed class SemanticExecutionService(
             Input = input,
             StartedAt = context.Clock.UtcNow
         };
-        await WriteJsonAtomicallyAsync(invocationPath, invocationNew, cancellationToken);
+
         if (agent.ExecutionProfile == AgentExecutionProfile.WorkspaceWrite)
-            await PersistWorkspaceSnapshotAsync(state.RunId, directory, cancellationToken);
+        {
+            try
+            {
+                var baseline = await workspaceTracker.PersistBaselineAsync(
+                    directory,
+                    cancellationToken);
+                await context.Events.WriteAsync(
+                    state.RunId,
+                    "workspace-tracking-baseline",
+                    new
+                    {
+                        attemptId,
+                        baselineCandidateCount = baseline.BaselineCandidateCount,
+                        baselineHead = baseline.BaselineHead,
+                        baselineTree = baseline.BaselineTree,
+                        durationMs = baseline.DurationMs
+                    },
+                    cancellationToken);
+            }
+            catch (AgentProtocolException exception) when (exception.Code == "WORKSPACE_TRACKING_FAILED")
+            {
+                await WriteTrackingFailureEventAsync(
+                    state.RunId,
+                    attemptId,
+                    exception,
+                    CancellationToken.None);
+                throw;
+            }
+        }
+
+        await WriteJsonAtomicallyAsync(invocationPath, invocationNew, cancellationToken);
 
         if (item is not null)
         {
@@ -264,17 +294,6 @@ internal sealed class SemanticExecutionService(
         SemanticAttemptReconciler.ValidateIdentity(state, attemptId, invocation, directory);
     }
 
-    private async Task PersistWorkspaceSnapshotAsync(
-        string runId,
-        string attemptDirectory,
-        CancellationToken cancellationToken) =>
-        await WriteJsonAtomicallyAsync(
-            Path.Combine(attemptDirectory, "workspace-before.json"),
-            new WorkspaceSnapshotArtifact(
-                1,
-                await SnapshotWorkspaceAsync(runId, cancellationToken)),
-            cancellationToken);
-
     private async Task<IReadOnlyList<string>> RecoverWorkspaceChangesAsync(
         AgentInvocation invocation,
         CancellationToken cancellationToken)
@@ -283,102 +302,56 @@ internal sealed class SemanticExecutionService(
             return [];
 
         var directory = Path.GetDirectoryName(invocation.SemanticOutputPath)!;
-        var changesPath = Path.Combine(directory, "workspace-changes.json");
-        WorkspaceChangesArtifact changes;
-        if (File.Exists(changesPath))
+        try
         {
-            changes = JsonSerializer.Deserialize<WorkspaceChangesArtifact>(
-                          await File.ReadAllTextAsync(changesPath, cancellationToken),
-                          FactoryJson.Options)
-                      ?? throw new FactoryStateException(
-                          "CORRUPT_FACTORY_STATE",
-                          $"Attempt {invocation.AttemptId} has an invalid workspace changes artifact.");
-        }
-        else
-        {
-            var beforePath = Path.Combine(directory, "workspace-before.json");
-            if (!File.Exists(beforePath))
-                return [];
-
-            var before = JsonSerializer.Deserialize<WorkspaceSnapshotArtifact>(
-                             await File.ReadAllTextAsync(beforePath, cancellationToken),
-                             FactoryJson.Options)
-                         ?? throw new FactoryStateException(
-                             "CORRUPT_FACTORY_STATE",
-                             $"Attempt {invocation.AttemptId} has an invalid workspace snapshot artifact.");
-            var after = await SnapshotWorkspaceAsync(invocation.RunId, cancellationToken);
-            changes = new(
-                1,
-                workspaceChangeCalculator.Calculate(before.Files, after).ToList());
-            await WriteJsonAtomicallyAsync(changesPath, changes, cancellationToken);
-        }
-
-        if (changes.SchemaVersion != 1)
-        {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                $"Attempt {invocation.AttemptId} has an unsupported workspace changes schema.");
-        }
-
-        return changes.ChangedPaths;
-    }
-
-    private async Task<SortedDictionary<string, string>> SnapshotWorkspaceAsync(
-        string runId,
-        CancellationToken cancellationToken)
-    {
-        var result = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        foreach (var path in await WorkspaceSnapshotFileEnumerator.EnumerateAsync(
-                     context.Workspace,
-                     cancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var relative = RelativePath(path);
-            if (IsOperationalArtifact(relative))
-                continue;
-
-            try
-            {
-                result[relative] = Convert.ToHexString(
-                    System.Security.Cryptography.SHA256.HashData(
-                        await File.ReadAllBytesAsync(path, cancellationToken)));
-            }
-            catch (Exception exception) when (
-                exception is IOException or UnauthorizedAccessException)
+            var result = await workspaceTracker.MaterializeChangesAsync(
+                directory,
+                cancellationToken);
+            if (result.WasMaterialized)
             {
                 await context.Events.WriteAsync(
-                    runId,
-                    "workspace-snapshot-file-skipped",
-                    new { path = relative, exception = exception.GetType().Name },
-                    CancellationToken.None);
+                    invocation.RunId,
+                    "workspace-tracking-completed",
+                    new
+                    {
+                        attemptId = invocation.AttemptId,
+                        baselineCandidateCount = result.BaselineCandidateCount,
+                        currentStatusCandidateCount = result.CurrentStatusCandidateCount,
+                        treeCandidateCount = result.TreeCandidateCount,
+                        candidateCount = result.CandidateCount,
+                        changedPathCount = result.ChangedPaths.Count,
+                        durationMs = result.DurationMs,
+                        artifact = $"attempts/{invocation.AttemptId}/workspace-changes.json"
+                    },
+                    cancellationToken);
             }
+            return result.ChangedPaths;
         }
-
-        return result;
+        catch (AgentProtocolException exception) when (exception.Code == "WORKSPACE_TRACKING_FAILED")
+        {
+            await WriteTrackingFailureEventAsync(
+                invocation.RunId,
+                invocation.AttemptId,
+                exception,
+                CancellationToken.None);
+            throw;
+        }
     }
 
-    private string RelativePath(string path) =>
-        Path.GetRelativePath(context.Workspace, path).Replace('\\', '/');
-
-    private static bool IsOperationalArtifact(string path)
+    private async Task WriteTrackingFailureEventAsync(
+        string runId,
+        string attemptId,
+        AgentProtocolException exception,
+        CancellationToken cancellationToken)
     {
-        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length >= 2
-            && segments[0].Equals(".idd", StringComparison.OrdinalIgnoreCase)
-            && segments[1].Equals("factory", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return segments.Any(x =>
-            x.Equals(".git", StringComparison.OrdinalIgnoreCase)
-            || x.Equals("bin", StringComparison.OrdinalIgnoreCase)
-            || x.Equals("obj", StringComparison.OrdinalIgnoreCase)
-            || x.Equals("node_modules", StringComparison.OrdinalIgnoreCase)
-            || x.Equals(".angular", StringComparison.OrdinalIgnoreCase)
-            || x.Equals(".cache", StringComparison.OrdinalIgnoreCase)
-            || x.Equals("dist", StringComparison.OrdinalIgnoreCase)
-            || x.Equals("TestResults", StringComparison.OrdinalIgnoreCase));
+        var message = exception.Message.Length <= 2048
+            ? exception.Message
+            : exception.Message[..2048] + " [truncated]";
+        await context.Events.WriteAsync(
+            runId,
+            "workspace-tracking-failed",
+            new { attemptId, failureCode = exception.Code, message },
+            cancellationToken);
     }
 
     private static async Task WriteJsonAtomicallyAsync<T>(
@@ -439,12 +412,4 @@ internal sealed class SemanticExecutionService(
             semantic,
             persisted.SemanticResultPath);
     }
-
-    private sealed record WorkspaceSnapshotArtifact(
-        int SchemaVersion,
-        SortedDictionary<string, string> Files);
-
-    private sealed record WorkspaceChangesArtifact(
-        int SchemaVersion,
-        List<string> ChangedPaths);
 }
