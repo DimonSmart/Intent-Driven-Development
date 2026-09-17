@@ -26,7 +26,7 @@ internal static class WorkspacePathPolicy
             normalized = normalized[2..];
 
         if (normalized.Length == 0
-            || normalized.StartsWith('/', StringComparison.Ordinal)
+            || normalized.StartsWith("/", StringComparison.Ordinal)
             || Path.IsPathRooted(path)
             || (normalized.Length >= 2 && char.IsLetter(normalized[0]) && normalized[1] == ':'))
         {
