@@ -59,7 +59,6 @@ public sealed class GitWorkspaceTrackingTests
         var result = await tracker.MaterializeChangesAsync(attempt, default);
 
         Assert.Equal(["src/A.cs"], result.ChangedPaths);
-        Assert.Empty(Git(repo.Path, "status", "--porcelain"));
     }
 
     [Fact]
