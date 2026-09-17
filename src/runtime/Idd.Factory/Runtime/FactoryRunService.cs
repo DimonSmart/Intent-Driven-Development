@@ -27,10 +27,13 @@ internal sealed class FactoryRunService(
                 "Use factory_continue for a resumable existing run, factory_restart to replace it, or factory_cancel if no replacement run is wanted.");
         }
 
+        await new GitWorkspacePreflight().EnsureAsync(context.Workspace, cancellationToken);
+
         Directory.CreateDirectory(context.CurrentDirectory);
         Directory.CreateDirectory(Path.Combine(context.CurrentDirectory, "work-items"));
         Directory.CreateDirectory(Path.Combine(context.CurrentDirectory, "attempts"));
         Directory.CreateDirectory(Path.Combine(context.CurrentDirectory, "plan-revisions"));
+        Directory.CreateDirectory(Path.Combine(context.CurrentDirectory, "changes"));
         await File.WriteAllTextAsync(
             Path.Combine(context.CurrentDirectory, "request.md"),
             request,

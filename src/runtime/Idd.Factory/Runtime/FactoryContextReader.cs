@@ -342,10 +342,21 @@ internal sealed class FactoryContextReader(FactoryRuntimeContext context)
             lines.Add(completed.ResultRef is null
                 ? "none"
                 : await ReadSemanticResultAsync(completed.ResultRef, cancellationToken));
-            lines.Add("Actual changed paths: " + (
-                completed.ChangedPaths.Count == 0
-                    ? "none"
-                    : string.Join(", ", completed.ChangedPaths)));
+            lines.Add("Actual changed paths:");
+            if (completed.Changes is null)
+            {
+                lines.Add("none");
+            }
+            else
+            {
+                lines.Add($"Count: {completed.Changes.Count}");
+                lines.Add($"Artifact: .idd/factory/current/{completed.Changes.Reference}");
+                lines.Add("Preview:");
+                if (completed.Changes.Preview.Count == 0)
+                    lines.Add("none");
+                else
+                    lines.AddRange(completed.Changes.Preview.Select(path => $"- {path}"));
+            }
             lines.Add("Verification evidence: " + (
                 completed.VerificationEvidenceRefs.Count == 0
                     ? "none"

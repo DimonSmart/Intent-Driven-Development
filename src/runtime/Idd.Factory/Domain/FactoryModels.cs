@@ -25,9 +25,16 @@ public enum VerificationDecision { None, Ok, ExpectedFailure, UnexpectedFailure 
 [JsonConverter(typeof(JsonStringEnumConverter<WorkItemInvocationKind>))]
 public enum WorkItemInvocationKind { Initial, SemanticRetry, TechnicalRestart }
 
+public sealed record ChangeSetSummary
+{
+    public required string Reference { get; init; }
+    public int Count { get; init; }
+    public List<string> Preview { get; init; } = [];
+}
+
 public sealed record FactoryState
 {
-    public const int CurrentSchemaVersion = 15;
+    public const int CurrentSchemaVersion = 16;
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     public required string MethodologyVersion { get; init; }
     public required string RuntimeVersion { get; init; }
@@ -53,6 +60,9 @@ public sealed record FactoryState
     public PendingContinuation? PendingContinuation { get; set; }
     public PendingVerificationSession? PendingVerificationSession { get; set; }
     public List<string> VerificationEvidenceRefs { get; init; } = [];
+    public ChangeSetSummary? RunChanges { get; set; }
+
+    [JsonIgnore]
     public List<string> FactoryRunChangedPaths { get; init; } = [];
 }
 
@@ -126,18 +136,44 @@ public sealed record PlannedWorkItem
     public List<string> PriorResultRefs { get; init; } = [];
     public List<TechnicalFailureDiagnostic> PriorTechnicalFailures { get; init; } = [];
     public List<string> PriorAttemptDiagnosticRefs { get; init; } = [];
+    public ChangeSetSummary? Changes { get; set; }
+
+    [JsonIgnore]
     public List<string> ChangedPaths { get; init; } = [];
 
     private WorkItemInvocationKind InvocationCounterKind => CurrentInvocationKind ?? NextInvocationKind;
 }
 
-public sealed record TechnicalFailureDiagnostic(
-    string FailedAttemptId,
-    string FailureCode,
-    string DiagnosticReference,
-    string Message,
-    int SemanticAttemptNumber,
-    List<string> ChangedPaths);
+public sealed record TechnicalFailureDiagnostic
+{
+    public TechnicalFailureDiagnostic() { }
+
+    public TechnicalFailureDiagnostic(
+        string failedAttemptId,
+        string failureCode,
+        string diagnosticReference,
+        string message,
+        int semanticAttemptNumber,
+        List<string> changedPaths)
+    {
+        FailedAttemptId = failedAttemptId;
+        FailureCode = failureCode;
+        DiagnosticReference = diagnosticReference;
+        Message = message;
+        SemanticAttemptNumber = semanticAttemptNumber;
+        ChangedPaths = changedPaths;
+    }
+
+    public string FailedAttemptId { get; init; } = string.Empty;
+    public string FailureCode { get; init; } = string.Empty;
+    public string DiagnosticReference { get; init; } = string.Empty;
+    public string Message { get; init; } = string.Empty;
+    public int SemanticAttemptNumber { get; init; }
+    public ChangeSetSummary? Changes { get; init; }
+
+    [JsonIgnore]
+    public List<string> ChangedPaths { get; init; } = [];
+}
 
 public sealed record CompletedWorkItem
 {
@@ -146,7 +182,11 @@ public sealed record CompletedWorkItem
     public List<string> TaskRelatedIntentIds { get; init; } = [];
     public List<string> RelevantCompletedWorkIds { get; init; } = [];
     public string? ResultRef { get; init; }
+    public ChangeSetSummary? Changes { get; init; }
+
+    [JsonIgnore]
     public List<string> ChangedPaths { get; init; } = [];
+
     public List<string> VerificationEvidenceRefs { get; init; } = [];
     public VerificationDecision VerificationDecision { get; init; }
 }
@@ -202,19 +242,57 @@ public sealed record PendingContinuation(
     string? VerificationCheckId = null,
     VerificationContinuationStage VerificationStage = VerificationContinuationStage.ExecuteCheck);
 
-public sealed record PendingVerificationSession(
-    string Context,
-    string? WorkItemId,
-    List<string> CheckIds,
-    List<string> ChangedPaths,
-    int NextCheckIndex,
-    List<string> CompletedCheckIds,
-    List<string> FailedCheckIds,
-    List<string> EvidenceRefs,
-    string? PendingCheckId,
-    string? PendingCheckDefinitionHash,
-    string PolicyHash,
-    VerificationContinuationStage Stage);
+public sealed record PendingVerificationSession
+{
+    public PendingVerificationSession() { }
+
+    public PendingVerificationSession(
+        string context,
+        string? workItemId,
+        List<string> checkIds,
+        List<string> changedPaths,
+        int nextCheckIndex,
+        List<string> completedCheckIds,
+        List<string> failedCheckIds,
+        List<string> evidenceRefs,
+        string? pendingCheckId,
+        string? pendingCheckDefinitionHash,
+        string policyHash,
+        VerificationContinuationStage stage,
+        ChangeSetSummary? changes = null)
+    {
+        Context = context;
+        WorkItemId = workItemId;
+        CheckIds = checkIds;
+        ChangedPaths = changedPaths;
+        NextCheckIndex = nextCheckIndex;
+        CompletedCheckIds = completedCheckIds;
+        FailedCheckIds = failedCheckIds;
+        EvidenceRefs = evidenceRefs;
+        PendingCheckId = pendingCheckId;
+        PendingCheckDefinitionHash = pendingCheckDefinitionHash;
+        PolicyHash = policyHash;
+        Stage = stage;
+        Changes = changes;
+    }
+
+    public string Context { get; init; } = string.Empty;
+    public string? WorkItemId { get; init; }
+    public List<string> CheckIds { get; init; } = [];
+
+    [JsonIgnore]
+    public List<string> ChangedPaths { get; init; } = [];
+
+    public int NextCheckIndex { get; init; }
+    public List<string> CompletedCheckIds { get; init; } = [];
+    public List<string> FailedCheckIds { get; init; } = [];
+    public List<string> EvidenceRefs { get; init; } = [];
+    public string? PendingCheckId { get; init; }
+    public string? PendingCheckDefinitionHash { get; init; }
+    public string PolicyHash { get; init; } = string.Empty;
+    public VerificationContinuationStage Stage { get; init; }
+    public ChangeSetSummary? Changes { get; init; }
+}
 
 [JsonConverter(typeof(JsonStringEnumConverter<ContinuationKind>))]
 public enum ContinuationKind { SemanticInvocation, VerificationGate, UserQuestion, Terminal }

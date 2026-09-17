@@ -180,7 +180,7 @@ public sealed class RelevantCompletedWorkTests
     [Fact]
     public void StateValidatorRejectsUnknownRelevantCompletedReferenceAndMutationOfSelection()
     {
-        Assert.Equal(15, FactoryState.CurrentSchemaVersion);
+        Assert.Equal(16, FactoryState.CurrentSchemaVersion);
         var validator = new FactoryStateValidator();
         var state = StateStoreTests.State();
         state.Completed.Add(StateStoreTests.Completed("W000001"));

@@ -13,6 +13,8 @@ public interface IFactoryStateStore
 
 public sealed class FileFactoryStateStore(string currentDirectory, FactoryStateValidator validator) : IFactoryStateStore
 {
+    private readonly ChangedPathSetStore changeSets = new(currentDirectory);
+
     public string StatePath => Path.Combine(currentDirectory, "state.json");
 
     public async Task<FactoryState?> LoadAsync(CancellationToken cancellationToken)
@@ -32,6 +34,8 @@ public sealed class FileFactoryStateStore(string currentDirectory, FactoryStateV
             var state = document.RootElement.Deserialize<FactoryState>(FactoryJson.Options)
                 ?? throw new FactoryStateException("CORRUPT_FACTORY_STATE", "state.json is empty.");
             validator.Validate(state);
+            await changeSets.HydrateStateAsync(state, cancellationToken);
+            validator.Validate(state);
             return state;
         }
         catch (FactoryStateException) { throw; }
@@ -44,6 +48,7 @@ public sealed class FileFactoryStateStore(string currentDirectory, FactoryStateV
     public async Task CreateAsync(FactoryState state, CancellationToken cancellationToken)
     {
         if (File.Exists(StatePath)) throw new FactoryStateException("FACTORY_RUN_EXISTS", "A Factory run already exists.");
+        await changeSets.MaterializeStateAsync(state, cancellationToken);
         validator.Validate(state);
         Directory.CreateDirectory(currentDirectory);
         await WriteAtomicAsync(state, cancellationToken);
@@ -55,6 +60,7 @@ public sealed class FileFactoryStateStore(string currentDirectory, FactoryStateV
             ?? throw new FactoryStateException("MISSING_FACTORY_STATE", "No Factory state exists.");
         if (previous.Revision != expectedRevision)
             throw new FactoryStateException("STALE_STATE_REVISION", $"Expected revision {expectedRevision}, actual {previous.Revision}.");
+        await changeSets.MaterializeStateAsync(state, cancellationToken);
         state.Revision = expectedRevision + 1;
         validator.ValidateMutation(previous, state);
         await WriteAtomicAsync(state, cancellationToken);

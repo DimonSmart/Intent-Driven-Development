@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Idd.Factory.Agents;
 using Idd.Factory.Configuration;
 using Idd.Factory.Domain;
@@ -17,6 +18,7 @@ internal static class FactoryTestRuntime
         FactoryConfiguration? configuration = null,
         VerificationEngine? verification = null)
     {
+        EnsureGitRepository(workspace);
         var current = Path.Combine(workspace, ".idd", "factory", "current");
         var clock = new FakeClock();
         configuration ??= Configuration();
@@ -32,6 +34,7 @@ internal static class FactoryTestRuntime
 
     public static FactoryContextReader ContextReader(string workspace)
     {
+        EnsureGitRepository(workspace);
         var current = Path.Combine(workspace, ".idd", "factory", "current");
         var clock = new FakeClock();
         return new FactoryContextReader(new FactoryRuntimeContext(
@@ -54,6 +57,39 @@ internal static class FactoryTestRuntime
             TimeSpan.FromMinutes(10)),
         "test-factory.yaml",
         "test-config-hash");
+
+    private static void EnsureGitRepository(string workspace)
+    {
+        Directory.CreateDirectory(workspace);
+        if (!Directory.Exists(Path.Combine(workspace, ".git"))
+            && !File.Exists(Path.Combine(workspace, ".git")))
+        {
+            RunGit(workspace, "init", "--quiet");
+        }
+        RunGit(workspace, "config", "user.email", "factory-tests@example.invalid");
+        RunGit(workspace, "config", "user.name", "IDD Factory Tests");
+    }
+
+    private static void RunGit(string workspace, params string[] arguments)
+    {
+        var start = new ProcessStartInfo("git")
+        {
+            WorkingDirectory = workspace,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        foreach (var argument in arguments)
+            start.ArgumentList.Add(argument);
+        using var process = Process.Start(start)
+                            ?? throw new InvalidOperationException("git did not start for Factory test setup");
+        var stderr = process.StandardError.ReadToEnd();
+        process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException($"git {string.Join(' ', arguments)} failed: {stderr}");
+    }
 }
 
 internal sealed class ScriptedAgentBackend : IAgentBackend

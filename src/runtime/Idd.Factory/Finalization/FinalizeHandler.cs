@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Idd.Factory.Domain;
+using Idd.Factory.Persistence;
 using Idd.Factory.Verification;
 
 namespace Idd.Factory.Finalization;
@@ -23,6 +24,7 @@ public sealed class FinalizeHandler
         ValidateState(state);
 
         var current = Path.Combine(workspace, ".idd", "factory", "current");
+        await new ChangedPathSetStore(current).ValidateStateReferencesAsync(state, cancellationToken);
         foreach (var reference in state.VerificationEvidenceRefs)
             _ = VerificationEngine.Read(await File.ReadAllTextAsync(Path.Combine(current, reference), cancellationToken));
 
@@ -38,9 +40,6 @@ public sealed class FinalizeHandler
         ValidatePreparedResult(current, state);
         transitionObserver?.Invoke(FinalizationStage.Prepared);
 
-        // This is the only destructive boundary. Before it, authoritative state and all run
-        // artifacts remain under current and FinalizeAsync can be retried. After it, the entire
-        // completed run exists under results, including events.jsonl and all attempt diagnostics.
         cancellationToken.ThrowIfCancellationRequested();
         await MoveDirectoryAsync(current, destination, cancellationToken);
         transitionObserver?.Invoke(FinalizationStage.Committed);
@@ -96,9 +95,16 @@ public sealed class FinalizeHandler
 
         var plan = new
         {
-            schemaVersion = 1,
+            schemaVersion = 2,
             state.PlanRevision,
-            completed = state.Completed.Select(x => new { x.Id, x.ContractPath, x.ResultRef, x.ChangedPaths, x.VerificationEvidenceRefs })
+            completed = state.Completed.Select(x => new
+            {
+                x.Id,
+                x.ContractPath,
+                x.ResultRef,
+                changes = x.Changes,
+                x.VerificationEvidenceRefs
+            })
         };
         await WriteJsonAtomicallyAsync(Path.Combine(current, "completed-work.json"), plan, cancellationToken);
 
@@ -131,7 +137,8 @@ public sealed class FinalizeHandler
             Path.Combine(current, "factory-result.json"),
             Path.Combine(current, "completed-work.json"),
             Path.Combine(current, "commit-message.md"),
-            Path.Combine(current, "finalization.json")
+            Path.Combine(current, "finalization.json"),
+            Path.Combine(current, "changes", "run.json")
         })
             if (!File.Exists(path)) throw new InvalidOperationException($"Required finalization artifact is missing: {path}");
 
@@ -141,6 +148,11 @@ public sealed class FinalizeHandler
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(current, "factory-result.json")));
         if (!document.RootElement.TryGetProperty("factoryOutcome", out var outcome) || outcome.GetString() != "COMPLETED")
             throw new InvalidOperationException("Prepared factory-result.json is invalid.");
+
+        using var completed = JsonDocument.Parse(File.ReadAllText(Path.Combine(current, "completed-work.json")));
+        if (!completed.RootElement.TryGetProperty("schemaVersion", out var schema)
+            || schema.GetInt32() != 2)
+            throw new InvalidOperationException("Prepared completed-work.json is invalid.");
     }
 
     private static bool IsSafeDirectoryName(string value) =>
