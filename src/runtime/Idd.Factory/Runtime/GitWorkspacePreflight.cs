@@ -74,17 +74,16 @@ internal sealed class GitWorkspacePreflight(IProcessExecutor? executor = null)
         return result.CompletionReason == ProcessCompletionReason.Exited && result.ExitCode == 0;
     }
 
-    private static bool SamePath(string left, string right)
-    {
-        var normalizedLeft = NormalizePath(left);
-        var normalizedRight = NormalizePath(right);
-        return string.Equals(
-            normalizedLeft,
-            normalizedRight,
-            OperatingSystem.IsWindows()
-                ? StringComparison.OrdinalIgnoreCase
-                : StringComparison.Ordinal);
-    }
+    private static bool SamePath(string left, string right) =>
+        string.Equals(
+            NormalizePath(left),
+            NormalizePath(right),
+            FileSystemPathComparison);
+
+    private static StringComparison FileSystemPathComparison =>
+        OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
 
     private static string NormalizePath(string path) =>
         Path.GetFullPath(path)
