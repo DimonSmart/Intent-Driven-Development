@@ -14,6 +14,10 @@ public sealed class FactoryStateValidator
         if (state.PlannedThroughCompletedCount > state.Completed.Count) throw Error("Planning cannot include completed work that does not exist.");
         if ((state.Current is null) != (state.CurrentPhase is null)) throw Error("Current and CurrentPhase must be set or cleared together.");
 
+        ValidateChangeSetSummary(state.RunChanges, "run");
+        foreach (var completed in state.Completed)
+            ValidateChangeSetSummary(completed.Changes, $"completed work {completed.Id}");
+
         var active = new[] { state.Current }.Where(x => x is not null).Concat(state.Remaining).Select(x => x!).ToArray();
         if (active.Any(x => x.SemanticAttemptCount < 0
                             || x.TechnicalRestartCount < 0
@@ -27,6 +31,12 @@ public sealed class FactoryStateValidator
             && state.CurrentAttemptId is not null
             && current.CurrentAttemptId != state.CurrentAttemptId)
             throw Error("Current work-item attempt identity must match Factory attempt identity.");
+        foreach (var item in active)
+        {
+            ValidateChangeSetSummary(item.Changes, $"work item {item.Id}");
+            foreach (var failure in item.PriorTechnicalFailures)
+                ValidateChangeSetSummary(failure.Changes, $"technical failure {failure.FailedAttemptId}");
+        }
 
         var all = state.Completed.Select(x => (
                 Id: x.Id,
@@ -55,7 +65,11 @@ public sealed class FactoryStateValidator
         if (state.CurrentAttemptId is not null && state.Current is null && state.PendingContinuation?.Operation != SemanticOperationKind.Planning)
             throw Error("An active attempt without Current work must be planning.");
         if (state.PendingVerificationSession is { WorkItemId: not null } session && state.Current?.Id != session.WorkItemId) throw Error("Subtask verification must target Current work.");
-        if (state.PendingVerificationSession is { } verificationSession) ValidateVerificationSession(verificationSession);
+        if (state.PendingVerificationSession is { } verificationSession)
+        {
+            ValidateVerificationSession(verificationSession);
+            ValidateChangeSetSummary(verificationSession.Changes, "pending verification");
+        }
         if (state.FinalVerificationPassed && state.FinalVerificationPlanRevision is null) throw Error("Passed final verification requires its plan revision.");
         if (state.FinalVerificationPlanRevision < 0) throw Error("Final evidence revisions cannot be negative.");
         if (state.FinalVerificationPlanRevision > state.PlanRevision) throw Error("Final evidence cannot target a future plan revision.");
@@ -116,6 +130,53 @@ public sealed class FactoryStateValidator
         {
             throw Error("Verification execute stage cannot retain pending-check metadata.");
         }
+    }
+
+    private static void ValidateChangeSetSummary(ChangeSetSummary? summary, string owner)
+    {
+        if (summary is null)
+            return;
+        if (summary.Count < 0)
+            throw Error($"Change-set count for {owner} cannot be negative.");
+        if (summary.Preview.Count > 50 || summary.Preview.Count > summary.Count)
+            throw Error($"Change-set preview for {owner} is not bounded by its count and the 50-path limit.");
+        ValidateArtifactReference(summary.Reference, owner);
+
+        string? previous = null;
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var path in summary.Preview)
+        {
+            var canonical = CanonicalRelativePath(path, $"change-set preview for {owner}");
+            if (!string.Equals(path, canonical, StringComparison.Ordinal))
+                throw Error($"Change-set preview for {owner} contains non-canonical path '{path}'.");
+            if (!seen.Add(path))
+                throw Error($"Change-set preview for {owner} contains duplicate path '{path}'.");
+            if (previous is not null && StringComparer.Ordinal.Compare(previous, path) >= 0)
+                throw Error($"Change-set preview for {owner} must be ordinal-sorted.");
+            previous = path;
+        }
+    }
+
+    private static void ValidateArtifactReference(string reference, string owner)
+    {
+        var canonical = CanonicalRelativePath(reference, $"change-set reference for {owner}");
+        if (!string.Equals(reference, canonical, StringComparison.Ordinal))
+            throw Error($"Change-set reference for {owner} must use canonical '/' separators.");
+    }
+
+    private static string CanonicalRelativePath(string path, string label)
+    {
+        if (string.IsNullOrWhiteSpace(path)
+            || Path.IsPathRooted(path)
+            || path.Contains('\\'))
+            throw Error($"Invalid {label} '{path}'.");
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0 || segments.Any(segment => segment is "." or ".."))
+            throw Error($"Invalid {label} '{path}'.");
+        var canonical = string.Join('/', segments);
+        if (canonical.Length >= 2 && char.IsLetter(canonical[0]) && canonical[1] == ':')
+            throw Error($"Invalid {label} '{path}'.");
+        return canonical;
     }
 
     private static void ValidateTaskRelatedIntentIds(string workItemId, IReadOnlyList<string> ids)
