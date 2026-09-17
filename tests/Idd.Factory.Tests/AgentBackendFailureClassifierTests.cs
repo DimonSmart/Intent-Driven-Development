@@ -21,9 +21,11 @@ public sealed class AgentBackendFailureClassifierTests
 
     [Theory]
     [InlineData("HTTP 429 / Too Many Requests", "AGENT_RATE_LIMITED")]
+    [InlineData("HTTP 429", "AGENT_RATE_LIMITED")]
     [InlineData("rate limit exceeded", "AGENT_RATE_LIMITED")]
     [InlineData("login required", "AGENT_AUTHENTICATION_REQUIRED")]
     [InlineData("401 Unauthorized", "AGENT_AUTHENTICATION_REQUIRED")]
+    [InlineData("HTTP 401", "AGENT_AUTHENTICATION_REQUIRED")]
     [InlineData("403 Forbidden", "AGENT_TRANSPORT_FAILURE")]
     [InlineData("unexpected backend error", "AGENT_TRANSPORT_FAILURE")]
     public void StderrClassificationIsConservative(string stderr, string expectedCode)
@@ -38,7 +40,7 @@ public sealed class AgentBackendFailureClassifierTests
     public void ArbitraryStdoutWordsDoNotCreateExternalBlocker()
     {
         var diagnostic = AgentBackendFailureClassifier.Classify(
-            Failure(stdout: "The task text mentions 429, quota, authentication and limit as examples."));
+            Failure(stdout: "The task text mentions HTTP 429, quota, authentication and limit as examples."));
 
         Assert.Equal("AGENT_TRANSPORT_FAILURE", diagnostic.FailureCode);
         Assert.Equal("stdout", diagnostic.Source);
@@ -85,6 +87,66 @@ public sealed class AgentBackendFailureClassifierTests
         Assert.Equal("You've hit your usage limit", diagnostic.HumanReadableMessage);
         var json = await File.ReadAllTextAsync(diagnosticPath);
         Assert.DoesNotContain("turn.failed", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RecoveryReconstructsStructuredDiagnosticWhenArtifactIsMissing()
+    {
+        using var workspace = new TestWorkspace();
+        var attemptDirectory = Path.Combine(workspace.Path, "attempts", "A000001");
+        Directory.CreateDirectory(attemptDirectory);
+        var process = Failure();
+        await File.WriteAllTextAsync(
+            Path.Combine(attemptDirectory, "process-telemetry.json"),
+            JsonSerializer.Serialize(process, FactoryJson.Options));
+        await File.WriteAllTextAsync(
+            Path.Combine(attemptDirectory, "stdout.log"),
+            "{\"type\":\"turn.failed\",\"error\":{\"message\":\"You've hit your usage limit\"}}\n");
+        await File.WriteAllTextAsync(Path.Combine(attemptDirectory, "stderr.log"), "");
+
+        var recovered = await AgentFailureDiagnosticStore.ReadOrRecoverAsync(
+            "A000001",
+            attemptDirectory,
+            default);
+
+        Assert.NotNull(recovered);
+        Assert.Equal("AGENT_CAPACITY_UNAVAILABLE", recovered!.FailureCode);
+        Assert.Equal("structured-agent-event", recovered.Source);
+        Assert.True(File.Exists(Path.Combine(attemptDirectory, "failure-diagnostic.json")));
+        var repeated = await AgentFailureDiagnosticStore.ReadOrRecoverAsync(
+            "A000001",
+            attemptDirectory,
+            default);
+        Assert.Equal(recovered, repeated);
+    }
+
+    [Fact]
+    public async Task RecoveryDoesNotInventFailureForCleanExit()
+    {
+        using var workspace = new TestWorkspace();
+        var attemptDirectory = Path.Combine(workspace.Path, "attempts", "A000001");
+        Directory.CreateDirectory(attemptDirectory);
+        var process = new AgentProcessResult(
+            0,
+            "",
+            "",
+            false,
+            false,
+            AgentTerminationKind.CleanExit);
+        await File.WriteAllTextAsync(
+            Path.Combine(attemptDirectory, "process-telemetry.json"),
+            JsonSerializer.Serialize(process, FactoryJson.Options));
+        await File.WriteAllTextAsync(
+            Path.Combine(attemptDirectory, "stdout.log"),
+            "{\"type\":\"turn.failed\",\"error\":{\"message\":\"quota exhausted\"}}\n");
+
+        var recovered = await AgentFailureDiagnosticStore.ReadOrRecoverAsync(
+            "A000001",
+            attemptDirectory,
+            default);
+
+        Assert.Null(recovered);
+        Assert.False(File.Exists(Path.Combine(attemptDirectory, "failure-diagnostic.json")));
     }
 
     [Fact]

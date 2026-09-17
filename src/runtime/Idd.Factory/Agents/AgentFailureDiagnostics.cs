@@ -60,6 +60,12 @@ internal static class AgentBackendFailureClassifier
     private static readonly Regex OpenAiStyleSecret = new(
         @"\bsk-[A-Za-z0-9_-]{12,}\b",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    private static readonly Regex Http429 = new(
+        @"(?i)\b(?:HTTP(?:/\d(?:\.\d)?)?\s+)?429\b",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    private static readonly Regex Http401 = new(
+        @"(?i)\b(?:HTTP(?:/\d(?:\.\d)?)?\s+)?401\b",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     public static AgentFailureDiagnostic Classify(AgentProcessResult process)
     {
@@ -112,8 +118,11 @@ internal static class AgentBackendFailureClassifier
             return AgentFailureCodes.CapacityUnavailable;
         }
 
-        if (ContainsAny(text, "rate limit exceeded", "rate limit reached", "too many requests"))
+        if (ContainsAny(text, "rate limit exceeded", "rate limit reached", "too many requests")
+            || signal.Source != AgentFailureDiagnosticSources.Stdout && Http429.IsMatch(text))
+        {
             return AgentFailureCodes.RateLimited;
+        }
 
         if (ContainsAny(
                 text,
@@ -125,7 +134,8 @@ internal static class AgentBackendFailureClassifier
                 "expired credential",
                 "invalid api key",
                 "expired api key",
-                "401 unauthorized"))
+                "401 unauthorized")
+            || signal.Source != AgentFailureDiagnosticSources.Stdout && Http401.IsMatch(text))
         {
             return AgentFailureCodes.AuthenticationRequired;
         }
@@ -336,7 +346,11 @@ internal static class AgentFailureDiagnosticStore
 
         if (process is null
             || process.CompleteResultObserved
-            || process.TerminationKind == AgentTerminationKind.Cancelled)
+            || process.TerminationKind == AgentTerminationKind.Cancelled
+            || process.TerminationKind is not (
+                AgentTerminationKind.CommandTimeout
+                or AgentTerminationKind.IncompleteCommand
+                or AgentTerminationKind.TransportFailure))
         {
             return null;
         }
