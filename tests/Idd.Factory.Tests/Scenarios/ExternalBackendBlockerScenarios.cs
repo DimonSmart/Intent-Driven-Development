@@ -121,6 +121,54 @@ public sealed class ExternalBackendBlockerScenarios
     }
 
     [Fact]
+    public async Task ExternalBlockerDuringSemanticRetryReplaysSameSemanticAttemptNumber()
+    {
+        const string task = "Implement A.";
+        const string retryProgressPath = "semantic-retry-recovered.txt";
+        var verificationCommand = OperatingSystem.IsWindows()
+            ? $"if (Test-Path {retryProgressPath}) {{ exit 0 }} else {{ exit 7 }}"
+            : $"test -f {retryProgressPath}";
+        using var scenario = FactoryScenario.Create();
+        scenario.WithVerificationCheck("semantic-retry-external", verificationCommand)
+            .Plan(task)
+            .Execute(task, invocation =>
+            {
+                File.WriteAllText(Path.Combine(invocation.Workspace, "initial-change.txt"), "changed");
+                return "Initial implementation changed the workspace.";
+            })
+            .CommandFailure(AgentTerminationKind.TransportFailure, "rate limit exceeded")
+            .Execute(task, invocation =>
+            {
+                Assert.Equal(WorkItemInvocationKind.SemanticRetry, invocation.InvocationKind);
+                Assert.Equal(2, invocation.SemanticAttemptNumber);
+                Assert.Equal(0, invocation.TechnicalRestartNumber);
+                File.WriteAllText(Path.Combine(invocation.Workspace, retryProgressPath), "ready");
+                return "Semantic retry resumed after the external blocker.";
+            })
+            .Done();
+
+        var blocked = await scenario.Run("Implement A and verify it.");
+
+        blocked.ShouldBeBlockedBy("AGENT_RATE_LIMITED");
+        Assert.Equal(1, blocked.State.Current!.SemanticAttemptCount);
+        Assert.Equal(0, blocked.State.Current.TechnicalRestartCount);
+        Assert.Equal(WorkItemInvocationKind.SemanticRetry, blocked.State.Current.NextInvocationKind);
+        var beforeContinue = WorkItemInvocations(blocked);
+        Assert.Equal(2, beforeContinue.Length);
+        Assert.Equal(2, beforeContinue[1].SemanticAttemptNumber);
+        Assert.Equal(WorkItemInvocationKind.SemanticRetry, beforeContinue[1].InvocationKind);
+
+        var completed = await scenario.Continue();
+
+        completed.ShouldComplete();
+        var invocations = WorkItemInvocations(completed);
+        Assert.Equal(3, invocations.Length);
+        Assert.Equal(2, invocations[2].SemanticAttemptNumber);
+        Assert.Equal(0, invocations[2].TechnicalRestartNumber);
+        Assert.Equal(WorkItemInvocationKind.SemanticRetry, invocations[2].InvocationKind);
+    }
+
+    [Fact]
     public async Task PlannerExternalFailureBlocksWithoutConsumingPlanningCycle()
     {
         const string task = "Implement A.";
