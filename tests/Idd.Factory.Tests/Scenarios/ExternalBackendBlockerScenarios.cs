@@ -199,6 +199,61 @@ public sealed class ExternalBackendBlockerScenarios
     }
 
     [Fact]
+    public async Task PersistedRecoveryReclassifiesQuotaAndDoesNotDoubleConsumeBudget()
+    {
+        const string task = "Implement A.";
+        using var scenario = FactoryScenario.Create()
+            .Plan(task)
+            .CommandFailure(AgentTerminationKind.TransportFailure, "quota exhausted")
+            .Execute(task)
+            .Done();
+
+        var liveBlock = await scenario.Run();
+        liveBlock.ShouldBeBlockedBy("AGENT_CAPACITY_UNAVAILABLE");
+        var failedInvocation = Assert.Single(WorkItemInvocations(liveBlock));
+        var diagnosticPath = Path.Combine(
+            liveBlock.RunDirectory,
+            "attempts",
+            failedInvocation.AttemptId,
+            "failure-diagnostic.json");
+        File.Delete(diagnosticPath);
+
+        var state = liveBlock.State;
+        state.RunStatus = FactoryRunStatus.Running;
+        state.Blocker = null;
+        state.CurrentPhase = CurrentWorkPhase.Running;
+        state.CurrentAttemptId = failedInvocation.AttemptId;
+        state.Current!.SemanticAttemptCount = 1;
+        state.Current.TechnicalRestartCount = 0;
+        state.Current.NextInvocationKind = WorkItemInvocationKind.Initial;
+        state.Current.CurrentInvocationKind = WorkItemInvocationKind.Initial;
+        state.Current.CurrentAttemptId = failedInvocation.AttemptId;
+        await File.WriteAllTextAsync(
+            Path.Combine(liveBlock.RunDirectory, "state.json"),
+            JsonSerializer.Serialize(state, FactoryJson.Options));
+
+        var recoveredBlock = await scenario.Continue();
+
+        recoveredBlock.ShouldBeBlockedBy("AGENT_CAPACITY_UNAVAILABLE");
+        Assert.Equal(0, recoveredBlock.State.Current!.SemanticAttemptCount);
+        Assert.Equal(0, recoveredBlock.State.Current.TechnicalRestartCount);
+        Assert.True(File.Exists(diagnosticPath));
+        Assert.Single(WorkItemInvocations(recoveredBlock));
+        var externalEvents = File.ReadAllLines(Path.Combine(recoveredBlock.RunDirectory, "events.jsonl"))
+            .Select(line => JsonDocument.Parse(line))
+            .Count(document => document.RootElement.GetProperty("type").GetString() == "agent-external-blocker");
+        Assert.Equal(1, externalEvents);
+
+        var completed = await scenario.Continue();
+
+        completed.ShouldComplete();
+        var invocations = WorkItemInvocations(completed);
+        Assert.Equal(2, invocations.Length);
+        Assert.Equal(1, invocations[1].SemanticAttemptNumber);
+        Assert.Equal(0, invocations[1].TechnicalRestartNumber);
+    }
+
+    [Fact]
     public async Task PartialWorkspaceChangesSurviveExternalBlocker()
     {
         const string task = "Implement A.";
