@@ -1,7 +1,8 @@
-using System.Text.Json;
 using Idd.Factory.Configuration;
 using Idd.Factory.Domain;
+using Idd.Factory.Persistence;
 using Idd.Factory.Runtime;
+using Idd.Factory.State;
 using Idd.Factory.Verification;
 
 namespace Idd.Factory.Tests;
@@ -157,8 +158,8 @@ internal sealed class FactoryScenario : IDisposable
     private async Task<ScenarioResult> CaptureAsync(FactoryCliOutcome outcome)
     {
         var runDirectory = outcome.ResultDirectory ?? Path.Combine(workspace.Path, ".idd", "factory", "current");
-        var state = JsonSerializer.Deserialize<FactoryState>(
-            await File.ReadAllTextAsync(Path.Combine(runDirectory, "state.json")), FactoryJson.Options)!;
+        var state = await new FileFactoryStateStore(runDirectory, new FactoryStateValidator()).LoadAsync(default)
+                    ?? throw new InvalidOperationException("Factory scenario state is missing.");
         return new ScenarioResult(outcome, state, backend.Invocations.ToArray(), runDirectory);
     }
 
