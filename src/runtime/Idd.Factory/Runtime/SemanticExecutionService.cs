@@ -12,13 +12,15 @@ internal sealed class SemanticExecutionService(
     FactoryAgentExecutor agentExecutor)
 {
     private readonly WorkspaceChangeCalculator workspaceChangeCalculator = new();
+    private readonly ExternalBackendBlockerCoordinator externalBlockerCoordinator = new(context);
 
     public Task<SemanticAttemptRecoveryResult> InspectRecoveryAsync(
         FactoryState state,
         CancellationToken cancellationToken) =>
         new SemanticAttemptReconciler(
                 context.CurrentDirectory,
-                RecoverWorkspaceChangesAsync)
+                RecoverWorkspaceChangesAsync,
+                externalBlockerCoordinator.PrepareAsync)
             .AnalyzeAsync(state, cancellationToken);
 
     public Task<SemanticExecutionResult> InvokeAsync(
@@ -177,6 +179,32 @@ internal sealed class SemanticExecutionService(
         try
         {
             execution = await agentExecutor.ExecuteAsync(invocationNew, cancellationToken);
+        }
+        catch (AgentProtocolException exception) when (
+            TechnicalFailureClassifier.Classify(
+                SemanticAttemptReconciler.ResolveOperation(invocationNew),
+                exception) == TechnicalFailureClassification.ExternalBackendBlocker)
+        {
+            var externalChangedPaths = agent.ExecutionProfile == AgentExecutionProfile.WorkspaceWrite
+                ? await RecoverWorkspaceChangesAsync(invocationNew, CancellationToken.None)
+                : [];
+            var diagnostic = exception.FailureDiagnostic
+                             ?? await AgentFailureDiagnosticStore.ReadOrRecoverAsync(
+                                 attemptId,
+                                 directory,
+                                 CancellationToken.None)
+                             ?? throw new AgentProtocolException(
+                                 "ATTEMPT_RECOVERY_UNSAFE",
+                                 $"External Agent Backend failure in {attemptId} has no normalized diagnostic.");
+            await externalBlockerCoordinator.PrepareAsync(
+                state,
+                item,
+                invocationNew,
+                diagnostic,
+                exception.DiagnosticReference ?? AgentFailureDiagnosticStore.ReferenceFor(attemptId),
+                externalChangedPaths,
+                CancellationToken.None);
+            throw;
         }
         finally
         {

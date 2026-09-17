@@ -9,7 +9,21 @@ public interface IAgentBackend
     Task CancelAsync(AgentRunHandle handle, CancellationToken cancellationToken);
 }
 
-public sealed class AgentProtocolException(string code, string message) : Exception(message)
+public sealed class AgentProtocolException : Exception
 {
-    public string Code { get; } = code;
+    public AgentProtocolException(
+        string code,
+        string message,
+        string? diagnosticReference = null,
+        AgentFailureDiagnostic? failureDiagnostic = null)
+        : base(message)
+    {
+        Code = code;
+        DiagnosticReference = diagnosticReference;
+        FailureDiagnostic = failureDiagnostic;
+    }
+
+    public string Code { get; }
+    public string? DiagnosticReference { get; }
+    public AgentFailureDiagnostic? FailureDiagnostic { get; }
 }

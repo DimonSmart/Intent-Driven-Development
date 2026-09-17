@@ -21,7 +21,8 @@ internal sealed record SemanticAttemptRecoveryResult(
 
 internal sealed class SemanticAttemptReconciler(
     string currentDirectory,
-    Func<AgentInvocation, CancellationToken, Task<IReadOnlyList<string>>> recoverWorkspaceChanges)
+    Func<AgentInvocation, CancellationToken, Task<IReadOnlyList<string>>> recoverWorkspaceChanges,
+    Func<FactoryState, PlannedWorkItem?, AgentInvocation, AgentFailureDiagnostic, string, IReadOnlyList<string>, CancellationToken, Task> prepareExternalBlocker)
 {
     public async Task<SemanticAttemptRecoveryResult> AnalyzeAsync(
         FactoryState state,
@@ -62,14 +63,15 @@ internal sealed class SemanticAttemptReconciler(
                 changedPaths);
         }
 
-        if (File.Exists(invocation.SemanticOutputPath))
-        {
-            await RecoverSemanticResultAsync(
+        var semanticOutputExists = File.Exists(invocation.SemanticOutputPath);
+        if (semanticOutputExists
+            && await TryRecoverSemanticResultAsync(
                 attemptId,
                 directory,
                 invocation,
                 resultPath,
-                cancellationToken);
+                cancellationToken))
+        {
             return new(
                 SemanticAttemptRecoveryKind.RecoverableSemanticOutput,
                 attemptId,
@@ -77,24 +79,58 @@ internal sealed class SemanticAttemptReconciler(
                 changedPaths);
         }
 
-        if (operation == SemanticOperationKind.WorkItemExecution && state.Current is { } item)
+        var failure = await AgentFailureDiagnosticStore.ReadOrRecoverAsync(
+            attemptId,
+            directory,
+            cancellationToken);
+        if (failure is not null && AgentFailureCodes.IsExternalBackendBlocker(failure.FailureCode))
         {
-            var technicalFailure = await TryReadRestartableTechnicalFailureAsync(
-                attemptId,
-                directory,
+            var diagnosticReference = AgentFailureDiagnosticStore.ReferenceFor(attemptId);
+            await prepareExternalBlocker(
+                state,
+                state.Current,
                 invocation,
+                failure,
+                diagnosticReference,
                 changedPaths,
                 cancellationToken);
-            if (technicalFailure is not null)
+            throw new AgentProtocolException(
+                failure.FailureCode,
+                failure.HumanReadableMessage,
+                diagnosticReference,
+                failure);
+        }
+
+        if (semanticOutputExists && failure is null)
+        {
+            throw new AgentProtocolException(
+                "ATTEMPT_RECOVERY_UNSAFE",
+                $"Attempt '{attemptId}' has semantic output without telemetry proving a complete trusted result or a known process failure.");
+        }
+
+        if (operation == SemanticOperationKind.WorkItemExecution && state.Current is { } item)
+        {
+            if (failure is not null
+                && TechnicalFailureClassifier.Classify(
+                    operation,
+                    new AgentProtocolException(failure.FailureCode, failure.HumanReadableMessage))
+                == TechnicalFailureClassification.RestartableTechnicalFailure)
             {
+                var diagnostic = new TechnicalFailureDiagnostic(
+                    attemptId,
+                    failure.FailureCode,
+                    AgentFailureDiagnosticStore.ReferenceFor(attemptId),
+                    failure.HumanReadableMessage,
+                    invocation.SemanticAttemptNumber!.Value,
+                    changedPaths.ToList());
                 item.NextInvocationKind = WorkItemInvocationKind.TechnicalRestart;
                 if (!item.PriorTechnicalFailures.Any(x => x.FailedAttemptId == attemptId))
-                    item.PriorTechnicalFailures.Add(technicalFailure);
+                    item.PriorTechnicalFailures.Add(diagnostic);
                 if (!item.PriorAttemptDiagnosticRefs.Contains(
-                        technicalFailure.DiagnosticReference,
+                        diagnostic.DiagnosticReference,
                         StringComparer.Ordinal))
                 {
-                    item.PriorAttemptDiagnosticRefs.Add(technicalFailure.DiagnosticReference);
+                    item.PriorAttemptDiagnosticRefs.Add(diagnostic.DiagnosticReference);
                 }
             }
             else
@@ -110,7 +146,7 @@ internal sealed class SemanticAttemptReconciler(
             changedPaths);
     }
 
-    private async Task RecoverSemanticResultAsync(
+    private async Task<bool> TryRecoverSemanticResultAsync(
         string attemptId,
         string directory,
         AgentInvocation invocation,
@@ -119,11 +155,7 @@ internal sealed class SemanticAttemptReconciler(
     {
         var telemetryPath = Path.Combine(directory, "process-telemetry.json");
         if (!File.Exists(telemetryPath))
-        {
-            throw new AgentProtocolException(
-                "ATTEMPT_RECOVERY_UNSAFE",
-                $"Attempt '{attemptId}' has semantic output but no process telemetry.");
-        }
+            return false;
 
         AgentProcessResult? process;
         try
@@ -143,9 +175,7 @@ internal sealed class SemanticAttemptReconciler(
             || !process.CompleteResultObserved
             || process.TerminationKind == AgentTerminationKind.Cancelled)
         {
-            throw new AgentProtocolException(
-                "ATTEMPT_RECOVERY_UNSAFE",
-                $"Attempt '{attemptId}' does not have telemetry proving that complete semantic output was observed.");
+            return false;
         }
 
         var semantic = await File.ReadAllTextAsync(invocation.SemanticOutputPath, cancellationToken);
@@ -166,56 +196,7 @@ internal sealed class SemanticAttemptReconciler(
             TerminationKind = process.TerminationKind
         };
         await WriteJsonAtomicallyAsync(resultPath, persisted, cancellationToken);
-    }
-
-    private async Task<TechnicalFailureDiagnostic?> TryReadRestartableTechnicalFailureAsync(
-        string attemptId,
-        string directory,
-        AgentInvocation invocation,
-        IReadOnlyList<string> changedPaths,
-        CancellationToken cancellationToken)
-    {
-        var telemetryPath = Path.Combine(directory, "process-telemetry.json");
-        if (!File.Exists(telemetryPath))
-            return null;
-
-        AgentProcessResult? process;
-        try
-        {
-            process = JsonSerializer.Deserialize<AgentProcessResult>(
-                await File.ReadAllTextAsync(telemetryPath, cancellationToken),
-                FactoryJson.Options);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-
-        if (process is null || process.CompleteResultObserved)
-            return null;
-
-        var failureCode = process.TerminationKind switch
-        {
-            AgentTerminationKind.CommandTimeout => "AGENT_COMMAND_TIMEOUT",
-            AgentTerminationKind.IncompleteCommand => "AGENT_COMMAND_INCOMPLETE",
-            AgentTerminationKind.TransportFailure => "AGENT_TRANSPORT_FAILURE",
-            _ => null
-        };
-        if (failureCode is null)
-            return null;
-
-        var diagnosticReference = $"attempts/{attemptId}/stderr.log";
-        var diagnosticPath = Path.Combine(currentDirectory, diagnosticReference.Replace('/', Path.DirectorySeparatorChar));
-        var message = File.Exists(diagnosticPath)
-            ? BoundDiagnostic(await File.ReadAllTextAsync(diagnosticPath, cancellationToken))
-            : $"Recovered {failureCode} from persisted process telemetry.";
-        return new(
-            attemptId,
-            failureCode,
-            diagnosticReference,
-            message,
-            invocation.SemanticAttemptNumber!.Value,
-            changedPaths.ToList());
+        return true;
     }
 
     internal static SemanticOperationKind ResolveOperation(AgentInvocation invocation) =>
@@ -296,15 +277,6 @@ internal sealed class SemanticAttemptReconciler(
                     $"Persisted attempt {attemptId} points to semantic output outside its exact attempt directory.");
             }
         }
-    }
-
-    private static string BoundDiagnostic(string value)
-    {
-        const int maximumLength = 4096;
-        var trimmed = value.Trim();
-        return trimmed.Length <= maximumLength
-            ? trimmed
-            : trimmed[..maximumLength] + " [truncated]";
     }
 
     private static bool SamePath(string left, string right) =>

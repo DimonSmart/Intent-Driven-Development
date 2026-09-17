@@ -37,6 +37,17 @@ internal sealed class PlanningService(
                 "Planning requires an exhausted batch.");
         }
 
+        if (state.CurrentAttemptId is null
+            && state.PendingContinuation is
+            {
+                Kind: ContinuationKind.SemanticInvocation,
+                Operation: SemanticOperationKind.Planning,
+                OperationInput: not null
+            } pending)
+        {
+            return new(pending.OperationInput, null);
+        }
+
         if (state.PlanningCycleCount >= context.Configuration.Limits.MaxPlanningCycles)
         {
             return new(
