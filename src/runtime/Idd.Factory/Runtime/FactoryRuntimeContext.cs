@@ -38,10 +38,14 @@ internal sealed class FactoryRuntimeContext(
             throw new AgentProtocolException("WORK_EXPANSION_BUDGET_EXHAUSTED", "Factory work exceeds the configured maximum.");
     }
 
-    public FactoryState CloneState(FactoryState state) =>
-        JsonSerializer.Deserialize<FactoryState>(
+    public FactoryState CloneState(FactoryState state)
+    {
+        var clone = JsonSerializer.Deserialize<FactoryState>(
             JsonSerializer.Serialize(state, FactoryJson.Options),
             FactoryJson.Options)!;
+        CopyTransientChangeSets(state, clone);
+        return clone;
+    }
 
     public static void ApplyCandidate(FactoryState state, FactoryState candidate)
     {
@@ -86,5 +90,57 @@ internal sealed class FactoryRuntimeContext(
         var temporary = path + ".tmp";
         await File.WriteAllTextAsync(temporary, content, cancellationToken);
         File.Move(temporary, path, true);
+    }
+
+    private static void CopyTransientChangeSets(FactoryState source, FactoryState target)
+    {
+        target.FactoryRunChangedPaths.Clear();
+        target.FactoryRunChangedPaths.AddRange(source.FactoryRunChangedPaths);
+
+        var sourceCompleted = source.Completed.ToDictionary(item => item.Id, StringComparer.Ordinal);
+        foreach (var item in target.Completed)
+        {
+            if (sourceCompleted.TryGetValue(item.Id, out var original))
+                CopyPaths(original.ChangedPaths, item.ChangedPaths);
+        }
+
+        if (source.Current is { } sourceCurrent && target.Current is { } targetCurrent)
+        {
+            CopyPaths(sourceCurrent.ChangedPaths, targetCurrent.ChangedPaths);
+            CopyFailurePaths(sourceCurrent, targetCurrent);
+        }
+
+        var sourceRemaining = source.Remaining.ToDictionary(item => item.Id, StringComparer.Ordinal);
+        foreach (var item in target.Remaining)
+        {
+            if (!sourceRemaining.TryGetValue(item.Id, out var original))
+                continue;
+            CopyPaths(original.ChangedPaths, item.ChangedPaths);
+            CopyFailurePaths(original, item);
+        }
+
+        if (source.PendingVerificationSession is { } sourceSession
+            && target.PendingVerificationSession is { } targetSession)
+        {
+            CopyPaths(sourceSession.ChangedPaths, targetSession.ChangedPaths);
+        }
+    }
+
+    private static void CopyFailurePaths(PlannedWorkItem source, PlannedWorkItem target)
+    {
+        var failures = source.PriorTechnicalFailures.ToDictionary(
+            failure => failure.FailedAttemptId,
+            StringComparer.Ordinal);
+        foreach (var targetFailure in target.PriorTechnicalFailures)
+        {
+            if (failures.TryGetValue(targetFailure.FailedAttemptId, out var sourceFailure))
+                CopyPaths(sourceFailure.ChangedPaths, targetFailure.ChangedPaths);
+        }
+    }
+
+    private static void CopyPaths(IReadOnlyCollection<string> source, List<string> target)
+    {
+        target.Clear();
+        target.AddRange(source);
     }
 }
