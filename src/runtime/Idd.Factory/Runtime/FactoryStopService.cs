@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Idd.Factory.Agents;
 using Idd.Factory.Domain;
 
 namespace Idd.Factory.Runtime;
@@ -32,6 +33,33 @@ internal sealed class FactoryStopService(FactoryRuntimeContext context)
         FactoryState state,
         AgentProtocolException exception)
     {
+        if (AgentFailureCodes.IsExternalBackendBlocker(exception.Code))
+        {
+            var continuation = state.PendingContinuation is
+                {
+                    Kind: ContinuationKind.SemanticInvocation,
+                    IsResumable: true
+                } pending
+                ? pending
+                : new(
+                    ContinuationKind.Terminal,
+                    state.Current?.Id,
+                    null,
+                    exception.Code,
+                    false);
+            var payload = state.Blocker?.Code == exception.Code
+                ? state.Blocker.Payload
+                : null;
+            return new(
+                exception.Code,
+                exception.FailureDiagnostic?.HumanReadableMessage ?? exception.Message,
+                continuation.IsResumable
+                    ? "Resolve the external Agent Backend condition, then use factory_continue."
+                    : "The interrupted semantic operation cannot be replayed safely; inspect the run before replacing it.",
+                continuation,
+                payload);
+        }
+
         if (exception.Code == "TECHNICAL_RESTART_BUDGET_EXHAUSTED")
             return TechnicalRestartBudgetExhausted(state, exception);
 

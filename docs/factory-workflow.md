@@ -169,8 +169,23 @@ cumulative `TechnicalRestartCount` consumes the independent
 `TECHNICAL_RESTART_BUDGET_EXHAUSTED`. Arbitrary protocol failures are not
 automatically Technical Restarts.
 
+An explicit Agent Backend quota, rate-limit, or authentication failure is an
+**External Backend Blocker**, not a Semantic Retry or Technical Restart. Runtime
+classifies these failures deterministically as `AGENT_CAPACITY_UNAVAILABLE`,
+`AGENT_RATE_LIMITED`, or `AGENT_AUTHENTICATION_REQUIRED`, stops the run in a
+resumable `Blocked` state, and preserves the exact pending semantic operation.
+The failed physical invocation keeps its unique `AttemptId`, but it consumes
+neither semantic-attempt nor technical-restart budget. After the external
+condition is resolved, `factory_continue` creates a new physical `AttemptId` and
+replays the persisted `OperationInput` with the same logical semantic-attempt and
+technical-restart numbers. No planner call is inserted around an interrupted
+executor invocation, and an interrupted planning invocation does not consume a
+planning cycle.
+
 Both Semantic Retry and Technical Restart preserve exactly the same ordered
-`TaskRelatedIntentIds`; neither invokes the planner to reconsider relevance.
+`TaskRelatedIntentIds`; an External Backend Blocker does as well. None of these
+mechanisms invokes the planner to reconsider intent relevance for an existing
+work item.
 
 After the batch is exhausted, planning always runs again. A validated exact
 `# Done` is mechanically mapped to the existing empty-batch representation and
@@ -187,11 +202,30 @@ planning question/answer artifacts remain separate human-readable artifacts.
 `result.json` stores only runtime-owned provenance pointing to semantic
 artifacts.
 
+Failed Agent Backend invocations additionally persist bounded normalized
+`attempts/<AttemptId>/failure-diagnostic.json`. It records the Factory failure
+code, primary human-readable diagnostic, exit code, termination kind, and the
+source used for classification. Raw `stdout.log` and `stderr.log` remain raw
+backend logs and are never populated with synthetic Factory diagnostics.
+Structured backend events are preferred over `stderr`; bounded `stdout` is only
+a fallback for a failed backend invocation. The classifier is conservative and
+runtime-owned; arbitrary agent prose is not treated as a quota/rate/auth signal.
+
 Recovery resumes the exact persisted planning, execution, verification, or
 user-question continuation. It never asks an LLM to reconstruct related-intent
 references, and retry never reruns semantic relevance selection for an existing
 work item. Later planning cycles may select different intent for newly created
 tasks; existing task definitions and completed history remain immutable.
+
+Live failure handling and persisted recovery use the same normalized backend
+failure model. If a process crash leaves `process-telemetry.json` and raw logs
+but occurs before `failure-diagnostic.json` is written, recovery reconstructs the
+same classification and writes the normalized artifact. External-blocker budget
+rollback and event recording are idempotent for the physical `AttemptId`, so
+recovery cannot consume a retry slot twice or create duplicate blocker events.
+Partial workspace changes discovered for a failed executor invocation remain
+part of the work item and run; continuation operates on the actual current
+workspace rather than reverting product changes automatically.
 
 An explicit run-level restart is different from continuation. The launcher first
 resolves one complete replacement request and completes replacement-run Intent
@@ -201,19 +235,22 @@ existing run and starts the replacement. `factory_cancel` instead archives the
 existing run without starting a replacement; it is not a prerequisite for
 `factory_restart`.
 
-Factory state schema 14 persists separate `SemanticAttemptCount`,
+Factory state schema 15 persists separate `SemanticAttemptCount`,
 `TechnicalRestartCount`, `AdditionalSemanticAttemptBudget`, and the exact
 `NextInvocationKind` (`Initial`, `SemanticRetry`, or `TechnicalRestart`) in
-addition to related-intent metadata. This reason is saved before a replacement
-executor starts, so process recovery cannot reinterpret a scheduled Technical
-Restart as a Semantic Retry. Active older-schema runs surface
-`LEGACY_FACTORY_STATE`; cross-version continuation is unavailable without an
-explicit migration for the exact source schema. An explicit restart uses the
-same `factory_restart` replacement path as a supported active run, while an
-explicit cancellation uses `factory_cancel`. No implicit migration or semantic
-interpretation of obsolete legacy state is introduced.
+addition to related-intent metadata. External backend pause/replay reuses the
+existing `PendingContinuation`, `Operation`, and `OperationInput` state rather
+than adding another persisted semantic-state concept. The invocation reason is
+saved before a replacement executor starts, so process recovery cannot
+reinterpret a scheduled Technical Restart as a Semantic Retry. Active
+older-schema runs surface `LEGACY_FACTORY_STATE`; cross-version continuation is
+unavailable without an explicit migration for the exact source schema. An
+explicit restart uses the same `factory_restart` replacement path as a supported
+active run, while an explicit cancellation uses `factory_cancel`. No implicit
+migration or semantic interpretation of obsolete legacy state is introduced.
 
 Persisted planner output is validated under the current protocol, so an exact
 `# Done` may resume normally while a persisted blank result is malformed.
 Runtime budgets independently bound planning cycles, total work items, semantic
-attempts per task, and technical restarts per task.
+attempts per task, and technical restarts per task. External backend blockers do
+not spend those semantic or restart budgets.

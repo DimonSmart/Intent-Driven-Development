@@ -1,4 +1,5 @@
 using System.Text;
+using Idd.Factory.Agents;
 using Idd.Factory.Domain;
 
 namespace Idd.Factory.Runtime;
@@ -20,8 +21,6 @@ internal sealed class ExecutionService(
     FactoryRuntimeContext context,
     FactoryContextReader contextReader)
 {
-    private static readonly UTF8Encoding HumanReadableUtf8 =
-        new(encoderShouldEmitUTF8Identifier: true, throwOnInvalidBytes: true);
     private readonly IntentDocumentResolver intentResolver = new(context.Workspace);
 
     public async Task<FactoryExecutionPreparation> PrepareAsync(
@@ -37,6 +36,22 @@ internal sealed class ExecutionService(
             throw new AgentProtocolException(
                 "INVALID_DISPATCH",
                 $"Work item {workItemId} is not Current executable work.");
+        }
+
+        if (state.CurrentAttemptId is null
+            && state.PendingContinuation is
+            {
+                Kind: ContinuationKind.SemanticInvocation,
+                Operation: SemanticOperationKind.WorkItemExecution,
+                OperationInput: not null
+            } pending
+            && pending.WorkItemId == item.Id)
+        {
+            return new(
+                FactoryExecutionResultKind.Ready,
+                item.Id,
+                pending.OperationInput,
+                item.LastVerificationDecision == VerificationDecision.UnexpectedFailure);
         }
 
         var reusable = state.CurrentAttemptId is { } attempt
@@ -76,26 +91,18 @@ internal sealed class ExecutionService(
             item.LastVerificationDecision == VerificationDecision.UnexpectedFailure);
     }
 
-    public async Task<string> PersistCommandFailureDiagnosticAsync(
+    public Task<string> PersistCommandFailureDiagnosticAsync(
         string attemptId,
         AgentProtocolException exception,
         CancellationToken cancellationToken)
     {
-        var diagnosticReference = $"attempts/{attemptId}/stderr.log";
-        var diagnosticPath = Path.Combine(
-            context.CurrentDirectory,
-            diagnosticReference.Replace('/', Path.DirectorySeparatorChar));
-        if (!File.Exists(diagnosticPath))
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(diagnosticPath)!);
-            await File.WriteAllTextAsync(
-                diagnosticPath,
-                exception.Message,
-                HumanReadableUtf8,
-                cancellationToken);
-        }
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!string.IsNullOrWhiteSpace(exception.DiagnosticReference))
+            return Task.FromResult(exception.DiagnosticReference!);
 
-        return diagnosticReference;
+        throw new AgentProtocolException(
+            "ATTEMPT_RECOVERY_UNSAFE",
+            $"Technical failure {exception.Code} in {attemptId} has no normalized failure diagnostic.");
     }
 
     public int AvailableAdditionalAttempts(PlannedWorkItem item) =>

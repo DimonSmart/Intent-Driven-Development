@@ -1,3 +1,4 @@
+using Idd.Factory.Agents;
 using Idd.Factory.Domain;
 
 namespace Idd.Factory.Runtime;
@@ -5,6 +6,7 @@ namespace Idd.Factory.Runtime;
 internal enum TechnicalFailureClassification
 {
     RestartableTechnicalFailure,
+    ExternalBackendBlocker,
     TerminalTechnicalFailure,
     OtherProtocolFailure
 }
@@ -15,14 +17,17 @@ internal static class TechnicalFailureClassifier
         SemanticOperationKind operation,
         AgentProtocolException exception)
     {
+        if (AgentFailureCodes.IsExternalBackendBlocker(exception.Code))
+            return TechnicalFailureClassification.ExternalBackendBlocker;
+
         if (operation != SemanticOperationKind.WorkItemExecution)
             return TechnicalFailureClassification.OtherProtocolFailure;
 
         return exception.Code switch
         {
-            "AGENT_COMMAND_TIMEOUT" => TechnicalFailureClassification.RestartableTechnicalFailure,
-            "AGENT_COMMAND_INCOMPLETE" => TechnicalFailureClassification.RestartableTechnicalFailure,
-            "AGENT_TRANSPORT_FAILURE" => TechnicalFailureClassification.RestartableTechnicalFailure,
+            AgentFailureCodes.CommandTimeout => TechnicalFailureClassification.RestartableTechnicalFailure,
+            AgentFailureCodes.CommandIncomplete => TechnicalFailureClassification.RestartableTechnicalFailure,
+            AgentFailureCodes.TransportFailure => TechnicalFailureClassification.RestartableTechnicalFailure,
             _ => TechnicalFailureClassification.OtherProtocolFailure
         };
     }
