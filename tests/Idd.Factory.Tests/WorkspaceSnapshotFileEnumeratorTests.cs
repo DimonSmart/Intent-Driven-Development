@@ -41,39 +41,35 @@ public sealed class WorkspaceSnapshotFileEnumeratorTests
     }
 
     [Fact]
-    public async Task NonGitFallbackExcludesVisualStudioWorkspaceDirectory()
+    public async Task NonGitWorkspaceFailsInsteadOfUsingFilesystemFallback()
     {
         using var temp = new TestWorkspace();
         temp.Write("visible.txt", "visible");
-        temp.Write(".vs/session.bin", "ignored");
 
-        var files = await WorkspaceSnapshotFileEnumerator.EnumerateAsync(temp.Path, default);
-        var relative = RelativePaths(temp.Path, files);
+        var error = await Assert.ThrowsAsync<FactoryStateException>(() =>
+            WorkspaceSnapshotFileEnumerator.EnumerateAsync(temp.Path, default));
 
-        Assert.Contains("visible.txt", relative);
-        Assert.DoesNotContain(".vs/session.bin", relative);
+        Assert.Equal("WORKSPACE_TRACKING_FAILED", error.Code);
     }
 
     [Fact]
-    public async Task TimedOutGitEnumerationFallsBackToManagedEnumeration()
+    public async Task TimedOutGitEnumerationFailsInsteadOfUsingManagedEnumeration()
     {
         using var temp = new TestWorkspace();
         temp.Write("visible.txt", "visible");
-        temp.Write(".vs/session.bin", "ignored");
         var executor = new TimedOutExecutor();
         var timeout = TimeSpan.FromMilliseconds(25);
 
-        var files = await WorkspaceSnapshotFileEnumerator.EnumerateAsync(
-            temp.Path,
-            default,
-            executor,
-            timeout);
-        var relative = RelativePaths(temp.Path, files);
+        var error = await Assert.ThrowsAsync<FactoryStateException>(() =>
+            WorkspaceSnapshotFileEnumerator.EnumerateAsync(
+                temp.Path,
+                default,
+                executor,
+                timeout));
 
+        Assert.Equal("WORKSPACE_TRACKING_FAILED", error.Code);
         Assert.Equal(timeout, executor.Request!.Timeout);
         Assert.Equal("git", executor.Request.Executable);
-        Assert.Contains("visible.txt", relative);
-        Assert.DoesNotContain(".vs/session.bin", relative);
     }
 
     private static string[] RelativePaths(string workspace, IReadOnlyList<string> files) =>
