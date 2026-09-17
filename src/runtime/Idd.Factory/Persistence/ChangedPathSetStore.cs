@@ -16,87 +16,55 @@ internal sealed class ChangedPathSetStore(string runDirectory)
         for (var index = 0; index < state.Completed.Count; index++)
         {
             var item = state.Completed[index];
-            var summary = await WriteAsync(
-                WorkItemReference(item.Id),
-                item.ChangedPaths,
-                cancellationToken);
+            var summary = await WriteAsync(WorkItemReference(item.Id), item.ChangedPaths, cancellationToken);
             state.Completed[index] = item with { Changes = summary };
         }
 
         if (state.Current is { } current)
         {
-            current.Changes = await WriteAsync(
-                WorkItemReference(current.Id),
-                current.ChangedPaths,
-                cancellationToken);
+            current.Changes = await WriteAsync(WorkItemReference(current.Id), current.ChangedPaths, cancellationToken);
             await MaterializeTechnicalFailuresAsync(current, cancellationToken);
         }
 
         foreach (var item in state.Remaining)
         {
             if (item.Changes is not null || item.ChangedPaths.Count != 0)
-            {
-                item.Changes = await WriteAsync(
-                    WorkItemReference(item.Id),
-                    item.ChangedPaths,
-                    cancellationToken);
-            }
+                item.Changes = await WriteAsync(WorkItemReference(item.Id), item.ChangedPaths, cancellationToken);
             await MaterializeTechnicalFailuresAsync(item, cancellationToken);
         }
 
-        foreach (var item in state.Completed)
-        {
-            // Completed work does not persist technical-failure history, so there is nothing
-            // additional to materialize here.
-        }
-
-        state.RunChanges = await WriteAsync(
-            "changes/run.json",
-            state.FactoryRunChangedPaths,
-            cancellationToken);
+        state.RunChanges = await WriteAsync("changes/run.json", state.FactoryRunChangedPaths, cancellationToken);
 
         if (state.PendingVerificationSession is { } session)
         {
-            var summary = session.Context == "final"
-                ? state.RunChanges
-                : state.Current?.Changes;
+            var summary = session.Context == "final" ? state.RunChanges : state.Current?.Changes;
             if (summary is null)
-            {
-                throw new FactoryStateException(
-                    "CORRUPT_FACTORY_STATE",
-                    "Pending verification has no authoritative change-set artifact.");
-            }
-
+                throw Corrupt("Pending verification has no authoritative change-set artifact.");
             state.PendingVerificationSession = session with { Changes = summary };
         }
     }
 
     public async Task HydrateStateAsync(FactoryState state, CancellationToken cancellationToken)
     {
-        state.FactoryRunChangedPaths.Clear();
-        state.FactoryRunChangedPaths.AddRange(
-            await ReadOrRebuildRunAsync(state, cancellationToken));
+        var run = await ReadOrRebuildAggregateAsync("changes/run.json", state.RunChanges, null, cancellationToken);
+        state.RunChanges = run.Summary;
+        Replace(state.FactoryRunChangedPaths, run.Paths);
 
         for (var index = 0; index < state.Completed.Count; index++)
         {
             var item = state.Completed[index];
-            var paths = await ReadOrRebuildWorkItemAsync(
-                item.Id,
-                item.Changes,
-                cancellationToken);
-            item.ChangedPaths.Clear();
-            item.ChangedPaths.AddRange(paths);
-            state.Completed[index] = item;
+            var aggregate = await ReadOrRebuildAggregateAsync(
+                WorkItemReference(item.Id), item.Changes, item.Id, cancellationToken);
+            Replace(item.ChangedPaths, aggregate.Paths);
+            state.Completed[index] = item with { Changes = aggregate.Summary };
         }
 
         if (state.Current is { } current)
         {
-            var paths = await ReadOrRebuildWorkItemAsync(
-                current.Id,
-                current.Changes,
-                cancellationToken);
-            current.ChangedPaths.Clear();
-            current.ChangedPaths.AddRange(paths);
+            var aggregate = await ReadOrRebuildAggregateAsync(
+                WorkItemReference(current.Id), current.Changes, current.Id, cancellationToken);
+            current.Changes = aggregate.Summary;
+            Replace(current.ChangedPaths, aggregate.Paths);
             await HydrateTechnicalFailuresAsync(current, cancellationToken);
         }
 
@@ -104,54 +72,47 @@ internal sealed class ChangedPathSetStore(string runDirectory)
         {
             if (item.Changes is not null)
             {
+                var expected = WorkItemReference(item.Id);
+                if (!string.Equals(item.Changes.Reference, expected, StringComparison.Ordinal))
+                    throw Corrupt($"Work item {item.Id} has unexpected change-set reference '{item.Changes.Reference}'.");
                 var paths = await ReadAndValidateAsync(item.Changes, cancellationToken);
-                item.ChangedPaths.Clear();
-                item.ChangedPaths.AddRange(paths);
+                Replace(item.ChangedPaths, paths);
             }
             await HydrateTechnicalFailuresAsync(item, cancellationToken);
         }
 
         if (state.PendingVerificationSession is { } session)
         {
-            var summary = session.Changes
-                          ?? (session.Context == "final"
-                              ? state.RunChanges
-                              : state.Current?.Changes)
-                          ?? throw new FactoryStateException(
-                              "CORRUPT_FACTORY_STATE",
-                              "Pending verification has no authoritative change-set summary.");
-            var paths = await ReadAndValidateAsync(summary, cancellationToken);
-            session.ChangedPaths.Clear();
-            session.ChangedPaths.AddRange(paths);
-            state.PendingVerificationSession = session with { Changes = summary };
+            var authoritative = session.Context == "final" ? state.RunChanges : state.Current?.Changes;
+            if (authoritative is null)
+                throw Corrupt("Pending verification has no authoritative change-set summary.");
+            if (session.Changes is not null
+                && !string.Equals(session.Changes.Reference, authoritative.Reference, StringComparison.Ordinal))
+            {
+                throw Corrupt("Pending verification references a different change-set artifact than its verification scope.");
+            }
+            var paths = await ReadAndValidateAsync(authoritative, cancellationToken);
+            Replace(session.ChangedPaths, paths);
+            state.PendingVerificationSession = session with { Changes = authoritative };
         }
     }
 
-    public async Task ValidateStateReferencesAsync(
-        FactoryState state,
-        CancellationToken cancellationToken)
+    public async Task ValidateStateReferencesAsync(FactoryState state, CancellationToken cancellationToken)
     {
         if (state.RunChanges is null)
-        {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                "Run change-set summary is missing.");
-        }
+            throw Corrupt("Run change-set summary is missing.");
+        if (!string.Equals(state.RunChanges.Reference, "changes/run.json", StringComparison.Ordinal))
+            throw Corrupt("Run change-set summary has an unexpected reference.");
         _ = await ReadAndValidateAsync(state.RunChanges, cancellationToken);
 
         foreach (var item in state.Completed)
         {
             if (item.Changes is null)
-            {
-                throw new FactoryStateException(
-                    "CORRUPT_FACTORY_STATE",
-                    $"Completed work item {item.Id} has no change-set summary.");
-            }
+                throw Corrupt($"Completed work item {item.Id} has no change-set summary.");
+            if (!string.Equals(item.Changes.Reference, WorkItemReference(item.Id), StringComparison.Ordinal))
+                throw Corrupt($"Completed work item {item.Id} has an unexpected change-set reference.");
             _ = await ReadAndValidateAsync(item.Changes, cancellationToken);
         }
-
-        if (state.PendingVerificationSession?.Changes is { } pending)
-            _ = await ReadAndValidateAsync(pending, cancellationToken);
     }
 
     public async Task<ChangeSetSummary> WriteAsync(
@@ -161,15 +122,7 @@ internal sealed class ChangedPathSetStore(string runDirectory)
     {
         reference = ValidateReference(reference);
         var changedPaths = WorkspacePathPolicy.NormalizeChangedPaths(paths).ToList();
-        var artifact = new ChangedPathSetArtifact(SchemaVersion, changedPaths);
-        var path = Resolve(reference);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var temporary = path + ".tmp";
-        await File.WriteAllTextAsync(
-            temporary,
-            JsonSerializer.Serialize(artifact, FactoryJson.Options),
-            cancellationToken);
-        File.Move(temporary, path, true);
+        await WriteArtifactAtomicallyAsync(reference, changedPaths, cancellationToken);
         return Summary(reference, changedPaths);
     }
 
@@ -178,154 +131,88 @@ internal sealed class ChangedPathSetStore(string runDirectory)
         CancellationToken cancellationToken)
     {
         var reference = ValidateReference(summary.Reference);
-        var path = Resolve(reference);
-        if (!File.Exists(path))
-        {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                $"Authoritative change-set artifact '{reference}' is missing.");
-        }
-
-        ChangedPathSetArtifact artifact;
-        try
-        {
-            artifact = JsonSerializer.Deserialize<ChangedPathSetArtifact>(
-                           await File.ReadAllTextAsync(path, cancellationToken),
-                           FactoryJson.Options)
-                       ?? throw new FactoryStateException(
-                           "CORRUPT_FACTORY_STATE",
-                           $"Authoritative change-set artifact '{reference}' is empty.");
-        }
-        catch (FactoryStateException)
-        {
-            throw;
-        }
-        catch (Exception exception) when (exception is JsonException or IOException)
-        {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                $"Cannot read authoritative change-set artifact '{reference}': {exception.Message}");
-        }
-
-        if (artifact.SchemaVersion != SchemaVersion)
-        {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                $"Authoritative change-set artifact '{reference}' has unsupported schema {artifact.SchemaVersion}.");
-        }
-
-        var normalized = WorkspacePathPolicy.NormalizeChangedPaths(artifact.ChangedPaths);
-        if (!normalized.SequenceEqual(artifact.ChangedPaths, StringComparer.Ordinal))
-        {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                $"Authoritative change-set artifact '{reference}' is not canonical, distinct, and sorted.");
-        }
-        if (summary.Count != artifact.ChangedPaths.Count)
-        {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                $"Change-set summary count for '{reference}' does not match its artifact.");
-        }
-        var expectedPreview = artifact.ChangedPaths.Take(PreviewLimit).ToArray();
-        if (!expectedPreview.SequenceEqual(summary.Preview, StringComparer.Ordinal))
-        {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                $"Change-set summary preview for '{reference}' does not match its artifact.");
-        }
-
-        return artifact.ChangedPaths;
+        var paths = await ReadArtifactAsync(reference, cancellationToken, "change-set");
+        if (summary.Count != paths.Count)
+            throw Corrupt($"Change-set summary count for '{reference}' does not match its artifact.");
+        if (!paths.Take(PreviewLimit).SequenceEqual(summary.Preview, StringComparer.Ordinal))
+            throw Corrupt($"Change-set summary preview for '{reference}' does not match its artifact.");
+        return paths;
     }
 
-    private async Task MaterializeTechnicalFailuresAsync(
-        PlannedWorkItem item,
+    private async Task<AggregateRead> ReadOrRebuildAggregateAsync(
+        string expectedReference,
+        ChangeSetSummary? persistedSummary,
+        string? workItemId,
         CancellationToken cancellationToken)
+    {
+        if (persistedSummary is not null
+            && !string.Equals(persistedSummary.Reference, expectedReference, StringComparison.Ordinal))
+        {
+            throw Corrupt($"Change-set summary references '{persistedSummary.Reference}' instead of '{expectedReference}'.");
+        }
+
+        if (persistedSummary is not null)
+        {
+            try
+            {
+                var paths = await ReadAndValidateAsync(persistedSummary, cancellationToken);
+                return new(paths, persistedSummary);
+            }
+            catch (FactoryStateException)
+            {
+                // Aggregates are materialized views. A crash may leave the aggregate newer than
+                // state.json or temporarily absent; immutable attempt artifacts are authoritative.
+            }
+        }
+
+        var rebuilt = await RebuildFromAttemptsAsync(workItemId, cancellationToken);
+        var summary = await WriteAsync(expectedReference, rebuilt, cancellationToken);
+        return new(rebuilt, summary);
+    }
+
+    private async Task MaterializeTechnicalFailuresAsync(PlannedWorkItem item, CancellationToken cancellationToken)
     {
         for (var index = 0; index < item.PriorTechnicalFailures.Count; index++)
         {
             var failure = item.PriorTechnicalFailures[index];
             var reference = AttemptReference(failure.FailedAttemptId);
-            ChangeSetSummary summary;
+            IReadOnlyList<string> paths;
             if (File.Exists(Resolve(reference)))
             {
-                var paths = await ReadAttemptArtifactAsync(reference, cancellationToken);
-                summary = Summary(reference, paths);
+                paths = await ReadArtifactAsync(reference, cancellationToken, "attempt change");
             }
             else
             {
-                summary = await WriteAsync(reference, failure.ChangedPaths, cancellationToken);
+                paths = WorkspacePathPolicy.NormalizeChangedPaths(failure.ChangedPaths);
+                await WriteArtifactAtomicallyAsync(reference, paths, cancellationToken);
             }
-            item.PriorTechnicalFailures[index] = failure with { Changes = summary };
+            item.PriorTechnicalFailures[index] = failure with { Changes = Summary(reference, paths) };
         }
     }
 
-    private async Task HydrateTechnicalFailuresAsync(
-        PlannedWorkItem item,
-        CancellationToken cancellationToken)
+    private async Task HydrateTechnicalFailuresAsync(PlannedWorkItem item, CancellationToken cancellationToken)
     {
         for (var index = 0; index < item.PriorTechnicalFailures.Count; index++)
         {
             var failure = item.PriorTechnicalFailures[index];
-            var summary = failure.Changes;
-            if (summary is null)
+            var reference = AttemptReference(failure.FailedAttemptId);
+            if (failure.Changes is not null
+                && !string.Equals(failure.Changes.Reference, reference, StringComparison.Ordinal))
             {
-                var reference = AttemptReference(failure.FailedAttemptId);
-                var paths = await ReadAttemptArtifactAsync(reference, cancellationToken);
-                summary = Summary(reference, paths);
+                throw Corrupt($"Technical failure {failure.FailedAttemptId} references the wrong attempt change artifact.");
             }
-            var full = await ReadAndValidateAsync(summary, cancellationToken);
-            failure.ChangedPaths.Clear();
-            failure.ChangedPaths.AddRange(full);
+
+            var paths = await ReadArtifactAsync(reference, cancellationToken, "attempt change");
+            var summary = Summary(reference, paths);
+            if (failure.Changes is not null
+                && (failure.Changes.Count != summary.Count
+                    || !failure.Changes.Preview.SequenceEqual(summary.Preview, StringComparer.Ordinal)))
+            {
+                throw Corrupt($"Technical failure {failure.FailedAttemptId} change summary does not match its immutable attempt artifact.");
+            }
+            Replace(failure.ChangedPaths, paths);
             item.PriorTechnicalFailures[index] = failure with { Changes = summary };
         }
-    }
-
-    private async Task<IReadOnlyList<string>> ReadOrRebuildWorkItemAsync(
-        string workItemId,
-        ChangeSetSummary? summary,
-        CancellationToken cancellationToken)
-    {
-        if (summary is not null)
-        {
-            try
-            {
-                return await ReadAndValidateAsync(summary, cancellationToken);
-            }
-            catch (FactoryStateException exception) when (
-                exception.Message.Contains("is missing", StringComparison.Ordinal))
-            {
-            }
-        }
-
-        var rebuilt = await RebuildFromAttemptsAsync(workItemId, cancellationToken);
-        return (await WriteAsync(
-            WorkItemReference(workItemId),
-            rebuilt,
-            cancellationToken)).Preview.Count >= 0
-            ? rebuilt
-            : rebuilt;
-    }
-
-    private async Task<IReadOnlyList<string>> ReadOrRebuildRunAsync(
-        FactoryState state,
-        CancellationToken cancellationToken)
-    {
-        if (state.RunChanges is not null)
-        {
-            try
-            {
-                return await ReadAndValidateAsync(state.RunChanges, cancellationToken);
-            }
-            catch (FactoryStateException exception) when (
-                exception.Message.Contains("is missing", StringComparison.Ordinal))
-            {
-            }
-        }
-
-        var rebuilt = await RebuildFromAttemptsAsync(null, cancellationToken);
-        state.RunChanges = await WriteAsync("changes/run.json", rebuilt, cancellationToken);
-        return rebuilt;
     }
 
     private async Task<IReadOnlyList<string>> RebuildFromAttemptsAsync(
@@ -337,8 +224,7 @@ internal sealed class ChangedPathSetStore(string runDirectory)
             return [];
 
         var union = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var directory in Directory.EnumerateDirectories(attemptsRoot)
-                     .OrderBy(path => path, StringComparer.Ordinal))
+        foreach (var directory in Directory.EnumerateDirectories(attemptsRoot).OrderBy(path => path, StringComparer.Ordinal))
         {
             var invocationPath = Path.Combine(directory, "invocation.json");
             var changesPath = Path.Combine(directory, "workspace-changes.json");
@@ -354,45 +240,39 @@ internal sealed class ChangedPathSetStore(string runDirectory)
             }
             catch (JsonException exception)
             {
-                throw new FactoryStateException(
-                    "CORRUPT_FACTORY_STATE",
-                    $"Cannot rebuild change aggregates from '{invocationPath}': {exception.Message}");
+                throw Corrupt($"Cannot rebuild change aggregates from '{invocationPath}': {exception.Message}");
             }
             if (invocation is null || invocation.ExecutionProfile != AgentExecutionProfile.WorkspaceWrite)
                 continue;
             if (workItemId is not null && invocation.WorkItemId != workItemId)
                 continue;
 
-            var reference = AttemptReference(invocation.AttemptId);
-            foreach (var path in await ReadAttemptArtifactAsync(reference, cancellationToken))
+            foreach (var path in await ReadArtifactAsync(
+                         AttemptReference(invocation.AttemptId), cancellationToken, "attempt change"))
+            {
                 union.Add(path);
+            }
         }
 
         return union.OrderBy(path => path, StringComparer.Ordinal).ToArray();
     }
 
-    private async Task<IReadOnlyList<string>> ReadAttemptArtifactAsync(
+    private async Task<IReadOnlyList<string>> ReadArtifactAsync(
         string reference,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string label)
     {
         reference = ValidateReference(reference);
         var path = Resolve(reference);
         if (!File.Exists(path))
-        {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                $"Authoritative attempt change artifact '{reference}' is missing.");
-        }
+            throw Corrupt($"Authoritative {label} artifact '{reference}' is missing.");
 
         ChangedPathSetArtifact artifact;
         try
         {
             artifact = JsonSerializer.Deserialize<ChangedPathSetArtifact>(
-                           await File.ReadAllTextAsync(path, cancellationToken),
-                           FactoryJson.Options)
-                       ?? throw new FactoryStateException(
-                           "CORRUPT_FACTORY_STATE",
-                           $"Authoritative attempt change artifact '{reference}' is empty.");
+                           await File.ReadAllTextAsync(path, cancellationToken), FactoryJson.Options)
+                       ?? throw Corrupt($"Authoritative {label} artifact '{reference}' is empty.");
         }
         catch (FactoryStateException)
         {
@@ -400,34 +280,52 @@ internal sealed class ChangedPathSetStore(string runDirectory)
         }
         catch (Exception exception) when (exception is JsonException or IOException)
         {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                $"Cannot read authoritative attempt change artifact '{reference}': {exception.Message}");
+            throw Corrupt($"Cannot read authoritative {label} artifact '{reference}': {exception.Message}");
         }
 
         if (artifact.SchemaVersion != SchemaVersion)
-        {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                $"Authoritative attempt change artifact '{reference}' has unsupported schema {artifact.SchemaVersion}.");
-        }
+            throw Corrupt($"Authoritative {label} artifact '{reference}' has unsupported schema {artifact.SchemaVersion}.");
         var normalized = WorkspacePathPolicy.NormalizeChangedPaths(artifact.ChangedPaths);
         if (!normalized.SequenceEqual(artifact.ChangedPaths, StringComparer.Ordinal))
-        {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                $"Authoritative attempt change artifact '{reference}' is not canonical, distinct, and sorted.");
-        }
+            throw Corrupt($"Authoritative {label} artifact '{reference}' is not canonical, distinct, and sorted.");
         return artifact.ChangedPaths;
     }
 
-    private static ChangeSetSummary Summary(string reference, IReadOnlyList<string> paths) =>
-        new()
+    private async Task WriteArtifactAtomicallyAsync(
+        string reference,
+        IReadOnlyList<string> changedPaths,
+        CancellationToken cancellationToken)
+    {
+        var path = Resolve(reference);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var temporary = path + ".tmp";
+        try
         {
-            Reference = reference,
-            Count = paths.Count,
-            Preview = paths.Take(PreviewLimit).ToList()
-        };
+            await File.WriteAllTextAsync(
+                temporary,
+                JsonSerializer.Serialize(new ChangedPathSetArtifact(SchemaVersion, changedPaths.ToList()), FactoryJson.Options),
+                cancellationToken);
+            File.Move(temporary, path, true);
+        }
+        finally
+        {
+            if (File.Exists(temporary))
+                File.Delete(temporary);
+        }
+    }
+
+    private static ChangeSetSummary Summary(string reference, IReadOnlyList<string> paths) => new()
+    {
+        Reference = reference,
+        Count = paths.Count,
+        Preview = paths.Take(PreviewLimit).ToList()
+    };
+
+    private static void Replace(List<string> target, IEnumerable<string> source)
+    {
+        target.Clear();
+        target.AddRange(source);
+    }
 
     private static string WorkItemReference(string id) => $"changes/{id}.json";
     private static string AttemptReference(string attemptId) => $"attempts/{attemptId}/workspace-changes.json";
@@ -435,43 +333,27 @@ internal sealed class ChangedPathSetStore(string runDirectory)
     private string Resolve(string reference)
     {
         var canonical = ValidateReference(reference);
-        var full = Path.GetFullPath(Path.Combine(
-            runDirectory,
-            canonical.Replace('/', Path.DirectorySeparatorChar)));
+        var full = Path.GetFullPath(Path.Combine(runDirectory, canonical.Replace('/', Path.DirectorySeparatorChar)));
         var root = Path.GetFullPath(runDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                    + Path.DirectorySeparatorChar;
-        var comparison = OperatingSystem.IsWindows()
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         if (!full.StartsWith(root, comparison))
-        {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                $"Change-set reference '{reference}' escapes the Factory run directory.");
-        }
+            throw Corrupt($"Change-set reference '{reference}' escapes the Factory run directory.");
         return full;
     }
 
     private static string ValidateReference(string reference)
     {
-        if (string.IsNullOrWhiteSpace(reference)
-            || Path.IsPathRooted(reference)
-            || reference.Contains('\\'))
-        {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                $"Invalid change-set reference '{reference}'.");
-        }
-
+        if (string.IsNullOrWhiteSpace(reference) || Path.IsPathRooted(reference) || reference.Contains('\\'))
+            throw Corrupt($"Invalid change-set reference '{reference}'.");
         var canonical = WorkspacePathPolicy.Canonicalize(reference);
         if (!string.Equals(reference, canonical, StringComparison.Ordinal))
-        {
-            throw new FactoryStateException(
-                "CORRUPT_FACTORY_STATE",
-                $"Invalid change-set reference '{reference}'.");
-        }
+            throw Corrupt($"Invalid change-set reference '{reference}'.");
         return canonical;
     }
 
+    private static FactoryStateException Corrupt(string message) => new("CORRUPT_FACTORY_STATE", message);
+
     private sealed record ChangedPathSetArtifact(int SchemaVersion, List<string> ChangedPaths);
+    private sealed record AggregateRead(IReadOnlyList<string> Paths, ChangeSetSummary Summary);
 }
