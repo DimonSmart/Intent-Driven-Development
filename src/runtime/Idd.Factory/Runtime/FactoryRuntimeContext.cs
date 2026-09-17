@@ -66,6 +66,7 @@ internal sealed class FactoryRuntimeContext(
         state.PendingVerificationSession = candidate.PendingVerificationSession;
         state.VerificationEvidenceRefs.Clear();
         state.VerificationEvidenceRefs.AddRange(candidate.VerificationEvidenceRefs);
+        state.RunChanges = candidate.RunChanges;
         state.FactoryRunChangedPaths.Clear();
         state.FactoryRunChangedPaths.AddRange(candidate.FactoryRunChangedPaths);
     }
