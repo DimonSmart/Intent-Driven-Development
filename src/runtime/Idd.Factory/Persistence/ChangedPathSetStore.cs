@@ -330,27 +330,11 @@ internal sealed class ChangedPathSetStore(string runDirectory)
     private static string WorkItemReference(string id) => $"changes/{id}.json";
     private static string AttemptReference(string attemptId) => $"attempts/{attemptId}/workspace-changes.json";
 
-    private string Resolve(string reference)
-    {
-        var canonical = ValidateReference(reference);
-        var full = Path.GetFullPath(Path.Combine(runDirectory, canonical.Replace('/', Path.DirectorySeparatorChar)));
-        var root = Path.GetFullPath(runDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                   + Path.DirectorySeparatorChar;
-        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        if (!full.StartsWith(root, comparison))
-            throw Corrupt($"Change-set reference '{reference}' escapes the Factory run directory.");
-        return full;
-    }
+    private string Resolve(string reference) =>
+        WorkspacePathPolicy.ResolveArtifactReference(runDirectory, reference);
 
-    private static string ValidateReference(string reference)
-    {
-        if (string.IsNullOrWhiteSpace(reference) || Path.IsPathRooted(reference) || reference.Contains('\\'))
-            throw Corrupt($"Invalid change-set reference '{reference}'.");
-        var canonical = WorkspacePathPolicy.Canonicalize(reference);
-        if (!string.Equals(reference, canonical, StringComparison.Ordinal))
-            throw Corrupt($"Invalid change-set reference '{reference}'.");
-        return canonical;
-    }
+    private static string ValidateReference(string reference) =>
+        WorkspacePathPolicy.ValidateArtifactReference(reference);
 
     private static FactoryStateException Corrupt(string message) => new("CORRUPT_FACTORY_STATE", message);
 

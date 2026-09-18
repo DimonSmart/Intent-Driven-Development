@@ -103,32 +103,31 @@ internal sealed class GitWorkspaceChangeTracker(
         var baseline = await ReadBaselineAsync(baselinePath, cancellationToken);
         await EnsureRepositoryAsync(cancellationToken);
         var currentStatus = await ReadStatusPathsAsync(cancellationToken);
-        var currentTree = await TryResolveAsync("HEAD^{tree}", cancellationToken);
-        var treePaths = await ReadTreeDiffPathsAsync(
+        var workspaceDiffPaths = await ReadWorkspaceDiffPathsAsync(
             baseline.BaselineTree,
-            currentTree,
             cancellationToken);
 
         var baselineByPath = baseline.BaselineEntries.ToDictionary(
             entry => entry.Path,
             StringComparer.Ordinal);
+        var changed = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var entry in baseline.BaselineEntries)
+        {
+            if (!await MatchesPersistedBaselineAsync(entry, cancellationToken))
+                changed.Add(entry.Path);
+        }
+
+        foreach (var path in workspaceDiffPaths)
+        {
+            if (!baselineByPath.ContainsKey(path))
+                changed.Add(path);
+        }
+
         var candidates = WorkspacePathPolicy.NormalizeChangedPaths(
             baselineByPath.Keys
                 .Concat(currentStatus.Select(candidate => candidate.Path))
-                .Concat(treePaths));
-
-        var changed = new List<string>();
-        foreach (var path in candidates)
-        {
-            var differs = baselineByPath.TryGetValue(path, out var baselineEntry)
-                ? !await MatchesPersistedBaselineAsync(baselineEntry, cancellationToken)
-                : !await MatchesCleanTrackedBaselineAsync(
-                    baseline.BaselineTree,
-                    path,
-                    cancellationToken);
-            if (differs)
-                changed.Add(path);
-        }
+                .Concat(workspaceDiffPaths));
 
         var normalizedChanges = WorkspacePathPolicy.NormalizeChangedPaths(changed).ToList();
         await WriteJsonAtomicallyAsync(
@@ -139,7 +138,7 @@ internal sealed class GitWorkspaceChangeTracker(
             normalizedChanges,
             baseline.BaselineEntries.Count,
             currentStatus.Count,
-            treePaths.Count,
+            workspaceDiffPaths.Count,
             candidates.Count,
             stopwatch.ElapsedMilliseconds,
             true);
@@ -161,36 +160,7 @@ internal sealed class GitWorkspaceChangeTracker(
                && string.Equals(current.Hash, baseline.Hash, StringComparison.Ordinal);
     }
 
-    private async Task<bool> MatchesCleanTrackedBaselineAsync(
-        string? baselineTree,
-        string path,
-        CancellationToken cancellationToken)
-    {
-        var currentExists = File.Exists(Absolute(path)) || Directory.Exists(Absolute(path));
-        if (baselineTree is null)
-            return !currentExists;
-
-        var baselineEntry = await ReadTreeEntryAsync(baselineTree, path, cancellationToken);
-        if (baselineEntry is null)
-            return !currentExists;
-        if (!currentExists)
-            return false;
-
-        if (baselineEntry.Type == "commit")
-            return Directory.Exists(Absolute(path));
-        if (baselineEntry.Type != "blob" || !File.Exists(Absolute(path)))
-            return false;
-
-        var currentBlob = await RunRequiredAsync(
-            ["hash-object", $"--path={path}", "--", path],
-            cancellationToken);
-        return string.Equals(
-            currentBlob.StandardOutput.Trim(),
-            baselineEntry.ObjectId,
-            StringComparison.Ordinal);
-    }
-
-    private async Task<FilesystemState> SnapshotFilesystemAsync(
+    private async Task<FilesystemState> SnapshotFilesystemAsync(    private async Task<FilesystemState> SnapshotFilesystemAsync(
         string canonicalPath,
         CancellationToken cancellationToken)
     {
@@ -227,7 +197,7 @@ internal sealed class GitWorkspaceChangeTracker(
             if (record.Length < 4 || record[2] != ' ')
                 throw TrackingFailure("Git returned an invalid porcelain status record.");
 
-            var canonical = WorkspacePathPolicy.Canonicalize(record[3..]);
+            var canonical = WorkspacePathPolicy.ValidateGitPath(record[3..]);
             if (WorkspacePathPolicy.IsOperationalArtifact(canonical))
                 continue;
             candidates.Add(new(canonical, record[0] == '?' && record[1] == '?'));
@@ -239,60 +209,62 @@ internal sealed class GitWorkspaceChangeTracker(
             .ToArray();
     }
 
-    private async Task<IReadOnlyList<string>> ReadTreeDiffPathsAsync(
+    private async Task<IReadOnlyList<string>> ReadWorkspaceDiffPathsAsync(
         string? baselineTree,
-        string? currentTree,
         CancellationToken cancellationToken)
     {
-        if (baselineTree is null && currentTree is null)
-            return [];
+        var temporaryRoot = Path.Combine(Path.GetTempPath(), "idd-factory-git-index");
+        Directory.CreateDirectory(temporaryRoot);
+        var indexPath = Path.Combine(temporaryRoot, $"{Guid.NewGuid():N}.index");
+        var environment = new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["GIT_INDEX_FILE"] = indexPath
+        };
 
-        ProcessExecutionResult result;
-        if (baselineTree is null)
+        try
         {
-            result = await RunRequiredAsync(
-                ["ls-tree", "-r", "--name-only", "-z", currentTree!],
-                cancellationToken);
-        }
-        else if (currentTree is null)
-        {
-            result = await RunRequiredAsync(
-                ["ls-tree", "-r", "--name-only", "-z", baselineTree],
-                cancellationToken);
-        }
-        else
-        {
-            result = await RunRequiredAsync(
-                ["diff", "--name-only", "-z", "--no-renames", baselineTree, currentTree, "--"],
-                cancellationToken);
-        }
+            if (baselineTree is null)
+            {
+                await RunRequiredAsync(
+                    ["read-tree", "--empty"],
+                    cancellationToken,
+                    environment);
+            }
+            else
+            {
+                await RunRequiredAsync(
+                    ["read-tree", "--no-sparse-checkout", baselineTree],
+                    cancellationToken,
+                    environment);
+            }
 
-        return WorkspacePathPolicy.NormalizeChangedPaths(
-            result.StandardOutput.Split('\0', StringSplitOptions.RemoveEmptyEntries));
+            await RunRequiredAsync(
+                ["-c", "core.filemode=false", "add", "-A", "--", "."],
+                cancellationToken,
+                environment);
+
+            var result = baselineTree is null
+                ? await RunRequiredAsync(
+                    ["ls-files", "-z"],
+                    cancellationToken,
+                    environment)
+                : await RunRequiredAsync(
+                    ["diff-index", "--cached", "--name-only", "-z", "--no-renames",
+                     "--ignore-submodules=all", baselineTree, "--"],
+                    cancellationToken,
+                    environment);
+
+            return WorkspacePathPolicy.NormalizeChangedPaths(
+                result.StandardOutput.Split('\0', StringSplitOptions.RemoveEmptyEntries));
+        }
+        finally
+        {
+            TryDelete(indexPath + ".lock");
+            TryDelete(indexPath);
+        }
     }
 
-    private async Task<TreeEntry?> ReadTreeEntryAsync(
-        string tree,
-        string path,
-        CancellationToken cancellationToken)
-    {
-        var result = await RunRequiredAsync(
-            ["ls-tree", "-z", tree, "--", $":(literal){path}"],
-            cancellationToken);
-        if (string.IsNullOrEmpty(result.StandardOutput))
-            return null;
-
-        var record = result.StandardOutput.TrimEnd('\0');
-        var tab = record.IndexOf('\t');
-        if (tab <= 0)
-            throw TrackingFailure("Git returned an invalid tree entry.");
-        var fields = record[..tab].Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (fields.Length != 3)
-            throw TrackingFailure("Git returned an invalid tree entry header.");
-        return new(fields[1], fields[2]);
-    }
-
-    private async Task EnsureRepositoryAsync(CancellationToken cancellationToken)
+    private async Task EnsureRepositoryAsync(    private async Task EnsureRepositoryAsync(CancellationToken cancellationToken)
     {
         var inside = await RunRequiredAsync(
             ["rev-parse", "--is-inside-work-tree"],
@@ -333,9 +305,10 @@ internal sealed class GitWorkspaceChangeTracker(
 
     private async Task<ProcessExecutionResult> RunRequiredAsync(
         IReadOnlyList<string> arguments,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string?>? environmentOverrides = null)
     {
-        var result = await RunGitAsync(arguments, cancellationToken);
+        var result = await RunGitAsync(arguments, cancellationToken, environmentOverrides);
         if (result.CompletionReason == ProcessCompletionReason.Cancelled)
             throw new OperationCanceledException(cancellationToken);
         if (result.CompletionReason != ProcessCompletionReason.Exited || result.ExitCode != 0)
@@ -351,11 +324,13 @@ internal sealed class GitWorkspaceChangeTracker(
 
     private Task<ProcessExecutionResult> RunGitAsync(
         IReadOnlyList<string> arguments,
-        CancellationToken cancellationToken) =>
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string?>? environmentOverrides = null) =>
         processExecutor.RunAsync(
             new ProcessExecutionRequest("git", arguments, workspace)
             {
-                Timeout = GitTimeout
+                Timeout = GitTimeout,
+                EnvironmentOverrides = environmentOverrides
             },
             cancellationToken);
 
@@ -438,10 +413,23 @@ internal sealed class GitWorkspaceChangeTracker(
         File.Move(temporary, path, true);
     }
 
-    private string Absolute(string canonicalPath) =>
-        Path.GetFullPath(Path.Combine(
-            workspace,
-            canonicalPath.Replace('/', Path.DirectorySeparatorChar)));
+    private string Absolute(string gitPath) =>
+        WorkspacePathPolicy.ResolveGitPath(workspace, gitPath);
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
 
     private static string NormalizeFullPath(string path) =>
         Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
@@ -451,7 +439,6 @@ internal sealed class GitWorkspaceChangeTracker(
 
     private sealed record StatusCandidate(string Path, bool IsUntracked);
     private sealed record FilesystemState(bool Exists, string? Hash);
-    private sealed record TreeEntry(string Type, string ObjectId);
     private sealed record WorkspaceBaselineEntry(string Path, string Kind, bool Exists, string? Hash);
     private sealed record WorkspaceBaselineArtifact(
         int SchemaVersion,

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Idd.Factory.Domain;
+using Idd.Factory.Runtime;
 
 namespace Idd.Factory.State;
 
@@ -146,9 +147,7 @@ public sealed class FactoryStateValidator
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var path in summary.Preview)
         {
-            var canonical = CanonicalRelativePath(path, $"change-set preview for {owner}");
-            if (!string.Equals(path, canonical, StringComparison.Ordinal))
-                throw Error($"Change-set preview for {owner} contains non-canonical path '{path}'.");
+            WorkspacePathPolicy.ValidateGitPath(path);
             if (!seen.Add(path))
                 throw Error($"Change-set preview for {owner} contains duplicate path '{path}'.");
             if (previous is not null && StringComparer.Ordinal.Compare(previous, path) >= 0)
@@ -159,27 +158,17 @@ public sealed class FactoryStateValidator
 
     private static void ValidateArtifactReference(string reference, string owner)
     {
-        var canonical = CanonicalRelativePath(reference, $"change-set reference for {owner}");
-        if (!string.Equals(reference, canonical, StringComparison.Ordinal))
-            throw Error($"Change-set reference for {owner} must use canonical '/' separators.");
+        try
+        {
+            WorkspacePathPolicy.ValidateArtifactReference(reference);
+        }
+        catch (FactoryStateException)
+        {
+            throw Error($"Invalid change-set reference for {owner} '{reference}'.");
+        }
     }
 
-    private static string CanonicalRelativePath(string path, string label)
-    {
-        if (string.IsNullOrWhiteSpace(path)
-            || Path.IsPathRooted(path)
-            || path.Contains('\\'))
-            throw Error($"Invalid {label} '{path}'.");
-        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length == 0 || segments.Any(segment => segment is "." or ".."))
-            throw Error($"Invalid {label} '{path}'.");
-        var canonical = string.Join('/', segments);
-        if (canonical.Length >= 2 && char.IsLetter(canonical[0]) && canonical[1] == ':')
-            throw Error($"Invalid {label} '{path}'.");
-        return canonical;
-    }
-
-    private static void ValidateTaskRelatedIntentIds(string workItemId, IReadOnlyList<string> ids)
+    private static void ValidateTaskRelatedIntentIds(    private static void ValidateTaskRelatedIntentIds(string workItemId, IReadOnlyList<string> ids)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var id in ids)
