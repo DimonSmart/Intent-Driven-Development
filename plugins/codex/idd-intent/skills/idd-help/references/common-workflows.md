@@ -146,9 +146,9 @@ routing or intent work.
   approval.
 - Import uses existing product knowledge as evidence and does not reconstruct
   requirements primarily from code.
-- Factory Runtime and its work items may read intent, but must not create or
-  change product intent. An end-to-end Factory launcher may complete the
-  separate Intent Preflight workflow before runtime creation.
+- Factory planners and workers may read intent, but must not create or change
+  product intent. An end-to-end Factory run completes the separate Intent
+  Preflight before native-agent orchestration starts.
 - Plans, route classifications, preservation records, discovery reports,
   confirmation transcripts, and review notes are temporary workflow evidence.
 - Obsolete ordinary specs are deleted, not archived.
@@ -403,52 +403,54 @@ product meaning; otherwise prefer the smallest focused implementation workflow.
 ## Focused and Orchestrated Execution
 
 Use focused execution when one implementation pass can safely satisfy current
-intent. Use optional `idd-factory-run` only for coordinated multi-task
-implementation, sequencing, temporary planning, or high-risk
-preservation boundaries. Factory remains optional and must not become a
-dependency of `idd-intent`.
+intent. Use optional `idd-factory-run` for coordinated multi-task
+implementation, sequencing, temporary planning, or high-risk preservation
+boundaries. Factory remains optional and must not become a dependency of
+`idd-intent`.
 
-The user's logical request defines the Factory Task. Text explicitly supplied
-through host-local pasted or attachment references is mechanically materialized
-without semantic rewriting before Factory starts. The resulting self-contained
-request is stored in `request.md`; recovery and planning must not
-depend on the temporary host attachment remaining available. The packaged .NET
-Factory Runtime owns one resumable run under `.idd/factory/current/`;
-`state.json` is authoritative and stable work-item filenames do not encode
-status. A fresh planner creates each bounded batch and fresh executors perform
-its tasks sequentially. Executors report results without controlling future
-work. Programmatic orchestration runs verification, replans after exhausted
-batches, prepares final result artifacts, and moves the
-complete run directory to `.idd/factory/results/<timestamp>_<work-slug>/`. The
-completed result preserves state, events, attempts, verification evidence,
-commit-message handoff, and other diagnostics. `.idd/factory/current/` remains
-reserved for an active or resumable run. Neither directory is product intent,
-and both are ignored by default.
-
-Before a new end-to-end Factory run, apply Intent Preflight:
+The logical request is materialized self-contained and stored in
+`.idd/factory/current/request.md`. Before a new run, apply Intent Preflight:
 
 ```text
-materialized logical request + requested scope + relevant current intent
--> Covered | ExplicitIntentChange | MissingIntentDecision | ImplementationOnly
--> optional existing intent workflow
--> semantic coverage validation
--> Factory Runtime
+logical request + requested scope + relevant current intent
+-> AlreadyCovered | ExplicitIntentChange | MissingIntentDecision | ImplementationOnly
+-> optional intent update
+-> coverage validation
+-> native-agent Factory orchestration
 ```
 
-Missing or absent documentation is not by itself a missing product decision.
-When the request explicitly and unambiguously defines changed durable behavior,
-update current intent through `idd-intent-change` and, when ownership requires
-it, `idd-intent-new-document`, then start Factory with the same self-contained
-materialized logical request. `implementation-only` scope forbids that intent
-update and must stop with `INTENT_REQUIRED` if current intent is insufficient.
+The Factory semantic loop is intentionally small:
 
-Intent preparation finishes before `.idd/factory/current/` is created. It is
-not a Factory work item and does not change the deterministic
-`Completed / Current / Remaining` scheduler.
+```text
+fresh planner
+-> current batch
+-> fresh sequential worker per task
+-> fresh planner
+```
 
-Do not start or resume Factory work when requested scope is `route-only` or
-`intent-only`. For `implementation-only`, Factory may be used only when current
-intent is already sufficient and execution is orchestrated.
+Each planner and worker receives a fresh isolated semantic context rather than
+the root transcript. Workers share the repository but do not share transcripts.
+The repository is authoritative implementation reality.
+
+Temporary continuation state is limited to the original request, remaining
+current batch, short completed summaries, exact user answers, and optional
+question/verification-failure artifacts. There is no Factory-owned workflow
+state machine, process supervisor, MCP transport, retry budget, or exact
+continuation protocol.
+
+Factory uses at-least-once execution. An interrupted task may execute again; a
+fresh worker inspects current repository reality and converges from whatever
+correct partial work already exists.
+
+When the planner returns `# Done`, run configured project verification. A
+bounded verification failure becomes input to a new fresh planner. A successful
+verification completes Factory. Planner `# Question` persists one concrete
+question and stops until the user answers; durable-intent handling remains an
+ordinary outer IDD workflow.
+
+Do not start or resume implementation when requested scope is `route-only` or
+`intent-only`. With `implementation-only`, Factory can run only when current
+intent is already sufficient.
 
 ## Preservation And Discovery Boundaries
 

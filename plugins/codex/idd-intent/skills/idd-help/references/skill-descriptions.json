@@ -124,32 +124,12 @@
     "description": "Update `.idd/intent/` product intent from confirmed implementation behavior."
   },
   "idd-factory-run": {
-    "description": "Prepare explicit durable product changes when required, then run, resume, or cancel a deterministic IDD Factory Runtime execution."
+    "description": "Prepare durable product intent when required, then orchestrate incremental planning and isolated native-agent workers using minimal temporary Factory state."
   },
   "idd-factory-decompose-task": {
-    "description": "Return all currently contractable remaining Factory work in execution order, deferring only work that needs evidence not yet available.",
-    "adapters": {
-      "claude": {
-        "frontmatter": {
-          "context": "fork",
-          "agent": "Explore",
-          "argument-hint": "[request text or file contents]",
-          "allowed-tools": ["Read", "Glob", "Grep"]
-        }
-      }
-    }
+    "description": "In a fresh planner context, return the small current batch of self-contained Factory tasks that can be contracted reliably now, one user question, or Done."
   },
   "idd-factory-execute-subtask": {
-    "description": "Execute one focused workspace-writing implementation work item in an isolated worker context.",
-    "adapters": {
-      "claude": {
-        "frontmatter": {
-          "context": "fork",
-          "agent": "general-purpose",
-          "argument-hint": "[active work-item path]",
-          "allowed-tools": ["Read", "Glob", "Grep", "Edit", "Write", "Bash"]
-        }
-      }
-    }
+    "description": "Execute one self-contained Factory task from current repository reality in a fresh isolated workspace-writing agent context."
   }
 }

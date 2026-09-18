@@ -1,131 +1,103 @@
 ---
 name: idd-factory-execute-subtask
-description: Execute one focused workspace-writing implementation work item in an isolated worker context.
+description: Execute one self-contained Factory task from current repository reality in a fresh isolated workspace-writing agent context.
 ---
 
-# idd-factory-execute-subtask
+# IDD Factory Execute Subtask
 
-## Purpose
+Execute exactly one Factory task in a fresh semantic context. You are a worker,
+not a planner or workflow controller.
 
-Execute the assigned immutable task and report what actually happened.
+## Inputs
 
-## Inputs and boundaries
+You receive:
 
-Use the supplied self-contained task contract, supplied task-related durable
-intent, planner-selected relevant completed semantic results, current repository
-state, prior results for this same task, and authoritative verification failures
-from earlier attempts.
+```text
+one self-contained Task
+optional TaskRelatedIntent IDs
+current repository access
+```
 
-The task contract defines the concrete work to perform. Supplied task-related
-durable intent is normative product input. Both constrain implementation. The
-planner has already selected the stable intent references for this work item.
-Factory has persisted those references, resolved them mechanically, and loaded
-the complete current contents of the selected documents. Correctness for
-explicitly supplied documents must not depend on rediscovering them from
-`.idd/intent`.
+Do not assume access to the parent conversation, planner transcript, or previous
+worker transcripts.
 
-The supplied relevant completed work is an explicit planner-selected subset,
-not the complete Factory history. Each supplied entry exists because the
-planner determined that its bounded semantic result is needed by this task.
-Use it as semantic context when relevant, but treat the current repository state
-as the primary source of what previous implementation actually produced. Do not
-attempt to reconstruct or request the complete completed-work history merely
-because other work items exist.
+## Resolve task-related intent
 
-You may still inspect current repository state, additional code, additional
-durable intent, or the optional glossary when a genuine implementation
-discovery makes that necessary. Do not routinely scan `.idd/intent` as a
-substitute for the task-related durable intent Factory supplied.
+For each selected `IDD-NNNN`, mechanically resolve exactly one current file:
+
+```text
+.idd/intent/IDD-NNNN.*.md
+```
+
+Read the complete current contents of those selected documents before
+implementation. Do not infer additional semantic relevance from filenames,
+keywords, embeddings, project type, or similarity.
+
+If a selected ID is missing or resolves to more than one current document, do
+not execute the task. Return a short diagnostic so Factory can stop cleanly.
+
+Do not modify `.idd/intent`, `.idd/factory/current`, or the project
+verification policy. Durable intent is prepared outside worker execution.
+
+## Work from current reality
+
+A previous execution of this task may have modified the repository partially.
+Inspect current state before editing.
+
+Complete the task from the current reality. Do not assume the task has never
+started. Do not revert correct existing work merely because it may have been
+created by an earlier interrupted execution.
+
+Aim for semantic idempotency. Factory intentionally provides at-least-once
+execution rather than exactly-once side effects.
 
 ## Repository discovery
 
-Treat ordinary repository discovery as task-scoped and Git-visible. Start from
-the task contract, supplied task-related intent, paths and names already known
-from the task, files and symbols already discovered, and the structure of the
-relevant part of the project. If the search area can be narrowed, investigate
-only that area rather than inventorying the whole workspace.
+Prefer bounded repository discovery. For Git workspaces, use:
 
-When file enumeration is needed in a Git repository, use this as the normal
-visibility model:
-
-```bash
+```text
 git ls-files --cached --others --exclude-standard
 ```
 
-This is the Git-visible workspace: tracked + untracked non-ignored files. A
-tracked file remains visible even if it later matches `.gitignore`; a new
-untracked non-ignored file is visible; an untracked ignored file is omitted; and
-a generated file that is not ignored remains visible. Do not add a separate
-notion of generated-file visibility.
+This is the tracked + untracked non-ignored view. Narrow large investigations
+with a scoped pathspec when possible.
 
-Prefer a scoped pathspec whenever the current task gives enough information to
-narrow the search, for example:
+Do not begin with broad recursive scans such as `Get-ChildItem -Recurse`,
+`find .`, or tools configured with `--no-ignore`. Ignored/generated paths are not forbidden: directly read a known ignored/generated file when the task
+requires that specific file.
 
-```bash
-git ls-files --cached --others --exclude-standard -- src tests
+## Execution
+
+Implement only the assigned task and run reasonable focused checks needed to
+establish its correctness.
+
+Do not:
+
+- create later Factory tasks;
+- decide whether the original Factory request is complete;
+- ask the planner to replan;
+- select another worker;
+- create retries, restarts, attempts, or lifecycle transitions;
+- perform Factory finalization;
+- create a separate verification workflow.
+
+If execution cannot complete, return a concise explanation. The orchestrator
+will leave this task in `plan.md`; you do not mutate Factory scheduling state.
+
+## Result
+
+Return a short semantic result containing only information potentially useful to
+the next planner or the user. For example:
+
+```text
+Completed.
+
+Implemented viewer refresh behavior.
+Relevant focused tests pass.
+
+Concern: none.
 ```
 
-`src` and `tests` are only an example, not an assumed repository layout. Choose
-pathspecs from the actual task and repository structure. Enumerating the complete
-Git-visible workspace is acceptable only when the area cannot reasonably be
-narrowed first.
-
-Do not use a broad physical recursive filesystem scan as the default way to
-understand a repository. Commands such as `Get-ChildItem -Recurse`, `find .`,
-`dir /s`, or equivalent whole-workspace scans should not be ordinary discovery.
-A narrow physical scan of a specific directory is allowed when the task gives a
-concrete reason to inspect that directory's physical contents.
-
-After identifying the relevant area, prefer focused investigation: search for a
-specific symbol or file name, use `rg` for a specific string or pattern, read
-specific files, and search within relevant directories. Do not first produce a
-large file tree when a focused search can answer the same question. Do not use
-ignore-bypassing search options such as `--no-ignore`, `-uuu`, or equivalents
-without a concrete task-related reason.
-
-Ignore semantics limit ordinary discovery; they do not prohibit access.
-Ignored/generated paths are not forbidden. When a concrete reason arises, you
-may directly read a known ignored/generated file, inspect a specific generated
-directory, or perform a narrow physical scan of that specific path. Examples
-include an explicitly named artifact, build output relevant to a failure,
-generated source named by an error, or a log/cache/intermediate artifact that a
-focused investigation made relevant. Do not expand such targeted access into a
-recursive scan of the whole workspace.
-
-If Git-visible enumeration is unavailable because the workspace is not a Git
-repository or the Git command fails, fall back to filesystem discovery, but keep
-the fallback task-scoped whenever possible. Do not replace a failed
-`git ls-files` automatically with a recursive scan of the complete workspace.
-Do not infer that a file is generated or irrelevant from directory names,
-extensions, or hardcoded generated-directory lists; semantic relevance remains
-an executor decision within the mechanical visibility rules above.
-
-Make the smallest coherent product change that satisfies the contract and its
-normative task-related intent. You may inspect focused code and run focused
-development checks. Runtime performs the authoritative verification and
-deterministically retries this same immutable task when a required check fails.
-Retries preserve the task contract, selected intent IDs, and planner-selected
-relevant-completed-work IDs; Factory reloads their current referenced artifacts
-for every invocation.
-
-Do not mutate `.idd/factory/current`, `.idd/intent`, `.idd/factory.yaml`, or the
-verification policy. Do not plan later Factory work, create tasks, choose a
-worker or capability, decide whether the original Factory request is complete,
-request replanning, or select a runtime transition.
-
-If the task exposes an unexpected prerequisite, defect, architectural
-constraint, or incomplete portion, describe that fact plainly in the semantic
-report. Do not broaden the task merely to hide the discovery. Runtime will
-finish the current batch, and the next planner will decide whether new work is
-needed.
-
-## Output
-
-Return concise but complete human-readable Markdown describing what was
-actually done, discovered, or left unresolved. Use the natural structure that
-best fits this task; no fixed sections or fields are required.
-
-Do not return JSON or an orchestration outcome. In particular, do not return
-`completed`, `approved`, `correction-required`, `additional-work-required`,
-`global-replan-required`, `intent-required`, `blocked`, `next`, `need`,
-`capability`, `payload`, or `reason` as protocol signals.
+Do not return full diffs, large command logs, complete test output, tool
+history, internal reasoning, or a list of every file inspected unless a concise
+specific detail is necessary to explain a concern.

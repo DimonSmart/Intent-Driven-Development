@@ -19,10 +19,11 @@ sequencing, or coordinated execution across bounded tasks. Factory
 may be selected automatically for those conditions, but it never becomes
 product intent and must stop when current intent is missing or insufficient.
 
-For Factory terminology, a Request is the original user instruction that
-defines one complete Task. A Factory planner repeatedly decomposes that Task
-into bounded ordered batches. Executors complete one task each, and strict
-runtime-owned final verification validates the integrated result.
+For Factory terminology, a Request is the original self-contained user
+instruction. A fresh planner repeatedly contracts the current bounded batch.
+Each task runs in a separate fresh worker context against the shared repository,
+and configured project verification validates the integrated result after
+`# Done`.
 
 Guiding rule:
 
