@@ -160,7 +160,7 @@ internal sealed class GitWorkspaceChangeTracker(
                && string.Equals(current.Hash, baseline.Hash, StringComparison.Ordinal);
     }
 
-    private async Task<FilesystemState> SnapshotFilesystemAsync(    private async Task<FilesystemState> SnapshotFilesystemAsync(
+    private async Task<FilesystemState> SnapshotFilesystemAsync(
         string canonicalPath,
         CancellationToken cancellationToken)
     {
@@ -264,7 +264,7 @@ internal sealed class GitWorkspaceChangeTracker(
         }
     }
 
-    private async Task EnsureRepositoryAsync(    private async Task EnsureRepositoryAsync(CancellationToken cancellationToken)
+    private async Task EnsureRepositoryAsync(CancellationToken cancellationToken)
     {
         var inside = await RunRequiredAsync(
             ["rev-parse", "--is-inside-work-tree"],

@@ -168,7 +168,7 @@ public sealed class FactoryStateValidator
         }
     }
 
-    private static void ValidateTaskRelatedIntentIds(    private static void ValidateTaskRelatedIntentIds(string workItemId, IReadOnlyList<string> ids)
+    private static void ValidateTaskRelatedIntentIds(string workItemId, IReadOnlyList<string> ids)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var id in ids)
