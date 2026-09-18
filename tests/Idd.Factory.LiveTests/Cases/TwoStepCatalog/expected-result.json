@@ -1,6 +1,5 @@
 {
-  "schemaVersion": 1,
-  "factoryOutcome": "COMPLETED",
-  "factoryResultPath": ".idd/factory/results/example/factory-result.json",
+  "schemaVersion": 2,
+  "status": "COMPLETED",
   "reason": null
 }

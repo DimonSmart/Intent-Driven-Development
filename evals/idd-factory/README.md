@@ -1,36 +1,42 @@
-# IDD Factory live eval
+# IDD Factory live evaluation
 
-The Factory live evaluation is a deliberately small real-host safety net. It consumes Codex usage and requires an authenticated Codex CLI, Git, and a .NET 10 SDK. All deterministic Factory contracts remain covered by `Idd.Factory.Tests`; benchmark and efficiency research belongs to `tools/factory-benchmark`.
+The live Factory evaluation validates the current native-agent architecture
+rather than the removed .NET runtime.
 
-There is exactly one token-consuming evaluation:
+## Scenario
 
-`FactoryEndToEndLiveTests.TwoStepCatalog_CompletesThroughOneBlockingFactoryCall`
+`TwoStepCatalog` requires two sequential implementation tasks:
 
-Run it with:
-
-```bat
-run-live-factory-evals.bat
+```text
+request
+-> fresh planner
+-> ProductCode task
+-> fresh worker A
+-> Catalog task
+-> fresh worker B
+-> fresh planner
+-> Done
+-> project verification
+-> complete
 ```
 
-Or invoke the same selection contract directly:
+The two workers share repository reality but not semantic transcripts.
 
-```powershell
-$env:IDD_RUN_LIVE_FACTORY_EVALS = "1"
-dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj `
-  --filter "Category=LiveFactoryEval" `
-  --logger "console;verbosity=detailed"
-```
+## Observable contract
 
-The scenario creates an isolated `CODEX_HOME`, builds and installs the current generated IDD plugin, checks the prepared `TwoStepCatalog` baseline, and launches real Codex with the supported unrestricted outer profile. Factory Runtime still applies its production worker capabilities: implementation workers receive workspace-write while planning/review workers remain restricted.
+The evaluation should establish that:
 
-`CODEX_HOME`, Codex plugin/cache data, and the generated marketplace are created under the OS temporary directory and deleted after the outer Codex process finishes. They are intentionally not retained under `artifacts/factory-evals` because they are reproducible infrastructure rather than diagnostic evidence. If cleanup cannot complete because files remain locked, the run keeps only a small `temporary-cleanup-warning.txt` pointing to the temporary directory.
+- requested product behavior is implemented;
+- protected durable intent is not modified by workers;
+- planning is incremental/current-reality based;
+- workers are separate native agents;
+- the root agent does not implement the product change instead of workers;
+- the generated plugin has no Factory MCP/runtime dependency;
+- no model-driven status polling is used;
+- final project verification passes.
 
-The scenario intentionally requires at least two sequential implementation work items. The first establishes `ProductCode`; the second integrates that completed abstraction into `Catalog`. The evaluation requires `CompletedWorkCount >= 2` and also inspects the persisted executor invocation for the second completed work item to prove that Factory passed the first work item's completed metadata and semantic result through `Relevant completed work and results`. Additional work items remain allowed when the workflow genuinely requires them.
+The trace should contain native child-agent dispatch and no
+`factory_run`, `factory_continue`, `factory_status`, or
+`idd-factory.dll` transport activity.
 
-The same invocation checks the blocking transport contract: exactly one `factory_run`, no `factory_status` polling, and no completed model turn while the blocking call is active. It also checks Factory `COMPLETED`, final verification `passed`, independent final build/tests, the expected product change, and preservation of durable intent and protected scenario inputs.
-
-Each run preserves diagnostic evidence under `artifacts/factory-evals/<run-id>/`: the workspace including Factory current/result data, Codex `events.jsonl`, stderr/final response, verification logs, progress log, task input, and git status/diff. Reproducible Codex/plugin caches and generated marketplace contents are not persisted there.
-
-Defaults are `gpt-5.6-luna`, low reasoning effort, and a 20-minute timeout. Override them with `IDD_FACTORY_EVAL_MODEL`, `IDD_FACTORY_EVAL_REASONING_EFFORT`, `IDD_FACTORY_EVAL_TIMEOUT_MINUTES`, and optionally `IDD_FACTORY_EVAL_VERSION`.
-
-Do not use real-model evaluations for deterministic failure paths, process mechanics, transport details, or other contracts that can be checked reliably in `Idd.Factory.Tests`.
+Do not emulate the removed deterministic state machine in the eval harness.

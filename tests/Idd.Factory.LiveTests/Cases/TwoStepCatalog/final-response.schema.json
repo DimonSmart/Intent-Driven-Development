@@ -2,11 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "factoryOutcome", "factoryResultPath", "reason"],
+  "required": ["schemaVersion", "status", "reason"],
   "properties": {
-    "schemaVersion": { "type": "integer", "const": 1 },
-    "factoryOutcome": { "enum": ["COMPLETED", "FOCUSED_HANDOFF", "NEEDS_CLARIFICATION", "INTENT_REQUIRED", "BLOCKED", "CORRUPT_FACTORY_STATE"] },
-    "factoryResultPath": { "type": ["string", "null"] },
+    "schemaVersion": { "type": "integer", "const": 2 },
+    "status": { "enum": ["COMPLETED", "QUESTION", "BLOCKED"] },
     "reason": { "type": ["string", "null"] }
   }
 }

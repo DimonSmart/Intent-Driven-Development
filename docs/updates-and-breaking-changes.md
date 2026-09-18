@@ -2,6 +2,46 @@
 
 This page records IDD changes that require action in repositories that already use the toolkit.
 
+## 2026-09-18 — Factory uses native agents; runtime and MCP removed
+
+Factory has been simplified to native-agent orchestration.
+
+Current Factory is now:
+
+```text
+fresh planner
+-> current batch
+-> fresh sequential worker per task
+-> fresh planner
+```
+
+The packaged .NET Factory Runtime, Factory MCP server, `factory_run`,
+`factory_continue`, `factory_restart`, `factory_retry`, `factory_cancel`,
+and `factory_status` operations are removed. Generated plugins no longer contain
+`runtime/idd-factory.dll`, `factory.yaml`, or Factory `.mcp.json`.
+
+Planner and every worker must run in a fresh semantic context without inherited
+parent transcript. Adapters use native child-agent spawn and terminal waiting;
+model-driven status polling is not a compatibility fallback.
+
+The separate `RelevantCompletedWork` protocol is removed. Planner tasks are
+self-contained and may carry only optional stable `TaskRelatedIntent` IDs.
+Workers resolve those IDs against current `.idd/intent/` themselves.
+
+Factory temporary state is reduced to request, remaining plan, short completed
+summaries, exact answers, and optional question/verification-failure files. The
+repository is authoritative implementation reality and execution is deliberately
+at-least-once.
+
+Legacy `.idd/factory/current/state.json` runs are not migrated or exactly
+continued. Preserve repository changes. For an explicit restart, reuse a valid
+persisted `request.md` as the replacement request when appropriate, archive old
+state for diagnostics if useful, and start the simplified Factory after Intent
+Preflight.
+
+`IDD-0006` supersedes the deterministic runtime, blocking transport, and
+runtime-owned backend failure decisions in IDD-0002, IDD-0004, and IDD-0005.
+
 Updating the installed plugins and migrating project-owned files are separate operations. Follow [Updating IDD](updating-idd.md) to refresh `idd-intent` and `idd-factory`. Then apply any relevant migration instructions below. Plugin updates do not automatically rewrite a repository's `.idd/intent/` directory.
 
 ## 2026-09-16 — Explicit Factory restart semantics

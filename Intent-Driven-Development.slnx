@@ -1,19 +1,11 @@
 <Solution>
-  <Folder Name="/src/">
-    <Project Path="src/runtime/Idd.Factory/Idd.Factory.csproj" />
-  </Folder>
   <Folder Name="/tools/">
-    <Project Path="tools/factory-benchmark/FactoryBenchmark.csproj" />
-    <Project Path="tools/factory-token-analysis/FactoryTokenAnalysis.csproj" />
     <Project Path="tools/generate/Generate.csproj" />
   </Folder>
   <Folder Name="/benchmarks/">
     <Project Path="benchmarks/bubble-sort/acceptance/BubbleSortAcceptance.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/FactoryBenchmark.Tests/FactoryBenchmark.Tests.csproj" />
-    <Project Path="tests/Idd.Factory.ProcessTestHelper/Idd.Factory.ProcessTestHelper.csproj" />
-    <Project Path="tests/Idd.Factory.Tests/Idd.Factory.Tests.csproj" />
     <Project Path="tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj" />
     <Project Path="tests/Idd.Generation.Tests/Idd.Generation.Tests.csproj" />
   </Folder>

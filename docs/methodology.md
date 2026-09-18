@@ -133,72 +133,50 @@ idd-intent    durable product memory
 idd-factory   temporary implementation organization
 ```
 
-`idd-intent` owns the durable side of the methodology. It initializes and maintains `.idd/intent/`, imports or changes current product truth, optionally builds the project glossary, implements from intent, and checks implementation against intent.
+`idd-intent` owns durable product truth and remains fully usable without
+Factory.
 
-`idd-factory` owns temporary execution orchestration. Its packaged .NET runtime
-deterministically coordinates bounded-batch planning, sequential execution,
-authoritative verification, retries, resume, and finalization.
-`idd-factory-run` is only the public launcher.
-
-The separation is visible to the user because the responsibilities have different lifecycles:
-
-- `idd-intent` is the normal standalone installation;
-- `idd-factory` is optional and depends on `idd-intent`;
-- Factory Runtime and its work items may read intent but must not create or
-  silently modify product truth;
-- before a new end-to-end run, the Factory launcher distinguishes a missing
-  intent document from a genuinely missing product decision and may invoke the
-  existing `idd-intent` workflow before runtime creation;
-- `INTENT_REQUIRED` before a new run means that a durable decision required for
-  safe implementation cannot be determined from the original request and
-  current intent, not merely that a corresponding specification file is absent;
-- during an existing run, when an exhausted batch leaves the planner unable to
-  contract any next task without a user decision, the planner may ask one
-  concrete question and runtime pauses with `USER_DECISION_REQUIRED`;
-- after the user answers, the outer IDD workflow decides whether the answer
-  changes durable intent, then the exact answer is passed back to the same run;
-- executors never emit intent, correction, replan, next-work, or user-question
-  control outcomes;
-- `.idd/factory/current/` holds at most one active or resumable run and
-  `.idd/factory/results/` preserves complete successfully finalized run directories for diagnostics and handoff;
-- both directories are ignored by default and are never durable product intent.
-
-The current workspace contains immutable `request.md`, authoritative
-`state.json`, stable work-item contracts, attempt artifacts, verification
-evidence, planning question/answer artifacts when needed, and an append-only
-event audit. Explicit state status and revision, not filenames or conversation
-history, support validation and safe resume.
-
-Factory's semantic loop is deliberately small:
+`idd-factory` owns only lightweight temporary semantic orchestration:
 
 ```text
-planner -> ordered batch -> sequential executors -> planner
+Intent Preflight
+-> fresh planner
+-> current batch
+-> fresh sequential workers
+-> fresh planner
+-> Question | Done
 ```
 
-The planner is the only semantic component that creates future work. Runtime
-assigns IDs, executes the whole current batch in order, observes actual changed
-paths, performs authoritative verification, retries the same immutable task on
-ordinary verification failure, and invokes planning again only after the batch
-is exhausted. When semantic reassessment finds no remaining work, the planner
-returns exactly `# Done`; blank or whitespace-only planner output is malformed.
-Runtime mechanically maps validated `# Done` to the existing empty-batch
-representation and runs strict final verification. A final verification failure
-becomes evidence for another ordinary planning cycle; a success permits
-finalization without a mandatory semantic final reviewer.
+Factory does not package or run a .NET workflow runtime. It has no Factory MCP
+transport, process supervisor, retry state machine, authoritative attempt
+history, or exact continuation protocol.
 
-If planning instead reaches a real user decision boundary, the planner returns
-one human-readable question and no tasks. Runtime owns only the durable pause and
-resume. It does not infer the answer or decide whether the answer is product
-intent. The user may answer and continue, with IDD updating durable intent first
-when appropriate, or cancel the run. Exact answers are stored separately from
-the immutable original request and become evidence for later planners.
+The repository is authoritative implementation reality. Temporary continuation
+state contains only the original request, remaining current batch, short
+completed summaries, exact answers, and optional question/verification failure
+artifacts.
 
-Only after successful final verification does Factory prepare final result
-artifacts and move the complete `.idd/factory/current/` directory to
-`.idd/factory/results/<timestamp>_<work-slug>/`. The completed result therefore
-retains state, request, events, attempts, verification evidence, planning
-question/answer artifacts, commit-message handoff, and other run diagnostics;
-prior results remain intact.
+Every planner and worker receives a fresh semantic context. Workers share the
+repository but do not inherit the root or sibling transcripts. Platforms are
+supported only when native agent APIs provide fresh/no-parent-history context,
+shared repository access, terminal waiting without model polling, final result
+retrieval, and stop/close control.
+
+The planner owns semantic relevance and future work. `TaskRelatedIntent`
+contains stable durable-intent IDs; the worker resolves and reads those current
+documents itself. There is no `RelevantCompletedWork` reference protocol.
+Future tasks are self-contained.
+
+Factory deliberately uses at-least-once execution. An interrupted task may run
+again against current repository reality.
+
+Planner `# Question` stops orchestration for one user decision. The outer IDD
+workflow decides whether the exact answer changes durable intent, then a fresh
+planner resumes.
+
+Planner `# Done` triggers existing project verification when configured.
+Failure is bounded input to a fresh planner; success completes the temporary
+run.
 
 ## Routing Model
 
@@ -239,4 +217,4 @@ IDD does not attempt to preserve every step that led to the product. It preserve
 
 ## Summary
 
-`idd-intent` preserves product memory and may optionally maintain a deliberately small project glossary. `idd-factory` organizes resumable temporary implementation work through bounded planning batches and deterministic runtime control. Requests, task statuses, planner questions and answers, completed-run diagnostics, and commit-message handoffs remain temporary, and Git owns product-intent history.
+`idd-intent` preserves product memory and may optionally maintain a deliberately small project glossary. `idd-factory` organizes temporary implementation work through fresh native planner/worker contexts, incremental batches, and repository-driven at-least-once convergence. Requests, plans, planner questions and answers, and diagnostic summaries remain temporary, and Git owns product-intent history.

@@ -3,8 +3,6 @@ using System.Text.Json.Nodes;
 
 internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
 {
-    private const int FactoryMcpToolTimeoutSeconds = 3 * 60 * 60;
-
     public override string Platform => "codex";
     protected override string ManifestDirectory => ".codex-plugin";
     protected override string ManifestFileName => "plugin.json";
@@ -31,10 +29,7 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
             ["version"] = version,
             ["description"] = plugin.Description,
             ["skills"] = "./skills/",
-            ["author"] = new JsonObject
-            {
-                ["name"] = AuthorName
-            },
+            ["author"] = new JsonObject { ["name"] = AuthorName },
             ["repository"] = RepositoryUrl,
             ["license"] = "MIT",
             ["interface"] = new JsonObject
@@ -43,48 +38,8 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                 ["shortDescription"] = plugin.Description
             }
         };
-        if (StringComparer.Ordinal.Equals(pluginName, "idd-factory"))
-        {
-            pluginJson["mcpServers"] = "./.mcp.json";
-        }
 
         return pluginJson.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n";
-    }
-
-    protected override IReadOnlyList<GeneratedFile> BuildAdditionalPluginFiles(string pluginName, string version)
-    {
-        var files = base.BuildAdditionalPluginFiles(pluginName, version).ToList();
-        if (!StringComparer.Ordinal.Equals(pluginName, "idd-factory"))
-        {
-            return files;
-        }
-
-        var mcp = new JsonObject
-        {
-            ["mcpServers"] = new JsonObject
-            {
-                ["factory"] = new JsonObject
-                {
-                    ["command"] = "dotnet",
-                    ["args"] = new JsonArray("runtime/idd-factory.dll", "mcp"),
-                    ["cwd"] = ".",
-                    ["tool_timeout_sec"] = FactoryMcpToolTimeoutSeconds,
-                    ["env"] = new JsonObject
-                    {
-                        ["IDD_FACTORY_WINDOWS_SANDBOX"] = "unelevated"
-                    },
-                    ["env_vars"] = new JsonArray(
-                        "IDD_FACTORY_CODEX_EXECUTABLE",
-                        "IDD_FACTORY_MODEL",
-                        "IDD_FACTORY_REASONING_EFFORT",
-                        "IDD_FACTORY_INHERIT_USER_SKILLS",
-                        "IDD_FACTORY_CAPABILITY_PROFILE"),
-                    ["omit_tools_from"] = new JsonArray("deferred", "code_mode")
-                }
-            }
-        };
-        files.Add(new GeneratedFile(".mcp.json", mcp.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n"));
-        return files;
     }
 
     protected override IReadOnlyList<GeneratedFile> BuildSkillFiles(
@@ -95,6 +50,7 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
         IReadOnlyDictionary<string, SkillDescription> skillDescriptions)
     {
         var files = base.BuildSkillFiles(adapter, plugin, roleDefinitions, skillName, skillDescriptions).ToList();
+
         if (StringComparer.Ordinal.Equals(skillName, "idd-factory-run"))
         {
             var skill = files.Single(file => StringComparer.Ordinal.Equals(
@@ -105,51 +61,34 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                 Content = ContentNormalizer.NormalizeContent(ContentNormalizer.JoinBlocks(
                     skill.Content!,
                     """
-                    ## Codex launcher
+                    ## Codex native-agent orchestration
 
-                    Use the bundled direct `mcp__factory` tools:
+                    Use native Codex child-agent delegation for Factory semantic work.
 
-                    - new run: `factory_run`
-                    - continue without or with a clarification answer: `factory_continue`
-                    - explicit cancellation: `factory_cancel`
-                    - read-only recovery/status after a lost or timed-out blocking response: `factory_status`
-
-                    A host/tool timeout is transport loss, not a Factory outcome, and
-                    it does not prove that the runtime stopped. If `factory_run` or
-                    `factory_continue` times out or loses its response, call
-                    `factory_status` once:
-
-                    - `ACTIVE`: the original runtime still owns the workspace; the run
-                      has not finished and no Factory outcome is available yet. Report
-                      this as `Factory status: ACTIVE`, never `Factory outcome: ACTIVE`.
-                      Include current work item, attempt, phase, completed/remaining
-                      counts, operation, and start time when returned. Do not call
-                      `factory_run` or `factory_continue`.
-                    - `READY_TO_CONTINUE`: no runtime owns the workspace; resume the
-                      persisted run once with `factory_continue`.
-                    - `WAITING_FOR_CONTINUATION`: report the persisted Factory outcome,
-                      reason, resume condition, and payload; continue only when that
-                      outcome's normal contract permits it.
-                    - `COMPLETED`: report the persisted completed result.
-                    - any other status: report it as returned rather than guessing.
-
-                    Do not use `factory_status` as a polling loop. An `ACTIVE` status
-                    ends the current launcher attempt; a later explicit invocation can
-                    check status again or continue after the runtime releases the
-                    workspace.
-
-                    Do not start `idd-factory.dll` through a shell. Do not use a
-                    command execution, wait, write-stdin, or status-polling loop as
-                    the Factory launcher. Do not use tool search for Factory tools
-                    and do not enable Code Mode.
-
-                    If the bundled Factory tools are unavailable, report that the
-                    installed Codex host does not expose the bundled IDD Factory MCP
-                    transport and that a supported Codex version is required. Do not
-                    fall back to the shell launcher.
+                    - Spawn every planner and worker in a fresh semantic context with
+                      parent-history inheritance explicitly disabled. Use
+                      `fork_turns = "none"` or the host-equivalent setting; never rely
+                      on an inheritance default.
+                    - Prefer a read-only planner and a workspace-writing worker when the
+                      host exposes those sandbox choices.
+                    - Use the native `spawn_agent` operation (or its current native
+                      equivalent) and a blocking/event-driven `wait_agent` operation.
+                      Prefer one long wait on the critical path. Do not build a
+                      short-wait/status-polling loop that consumes parent model turns.
+                    - If a wait fails or the host times out, do not start a replacement
+                      worker while the previous child may still write to the workspace.
+                      Stop or close the child natively when possible, leave the task in
+                      `plan.md`, and end the current Factory invocation.
+                    - If Codex cannot provide fresh/no-parent-history children, shared
+                      repository access, terminal waiting without model polling, final
+                      child results, and stop/close lifecycle control, Factory is
+                      unsupported on that host. Do not emulate the missing capability
+                      with a packaged runtime, MCP transport, shell process supervisor,
+                      or polling protocol.
                     """))
             };
         }
+
         if (skillDescriptions.TryGetValue(skillName, out var skillDescription) &&
             skillDescription.Invocation == SkillInvocation.Manual)
         {
@@ -212,9 +151,7 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
         foreach (var (skill, roles) in plugin.SkillRoleReferences.OrderBy(item => item.Key, StringComparer.Ordinal))
         {
             foreach (var role in roles)
-            {
                 bindings.Add(new JsonObject { ["skill"] = skill, ["role"] = role, ["dispatchMode"] = "generic-subagent" });
-            }
         }
 
         return bindings;
@@ -236,39 +173,18 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
 
             {mappings}
 
-            Do not treat a semantic capability as unavailable merely because no
-            runtime tool has the same name. A capability is unavailable only when
-            its mapped Codex tool or operation is actually unavailable. In
-            particular, use `spawn_agent` for `agent.spawn` and use `wait_agent`
-            for `agent.wait`.
-            Codex Multi-Agent V2 `wait_agent` is an event-driven wait for mailbox
-            activity from any live agent; it does not take a child agent id. When a
-            child result is on the critical path, prefer one long wait allowed by
-            the host instead of repeated short waits or another status-polling loop.
-            Before returning a dispatch-related `BLOCKED`, call `spawn_agent` or
-            `wait_agent`, as applicable, and preserve the observed runtime error
-            if it fails.
-            """,
-            """
-            ## Codex role delivery
-
-            Codex Factory roles are delivered to generic child agents through the
-            dispatch message. A role is not a native custom agent type.
+            A capability is unavailable only when its mapped Codex operation is
+            actually unavailable.
             """);
     }
 
     private static string DescribeCodexCapability(RoleTool tool) => tool switch
     {
-        RoleTool.FileRead =>
-            "Read files using the available shell or file-reading operations.",
-        RoleTool.FileWrite =>
-            "Create, modify, rename, or remove files using the available file-editing or shell operations.",
-        RoleTool.CommandExecute =>
-            "Execute repository commands using the available command-execution operation.",
-        RoleTool.AgentSpawn =>
-            "Call the Codex `spawn_agent` collaboration tool.",
-        RoleTool.AgentWait =>
-            "Call the Codex `wait_agent` collaboration tool. In Multi-Agent V2 it waits for mailbox activity from any live agent and does not take an agent id; prefer a long event-driven wait over short polling loops.",
+        RoleTool.FileRead => "Read files using available file or shell operations.",
+        RoleTool.FileWrite => "Create or modify files using available file-editing or shell operations.",
+        RoleTool.CommandExecute => "Execute repository commands using the available command operation.",
+        RoleTool.AgentSpawn => "Call the native Codex `spawn_agent` collaboration operation.",
+        RoleTool.AgentWait => "Call the native Codex `wait_agent` collaboration operation; prefer one long event-driven wait over polling.",
         _ => throw new ArgumentOutOfRangeException(nameof(tool), tool, "Unknown role capability.")
     };
 

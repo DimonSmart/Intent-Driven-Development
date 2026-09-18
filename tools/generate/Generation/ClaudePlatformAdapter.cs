@@ -28,39 +28,19 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
             Content = ContentNormalizer.NormalizeContent(ContentNormalizer.JoinBlocks(
                 skill.Content!,
                 """
-                ## Claude launcher
+                ## Claude native-agent capability
 
-                Resolve the installed plugin root as two parent directories above
-                this `SKILL.md`. Invoke the packaged runtime with the platform shell:
+                Use a native Claude fork/subagent mechanism only when the host can
+                provide every Factory capability required by the canonical skill:
+                a fresh semantic context with controlled input and no substantial
+                inherited parent transcript, shared repository access, terminal
+                waiting without model-driven polling, a final child result, and
+                stop/close lifecycle control.
 
-                ```text
-                dotnet <plugin-root>/runtime/idd-factory.dll run
-                  --workspace <absolute-workspace>
-                  --request-stdin true
-                  --plugin-root <plugin-root>
-                ```
-
-                Pipe the exact request as UTF-8 standard input, wait for process
-                exit, and parse the single structured outcome. Use `continue` with
-                the same workspace and plugin root, and `cancel` for explicit
-                cancellation. Always remove launcher-owned temporary files. Do not
-                search for a repository-local runtime.
-
-                On Windows, launch this trusted packaged Factory Runtime outside
-                the parent agent OS sandbox. The runtime applies a fresh,
-                role-appropriate sandbox to every semantic worker. If that launcher
-                boundary cannot be provided, report `BLOCKED` instead of starting
-                the nested runtime inside the parent sandbox. Do not weaken semantic
-                worker sandboxing.
-
-                In Windows PowerShell, configure the native pipeline for BOM-less
-                UTF-8 before piping the exact request to `dotnet`:
-
-                ```powershell
-                $utf8 = [System.Text.UTF8Encoding]::new($false)
-                $OutputEncoding = $utf8
-                [Console]::OutputEncoding = $utf8
-                ```
+                When those properties cannot be guaranteed, report Factory as
+                unsupported on the current Claude host. Do not restore or emulate
+                Factory through the removed .NET runtime, a packaged CLI launcher,
+                MCP transport, process supervision, or a status-polling loop.
                 """))
         };
         return files;
@@ -77,10 +57,7 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
             ["name"] = pluginName,
             ["description"] = plugin.Description,
             ["version"] = version,
-            ["author"] = new JsonObject
-            {
-                ["name"] = AuthorName
-            },
+            ["author"] = new JsonObject { ["name"] = AuthorName },
             ["repository"] = RepositoryUrl,
             ["license"] = "MIT"
         };

@@ -24,11 +24,14 @@ Do not add Markdown headings or fenced code blocks. Markdown content in
 
 `default.use` is required. A context may have either `use` or ordered `rules`. Rules with `paths` apply only when they cover the complete changed scope; the first matching rule wins. A rule without `paths` is a context fallback and goes last. If none matches, use `default`. Do not merge matching rules or introduce `kind`, `fast`, `standard`, `extended`, `manual`, components, or a rule language.
 
-Use changed paths for `direct`; contract scope plus actual changes for `subtask`; all `Covers` changes for `checkpoint`; and the Factory-run diff for `final`. Unexpected task scope is recorded as runtime-observed change evidence and is assessed by the planner after the batch is exhausted.
+Use changed paths for `direct`; task scope plus actual changes for `subtask`;
+all covered changes for `checkpoint`; and the integrated Factory change for
+`final`.
 
-If `.idd/verification.yaml` is missing, continue with the repository/platform fallback: project script, Make/task-runner target, CI command, then the platform default. Report that fallback. Before the first Factory planning cycle, when a repository fallback check exists, the deterministic Runtime runs that same fallback once against the unchanged workspace as a baseline. If the baseline passes, or no fallback check exists, normal planning begins.
-
-If that baseline fails, stop before any planner or executor invocation and ask the user whether to continue with the already-red repository. The recommended action is to fix the repository baseline separately and restart. If the user explicitly approves continuation, persist only `RepositoryFallbackBaselineAccepted = true`; do not parse test/build output and do not classify individual failures. With an accepted red baseline, a failed repository fallback during `subtask` verification is recorded as evidence but does not retry the current work item, because the broad fallback was already failing before the task. Strict `final` repository fallback must still pass before completion; if it remains red, block with `FINAL_VERIFICATION_FAILED` rather than starting a corrective planning cycle. Runner infrastructure failure is not an acceptable red baseline and still blocks before planning. This baseline behavior applies only when the YAML policy is absent; an existing policy remains authoritative and is not pre-run as a repository baseline.
+If `.idd/verification.yaml` is missing, continue with the repository/platform
+fallback: project script, Make/task-runner target, CI command, then the platform
+default. Report that fallback. Factory does not create a separate verification
+state machine around this policy.
 
 Other files, including Markdown files under `.idd/`, do not affect policy discovery or fallback. An existing YAML policy must never silently fall back: invalid YAML, Markdown headings or fenced YAML, an unsupported version, or a schema error blocks policy loading and the current operation. Validate unknown contexts/checks, missing or dual `run`/`instructions`, `confirmation` without `run`, conflicting context `use`/`rules`, rules without `use`, missing `default`, and unsafe rule fallbacks.
 
@@ -38,14 +41,15 @@ For direct non-Factory implementation, completion requires conclusive evidence
 for every assigned check. Missing user action remains `Not verified` and blocks
 approval.
 
-For Factory execution, the deterministic Runtime owns mandatory `subtask` and
-`final` verification. Semantic workers may run focused
-diagnostic commands, but those commands are not authoritative Factory evidence.
-The Runtime records every gate result, distinguishes ordinary failed checks from
-required user action and runner infrastructure failure. Failed subtask checks
-retry the same task and failed final checks trigger a new planning cycle, except
-for repository fallback after an explicitly accepted red baseline as described
-above. When a retry was caused by failed authoritative subtask verification and
-that retry produces no workspace changes, stop with
-`VERIFICATION_RETRY_NO_PROGRESS` before running verification again instead of
-spending additional semantic retry budget.
+For Factory execution, each worker performs reasonable task-local checks itself.
+Factory does not own a verification engine, retry budget, attempt lifecycle, or
+verification evidence graph.
+
+When a fresh planner returns exactly `# Done`, the orchestration layer runs the
+configured project `final` verification when available. On success, Factory
+completes. On failure, persist only a bounded diagnostic containing the failed
+check/command, exit result, and relevant output, then invoke a fresh planner.
+That planner decides whether a correction task is required.
+
+If no project verification policy is configured, `# Done` after normal worker
+checks is sufficient for Factory completion.

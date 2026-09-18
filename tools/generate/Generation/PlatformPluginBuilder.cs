@@ -59,11 +59,6 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
             new(Path.Combine("skills", "idd-factory-run", "references", "methodology-version.json"),
                 methodologyVersion.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n")
         };
-        var runtimeRoot = Path.Combine("artifacts", "runtime-package");
-        if (!Directory.Exists(runtimeRoot)) throw new InvalidOperationException("Packaged Factory runtime output is missing.");
-        files.AddRange(Directory.GetFiles(runtimeRoot).Where(path => !path.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(Path.GetFileName, StringComparer.Ordinal)
-            .Select(path => GeneratedFile.Binary(Path.Combine("runtime", Path.GetFileName(path)), path)));
         return files;
     }
 

@@ -1,77 +1,81 @@
 # Factory skills
 
-## Public entry point
+IDD Factory intentionally has only three canonical skills.
 
-`idd-factory-run` performs Intent Preflight and then invokes the packaged
-deterministic runtime. The launcher does not schedule semantic work itself.
+## `idd-factory-run`
 
-## Semantic workers
+This is the orchestration entry point.
 
-- `idd-factory-decompose-task` is the sole planner. It returns ordered `# Task`
-  Markdown sections, each optionally followed by `# TaskRelatedIntent` metadata
-  containing existing stable durable-intent IDs and then by
-  `# RelevantCompletedWork` metadata containing already-Completed stable
-  work-item IDs selected semantically for that task; exactly one `# Question`
-  when a user decision is required; or exactly `# Done` after semantic
-  reassessment finds nothing remains. Blank or whitespace-only planner output is
-  malformed.
-- `idd-factory-execute-subtask` executes one immutable task and returns a
-  free-form human-readable report. Factory supplies the concrete contract, the
-  complete current contents of exactly the persisted task-related intent
-  documents, and only the bounded semantic results of completed work items that
-  the planner explicitly selected for this task.
+It performs or reuses Intent Preflight, maintains minimal temporary continuation
+state, invokes a fresh planner, invokes fresh workers sequentially, handles one
+planner question, and runs configured project verification after planner
+`# Done`.
 
-The planner discovers intent through `.idd/intent/README.md` and `INDEX.md`, then
-opens only plausible current numbered documents as needed. It decides semantic
-relevance per task both for durable intent and for previous completed semantic
-results. Runtime mechanically validates canonical IDs, resolves persisted
-references, preserves planner order, loads artifacts, and applies deterministic
-presentation bounds. Runtime never infers completed-work relevance from paths,
-filenames, keywords, strings, project types, embeddings, result size, or
-execution order.
+It does not launch a packaged runtime, use Factory MCP tools, supervise child
+processes, poll status, maintain retry budgets, or own a workflow state machine.
 
-`TaskRelatedIntent` is not another source of truth and its contents are not
-copied into `contract.md` or Factory state. Current numbered intent documents
-remain normative. `RelevantCompletedWork` is likewise metadata rather than
-contract text. Current repository state is the primary source of what previous
-implementation produced; selected previous semantic results exist only for
-information that is not necessarily recoverable from repository state.
+Required host capabilities are native child spawn, fresh/no-parent-history
+context, shared repository access, terminal wait without model polling, final
+result retrieval, and stop/close control.
 
-A planner may reference only work items that were already in Completed at the
-start of that planning cycle. If a later task depends semantically on a result
-that a task in the current batch has not produced yet, that dependency is a
-batch boundary: the next planning cycle can reference the prerequisite after it
-is actually Completed. Runtime does not invent speculative IDs, sibling
-inheritance, dependency graphs, or relevance heuristics.
+## `idd-factory-decompose-task`
 
-There are no research, checkpoint-review, final-review, or standalone replan
-skills in the Factory protocol. Research can be included in an ordinary task
-contract when it is necessary to make that task coherent; discoveries that
-change future work are evaluated by the next planner after batch exhaustion.
+This is the planner.
 
-Workers never return semantic control JSON. They do not select capabilities,
-Factory/work-item identity, retries, corrections, or transitions. The planner
-may reference already-existing `IDD-NNNN` durable-intent IDs and already-
-Completed `WNNNNNN` work-item IDs; that is semantic input selection, not runtime
-identity selection. `# Done` is only the planner's minimal explicit no-more-work
-marker and is mechanically followed by existing strict final verification; it
-is not a Factory completion outcome. Runtime owns materialization, ordering,
-verification, retry, recovery, persistence, and finalization.
+A fresh planner inspects the original request, repository, relevant current
+intent, exact user answers, bounded completed summaries, and the latest bounded
+verification failure.
 
-Each attempt keeps semantic text separate from machine metadata:
+It returns exactly one of:
 
 ```text
-invocation.json       runtime-owned invocation identity
-planning-output.md    planner-created batch document
-semantic-result.md    executor's task-specific report
-result.json           runtime-owned provenance and semantic-result path
-process-telemetry.json
+# Task
+<self-contained contract>
+
+# TaskRelatedIntent
+IDD-NNNN
+
+# Question
+<one question>
+
+# Done
 ```
 
-Authoritative `state.json` stores each work item's ordered
-`TaskRelatedIntentIds` and `RelevantCompletedWorkIds` so both immutable
-selections survive Remaining -> Current -> retry -> Completed without becoming
-part of the human-readable contract. Planner completed-history context remains
-available for semantic reassessment; executor completed-work context is built
-separately and contains only the explicitly selected IDs and their bounded
-semantic results.
+Tasks/Question/Done cannot be mixed. `TaskRelatedIntent` is optional task
+metadata and contains stable current intent IDs only.
+
+Planning is incremental. Contract only work knowable now; do not speculate about
+later tasks whose contracts depend on unfinished work.
+
+There is no `RelevantCompletedWork` protocol. If a later task needs a semantic
+fact not recoverable from repository reality, the next planner embeds only that
+fact directly in the self-contained task.
+
+## `idd-factory-execute-subtask`
+
+This is the worker.
+
+Every task runs in a fresh isolated context against the shared current
+repository. The worker receives one self-contained task plus optional
+`TaskRelatedIntent` IDs.
+
+The worker mechanically resolves every selected ID to exactly one current
+`.idd/intent/IDD-NNNN.*.md` file and reads it itself. The root orchestrator
+does not load full intent documents merely to forward them.
+
+A worker may be re-run after interruption. It inspects current repository
+reality, keeps correct partial work, completes the task, runs focused task-local
+checks, and returns only a short semantic result.
+
+Workers do not modify durable intent or Factory scheduling state and do not
+decide retries, replanning, completion, or finalization.
+
+## Context isolation
+
+A separate thread is not sufficient when the platform automatically forks the
+parent transcript. The adapter must explicitly deliver a fresh semantic context.
+
+Codex generated guidance uses native spawn/wait and explicitly requires history
+inheritance to be disabled. Claude is supported only when its native subagent
+mechanism can provide the same semantic properties; otherwise Factory is
+unsupported on that host rather than emulated through a custom runtime.

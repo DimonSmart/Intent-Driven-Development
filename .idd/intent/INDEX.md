@@ -6,10 +6,11 @@ This index helps humans and Coding Agents find relevant current intent. The numb
 
 | Document | Role | Area | Notes | Replaces |
 | --- | --- | --- | --- | --- |
-| IDD-0001 | Spec | Factory orchestration | Deterministic runtime, task-related durable-intent propagation, verification, temporary execution state, semantic workers, recovery and finalization | — |
-| IDD-0002 | ADR | Factory architecture | Programmatic workflow ownership and replaceable agent backends | — |
+| IDD-0001 | Spec | Factory orchestration | Native-agent planner/worker loop, fresh contexts, minimal state, TaskRelatedIntent, at-least-once execution, questions and project verification | — |
+| IDD-0002 | ADR | Factory architecture | Superseded deterministic-runtime decision | — |
 | IDD-0003 | Spec | IDD core and distribution | Durable intent model, ambiguity-only glossary, canonical generation, self-hosting boundary, and temporary references to durable intent | — |
-| IDD-0004 | ADR | Factory transport | Blocking adapter transport avoids model-driven polling and remains replaceable | — |
-| IDD-0005 | Spec | Factory Agent Backend failures | Deterministic quota/rate/auth classification, normalized diagnostics, resumable external blockers, and budget-neutral replay | — |
+| IDD-0004 | ADR | Factory transport | Superseded blocking runtime-transport decision | — |
+| IDD-0005 | Spec | Factory backend failures | Superseded runtime-owned backend failure semantics | — |
+| IDD-0006 | ADR | Factory architecture | Native platform subagents replace Factory runtime and transport; Factory owns lightweight orchestration only | IDD-0002, IDD-0004, IDD-0005 |
 
 The `Document` column contains stable `IDD-NNNN` identifiers only. Resolve an identifier to the unique current `.idd/intent/IDD-NNNN.*.md` file.

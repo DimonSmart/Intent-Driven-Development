@@ -24,9 +24,8 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
         fixture.AssertFile(Path.Combine(
             intentRoot, "skills", "idd-project-init", "assets", "bootstrap", ".idd", "intent", "README.md"));
 
-        fixture.AssertFile(Path.Combine(factoryRoot, "runtime", "idd-factory.dll"));
-        fixture.AssertFile(Path.Combine(factoryRoot, "runtime", "factory.yaml"));
-        fixture.AssertMissing(Path.Combine(factoryRoot, "runtime", "factory-workflow.yaml"));
+        fixture.AssertMissing(Path.Combine(factoryRoot, "runtime"));
+        fixture.AssertMissing(Path.Combine(factoryRoot, ".mcp.json"));
         fixture.AssertDirectory(Path.Combine(factoryRoot, "assets", "bootstrap", ".idd", "factory"));
         fixture.AssertFile(Path.Combine(factoryRoot, "assets", "bootstrap", ".idd", "factory", ".gitignore"));
 
@@ -37,96 +36,73 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
             AssertString(methodology.RootElement, "methodologyVersion", fixture.Version);
         }
 
-        var runFrontMatter = GenerationFixture.ReadFrontMatter(fixture.ReadText(
-            Path.Combine(factoryRoot, "skills", "idd-factory-run", "SKILL.md")));
-        var workerSkills = new[] { "idd-factory-decompose-task", "idd-factory-execute-subtask" };
-
-        if (platform == "claude")
-        {
-            Assert.DoesNotContain("context: fork", runFrontMatter, StringComparison.Ordinal);
-            foreach (var skill in workerSkills)
-            {
-                var frontMatter = GenerationFixture.ReadFrontMatter(fixture.ReadText(
-                    Path.Combine(factoryRoot, "skills", skill, "SKILL.md")));
-                Assert.Contains("context: fork", frontMatter, StringComparison.Ordinal);
-            }
-        }
-        else
-        {
-            foreach (var skill in workerSkills.Prepend("idd-factory-run"))
-            {
-                var frontMatter = GenerationFixture.ReadFrontMatter(fixture.ReadText(
-                    Path.Combine(factoryRoot, "skills", skill, "SKILL.md")));
-                foreach (var claudeField in new[] { "context:", "agent:", "allowed-tools:", "argument-hint:" })
-                    Assert.DoesNotContain(claudeField, frontMatter, StringComparison.Ordinal);
-            }
-        }
-
         AssertIddMetadata(intentRoot, [], ".idd/intent");
         AssertIddMetadata(factoryRoot, ["idd-intent"], ".idd/factory");
     }
 
     [Fact]
-    public void FactoryMetadata_HasNoGeneratedRoleSurface()
+    public void FactoryPlugin_UsesNativeAgentsWithoutRuntimeOrMcpTransport()
+    {
+        var codexFactory = Path.Combine(fixture.MarketplaceRoot, "plugins", "codex", "idd-factory");
+        var claudeFactory = Path.Combine(fixture.MarketplaceRoot, "plugins", "claude", "idd-factory");
+
+        using (var manifest = JsonDocument.Parse(fixture.ReadText(
+                   Path.Combine(codexFactory, ".codex-plugin", "plugin.json"))))
+        {
+            Assert.False(manifest.RootElement.TryGetProperty("mcpServers", out _));
+        }
+
+        fixture.AssertMissing(Path.Combine(codexFactory, ".mcp.json"));
+        fixture.AssertMissing(Path.Combine(claudeFactory, ".mcp.json"));
+        fixture.AssertMissing(Path.Combine(codexFactory, "runtime"));
+        fixture.AssertMissing(Path.Combine(claudeFactory, "runtime"));
+
+        var codexSkill = fixture.ReadText(Path.Combine(
+            codexFactory, "skills", "idd-factory-run", "SKILL.md"));
+        Assert.Contains("Codex native-agent orchestration", codexSkill, StringComparison.Ordinal);
+        Assert.Contains("spawn_agent", codexSkill, StringComparison.Ordinal);
+        Assert.Contains("wait_agent", codexSkill, StringComparison.Ordinal);
+        Assert.Contains("fork_turns = \"none\"", codexSkill, StringComparison.Ordinal);
+        Assert.Contains("Do not build a", codexSkill, StringComparison.Ordinal);
+        Assert.Contains("status-polling loop", codexSkill, StringComparison.Ordinal);
+        Assert.DoesNotContain("factory_run", codexSkill, StringComparison.Ordinal);
+        Assert.DoesNotContain("idd-factory.dll", codexSkill, StringComparison.Ordinal);
+
+        var claudeSkill = fixture.ReadText(Path.Combine(
+            claudeFactory, "skills", "idd-factory-run", "SKILL.md"));
+        Assert.Contains("Claude native-agent capability", claudeSkill, StringComparison.Ordinal);
+        Assert.Contains("unsupported", claudeSkill, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("runtime/idd-factory.dll", claudeSkill, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FactoryMetadata_HasOnlyCanonicalThreeSkillsAndNoGeneratedRoleSurface()
     {
         foreach (var platform in new[] { "claude", "codex" })
         {
             var root = Path.Combine(fixture.MarketplaceRoot, "plugins", platform, "idd-factory");
+            var skills = Directory.GetDirectories(Path.Combine(root, "skills"))
+                .Select(Path.GetFileName)
+                .Where(name => name is not null)
+                .Select(name => name!)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.Equal(
+                new[]
+                {
+                    "idd-factory-decompose-task",
+                    "idd-factory-execute-subtask",
+                    "idd-factory-run"
+                },
+                skills);
+
             using var metadata = JsonDocument.Parse(fixture.ReadText(Path.Combine(root, "idd-plugin.json")));
             if (metadata.RootElement.TryGetProperty("roleDefinitions", out var roleDefinitions))
                 Assert.Equal(0, roleDefinitions.GetArrayLength());
             if (metadata.RootElement.TryGetProperty("skillRoleBindings", out var roleBindings))
                 Assert.Equal(0, roleBindings.GetArrayLength());
         }
-
-        var executorClaudeFrontMatter = GenerationFixture.ReadFrontMatter(fixture.ReadText(Path.Combine(
-            fixture.MarketplaceRoot, "plugins", "claude", "idd-factory", "skills", "idd-factory-execute-subtask", "SKILL.md")));
-        Assert.Contains("allowed-tools: [Read, Glob, Grep, Edit, Write, Bash]", executorClaudeFrontMatter, StringComparison.Ordinal);
-
-        fixture.AssertMissing(Path.Combine(fixture.MarketplaceRoot, "plugins", "codex", "idd-factory", "agents"));
-        fixture.AssertMissing(Path.Combine(fixture.MarketplaceRoot, "plugins", "codex", "idd-intent", "agents"));
-    }
-
-    [Fact]
-    public void FactoryTransport_HasStructuredPlatformContracts()
-    {
-        var codexIntent = Path.Combine(fixture.MarketplaceRoot, "plugins", "codex", "idd-intent");
-        var codexFactory = Path.Combine(fixture.MarketplaceRoot, "plugins", "codex", "idd-factory");
-        var claudeFactory = Path.Combine(fixture.MarketplaceRoot, "plugins", "claude", "idd-factory");
-
-        using (var manifest = JsonDocument.Parse(fixture.ReadText(Path.Combine(codexFactory, ".codex-plugin", "plugin.json"))))
-            AssertString(manifest.RootElement, "mcpServers", "./.mcp.json");
-
-        using (var intentManifest = JsonDocument.Parse(fixture.ReadText(Path.Combine(codexIntent, ".codex-plugin", "plugin.json"))))
-            Assert.False(intentManifest.RootElement.TryGetProperty("mcpServers", out _));
-
-        fixture.AssertMissing(Path.Combine(codexIntent, ".mcp.json"));
-        fixture.AssertMissing(Path.Combine(claudeFactory, ".mcp.json"));
-
-        using (var mcp = JsonDocument.Parse(fixture.ReadText(Path.Combine(codexFactory, ".mcp.json"))))
-        {
-            var factory = mcp.RootElement.GetProperty("mcpServers").GetProperty("factory");
-            AssertString(factory, "command", "dotnet");
-            AssertString(factory, "cwd", ".");
-            Assert.Equal(10800, factory.GetProperty("tool_timeout_sec").GetInt32());
-            Assert.Equal(["runtime/idd-factory.dll", "mcp"],
-                factory.GetProperty("args").EnumerateArray().Select(value => value.GetString()).ToArray());
-            Assert.Equal(["deferred", "code_mode"],
-                factory.GetProperty("omit_tools_from").EnumerateArray().Select(value => value.GetString()).ToArray());
-            Assert.Equal(
-                [
-                    "IDD_FACTORY_CODEX_EXECUTABLE",
-                    "IDD_FACTORY_MODEL",
-                    "IDD_FACTORY_REASONING_EFFORT",
-                    "IDD_FACTORY_INHERIT_USER_SKILLS",
-                    "IDD_FACTORY_CAPABILITY_PROFILE"
-                ],
-                factory.GetProperty("env_vars").EnumerateArray().Select(value => value.GetString()).ToArray());
-        }
-
-        var claudeSkill = fixture.ReadText(Path.Combine(claudeFactory, "skills", "idd-factory-run", "SKILL.md"));
-        Assert.Contains("runtime/idd-factory.dll", claudeSkill, StringComparison.Ordinal);
-        Assert.Contains("--request-stdin true", claudeSkill, StringComparison.Ordinal);
     }
 
     private void AssertGeneratedSkillLayout(string pluginRoot, string pluginName)
@@ -141,8 +117,7 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
             .Select(skill => skill.GetString()!)
             .Order(StringComparer.Ordinal)
             .ToArray();
-        var skillRoot = Path.Combine(pluginRoot, "skills");
-        var actual = Directory.GetDirectories(skillRoot)
+        var actual = Directory.GetDirectories(Path.Combine(pluginRoot, "skills"))
             .Select(Path.GetFileName)
             .Where(name => name is not null)
             .Select(name => name!)
@@ -151,7 +126,7 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
 
         Assert.Equal(expected, actual);
         foreach (var skill in expected)
-            fixture.AssertFile(Path.Combine(skillRoot, skill, "SKILL.md"));
+            fixture.AssertFile(Path.Combine(pluginRoot, "skills", skill, "SKILL.md"));
     }
 
     private void AssertPluginManifest(string pluginRoot, string manifestDirectory, string pluginName, string platform)
@@ -173,7 +148,6 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
         using var document = JsonDocument.Parse(fixture.ReadText(Path.Combine(pluginRoot, "idd-plugin.json")));
         var root = document.RootElement;
         AssertString(root, "version", fixture.Version);
-        Assert.False(root.TryGetProperty("skillReferences", out _));
         Assert.Equal(expectedDependencies,
             root.GetProperty("dependencies").EnumerateArray().Select(value => value.GetString()).ToArray());
         Assert.Equal([expectedAssetDestination],

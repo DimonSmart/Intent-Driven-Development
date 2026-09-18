@@ -57,26 +57,28 @@ based on current intent, conformance checking, or Factory orchestration. Use
 coordinated execution is required; Factory may be
 selected automatically and never becomes product intent.
 
-Factory keeps at most one resumable run in `.idd/factory/current/`. The planner
-is the only semantic source of new work and materializes an ordered batch of
-stable task contracts. Runtime-owned `state.json` is the only status source.
-Executors return free-form semantic reports and never decide future workflow.
-After each exhausted batch Factory plans again. When semantic reassessment finds
-no remaining work, the planner returns exactly `# Done`; blank or whitespace-only
-planner output is malformed. Runtime mechanically maps validated `# Done` to the
-existing empty-batch representation and starts strict final verification.
-Success prepares final result artifacts and moves the complete run directory to
-`.idd/factory/results/<timestamp>_<work-slug>/`. The moved result retains the
-state, event log, attempts, verification evidence, commit-message handoff, and
-other diagnostics, while `.idd/factory/current/` remains reserved for an active
-or resumable run.
+Factory keeps at most one simplified current run under
+`.idd/factory/current/`. The repository is the authoritative implementation
+reality. The planner is the only semantic source of new tasks and is invoked
+fresh whenever the current batch is empty. Every task runs in a separate fresh
+worker context against the shared repository.
 
-Intent decisions are resolved by preflight before Factory creates run state.
-Intent changes never become Factory tasks.
+Factory uses native platform child-agent capabilities. Parent transcript
+inheritance must be disabled for planner and workers, and waiting must be
+blocking/event-driven rather than a model-driven polling loop. If a platform
+cannot provide fresh contexts, shared repository access, terminal waiting, final
+results, and child stop/close control, Factory may be unsupported there rather
+than emulating a runtime.
 
-When a user asks to continue current Factory work, the packaged runtime validates
-and reconciles saved state instead of reconstructing work from conversation
-history. A new request must not replace a nonempty current run.
+Temporary state contains only `request.md`, remaining `plan.md`, short
+`completed.md`, `answers.md`, and optional question or verification-failure
+files. Intent decisions are resolved by preflight before implementation; Factory
+workers never modify durable intent.
+
+An interrupted task remains in the plan and may execute again. The replacement
+worker inspects current repository reality and completes from that state. When a
+fresh planner returns `# Done`, configured project verification runs; failure
+becomes bounded input to another fresh planner, while success completes the run.
 
 When a request concerns IDD but does not explicitly name a skill, classify it
 through the `idd-route` routing model before selecting an intent,
