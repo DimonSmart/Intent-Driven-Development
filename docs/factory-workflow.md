@@ -151,6 +151,11 @@ Runtime records actual changed paths, executor invocation identities, semantic-a
 and technical-restart counters, timestamps, exit codes, and verification evidence
 independently of the worker report.
 
+Workspace tracking is Git-only and records repository-relative filenames exactly.
+Changes inside Git submodules and changes of a submodule HEAD are not part of the
+guaranteed semantics of the current Factory workspace tracker; nested repository
+traversal is intentionally not performed.
+
 ## Verification and completion
 
 Required task verification is deterministic. An unexpected authoritative

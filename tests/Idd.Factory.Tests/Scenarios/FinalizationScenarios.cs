@@ -92,6 +92,67 @@ public sealed class FinalizationScenarios
         Assert.True(File.Exists(Path.Combine(result, "factory-result.json")));
     }
 
+
+    [Fact]
+    public async Task FinalizationKeepsCompletedWorkBoundedForFiveThousandPaths()
+    {
+        using var temp = new TestWorkspace();
+        var paths = Enumerable.Range(0, 5_000)
+            .Select(index => $"src/File{index:D4}.cs")
+            .ToList();
+        var (state, current) = await PrepareCompletedAsync(temp, paths);
+
+        var result = await new FinalizeHandler(temp.Path).FinalizeAsync(state, default);
+
+        Assert.False(Directory.Exists(current));
+        using var completed = JsonDocument.Parse(
+            await File.ReadAllTextAsync(Path.Combine(result, "completed-work.json")));
+        var work = Assert.Single(completed.RootElement.GetProperty("completed").EnumerateArray());
+        Assert.False(work.TryGetProperty("changedPaths", out _));
+        var changes = work.GetProperty("changes");
+        Assert.Equal("changes/W000001.json", changes.GetProperty("reference").GetString());
+        Assert.Equal(5_000, changes.GetProperty("count").GetInt32());
+        Assert.Equal(50, changes.GetProperty("preview").GetArrayLength());
+        Assert.True(File.Exists(Path.Combine(result, "changes", "W000001.json")));
+        Assert.True(File.Exists(Path.Combine(result, "changes", "run.json")));
+    }
+
+    [Fact]
+    public async Task MissingAuthoritativeArtifactBlocksFinalizationBeforeMove()
+    {
+        using var temp = new TestWorkspace();
+        var (state, current) = await PrepareCompletedAsync(temp, ["src/A.cs"]);
+        File.Delete(Path.Combine(current, "changes", "W000001.json"));
+
+        var error = await Assert.ThrowsAsync<FactoryStateException>(() =>
+            new FinalizeHandler(temp.Path).FinalizeAsync(state, default));
+
+        Assert.Equal("CORRUPT_FACTORY_STATE", error.Code);
+        Assert.True(Directory.Exists(current));
+        AssertNoCommittedResults(temp.Path);
+    }
+
+    [Fact]
+    public async Task CorruptAuthoritativeArtifactBlocksFinalizationBeforeMove()
+    {
+        using var temp = new TestWorkspace();
+        var (state, current) = await PrepareCompletedAsync(temp, ["src/A.cs"]);
+        await File.WriteAllTextAsync(
+            Path.Combine(current, "changes", "W000001.json"),
+            JsonSerializer.Serialize(new
+            {
+                schemaVersion = 1,
+                changedPaths = new[] { "src/Other.cs" }
+            }, FactoryJson.Options));
+
+        var error = await Assert.ThrowsAsync<FactoryStateException>(() =>
+            new FinalizeHandler(temp.Path).FinalizeAsync(state, default));
+
+        Assert.Equal("CORRUPT_FACTORY_STATE", error.Code);
+        Assert.True(Directory.Exists(current));
+        AssertNoCommittedResults(temp.Path);
+    }
+
     private static async Task<(FactoryState State, string Current)> PrepareAsync(TestWorkspace temp)
     {
         var current = Path.Combine(temp.Path, ".idd", "factory", "current");
@@ -113,6 +174,48 @@ public sealed class FinalizationScenarios
         };
         await new FileFactoryStateStore(current, new FactoryStateValidator()).CreateAsync(state, default);
         return (state, current);
+    }
+
+
+    private static async Task<(FactoryState State, string Current)> PrepareCompletedAsync(
+        TestWorkspace temp,
+        IReadOnlyList<string> changedPaths)
+    {
+        var current = Path.Combine(temp.Path, ".idd", "factory", "current");
+        Directory.CreateDirectory(Path.Combine(current, "attempts"));
+        Directory.CreateDirectory(Path.Combine(current, "plan-revisions"));
+        File.WriteAllText(Path.Combine(current, "request.md"), "# Bounded finalization\n");
+        File.WriteAllText(Path.Combine(current, "events.jsonl"), "{\"event\":\"scheduler-decision\"}\n");
+
+        var completed = StateStoreTests.Completed("W000001") with
+        {
+            VerificationDecision = VerificationDecision.Ok
+        };
+        completed.ChangedPaths.AddRange(changedPaths);
+
+        var state = new FactoryState
+        {
+            MethodologyVersion = "test-methodology",
+            RuntimeVersion = "test-runtime",
+            RunId = "bounded-finalization-run",
+            FactoryConfigurationHash = "test-config",
+            RequestPath = "request.md",
+            PlanRevision = 3,
+            PlanningCycleCount = 2,
+            FinalVerificationPassed = true,
+            FinalVerificationPlanRevision = 3
+        };
+        state.Completed.Add(completed);
+        state.FactoryRunChangedPaths.AddRange(changedPaths);
+
+        await new FileFactoryStateStore(current, new FactoryStateValidator()).CreateAsync(state, default);
+        return (state, current);
+    }
+
+    private static void AssertNoCommittedResults(string workspace)
+    {
+        var results = Path.Combine(workspace, ".idd", "factory", "results");
+        Assert.True(!Directory.Exists(results) || Directory.GetDirectories(results).Length == 0);
     }
 
     private static void AssertArtifacts(string directory, params string[] files) =>

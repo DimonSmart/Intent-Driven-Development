@@ -87,9 +87,11 @@ internal sealed class ChangedPathSetStore(string runDirectory)
             if (authoritative is null)
                 throw Corrupt("Pending verification has no authoritative change-set summary.");
             if (session.Changes is not null
-                && !string.Equals(session.Changes.Reference, authoritative.Reference, StringComparison.Ordinal))
+                && (!string.Equals(session.Changes.Reference, authoritative.Reference, StringComparison.Ordinal)
+                    || session.Changes.Count != authoritative.Count
+                    || !session.Changes.Preview.SequenceEqual(authoritative.Preview, StringComparer.Ordinal)))
             {
-                throw Corrupt("Pending verification references a different change-set artifact than its verification scope.");
+                throw Corrupt("Pending verification change-set summary no longer matches its authoritative verification scope.");
             }
             var paths = await ReadAndValidateAsync(authoritative, cancellationToken);
             Replace(session.ChangedPaths, paths);
