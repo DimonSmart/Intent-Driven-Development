@@ -1,6 +1,7 @@
 using Idd.Factory.Configuration;
 using Idd.Factory.Domain;
 using Idd.Factory.Persistence;
+using Idd.Factory.Processes;
 using Idd.Factory.Telemetry;
 using Idd.Factory.Verification;
 
@@ -18,6 +19,27 @@ public sealed class FactoryRuntime
         VerificationEngine verification,
         FactoryEventWriter events,
         IClock clock)
+        : this(
+            workspace,
+            configuration,
+            stateStore,
+            agentExecutor,
+            verification,
+            events,
+            clock,
+            null)
+    {
+    }
+
+    internal FactoryRuntime(
+        string workspace,
+        FactoryConfiguration configuration,
+        IFactoryStateStore stateStore,
+        FactoryAgentExecutor agentExecutor,
+        VerificationEngine verification,
+        FactoryEventWriter events,
+        IClock clock,
+        IProcessExecutor? workspaceProcessExecutor)
     {
         var context = new FactoryRuntimeContext(
             workspace,
@@ -25,7 +47,7 @@ public sealed class FactoryRuntime
             stateStore,
             events,
             clock);
-        var semanticExecution = new SemanticExecutionService(context, agentExecutor);
+        var semanticExecution = new SemanticExecutionService(context, agentExecutor, workspaceProcessExecutor);
         var contextReader = new FactoryContextReader(context);
         var planning = new PlanningService(
             context,

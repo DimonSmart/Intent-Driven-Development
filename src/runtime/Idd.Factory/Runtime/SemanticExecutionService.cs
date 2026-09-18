@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Idd.Factory.Domain;
+using Idd.Factory.Processes;
 
 namespace Idd.Factory.Runtime;
 
@@ -9,9 +10,10 @@ internal sealed record SemanticExecutionResult(
 
 internal sealed class SemanticExecutionService(
     FactoryRuntimeContext context,
-    FactoryAgentExecutor agentExecutor)
+    FactoryAgentExecutor agentExecutor,
+    IProcessExecutor? workspaceProcessExecutor = null)
 {
-    private readonly GitWorkspaceChangeTracker workspaceTracker = new(context.Workspace);
+    private readonly GitWorkspaceChangeTracker workspaceTracker = new(context.Workspace, workspaceProcessExecutor);
     private readonly ExternalBackendBlockerCoordinator externalBlockerCoordinator = new(context);
 
     public Task<SemanticAttemptRecoveryResult> InspectRecoveryAsync(
