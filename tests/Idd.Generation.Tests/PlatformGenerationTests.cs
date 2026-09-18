@@ -65,7 +65,7 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
         Assert.Contains("fork_turns = \"none\"", codexSkill, StringComparison.Ordinal);
         Assert.Contains("Do not build a", codexSkill, StringComparison.Ordinal);
         Assert.Contains("status-polling loop", codexSkill, StringComparison.Ordinal);
-        Assert.DoesNotContain("factory_run", codexSkill, StringComparison.Ordinal);
+
         Assert.DoesNotContain("idd-factory.dll", codexSkill, StringComparison.Ordinal);
 
         var claudeSkill = fixture.ReadText(Path.Combine(

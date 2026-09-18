@@ -58,8 +58,7 @@ This is the tracked + untracked non-ignored view. Narrow large investigations
 with a scoped pathspec when possible.
 
 Do not begin with broad recursive scans such as `Get-ChildItem -Recurse`,
-`find .`, or tools configured with `--no-ignore`. Ignored/generated paths
-are not forbidden: directly read a known ignored/generated file when the task
+`find .`, or tools configured with `--no-ignore`. Ignored/generated paths are not forbidden: directly read a known ignored/generated file when the task
 requires that specific file.
 
 ## Execution

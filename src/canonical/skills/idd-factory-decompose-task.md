@@ -97,8 +97,7 @@ Prefer the smallest independently useful and independently verifiable task that
 has a coherent implementation boundary.
 
 Do not make a task larger merely to reduce the number of Factory work items.
-Smaller tasks should produce smaller and more coherent implementation and
-troubleshooting contexts.
+Smaller tasks should produce smaller and more coherent implementation and troubleshooting contexts.
 
 Do not split work mechanically. Keep changes together when their correctness is
 naturally verified together. Tests needed to verify a capability normally
