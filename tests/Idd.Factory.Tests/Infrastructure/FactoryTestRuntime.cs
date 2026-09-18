@@ -3,6 +3,7 @@ using Idd.Factory.Agents;
 using Idd.Factory.Configuration;
 using Idd.Factory.Domain;
 using Idd.Factory.Persistence;
+using Idd.Factory.Processes;
 using Idd.Factory.Runtime;
 using Idd.Factory.State;
 using Idd.Factory.Telemetry;
@@ -16,7 +17,8 @@ internal static class FactoryTestRuntime
         string workspace,
         ScriptedAgentBackend backend,
         FactoryConfiguration? configuration = null,
-        VerificationEngine? verification = null)
+        VerificationEngine? verification = null,
+        IProcessExecutor? workspaceProcessExecutor = null)
     {
         EnsureGitRepository(workspace);
         var current = Path.Combine(workspace, ".idd", "factory", "current");
@@ -29,7 +31,8 @@ internal static class FactoryTestRuntime
             new FactoryAgentExecutor(backend),
             verification ?? new VerificationEngine(workspace, current),
             new FactoryEventWriter(current, clock),
-            clock);
+            clock,
+            workspaceProcessExecutor);
     }
 
     public static FactoryContextReader ContextReader(string workspace)

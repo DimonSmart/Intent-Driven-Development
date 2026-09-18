@@ -16,40 +16,97 @@ internal static class WorkspacePathPolicy
         "TestResults"
     };
 
-    public static string Canonicalize(string path)
+    public static string ValidateGitPath(string path)
     {
-        if (string.IsNullOrWhiteSpace(path))
-            throw Invalid(path);
-
-        var normalized = path.Replace('\\', '/');
-        while (normalized.StartsWith("./", StringComparison.Ordinal))
-            normalized = normalized[2..];
-
-        if (normalized.Length == 0
-            || normalized.StartsWith("/", StringComparison.Ordinal)
-            || Path.IsPathRooted(path)
-            || (normalized.Length >= 2 && char.IsLetter(normalized[0]) && normalized[1] == ':'))
+        if (string.IsNullOrEmpty(path)
+            || path.Contains('\0')
+            || path.StartsWith("/", StringComparison.Ordinal))
         {
-            throw Invalid(path);
+            throw InvalidGitPath(path);
         }
 
-        var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length == 0 || segments.Any(segment => segment is "." or ".."))
-            throw Invalid(path);
+        var segments = path.Split('/');
+        if (segments.Length == 0
+            || segments.Any(segment => segment.Length == 0 || segment is "." or ".."))
+        {
+            throw InvalidGitPath(path);
+        }
 
-        return string.Join('/', segments);
+        if (OperatingSystem.IsWindows())
+        {
+            if (path.Contains('\\')
+                || (path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':'))
+            {
+                throw InvalidGitPath(path);
+            }
+
+            var osPath = path.Replace('/', Path.DirectorySeparatorChar);
+            if (Path.IsPathRooted(osPath))
+                throw InvalidGitPath(path);
+        }
+
+        return path;
+    }
+
+    public static string ResolveGitPath(string workspaceRoot, string gitPath)
+    {
+        var validated = ValidateGitPath(gitPath);
+        var relative = validated.Replace('/', Path.DirectorySeparatorChar);
+        var root = Path.GetFullPath(workspaceRoot);
+        var full = Path.GetFullPath(Path.Combine(root, relative));
+
+        if (!IsInside(root, full))
+            throw InvalidGitPath(gitPath);
+
+        return full;
+    }
+
+    public static string ValidateArtifactReference(string reference)
+    {
+        if (string.IsNullOrWhiteSpace(reference)
+            || reference.Contains('\0')
+            || reference.Contains('\\')
+            || reference.StartsWith("/", StringComparison.Ordinal)
+            || Path.IsPathRooted(reference)
+            || (reference.Length >= 2 && char.IsLetter(reference[0]) && reference[1] == ':'))
+        {
+            throw InvalidArtifactReference(reference);
+        }
+
+        var segments = reference.Split('/');
+        if (segments.Length == 0
+            || segments.Any(segment => segment.Length == 0 || segment is "." or ".."))
+        {
+            throw InvalidArtifactReference(reference);
+        }
+
+        return reference;
+    }
+
+    public static string ResolveArtifactReference(string rootDirectory, string reference)
+    {
+        var validated = ValidateArtifactReference(reference);
+        var root = Path.GetFullPath(rootDirectory);
+        var full = Path.GetFullPath(Path.Combine(
+            root,
+            validated.Replace('/', Path.DirectorySeparatorChar)));
+
+        if (!IsInside(root, full))
+            throw InvalidArtifactReference(reference);
+
+        return full;
     }
 
     public static IReadOnlyList<string> NormalizeChangedPaths(IEnumerable<string> paths) =>
-        paths.Select(Canonicalize)
+        paths.Select(ValidateGitPath)
             .Where(path => !IsOperationalArtifact(path))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToArray();
 
-    public static bool IsOperationalArtifact(string canonicalPath)
+    public static bool IsOperationalArtifact(string gitPath)
     {
-        var segments = canonicalPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var segments = gitPath.Split('/');
         if (segments.Length >= 2
             && segments[0].Equals(".idd", StringComparison.OrdinalIgnoreCase)
             && segments[1].Equals("factory", StringComparison.OrdinalIgnoreCase))
@@ -60,6 +117,21 @@ internal static class WorkspacePathPolicy
         return segments.Any(ExcludedSegments.Contains);
     }
 
-    private static FactoryStateException Invalid(string path) =>
-        new("CORRUPT_FACTORY_STATE", $"Invalid repository-relative changed path '{path}'.");
+    private static bool IsInside(string root, string fullPath)
+    {
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        var rootWithSeparator = root.EndsWith(Path.DirectorySeparatorChar)
+            || root.EndsWith(Path.AltDirectorySeparatorChar)
+                ? root
+                : root + Path.DirectorySeparatorChar;
+        return fullPath.StartsWith(rootWithSeparator, comparison);
+    }
+
+    private static FactoryStateException InvalidGitPath(string path) =>
+        new("CORRUPT_FACTORY_STATE", $"Invalid Git repository-relative path '{path}'.");
+
+    private static FactoryStateException InvalidArtifactReference(string reference) =>
+        new("CORRUPT_FACTORY_STATE", $"Invalid Factory artifact reference '{reference}'.");
 }
