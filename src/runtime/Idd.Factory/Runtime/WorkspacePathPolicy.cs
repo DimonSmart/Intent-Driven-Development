@@ -34,8 +34,11 @@ internal static class WorkspacePathPolicy
 
         if (OperatingSystem.IsWindows())
         {
-            if (path.Contains('\\'))
+            if (path.Contains('\\')
+                || (path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':'))
+            {
                 throw InvalidGitPath(path);
+            }
 
             var osPath = path.Replace('/', Path.DirectorySeparatorChar);
             if (Path.IsPathRooted(osPath))

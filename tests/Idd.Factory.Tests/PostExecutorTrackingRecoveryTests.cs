@@ -36,7 +36,7 @@ public sealed class PostExecutorTrackingRecoveryTests
         Assert.True(failingGit.Failed);
         Assert.True(File.Exists(Path.Combine(current, "attempts", "A000002", "result.json")));
         Assert.False(File.Exists(Path.Combine(current, "attempts", "A000002", "workspace-changes.json")));
-        Assert.Single(backend.Invocations.Where(invocation => invocation.Capability == "implementation"));
+        Assert.Single(backend.Invocations, invocation => invocation.Capability == "implementation");
 
         var persisted = await new FileFactoryStateStore(current, new FactoryStateValidator()).LoadAsync(default);
         Assert.NotNull(persisted);
@@ -49,7 +49,7 @@ public sealed class PostExecutorTrackingRecoveryTests
         var completed = await recoveredRuntime.ContinueAsync(default);
 
         Assert.Equal("COMPLETED", completed.FactoryOutcome);
-        Assert.Single(backend.Invocations.Where(invocation => invocation.Capability == "implementation"));
+        Assert.Single(backend.Invocations, invocation => invocation.Capability == "implementation");
 
         var resultDirectory = completed.ResultDirectory!;
         Assert.True(File.Exists(Path.Combine(

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Idd.Factory.Agents;
 using Idd.Factory.Processes;
 using Idd.Factory.Runtime;
 using Idd.Factory.State;
@@ -346,6 +347,7 @@ public sealed class GitWorkspaceTrackingTests
         if (OperatingSystem.IsWindows())
         {
             Assert.Throws<FactoryStateException>(() => WorkspacePathPolicy.ValidateGitPath("C:/absolute.txt"));
+            Assert.Throws<FactoryStateException>(() => WorkspacePathPolicy.ValidateGitPath("C:relative.txt"));
             Assert.Throws<FactoryStateException>(() => WorkspacePathPolicy.ValidateGitPath("foo\\bar.txt"));
         }
         else
