@@ -12,5 +12,6 @@ This index helps humans and Coding Agents find relevant current intent. The numb
 | IDD-0004 | ADR | Factory transport | Superseded blocking runtime-transport decision | — |
 | IDD-0005 | Spec | Factory backend failures | Superseded runtime-owned backend failure semantics | — |
 | IDD-0006 | ADR | Factory architecture | Native platform subagents replace Factory runtime and transport; Factory owns lightweight orchestration only | IDD-0002, IDD-0004, IDD-0005 |
+| IDD-0007 | ADR | Factory architecture history | Custom orchestrator experiment, lessons learned, and deliberate return to native-agent orchestration | — |
 
 The `Document` column contains stable `IDD-NNNN` identifiers only. Resolve an identifier to the unique current `.idd/intent/IDD-NNNN.*.md` file.
