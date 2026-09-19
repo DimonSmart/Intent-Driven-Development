@@ -35,6 +35,9 @@ It returns exactly one of:
 # TaskRelatedIntent
 IDD-NNNN
 
+# TaskRelatedEngineering
+ENG-NNNN
+
 # Question
 <one question>
 
@@ -42,7 +45,10 @@ IDD-NNNN
 ```
 
 Tasks/Question/Done cannot be mixed. `TaskRelatedIntent` is optional task
-metadata and contains stable current intent IDs only.
+metadata and contains stable current intent IDs only. When
+`.idd/engineering/` exists, `TaskRelatedEngineering` is optional task metadata
+containing only planner-selected Conditional `ENG-NNNN` IDs. The planner never
+puts Always rules there.
 
 Planning is incremental. Contract only work knowable now; do not speculate about
 later tasks whose contracts depend on unfinished work.
@@ -57,11 +63,17 @@ This is the worker.
 
 Every task runs in a fresh isolated context against the shared current
 repository. The worker receives one self-contained task plus optional
-`TaskRelatedIntent` IDs.
+`TaskRelatedIntent` IDs, optional Conditional `TaskRelatedEngineering` IDs,
+and the current mechanically enumerated `AlwaysEngineering` IDs.
 
 The worker mechanically resolves every selected ID to exactly one current
-`.idd/intent/IDD-NNNN.*.md` file and reads it itself. The root orchestrator
-does not load full intent documents merely to forward them.
+Intent or Engineering document and reads it itself. Immediately before every
+worker execution, the orchestrator recomputes the Always set from the current
+Engineering INDEX. The root orchestrator does not load full documents merely to
+forward them.
+
+The worker does not select additional Conditional Engineering Rules and does
+not edit Engineering Rules.
 
 A worker may be re-run after interruption. It inspects current repository
 reality, keeps correct partial work, completes the task, runs focused task-local
