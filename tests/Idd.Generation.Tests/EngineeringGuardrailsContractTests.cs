@@ -115,7 +115,7 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
 
         Assert.Contains("deterministically re-read the current Engineering INDEX", run, StringComparison.Ordinal);
         Assert.Contains("enumerate all current Always ENG IDs", run, StringComparison.Ordinal);
-        Assert.Contains("recomputed", run, StringComparison.Ordinal);
+        Assert.Contains("Before every worker execution, mechanically enumerate all current", run, StringComparison.Ordinal);
     }
 
     [Fact]
