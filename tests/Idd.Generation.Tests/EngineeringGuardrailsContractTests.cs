@@ -149,6 +149,16 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
     }
 
     [Fact]
+    public void EngineeringLint_CanonicalTextIsSingleAndWellFormed()
+    {
+        var lint = Canonical("skills", "idd-intent-lint.md");
+
+        Assert.Equal(1, lint.Split("# idd-intent-lint", StringSplitOptions.None).Length - 1);
+        Assert.Equal(1, lint.Split("## Optional Engineering checks", StringSplitOptions.None).Length - 1);
+        Assert.DoesNotContain(".md# idd-intent-lint", lint, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GeneratedClaudeAndCodexArtifacts_PreserveCanonicalEngineeringSemantics()
     {
         var source = GenerationFixture.NormalizeText(Canonical("methodology", "engineering-guardrails.md"));
