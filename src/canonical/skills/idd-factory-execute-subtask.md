@@ -3,6 +3,9 @@
 Execute exactly one Factory task in a fresh semantic context. You are a worker,
 not a planner or workflow controller.
 
+Read `references/engineering-guardrails.md` before resolving optional
+Engineering inputs.
+
 ## Inputs
 
 You receive:
@@ -10,6 +13,8 @@ You receive:
 ```text
 one self-contained Task
 optional TaskRelatedIntent IDs
+optional TaskRelatedEngineering IDs
+AlwaysEngineering IDs when an Engineering layer exists
 current repository access
 ```
 
@@ -31,8 +36,38 @@ keywords, embeddings, project type, or similarity.
 If a selected ID is missing or resolves to more than one current document, do
 not execute the task. Return a short diagnostic so Factory can stop cleanly.
 
-Do not modify `.idd/intent`, `.idd/factory/current`, or the project
-verification policy. Durable intent is prepared outside worker execution.
+## Resolve Engineering Rules
+
+When `.idd/engineering/` exists, its structure must already be mechanically
+valid. Before implementation, resolve and read every Engineering ID supplied in
+the worker packet.
+
+For every `TaskRelatedEngineering` ID:
+
+```text
+ENG-NNNN -> exactly one .idd/engineering/ENG-NNNN.rule-*.md
+INDEX Applicability = document Applicability = Conditional
+```
+
+For every `AlwaysEngineering` ID:
+
+```text
+ENG-NNNN -> exactly one .idd/engineering/ENG-NNNN.rule-*.md
+INDEX Applicability = document Applicability = Always
+```
+
+If an ID is missing, ambiguous, malformed, or metadata-inconsistent, do not
+execute the task. Return a short diagnostic.
+
+Read all TaskRelatedIntent, TaskRelatedEngineering, and AlwaysEngineering
+documents before implementation.
+
+Do not search for additional Conditional Engineering Rules. Semantic
+applicability selection belongs to the planner.
+
+Do not modify `.idd/intent`, `.idd/engineering`,
+`.idd/factory/current`, or the project verification policy. Durable intent
+and Engineering Rules are prepared outside worker execution.
 
 ## Work from current reality
 
@@ -63,8 +98,9 @@ requires that specific file.
 
 ## Execution
 
-Implement only the assigned task and run reasonable focused checks needed to
-establish its correctness.
+Implement only the assigned task, satisfy all supplied product intent and
+Engineering Rules, and run reasonable focused checks needed to establish its
+correctness.
 
 Do not:
 
