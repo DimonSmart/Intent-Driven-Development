@@ -130,8 +130,14 @@ routing or intent work.
 
 - Current `IDD-NNNN` documents directly under `.idd/intent/` are normative
   product intent.
+- Optional `.idd/engineering/` contains current durable implementation
+  guardrails, not product intent. Its absence is valid.
+- Every Always Engineering Rule applies to implementation work. Relevant
+  Conditional rules are selected semantically from `Applies when`; deterministic
+  filename, keyword, path, extension, project-type, embedding, or similarity
+  heuristics do not decide applicability.
 - `.idd/verification.yaml` is project-owned operational configuration, not product
-  intent.
+  intent or Engineering Rules.
 - Git stores history.
 - Add, modify, and remove apply only to product truth changes.
 - Implementation-only refactoring does not change product truth.
@@ -147,8 +153,11 @@ routing or intent work.
 - Import uses existing product knowledge as evidence and does not reconstruct
   requirements primarily from code.
 - Factory planners and workers may read intent, but must not create or change
-  product intent. An end-to-end Factory run completes the separate Intent
-  Preflight before native-agent orchestration starts.
+  product intent. When Engineering exists, planners select only Conditional
+  `TaskRelatedEngineering` IDs, the orchestrator mechanically enumerates the
+  current Always set before each worker, and workers do not edit Engineering
+  Rules. An end-to-end Factory run completes the separate Intent Preflight
+  before native-agent orchestration starts.
 - Plans, route classifications, preservation records, discovery reports,
   confirmation transcripts, and review notes are temporary workflow evidence.
 - Obsolete ordinary specs are deleted, not archived.
