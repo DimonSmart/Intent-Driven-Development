@@ -15,6 +15,9 @@ idd-code-implement = current spec intent + mode + code change + verification
 Read `references/project-verification.md` before resolving verification checks
 or repository/platform fallback.
 
+Read `references/engineering-guardrails.md` before using an optional
+`.idd/engineering/` layer.
+
 ## Modes
 
 ```text
@@ -38,6 +41,15 @@ observable behavior change.
   `idd-intent-change` first.
 - Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and only relevant current specs.
 - Do not read the whole `.idd/intent/` directory by default.
+- When `.idd/engineering/` exists, validate its structure before code changes,
+  enumerate every Always rule mechanically, and select relevant Conditional
+  rules semantically from `Applies when`.
+- Do not read the whole Engineering rule set by default. Full rule bodies are
+  loaded only for all Always rules and selected Conditional rules.
+- Missing, duplicate, ambiguous, malformed, or INDEX-inconsistent Engineering
+  rules are blocking diagnostics. Do not silently implement without guardrails.
+- Never select Conditional Engineering Rules by filename, keyword, path,
+  extension, glob, project type, embeddings, or similarity.
 - Do not copy implementation plans or temporary notes into specs.
 - Prefer the smallest code change that satisfies the relevant acceptance
   criteria.
@@ -64,6 +76,25 @@ observable behavior change.
 - After implementation, perform a focused implementation/spec check using
   `idd-code-check-implementation`.
 
+## Engineering Guardrails
+
+When `.idd/engineering/` is absent, continue exactly as before.
+
+When it exists:
+
+1. Read `.idd/engineering/README.md` and `INDEX.md`.
+2. Perform the cheap deterministic structural validation defined in
+   `references/engineering-guardrails.md`. Stop on structural errors.
+3. Mechanically enumerate all INDEX entries with `Applicability = Always`.
+4. Let the model select only semantically relevant Conditional rules from their
+   human-readable `Applies when` metadata.
+5. Resolve each selected `ENG-NNNN` to exactly one current rule document and
+   read the full bodies of all Always plus selected Conditional rules.
+6. Treat those rules as normative implementation constraints together with
+   relevant product intent and verification policy.
+
+Always rules are enumerated, not semantically selected.
+
 ## Workflow
 
 1. Classify mode:
@@ -72,14 +103,16 @@ observable behavior change.
    - `preserve-current-intent`.
 
 2. Read relevant current intent.
-3. For preserve mode, establish or accept the preservation boundary.
-4. Locate implementation and verification areas.
-5. Apply the smallest safe implementation change.
-6. Add or update only the minimal high-value verification needed for meaningful
+3. Resolve optional Engineering Guardrails as defined above.
+4. For preserve mode, establish or accept the preservation boundary.
+5. Locate implementation and verification areas.
+6. Apply the smallest safe implementation change while satisfying relevant
+   Intent and Engineering Rules.
+7. Add or update only the minimal high-value verification needed for meaningful
    behavior or regression risk.
-7. Run relevant verification.
-8. Run focused `idd-code-check-implementation`.
-9. Report the required implementation result fields.
+8. Run relevant verification.
+9. Run focused `idd-code-check-implementation`.
+10. Report the required implementation result fields.
 
 ## Missing Spec Rule
 
@@ -110,6 +143,7 @@ Use these fields:
 ```text
 Mode:
 Specs used as intent:
+Engineering rules applied:
 Behavior changed:
 Behavior preserved:
 Public contracts preserved:
@@ -117,6 +151,7 @@ Compatibility/data constraints:
 Code areas changed:
 Tests changed:
 Verification result:
+Engineering conformance:
 Conformance-check result:
 Remaining risks:
 ```
