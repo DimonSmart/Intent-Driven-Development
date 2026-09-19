@@ -68,10 +68,11 @@ public sealed class NativeFactoryEndToEndLiveTests
                         ? minutes
                         : 20));
 
-            Assert.Contains("spawn_agent", result.Stdout, StringComparison.Ordinal);
-            Assert.DoesNotContain("factory_run", result.Stdout, StringComparison.Ordinal);
-            Assert.DoesNotContain("factory_status", result.Stdout, StringComparison.Ordinal);
-            Assert.DoesNotContain("idd-factory.dll", result.Stdout, StringComparison.Ordinal);
+            var traceItems = ParseTraceItems(result.Stdout);
+            Assert.Contains(traceItems, item => IsToolCall(item, "collab_tool_call", "spawn_agent"));
+            Assert.DoesNotContain(traceItems, item => IsToolCall(item, "mcp_tool_call", "factory_run"));
+            Assert.DoesNotContain(traceItems, item => IsToolCall(item, "mcp_tool_call", "factory_status"));
+            Assert.DoesNotContain(traceItems, IsLegacyFactoryRuntimeCommand);
 
             var finalJson = JsonDocument.Parse(await File.ReadAllTextAsync(lastMessage));
             Assert.Equal("COMPLETED", finalJson.RootElement.GetProperty("status").GetString());
@@ -87,6 +88,35 @@ public sealed class NativeFactoryEndToEndLiveTests
         {
             try { Directory.Delete(tempRoot, recursive: true); } catch { }
         }
+    }
+
+    private static IReadOnlyList<JsonElement> ParseTraceItems(string stdout)
+    {
+        var items = new List<JsonElement>();
+        foreach (var line in stdout.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            using var document = JsonDocument.Parse(line);
+            if (document.RootElement.TryGetProperty("item", out var item))
+                items.Add(item.Clone());
+        }
+
+        return items;
+    }
+
+    private static bool IsToolCall(JsonElement item, string itemType, string tool)
+    {
+        return item.TryGetProperty("type", out var type)
+            && type.ValueEquals(itemType)
+            && item.TryGetProperty("tool", out var actualTool)
+            && actualTool.ValueEquals(tool);
+    }
+
+    private static bool IsLegacyFactoryRuntimeCommand(JsonElement item)
+    {
+        return item.TryGetProperty("type", out var type)
+            && type.ValueEquals("command_execution")
+            && item.TryGetProperty("command", out var command)
+            && command.GetString()?.Contains("idd-factory.dll", StringComparison.OrdinalIgnoreCase) == true;
     }
 
     private static async Task InitializeGitRepositoryAsync(string workspace)
