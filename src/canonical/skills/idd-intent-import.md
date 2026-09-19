@@ -372,7 +372,8 @@ Create current spec documents only for durable current product intent. Create
 adr documents only for durable decision records. Create spike documents only for
 active unresolved research.
 
-For example, import this source:
+For example, this source mixes operational commands with a concrete
+implementation constraint:
 
 ````md
 Run:
@@ -386,20 +387,14 @@ UiCompositionHost must be created in Bootstrap and passed to every dialog
 constructor.
 ````
 
-as the durable outcome only:
+Do not turn either fragment into product intent automatically. Build/test
+commands belong in verification configuration. Constructor wiring is incidental
+unless separately confirmed as a durable Engineering Rule, and this Intent
+import workflow does not create that rule.
 
-```md
-## Durable Architecture And Constraints
-
-Application-owned UI surfaces and overlays share one composition lifecycle.
-
-## Verification
-
-Automated coverage verifies composition behavior for nested overlays and
-viewport changes.
-```
-
-Do not import the commands or constructor wiring.
+If the same source also states a product-visible requirement such as consistent
+dialog and overlay redraw behavior across viewport changes, import that product
+requirement and its durable verification property into Intent.
 
 Imported current documents must use current IDD document shapes. Do not preserve
 legacy section layout when the document becomes current normative intent.
