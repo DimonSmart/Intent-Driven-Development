@@ -24,8 +24,13 @@ implementation.
 - Do not copy a package version unless that version is itself a compatibility
   contract.
 - Before transferring behavior from implementation, express it without internal
-  type names. If that is impossible, determine whether the type is a public or
-  durable architecture contract before updating intent.
+  type names. If that is impossible, determine whether the type is a public,
+  product-significant architecture, compatibility, security, or operability
+  contract before updating intent.
+- Do not promote an implementation-only durable convention into product intent.
+  If the confirmed behavior instead expresses a project Engineering Guardrail,
+  report that boundary and leave Engineering management to an explicit future
+  workflow rather than creating or migrating `.idd/engineering/` here.
 - Do not update a specification from implementation merely because the
   implementation exists.
 - Require explicit user confirmation before making semantic changes.
@@ -60,10 +65,11 @@ implementation.
 1. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and relevant current numbered
    documents directly under `.idd/intent/`.
 2. Inspect the implementation and verification evidence.
-3. Identify observable behavior and durable architecture that may represent
-   current product intent.
-4. Express candidate behavior without internal type names, then exclude
-   incidental implementation details and temporary state.
+3. Identify observable behavior and product-significant architecture or
+   compatibility constraints that may represent current product intent.
+4. Separate implementation-only durable engineering conventions from product
+   intent candidates, then express candidate product behavior without internal
+   type names and exclude incidental implementation details and temporary state.
 5. Summarize the proposed semantic specification changes for user confirmation.
 6. After confirmation, update the smallest set of current specification files.
 7. Update `INDEX.md` only when document structure or document roles changed.
