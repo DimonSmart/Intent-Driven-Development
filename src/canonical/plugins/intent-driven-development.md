@@ -2,10 +2,17 @@ This project uses Intent-Driven Development.
 
 Current product intent lives in `.idd/intent/`.
 
-Use IDD only when working with durable product intent.
+Optional project-owned durable implementation guardrails live separately in
+`.idd/engineering/`. Its absence is valid. Implementation workflows read its
+README and INDEX first, apply every Always rule, and semantically select only
+relevant Conditional rules without loading the complete rule set.
+
+Use IDD when working with durable product intent or implementing/checking code
+against current project-owned IDD knowledge.
 
 Do not load the whole `.idd/intent/` directory by default. Read
 `.idd/intent/README.md`, `.idd/intent/INDEX.md`, then only relevant numbered specs.
+Do not load the whole `.idd/engineering/` directory by default.
 
 If `.idd/intent/GLOSSARY.md` exists and project-specific terminology may affect
 interpretation of the current request, read the relevant entries before the
