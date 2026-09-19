@@ -66,8 +66,9 @@ Specifications include:
 
 - product behavior;
 - domain contracts;
-- durable architecture boundaries and important technical constraints;
-- architecture decisions that define product properties;
+- architecture boundaries and technical constraints when they define a
+  product, public, domain, compatibility, security, or operability contract;
+- architecture decisions whose rationale must remain durable as ADRs;
 - framework or library choices only when they define compatibility, public
   contracts, security, operability, or an accepted architecture decision;
 - compatibility expectations;
@@ -90,6 +91,50 @@ Specifications also do not include private type or method names, source files,
 constructor signatures, dependency-injection wiring, implementation order,
 migration mechanics, temporary workarounds, build or test commands, one-off
 source scans, test locations, or progress status.
+
+Implementation-only durable constraints are not automatically product intent.
+When they exist to preserve architecture, consistency, maintainability, or
+engineering conventions while another implementation could preserve the same
+product contract, store them in the optional Engineering layer instead.
+
+## Engineering Guardrails
+
+IDD separates four project concerns:
+
+```text
+Intent        product truth and product-significant contracts
+Engineering   durable implementation constraints
+Verification  operational evidence acquisition
+Factory       temporary organization of one implementation change
+```
+
+A project may optionally keep `.idd/engineering/`. Its absence is valid.
+
+Engineering Rules use stable `ENG-NNNN` identifiers. All `Always` rules apply
+to every implementation task and are mechanically enumerated. `Conditional`
+rules are selected semantically by the model from human-readable `Applies when`
+metadata. Deterministic filename, keyword, path, extension, project-type,
+embedding, or similarity heuristics must not select Conditional rules.
+
+Read `.idd/engineering/INDEX.md` for cheap discovery rather than loading every
+rule. When the layer exists, structural inconsistency is a blocking
+implementation diagnostic rather than permission to ignore guardrails.
+
+ADRs remain allowed in `.idd/intent/` to preserve durable decisions and
+rationale. An Engineering Rule may reference an ADR while owning only the
+current normative implementation constraint.
+
+Rule Verification sections describe required properties or evidence. Repository
+build/test commands remain in `.idd/verification.yaml`.
+
+Engineering Rules do not replace shared product intent. Product-visible shared
+behavior such as keyboard interaction, accessibility, common validation, and
+compatibility remains in Intent even when a separate Engineering Rule prescribes
+the shared implementation mechanism.
+
+See `engineering-guardrails.md` in canonical skill references for the exact
+rule/index format, deterministic structural validation, and direct/Factory
+propagation protocol.
 
 ## Optional Project Glossary
 
@@ -137,12 +182,16 @@ Git history stores glossary revisions just as it stores specification revisions.
 
 ## Durable Constraint vs Implementation Detail
 
-Ask: **Would a different correct implementation still be allowed?** If yes, the
-specific detail is probably not intent.
+Ask first whether the constraint is part of the product contract or only a
+durable implementation rule.
 
-Durable technical constraints, durable architecture boundaries, and verification
-rules describe what future implementations must preserve. Current code structure
-and local execution mechanics do not.
+If another implementation can completely preserve product behavior and public,
+domain, compatibility, security, and operability contracts but would still be
+forbidden by the project rule, that rule normally belongs in Engineering rather
+than product Intent.
+
+Current code structure and local execution mechanics remain incidental unless a
+separate durable contract makes them normative.
 
 Durable constraint:
 
@@ -209,7 +258,9 @@ Before changing `.idd/intent/`, decide:
 ## Project Directory
 
 IDD projects use `.idd/intent/` for current product intent and current
-decision/research records, with an optional project glossary:
+decision/research records, with an optional project glossary. They may also use
+the separate optional `.idd/engineering/` layer for durable implementation
+guardrails:
 
 ```text
 .idd/intent/
@@ -220,6 +271,11 @@ decision/research records, with an optional project glossary:
     spec.md
     adr.md
     spike.md
+
+.idd/engineering/         optional
+  README.md
+  INDEX.md
+  ENG-NNNN.rule-*.md
 ```
 
 Use these meanings:
@@ -227,6 +283,9 @@ Use these meanings:
 ```text
 .idd/intent/              current product intent, ADRs, active spikes,
                           and optional glossary support
+.idd/engineering/         current durable implementation guardrails
+.idd/verification.yaml    operational verification policy
+.idd/factory/             temporary Factory state when Factory is used
 ```
 
 Small product-neutral changes belong in commit messages, not in `.idd/intent/`.
