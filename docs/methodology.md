@@ -49,8 +49,10 @@ If no, do not persist it in current intent. If yes, record the minimum required 
 ## Durable and Temporary Knowledge
 
 ```text
-product intent       durable product knowledge
+product intent       durable product behavior and product-significant contracts
+engineering rules    optional durable implementation guardrails
 project glossary     optional shared vocabulary
+verification policy  optional operational evidence commands
 plugin workflows     reusable methodology knowledge
 implementation       replaceable code, tests, and architecture
 temporary work       plans, tasks, status, reviews, and chat
@@ -68,8 +70,8 @@ Keep:
 product behavior
 user scenarios
 domain contracts
-accepted architecture decisions
-important constraints
+accepted architecture decisions and rationale
+product-significant constraints
 non-goals
 acceptance criteria
 verification rules
@@ -86,7 +88,46 @@ chat summaries
 local scratch files
 agent delivery files
 commands tied only to the current toolchain
+implementation-only durable conventions that belong in Engineering
 ```
+
+## Optional Engineering Guardrails
+
+A project may optionally keep durable implementation constraints in
+`.idd/engineering/`. This layer is separate from product intent.
+
+Use Intent for externally observable behavior, public/domain/compatibility
+contracts, and product-significant operational properties. Use Engineering when
+another implementation could preserve the complete product contract but would
+still be forbidden by a durable architecture, consistency, maintainability, or
+engineering convention.
+
+For example:
+
+```text
+Dialogs have consistent keyboard behavior.              -> Intent
+Dialogs obtain keyboard behavior from shared Dialog UI. -> Engineering
+```
+
+Engineering Rules use stable `ENG-NNNN` identifiers. `Always` rules apply to
+every implementation task and are enumerated mechanically. `Conditional`
+rules are selected semantically from their human-readable `Applies when`
+metadata. IDD does not use filename, keyword, path, file-extension, project-type,
+embedding, or similarity heuristics to determine Conditional applicability.
+
+The Engineering INDEX is read first for cheap discovery. Full rule documents are
+loaded only for all Always rules and the relevant Conditional rules. Malformed
+or ambiguous Engineering structure blocks implementation rather than being
+silently ignored.
+
+Rule verification sections describe required evidence or properties; operational
+commands stay in `.idd/verification.yaml`.
+
+The layer is optional and is not created automatically by
+`idd-project-init`. Git owns its history and there is no Engineering archive.
+
+See [Engineering Guardrails](engineering-guardrails.md) for the exact format and
+direct/Factory protocol.
 
 ## Optional Project Glossary
 
