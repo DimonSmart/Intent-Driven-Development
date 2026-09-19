@@ -5,6 +5,12 @@ multi-task orchestration. Factory is a thin semantic orchestration skill over
 native child-agent capabilities. It is not a workflow engine, process runtime,
 MCP transport, retry engine, or durable implementation database.
 
+## Required references
+
+Read `references/engineering-guardrails.md` before using an optional
+`.idd/engineering/` layer. Read `references/project-verification.md` before
+project verification.
+
 ## Required host capabilities
 
 Factory requires the platform adapter to provide all of these properties:
@@ -32,6 +38,11 @@ implementation when the request requires it. Factory workers never update
 durable intent themselves, and intent changes are not Factory tasks.
 
 Continuation of an existing simplified run does not repeat initial preflight.
+
+If `.idd/engineering/` exists, run the deterministic structural validation
+defined in `references/engineering-guardrails.md` before planning or worker
+execution. A malformed Engineering layer is a blocking diagnostic. Absence of
+the layer is valid and produces no warning.
 
 For an explicit replacement request, resolve the complete replacement request,
 run replacement preflight, and only then replace the temporary Factory state. If
@@ -109,9 +120,11 @@ while true:
 
         Question -> persist question.md and stop
         Done     -> run project verification
-        Tasks    -> persist the current batch in plan.md
+        Tasks    -> persist the planner output for the current batch in plan.md
 
     take the first remaining task
+    deterministically re-read the current Engineering INDEX
+    enumerate all current Always ENG IDs
     run one fresh worker
     wait natively for its terminal result
 
@@ -134,8 +147,14 @@ completed summaries, and the latest bounded project-verification failure when
 present. The planner discovers current durable intent through the normal
 `.idd/intent/README.md` and `INDEX.md` flow and reads only relevant documents.
 
+When `.idd/engineering/` exists, also give the planner access to its README and
+INDEX. The planner semantically selects only relevant Conditional rules and
+emits them as `TaskRelatedEngineering`. It does not emit Always rules. Full
+Always documents are not automatically loaded into planner context, though the
+planner may read one when its content is necessary for correct decomposition.
+
 Do not forward the parent transcript or automatically load the complete intent
-tree.
+or Engineering trees.
 
 ### Fresh worker
 
@@ -145,11 +164,20 @@ fresh semantic context. Give it:
 ```text
 Task
 TaskRelatedIntent IDs, when present
+TaskRelatedEngineering IDs, when present
+AlwaysEngineering IDs, mechanically enumerated immediately before this worker
 current repository
 ```
 
-Do not give it previous worker transcripts. The worker resolves selected intent
-IDs from the current repository and performs reasonable task-local checks.
+Do not give it previous worker transcripts. The worker resolves selected
+Intent and Engineering IDs from the current repository and performs reasonable
+task-local checks.
+
+`AlwaysEngineering` is not planner output and does not need to be persisted in
+`plan.md`. Before every worker execution, mechanically enumerate all current
+INDEX entries whose Applicability is `Always`, validate that they resolve
+uniquely to matching current rule documents, and pass those IDs separately.
+Always rules are enumerated, never semantically selected.
 
 Workers run sequentially against the shared workspace. Do not add parallel
 write workers in this workflow.
@@ -179,7 +207,8 @@ have produced them.
 
 The planner returns exactly one of:
 
-- one or more `# Task` sections with optional `# TaskRelatedIntent`;
+- one or more `# Task` sections with optional `# TaskRelatedIntent` and
+  optional `# TaskRelatedEngineering`;
 - exactly one `# Question`;
 - exactly `# Done`.
 
@@ -223,8 +252,10 @@ configured, planner `# Done` after ordinary worker checks completes Factory.
 Semantic relevance belongs to agents. Mechanical operations belong to code or
 the host.
 
-Do not solve semantic tasks with deterministic code. Do not ask an LLM to do
-simple mechanical resolution, persistence, or file operations that the host can
-perform directly. Any proposed Factory feature that requires a new lifecycle
+Do not solve semantic tasks with deterministic code. Conditional Engineering
+applicability is a model decision. Do not ask an LLM to do simple mechanical
+resolution, persistence, structural validation, or Always-rule enumeration that
+the host can perform directly. When the host has no native non-LLM hook, execute
+those operations as strict protocol steps without semantic selection. Any proposed Factory feature that requires a new lifecycle
 state, retry class, transition type, or recovery protocol should be presumed
 outside Factory unless separately justified.
