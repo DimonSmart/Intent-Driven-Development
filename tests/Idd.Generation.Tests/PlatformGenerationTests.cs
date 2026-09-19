@@ -21,8 +21,12 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
         AssertGeneratedSkillLayout(factoryRoot, "idd-factory");
 
         fixture.AssertFile(Path.Combine(intentRoot, "assets", "bootstrap", ".idd", "intent", "README.md"));
+        fixture.AssertFile(Path.Combine(intentRoot, "assets", "bootstrap", ".idd", "engineering", "README.md"));
+        fixture.AssertFile(Path.Combine(intentRoot, "assets", "bootstrap", ".idd", "engineering", "INDEX.md"));
         fixture.AssertFile(Path.Combine(
             intentRoot, "skills", "idd-project-init", "assets", "bootstrap", ".idd", "intent", "README.md"));
+        fixture.AssertMissing(Path.Combine(
+            intentRoot, "skills", "idd-project-init", "assets", "bootstrap", ".idd", "engineering"));
 
         fixture.AssertMissing(Path.Combine(factoryRoot, "runtime"));
         fixture.AssertMissing(Path.Combine(factoryRoot, ".mcp.json"));
@@ -36,8 +40,8 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
             AssertString(methodology.RootElement, "methodologyVersion", fixture.Version);
         }
 
-        AssertIddMetadata(intentRoot, [], ".idd/intent");
-        AssertIddMetadata(factoryRoot, ["idd-intent"], ".idd/factory");
+        AssertIddMetadata(intentRoot, [], [".idd/intent", ".idd/engineering"]);
+        AssertIddMetadata(factoryRoot, ["idd-intent"], [".idd/factory"]);
     }
 
     [Fact]
@@ -143,14 +147,14 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
         }
     }
 
-    private void AssertIddMetadata(string pluginRoot, string[] expectedDependencies, string expectedAssetDestination)
+    private void AssertIddMetadata(string pluginRoot, string[] expectedDependencies, string[] expectedAssetDestinations)
     {
         using var document = JsonDocument.Parse(fixture.ReadText(Path.Combine(pluginRoot, "idd-plugin.json")));
         var root = document.RootElement;
         AssertString(root, "version", fixture.Version);
         Assert.Equal(expectedDependencies,
             root.GetProperty("dependencies").EnumerateArray().Select(value => value.GetString()).ToArray());
-        Assert.Equal([expectedAssetDestination],
+        Assert.Equal(expectedAssetDestinations,
             root.GetProperty("assets").EnumerateArray().Select(asset => asset.GetProperty("destination").GetString()).ToArray());
     }
 
