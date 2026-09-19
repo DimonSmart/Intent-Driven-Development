@@ -8,6 +8,13 @@ Use only current `IDD-NNNN` documents in `.idd/intent/` as normative product
 intent. There is no `.idd/intent` archive lifecycle. Do not inspect deleted Git
 history unless the user explicitly asks for historical investigation.
 
+When `.idd/engineering/` exists, treat it as current project-owned durable
+implementation guardrails. Before implementation or implementation conformance
+work, mechanically validate its README, INDEX, rule identity, headings, and
+Applicability metadata. Apply every Always rule and let the model select only
+semantically relevant Conditional rules from `Applies when`. Do not load the
+complete Engineering tree by default.
+
 When implementation and specification disagree, do not assume the
 implementation is the new intent.
 
@@ -25,6 +32,8 @@ Prefer focused specification reads:
 - read `.idd/intent/README.md`;
 - read `.idd/intent/INDEX.md`;
 - read only relevant current `IDD-NNNN` documents;
+- when Engineering exists, read its README and INDEX, then full bodies only for
+  all Always and selected Conditional rules;
 - avoid importing large unrelated context into the main conversation.
 
 Large maintenance operations should produce compact summaries instead of
