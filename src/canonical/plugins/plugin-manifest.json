@@ -1,7 +1,7 @@
 {
   "plugins": {
     "idd-intent": {
-      "description": "Durable product memory for Intent-Driven Development.",
+      "description": "Durable product intent plus optional project-owned Engineering Guardrails for Intent-Driven Development.",
       "dependencies": [],
       "skills": [
         "idd-help",
@@ -84,12 +84,31 @@
           "skill": "idd-intent-import",
           "source": "src/canonical/methodology/glossary-integration.md",
           "destination": "glossary-integration.md"
+        },
+        {
+          "skill": "idd-code-implement",
+          "source": "src/canonical/methodology/engineering-guardrails.md",
+          "destination": "engineering-guardrails.md"
+        },
+        {
+          "skill": "idd-code-check-implementation",
+          "source": "src/canonical/methodology/engineering-guardrails.md",
+          "destination": "engineering-guardrails.md"
+        },
+        {
+          "skill": "idd-intent-lint",
+          "source": "src/canonical/methodology/engineering-guardrails.md",
+          "destination": "engineering-guardrails.md"
         }
       ],
       "assets": [
         {
           "source": "src/canonical/project-files/intent",
           "destination": ".idd/intent"
+        },
+        {
+          "source": "src/canonical/project-files/engineering",
+          "destination": ".idd/engineering"
         }
       ],
       "metadata": {
@@ -118,6 +137,21 @@
           "skill": "idd-factory-run",
           "source": "src/canonical/methodology/project-verification.md",
           "destination": "project-verification.md"
+        },
+        {
+          "skill": "idd-factory-run",
+          "source": "src/canonical/methodology/engineering-guardrails.md",
+          "destination": "engineering-guardrails.md"
+        },
+        {
+          "skill": "idd-factory-decompose-task",
+          "source": "src/canonical/methodology/engineering-guardrails.md",
+          "destination": "engineering-guardrails.md"
+        },
+        {
+          "skill": "idd-factory-execute-subtask",
+          "source": "src/canonical/methodology/engineering-guardrails.md",
+          "destination": "engineering-guardrails.md"
         }
       ],
       "assets": [
