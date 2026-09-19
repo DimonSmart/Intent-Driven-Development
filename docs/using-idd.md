@@ -8,7 +8,18 @@ In Factory, the original Request defines one complete Task. A Factory run
 repeatedly plans bounded batches of tasks. Executors complete each task in order,
 and strict final verification validates the complete result.
 
-For project-specific commands, use `idd-verification-configure` to create `.idd/verification.yaml`. It assigns checks by `direct`, `subtask`, `checkpoint`, and `final` context without putting commands in product intent.
+Projects may optionally keep durable implementation guardrails in
+`.idd/engineering/`. The layer is absent by default and is not created by
+`idd-project-init`. Direct implementation and Factory both apply it when
+present.
+
+For project-specific commands, use `idd-verification-configure` to create
+`.idd/verification.yaml`. It assigns checks by `direct`, `subtask`,
+`checkpoint`, and `final` context without putting commands in product intent
+or Engineering Rules.
+
+See [Engineering Guardrails](engineering-guardrails.md) for the Intent versus
+Engineering boundary and rule format.
 
 ## Find the Right Action
 
@@ -152,11 +163,16 @@ For focused implementation when current intent is already correct:
 Use idd-code-implement for the folder comparison behavior.
 ```
 
-The workflow reads relevant intent, inspects the affected code, implements the change, and verifies the result.
+The workflow reads relevant intent, applies every Always Engineering Rule plus
+semantically relevant Conditional Engineering Rules when the optional layer
+exists, inspects the affected code, implements the change, and verifies the
+result.
 
 ## Verify an Existing Implementation
 
-Use after bootstrap, refactoring, agent-generated changes, migrations, or whenever implementation and intent may have diverged:
+Use after bootstrap, refactoring, agent-generated changes, migrations, or
+whenever implementation may have diverged from product intent or applicable
+Engineering Guardrails:
 
 ```text
 Use idd-code-check-implementation for the comparison workflow.
