@@ -22,6 +22,7 @@ public sealed class NativeFactoryEndToEndLiveTests
         try
         {
             CopyDirectory(Path.Combine(caseRoot, "Template"), workspace);
+            await InitializeGitRepositoryAsync(workspace);
             PrepareCodexHome(codexHome);
 
             await RunAsync("dotnet", ["build", "tools/generate/Generate.csproj", "--nologo"], repo, null, null);
@@ -86,6 +87,15 @@ public sealed class NativeFactoryEndToEndLiveTests
         {
             try { Directory.Delete(tempRoot, recursive: true); } catch { }
         }
+    }
+
+    private static async Task InitializeGitRepositoryAsync(string workspace)
+    {
+        await RunAsync("git", ["init"], workspace, null, null);
+        await RunAsync("git", ["config", "user.name", "IDD Factory Eval"], workspace, null, null);
+        await RunAsync("git", ["config", "user.email", "idd-factory-eval@localhost"], workspace, null, null);
+        await RunAsync("git", ["add", "--all"], workspace, null, null);
+        await RunAsync("git", ["commit", "-m", "Initial eval workspace"], workspace, null, null);
     }
 
     private static void PrepareCodexHome(string target)
