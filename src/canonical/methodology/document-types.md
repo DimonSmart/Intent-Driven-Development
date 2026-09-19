@@ -5,9 +5,15 @@
 `spec` describes what the system should be. It is not a task list.
 
 Use `spec` when the change affects product behavior, domain contracts,
-durable architecture boundaries, durable technical constraints, compatibility
+product-significant architecture or operational constraints, compatibility
 expectations, non-goals, acceptance criteria, verification rules, or shared
 behavior.
+
+A durable technical constraint is not automatically product intent. If another
+implementation could preserve the complete product contract while still being
+forbidden by the constraint, the constraint normally belongs in the optional
+`.idd/engineering/` layer. Do not migrate existing intent automatically merely
+because it now fits this classification better.
 
 A spec document has no lifecycle status. Its presence in the current intent
 directory means that it is current. Do not mark a spec as `Current`,
