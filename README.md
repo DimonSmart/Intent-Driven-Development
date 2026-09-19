@@ -40,7 +40,7 @@ It is a complete standalone plugin and is sufficient for normal IDD workflows. S
 
 `idd-factory` is an optional plugin for larger tasks that benefit from incremental planning and implementation in separate fresh native-agent contexts.
 
-Projects can optionally keep `.idd/verification.yaml` as their Git-owned operational verification policy. Use `idd-verification-configure` to propose it; the policy keeps repository commands separate from product intent.
+Projects can optionally keep `.idd/engineering/` as their Git-owned durable implementation guardrails and `.idd/verification.yaml` as their operational verification policy. Engineering Rules stay separate from product intent; verification policy keeps repository commands separate from both. `idd-project-init` does not create the optional Engineering layer automatically.
 
 Factory is actively developed with a strong focus on token efficiency. Its primary optimization target is to make structured Factory-driven implementation cost close to equivalent direct Coding Agent commands in token usage — adding control and reliability without turning orchestration into a token multiplier.
 
@@ -115,6 +115,7 @@ Release-specific migration instructions are maintained on the dedicated [Updates
 ## Documentation
 
 - [IDD Use Cases](docs/using-idd.md)
+- [Engineering Guardrails](docs/engineering-guardrails.md)
 - [Verify Installation](docs/verify-installation.md)
 - [Updating IDD](docs/updating-idd.md)
 - [Updates and Breaking Changes](docs/updates-and-breaking-changes.md)
