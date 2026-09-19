@@ -13,18 +13,25 @@ intent.
 
 Describe observable behavior and domain contracts.
 
-## Durable Architecture And Constraints
+## Product-Significant Architecture And Constraints
 
-Describe only architecture boundaries and technical constraints that future
-implementations must preserve.
+Describe architecture boundaries and technical constraints here only when they
+are part of product behavior, a public/domain/compatibility contract, security,
+operability, or another product-significant property.
 
-Include future-facing constraints only when they materially affect a decision
-being made now. State the required capability, invariant, or prohibited lock-in,
-not the expected future design.
+A durable implementation-only convention is not automatically product intent.
+If another implementation could preserve the complete product contract but
+would still be forbidden by the constraint, it normally belongs in the optional
+`.idd/engineering/` layer instead.
 
-Include implementation patterns, frameworks, or libraries only when changing
-them would change product behavior, compatibility, public contracts, security,
-operability, or an accepted architecture decision.
+Include future-facing product constraints only when they materially affect a
+decision being made now. State the required capability, invariant, or prohibited
+lock-in, not the expected future design.
+
+Architecture decision rationale may be recorded in an ADR. Implementation
+patterns, frameworks, or libraries belong in this spec only when changing them
+would change product behavior, compatibility, public contracts, security, or
+operability.
 
 Do not include private class names, private methods, file names, constructor
 signatures, dependency-wiring steps, temporary workarounds, migration steps, or
