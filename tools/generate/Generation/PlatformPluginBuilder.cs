@@ -138,9 +138,16 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
                 ContentNormalizer.NormalizeContent(referenceContent)));
         }
 
-        if (StringComparer.Ordinal.Equals(skillName, "idd-project-init"))
+        var skillBootstrapDestination = skillName switch
         {
-            foreach (var asset in plugin.Assets.Where(asset => StringComparer.Ordinal.Equals(asset.Destination, ".idd/intent")))
+            "idd-project-init" => ".idd/intent",
+            "idd-engineering-change" => ".idd/engineering",
+            _ => null
+        };
+        if (skillBootstrapDestination is not null)
+        {
+            foreach (var asset in plugin.Assets.Where(asset =>
+                         StringComparer.Ordinal.Equals(asset.Destination, skillBootstrapDestination)))
             {
                 files.AddRange(BuildSkillAssetFiles(skillName, asset));
             }
