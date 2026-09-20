@@ -22,6 +22,7 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
         Assert.Contains("Always", readme, StringComparison.Ordinal);
         Assert.Contains("Conditional", readme, StringComparison.Ordinal);
         Assert.Contains("| Rule | Applicability | Applies when | Summary |", index, StringComparison.Ordinal);
+        Assert.Contains("Next ID: ENG-0001", index, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -167,6 +168,7 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
             ("idd-intent", "idd-code-implement"),
             ("idd-intent", "idd-code-check-implementation"),
             ("idd-intent", "idd-intent-lint"),
+            ("idd-intent", "idd-engineering-change"),
             ("idd-factory", "idd-factory-run"),
             ("idd-factory", "idd-factory-decompose-task"),
             ("idd-factory", "idd-factory-execute-subtask")
@@ -180,6 +182,88 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
                 "references", "engineering-guardrails.md"));
             Assert.Equal(source, GenerationFixture.NormalizeText(generated));
         }
+    }
+
+
+    [Fact]
+    public void EngineeringManagement_IsOwnedByIntentPlugin()
+    {
+        using var manifest = JsonDocument.Parse(Canonical("plugins", "plugin-manifest.json"));
+        var plugins = manifest.RootElement.GetProperty("plugins");
+        var intentSkills = plugins.GetProperty("idd-intent").GetProperty("skills")
+            .EnumerateArray().Select(value => value.GetString()).ToArray();
+
+        Assert.Contains("idd-engineering-change", intentSkills);
+        Assert.False(plugins.TryGetProperty("idd-engineering", out _));
+        Assert.Equal(2, plugins.EnumerateObject().Count());
+    }
+
+    [Fact]
+    public void EngineeringManagementSkill_DefinesLifecycleAndFactoryGuard()
+    {
+        var skill = Canonical("skills", "idd-engineering-change.md");
+
+        Assert.Contains("Supported operations: `add`, `modify`, and `remove`.", skill, StringComparison.Ordinal);
+        Assert.Contains("assets/bootstrap/.idd/engineering/", skill, StringComparison.Ordinal);
+        Assert.Contains(".idd/factory/current/request.md", skill, StringComparison.Ordinal);
+        Assert.Contains("state.json` alone, is not an active run", skill, StringComparison.Ordinal);
+        Assert.Contains("Equivalent existing Rule => `no-op`", skill, StringComparison.Ordinal);
+        Assert.Contains("Never change Next ID", skill, StringComparison.Ordinal);
+        Assert.Contains("delete its document and INDEX row, preserve Next ID", skill, StringComparison.Ordinal);
+        Assert.Contains("Do not fake it with deterministic filename, keyword, embedding, or similarity heuristics", skill, StringComparison.Ordinal);
+        Assert.Contains("This skill changes durable knowledge, not implementation", skill, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EngineeringAllocator_IsStableAndLegacyCompatible()
+    {
+        var reference = Canonical("methodology", "engineering-guardrails.md");
+        var lint = Canonical("skills", "idd-intent-lint.md");
+
+        Assert.Contains("Next ID = max(current ENG IDs) + 1", reference, StringComparison.Ordinal);
+        Assert.Contains("deleted IDs are not reused", reference, StringComparison.Ordinal);
+        Assert.Contains("valid legacy Engineering layer with no allocator line remains structurally readable", lint, StringComparison.Ordinal);
+        Assert.Contains("allocator ID is less than or equal to any current", lint, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Routing_RecognizesEngineeringChangeOperations()
+    {
+        var route = Canonical("skills", "idd-route.md");
+        var workflows = Canonical("methodology", "common-workflows.md");
+
+        Assert.Contains("- engineering-change", route, StringComparison.Ordinal);
+        Assert.Contains("| `engineering-change` | `idd-engineering-change` |", route, StringComparison.Ordinal);
+        Assert.Contains("For `product-change` and `engineering-change`, set `Operation`", route, StringComparison.Ordinal);
+        Assert.Contains("## Workflow Family: Engineering Management", workflows, StringComparison.Ordinal);
+        Assert.Contains("idd-engineering-change(operation: add | modify | remove)", workflows, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExistingIntentWorkflows_HandOffEngineeringCandidatesWithoutMutating()
+    {
+        var bootstrap = Canonical("skills", "idd-intent-bootstrap.md");
+        var import = Canonical("skills", "idd-intent-import.md");
+        var update = Canonical("skills", "idd-code-update-intent.md");
+        var audit = Canonical("skills", "idd-intent-audit.md");
+
+        Assert.Contains("offer `idd-engineering-change`", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("Bootstrap itself never writes `.idd/engineering/`", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("offer `idd-engineering-change`", import, StringComparison.Ordinal);
+        Assert.Contains("import skill itself never mutates Engineering", import, StringComparison.Ordinal);
+        Assert.Contains("this skill never creates, modifies, removes, or migrates Engineering Rules", update, StringComparison.Ordinal);
+        Assert.Contains("This audit remains", audit, StringComparison.Ordinal);
+        Assert.Contains("read-only", audit, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicSkillName_AllowsOnlyExplicitEngineeringChangeSpecialCase()
+    {
+        var validator = fixture.ReadText(Path.Combine(
+            fixture.RepoRoot, "tools", "generate", "Validation", "SkillDescriptionValidator.cs"));
+
+        Assert.Contains("idd-engineering-change|idd-(intent|code|factory)", validator, StringComparison.Ordinal);
+        Assert.DoesNotContain("idd-engineering-[a-z0-9]", validator, StringComparison.Ordinal);
     }
 
     [Fact]
