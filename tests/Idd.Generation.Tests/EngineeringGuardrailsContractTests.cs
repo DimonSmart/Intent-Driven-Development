@@ -259,11 +259,12 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
     [Fact]
     public void PublicSkillName_AllowsOnlyExplicitEngineeringChangeSpecialCase()
     {
-        var validator = fixture.ReadText(Path.Combine(
-            fixture.RepoRoot, "tools", "generate", "Validation", "SkillDescriptionValidator.cs"));
+        SkillDescriptionValidator.GuardPublicSkillName("test", "idd-engineering-change");
 
-        Assert.Contains("idd-engineering-change|idd-(intent|code|factory)", validator, StringComparison.Ordinal);
-        Assert.DoesNotContain("idd-engineering-[a-z0-9]", validator, StringComparison.Ordinal);
+        Assert.Throws<InvalidOperationException>(() =>
+            SkillDescriptionValidator.GuardPublicSkillName("test", "idd-engineering-add"));
+        Assert.Throws<InvalidOperationException>(() =>
+            SkillDescriptionValidator.GuardPublicSkillName("test", "idd-engineering-remove"));
     }
 
     [Fact]
