@@ -81,8 +81,10 @@ Therefore current specs may contain:
 
 A durable implementation-only constraint is not automatically product intent.
 Classify it separately from imported Intent. This skill does not create or
-migrate `.idd/engineering/`; report a genuine Engineering candidate as
-out-of-scope follow-up instead of forcing it into a spec.
+migrate `.idd/engineering/`; report a genuine Engineering candidate, explain
+the boundary, and offer `idd-engineering-change`. Only an explicit user
+confirmation that the constraint is durable project policy authorizes handoff.
+The import skill itself never mutates Engineering.
 
 Current specs must not contain:
 
