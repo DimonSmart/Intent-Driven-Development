@@ -15,6 +15,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\..\tools\generate\Validation\SkillReferencePathValidator.cs" Link="Generator\Validation\SkillReferencePathValidator.cs" />
+    <Compile Include="..\..\tools\generate\Validation\SkillDescriptionValidator.cs" Link="Generator\Validation\SkillDescriptionValidator.cs" />
     <Compile Include="..\..\tools\generate\Models\RoleDefinition.cs" Link="Generator\Models\RoleDefinition.cs" />
     <Compile Include="..\..\tools\generate\Models\RoleTool.cs" Link="Generator\Models\RoleTool.cs" />
     <Compile Include="..\..\tools\generate\Models\RoleToolNames.cs" Link="Generator\Models\RoleToolNames.cs" />
