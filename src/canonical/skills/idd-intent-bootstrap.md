@@ -37,8 +37,11 @@ The skill must distinguish:
 Do not infer Engineering Rules from repeated implementation patterns. Bootstrap
 owns initial product Intent only; it does not create or migrate
 `.idd/engineering/`. If explicit source material appears to define a durable
-implementation-only guardrail, report it separately as an Engineering candidate
-for future explicit management rather than writing it as product intent.
+implementation-only guardrail, report it separately as an Engineering candidate,
+explain the Intent / Engineering boundary, and offer `idd-engineering-change`.
+Only after explicit user confirmation that the candidate is durable project policy
+may it be handed off to that skill. Source code or a repeated pattern is not
+confirmation. Bootstrap itself never writes `.idd/engineering/`.
 
 Nothing becomes a current `IDD-NNNN` document until the user reviews and approves
 the proposed semantic model.
