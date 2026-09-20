@@ -27,6 +27,12 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
             intentRoot, "skills", "idd-project-init", "assets", "bootstrap", ".idd", "intent", "README.md"));
         fixture.AssertMissing(Path.Combine(
             intentRoot, "skills", "idd-project-init", "assets", "bootstrap", ".idd", "engineering"));
+        fixture.AssertFile(Path.Combine(
+            intentRoot, "skills", "idd-engineering-change", "assets", "bootstrap", ".idd", "engineering", "README.md"));
+        fixture.AssertFile(Path.Combine(
+            intentRoot, "skills", "idd-engineering-change", "assets", "bootstrap", ".idd", "engineering", "INDEX.md"));
+        fixture.AssertMissing(Path.Combine(
+            intentRoot, "skills", "idd-engineering-change", "assets", "bootstrap", ".idd", "intent"));
 
         fixture.AssertMissing(Path.Combine(factoryRoot, "runtime"));
         fixture.AssertMissing(Path.Combine(factoryRoot, ".mcp.json"));
