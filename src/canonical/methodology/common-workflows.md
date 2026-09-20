@@ -16,6 +16,8 @@ Classify the request by the thing that changes:
 
 - `product truth`: desired product behavior, constraint, acceptance rule,
   public contract, or durable architecture changes.
+- `engineering policy`: an explicit project decision adds, modifies, or removes
+  a durable implementation-only Engineering Rule.
 - `implementation only`: code structure changes while current product intent
   remains unchanged.
 - `intent structure`: current intent is moved, split, merged, renamed, or
@@ -45,22 +47,19 @@ existing source material that already expresses product meaning
 Code may be evidence during both workflows, but import must not become an
 implicit reverse-engineering workflow.
 
-### Product Operation
+### Product and Engineering Operation
 
-For product truth changes, classify the requested operation separately from
-document ownership:
+For `product-change`, classify `Operation` as `add`, `modify`, or `remove` and target current product truth under `.idd/intent/`.
 
-- `add`: introduce behavior, a constraint, an interaction, or a product rule.
-- `modify`: change existing behavior, constraints, acceptance criteria, or
-  product rules.
-- `remove`: remove existing behavior, a capability, a contract, or a product
-  rule.
+For `engineering-change`, use the same operation names independently and target current durable implementation policy under `.idd/engineering/`.
 
-Adding behavior can still update an existing spec. Removing behavior can still
-leave the owning spec in place when it contains other current intent.
+Product operations and Engineering operations do not share semantic ownership. A product constraint must not become Engineering merely because it mentions implementation, and an implementation-only durable convention must not be forced into Intent.
+
+Adding product behavior can still update an existing spec. Removing product behavior can still leave the owning spec in place when it contains other current intent. Engineering add may become a no-op or an explicit modify when an existing Rule already owns the durable constraint.
 
 Bootstrap establishes current product truth; it is not an `add` operation.
 Import normalizes source knowledge; it is not an `add` operation.
+For classifications other than `product-change` and `engineering-change`, `Operation` is `not-applicable`.
 
 ### Request Clarity
 
@@ -82,7 +81,8 @@ Classify how much of the workflow the user authorizes in the current request:
 
 - `route-only`: classify and describe the workflow without invoking another
   skill or changing files.
-- `intent-only`: perform only intent-side work. Do not implement product code or
+- `intent-only`: perform only durable IDD knowledge-side work, including
+  product Intent or Engineering management. Do not implement product code or
   start Factory execution.
 - `implementation-only`: implement or check against current intent without
   changing product intent.
@@ -139,7 +139,13 @@ routing or intent work.
 - `.idd/verification.yaml` is project-owned operational configuration, not product
   intent or Engineering Rules.
 - Git stores history.
-- Add, modify, and remove apply only to product truth changes.
+- Product `add`, `modify`, and `remove` mutate only `.idd/intent/`.
+- Engineering `add`, `modify`, and `remove` mutate only `.idd/engineering/`
+  and are owned by `idd-engineering-change`.
+- Other IDD skills may read or validate Engineering and may report or hand off
+  explicitly confirmed candidates, but they do not independently mutate Rules.
+- Repeated implementation patterns are evidence, not authority for creating
+  durable Engineering policy.
 - Implementation-only refactoring does not change product truth.
 - Intent normalization does not change product meaning.
 - Implementation evidence is not product intent by itself.
@@ -340,6 +346,30 @@ For `intent-only`, stop after the intent-side stage and report the remaining
 complete lifecycle without starting implementation. For `route-only`, do not
 start the product-change workflow at all.
 
+## Workflow Family: Engineering Management
+
+Use this workflow only for an explicit durable implementation-only project decision:
+
+```text
+explicit durable engineering decision
+-> idd-engineering-change(operation: add | modify | remove)
+-> structural validation through idd-intent-lint
+```
+
+`idd-engineering-change` is the standard mutation owner for `.idd/engineering/`. It may lazily create the Engineering layer on the first add, but `idd-project-init` does not create it. The workflow does not infer Rules from current code patterns.
+
+When the same user request also asks to change implementation, the complete lifecycle may continue:
+
+```text
+idd-engineering-change
+-> idd-code-implement or Factory
+-> idd-code-check-implementation
+```
+
+The Engineering mutation happens first. An active Factory run marked by `.idd/factory/current/request.md` blocks the mutation; management does not rewrite or re-plan active Factory state automatically.
+
+For `intent-only`, stop after Engineering management and structural validation. For `route-only`, do not start the management workflow.
+
 ## Workflow Family: Implementation Change
 
 ### Refactor While Preserving Behavior
@@ -517,7 +547,11 @@ a deliberate review concludes that no change is required.
 For `end-to-end`, product changes complete after intent is updated and coverage
 is validated against the materialized logical request, implementation is
 performed, and `idd-code-check-implementation` verifies changed, removed, and
-preserved behavior. Implementation-only work completes after verification proves
+preserved behavior. Engineering-only management completes after the requested
+mutation or semantic no-op and clean structural validation; it does not imply
+repository implementation changes. End-to-end Engineering requests continue to
+implementation only when that implementation work was explicitly requested.
+Implementation-only work completes after verification proves
 current intent was preserved. Normalization completes after semantic movement
 is checked and `idd-intent-lint` passes.
 
