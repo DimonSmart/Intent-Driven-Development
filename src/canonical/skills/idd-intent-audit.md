@@ -43,7 +43,9 @@ rules.
 
 A durable implementation-only convention is not automatically product intent.
 When one appears to be stored in Intent, report the boundary concern for human
-review; do not automatically move it to `.idd/engineering/`.
+review; do not automatically move it to `.idd/engineering/`. This audit remains
+read-only: it may recommend `idd-engineering-change`, but only after explicit
+user confirmation may a candidate be handed off for mutation.
 
 Current specs must not contain local tasks, temporary implementation notes,
 progress logs, chat history, one-off cleanup notes, plans that do not define
