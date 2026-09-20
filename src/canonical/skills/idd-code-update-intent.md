@@ -29,8 +29,9 @@ implementation.
   contract before updating intent.
 - Do not promote an implementation-only durable convention into product intent.
   If the confirmed behavior instead expresses a project Engineering Guardrail,
-  report that boundary and leave Engineering management to an explicit future
-  workflow rather than creating or migrating `.idd/engineering/` here.
+  report that boundary and offer `idd-engineering-change`. Only explicit user
+  confirmation that it should become durable project policy authorizes handoff;
+  this skill never creates, modifies, removes, or migrates Engineering Rules.
 - Do not update a specification from implementation merely because the
   implementation exists.
 - Require explicit user confirmation before making semantic changes.
