@@ -2,6 +2,8 @@
 
 Standard owner of project Engineering Rule semantic mutations: `add`, `modify`, and `remove`.
 
+Supported operations: `add`, `modify`, and `remove`.
+
 Read `references/engineering-guardrails.md` first. Use existing `idd-intent-lint` for structural validation. Engineering management stays in `idd-intent`; do not create a separate plugin, runtime, MCP server, agent, workflow engine, or Engineering lint skill.
 
 ## Boundary
