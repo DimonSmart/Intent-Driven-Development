@@ -6,5 +6,7 @@ The `Rule` column contains stable `ENG-NNNN` identifiers only. Resolve each ID t
 
 No Engineering Rules have been created yet.
 
+Next ID: ENG-0001
+
 | Rule | Applicability | Applies when | Summary |
 | --- | --- | --- | --- |
