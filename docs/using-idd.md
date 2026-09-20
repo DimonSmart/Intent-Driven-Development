@@ -11,7 +11,8 @@ and strict final verification validates the complete result.
 Projects may optionally keep durable implementation guardrails in
 `.idd/engineering/`. The layer is absent by default and is not created by
 `idd-project-init`. Direct implementation and Factory both apply it when
-present.
+present. Use `idd-engineering-change` for explicit durable Rule add, modify,
+and remove operations; current code patterns are not promoted automatically.
 
 For project-specific commands, use `idd-verification-configure` to create
 `.idd/verification.yaml`. It assigns checks by `direct`, `subtask`,
@@ -242,6 +243,8 @@ idd-route
 ```
 
 Requests to reconstruct initial intent for an existing undocumented implementation route to `idd-intent-bootstrap`; existing source specifications that need normalization route to `idd-intent-import`.
+
+Explicit durable implementation-policy mutations route to `engineering-change` and `idd-engineering-change`. Product behavior continues to route to `product-change`; repeated implementation patterns alone do not select Engineering.
 
 Glossary construction remains manual-only. Run `idd-glossary-build` explicitly or accept an explicit bootstrap/import offer.
 
