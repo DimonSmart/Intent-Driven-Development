@@ -14,6 +14,7 @@
         "idd-intent-audit",
         "idd-intent-brainstorm",
         "idd-intent-change",
+        "idd-engineering-change",
         "idd-intent-import",
         "idd-code-implement",
         "idd-intent-lint",
@@ -99,6 +100,16 @@
           "skill": "idd-intent-lint",
           "source": "src/canonical/methodology/engineering-guardrails.md",
           "destination": "engineering-guardrails.md"
+        },
+        {
+          "skill": "idd-engineering-change",
+          "source": "src/canonical/methodology/engineering-guardrails.md",
+          "destination": "engineering-guardrails.md"
+        },
+        {
+          "skill": "idd-engineering-change",
+          "source": "src/canonical/methodology/common-workflows.md",
+          "destination": "common-workflows.md"
         }
       ],
       "assets": [
