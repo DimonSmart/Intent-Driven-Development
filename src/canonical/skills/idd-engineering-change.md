@@ -16,7 +16,7 @@ Intent <-> Engineering movement requires a separate explicit semantic decision.
 
 Before any mutation:
 
-1. If `.idd/factory/current/request.md` exists, return `blocked` and mutate nothing. A directory without `request.md`, or legacy `state.json` alone, is not an active run.
+1. If `.idd/factory/current/request.md` exists, return `blocked` and mutate nothing. The current Factory run must be completed, cancelled, or explicitly restarted/replanned after the Engineering decision changes. A directory without `request.md`, or legacy `state.json` alone, is not an active run. Do not patch `plan.md`, rewrite `TaskRelatedEngineering`, restart Factory, or re-plan automatically.
 2. If `.idd/engineering/` exists, validate it first. Never bootstrap over a malformed or partial existing layer.
 3. For modify/remove, resolve the target to exactly one current Rule by `ENG-NNNN` or unambiguous semantics. Zero matches is missing; multiple plausible matches is `ambiguous`. Never choose by filename or first keyword match.
 
