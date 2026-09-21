@@ -80,18 +80,40 @@ function Invoke-LiveValidation {
 
     $previousLive = $env:IDD_RUN_LIVE_FACTORY_EVALS
     $previousEvalVersion = $env:IDD_FACTORY_EVAL_VERSION
+    $previousArtifactDir = $env:IDD_FACTORY_EVAL_ARTIFACT_DIR
+
     $env:IDD_RUN_LIVE_FACTORY_EVALS = "1"
     if (-not [string]::IsNullOrWhiteSpace($ValidationVersion)) {
         $env:IDD_FACTORY_EVAL_VERSION = $ValidationVersion
     }
 
+    if ([string]::IsNullOrWhiteSpace($env:IDD_FACTORY_EVAL_ARTIFACT_DIR)) {
+        $runId = "$(Get-Date -AsUTC -Format 'yyyyMMdd-HHmmssfff')-$([Guid]::NewGuid().ToString('N'))"
+        $env:IDD_FACTORY_EVAL_ARTIFACT_DIR = Join-Path $repoRoot "artifacts/factory-evals/$runId"
+    }
+
+    New-Item -ItemType Directory -Force -Path $env:IDD_FACTORY_EVAL_ARTIFACT_DIR | Out-Null
+    Write-Host "Live artifacts: $env:IDD_FACTORY_EVAL_ARTIFACT_DIR"
+
     try {
         Invoke-CheckedNative -FilePath "dotnet" -Arguments @("build", "tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj", "--nologo")
-        Invoke-CheckedNative -FilePath "dotnet" -Arguments @("test", "tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj", "--no-build", "--nologo", "--filter", "Category=LiveFactoryEval")
+        Invoke-CheckedNative -FilePath "dotnet" -Arguments @(
+            "test",
+            "tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj",
+            "--no-build",
+            "--nologo",
+            "--filter",
+            "Category=LiveFactoryEval",
+            "--logger",
+            "trx;LogFileName=live-tests.trx",
+            "--results-directory",
+            $env:IDD_FACTORY_EVAL_ARTIFACT_DIR
+        )
     }
     finally {
         $env:IDD_RUN_LIVE_FACTORY_EVALS = $previousLive
         $env:IDD_FACTORY_EVAL_VERSION = $previousEvalVersion
+        $env:IDD_FACTORY_EVAL_ARTIFACT_DIR = $previousArtifactDir
     }
 }
 
