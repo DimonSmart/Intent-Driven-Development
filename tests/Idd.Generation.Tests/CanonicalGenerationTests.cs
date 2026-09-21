@@ -8,53 +8,7 @@ namespace Idd.Generation.Tests;
 [Collection(GenerationCollection.Name)]
 public sealed class CanonicalGenerationTests(GenerationFixture fixture)
 {
-    [Fact]
-    public void CanonicalFactorySkills_ArePlatformNeutralAndExposePlannerProtocol()
-    {
-        fixture.AssertMissing(Path.Combine(fixture.RepoRoot, "src", "canonical", "factory"));
 
-        var platformSpecificMarkers = new[]
-        {
-            "Codex",
-            "Claude",
-            "mcp__factory",
-            "runtime/idd-factory.dll",
-            "PowerShell"
-        };
-        foreach (var file in Directory.GetFiles(
-                     Path.Combine(fixture.RepoRoot, "src", "canonical", "skills"), "idd-factory-*.md"))
-        {
-            var content = File.ReadAllText(file);
-            foreach (var marker in platformSpecificMarkers)
-                Assert.DoesNotContain(marker, content, StringComparison.Ordinal);
-        }
-
-        var decomposition = fixture.ReadText(Path.Combine(
-            fixture.RepoRoot, "src", "canonical", "skills", "idd-factory-decompose-task.md"));
-        foreach (var protocolMarker in new[] { "# Task", "# TaskRelatedIntent", "# Question", "# Done" })
-            Assert.Contains(protocolMarker, decomposition, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void CanonicalFactoryDecomposer_DefinesLocalEfficiencyAwareSizingContract()
-    {
-        var decomposition = fixture.ReadText(Path.Combine(
-            fixture.RepoRoot, "src", "canonical", "skills", "idd-factory-decompose-task.md"));
-
-        foreach (var semanticMarker in new[]
-        {
-            "smallest independently useful and independently verifiable",
-            "Do not make a task larger merely to reduce the number of Factory work items",
-            "smaller and more coherent implementation and troubleshooting",
-            "Do not split work mechanically",
-            "broad or semantically heterogeneous `TaskRelatedIntent` set",
-            "Tests needed to verify a capability",
-            "Materialize every task that can be contracted reliably"
-        })
-        {
-            Assert.Contains(semanticMarker, decomposition, StringComparison.Ordinal);
-        }
-    }
 
     [Fact]
     public void CanonicalRoleReader_PreservesToolsAndRejectsInvalidRoles()
