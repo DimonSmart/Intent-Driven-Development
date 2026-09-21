@@ -88,7 +88,7 @@ function Invoke-LiveValidation {
     }
 
     if ([string]::IsNullOrWhiteSpace($env:IDD_FACTORY_EVAL_ARTIFACT_DIR)) {
-        $runId = "$(Get-Date -AsUTC -Format 'yyyyMMdd-HHmmssfff')-$([Guid]::NewGuid().ToString('N'))"
+        $runId = "$([DateTime]::UtcNow.ToString('yyyyMMdd-HHmmssfff'))-$([Guid]::NewGuid().ToString('N'))"
         $env:IDD_FACTORY_EVAL_ARTIFACT_DIR = Join-Path $repoRoot "artifacts/factory-evals/$runId"
     }
 
