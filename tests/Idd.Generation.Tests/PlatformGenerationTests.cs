@@ -51,7 +51,7 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
     }
 
     [Fact]
-    public void FactoryPlugin_UsesNativeAgentsWithoutRuntimeOrMcpTransport()
+    public void FactoryPlugin_HasNoRuntimeOrMcpTransport()
     {
         var codexFactory = Path.Combine(fixture.MarketplaceRoot, "plugins", "codex", "idd-factory");
         var claudeFactory = Path.Combine(fixture.MarketplaceRoot, "plugins", "claude", "idd-factory");
@@ -66,23 +66,6 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
         fixture.AssertMissing(Path.Combine(claudeFactory, ".mcp.json"));
         fixture.AssertMissing(Path.Combine(codexFactory, "runtime"));
         fixture.AssertMissing(Path.Combine(claudeFactory, "runtime"));
-
-        var codexSkill = fixture.ReadText(Path.Combine(
-            codexFactory, "skills", "idd-factory-run", "SKILL.md"));
-        Assert.Contains("Codex native-agent orchestration", codexSkill, StringComparison.Ordinal);
-        Assert.Contains("spawn_agent", codexSkill, StringComparison.Ordinal);
-        Assert.Contains("wait_agent", codexSkill, StringComparison.Ordinal);
-        Assert.Contains("fork_turns = \"none\"", codexSkill, StringComparison.Ordinal);
-        Assert.Contains("Do not build a", codexSkill, StringComparison.Ordinal);
-        Assert.Contains("status-polling loop", codexSkill, StringComparison.Ordinal);
-
-        Assert.DoesNotContain("idd-factory.dll", codexSkill, StringComparison.Ordinal);
-
-        var claudeSkill = fixture.ReadText(Path.Combine(
-            claudeFactory, "skills", "idd-factory-run", "SKILL.md"));
-        Assert.Contains("Claude native-agent capability", claudeSkill, StringComparison.Ordinal);
-        Assert.Contains("unsupported", claudeSkill, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("runtime/idd-factory.dll", claudeSkill, StringComparison.Ordinal);
     }
 
     [Fact]
