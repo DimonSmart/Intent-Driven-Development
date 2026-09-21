@@ -12,8 +12,12 @@ public sealed class NativeFactoryEndToEndLiveTests
     {
         var repo = FindRepositoryRoot();
         var startedAtUtc = DateTimeOffset.UtcNow;
-        var runId = $"{startedAtUtc:yyyyMMdd-HHmmssfff}-{Guid.NewGuid():N}";
-        var artifactRoot = Path.Combine(repo, "artifacts", "factory-evals", runId);
+        var generatedRunId = $"{startedAtUtc:yyyyMMdd-HHmmssfff}-{Guid.NewGuid():N}";
+        var configuredArtifactRoot = Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_ARTIFACT_DIR");
+        var artifactRoot = string.IsNullOrWhiteSpace(configuredArtifactRoot)
+            ? Path.Combine(repo, "artifacts", "factory-evals", generatedRunId)
+            : Path.GetFullPath(configuredArtifactRoot);
+        var runId = Path.GetFileName(Path.TrimEndingDirectorySeparator(artifactRoot));
         Directory.CreateDirectory(artifactRoot);
 
         var caseRoot = Path.Combine(repo, "tests", "Idd.Factory.LiveTests", "Cases", "TwoStepCatalog");
@@ -143,6 +147,7 @@ public sealed class NativeFactoryEndToEndLiveTests
         finally
         {
             await TrySaveWorkspaceArtifactsAsync(workspace, artifactRoot);
+            await TrySaveCodexAliasesAsync(artifactRoot);
             await TrySaveLastMessageAsync(lastMessage, artifactRoot);
             await TryWriteSummaryAsync(
                 artifactRoot,
@@ -349,6 +354,24 @@ public sealed class NativeFactoryEndToEndLiveTests
         catch (Exception ex)
         {
             await TryWriteTextAsync(Path.Combine(artifactRoot, "artifact-capture-error.txt"), ex.ToString());
+        }
+    }
+
+    private static async Task TrySaveCodexAliasesAsync(string artifactRoot)
+    {
+        try
+        {
+            var stdout = Path.Combine(artifactRoot, "10-codex-exec.stdout.log");
+            if (File.Exists(stdout))
+                File.Copy(stdout, Path.Combine(artifactRoot, "codex-trace.jsonl"), overwrite: true);
+
+            var stderr = Path.Combine(artifactRoot, "10-codex-exec.stderr.log");
+            if (File.Exists(stderr))
+                File.Copy(stderr, Path.Combine(artifactRoot, "codex-stderr.log"), overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            await TryWriteTextAsync(Path.Combine(artifactRoot, "codex-alias-copy-error.txt"), ex.ToString());
         }
     }
 
