@@ -976,6 +976,13 @@ public sealed class FactoryReportEngine
             }
         }
 
+        if (end is not null)
+        {
+            agents.RemoveAll(x => x.StartedAt is not null && x.StartedAt > end);
+            plannerAgents = agents.Where(x => x.Role == "planner").OrderBy(x => x.StartedAt).ToArray();
+            workerAgents = agents.Where(x => x.Role == "worker").OrderBy(x => x.StartedAt).ToArray();
+        }
+
         var diagnostics = new List<Diagnostic>();
         diagnostics.AddRange(state.Diagnostics);
         diagnostics.AddRange(root.Diagnostics);
@@ -1247,7 +1254,11 @@ public sealed class FactoryReportEngine
             StartedAt = start,
             FinishedAt = end,
             Tokens = ComputeSegmentTokens(root.Events, start, end),
-            Tools = AnalyzeTools(segmentEvents, "Factory root"),
+            Tools = AnalyzeTools(
+                segmentEvents.Where(x =>
+                    (start is null || x.Timestamp is null || x.Timestamp >= start) &&
+                    (end is null || x.Timestamp is null || x.Timestamp <= end)),
+                "Factory root"),
             RolloutPath = verbose ? root.Path : null
         };
     }
