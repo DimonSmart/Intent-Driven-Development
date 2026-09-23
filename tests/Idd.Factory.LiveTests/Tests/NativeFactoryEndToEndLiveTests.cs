@@ -97,7 +97,7 @@ public sealed class NativeFactoryEndToEndLiveTests
             var result = await RunAsync(
                 codex,
                 [
-                    "exec", "--json", "--ephemeral", "--ignore-rules",
+                    "exec", "--json", "--ignore-rules",
                     "--enable", "multi_agent", "--disable", "multi_agent_v2",
                     "--enable", "plugins", "--disable", "remote_plugin",
                     "-c", "agents.max_depth=2",
