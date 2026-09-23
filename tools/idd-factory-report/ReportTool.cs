@@ -299,7 +299,7 @@ public sealed class CodexRolloutReader
                 if (type == "agent_message") role = "assistant";
 
                 var text = ExtractText(eventObject);
-                if (text is null && !ReferenceEquals(eventObject, payload))
+                if (text is null && item is not null)
                     text = ExtractText(payload);
 
                 string? toolId = null;
@@ -498,7 +498,8 @@ public sealed class CodexRolloutReader
             return null;
         foreach (var name in new[] { "arguments", "input", "command", "cmd" })
         {
-            if (!element.TryGetProperty(name, out var value))
+            if (!element.TryGetProperty(name, out var value) ||
+                value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
                 continue;
             return value.ValueKind == JsonValueKind.String ? value.GetString() : value.GetRawText();
         }
@@ -1156,9 +1157,10 @@ public sealed class FactoryReportEngine
                 queue.Enqueue(edge.Key);
                 if (!byId.TryGetValue(edge.Key, out var child))
                     continue;
-                if (runStart is not null && child.StartedAt is not null && child.StartedAt < runStart)
+                var childActivityStart = ActivityStartedAt(child);
+                if (runStart is not null && childActivityStart is not null && childActivityStart < runStart)
                     continue;
-                if (nextRunStart is not null && child.StartedAt is not null && child.StartedAt >= nextRunStart)
+                if (nextRunStart is not null && childActivityStart is not null && childActivityStart >= nextRunStart)
                     continue;
                 result.Add(child);
             }
@@ -1166,6 +1168,9 @@ public sealed class FactoryReportEngine
 
         return result;
     }
+
+    private static DateTimeOffset? ActivityStartedAt(CodexRollout rollout) =>
+        rollout.Events.FirstOrDefault(x => x.Type != "session_meta")?.Timestamp ?? rollout.StartedAt;
 
     private static List<AgentReport> BuildAgents(
         CodexRollout root,
@@ -1185,7 +1190,7 @@ public sealed class FactoryReportEngine
                 ThreadId = child.ThreadId,
                 ParentThreadId = child.ParentThreadId ?? state.ParentByChild.GetValueOrDefault(child.ThreadId),
                 Role = role,
-                StartedAt = child.StartedAt,
+                StartedAt = ActivityStartedAt(child),
                 FinishedAt = child.FinishedAt,
                 Task = task,
                 PlannerOutcome = outcome,
@@ -1410,14 +1415,19 @@ public sealed class FactoryReportEngine
 
     private static string? ExtractCommand(string? arguments)
     {
-        if (string.IsNullOrWhiteSpace(arguments))
+        if (string.IsNullOrWhiteSpace(arguments) ||
+            string.Equals(arguments.Trim(), "null", StringComparison.OrdinalIgnoreCase))
             return null;
         try
         {
             using var doc = JsonDocument.Parse(arguments);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                return arguments;
+
             foreach (var name in new[] { "cmd", "command", "input" })
             {
-                if (doc.RootElement.TryGetProperty(name, out var value))
+                if (doc.RootElement.TryGetProperty(name, out var value) &&
+                    value.ValueKind is not JsonValueKind.Null and not JsonValueKind.Undefined)
                     return value.ValueKind == JsonValueKind.String ? value.GetString() : value.GetRawText();
             }
         }
