@@ -1187,6 +1187,7 @@ public sealed class FactoryReportEngine
                 queue.Enqueue(edge.Key);
                 if (!byId.TryGetValue(edge.Key, out var child))
                     continue;
+                child.ParentThreadId ??= parent;
                 var childActivityStart = ActivityStartedAt(child);
                 if (runStart is not null && childActivityStart is not null && childActivityStart < runStart)
                     continue;
