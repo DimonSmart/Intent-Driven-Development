@@ -1178,6 +1178,13 @@ public sealed class FactoryReportEngine
 
         var rootReportedTokens = ComputeRootReportedTokens(root.Events, end);
         var tokenMetrics = AggregateTokens(agents, out var tokenMethod, out var tokenComplete);
+        if (rootReportedTokens.Available && agents.Any(x => x.Role != "root" && x.Tokens.Available))
+        {
+            tokenMetrics = new TokenMetrics();
+            tokenMethod = "overlap-unknown";
+            tokenComplete = false;
+        }
+
         var tokenStatus = tokenMethod == "overlap-unknown"
             ? "overlap-unknown"
             : tokenComplete ? "complete" : "unavailable";
@@ -2228,6 +2235,8 @@ public static class ReportWriters
         writer.WriteLine($"Duration: {FormatDuration(report.Metrics.DurationMilliseconds)}");
         if (report.Run.ResultEvidence.Count > 0)
             writer.WriteLine($"Evidence: {string.Join(", ", report.Run.ResultEvidence)}");
+        if (!string.IsNullOrWhiteSpace(report.Run.Reason))
+            writer.WriteLine($"Reason:   {report.Run.Reason}");
 
         writer.WriteLine();
         writer.WriteLine("Agents");
@@ -2252,13 +2261,26 @@ public static class ReportWriters
             writer.WriteLine("unavailable");
         foreach (var task in report.Tasks)
         {
-            writer.WriteLine($"{task.Number}. {task.Status.ToUpperInvariant()}");
-            writer.WriteLine($"   {task.Text ?? "unavailable"}");
+            writer.WriteLine($"{task.Number}. {task.Status.ToUpperInvariant(),-11} {FormatDuration(task.DurationMilliseconds),10}");
+            writer.WriteLine($"   {Short(task.Text, 180)}");
+            if (verbose)
+                writer.WriteLine($"   agent: {task.AgentThreadId}");
         }
 
         writer.WriteLine();
         writer.WriteLine("Tokens");
         writer.WriteLine("------");
+        if (report.Metrics.RootReportedTokens.Available)
+        {
+            writer.WriteLine("Root reported usage");
+            writer.WriteLine("-------------------");
+            writer.WriteLine($"Input:      {Num(report.Metrics.RootReportedTokens.InputTokens)}");
+            writer.WriteLine($"Cached:     {Num(report.Metrics.RootReportedTokens.CachedInputTokens)}");
+            writer.WriteLine($"New input:  {Num(report.Metrics.RootReportedTokens.NewInputTokens)}");
+            writer.WriteLine($"Output:     {Num(report.Metrics.RootReportedTokens.OutputTokens)}");
+            writer.WriteLine();
+        }
+
         writer.WriteLine($"{"Agent",-20} {"Input",10} {"Cached",10} {"New input",10} {"Output",10}");
         foreach (var agent in report.Agents)
         {
@@ -2266,6 +2288,7 @@ public static class ReportWriters
             writer.WriteLine($"{label,-20} {Num(agent.Tokens.InputTokens),10} {Num(agent.Tokens.CachedInputTokens),10} {Num(agent.Tokens.NewInputTokens),10} {Num(agent.Tokens.OutputTokens),10}");
         }
         writer.WriteLine($"{"Total",-20} {Num(report.Metrics.Tokens.InputTokens),10} {Num(report.Metrics.Tokens.CachedInputTokens),10} {Num(report.Metrics.Tokens.NewInputTokens),10} {Num(report.Metrics.Tokens.OutputTokens),10}");
+        writer.WriteLine($"Aggregation: {report.Metrics.TokenAggregationStatus}");
 
         writer.WriteLine();
         writer.WriteLine("Tools");
@@ -2274,6 +2297,11 @@ public static class ReportWriters
         writer.WriteLine($"Tool batches:     {report.Metrics.Tools.ToolBatches}");
         writer.WriteLine($"Commands:         {report.Metrics.Tools.Commands}");
         writer.WriteLine($"Failed commands:  {report.Metrics.Tools.FailedCommands}");
+        writer.WriteLine($"Spawn agent calls:{report.Metrics.Tools.SpawnAgentCalls,4}");
+        writer.WriteLine($"Wait agent calls: {report.Metrics.Tools.WaitAgentCalls,4}");
+        writer.WriteLine($"File operations:  {report.Metrics.Tools.FileOperations,4}");
+        writer.WriteLine($"Search operations:{report.Metrics.Tools.SearchOperations,4}");
+        writer.WriteLine($"Other:            {report.Metrics.Tools.OtherToolCalls,4}");
 
         if (report.Metrics.Tools.FailedCommandItems.Count > 0)
         {
@@ -2339,6 +2367,8 @@ public static class ReportWriters
         writer.WriteLine($"- Thread: `{report.Run.RootThreadId}`");
         writer.WriteLine($"- Run: {report.Run.RunIndex}");
         writer.WriteLine($"- Result: **{report.Run.Result.ToUpperInvariant()}**");
+        if (!string.IsNullOrWhiteSpace(report.Run.Reason))
+            writer.WriteLine($"- Reason: {report.Run.Reason}");
         writer.WriteLine($"- Started: {FormatTime(report.Run.StartedAt)}");
         writer.WriteLine($"- Finished: {FormatTime(report.Run.FinishedAt)}");
         writer.WriteLine($"- Duration: {FormatDuration(report.Metrics.DurationMilliseconds)}");
@@ -2358,7 +2388,15 @@ public static class ReportWriters
         if (report.Tasks.Count == 0)
             writer.WriteLine("unavailable");
         foreach (var task in report.Tasks)
-            writer.WriteLine($"{task.Number}. **{task.Status.ToUpperInvariant()}** — {task.Text ?? "unavailable"}");
+            writer.WriteLine($"{task.Number}. **{task.Status.ToUpperInvariant()}** ({FormatDuration(task.DurationMilliseconds)}) — {Short(task.Text, 300)}");
+        writer.WriteLine();
+        writer.WriteLine("## Token accounting");
+        writer.WriteLine();
+        writer.WriteLine($"- Root reported input: {Num(report.Metrics.RootReportedTokens.InputTokens)}");
+        writer.WriteLine($"- Root reported cached: {Num(report.Metrics.RootReportedTokens.CachedInputTokens)}");
+        writer.WriteLine($"- Root reported new input: {Num(report.Metrics.RootReportedTokens.NewInputTokens)}");
+        writer.WriteLine($"- Root reported output: {Num(report.Metrics.RootReportedTokens.OutputTokens)}");
+        writer.WriteLine($"- Aggregate status: {report.Metrics.TokenAggregationStatus}");
         writer.WriteLine();
         writer.WriteLine("## Tools");
         writer.WriteLine();
@@ -2366,6 +2404,11 @@ public static class ReportWriters
         writer.WriteLine($"- Tool batches: {report.Metrics.Tools.ToolBatches}");
         writer.WriteLine($"- Commands: {report.Metrics.Tools.Commands}");
         writer.WriteLine($"- Failed commands: {report.Metrics.Tools.FailedCommands}");
+        writer.WriteLine($"- Spawn agent calls: {report.Metrics.Tools.SpawnAgentCalls}");
+        writer.WriteLine($"- Wait agent calls: {report.Metrics.Tools.WaitAgentCalls}");
+        writer.WriteLine($"- File operations: {report.Metrics.Tools.FileOperations}");
+        writer.WriteLine($"- Search operations: {report.Metrics.Tools.SearchOperations}");
+        writer.WriteLine($"- Other: {report.Metrics.Tools.OtherToolCalls}");
         writer.WriteLine();
         writer.WriteLine("## Timeline");
         writer.WriteLine();
@@ -2409,6 +2452,14 @@ public static class ReportWriters
     }
 
     private static string Num(long? value) => value?.ToString() ?? "unavailable";
+    private static string Short(string? value, int max)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "unavailable";
+        var normalized = Regex.Replace(value, @"\s+", " ").Trim();
+        return normalized.Length <= max ? normalized : normalized[..max] + " [truncated]";
+    }
+
     private static string Present(bool value) => value ? "PRESENT" : "absent";
     private static string Available(bool value) => value ? "available" : "unavailable";
     private static string Cap(string value) => string.IsNullOrEmpty(value) ? value : char.ToUpperInvariant(value[0]) + value[1..];
