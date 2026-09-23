@@ -791,7 +791,7 @@ public sealed class FactoryReportEngine
             try
             {
                 var meta = _reader.Read(path, metadataOnly: true);
-                if (PathsEqual(meta.Cwd, repo))
+                if (PathBelongsToRepository(meta.Cwd, repo))
                     candidates.Add(path);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -946,6 +946,22 @@ public sealed class FactoryReportEngine
             }
         }
 
+        if (result == "unknown")
+        {
+            var incompleteFactoryAgent = agents.FirstOrDefault(x =>
+                x.Role is "planner" or "worker" &&
+                byId.TryGetValue(x.ThreadId, out var childRollout) &&
+                !HasTerminalEvidence(childRollout));
+            if (incompleteFactoryAgent is not null)
+            {
+                result = "interrupted";
+                resultEvidence.Add("child_without_completion");
+                end = incompleteFactoryAgent.FinishedAt;
+                endEvidence = $"{incompleteFactoryAgent.Role} child has no terminal completion evidence";
+                endConfidence = "derived";
+            }
+        }
+
         if (end is null)
         {
             var owned = segmentRootEvents.Where(IsFactoryOwned).Select(x => x.Timestamp)
@@ -1032,12 +1048,23 @@ public sealed class FactoryReportEngine
         agents.Insert(0, rootAgent);
 
         AssignSequences(agents);
-        var tasks = workerAgents.Select((x, index) => new TaskReport
+        var tasks = workerAgents.Select((x, index) =>
         {
-            Number = index + 1,
-            AgentThreadId = x.ThreadId,
-            Text = x.Task,
-            Status = HasThreadFailure(byId.GetValueOrDefault(x.ThreadId)) ? "failed" : "completed"
+            var rollout = byId.GetValueOrDefault(x.ThreadId);
+            var status = rollout is null
+                ? "unknown"
+                : HasThreadFailure(rollout)
+                    ? "failed"
+                    : HasTerminalEvidence(rollout)
+                        ? "completed"
+                        : "interrupted";
+            return new TaskReport
+            {
+                Number = index + 1,
+                AgentThreadId = x.ThreadId,
+                Text = x.Task,
+                Status = status
+            };
         }).ToList();
 
         var tokenMetrics = AggregateTokens(agents, out var tokenMethod, out var tokenComplete);
@@ -1136,10 +1163,13 @@ public sealed class FactoryReportEngine
             if (!string.IsNullOrWhiteSpace(rollout.ParentThreadId))
                 parentMap[rollout.ThreadId] = rollout.ParentThreadId!;
         }
-        foreach (var spawn in root.SpawnRecords.Values)
+        foreach (var spawningRollout in all)
         {
-            if (!string.IsNullOrWhiteSpace(spawn.ChildThreadId))
-                parentMap[spawn.ChildThreadId!] = root.ThreadId;
+            foreach (var spawn in spawningRollout.SpawnRecords.Values)
+            {
+                if (!string.IsNullOrWhiteSpace(spawn.ChildThreadId))
+                    parentMap[spawn.ChildThreadId!] = spawningRollout.ThreadId;
+            }
         }
 
         var result = new List<CodexRollout>();
@@ -1644,13 +1674,25 @@ public sealed class FactoryReportEngine
         return normalized.Length <= max ? normalized : normalized[..max] + " [truncated]";
     }
 
-    private static bool PathsEqual(string? left, string right)
+    private static bool PathBelongsToRepository(string? cwd, string repository)
     {
-        if (string.IsNullOrWhiteSpace(left))
+        if (string.IsNullOrWhiteSpace(cwd))
             return false;
         try
         {
-            return PathComparer().Equals(NormalizePath(left), NormalizePath(right));
+            var normalizedCwd = NormalizePath(cwd);
+            var normalizedRepository = NormalizePath(repository);
+            if (PathComparer().Equals(normalizedCwd, normalizedRepository))
+                return true;
+
+            var relative = Path.GetRelativePath(normalizedRepository, normalizedCwd);
+            if (Path.IsPathRooted(relative) || relative == "..")
+                return false;
+
+            var parentPrefix = ".." + Path.DirectorySeparatorChar;
+            var alternateParentPrefix = ".." + Path.AltDirectorySeparatorChar;
+            return !relative.StartsWith(parentPrefix, PathComparison()) &&
+                   !relative.StartsWith(alternateParentPrefix, PathComparison());
         }
         catch
         {
@@ -1663,6 +1705,9 @@ public sealed class FactoryReportEngine
 
     private static StringComparer PathComparer() =>
         OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+
+    private static StringComparison PathComparison() =>
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
     private sealed class ToolCallState
     {
