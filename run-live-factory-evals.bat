@@ -10,11 +10,13 @@ set "CLEANUP_EVAL_TEMP_ROOT=0"
 if not defined IDD_FACTORY_EVAL_TIMEOUT_MINUTES set "IDD_FACTORY_EVAL_TIMEOUT_MINUTES=20"
 if not defined IDD_FACTORY_EVAL_TEMP_ROOT call :CreateEvalTempRoot
 if errorlevel 1 exit /b %ERRORLEVEL%
+if not defined IDD_FACTORY_EVAL_ARTIFACT_DIR call :CreateArtifactRoot
+if errorlevel 1 exit /b %ERRORLEVEL%
 set "IDD_FACTORY_EVAL_KEEP_TEMP=1"
 
 echo [%DATE% %TIME%] Starting IDD Factory live tests.
 echo Codex timeout: %IDD_FACTORY_EVAL_TIMEOUT_MINUTES% minutes
-echo Live artifacts: %CD%\artifacts\factory-evals
+echo Live artifacts: %IDD_FACTORY_EVAL_ARTIFACT_DIR%
 echo Eval temp root: %IDD_FACTORY_EVAL_TEMP_ROOT%
 
 call :UnlockTestDll
@@ -29,7 +31,7 @@ echo [%DATE% %TIME%] Running idd-factory-report.
 if not exist "%IDD_FACTORY_EVAL_TEMP_ROOT%\workspace\.git" goto ReportUnavailable
 if not exist "%IDD_FACTORY_EVAL_TEMP_ROOT%\codex-home" goto ReportUnavailable
 
-dotnet run --project ".\tools\idd-factory-report\Idd.Factory.Report.csproj" -- latest --repo "%IDD_FACTORY_EVAL_TEMP_ROOT%\workspace" --codex-home "%IDD_FACTORY_EVAL_TEMP_ROOT%\codex-home"
+dotnet run --project ".\tools\idd-factory-report\Idd.Factory.Report.csproj" -- latest --repo "%IDD_FACTORY_EVAL_TEMP_ROOT%\workspace" --codex-home "%IDD_FACTORY_EVAL_TEMP_ROOT%\codex-home" --json "%IDD_FACTORY_EVAL_ARTIFACT_DIR%\factory-report.json" --markdown "%IDD_FACTORY_EVAL_ARTIFACT_DIR%\factory-report.md"
 set "REPORT_EXIT_CODE=%ERRORLEVEL%"
 goto Cleanup
 
@@ -44,6 +46,11 @@ if "%CLEANUP_EVAL_TEMP_ROOT%"=="1" (
 
 if not "%TEST_EXIT_CODE%"=="0" exit /b %TEST_EXIT_CODE%
 exit /b %REPORT_EXIT_CODE%
+
+:CreateArtifactRoot
+for /f "usebackq delims=" %%I in (`powershell.exe -NoLogo -NoProfile -NonInteractive -Command "$id = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmssfff') + '-' + [Guid]::NewGuid().ToString('N'); [IO.Path]::Combine($pwd.Path, 'artifacts', 'factory-evals', $id)"`) do set "IDD_FACTORY_EVAL_ARTIFACT_DIR=%%I"
+if not defined IDD_FACTORY_EVAL_ARTIFACT_DIR exit /b 1
+exit /b 0
 
 :CreateEvalTempRoot
 for /f "usebackq delims=" %%I in (`powershell.exe -NoLogo -NoProfile -NonInteractive -Command "[IO.Path]::Combine([IO.Path]::GetTempPath(), 'idd-factory-native-eval', [Guid]::NewGuid().ToString('N'))"`) do set "IDD_FACTORY_EVAL_TEMP_ROOT=%%I"

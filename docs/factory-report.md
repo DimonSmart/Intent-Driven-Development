@@ -16,9 +16,12 @@ Factory runs. The report therefore treats a Factory run as a segment inside a
 root thread, not as the whole thread.
 
 The reporter uses deterministic evidence such as an explicit
-`idd-factory-run` invocation/reference, Factory planner/worker skill identity,
-native child linkage, and terminal Factory events. It does not use an LLM,
-embeddings, Git diffs, or inferred task descriptions.
+`idd-factory-run` invocation/reference, the exact `spawn_agent` prompt,
+native child linkage (including `receiver_thread_ids`), explicit agent-role
+metadata, and terminal Factory events. Structured terminal assistant JSON such
+as `{"status":"COMPLETED","reason":"..."}` is the highest-priority result
+evidence. It does not use an LLM, embeddings, Git diffs, or inferred task
+descriptions.
 
 ## Data sources
 
@@ -81,12 +84,11 @@ When the host trace exposes the required evidence, the report shows:
 
 Root token accounting is segment-aware. Cumulative counters are differenced
 across the Factory boundary when a trustworthy pre-run baseline exists;
-per-turn counters are summed only inside the Factory segment. If the semantics
-cannot be established, the value is reported as `unavailable` (or `null` in
-JSON) rather than substituting the whole thread total.
-
-Totals are emitted only when distinct-thread aggregation is complete enough to
-avoid known double counting.
+per-turn counters are summed only inside the Factory segment. The terminal
+root-reported usage is also preserved separately even when a segment delta
+cannot be proven. If root and child accounting may overlap, aggregate Total is
+reported as unavailable with `overlap-unknown` status rather than adding the
+counters and risking double counting.
 
 ## Partial and damaged traces
 
@@ -135,3 +137,12 @@ If `latest` finds nothing, verify that:
 
 Use `--verbose` to see detected Codex capabilities and boundary/linkage
 diagnostics.
+
+## Live-eval artifacts
+
+`run-live-factory-evals.bat` assigns one artifact directory for the live run
+and writes `factory-report.json` and `factory-report.md` there after the
+test. The live harness also preserves a `report-source/` allow-list containing
+only session history, archived session history, and `state_*.sqlite` files
+when present. Authentication files such as `auth.json` are never copied into
+that report source.

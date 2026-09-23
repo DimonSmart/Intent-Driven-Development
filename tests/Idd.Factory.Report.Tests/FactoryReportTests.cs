@@ -307,6 +307,92 @@ public sealed class FactoryReportTests : IDisposable
         Assert.Equal("completed", report.Run.Result);
     }
 
+    [Fact]
+    public void RealNativeFactoryTrace_IsReportedCorrectly()
+    {
+        var repo = Path.Combine(_root, "repo-native");
+        var codex = Path.Combine(_root, "codex-native");
+        Directory.CreateDirectory(repo);
+        var dir = Path.Combine(codex, "sessions", "2026", "09", "23");
+        Directory.CreateDirectory(dir);
+
+        const string rootId = "10101010-1010-1010-1010-101010101010";
+        const string planner1 = "20202020-2020-2020-2020-202020202020";
+        const string worker1 = "30303030-3030-3030-3030-303030303030";
+        const string worker2 = "40404040-4040-4040-4040-404040404040";
+        const string planner2 = "50505050-5050-5050-5050-505050505050";
+
+        Write(Path.Combine(dir, "root.jsonl"),
+        [
+            Session(rootId, repo),
+            User("2026-09-23T10:00:00Z", "Run idd-factory-run for the requested change."),
+            NativeSpawn("2026-09-23T10:00:01Z", "p1", "Use idd-factory-decompose-task and return the next task.", planner1),
+            NativeSpawn("2026-09-23T10:00:10Z", "w1", "Use idd-factory-execute-subtask. Task: Implement MiniCatalog.ProductCode.", worker1),
+            NativeSpawn("2026-09-23T10:01:10Z", "w2", "Use idd-factory-execute-subtask. Task: Update MiniCatalog.Catalog.", worker2),
+            NativeSpawn("2026-09-23T10:02:10Z", "p2", "Use idd-factory-decompose-task and decide what remains.", planner2),
+            NativeCommandCompleted("2026-09-23T10:03:00Z", "cmd-failed", "type missing-SKILL.md", 1),
+            NativeCommandCompleted("2026-09-23T10:03:10Z", "cmd-ok", "dotnet test", 0),
+            Tokens("2026-09-23T10:03:20Z", 901767, 813568, 3477),
+            Assistant("2026-09-23T10:03:30Z", "{\"status\":\"COMPLETED\",\"reason\":\"Implemented ProductCode and Catalog\"}")
+        ]);
+
+        Write(Path.Combine(dir, "planner-1.jsonl"),
+        [
+            Session(planner1, repo),
+            User("2026-09-23T10:00:02Z", "Factory context mentions idd-factory-decompose-task and idd-factory-execute-subtask."),
+            Assistant("2026-09-23T10:00:05Z", "# Task\nImplement MiniCatalog.ProductCode")
+        ]);
+
+        Write(Path.Combine(dir, "worker-1.jsonl"),
+        [
+            Session(worker1, repo),
+            User("2026-09-23T10:00:11Z", "Inherited Factory context mentions idd-factory-decompose-task too."),
+            Tokens("2026-09-23T10:00:50Z", 1200, 700, 90),
+            Assistant("2026-09-23T10:01:00Z", "Implemented ProductCode.")
+        ]);
+
+        Write(Path.Combine(dir, "worker-2.jsonl"),
+        [
+            Session(worker2, repo),
+            User("2026-09-23T10:01:11Z", "Inherited Factory context mentions idd-factory-decompose-task too."),
+            Tokens("2026-09-23T10:01:50Z", 900, 400, 70),
+            Assistant("2026-09-23T10:02:00Z", "Updated Catalog.")
+        ]);
+
+        Write(Path.Combine(dir, "planner-2.jsonl"),
+        [
+            Session(planner2, repo),
+            User("2026-09-23T10:02:11Z", "Factory planner context."),
+            Assistant("2026-09-23T10:02:30Z", "# Done")
+        ]);
+
+        var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
+
+        Assert.Equal("completed", report.Run.Result);
+        Assert.Equal("Implemented ProductCode and Catalog", report.Run.Reason);
+        Assert.Equal("exact", report.Run.EndBoundary.Confidence);
+        Assert.Contains("structured_final_response", report.Run.ResultEvidence);
+        Assert.Equal(2, report.Metrics.PlannerInvocations);
+        Assert.Equal(2, report.Metrics.WorkerInvocations);
+        Assert.Equal(2, report.Tasks.Count);
+        Assert.All(report.Tasks, task => Assert.Equal("completed", task.Status));
+        Assert.Contains("ProductCode", report.Tasks[0].Text);
+        Assert.Contains("Catalog", report.Tasks[1].Text);
+        Assert.All(report.Tasks, task => Assert.NotNull(task.DurationMilliseconds));
+        Assert.Equal(2, report.Metrics.Tools.Commands);
+        Assert.Equal(1, report.Metrics.Tools.FailedCommands);
+        Assert.Equal(901767, report.Metrics.RootReportedTokens.InputTokens);
+        Assert.Equal(813568, report.Metrics.RootReportedTokens.CachedInputTokens);
+        Assert.Equal(88199, report.Metrics.RootReportedTokens.NewInputTokens);
+        Assert.Equal(3477, report.Metrics.RootReportedTokens.OutputTokens);
+        Assert.Equal("overlap-unknown", report.Metrics.TokenAggregationStatus);
+        Assert.False(report.Metrics.Tokens.Available);
+        Assert.Contains(report.Diagnostics, x => x.Category == "factory" && x.Code == "failed_command");
+        Assert.Contains(report.Diagnostics, x => x.Category == "reporter" && x.Code == "token_aggregation_overlap_unknown");
+        Assert.DoesNotContain(report.Diagnostics, x => x.Code == "factory_run_without_worker");
+        Assert.DoesNotContain(report.Diagnostics, x => x.Code == "factory_boundary_not_exact");
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_root, recursive: true); } catch { }
@@ -393,6 +479,36 @@ public sealed class FactoryReportTests : IDisposable
             type = "function_call_output",
             call_id = callId,
             output = $"spawned child thread {childId}"
+        }
+    };
+
+    private static object NativeSpawn(string timestamp, string id, string prompt, string childId) => new
+    {
+        timestamp,
+        type = "item.completed",
+        item = new
+        {
+            id,
+            type = "collab_tool_call",
+            tool = "spawn_agent",
+            prompt,
+            receiver_thread_ids = new[] { childId },
+            status = "completed"
+        }
+    };
+
+    private static object NativeCommandCompleted(string timestamp, string id, string command, int exitCode) => new
+    {
+        timestamp,
+        type = "item.completed",
+        item = new
+        {
+            id,
+            type = "command_execution",
+            command,
+            exit_code = exitCode,
+            status = exitCode == 0 ? "completed" : "failed",
+            aggregated_output = exitCode == 0 ? "ok" : "failed"
         }
     };
 

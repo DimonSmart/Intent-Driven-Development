@@ -156,6 +156,7 @@ public sealed class NativeFactoryEndToEndLiveTests
             await TrySaveWorkspaceArtifactsAsync(workspace, artifactRoot);
             await TrySaveCodexAliasesAsync(artifactRoot);
             await TrySaveLastMessageAsync(lastMessage, artifactRoot);
+            await TrySaveReportSourceAsync(codexHome, artifactRoot);
             await TryWriteSummaryAsync(
                 artifactRoot,
                 runId,
@@ -397,6 +398,42 @@ public sealed class NativeFactoryEndToEndLiveTests
         catch (Exception ex)
         {
             await TryWriteTextAsync(Path.Combine(artifactRoot, "last-message-copy-error.txt"), ex.ToString());
+        }
+    }
+
+    private static async Task TrySaveReportSourceAsync(string codexHome, string artifactRoot)
+    {
+        try
+        {
+            if (!Directory.Exists(codexHome))
+                return;
+
+            var destination = Path.Combine(artifactRoot, "report-source");
+            Directory.CreateDirectory(destination);
+
+            foreach (var directoryName in new[] { "sessions", "archived_sessions" })
+            {
+                var source = Path.Combine(codexHome, directoryName);
+                if (Directory.Exists(source))
+                    CopyDirectory(source, Path.Combine(destination, directoryName));
+            }
+
+            foreach (var stateFile in Directory.EnumerateFiles(codexHome, "state_*.sqlite", SearchOption.TopDirectoryOnly))
+                File.Copy(stateFile, Path.Combine(destination, Path.GetFileName(stateFile)), overwrite: true);
+
+            var manifest = JsonSerializer.Serialize(
+                new
+                {
+                    source = "allow-list",
+                    copied = new[] { "sessions/**", "archived_sessions/**", "state_*.sqlite" },
+                    excluded = new[] { "auth.json", "credentials", "API keys", "plugin credentials" }
+                },
+                new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(Path.Combine(destination, "manifest.json"), manifest);
+        }
+        catch (Exception ex)
+        {
+            await TryWriteTextAsync(Path.Combine(artifactRoot, "report-source-copy-error.txt"), ex.ToString());
         }
     }
 

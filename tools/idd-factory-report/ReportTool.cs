@@ -46,6 +46,7 @@ public sealed class RunInfo
     public BoundaryInfo StartBoundary { get; init; } = new();
     public BoundaryInfo EndBoundary { get; init; } = new();
     public string Result { get; init; } = "unknown";
+    public string? Reason { get; init; }
     public List<string> ResultEvidence { get; init; } = [];
 }
 
@@ -81,6 +82,7 @@ public sealed class TaskReport
     public string AgentThreadId { get; init; } = "";
     public string? Text { get; init; }
     public string Status { get; init; } = "unknown";
+    public long? DurationMilliseconds { get; init; }
 }
 
 public sealed class TokenMetrics
@@ -154,7 +156,9 @@ public sealed class FailedCommand
 public sealed class ReportMetrics
 {
     public TokenMetrics Tokens { get; init; } = new();
+    public TokenMetrics RootReportedTokens { get; init; } = new();
     public string TokenAggregationMethod { get; init; } = "unavailable";
+    public string TokenAggregationStatus { get; init; } = "unavailable";
     public bool TokenAggregationComplete { get; init; }
     public ToolMetrics Tools { get; init; } = new();
     public long? DurationMilliseconds { get; init; }
@@ -236,7 +240,7 @@ public sealed class SpawnRecord
 {
     public string CallId { get; init; } = "";
     public string? ChildThreadId { get; set; }
-    public string? Task { get; init; }
+    public string? Task { get; set; }
     public DateTimeOffset? Timestamp { get; init; }
 }
 
@@ -308,6 +312,7 @@ public sealed class CodexRolloutReader
                 string? toolArguments = null;
                 string? toolOutput = null;
                 string? spawnTask = null;
+                string? childThreadId = null;
 
                 var eventTypeForLifecycle = topType ?? type;
                 var itemType = String(eventObject, "type") ?? type;
@@ -339,7 +344,14 @@ public sealed class CodexRolloutReader
                 }
 
                 if (toolName?.Contains("spawn_agent", StringComparison.OrdinalIgnoreCase) == true)
+                {
                     spawnTask = ExtractSpawnTask(toolArguments);
+                    childThreadId = ExtractSpawnChildThreadId(eventObject);
+                }
+                else if (itemType is "function_call_output" or "custom_tool_call_output")
+                {
+                    childThreadId = ExtractSpawnChildThreadId(eventObject);
+                }
 
                 var usage = ExtractUsage(root, payload, out var cumulative);
 
@@ -359,6 +371,7 @@ public sealed class CodexRolloutReader
                     Status = FindString(eventObject, "status", "outcome"),
                     Usage = usage,
                     UsageIsCumulative = cumulative,
+                    ChildThreadId = childThreadId,
                     SpawnTask = spawnTask
                 });
 
@@ -394,20 +407,37 @@ public sealed class CodexRolloutReader
 
             if (e.ToolName?.Contains("spawn_agent", StringComparison.OrdinalIgnoreCase) == true)
             {
-                var record = new SpawnRecord
+                if (!spawnByCall.TryGetValue(e.ToolId, out var record))
                 {
-                    CallId = e.ToolId,
-                    Task = e.SpawnTask,
-                    Timestamp = e.Timestamp
-                };
-                spawnByCall[e.ToolId] = record;
-                rollout.SpawnRecords[e.ToolId] = record;
+                    record = new SpawnRecord
+                    {
+                        CallId = e.ToolId,
+                        Task = e.SpawnTask,
+                        Timestamp = e.Timestamp
+                    };
+                    spawnByCall[e.ToolId] = record;
+                    rollout.SpawnRecords[e.ToolId] = record;
+                }
+                else if (record.Task is null && e.SpawnTask is not null)
+                {
+                    record.Task = e.SpawnTask;
+                }
+
+                var id = e.ChildThreadId ?? ExtractThreadId(e.ToolOutput);
+                if (!string.IsNullOrWhiteSpace(id))
+                {
+                    record.ChildThreadId = id;
+                    e.ChildThreadId = id;
+                }
             }
             else if (e.ToolPhase == "output" && spawnByCall.TryGetValue(e.ToolId, out var record))
             {
-                var id = ExtractThreadId(e.ToolOutput);
-                record.ChildThreadId = id;
-                e.ChildThreadId = id;
+                var id = e.ChildThreadId ?? ExtractThreadId(e.ToolOutput);
+                if (!string.IsNullOrWhiteSpace(id))
+                {
+                    record.ChildThreadId = id;
+                    e.ChildThreadId = id;
+                }
             }
         }
     }
@@ -475,7 +505,8 @@ public sealed class CodexRolloutReader
 
     private static bool IsToolType(string? type) =>
         type is "function_call" or "mcp_tool_call" or "collab_tool_call" or "custom_tool_call"
-            or "local_shell_call" or "command_execution";
+            or "local_shell_call" or "local_shell" or "shell_command" or "exec_command"
+            or "write_stdin" or "command_execution";
 
     private static string? ExtractSpawnTask(string? arguments)
     {
@@ -496,13 +527,61 @@ public sealed class CodexRolloutReader
     {
         if (element.ValueKind != JsonValueKind.Object)
             return null;
-        foreach (var name in new[] { "arguments", "input", "command", "cmd" })
+        foreach (var name in new[] { "arguments", "prompt", "message", "task", "input", "command", "cmd" })
         {
             if (!element.TryGetProperty(name, out var value) ||
                 value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
                 continue;
             return value.ValueKind == JsonValueKind.String ? value.GetString() : value.GetRawText();
         }
+        return null;
+    }
+
+    private static string? ExtractSpawnChildThreadId(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.String)
+            return ExtractThreadId(element.GetString());
+
+        if (element.ValueKind != JsonValueKind.Object)
+            return null;
+
+        foreach (var name in new[] { "receiver_thread_ids", "receiverThreadIds" })
+        {
+            if (!element.TryGetProperty(name, out var ids))
+                continue;
+
+            if (ids.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var id in ids.EnumerateArray())
+                {
+                    if (id.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(id.GetString()))
+                        return id.GetString();
+                }
+            }
+            else if (ids.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(ids.GetString()))
+            {
+                return ids.GetString();
+            }
+        }
+
+        foreach (var name in new[] { "child_thread_id", "childThreadId", "receiver_thread_id", "receiverThreadId" })
+        {
+            if (element.TryGetProperty(name, out var id) &&
+                id.ValueKind == JsonValueKind.String &&
+                !string.IsNullOrWhiteSpace(id.GetString()))
+                return id.GetString();
+        }
+
+        foreach (var name in new[] { "output", "result", "content" })
+        {
+            if (element.TryGetProperty(name, out var nested))
+            {
+                var id = ExtractSpawnChildThreadId(nested);
+                if (!string.IsNullOrWhiteSpace(id))
+                    return id;
+            }
+        }
+
         return null;
     }
 
@@ -760,6 +839,18 @@ public sealed class FactoryReportEngine
                 child.ParentThreadId = parent;
         }
 
+        foreach (var spawningRollout in all)
+        {
+            foreach (var spawn in spawningRollout.SpawnRecords.Values)
+            {
+                if (string.IsNullOrWhiteSpace(spawn.ChildThreadId) ||
+                    !byId.TryGetValue(spawn.ChildThreadId, out var child))
+                    continue;
+
+                child.ParentThreadId ??= spawningRollout.ThreadId;
+            }
+        }
+
         var roots = all.Where(x => string.IsNullOrWhiteSpace(x.ParentThreadId)).ToArray();
         var reports = new List<FactoryRunReport>();
 
@@ -881,11 +972,22 @@ public sealed class FactoryReportEngine
 
         var resultEvidence = new List<string>();
         var result = "unknown";
+        string? resultReason = null;
         DateTimeOffset? end = null;
         string? endEvidence = null;
         var endConfidence = "unknown";
 
-        if (latestPlanner?.PlannerOutcome == "Question")
+        var structuredResult = FindStructuredFactoryResult(segmentRootEvents);
+        if (structuredResult is not null)
+        {
+            result = structuredResult.Status;
+            resultReason = structuredResult.Reason;
+            resultEvidence.Add("structured_final_response");
+            end = structuredResult.Event.Timestamp;
+            endEvidence = $"structured final response status={structuredResult.Status.ToUpperInvariant()}";
+            endConfidence = "exact";
+        }
+        else if (latestPlanner?.PlannerOutcome == "Question")
         {
             result = "question";
             resultEvidence.Add("planner_question");
@@ -1002,6 +1104,17 @@ public sealed class FactoryReportEngine
             }
         }
 
+        foreach (var unresolved in agents.Where(x => x.Role == "unknown"))
+        {
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "info",
+                Category = "reporter",
+                Code = "agent_role_unresolved",
+                Message = $"Could not determine the Factory role of child thread {unresolved.ThreadId} from explicit metadata or spawn instructions."
+            });
+        }
+
         foreach (var spawn in root.SpawnRecords.Values.Where(x =>
                      x.Timestamp >= start.Timestamp && (end is null || x.Timestamp <= end)))
         {
@@ -1029,7 +1142,7 @@ public sealed class FactoryReportEngine
             });
         }
 
-        if (workerAgents.Length == 0)
+        if (workerAgents.Length == 0 && !agents.Any(x => x.Role == "unknown"))
         {
             diagnostics.Add(new Diagnostic
             {
@@ -1070,11 +1183,34 @@ public sealed class FactoryReportEngine
                 Number = index + 1,
                 AgentThreadId = x.ThreadId,
                 Text = x.Task,
-                Status = status
+                Status = status,
+                DurationMilliseconds = x.DurationMilliseconds
             };
         }).ToList();
 
+        var rootReportedTokens = ComputeRootReportedTokens(root.Events, end);
         var tokenMetrics = AggregateTokens(agents, out var tokenMethod, out var tokenComplete);
+        if (rootReportedTokens.Available && agents.Any(x => x.Role != "root" && x.Tokens.Available))
+        {
+            tokenMetrics = new TokenMetrics();
+            tokenMethod = "overlap-unknown";
+            tokenComplete = false;
+        }
+
+        var tokenStatus = tokenMethod == "overlap-unknown"
+            ? "overlap-unknown"
+            : tokenComplete ? "complete" : "unavailable";
+        if (tokenStatus == "overlap-unknown")
+        {
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "info",
+                Category = "reporter",
+                Code = "token_aggregation_overlap_unknown",
+                Message = "Root and child token accounting may overlap; aggregate Total is intentionally unavailable."
+            });
+        }
+
         var tools = AggregateTools(agents);
         foreach (var failed in tools.FailedCommandItems)
         {
@@ -1126,6 +1262,7 @@ public sealed class FactoryReportEngine
                 },
                 EndBoundary = new BoundaryInfo { Confidence = endConfidence, Evidence = endEvidence },
                 Result = result,
+                Reason = resultReason,
                 ResultEvidence = resultEvidence
             },
             Agents = agents,
@@ -1133,7 +1270,9 @@ public sealed class FactoryReportEngine
             Metrics = new ReportMetrics
             {
                 Tokens = tokenMetrics,
+                RootReportedTokens = rootReportedTokens,
                 TokenAggregationMethod = tokenMethod,
+                TokenAggregationStatus = tokenStatus,
                 TokenAggregationComplete = tokenComplete,
                 Tools = tools,
                 DurationMilliseconds = start.Timestamp is not null && end is not null
@@ -1218,10 +1357,13 @@ public sealed class FactoryReportEngine
         bool verbose)
     {
         var agents = new List<AgentReport>();
+        var spawningRollouts = new[] { root }.Concat(descendants).ToArray();
+
         foreach (var child in descendants.OrderBy(x => x.StartedAt))
         {
-            var role = ClassifyRole(root, child, descendants);
-            var task = role == "worker" ? FindSpawnTask(root, child.ThreadId) : null;
+            var spawn = FindSpawnRecord(spawningRollouts, child.ThreadId);
+            var role = ClassifyRole(root, child, spawn);
+            var task = spawn?.Task is { } spawnTask ? Bound(spawnTask, 1000) : null;
             var outcome = role == "planner" ? PlannerOutcome(child) : null;
             agents.Add(new AgentReport
             {
@@ -1263,23 +1405,31 @@ public sealed class FactoryReportEngine
         };
     }
 
-    private static string ClassifyRole(CodexRollout root, CodexRollout child, IReadOnlyList<CodexRollout> descendants)
+    private static string ClassifyRole(CodexRollout root, CodexRollout child, SpawnRecord? spawn)
     {
         if (child.AgentRoleHint?.Contains("planner", StringComparison.OrdinalIgnoreCase) == true)
             return "planner";
         if (child.AgentRoleHint?.Contains("worker", StringComparison.OrdinalIgnoreCase) == true)
             return "worker";
 
-        var spawnTask = FindSpawnTask(root, child.ThreadId);
+        var spawnTask = spawn?.Task;
         if (spawnTask?.Contains(PlannerSkill, StringComparison.OrdinalIgnoreCase) == true)
             return "planner";
         if (spawnTask?.Contains(WorkerSkill, StringComparison.OrdinalIgnoreCase) == true)
             return "worker";
 
-        var initial = string.Join("\n", child.Events.Take(12).Select(x => x.Text ?? x.ToolArguments ?? ""));
-        if (initial.Contains(PlannerSkill, StringComparison.OrdinalIgnoreCase))
+        var initialInstructions = string.Join("\n",
+            child.Events
+                .Where(x => string.Equals(x.Role, "user", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(x.Role, "system", StringComparison.OrdinalIgnoreCase))
+                .Take(4)
+                .Select(x => x.Text ?? ""));
+
+        var mentionsPlanner = initialInstructions.Contains(PlannerSkill, StringComparison.OrdinalIgnoreCase);
+        var mentionsWorker = initialInstructions.Contains(WorkerSkill, StringComparison.OrdinalIgnoreCase);
+        if (mentionsPlanner && !mentionsWorker)
             return "planner";
-        if (initial.Contains(WorkerSkill, StringComparison.OrdinalIgnoreCase))
+        if (mentionsWorker && !mentionsPlanner)
             return "worker";
 
         if (child.ParentThreadId is not null && child.ParentThreadId != root.ThreadId)
@@ -1287,11 +1437,16 @@ public sealed class FactoryReportEngine
         return "unknown";
     }
 
-    private static string? FindSpawnTask(CodexRollout root, string childId)
+    private static SpawnRecord? FindSpawnRecord(IEnumerable<CodexRollout> rollouts, string childId)
     {
-        return root.SpawnRecords.Values.FirstOrDefault(x => x.ChildThreadId == childId)?.Task is { } task
-            ? Bound(task, 1000)
-            : null;
+        foreach (var rollout in rollouts)
+        {
+            var record = rollout.SpawnRecords.Values.FirstOrDefault(
+                x => string.Equals(x.ChildThreadId, childId, StringComparison.Ordinal));
+            if (record is not null)
+                return record;
+        }
+        return null;
     }
 
     private static string PlannerOutcome(CodexRollout rollout)
@@ -1342,6 +1497,22 @@ public sealed class FactoryReportEngine
                 x.Timestamp >= start && x.Timestamp <= end)
             .Select(x => x.Usage!)
             .ToArray();
+        return perTurn.Length == 0 ? new TokenMetrics() : TokenMetrics.Sum(perTurn);
+    }
+
+    private static TokenMetrics ComputeRootReportedTokens(
+        IReadOnlyList<CodexEvent> events,
+        DateTimeOffset? end)
+    {
+        var eligible = events
+            .Where(x => x.Usage is not null && (end is null || x.Timestamp is null || x.Timestamp <= end))
+            .ToArray();
+
+        var cumulative = eligible.LastOrDefault(x => x.UsageIsCumulative);
+        if (cumulative?.Usage is not null)
+            return cumulative.Usage;
+
+        var perTurn = eligible.Where(x => !x.UsageIsCumulative).Select(x => x.Usage!).ToArray();
         return perTurn.Length == 0 ? new TokenMetrics() : TokenMetrics.Sum(perTurn);
     }
 
@@ -1479,6 +1650,74 @@ public sealed class FactoryReportEngine
         return arguments;
     }
 
+    private static StructuredFactoryResult? FindStructuredFactoryResult(IEnumerable<CodexEvent> events)
+    {
+        foreach (var e in events.Reverse())
+        {
+            if (TryParseStructuredFactoryResult(e, out var status, out var reason))
+                return new StructuredFactoryResult(status, reason, e);
+        }
+        return null;
+    }
+
+    private static bool TryParseStructuredFactoryResult(
+        CodexEvent e,
+        out string status,
+        out string? reason)
+    {
+        status = "";
+        reason = null;
+
+        if (!string.Equals(e.Role, "assistant", StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(e.Text))
+            return false;
+
+        var text = e.Text.Trim();
+        if (text.StartsWith("```", StringComparison.Ordinal))
+        {
+            var firstNewLine = text.IndexOf('\n');
+            var closingFence = text.LastIndexOf("```", StringComparison.Ordinal);
+            if (firstNewLine >= 0 && closingFence > firstNewLine)
+                text = text[(firstNewLine + 1)..closingFence].Trim();
+        }
+
+        if (!text.StartsWith("{", StringComparison.Ordinal) ||
+            !text.EndsWith("}", StringComparison.Ordinal))
+            return false;
+
+        try
+        {
+            using var document = JsonDocument.Parse(text);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                return false;
+
+            string? rawStatus = null;
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                if (property.Name.Equals("status", StringComparison.OrdinalIgnoreCase) &&
+                    property.Value.ValueKind == JsonValueKind.String)
+                    rawStatus = property.Value.GetString();
+                else if (property.Name.Equals("reason", StringComparison.OrdinalIgnoreCase) &&
+                         property.Value.ValueKind == JsonValueKind.String)
+                    reason = property.Value.GetString();
+            }
+
+            status = rawStatus?.Trim().ToUpperInvariant() switch
+            {
+                "COMPLETED" => "completed",
+                "INTERRUPTED" => "interrupted",
+                "BLOCKED" => "blocked",
+                "QUESTION" => "question",
+                _ => ""
+            };
+            return status.Length > 0;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
     private static bool IsFactoryCompletion(CodexEvent e)
     {
         var text = e.Text;
@@ -1502,7 +1741,8 @@ public sealed class FactoryReportEngine
         e.Contains(RunSkill) || e.Contains(PlannerSkill) || e.Contains(WorkerSkill) ||
         e.ToolName?.Contains("spawn_agent", StringComparison.OrdinalIgnoreCase) == true ||
         e.ToolName?.Contains("wait_agent", StringComparison.OrdinalIgnoreCase) == true ||
-        IsFactoryCompletion(e);
+        IsFactoryCompletion(e) ||
+        TryParseStructuredFactoryResult(e, out _, out _);
 
     private static bool HasTerminalEvidence(CodexRollout rollout) =>
         rollout.Events.Any(x =>
@@ -1523,12 +1763,29 @@ public sealed class FactoryReportEngine
         out bool complete)
     {
         var distinct = agents.GroupBy(x => x.ThreadId, StringComparer.Ordinal).Select(x => x.First()).ToArray();
-        complete = distinct.Length > 0 && distinct.All(x => x.Tokens.Available);
+        if (distinct.Length == 0)
+        {
+            complete = false;
+            method = "unavailable";
+            return new TokenMetrics();
+        }
+
+        var root = distinct.FirstOrDefault(x => x.Role == "root");
+        var children = distinct.Where(x => x.Role != "root").ToArray();
+        if (root?.Tokens.Available == true && children.Any(x => x.Tokens.Available))
+        {
+            complete = false;
+            method = "overlap-unknown";
+            return new TokenMetrics();
+        }
+
+        complete = distinct.All(x => x.Tokens.Available);
         if (!complete)
         {
             method = "partial-distinct-thread-sum";
             return new TokenMetrics();
         }
+
         method = "sum-distinct-threads";
         return TokenMetrics.Sum(distinct.Select(x => x.Tokens));
     }
@@ -1720,6 +1977,8 @@ public sealed class FactoryReportEngine
 
     private static StringComparison PathComparison() =>
         OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+    private sealed record StructuredFactoryResult(string Status, string? Reason, CodexEvent Event);
 
     private sealed class ToolCallState
     {
@@ -1988,6 +2247,8 @@ public static class ReportWriters
         writer.WriteLine($"Duration: {FormatDuration(report.Metrics.DurationMilliseconds)}");
         if (report.Run.ResultEvidence.Count > 0)
             writer.WriteLine($"Evidence: {string.Join(", ", report.Run.ResultEvidence)}");
+        if (!string.IsNullOrWhiteSpace(report.Run.Reason))
+            writer.WriteLine($"Reason:   {report.Run.Reason}");
 
         writer.WriteLine();
         writer.WriteLine("Agents");
@@ -2012,13 +2273,26 @@ public static class ReportWriters
             writer.WriteLine("unavailable");
         foreach (var task in report.Tasks)
         {
-            writer.WriteLine($"{task.Number}. {task.Status.ToUpperInvariant()}");
-            writer.WriteLine($"   {task.Text ?? "unavailable"}");
+            writer.WriteLine($"{task.Number}. {task.Status.ToUpperInvariant(),-11} {FormatDuration(task.DurationMilliseconds),10}");
+            writer.WriteLine($"   {Short(task.Text, 180)}");
+            if (verbose)
+                writer.WriteLine($"   agent: {task.AgentThreadId}");
         }
 
         writer.WriteLine();
         writer.WriteLine("Tokens");
         writer.WriteLine("------");
+        if (report.Metrics.RootReportedTokens.Available)
+        {
+            writer.WriteLine("Root reported usage");
+            writer.WriteLine("-------------------");
+            writer.WriteLine($"Input:      {Num(report.Metrics.RootReportedTokens.InputTokens)}");
+            writer.WriteLine($"Cached:     {Num(report.Metrics.RootReportedTokens.CachedInputTokens)}");
+            writer.WriteLine($"New input:  {Num(report.Metrics.RootReportedTokens.NewInputTokens)}");
+            writer.WriteLine($"Output:     {Num(report.Metrics.RootReportedTokens.OutputTokens)}");
+            writer.WriteLine();
+        }
+
         writer.WriteLine($"{"Agent",-20} {"Input",10} {"Cached",10} {"New input",10} {"Output",10}");
         foreach (var agent in report.Agents)
         {
@@ -2026,6 +2300,7 @@ public static class ReportWriters
             writer.WriteLine($"{label,-20} {Num(agent.Tokens.InputTokens),10} {Num(agent.Tokens.CachedInputTokens),10} {Num(agent.Tokens.NewInputTokens),10} {Num(agent.Tokens.OutputTokens),10}");
         }
         writer.WriteLine($"{"Total",-20} {Num(report.Metrics.Tokens.InputTokens),10} {Num(report.Metrics.Tokens.CachedInputTokens),10} {Num(report.Metrics.Tokens.NewInputTokens),10} {Num(report.Metrics.Tokens.OutputTokens),10}");
+        writer.WriteLine($"Aggregation: {report.Metrics.TokenAggregationStatus}");
 
         writer.WriteLine();
         writer.WriteLine("Tools");
@@ -2034,6 +2309,11 @@ public static class ReportWriters
         writer.WriteLine($"Tool batches:     {report.Metrics.Tools.ToolBatches}");
         writer.WriteLine($"Commands:         {report.Metrics.Tools.Commands}");
         writer.WriteLine($"Failed commands:  {report.Metrics.Tools.FailedCommands}");
+        writer.WriteLine($"Spawn agent calls:{report.Metrics.Tools.SpawnAgentCalls,4}");
+        writer.WriteLine($"Wait agent calls: {report.Metrics.Tools.WaitAgentCalls,4}");
+        writer.WriteLine($"File operations:  {report.Metrics.Tools.FileOperations,4}");
+        writer.WriteLine($"Search operations:{report.Metrics.Tools.SearchOperations,4}");
+        writer.WriteLine($"Other:            {report.Metrics.Tools.OtherToolCalls,4}");
 
         if (report.Metrics.Tools.FailedCommandItems.Count > 0)
         {
@@ -2099,6 +2379,8 @@ public static class ReportWriters
         writer.WriteLine($"- Thread: `{report.Run.RootThreadId}`");
         writer.WriteLine($"- Run: {report.Run.RunIndex}");
         writer.WriteLine($"- Result: **{report.Run.Result.ToUpperInvariant()}**");
+        if (!string.IsNullOrWhiteSpace(report.Run.Reason))
+            writer.WriteLine($"- Reason: {report.Run.Reason}");
         writer.WriteLine($"- Started: {FormatTime(report.Run.StartedAt)}");
         writer.WriteLine($"- Finished: {FormatTime(report.Run.FinishedAt)}");
         writer.WriteLine($"- Duration: {FormatDuration(report.Metrics.DurationMilliseconds)}");
@@ -2118,7 +2400,15 @@ public static class ReportWriters
         if (report.Tasks.Count == 0)
             writer.WriteLine("unavailable");
         foreach (var task in report.Tasks)
-            writer.WriteLine($"{task.Number}. **{task.Status.ToUpperInvariant()}** — {task.Text ?? "unavailable"}");
+            writer.WriteLine($"{task.Number}. **{task.Status.ToUpperInvariant()}** ({FormatDuration(task.DurationMilliseconds)}) — {Short(task.Text, 300)}");
+        writer.WriteLine();
+        writer.WriteLine("## Token accounting");
+        writer.WriteLine();
+        writer.WriteLine($"- Root reported input: {Num(report.Metrics.RootReportedTokens.InputTokens)}");
+        writer.WriteLine($"- Root reported cached: {Num(report.Metrics.RootReportedTokens.CachedInputTokens)}");
+        writer.WriteLine($"- Root reported new input: {Num(report.Metrics.RootReportedTokens.NewInputTokens)}");
+        writer.WriteLine($"- Root reported output: {Num(report.Metrics.RootReportedTokens.OutputTokens)}");
+        writer.WriteLine($"- Aggregate status: {report.Metrics.TokenAggregationStatus}");
         writer.WriteLine();
         writer.WriteLine("## Tools");
         writer.WriteLine();
@@ -2126,6 +2416,11 @@ public static class ReportWriters
         writer.WriteLine($"- Tool batches: {report.Metrics.Tools.ToolBatches}");
         writer.WriteLine($"- Commands: {report.Metrics.Tools.Commands}");
         writer.WriteLine($"- Failed commands: {report.Metrics.Tools.FailedCommands}");
+        writer.WriteLine($"- Spawn agent calls: {report.Metrics.Tools.SpawnAgentCalls}");
+        writer.WriteLine($"- Wait agent calls: {report.Metrics.Tools.WaitAgentCalls}");
+        writer.WriteLine($"- File operations: {report.Metrics.Tools.FileOperations}");
+        writer.WriteLine($"- Search operations: {report.Metrics.Tools.SearchOperations}");
+        writer.WriteLine($"- Other: {report.Metrics.Tools.OtherToolCalls}");
         writer.WriteLine();
         writer.WriteLine("## Timeline");
         writer.WriteLine();
@@ -2169,6 +2464,14 @@ public static class ReportWriters
     }
 
     private static string Num(long? value) => value?.ToString() ?? "unavailable";
+    private static string Short(string? value, int max)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "unavailable";
+        var normalized = Regex.Replace(value, @"\s+", " ").Trim();
+        return normalized.Length <= max ? normalized : normalized[..max] + " [truncated]";
+    }
+
     private static string Present(bool value) => value ? "PRESENT" : "absent";
     private static string Available(bool value) => value ? "available" : "unavailable";
     private static string Cap(string value) => string.IsNullOrEmpty(value) ? value : char.ToUpperInvariant(value[0]) + value[1..];
