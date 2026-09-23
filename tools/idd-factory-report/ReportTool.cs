@@ -1631,6 +1631,74 @@ public sealed class FactoryReportEngine
         return arguments;
     }
 
+    private static StructuredFactoryResult? FindStructuredFactoryResult(IEnumerable<CodexEvent> events)
+    {
+        foreach (var e in events.Reverse())
+        {
+            if (TryParseStructuredFactoryResult(e, out var status, out var reason))
+                return new StructuredFactoryResult(status, reason, e);
+        }
+        return null;
+    }
+
+    private static bool TryParseStructuredFactoryResult(
+        CodexEvent e,
+        out string status,
+        out string? reason)
+    {
+        status = "";
+        reason = null;
+
+        if (!string.Equals(e.Role, "assistant", StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(e.Text))
+            return false;
+
+        var text = e.Text.Trim();
+        if (text.StartsWith("```", StringComparison.Ordinal))
+        {
+            var firstNewLine = text.IndexOf('\n');
+            var closingFence = text.LastIndexOf("```", StringComparison.Ordinal);
+            if (firstNewLine >= 0 && closingFence > firstNewLine)
+                text = text[(firstNewLine + 1)..closingFence].Trim();
+        }
+
+        if (!text.StartsWith("{", StringComparison.Ordinal) ||
+            !text.EndsWith("}", StringComparison.Ordinal))
+            return false;
+
+        try
+        {
+            using var document = JsonDocument.Parse(text);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                return false;
+
+            string? rawStatus = null;
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                if (property.Name.Equals("status", StringComparison.OrdinalIgnoreCase) &&
+                    property.Value.ValueKind == JsonValueKind.String)
+                    rawStatus = property.Value.GetString();
+                else if (property.Name.Equals("reason", StringComparison.OrdinalIgnoreCase) &&
+                         property.Value.ValueKind == JsonValueKind.String)
+                    reason = property.Value.GetString();
+            }
+
+            status = rawStatus?.Trim().ToUpperInvariant() switch
+            {
+                "COMPLETED" => "completed",
+                "INTERRUPTED" => "interrupted",
+                "BLOCKED" => "blocked",
+                "QUESTION" => "question",
+                _ => ""
+            };
+            return status.Length > 0;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
     private static bool IsFactoryCompletion(CodexEvent e)
     {
         var text = e.Text;
@@ -1654,7 +1722,8 @@ public sealed class FactoryReportEngine
         e.Contains(RunSkill) || e.Contains(PlannerSkill) || e.Contains(WorkerSkill) ||
         e.ToolName?.Contains("spawn_agent", StringComparison.OrdinalIgnoreCase) == true ||
         e.ToolName?.Contains("wait_agent", StringComparison.OrdinalIgnoreCase) == true ||
-        IsFactoryCompletion(e);
+        IsFactoryCompletion(e) ||
+        TryParseStructuredFactoryResult(e, out _, out _);
 
     private static bool HasTerminalEvidence(CodexRollout rollout) =>
         rollout.Events.Any(x =>
@@ -1889,6 +1958,8 @@ public sealed class FactoryReportEngine
 
     private static StringComparison PathComparison() =>
         OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+    private sealed record StructuredFactoryResult(string Status, string? Reason, CodexEvent Event);
 
     private sealed class ToolCallState
     {
