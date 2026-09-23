@@ -1338,10 +1338,13 @@ public sealed class FactoryReportEngine
         bool verbose)
     {
         var agents = new List<AgentReport>();
+        var spawningRollouts = new[] { root }.Concat(descendants).ToArray();
+
         foreach (var child in descendants.OrderBy(x => x.StartedAt))
         {
-            var role = ClassifyRole(root, child, descendants);
-            var task = role == "worker" ? FindSpawnTask(root, child.ThreadId) : null;
+            var spawn = FindSpawnRecord(spawningRollouts, child.ThreadId);
+            var role = ClassifyRole(root, child, spawn);
+            var task = spawn?.Task is { } spawnTask ? Bound(spawnTask, 1000) : null;
             var outcome = role == "planner" ? PlannerOutcome(child) : null;
             agents.Add(new AgentReport
             {
@@ -1383,23 +1386,31 @@ public sealed class FactoryReportEngine
         };
     }
 
-    private static string ClassifyRole(CodexRollout root, CodexRollout child, IReadOnlyList<CodexRollout> descendants)
+    private static string ClassifyRole(CodexRollout root, CodexRollout child, SpawnRecord? spawn)
     {
         if (child.AgentRoleHint?.Contains("planner", StringComparison.OrdinalIgnoreCase) == true)
             return "planner";
         if (child.AgentRoleHint?.Contains("worker", StringComparison.OrdinalIgnoreCase) == true)
             return "worker";
 
-        var spawnTask = FindSpawnTask(root, child.ThreadId);
+        var spawnTask = spawn?.Task;
         if (spawnTask?.Contains(PlannerSkill, StringComparison.OrdinalIgnoreCase) == true)
             return "planner";
         if (spawnTask?.Contains(WorkerSkill, StringComparison.OrdinalIgnoreCase) == true)
             return "worker";
 
-        var initial = string.Join("\n", child.Events.Take(12).Select(x => x.Text ?? x.ToolArguments ?? ""));
-        if (initial.Contains(PlannerSkill, StringComparison.OrdinalIgnoreCase))
+        var initialInstructions = string.Join("\n",
+            child.Events
+                .Where(x => string.Equals(x.Role, "user", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(x.Role, "system", StringComparison.OrdinalIgnoreCase))
+                .Take(4)
+                .Select(x => x.Text ?? ""));
+
+        var mentionsPlanner = initialInstructions.Contains(PlannerSkill, StringComparison.OrdinalIgnoreCase);
+        var mentionsWorker = initialInstructions.Contains(WorkerSkill, StringComparison.OrdinalIgnoreCase);
+        if (mentionsPlanner && !mentionsWorker)
             return "planner";
-        if (initial.Contains(WorkerSkill, StringComparison.OrdinalIgnoreCase))
+        if (mentionsWorker && !mentionsPlanner)
             return "worker";
 
         if (child.ParentThreadId is not null && child.ParentThreadId != root.ThreadId)
@@ -1407,11 +1418,16 @@ public sealed class FactoryReportEngine
         return "unknown";
     }
 
-    private static string? FindSpawnTask(CodexRollout root, string childId)
+    private static SpawnRecord? FindSpawnRecord(IEnumerable<CodexRollout> rollouts, string childId)
     {
-        return root.SpawnRecords.Values.FirstOrDefault(x => x.ChildThreadId == childId)?.Task is { } task
-            ? Bound(task, 1000)
-            : null;
+        foreach (var rollout in rollouts)
+        {
+            var record = rollout.SpawnRecords.Values.FirstOrDefault(
+                x => string.Equals(x.ChildThreadId, childId, StringComparison.Ordinal));
+            if (record is not null)
+                return record;
+        }
+        return null;
     }
 
     private static string PlannerOutcome(CodexRollout rollout)
