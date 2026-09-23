@@ -46,6 +46,7 @@ public sealed class RunInfo
     public BoundaryInfo StartBoundary { get; init; } = new();
     public BoundaryInfo EndBoundary { get; init; } = new();
     public string Result { get; init; } = "unknown";
+    public string? Reason { get; init; }
     public List<string> ResultEvidence { get; init; } = [];
 }
 
@@ -81,6 +82,7 @@ public sealed class TaskReport
     public string AgentThreadId { get; init; } = "";
     public string? Text { get; init; }
     public string Status { get; init; } = "unknown";
+    public long? DurationMilliseconds { get; init; }
 }
 
 public sealed class TokenMetrics
@@ -154,7 +156,9 @@ public sealed class FailedCommand
 public sealed class ReportMetrics
 {
     public TokenMetrics Tokens { get; init; } = new();
+    public TokenMetrics RootReportedTokens { get; init; } = new();
     public string TokenAggregationMethod { get; init; } = "unavailable";
+    public string TokenAggregationStatus { get; init; } = "unavailable";
     public bool TokenAggregationComplete { get; init; }
     public ToolMetrics Tools { get; init; } = new();
     public long? DurationMilliseconds { get; init; }
@@ -236,7 +240,7 @@ public sealed class SpawnRecord
 {
     public string CallId { get; init; } = "";
     public string? ChildThreadId { get; set; }
-    public string? Task { get; init; }
+    public string? Task { get; set; }
     public DateTimeOffset? Timestamp { get; init; }
 }
 
@@ -308,6 +312,7 @@ public sealed class CodexRolloutReader
                 string? toolArguments = null;
                 string? toolOutput = null;
                 string? spawnTask = null;
+                string? childThreadId = null;
 
                 var eventTypeForLifecycle = topType ?? type;
                 var itemType = String(eventObject, "type") ?? type;
@@ -339,7 +344,14 @@ public sealed class CodexRolloutReader
                 }
 
                 if (toolName?.Contains("spawn_agent", StringComparison.OrdinalIgnoreCase) == true)
+                {
                     spawnTask = ExtractSpawnTask(toolArguments);
+                    childThreadId = ExtractSpawnChildThreadId(eventObject);
+                }
+                else if (itemType is "function_call_output" or "custom_tool_call_output")
+                {
+                    childThreadId = ExtractSpawnChildThreadId(eventObject);
+                }
 
                 var usage = ExtractUsage(root, payload, out var cumulative);
 
@@ -359,6 +371,7 @@ public sealed class CodexRolloutReader
                     Status = FindString(eventObject, "status", "outcome"),
                     Usage = usage,
                     UsageIsCumulative = cumulative,
+                    ChildThreadId = childThreadId,
                     SpawnTask = spawnTask
                 });
 
@@ -394,20 +407,37 @@ public sealed class CodexRolloutReader
 
             if (e.ToolName?.Contains("spawn_agent", StringComparison.OrdinalIgnoreCase) == true)
             {
-                var record = new SpawnRecord
+                if (!spawnByCall.TryGetValue(e.ToolId, out var record))
                 {
-                    CallId = e.ToolId,
-                    Task = e.SpawnTask,
-                    Timestamp = e.Timestamp
-                };
-                spawnByCall[e.ToolId] = record;
-                rollout.SpawnRecords[e.ToolId] = record;
+                    record = new SpawnRecord
+                    {
+                        CallId = e.ToolId,
+                        Task = e.SpawnTask,
+                        Timestamp = e.Timestamp
+                    };
+                    spawnByCall[e.ToolId] = record;
+                    rollout.SpawnRecords[e.ToolId] = record;
+                }
+                else if (record.Task is null && e.SpawnTask is not null)
+                {
+                    record.Task = e.SpawnTask;
+                }
+
+                var id = e.ChildThreadId ?? ExtractThreadId(e.ToolOutput);
+                if (!string.IsNullOrWhiteSpace(id))
+                {
+                    record.ChildThreadId = id;
+                    e.ChildThreadId = id;
+                }
             }
             else if (e.ToolPhase == "output" && spawnByCall.TryGetValue(e.ToolId, out var record))
             {
-                var id = ExtractThreadId(e.ToolOutput);
-                record.ChildThreadId = id;
-                e.ChildThreadId = id;
+                var id = e.ChildThreadId ?? ExtractThreadId(e.ToolOutput);
+                if (!string.IsNullOrWhiteSpace(id))
+                {
+                    record.ChildThreadId = id;
+                    e.ChildThreadId = id;
+                }
             }
         }
     }
@@ -475,7 +505,8 @@ public sealed class CodexRolloutReader
 
     private static bool IsToolType(string? type) =>
         type is "function_call" or "mcp_tool_call" or "collab_tool_call" or "custom_tool_call"
-            or "local_shell_call" or "command_execution";
+            or "local_shell_call" or "local_shell" or "shell_command" or "exec_command"
+            or "write_stdin" or "command_execution";
 
     private static string? ExtractSpawnTask(string? arguments)
     {
@@ -496,13 +527,61 @@ public sealed class CodexRolloutReader
     {
         if (element.ValueKind != JsonValueKind.Object)
             return null;
-        foreach (var name in new[] { "arguments", "input", "command", "cmd" })
+        foreach (var name in new[] { "arguments", "prompt", "message", "task", "input", "command", "cmd" })
         {
             if (!element.TryGetProperty(name, out var value) ||
                 value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
                 continue;
             return value.ValueKind == JsonValueKind.String ? value.GetString() : value.GetRawText();
         }
+        return null;
+    }
+
+    private static string? ExtractSpawnChildThreadId(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.String)
+            return ExtractThreadId(element.GetString());
+
+        if (element.ValueKind != JsonValueKind.Object)
+            return null;
+
+        foreach (var name in new[] { "receiver_thread_ids", "receiverThreadIds" })
+        {
+            if (!element.TryGetProperty(name, out var ids))
+                continue;
+
+            if (ids.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var id in ids.EnumerateArray())
+                {
+                    if (id.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(id.GetString()))
+                        return id.GetString();
+                }
+            }
+            else if (ids.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(ids.GetString()))
+            {
+                return ids.GetString();
+            }
+        }
+
+        foreach (var name in new[] { "child_thread_id", "childThreadId", "receiver_thread_id", "receiverThreadId" })
+        {
+            if (element.TryGetProperty(name, out var id) &&
+                id.ValueKind == JsonValueKind.String &&
+                !string.IsNullOrWhiteSpace(id.GetString()))
+                return id.GetString();
+        }
+
+        foreach (var name in new[] { "output", "result", "content" })
+        {
+            if (element.TryGetProperty(name, out var nested))
+            {
+                var id = ExtractSpawnChildThreadId(nested);
+                if (!string.IsNullOrWhiteSpace(id))
+                    return id;
+            }
+        }
+
         return null;
     }
 
