@@ -1481,6 +1481,22 @@ public sealed class FactoryReportEngine
         return perTurn.Length == 0 ? new TokenMetrics() : TokenMetrics.Sum(perTurn);
     }
 
+    private static TokenMetrics ComputeRootReportedTokens(
+        IReadOnlyList<CodexEvent> events,
+        DateTimeOffset? end)
+    {
+        var eligible = events
+            .Where(x => x.Usage is not null && (end is null || x.Timestamp is null || x.Timestamp <= end))
+            .ToArray();
+
+        var cumulative = eligible.LastOrDefault(x => x.UsageIsCumulative);
+        if (cumulative?.Usage is not null)
+            return cumulative.Usage;
+
+        var perTurn = eligible.Where(x => !x.UsageIsCumulative).Select(x => x.Usage!).ToArray();
+        return perTurn.Length == 0 ? new TokenMetrics() : TokenMetrics.Sum(perTurn);
+    }
+
     private static ToolMetrics AnalyzeTools(IEnumerable<CodexEvent> source, string agent)
     {
         var events = source.OrderBy(x => x.Ordinal).ToArray();
@@ -1659,12 +1675,29 @@ public sealed class FactoryReportEngine
         out bool complete)
     {
         var distinct = agents.GroupBy(x => x.ThreadId, StringComparer.Ordinal).Select(x => x.First()).ToArray();
-        complete = distinct.Length > 0 && distinct.All(x => x.Tokens.Available);
+        if (distinct.Length == 0)
+        {
+            complete = false;
+            method = "unavailable";
+            return new TokenMetrics();
+        }
+
+        var root = distinct.FirstOrDefault(x => x.Role == "root");
+        var children = distinct.Where(x => x.Role != "root").ToArray();
+        if (root?.Tokens.Available == true && children.Any(x => x.Tokens.Available))
+        {
+            complete = false;
+            method = "overlap-unknown";
+            return new TokenMetrics();
+        }
+
+        complete = distinct.All(x => x.Tokens.Available);
         if (!complete)
         {
             method = "partial-distinct-thread-sum";
             return new TokenMetrics();
         }
+
         method = "sum-distinct-threads";
         return TokenMetrics.Sum(distinct.Select(x => x.Tokens));
     }
