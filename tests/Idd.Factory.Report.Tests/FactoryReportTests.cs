@@ -66,6 +66,8 @@ public sealed class FactoryReportTests : IDisposable
             CommandStarted("2026-09-23T10:04:00Z", "verify", "dotnet test"),
             CommandCompleted("2026-09-23T10:04:30Z", "verify", "dotnet test", 0),
             Assistant("2026-09-23T10:04:31Z", "Factory completed."),
+            CommandStarted("2026-09-23T10:04:40Z", "post", "dotnet build unrelated"),
+            CommandCompleted("2026-09-23T10:04:50Z", "post", "dotnet build unrelated", 1),
             User("2026-09-23T10:05:00Z", "ordinary post-factory work"),
             Tokens("2026-09-23T10:05:30Z", 999, 400, 200)
         };
@@ -91,7 +93,9 @@ public sealed class FactoryReportTests : IDisposable
         Assert.Equal(110, report.Agents.Single(x => x.Role == "root").Tokens.NewInputTokens);
         Assert.Equal(40, report.Agents.Single(x => x.Role == "root").Tokens.OutputTokens);
         Assert.Equal(DateTimeOffset.Parse("2026-09-23T10:04:31Z"), report.Run.FinishedAt);
-        Assert.DoesNotContain(report.Timeline, x => x.Timestamp >= DateTimeOffset.Parse("2026-09-23T10:05:00Z"));
+        Assert.Equal(1, report.Metrics.Tools.Commands);
+        Assert.Equal(0, report.Metrics.Tools.FailedCommands);
+        Assert.DoesNotContain(report.Timeline, x => x.Timestamp >= DateTimeOffset.Parse("2026-09-23T10:04:40Z"));
     }
 
     [Fact]
