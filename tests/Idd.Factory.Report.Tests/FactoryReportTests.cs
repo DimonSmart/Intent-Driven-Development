@@ -201,6 +201,108 @@ public sealed class FactoryReportTests : IDisposable
         }
     }
 
+
+    [Fact]
+    public void Report_MarksWorkerWithoutTerminalEvidenceAsInterrupted()
+    {
+        var repo = Path.Combine(_root, "repo-interrupted");
+        var codex = Path.Combine(_root, "codex-interrupted");
+        Directory.CreateDirectory(repo);
+        var dir = Path.Combine(codex, "sessions");
+        Directory.CreateDirectory(dir);
+
+        const string rootId = "12121212-1212-1212-1212-121212121212";
+        const string workerId = "34343434-3434-3434-3434-343434343434";
+
+        Write(Path.Combine(dir, "root.jsonl"),
+        [
+            Session(rootId, repo),
+            User("2026-09-23T10:00:00Z", "idd-factory-run"),
+            SpawnCall("2026-09-23T10:00:01Z", "w1", "Use idd-factory-execute-subtask. Task: incomplete work."),
+            SpawnOutput("2026-09-23T10:00:02Z", "w1", workerId)
+        ]);
+
+        Write(Path.Combine(dir, "worker.jsonl"),
+        [
+            Session(workerId, repo, rootId),
+            User("2026-09-23T10:00:03Z", "Factory child context")
+        ]);
+
+        var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
+
+        Assert.Equal("interrupted", report.Run.Result);
+        Assert.Contains("child_without_completion", report.Run.ResultEvidence);
+        Assert.Single(report.Tasks);
+        Assert.Equal("interrupted", report.Tasks[0].Status);
+    }
+
+    [Fact]
+    public void Report_ReconstructsNestedSpawnLinkageWithoutChildParentMetadata()
+    {
+        var repo = Path.Combine(_root, "repo-nested");
+        var codex = Path.Combine(_root, "codex-nested");
+        Directory.CreateDirectory(repo);
+        var dir = Path.Combine(codex, "sessions");
+        Directory.CreateDirectory(dir);
+
+        const string rootId = "45454545-4545-4545-4545-454545454545";
+        const string workerId = "56565656-5656-5656-5656-565656565656";
+        const string subagentId = "67676767-6767-6767-6767-676767676767";
+
+        Write(Path.Combine(dir, "root.jsonl"),
+        [
+            Session(rootId, repo),
+            User("2026-09-23T10:00:00Z", "idd-factory-run"),
+            SpawnCall("2026-09-23T10:00:01Z", "w1", "Use idd-factory-execute-subtask. Task: implementation."),
+            SpawnOutput("2026-09-23T10:00:02Z", "w1", workerId),
+            Assistant("2026-09-23T10:02:00Z", "Factory completed.")
+        ]);
+
+        Write(Path.Combine(dir, "worker.jsonl"),
+        [
+            Session(workerId, repo, rootId),
+            User("2026-09-23T10:00:03Z", "Use idd-factory-execute-subtask."),
+            SpawnCall("2026-09-23T10:00:10Z", "sub1", "Inspect the implementation independently."),
+            SpawnOutput("2026-09-23T10:00:11Z", "sub1", subagentId),
+            Assistant("2026-09-23T10:01:30Z", "Worker completed.")
+        ]);
+
+        Write(Path.Combine(dir, "subagent.jsonl"),
+        [
+            Session(subagentId, repo),
+            User("2026-09-23T10:00:12Z", "Inspect the implementation independently."),
+            Assistant("2026-09-23T10:01:00Z", "Inspection complete.")
+        ]);
+
+        var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
+        var subagent = Assert.Single(report.Agents.Where(x => x.ThreadId == subagentId));
+
+        Assert.Equal("subagent", subagent.Role);
+        Assert.Equal(workerId, subagent.ParentThreadId);
+        Assert.Equal(2, report.Metrics.MaximumDepth);
+    }
+
+    [Fact]
+    public void Report_MatchesSessionCwdInsideRepository()
+    {
+        var repo = Path.Combine(_root, "repo-subdir");
+        var cwd = Path.Combine(repo, "src", "feature");
+        var codex = Path.Combine(_root, "codex-subdir");
+        Directory.CreateDirectory(cwd);
+        var dir = Path.Combine(codex, "sessions");
+        Directory.CreateDirectory(dir);
+
+        Write(Path.Combine(dir, "root.jsonl"),
+        [
+            Session("78787878-7878-7878-7878-787878787878", cwd),
+            User("2026-09-23T10:00:00Z", "idd-factory-run"),
+            Assistant("2026-09-23T10:00:30Z", "Factory completed.")
+        ]);
+
+        var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
+        Assert.Equal("completed", report.Run.Result);
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_root, recursive: true); } catch { }
