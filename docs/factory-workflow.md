@@ -101,3 +101,9 @@ final result retrieval, and stop/close lifecycle control.
 
 If those properties are unavailable, Factory may be unsupported. Do not recreate
 a packaged C# runtime, MCP transport, process supervisor, or polling protocol.
+
+## Post-run diagnostics
+
+For deterministic post-run diagnostics and statistics over the host-owned trace,
+see [`idd-factory-report`](factory-report.md). The reporter is a development
+utility and is not part of the Factory workflow or plugin runtime.
