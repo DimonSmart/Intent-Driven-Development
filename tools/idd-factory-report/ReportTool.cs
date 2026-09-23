@@ -839,6 +839,18 @@ public sealed class FactoryReportEngine
                 child.ParentThreadId = parent;
         }
 
+        foreach (var spawningRollout in all)
+        {
+            foreach (var spawn in spawningRollout.SpawnRecords.Values)
+            {
+                if (string.IsNullOrWhiteSpace(spawn.ChildThreadId) ||
+                    !byId.TryGetValue(spawn.ChildThreadId, out var child))
+                    continue;
+
+                child.ParentThreadId ??= spawningRollout.ThreadId;
+            }
+        }
+
         var roots = all.Where(x => string.IsNullOrWhiteSpace(x.ParentThreadId)).ToArray();
         var reports = new List<FactoryRunReport>();
 
