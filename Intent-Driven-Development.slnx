@@ -1,12 +1,14 @@
 <Solution>
   <Folder Name="/tools/">
     <Project Path="tools/generate/Generate.csproj" />
+    <Project Path="tools/idd-factory-report/Idd.Factory.Report.csproj" />
   </Folder>
   <Folder Name="/benchmarks/">
     <Project Path="benchmarks/bubble-sort/acceptance/BubbleSortAcceptance.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj" />
+    <Project Path="tests/Idd.Factory.Report.Tests/Idd.Factory.Report.Tests.csproj" />
     <Project Path="tests/Idd.Generation.Tests/Idd.Generation.Tests.csproj" />
   </Folder>
 </Solution>
