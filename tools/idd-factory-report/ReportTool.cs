@@ -960,11 +960,22 @@ public sealed class FactoryReportEngine
 
         var resultEvidence = new List<string>();
         var result = "unknown";
+        string? resultReason = null;
         DateTimeOffset? end = null;
         string? endEvidence = null;
         var endConfidence = "unknown";
 
-        if (latestPlanner?.PlannerOutcome == "Question")
+        var structuredResult = FindStructuredFactoryResult(segmentRootEvents);
+        if (structuredResult is not null)
+        {
+            result = structuredResult.Status;
+            resultReason = structuredResult.Reason;
+            resultEvidence.Add("structured_final_response");
+            end = structuredResult.Event.Timestamp;
+            endEvidence = $"structured final response status={structuredResult.Status.ToUpperInvariant()}";
+            endConfidence = "exact";
+        }
+        else if (latestPlanner?.PlannerOutcome == "Question")
         {
             result = "question";
             resultEvidence.Add("planner_question");
@@ -1081,6 +1092,17 @@ public sealed class FactoryReportEngine
             }
         }
 
+        foreach (var unresolved in agents.Where(x => x.Role == "unknown"))
+        {
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "info",
+                Category = "reporter",
+                Code = "agent_role_unresolved",
+                Message = $"Could not determine the Factory role of child thread {unresolved.ThreadId} from explicit metadata or spawn instructions."
+            });
+        }
+
         foreach (var spawn in root.SpawnRecords.Values.Where(x =>
                      x.Timestamp >= start.Timestamp && (end is null || x.Timestamp <= end)))
         {
@@ -1108,7 +1130,7 @@ public sealed class FactoryReportEngine
             });
         }
 
-        if (workerAgents.Length == 0)
+        if (workerAgents.Length == 0 && !agents.Any(x => x.Role == "unknown"))
         {
             diagnostics.Add(new Diagnostic
             {
@@ -1149,11 +1171,27 @@ public sealed class FactoryReportEngine
                 Number = index + 1,
                 AgentThreadId = x.ThreadId,
                 Text = x.Task,
-                Status = status
+                Status = status,
+                DurationMilliseconds = x.DurationMilliseconds
             };
         }).ToList();
 
+        var rootReportedTokens = ComputeRootReportedTokens(root.Events, end);
         var tokenMetrics = AggregateTokens(agents, out var tokenMethod, out var tokenComplete);
+        var tokenStatus = tokenMethod == "overlap-unknown"
+            ? "overlap-unknown"
+            : tokenComplete ? "complete" : "unavailable";
+        if (tokenStatus == "overlap-unknown")
+        {
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "info",
+                Category = "reporter",
+                Code = "token_aggregation_overlap_unknown",
+                Message = "Root and child token accounting may overlap; aggregate Total is intentionally unavailable."
+            });
+        }
+
         var tools = AggregateTools(agents);
         foreach (var failed in tools.FailedCommandItems)
         {
@@ -1205,6 +1243,7 @@ public sealed class FactoryReportEngine
                 },
                 EndBoundary = new BoundaryInfo { Confidence = endConfidence, Evidence = endEvidence },
                 Result = result,
+                Reason = resultReason,
                 ResultEvidence = resultEvidence
             },
             Agents = agents,
@@ -1212,7 +1251,9 @@ public sealed class FactoryReportEngine
             Metrics = new ReportMetrics
             {
                 Tokens = tokenMetrics,
+                RootReportedTokens = rootReportedTokens,
                 TokenAggregationMethod = tokenMethod,
+                TokenAggregationStatus = tokenStatus,
                 TokenAggregationComplete = tokenComplete,
                 Tools = tools,
                 DurationMilliseconds = start.Timestamp is not null && end is not null
