@@ -21,7 +21,14 @@ public sealed class NativeFactoryEndToEndLiveTests
         Directory.CreateDirectory(artifactRoot);
 
         var caseRoot = Path.Combine(repo, "tests", "Idd.Factory.LiveTests", "Cases", "TwoStepCatalog");
-        var tempRoot = Path.Combine(Path.GetTempPath(), "idd-factory-native-eval", Guid.NewGuid().ToString("N"));
+        var configuredTempRoot = Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_TEMP_ROOT");
+        var tempRoot = string.IsNullOrWhiteSpace(configuredTempRoot)
+            ? Path.Combine(Path.GetTempPath(), "idd-factory-native-eval", Guid.NewGuid().ToString("N"))
+            : Path.GetFullPath(configuredTempRoot);
+        var preserveTempRoot = string.Equals(
+            Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_KEEP_TEMP"),
+            "1",
+            StringComparison.Ordinal);
         var workspace = Path.Combine(tempRoot, "workspace");
         var marketplace = Path.Combine(tempRoot, "marketplace");
         var codexHome = Path.Combine(tempRoot, "codex-home");
@@ -158,7 +165,10 @@ public sealed class NativeFactoryEndToEndLiveTests
                 timeoutMinutes,
                 failure);
 
-            try { Directory.Delete(tempRoot, recursive: true); } catch { }
+            if (!preserveTempRoot)
+            {
+                try { Directory.Delete(tempRoot, recursive: true); } catch { }
+            }
         }
     }
 
