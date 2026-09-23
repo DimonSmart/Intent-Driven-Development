@@ -69,6 +69,7 @@ function Invoke-FastValidation {
     try {
         Invoke-CheckedNative -FilePath "dotnet" -Arguments @("build", "Intent-Driven-Development.slnx", "--nologo")
         Invoke-CheckedNative -FilePath "dotnet" -Arguments @("test", "tests/Idd.Generation.Tests/Idd.Generation.Tests.csproj", "--no-build", "--nologo")
+        Invoke-CheckedNative -FilePath "dotnet" -Arguments @("test", "tests/Idd.Factory.Report.Tests/Idd.Factory.Report.Tests.csproj", "--no-build", "--nologo")
     }
     finally {
         $env:IDD_GENERATION_TEST_VERSION = $previousGenerationVersion
