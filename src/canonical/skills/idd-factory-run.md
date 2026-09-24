@@ -9,7 +9,8 @@ MCP transport, retry engine, or durable implementation database.
 
 Read `references/engineering-guardrails.md` before using an optional
 `.idd/engineering/` layer. Read `references/project-verification.md` before
-project verification.
+project verification. Read `references/factory-execution-policy.md` before
+interpreting `ExecutionProfile` or `.idd/execution.yaml`.
 
 ## Required host capabilities
 
@@ -70,6 +71,10 @@ summaries useful to later planners. `answers.md` contains exact user answers.
 The repository is the authoritative implementation reality. These files are
 best-effort scheduling and semantic context, not proof that a change exists.
 
+`.idd/execution.yaml`, when present, is deliberately outside
+`.idd/factory/current/`. It is project-owned execution policy that survives
+Factory runs, not temporary Factory state or workflow/runtime configuration.
+
 Do not persist attempt IDs, process IDs, retry counters, workflow states,
 transition history, changed-path snapshots, runtime ownership, verification
 graphs, or schema versions for a Factory state machine.
@@ -123,9 +128,12 @@ while true:
         Tasks    -> persist the planner output for the current batch in plan.md
 
     take the first remaining task
+    read its ExecutionProfile, defaulting missing metadata to standard
+    structurally validate .idd/execution.yaml when present
+    mechanically resolve the active-platform profile mapping
     deterministically re-read the current Engineering INDEX
     enumerate all current Always ENG IDs
-    run one fresh worker
+    spawn the same fresh worker with the resolved native model override
     wait natively for its terminal result
 
     if no trusted completed result:
@@ -155,6 +163,36 @@ planner may read one when its content is necessary for correct decomposition.
 
 Do not forward the parent transcript or automatically load the complete intent
 or Engineering trees.
+
+### Worker execution profile
+
+Immediately before every worker spawn, apply the bounded lookup from
+`references/factory-execution-policy.md`:
+
+```text
+planner ExecutionProfile
+-> default missing profile to standard
+-> project configuration lookup
+-> inherit OR exact configured active-platform model/settings
+-> native child-agent spawn
+```
+
+This is a mechanical protocol step. Do not reconsider task complexity, compare
+candidate models, optimize cost, upgrade/downgrade the profile, or choose a
+model that is not the exact configured mapping.
+
+When `.idd/execution.yaml` is absent, all profiles inherit. For partial
+configuration, a missing profile or missing active-platform mapping also
+inherits. `inherit` means omit Factory-specific model and reasoning overrides.
+
+Malformed explicit configuration blocks the worker spawn with a clear
+diagnostic; never silently fall back to `inherit`. If the native host rejects a
+configured model/reasoning value or cannot honor an explicit per-child override,
+stop without spawning a substitute worker and suggest rerunning
+`idd-factory-configure`.
+
+Model selection changes only native spawn settings. The worker skill is always
+`idd-factory-execute-subtask`.
 
 ### Fresh worker
 
@@ -207,8 +245,8 @@ have produced them.
 
 The planner returns exactly one of:
 
-- one or more `# Task` sections with optional `# TaskRelatedIntent` and
-  optional `# TaskRelatedEngineering`;
+- one or more `# Task` sections with optional `# ExecutionProfile`, optional
+  `# TaskRelatedIntent`, and optional `# TaskRelatedEngineering`;
 - exactly one `# Question`;
 - exactly `# Done`.
 
@@ -252,8 +290,10 @@ configured, planner `# Done` after ordinary worker checks completes Factory.
 Semantic relevance belongs to agents. Mechanical operations belong to code or
 the host.
 
-Do not solve semantic tasks with deterministic code. Conditional Engineering
-applicability is a model decision. Do not ask an LLM to do simple mechanical
+Do not solve semantic tasks with deterministic code. Execution-profile
+classification and Conditional Engineering applicability are model decisions.
+Profile-to-model lookup is mechanical and must follow the project policy exactly.
+Conditional Engineering applicability is a model decision. Do not ask an LLM to do simple mechanical
 resolution, persistence, structural validation, or Always-rule enumeration that
 the host can perform directly. When the host has no native non-LLM hook, execute
 those operations as strict protocol steps without semantic selection. Any proposed Factory feature that requires a new lifecycle

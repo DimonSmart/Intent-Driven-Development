@@ -21,6 +21,10 @@ current repository access
 Do not assume access to the parent conversation, planner transcript, or previous
 worker transcripts.
 
+The root agent has already chosen this child context before the worker starts.
+Do not read `.idd/execution.yaml`, choose a model, reinterpret an
+`ExecutionProfile`, request a stronger/weaker model, or alter model policy.
+
 ## Resolve task-related intent
 
 For each selected `IDD-NNNN`, mechanically resolve exactly one current file:
@@ -65,7 +69,7 @@ documents before implementation.
 Do not search for additional Conditional Engineering Rules. Semantic
 applicability selection belongs to the planner.
 
-Do not modify `.idd/intent`, `.idd/engineering`,
+Do not modify `.idd/intent`, `.idd/engineering`, `.idd/execution.yaml`,
 `.idd/factory/current`, or the project verification policy. Durable intent
 and Engineering Rules are prepared outside worker execution.
 

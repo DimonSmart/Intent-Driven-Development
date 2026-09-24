@@ -21,6 +21,9 @@ Use only:
 - short semantic summaries from `completed.md`;
 - the latest bounded `verification-failure.md`, when present.
 
+Do not read `.idd/execution.yaml`. Model policy, model availability, model cost,
+and vendor-specific reasoning settings are outside planner inputs.
+
 Repository state is the primary source of implementation reality. Completed
 summaries are context, not authoritative proof.
 
@@ -67,6 +70,10 @@ Tasks:
 
 <self-contained task contract>
 
+# ExecutionProfile
+
+strong
+
 # TaskRelatedIntent
 
 IDD-0012
@@ -88,6 +95,12 @@ task. Values are stable `IDD-NNNN` IDs only.
 `# TaskRelatedEngineering` is optional and also belongs to the immediately
 preceding task. Values are stable `ENG-NNNN` IDs only and may contain only
 planner-selected Conditional rules. Never put Always rules there.
+
+`# ExecutionProfile` is optional and belongs to the immediately preceding
+`# Task`. Its value must be exactly one of `economy`, `standard`, or
+`strong`. If it is absent, the task means `standard`. Any other value is
+malformed planner output. A profile never contains a concrete model ID or a
+vendor-specific reasoning setting.
 
 Question:
 
@@ -140,6 +153,27 @@ the task may be too large or insufficiently focused.
 
 Every task contract must be self-contained enough for a fresh worker that sees
 no earlier worker transcript.
+
+## ExecutionProfile
+
+Classify each task only by the reasoning capability needed to execute that task:
+
+- `economy`: simple, well-bounded, mostly mechanical work with limited
+  reasoning, such as a small localized edit, running focused tests, or checking
+  an obvious hypothesis;
+- `standard`: ordinary engineering work of normal complexity. This is the
+  default;
+- `strong`: materially harder reasoning such as architecture changes,
+  multi-cause debugging, concurrency/lifecycle analysis, or work with many
+  interacting constraints and substantial uncertainty.
+
+Do not classify based on model price, currently configured models, or whether
+multiple profiles happen to map to the same model. Do not read or infer the
+profile-to-model mapping. Do not emit concrete model IDs, `reasoningEffort`,
+`effort`, or any other vendor-specific model setting.
+
+The root agent applies the project policy mechanically after planning. It must
+not reinterpret your classification.
 
 ## TaskRelatedIntent
 
