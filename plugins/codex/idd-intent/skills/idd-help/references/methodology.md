@@ -127,6 +127,13 @@ current normative implementation constraint.
 Rule Verification sections describe required properties or evidence. Repository
 build/test commands remain in `.idd/verification.yaml`.
 
+`idd-engineering-change` is the standard owner of ordinary explicit Engineering
+add/modify/remove requests. `idd-intent-import` may create or update Rules only
+as a migration of explicit durable Engineering decisions already present in
+supplied authoritative source material. This import exception does not authorize
+technical choice, code-derived policy, ordinary removal, or verification
+configuration mutation.
+
 Engineering Rules do not replace shared product intent. Product-visible shared
 behavior such as keyboard interaction, accessibility, common validation, and
 compatibility remains in Intent even when a separate Engineering Rule prescribes

@@ -143,14 +143,26 @@ The index may be used to enumerate Always rules and to discover candidate Condit
 
 ## Engineering management
 
-`idd-engineering-change`, owned by the `idd-intent` plugin, is the standard owner of project Engineering Rule `add`, `modify`, and `remove` mutations.
+`idd-engineering-change`, owned by the `idd-intent` plugin, is the standard owner of ordinary project Engineering Rule `add`, `modify`, and `remove` mutations.
+
+`idd-intent-import` has one narrow migration exception: it may create or update
+Engineering Rules only when supplied import material already contains an
+explicit durable current implementation-only decision. Import does not gain
+general Engineering management authority and never removes a Rule merely because
+the source omits it.
 
 A Rule exists because the project explicitly decided that a durable implementation constraint must exist. Current code may be evidence, but a repeated implementation pattern is never authority to promote itself into Engineering policy.
 
 ```text
-explicit durable engineering decision
+ordinary explicit Engineering add/modify/remove
 -> idd-engineering-change
 -> .idd/engineering/
+
+explicit durable Engineering knowledge already present in supplied import sources
+-> idd-intent-import
+-> .idd/engineering/
+
+both mutation paths
 -> Mechanical Engineering Validation
 ```
 
@@ -162,9 +174,36 @@ Before any mutation, `.idd/factory/current/request.md` is the canonical active s
 
 An add request may create one or more coherent Rules, modify an existing semantic owner, or be a no-op. After the complete batch is planned, only new Rules consume IDs: allocate sequentially from current `Next ID` and set the final allocator to the first unused ID after the batch. Equivalent and modified candidates consume no IDs. If the required allocation would exceed `ENG-9999`, block before any mutation. Modify preserves stable ID while synchronizing INDEX projection. Remove deletes the Rule and INDEX row, preserves the allocator, and creates no archive or tombstone. If any candidate is ambiguous, mutate nothing. Git remains the only history layer.
 
-Other IDD skills may read or validate Engineering, report candidates, and hand explicitly confirmed candidates to `idd-engineering-change`; they do not independently create, modify, or remove Rules.
+Other IDD skills may read or validate Engineering and report candidates. Apart
+from the bounded source-migration authority of `idd-intent-import`, they do not
+independently create, modify, or remove Rules.
 
 Engineering management changes durable knowledge, not implementation. If the user's request is end-to-end, implementation may follow through `idd-code-implement` or Factory and then `idd-code-check-implementation`. Existing consumers continue to apply every Always Rule plus semantically relevant Conditional Rules; management does not duplicate applicability logic.
+
+## Engineering import migration
+
+When `idd-intent-import` receives authoritative source material, it may migrate
+only decisions already established by that source. Code structure, package
+references, tests, runtime wiring, and repeated implementation patterns remain
+evidence rather than authority.
+
+Import classifies explicit decision groups as new, equivalent, modify-existing,
+or ambiguous against current Rules. Equivalent decisions are no-op. An
+unambiguous replacement preserves the semantic owner's stable `ENG-NNNN`.
+Conflicting current policy is not superseded unless supplied context clearly
+establishes replacement/current-truth semantics. Any real ambiguous Engineering
+candidate makes the entire Engineering mutation batch atomic-no-change, although
+independent Product Intent may still be imported.
+
+Unconfirmed suggestions, alternatives, unresolved research, and historical
+statements are review/skipped material, not mutating candidates. Import does not
+perform ordinary Rule removal and does not modify `.idd/verification.yaml`.
+
+The same pre-mutation invariants apply to import: validate an existing layer,
+plan the full batch, check the Factory `request.md` guard and allocator
+capacity, lazily materialize canonical packaged bootstrap only before a real new
+Rule, migrate legacy allocator metadata only immediately before real mutation,
+and validate the final layer mechanically.
 
 ## Mechanical Engineering Validation
 
