@@ -163,7 +163,7 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
         Assert.Contains("explicit durable Engineering decision", import);
         Assert.Contains("Repository code, package references, tests, runtime wiring", import);
         Assert.Contains("mutate no Engineering Rules in this invocation", import);
-        Assert.Contains("never changes `.idd/verification.yaml`", import);
+        Assert.Matches(@"never changes\s+`\.idd/verification\.yaml`", import);
         Assert.Contains("Do not invoke `idd-engineering-change` as an executable subroutine.", import);
         Assert.Contains("ENG-9999", import);
         Assert.Contains(".idd/factory/current/request.md", import);
