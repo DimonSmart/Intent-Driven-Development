@@ -35,6 +35,9 @@ Planner output is Markdown:
 # Task
 ...
 
+# ExecutionProfile
+standard
+
 # TaskRelatedIntent
 IDD-0012
 
@@ -45,6 +48,16 @@ IDD-0012
 ```
 
 Exactly one form is used per planner invocation. Blank output is invalid.
+
+`# ExecutionProfile` is optional task metadata with exactly `economy`,
+`standard`, or `strong`; absence means `standard`. The planner selects the
+profile from task complexity only and does not read model mappings.
+
+Immediately before a worker starts, the root agent mechanically resolves that
+profile through optional project-owned `.idd/execution.yaml`. Missing mappings
+inherit the host model. Explicit mappings are applied exactly through native
+child-agent controls; malformed/unavailable mappings never trigger silent model
+substitution.
 
 ## Temporary state
 

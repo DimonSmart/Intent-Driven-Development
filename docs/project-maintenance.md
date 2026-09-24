@@ -15,7 +15,7 @@ idd-factory   temporary implementation organization
 
 `idd-intent` is standalone and is the default installation. `idd-factory` depends on `idd-intent` and is installed only when temporary multi-step orchestration is needed.
 
-Keep `.idd/verification.yaml` in Git as operational configuration, outside `.idd/intent/`. It is configured by `idd-verification-configure` and is not the responsibility of `idd-intent-lint`.
+Keep `.idd/verification.yaml` in Git as operational verification configuration, outside `.idd/intent/`. Keep optional `.idd/execution.yaml` in Git as project-owned Factory execution policy, also outside `.idd/intent/` and `.idd/factory/current/`. Neither file is product intent.
 
 The split is part of the product contract, not an internal packaging detail. Durable product truth and temporary execution state must remain independently installable and independently owned.
 
@@ -57,9 +57,12 @@ Ownership rules:
 - Intent must not depend on Factory.
 
 The canonical Factory skill set is exactly `idd-factory-run`,
-`idd-factory-decompose-task`, and `idd-factory-execute-subtask`. The planner
-creates the current contractable batch; each task executes in a fresh native
-worker context; a fresh planner runs after the batch is exhausted.
+`idd-factory-configure`, `idd-factory-decompose-task`, and
+`idd-factory-execute-subtask`. The configuration skill owns persistent
+project model policy; the other three implement the run loop. The planner
+creates the current contractable batch and capability profile; the root agent
+mechanically maps that profile immediately before each fresh native worker; a
+fresh planner runs after the batch is exhausted.
 
 The generator publishes skills, references, adapter metadata, and bootstrap
 assets only. It must not publish `idd-factory.dll`, a runtime package, or a
@@ -217,6 +220,8 @@ The `marketplace` branch contains only ready-to-consume marketplace output and t
 - Keep Factory data temporary under `.idd/factory/`.
 - Keep `.idd/factory/current/` and `.idd/factory/results/` ignored by the
   packaged `*` / `!.gitignore` policy.
+- Keep persistent model-selection policy in `.idd/execution.yaml`, never under `.idd/factory/current/`.
+- Keep profile-to-model lookup mechanical and user-authoritative; adapters must not hardcode concrete model recommendations.
 - Keep Factory state minimal and temporary; the repository remains authoritative
   implementation reality.
 - Never reintroduce a Factory runtime/MCP transport only to emulate missing
