@@ -82,9 +82,12 @@ lacks an adequate current IDD product model and the user asks to discover,
 reconstruct, or create initial intent from codebase evidence with owner
 confirmation.
 
-Use `intent-import` when existing documents or other source material already
-express product knowledge that needs normalization into IDD. Do not route
-codebase reverse discovery to import merely because code is a source.
+Use `intent-import` when existing documents or other supplied source material
+already express durable knowledge that needs migration into IDD. That knowledge
+may contain Product Intent, explicit accepted durable Engineering decisions, or
+both. Do not route a new technical choice to import merely because it is written
+in the request, and do not route codebase reverse discovery to import merely
+because code is a source.
 
 Use `engineering-change` when the user explicitly adds, modifies, or removes a durable implementation-only project constraint. Do not route to Engineering merely because current code repeats a pattern; source code alone is not an explicit durable policy decision.
 

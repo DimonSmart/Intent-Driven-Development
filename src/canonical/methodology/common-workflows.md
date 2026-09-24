@@ -288,22 +288,26 @@ the workflow still returns the discovery summary as temporary output.
 
 ## Workflow Family: Intent Import
 
-Use this workflow when existing material already expresses product knowledge:
+Use this workflow when existing supplied material already expresses durable
+knowledge:
 
 ```text
 idd-project-init if needed
 -> idd-intent-import
--> structural normalization
--> conflict reporting
--> idd-intent-lint
+-> classify Product Intent + explicit Engineering knowledge
+-> normalize + direct mechanical validation
+-> report conflicts, blocked changes, and review material
 ```
 
 Typical sources include requirements, specifications, ADRs, public contracts,
+normative technical-design material, documented engineering conventions,
 research notes, product documentation, relevant acceptance tests, and confirmed
 operational behavior.
 
-Import is a migration of meaning. It does not automatically treat every old
-document or implementation detail as current product truth.
+Import is a migration of meaning. It may create or update Engineering Rules only
+for explicit durable decisions already established by the supplied source. It
+does not choose a new technical solution and does not automatically treat every
+old document or implementation detail as current product truth.
 
 When the main task is to infer what an undocumented implemented product is,
 route to bootstrap rather than import.
@@ -366,7 +370,15 @@ explicit durable engineering decision
 -> direct Mechanical Engineering Validation
 ```
 
-`idd-engineering-change` is the standard mutation owner for `.idd/engineering/`. One request may contain one or more durable decisions; it plans the complete semantic batch before mutation, groups decisions into coherent Rules, and allocates IDs only to new Rules. It may lazily create the Engineering layer only after planning confirms a real add, but `idd-project-init` does not create it. The workflow does not infer Rules from current code patterns.
+`idd-engineering-change` is the standard mutation owner for ordinary explicit
+Engineering management requests. One request may contain one or more durable
+decisions; it plans the complete semantic batch before mutation, groups decisions
+into coherent Rules, and allocates IDs only to new Rules. It may lazily create
+the Engineering layer only after planning confirms a real add, but
+`idd-project-init` does not create it. The workflow does not infer Rules from
+current code patterns. The separate bounded `idd-intent-import` exception
+applies only while migrating explicit durable decisions already present in
+supplied import sources.
 
 When the same user request also asks to change implementation, the complete lifecycle may continue:
 

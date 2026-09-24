@@ -212,7 +212,9 @@ public sealed class IntentImportEndToEndLiveTests
 
         var rules = GetRuleFiles(workspace);
         Assert.Single(rules);
-        Assert.StartsWith("ENG-0002.rule-", Path.GetFileName(rules[0]), StringComparison.Ordinal);
+        Assert.True(
+            Path.GetFileName(rules[0]).StartsWith("ENG-0002.rule-", StringComparison.Ordinal),
+            "Explicit replacement must preserve ENG-0002 identity.");
         var content = File.ReadAllText(rules[0]);
         Assert.Contains("NetTopologySuite", content, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(
