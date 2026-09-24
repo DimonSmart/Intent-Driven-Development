@@ -33,10 +33,21 @@ The skill must distinguish:
 
 - observable product behavior from accidental behavior;
 - public contracts and compatibility constraints from internal formats;
-- intentional durable architecture from replaceable implementation choices;
+- product-significant architecture decisions and constraints from
+  implementation-only durable engineering conventions;
+- replaceable implementation choices from both of those;
 - current product areas from obsolete, experimental, migration, or internal-tool
   areas;
 - confirmed product truth from unresolved or conflicting interpretations.
+
+Do not infer Engineering Rules from repeated implementation patterns. Bootstrap
+owns initial product Intent only; it does not create or migrate
+`.idd/engineering/`. If explicit source material appears to define a durable
+implementation-only guardrail, report it separately as an Engineering candidate,
+explain the Intent / Engineering boundary, and offer `idd-engineering-change`.
+Only after explicit user confirmation that the candidate is durable project policy
+may it be handed off to that skill. Source code or a repeated pattern is not
+confirmation. Bootstrap itself never writes `.idd/engineering/`.
 
 Nothing becomes a current `IDD-NNNN` document until the user reviews and approves
 the proposed semantic model.
@@ -502,7 +513,10 @@ Before completion, verify:
 - no final response was emitted while a blocking decision was pending;
 - implementation evidence was not treated as product intent automatically;
 - user-supplied context was not copied as workflow history;
-- technical choices were included only at their confirmed durable level;
+- technical choices were included in Intent only when they are product-significant
+  contracts or confirmed decision rationale;
+- implementation-only durable conventions were not inferred from code or written
+  as product intent;
 - accidental patterns, ordinary dependencies, source paths, and coding style
   were excluded;
 - conflicts remained visible and were not resolved silently;

@@ -71,6 +71,7 @@ Classification:
 - intent-bootstrap
 - intent-import
 - product-change
+- engineering-change
 - implementation-change
 - intent-normalization
 - intent-audit
@@ -94,9 +95,9 @@ Use `intent-import` when existing documents or other source material already
 express product knowledge that needs normalization into IDD. Do not route
 codebase reverse discovery to import merely because code is a source.
 
-For `product-change`, set `Operation` to `add`, `modify`, or `remove` according
-to the required reference. For every other classification, set
-`Operation: not-applicable`.
+Use `engineering-change` when the user explicitly adds, modifies, or removes a durable implementation-only project constraint. Do not route to Engineering merely because current code repeats a pattern; source code alone is not an explicit durable policy decision.
+
+For `product-change` and `engineering-change`, set `Operation` to `add`, `modify`, or `remove` according to the required reference. For every other classification, set `Operation: not-applicable`.
 
 Set `Clarity` to `clear`, `ambiguous`, or `research-required`.
 
@@ -127,9 +128,9 @@ with the classification.
 
 - `route-only`: describe the route and stop. Do not invoke another skill or
   change files.
-- `intent-only`: perform only intent-side work, including initialization,
-  bootstrap, import, brainstorm, audit, lint, change, new-document, or
-  normalization as applicable. Do not implement product code or start Factory
+- `intent-only`: perform only durable IDD knowledge-side work, including
+  initialization, product Intent workflows, Engineering management, audit, lint,
+  or normalization as applicable. Do not implement product code or start Factory
   execution.
 - `implementation-only`: perform implementation or implementation checking from
   current intent. Do not change product intent. If current intent is missing,
@@ -163,6 +164,7 @@ a handoff index:
 | `intent-bootstrap` | `idd-intent-bootstrap` |
 | `intent-import` | `idd-intent-import` |
 | `product-change` | `idd-intent-change` |
+| `engineering-change` | `idd-engineering-change` |
 | `implementation-change` | `idd-code-implement` or Factory |
 | `intent-normalization` | `idd-intent-normalize-current` |
 | `intent-audit` | `idd-intent-audit` |

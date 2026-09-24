@@ -1,5 +1,5 @@
 {
-  "version": "2.0.69",
+  "version": "2.0.70",
   "platform": "codex",
   "dependencies": [],
   "roles": [],
@@ -9,6 +9,10 @@
     {
       "source": "src/canonical/project-files/intent",
       "destination": ".idd/intent"
+    },
+    {
+      "source": "src/canonical/project-files/engineering",
+      "destination": ".idd/engineering"
     }
   ],
   "canonicalSource": "src/canonical"

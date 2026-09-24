@@ -77,12 +77,19 @@ Therefore current specs may contain:
 - product behavior;
 - user scenarios;
 - domain contracts;
-- durable architecture patterns;
-- durable technical constraints;
+- architecture and technical constraints when they are product-significant,
+  public, domain, compatibility, security, or operability contracts;
 - compatibility requirements;
 - non-goals;
 - acceptance criteria;
 - verification rules.
+
+A durable implementation-only constraint is not automatically product intent.
+Classify it separately from imported Intent. This skill does not create or
+migrate `.idd/engineering/`; report a genuine Engineering candidate, explain
+the boundary, and offer `idd-engineering-change`. Only an explicit user
+confirmation that the constraint is durable project policy authorizes handoff.
+The import skill itself never mutates Engineering.
 
 Current specs must not contain:
 
@@ -372,7 +379,8 @@ Create current spec documents only for durable current product intent. Create
 adr documents only for durable decision records. Create spike documents only for
 active unresolved research.
 
-For example, import this source:
+For example, this source mixes operational commands with a concrete
+implementation constraint:
 
 ````md
 Run:
@@ -386,20 +394,14 @@ UiCompositionHost must be created in Bootstrap and passed to every dialog
 constructor.
 ````
 
-as the durable outcome only:
+Do not turn either fragment into product intent automatically. Build/test
+commands belong in verification configuration. Constructor wiring is incidental
+unless separately confirmed as a durable Engineering Rule, and this Intent
+import workflow does not create that rule.
 
-```md
-## Durable Architecture And Constraints
-
-Application-owned UI surfaces and overlays share one composition lifecycle.
-
-## Verification
-
-Automated coverage verifies composition behavior for nested overlays and
-viewport changes.
-```
-
-Do not import the commands or constructor wiring.
+If the same source also states a product-visible requirement such as consistent
+dialog and overlay redraw behavior across viewport changes, import that product
+requirement and its durable verification property into Intent.
 
 Imported current documents must use current IDD document shapes. Do not preserve
 legacy section layout when the document becomes current normative intent.
@@ -426,12 +428,15 @@ intent.
 
 Describe observable behavior and domain contracts.
 
-## Durable Architecture And Constraints
+## Product-Significant Architecture And Constraints
 
-Describe only architecture boundaries and technical constraints that future
-implementations must preserve. Include implementation patterns, frameworks, or
-libraries only when changing them would change product behavior, compatibility,
-public contracts, security, operability, or an accepted architecture decision.
+Describe architecture boundaries and technical constraints only when they are
+part of product behavior, a public/domain/compatibility contract, security,
+operability, or another product-significant property.
+
+Do not put implementation-only durable conventions here merely because future
+implementations should follow them. Those belong in the optional Engineering
+layer and are outside this Intent import workflow.
 
 Do not include private class names, private methods, file names, constructor
 signatures, dependency-wiring steps, temporary workarounds, migration steps, or

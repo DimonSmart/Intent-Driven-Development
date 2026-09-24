@@ -46,9 +46,15 @@ If the implementation is deleted but the specs remain, can the product be rebuil
 ```
 
 Therefore current specs may contain product behavior, user scenarios, domain
-contracts, durable architecture patterns, durable technical constraints,
+contracts, product-significant architecture and technical constraints,
 compatibility requirements, non-goals, acceptance criteria, and verification
 rules.
+
+A durable implementation-only convention is not automatically product intent.
+When one appears to be stored in Intent, report the boundary concern for human
+review; do not automatically move it to `.idd/engineering/`. This audit remains
+read-only: it may recommend `idd-engineering-change`, but only after explicit
+user confirmation may a candidate be handed off for mutation.
 
 Current specs must not contain local tasks, temporary implementation notes,
 progress logs, chat history, one-off cleanup notes, plans that do not define

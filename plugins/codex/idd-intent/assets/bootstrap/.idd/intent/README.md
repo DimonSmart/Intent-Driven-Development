@@ -29,3 +29,20 @@ Do not mark specs as Current, Completed, Deprecated, Retired, or Superseded.
 Edit an owning spec in place or migrate its remaining current intent and delete
 it. ADR status remains part of ADR decision records; a spike remains only while
 its question is active.
+
+## Intent and Engineering boundary
+
+Product behavior, externally observable properties, public/domain/compatibility
+contracts, and product-significant operational constraints belong here.
+
+Implementation-only durable constraints used to preserve architecture,
+consistency, maintainability, or engineering conventions belong in the optional
+`.idd/engineering/` layer.
+
+A useful test is: if a different implementation could fully preserve the product
+contract but would still be forbidden by the rule, that rule usually belongs in
+Engineering.
+
+Shared/cross-cutting product behavior still belongs in Intent. Use `Area`,
+`Notes`, or equivalent INDEX discovery metadata to make such intent visible to
+planners without requiring a schema migration.

@@ -16,6 +16,9 @@ classifies differences. It does not silently change specifications or code.
 Read `references/project-verification.md` before resolving verification checks
 or repository/platform fallback.
 
+Read `references/engineering-guardrails.md` before using an optional
+`.idd/engineering/` layer.
+
 ## Required Input
 
 The request must provide at least one concrete check focus:
@@ -79,6 +82,13 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
 
 - Use only current `IDD-NNNN` documents directly under `.idd/intent/` as normative
   product intent.
+- When `.idd/engineering/` exists, structurally validate it first, include all
+  mechanically enumerated Always rules, and semantically select relevant
+  Conditional rules from `Applies when`.
+- Do not select Conditional Engineering Rules by filename, keyword, path,
+  extension, glob, project type, embeddings, or similarity.
+- Classify an Engineering Rule violation as an Engineering mismatch, not as
+  missing product specification or product-intent mismatch.
 - There is no `.idd/intent` archive lifecycle.
 - Do not inspect deleted Git history unless the user explicitly asks for
   historical investigation.
@@ -116,7 +126,11 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
 2. If no concrete focus is present, stop and ask for one.
 3. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and relevant current numbered
    documents directly under `.idd/intent/`.
-4. Inspect the focused implementation evidence:
+4. If `.idd/engineering/` exists, read its README and INDEX, run deterministic
+   structural validation, enumerate all Always rules, semantically select
+   relevant Conditional rules, resolve each selected `ENG-NNNN` uniquely, and
+   read only those full rule documents. Stop on malformed or ambiguous rules.
+5. Inspect the focused implementation evidence:
 
    - code;
    - tests;
@@ -125,11 +139,14 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
    - user-provided bug report;
    - logs, when relevant.
 
-5. Compare observed implementation behavior with current product intent.
-6. Classify each finding as one of:
+6. Compare observed implementation behavior separately with current product
+   intent and applicable Engineering Rules.
+7. Classify each finding as one of:
 
    - `matches-spec`;
    - `implementation-mismatch`;
+   - `engineering-match`;
+   - `engineering-mismatch`;
    - `missing-verification`;
    - `missing-spec`;
    - `unclear-intent`;
@@ -148,9 +165,10 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
    Use `current-requirement` for ordinary checks against an existing current
    requirement when no specific change context is provided.
 
-7. For each mismatch, cite the relevant spec section or explain that no current
-   spec covers the behavior.
-8. Recommend the smallest next step:
+8. For each mismatch, cite the relevant product spec section or Engineering
+   Rule. Do not use absence of product intent to explain a rule-owned Engineering
+   violation.
+9. Recommend the smallest next step:
 
    - fix implementation;
    - add or update minimal high-value verification;
@@ -162,8 +180,8 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
      only after explicit confirmation;
    - create a spike if the correct intent requires research.
 
-9. Do not apply fixes unless the user explicitly asks for them.
-10. When repository commands are needed, resolve `.idd/verification.yaml` with
+10. Do not apply fixes unless the user explicitly asks for them.
+11. When repository commands are needed, resolve `.idd/verification.yaml` with
     context `direct` for the focused changed paths. Run only assigned automatic
     checks; request confirmation when required; and keep user instructions
     `Not verified` until confirmed. If no policy exists, report the
@@ -185,16 +203,22 @@ What implementation or specification area was checked.
 
 Current specs and sections used as normative intent.
 
+## Relevant Engineering Guardrails
+
+Applicable Always rules and semantically selected Conditional rules, or
+`None (Engineering layer absent)`.
+
 ## Findings
 
 ### 1. Finding title
 
-Classification: `implementation-mismatch | missing-verification | missing-spec | unclear-intent | possible-intent-change | matches-spec | non-goal-or-out-of-scope`
+Classification: `implementation-mismatch | engineering-mismatch | engineering-match | missing-verification | missing-spec | unclear-intent | possible-intent-change | matches-spec | non-goal-or-out-of-scope`
 
 Scope: `current-requirement | changed-requirement | preserved-requirement | removed-behavior | compatibility-boundary | unowned-behavior`
 
 Evidence:
-- Spec evidence:
+- Product intent evidence:
+- Engineering rule evidence:
 - Implementation evidence:
 
 Explanation:
@@ -203,11 +227,20 @@ Recommended next step:
 
 ## Summary
 
+### Product intent conformance
 - Matches:
 - Mismatches:
-- Missing verification:
 - Missing or unclear intent:
-- Recommended action:
+
+### Engineering guardrail conformance
+- Matches:
+- Mismatches:
+
+### Verification evidence
+- Evidence present:
+- Missing verification:
+
+### Recommended action
 ```
 
 ## Classification Rules
@@ -265,6 +298,25 @@ Recommended next step:
 ```text
 Fix implementation or tests. Do not update the spec unless the user confirms the
 implementation is the intended behavior.
+```
+
+### `engineering-match`
+
+Use when implementation satisfies an applicable Engineering Rule.
+
+### `engineering-mismatch`
+
+Use when implementation violates an applicable `ENG-NNNN` rule. Cite that
+rule and keep the finding in the Engineering conformance dimension. Do not
+reclassify it as `missing-spec`.
+
+Example:
+
+```text
+ENG-0012 requires application services to be resolved through the DI container.
+The implementation directly constructs another application service.
+
+Classification: engineering-mismatch
 ```
 
 ### `missing-verification`

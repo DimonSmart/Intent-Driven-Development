@@ -9,15 +9,20 @@ allowed-tools: Read Glob Grep Bash
 
 # idd-intent-lint
 
-Use this skill to perform cheap mechanical validation over `.idd/intent`.
+Use this skill to perform cheap mechanical validation over `.idd/intent` and,
+when present, the optional `.idd/engineering` layer.
 
 Formula:
 
 ```text
-idd-intent-lint = cheap mechanical validation, not semantic review
+idd-intent-lint = cheap mechanical IDD validation, not semantic review
 ```
 
-Use it when the user asks whether `.idd/intent` is mechanically consistent.
+Use it when the user asks whether project-owned IDD knowledge is mechanically
+consistent.
+
+Read `references/engineering-guardrails.md` before validating an optional
+Engineering layer.
 
 ## Rules
 
@@ -28,6 +33,9 @@ Use it when the user asks whether `.idd/intent` is mechanically consistent.
 - Treat `GLOSSARY.md` as optional. Its absence is valid and produces no warning.
 - Do not create or update the glossary from lint.
 - Report errors, warnings, and suggested fixes only.
+- Absence of `.idd/engineering/` is valid and produces no warning.
+- Do not use lint to decide semantic applicability of Conditional Engineering
+  Rules.
 
 ## Checks
 
@@ -161,10 +169,45 @@ semantic review. Glossary inclusion quality is primarily reviewed by
 `idd-glossary-build`; lint only catches cheap structural problems and obvious
 scope leakage.
 
+## Optional Engineering checks
+
+When `.idd/engineering/` exists, fail mechanical validation if any of these are
+true:
+
+- `README.md` or `INDEX.md` is missing;
+- `.idd/engineering/archive` exists;
+- a rule filename does not match
+  `^ENG-\d{4}\.rule-[a-z0-9][a-z0-9-]*\.md$`;
+- the same stable `ENG-NNNN` resolves to more than one rule document;
+- an INDEX Rule entry is not a plain `ENG-NNNN`, is duplicated, resolves to
+  zero or multiple documents, or a current rule document is absent from INDEX;
+- the first heading differs from the filename stem;
+- required `Rule`, `Applicability`, `Rationale`, `Guidance`, or
+  `Verification` sections are missing;
+- document Applicability is not exactly `Always` or `Conditional`;
+- INDEX Applicability differs from document Applicability;
+- a Conditional rule has no non-empty `Applies when`;
+- an explicit task/progress/migration-status/checklist section appears;
+- a normative Engineering section contains a fenced shell/build/test command;
+- allocator metadata is present but there is not exactly one `Next ID: ENG-NNNN` line;
+- an existing allocator line does not match `^Next ID: ENG-\\d{4}$`;
+- the allocator ID is less than or equal to any current `ENG-NNNN`.
+
+A valid legacy Engineering layer with no allocator line remains structurally readable. `idd-engineering-change` owns migration before the first management mutation; lint must not invent or persist allocator state itself.
+
+Warn, without failing automatically, when a rule contains concrete source
+filenames, private type names, constructor names, or other text that may be an
+incidental implementation detail rather than durable guidance.
+
+Do not mechanically decide whether a rule belongs in Engineering instead of
+Intent, whether a Conditional rule applies to a specific task, whether Guidance
+is good architecture, or whether suspicious implementation detail is actually
+invalid. Those are semantic questions.
+
 ## Output Format
 
 ```md
-# IDD Intent Lint Report
+# IDD Mechanical Lint Report
 
 ## Result
 

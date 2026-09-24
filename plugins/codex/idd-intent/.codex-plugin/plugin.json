@@ -1,7 +1,7 @@
 {
   "name": "idd-intent",
-  "version": "2.0.69",
-  "description": "Durable product memory for Intent-Driven Development.",
+  "version": "2.0.70",
+  "description": "Durable product intent plus optional project-owned Engineering Guardrails for Intent-Driven Development.",
   "skills": "./skills/",
   "author": {
     "name": "DimonSmart"
@@ -10,6 +10,6 @@
   "license": "MIT",
   "interface": {
     "displayName": "IDD Intent",
-    "shortDescription": "Durable product memory for Intent-Driven Development."
+    "shortDescription": "Durable product intent plus optional project-owned Engineering Guardrails for Intent-Driven Development."
   }
 }

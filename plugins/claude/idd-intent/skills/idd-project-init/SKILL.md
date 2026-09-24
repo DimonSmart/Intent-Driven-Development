@@ -75,6 +75,11 @@ Create minimal bootstrap intent documents when they are missing:
 .idd/intent/_templates/spike.md
 ```
 
+Do not create `.idd/engineering/` during project initialization. Its absence is
+the normal default. The installed plugin may contain canonical Engineering
+bootstrap definitions for future management workflows, but this skill must not
+materialize them.
+
 Write `.idd/plugins.json` as a declaration of the required product-memory plugin, not as a copy of its implementation:
 
 ```json
@@ -94,11 +99,11 @@ The root Coding Agent instruction file must contain exactly one managed IDD bloc
 ```markdown
 <!-- idd:project:start -->
 ## Intent-Driven Development
-
 This project uses Intent-Driven Development (IDD). Treat `.idd/intent/` as the
-current product truth. When `.idd/verification.yaml` exists, follow it as the
-project-owned verification policy. Use the installed IDD skills when changing
-intent, implementing behavior, or verifying implementation.
+current product truth. When `.idd/engineering/` exists, treat it as the current
+durable engineering guardrails. When `.idd/verification.yaml` exists, follow it
+as the project-owned verification policy. Use the installed IDD skills when
+changing intent, implementing behavior, or verifying implementation.
 <!-- idd:project:end -->
 ```
 
@@ -245,7 +250,10 @@ product truth during the handoff.
 - Do not implement instruction-file installation through program code.
 - Do not say that `.idd/plugins.json` installs plugins. It is a project-level IDD declaration for people and IDD workflows.
 - Do not create `.idd/factory` unless Factory work is explicitly requested.
-- Product intent lives only under `.idd/intent`.
+- Do not create `.idd/engineering` by default and do not add a separate
+  Engineering plugin declaration to `.idd/plugins.json`.
+- Product intent lives only under `.idd/intent`. Optional durable
+  implementation guardrails live separately under `.idd/engineering`.
 - Factory working data, when used, is temporary and belongs under `.idd/factory`.
 - Optional bootstrap discovery remains a separate skill with a separate semantic
   confirmation gate.

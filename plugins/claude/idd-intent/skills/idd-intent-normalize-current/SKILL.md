@@ -112,12 +112,18 @@ Therefore current specs may contain:
 - product behavior;
 - user scenarios;
 - domain contracts;
-- durable architecture patterns;
-- durable technical constraints;
+- product-significant architecture and technical constraints;
 - compatibility requirements;
 - non-goals;
 - acceptance criteria;
 - verification rules.
+
+Implementation-only durable constraints normally belong in the optional
+`.idd/engineering/` layer rather than being created as new product intent.
+However, normalization must not automatically migrate an existing current
+constraint from Intent to Engineering. Reclassification changes ownership and
+requires an explicit semantic decision outside ordinary structural
+normalization.
 
 Current specs must not contain:
 
