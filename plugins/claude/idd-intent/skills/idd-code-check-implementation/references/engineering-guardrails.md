@@ -19,7 +19,7 @@ The architectural rule is:
 
 ```text
 semantic decisions -> model
-mechanical operations -> deterministic procedure / host capability
+mechanical checks   -> bounded host operations
 ```
 
 Do not introduce a Factory runtime merely to support Engineering Rules.
@@ -135,7 +135,7 @@ Next ID: ENG-0003
 | ENG-0002 | Conditional | User-visible UI changes | Use shared UI composition |
 ```
 
-The allocator line has the exact form `^Next ID: ENG-\\d{4}$`. Canonical bootstrap contains `Next ID: ENG-0001`. A valid legacy layer may omit the allocator for read-only consumption. On its first Engineering management mutation, derive `Next ID = max(current ENG IDs) + 1`, or `ENG-0001` when no Rules exist. Once introduced, the allocator is authoritative and deleted IDs are not reused. Do not use Git history to reconstruct pre-allocator deletions.
+The allocator line has the exact form `^Next ID: ENG-\d{4}$`. Canonical bootstrap contains `Next ID: ENG-0001`. A valid legacy layer may omit the allocator for read-only consumption. On its first Engineering management mutation, derive `Next ID = max(current ENG IDs) + 1`, or `ENG-0001` when no Rules exist. Once introduced, the allocator is authoritative and deleted IDs are not reused. Do not use Git history to reconstruct pre-allocator deletions.
 
 The `Rule` column contains only stable `ENG-NNNN` IDs.
 
@@ -151,56 +151,61 @@ A Rule exists because the project explicitly decided that a durable implementati
 explicit durable engineering decision
 -> idd-engineering-change
 -> .idd/engineering/
--> idd-intent-lint structural validation
+-> Mechanical Engineering Validation
 ```
 
-The workflow resolves semantic ownership before add and resolves modify/remove targets to exactly one current Rule. Semantic equivalence, Intent-versus-Engineering classification, architectural quality, and Conditional applicability remain model decisions; deterministic filename, keyword, embedding, or similarity heuristics must not impersonate them.
+The workflow performs semantic planning for the complete request before mutation. One request may contain one or more durable Engineering decisions; the model groups them into the minimum semantically coherent set of Rules, classifies each candidate as new, equivalent, modify, or ambiguous, and resolves modify/remove targets to exactly one current Rule. Semantic equivalence, Intent-versus-Engineering classification, architectural quality, and Conditional applicability remain model decisions; deterministic filename, keyword, embedding, or similarity heuristics must not impersonate them.
 
-The Engineering layer is created lazily only by the first add when `.idd/engineering/` is completely absent, using packaged canonical bootstrap assets. `idd-project-init` does not create it. An existing malformed or partial layer blocks mutation and is never overwritten by bootstrap.
+The Engineering layer is created lazily only after semantic planning confirms at least one new Rule and `.idd/engineering/` is completely absent, using packaged canonical bootstrap assets. `idd-project-init` does not create it. Planning, ambiguity detection, allocator-capacity checks, and all other pre-mutation gates happen before bootstrap. An existing malformed or partial layer blocks mutation and is never overwritten by bootstrap.
 
 Before any mutation, `.idd/factory/current/request.md` is the canonical active simplified Factory marker. If it exists, block Engineering mutation until that run is completed, cancelled, or explicitly restarted/replanned. The management workflow does not patch `plan.md`, rewrite `TaskRelatedEngineering`, restart Factory, or re-plan automatically. A stale `.idd/factory/current/` directory without `request.md`, or legacy `state.json` alone, is not an active-run marker.
 
-Add consumes exactly current `Next ID`, creates one Rule, advances the allocator, updates INDEX, and validates structure. An equivalent existing Rule is a no-op and does not allocate. Modify preserves stable ID and allocator while synchronizing INDEX projection. Remove deletes the Rule and INDEX row, preserves allocator, and creates no archive or tombstone. Git remains the only history layer.
+An add request may create one or more coherent Rules, modify an existing semantic owner, or be a no-op. After the complete batch is planned, only new Rules consume IDs: allocate sequentially from current `Next ID` and set the final allocator to the first unused ID after the batch. Equivalent and modified candidates consume no IDs. If the required allocation would exceed `ENG-9999`, block before any mutation. Modify preserves stable ID while synchronizing INDEX projection. Remove deletes the Rule and INDEX row, preserves the allocator, and creates no archive or tombstone. If any candidate is ambiguous, mutate nothing. Git remains the only history layer.
 
 Other IDD skills may read or validate Engineering, report candidates, and hand explicitly confirmed candidates to `idd-engineering-change`; they do not independently create, modify, or remove Rules.
 
 Engineering management changes durable knowledge, not implementation. If the user's request is end-to-end, implementation may follow through `idd-code-implement` or Factory and then `idd-code-check-implementation`. Existing consumers continue to apply every Always Rule plus semantically relevant Conditional Rules; management does not duplicate applicability logic.
 
-## Mechanical structural validation
+## Mechanical Engineering Validation
 
-When `.idd/engineering/` exists, validate it before using it as a normative source. This validation is deterministic and must not make semantic applicability decisions.
+When `.idd/engineering/` exists, validate it before using it as a normative source and after every Engineering management mutation. This section is the single canonical checklist for Engineering structural validation. Consumers may state when to run it or which subset is relevant, but must not maintain another full copy.
+
+Mechanical Engineering Validation uses bounded repository/host operations only:
+
+```text
+read
+list/glob
+search/grep
+exact string/regex match
+count
+compare
+```
+
+A short single-purpose host or shell command is acceptable when useful. Do not generate a general-purpose validator program, temporary `.ps1`, `.py`, `.sh`, `.cs`, validator executable, MCP validator, workflow engine, or equivalent inline multi-step program solely to reimplement IDD lint.
 
 Validate:
 
-1. `README.md` exists.
-2. `INDEX.md` exists.
-3. No `.idd/engineering/archive` directory exists.
-4. Every rule filename matches the canonical regex.
-5. Each stable `ENG-NNNN` occurs in exactly one rule document.
-6. Every INDEX Rule entry is a plain `ENG-NNNN`, appears once, and resolves to exactly one rule document.
-7. Every rule document is represented exactly once in INDEX.
-8. The first heading equals the filename stem.
-9. Required `## Rule`, `## Applicability`, `## Rationale`, `## Guidance`, and `## Verification` sections exist.
-10. Applicability is exactly `Always` or `Conditional`.
-11. INDEX Applicability equals document Applicability.
-12. Every Conditional rule has a non-empty `## Applies when`.
-13. Explicit task/progress lifecycle sections such as `## Task`, `## Tasks`, `## Progress`, `## Implementation progress`, `## Migration status`, or implementation checklists are rejected.
-14. Normative Engineering sections do not contain fenced shell/build/test commands. Build and test commands belong in `.idd/verification.yaml`.
-15. Allocator metadata is optional only for a legacy read-only layer. If present, exactly one line matches `^Next ID: ENG-\\d{4}$` and its ID is greater than every current `ENG-NNNN`.
-16. A management mutation requires allocator metadata: a valid legacy layer receives the migration described above before mutation; malformed, duplicated, or non-monotonic existing allocator metadata is a blocking error.
+1. `.idd/engineering/README.md` exists.
+2. `.idd/engineering/INDEX.md` exists.
+3. `.idd/engineering/archive` does not exist.
+4. Every current Rule filename matches `^ENG-\d{4}\.rule-[a-z0-9][a-z0-9-]*\.md$`.
+5. A stable ID is derived from the canonical Rule filename. Every current `ENG-NNNN` resolves to exactly one Rule document; arbitrary mentions of an ID inside prose do not count as extra documents.
+6. Every INDEX `Rule` cell is exactly a plain `ENG-NNNN` matching `^ENG-\d{4}$`, appears exactly once, and resolves to exactly one current Rule document. Every current Rule document is represented exactly once in INDEX.
+7. The first Markdown heading is exactly `# <filename stem>`.
+8. Each Rule contains exactly one unambiguous structural section for `## Rule`, `## Applicability`, `## Rationale`, `## Guidance`, and `## Verification`.
+9. Document Applicability is exactly `Always` or `Conditional`, and INDEX Applicability matches it.
+10. Every Conditional Rule has a non-empty `## Applies when` section. For Always, that section is optional.
+11. Explicit lifecycle sections such as `## Task`, `## Tasks`, `## Progress`, `## Implementation progress`, and `## Migration status`, plus implementation checklists in normative Engineering content, are rejected. Do not try to infer from ordinary prose whether it merely resembles a task.
+12. Normative Engineering sections do not contain fenced shell/build/test command blocks. Operational commands belong in `.idd/verification.yaml`; `## Verification` describes required properties or evidence.
+13. Allocator metadata may be absent only in a valid legacy read-only layer. If present, exactly one line matches `^Next ID: ENG-\d{4}$` and its ID is strictly greater than every current Rule ID.
+14. Before a real management mutation, a valid legacy layer without allocator receives `max(existing ENG IDs) + 1`, or `ENG-0001` when no Rules exist. This migration occurs only after semantic planning and only when mutation will actually happen. A malformed, duplicate, or non-monotonic existing allocator is blocking and is not repaired automatically.
+15. A mutation that would require an ID beyond `ENG-9999` is blocked before files are changed.
 
-Malformed, missing, duplicate, ambiguous, or metadata-inconsistent rules are blocking errors for implementation workflows. Do not silently continue without guardrails.
+Malformed, missing, duplicate, ambiguous, or metadata-inconsistent rules are blocking errors for implementation workflows. Management reports success only after post-mutation validation passes.
 
-Do not load every complete rule into model context merely to perform this validation when a host or deterministic file operation can check structure directly.
+Mechanical validation is structural only. It must not decide whether a rule belongs in Engineering rather than Intent, whether a Conditional rule applies to a task, whether Guidance is good architecture, or whether ordinary prose contains incidental implementation detail.
 
 Warnings, not deterministic errors, are appropriate for suspicious implementation leakage such as concrete source filenames, private type names, constructor names, or incidental current layout. Semantic review decides whether such content is truly durable Engineering guidance.
-
-Mechanical validation must not pretend to decide:
-
-- whether a rule belongs in Engineering rather than Intent;
-- whether a Conditional rule applies to a task;
-- whether Guidance is good architecture;
-- whether a rule is fully free of incidental implementation detail.
 
 ## Rule discovery and applicability
 

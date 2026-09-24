@@ -76,7 +76,7 @@ For `Always`, `## Applies when` is optional and does not alter applicability.
 
 Rule documents are normative. `INDEX.md` is only a compact metadata projection for discovery. INDEX Applicability must match the document.
 
-`idd-engineering-change` is the standard workflow for explicit Rule add, modify, and remove mutations. `INDEX.md` carries the authoritative `Next ID: ENG-NNNN` allocator once introduced. New canonical layers start at `ENG-0001`; add consumes and advances the allocator, while modify and remove preserve it so deleted IDs are not reused. A legacy layer without allocator remains readable and receives `max(current IDs) + 1` on its first management mutation.
+`idd-engineering-change` is the standard workflow for explicit Rule add, modify, and remove mutations. One request may produce one or more semantically coherent Rules; the complete batch is planned before files change. `INDEX.md` carries the authoritative `Next ID: ENG-NNNN` allocator once introduced. New canonical layers start at `ENG-0001`; only new Rules consume sequential IDs, while modifications, no-ops, and removals do not consume IDs. A legacy layer without allocator remains readable and receives `max(current IDs) + 1` only immediately before its first real management mutation.
 
 When this directory exists, malformed filenames, duplicate IDs, missing or ambiguous INDEX resolution, heading mismatches, invalid Applicability, missing Conditional `Applies when`, an archive directory, task/progress sections, or fenced shell/build/test commands are blocking structural errors for implementation workflows.
 

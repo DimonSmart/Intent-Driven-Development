@@ -79,7 +79,7 @@
     "description": "Update current `.idd/intent/` product intent for add, modify, and remove product operations, preferring existing specs over new specs."
   },
   "idd-engineering-change": {
-    "description": "Manage explicit durable Engineering Rule add, modify, and remove mutations under `.idd/engineering/`, with lazy bootstrap, stable allocation, Factory safety guard, and existing structural validation."
+    "description": "Manage explicit durable Engineering Rule add, modify, and remove mutations under `.idd/engineering/`, with batch semantic planning, lazy bootstrap, stable allocation, Factory safety guard, and direct shared mechanical validation."
   },
   "idd-code-implement": {
     "description": "Implement current product intent or perform a behavior-preserving implementation change, then verify the result against relevant `.idd/intent/` specifications."

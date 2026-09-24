@@ -36,6 +36,14 @@ Engineering layer.
 - Absence of `.idd/engineering/` is valid and produces no warning.
 - Do not use lint to decide semantic applicability of Conditional Engineering
   Rules.
+- Ordinary project lint is limited to project-owned `.idd/intent/`, optional
+  `.idd/intent/GLOSSARY.md`, and optional `.idd/engineering/` state. Do not scan
+  an installed plugin cache, canonical IDD repository, skill source tree, or IDD
+  documentation tree unless the user explicitly asks to validate the IDD
+  distribution itself.
+- Do not generate a general-purpose validator program solely to perform IDD lint.
+  Use bounded repository inspection operations: Read, Glob, Grep/Search, and
+  simple bounded host/shell commands when useful.
 
 ## Checks
 
@@ -64,9 +72,6 @@ Check that:
 - `INDEX.md` has no `Archived` section;
 - no current spec links to deleted document storage;
 - no file under `.idd/intent` references `.idd/intent/archive/...`;
-- skills do not contain an archive-enabling flag;
-- skills do not contain an archive import action;
-- skills do not recommend archiving obsolete specs;
 - obsolete/task-like/process-only docs are reported as delete candidates, not
   preservation candidates;
 - templates and support files are not listed as current specs;
@@ -126,10 +131,6 @@ When `.idd/intent/GLOSSARY.md` exists, also check that:
 - any `Related`, `Replaces`, `Supersedes`, `Depends on`, or similar normative
   relation uses a bare four-digit document number or points to a missing current
   document;
-- any skill contains an archive-enabling flag;
-- any skill contains an archive import action;
-- any skill recommends moving specs to archive;
-- docs describe archive as a normal lifecycle;
 - an ordinary spec contains `Status: Current`, `Status: Superseded`,
   `Superseded by`, or another explicit lifecycle status;
 - `INDEX.md` models ordinary specs as `Current`, `Completed`, `Superseded`, or
@@ -169,40 +170,15 @@ semantic review. Glossary inclusion quality is primarily reviewed by
 `idd-glossary-build`; lint only catches cheap structural problems and obvious
 scope leakage.
 
-## Optional Engineering checks
+## Engineering layer
 
-When `.idd/engineering/` exists, fail mechanical validation if any of these are
-true:
+When `.idd/engineering/` exists, apply the `Mechanical Engineering Validation` defined in `references/engineering-guardrails.md`.
 
-- `README.md` or `INDEX.md` is missing;
-- `.idd/engineering/archive` exists;
-- a rule filename does not match
-  `^ENG-\d{4}\.rule-[a-z0-9][a-z0-9-]*\.md$`;
-- the same stable `ENG-NNNN` resolves to more than one rule document;
-- an INDEX Rule entry is not a plain `ENG-NNNN`, is duplicated, resolves to
-  zero or multiple documents, or a current rule document is absent from INDEX;
-- the first heading differs from the filename stem;
-- required `Rule`, `Applicability`, `Rationale`, `Guidance`, or
-  `Verification` sections are missing;
-- document Applicability is not exactly `Always` or `Conditional`;
-- INDEX Applicability differs from document Applicability;
-- a Conditional rule has no non-empty `Applies when`;
-- an explicit task/progress/migration-status/checklist section appears;
-- a normative Engineering section contains a fenced shell/build/test command;
-- allocator metadata is present but there is not exactly one `Next ID: ENG-NNNN` line;
-- an existing allocator line does not match `^Next ID: ENG-\\d{4}$`;
-- the allocator ID is less than or equal to any current `ENG-NNNN`.
+Absence of the Engineering layer is valid. Lint is read-only. A valid legacy layer without allocator remains readable; lint does not migrate, create, repair, or advance allocator state. Lint does not make semantic Engineering decisions such as ownership, Intent-versus-Engineering classification, or Conditional applicability.
 
-A valid legacy Engineering layer with no allocator line remains structurally readable. `idd-engineering-change` owns migration before the first management mutation; lint must not invent or persist allocator state itself.
+Warn, without failing automatically, when a Rule contains concrete source filenames, private type names, constructor names, or other text that may be incidental implementation detail rather than durable guidance.
 
-Warn, without failing automatically, when a rule contains concrete source
-filenames, private type names, constructor names, or other text that may be an
-incidental implementation detail rather than durable guidance.
-
-Do not mechanically decide whether a rule belongs in Engineering instead of
-Intent, whether a Conditional rule applies to a specific task, whether Guidance
-is good architecture, or whether suspicious implementation detail is actually
-invalid. Those are semantic questions.
+Use the canonical reference directly instead of copying its structural checklist into this skill.
 
 ## Output Format
 
