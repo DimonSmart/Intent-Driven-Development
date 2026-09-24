@@ -49,7 +49,7 @@ public sealed class NativeCodexTraceTests : IDisposable
         foreach (var file in Directory.EnumerateFiles(fixture, "*.jsonl"))
         {
             var text = File.ReadAllText(file, Encoding.UTF8)
-                .Replace(""__REPO__"", JsonSerializer.Serialize(repository), StringComparison.Ordinal);
+                .Replace(JsonSerializer.Serialize("__REPO__"), JsonSerializer.Serialize(repository), StringComparison.Ordinal);
             File.WriteAllText(Path.Combine(sessions, Path.GetFileName(file)), text, Encoding.UTF8);
         }
 
