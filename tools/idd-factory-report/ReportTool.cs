@@ -511,7 +511,7 @@ public sealed class CodexRolloutReader
         }
     }
 
-    public static string? ExtractThreadId    public static string? ExtractThreadId(string? text)
+    public static string? ExtractThreadId(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
             return null;
@@ -587,7 +587,7 @@ public sealed class CodexRolloutReader
         return null;
     }
 
-    private static TokenMetrics ParseUsage    private static TokenMetrics ParseUsage(JsonElement usage)
+    private static TokenMetrics ParseUsage(JsonElement usage)
     {
         var input = FindLong(usage, "input_tokens", "inputTokens");
         var cached = FindLong(usage, "cached_input_tokens", "cachedInputTokens");
@@ -1597,7 +1597,7 @@ public sealed class FactoryReportEngine
         return agents;
     }
 
-    private static AgentReport BuildRootAgent(    private static AgentReport BuildRootAgent(
+    private static AgentReport BuildRootAgent(
         CodexRollout root,
         DateTimeOffset? start,
         DateTimeOffset? end,
@@ -1623,7 +1623,7 @@ public sealed class FactoryReportEngine
         };
     }
 
-    private static string ClassifyRole    private static string ClassifyRole(CodexRollout root, CodexRollout child, SpawnRecord? spawn)
+    private static string ClassifyRole(CodexRollout root, CodexRollout child, SpawnRecord? spawn)
     {
         if (child.AgentRoleHint?.Contains("planner", StringComparison.OrdinalIgnoreCase) == true)
             return "planner";
@@ -1846,7 +1846,7 @@ public sealed class FactoryReportEngine
                Same(usage.RootTurnId, terminal.RootTurnId);
     }
 
-    private static ToolMetrics AnalyzeTools    private static ToolMetrics AnalyzeTools(IEnumerable<CodexEvent> source, string agent)
+    private static ToolMetrics AnalyzeTools(IEnumerable<CodexEvent> source, string agent)
     {
         var events = source.OrderBy(x => x.Ordinal).ToArray();
         var calls = new Dictionary<string, ToolCallState>(StringComparer.Ordinal);
@@ -1899,7 +1899,7 @@ public sealed class FactoryReportEngine
 
         var metrics = new ToolMetrics
         {
-            ToolCalls = semantic.Length,
+            ToolCalls = calls.Count,
             NativeOperations = calls.Values.Count(x => x.IsNative),
             HostWrapperCalls = wrapperIds.Count,
             ToolBatches = ComputeToolBatches(semantic)
@@ -1985,7 +1985,7 @@ public sealed class FactoryReportEngine
         return batches;
     }
 
-    private static bool IsFailed    private static bool IsFailed(ToolCallState call) =>
+    private static bool IsFailed(ToolCallState call) =>
         call.ExitCode is not null && call.ExitCode != 0 ||
         call.Status is not null && call.Status is "failed" or "error" or "declined";
 
@@ -2287,7 +2287,7 @@ public sealed class FactoryReportEngine
         }
     }
 
-    private static List<TimelineEvent> BuildTimeline(    private static List<TimelineEvent> BuildTimeline(
+    private static List<TimelineEvent> BuildTimeline(
         CodexEvent start,
         DateTimeOffset? end,
         string result,
@@ -2374,7 +2374,7 @@ public sealed class FactoryReportEngine
         return events.OrderBy(x => x.Timestamp ?? DateTimeOffset.MaxValue).ThenBy(x => x.Ordinal).ToList();
     }
 
-    private static void AssignSequences    private static void AssignSequences(List<AgentReport> agents)
+    private static void AssignSequences(List<AgentReport> agents)
     {
         foreach (var group in agents.Where(x => x.Role != "root").GroupBy(x => x.Role))
         {

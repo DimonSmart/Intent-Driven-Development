@@ -181,7 +181,7 @@ public sealed class FactoryReportTests : IDisposable
         ReportWriters.WriteJson(report, path);
 
         using var document = JsonDocument.Parse(File.ReadAllText(path));
-        Assert.Equal(1, document.RootElement.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(2, document.RootElement.GetProperty("schemaVersion").GetInt32());
         Assert.Equal(JsonValueKind.Null,
             document.RootElement.GetProperty("metrics").GetProperty("tokens").GetProperty("inputTokens").ValueKind);
     }
