@@ -1,0 +1,6 @@
+{"timestamp":"2026-09-24T08:13:30Z","type":"session_meta","payload":{"id":"planner-thread","cwd":"__REPO__","parent_thread_id":"root-thread"}}
+{"timestamp":"2026-09-24T08:13:31Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Use idd-factory-decompose-task."}]}}
+{"timestamp":"2026-09-24T08:14:10Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"# Task\nImplement ProductCode\n\n# Task\nImplement Catalog"}]}}
+{"timestamp":"2026-09-24T08:18:25Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Continue planner after completed worker batch."}]}}
+{"timestamp":"2026-09-24T08:18:42Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"# Done"}]}}
+{"timestamp":"2026-09-24T08:18:42.010Z","type":"token_usage_record","thread_id":"planner-thread","turn_id":"planner-final","root_turn_id":"turn-final","response_id":"planner-response","thread_token_usage":{"input_tokens":60600,"cached_input_tokens":47100,"output_tokens":763}}

@@ -10,7 +10,7 @@ namespace Idd.Factory.Report;
 
 public sealed class FactoryRunReport
 {
-    public int SchemaVersion { get; init; } = 1;
+    public int SchemaVersion { get; init; } = 2;
     public string Repository { get; init; } = "";
     public HostInfo Host { get; init; } = new();
     public RunInfo Run { get; init; } = new();
@@ -20,6 +20,15 @@ public sealed class FactoryRunReport
     public List<TimelineEvent> Timeline { get; init; } = [];
     public List<Diagnostic> Diagnostics { get; init; } = [];
     public FactoryProjectState FactoryProjectState { get; init; } = new();
+    public CompletionReport Completion { get; init; } = new();
+}
+
+public sealed class CompletionReport
+{
+    public bool? PlannerDone { get; init; }
+    public string ProjectVerification { get; init; } = "unavailable";
+    public string DeclaredResult { get; init; } = "unavailable";
+    public string ProtocolValidation { get; init; } = "unavailable";
 }
 
 public sealed class HostInfo
@@ -69,8 +78,12 @@ public sealed class AgentReport
             ? (long)(FinishedAt.Value - StartedAt.Value).TotalMilliseconds
             : null;
     public string? Task { get; set; }
+    public string? TaskTitle { get; set; }
     public string? PlannerOutcome { get; set; }
+    public DateTimeOffset? PlannerOutcomeAt { get; set; }
     public TokenMetrics Tokens { get; set; } = new();
+    [JsonIgnore]
+    public bool TokensAuthoritative { get; set; }
     public ToolMetrics Tools { get; set; } = new();
     [JsonIgnore]
     public string? RolloutPath { get; init; }
@@ -131,9 +144,12 @@ public sealed class TokenMetrics
 public sealed class ToolMetrics
 {
     public long ToolCalls { get; set; }
-    public long ToolBatches { get; set; }
+    public long NativeOperations { get; set; }
+    public long HostWrapperCalls { get; set; }
+    public long? ToolBatches { get; set; }
     public long Commands { get; set; }
     public long FailedCommands { get; set; }
+    public long FileChanges { get; set; }
     public long FileOperations { get; set; }
     public long SearchOperations { get; set; }
     public long SpawnAgentCalls { get; set; }
@@ -203,6 +219,17 @@ public sealed class CodexEvent
     public long Ordinal { get; init; }
     public DateTimeOffset? Timestamp { get; init; }
     public string Type { get; init; } = "";
+    public string? Lifecycle { get; init; }
+    public string? ItemKind { get; init; }
+    public string? ThreadId { get; init; }
+    public string? TurnId { get; init; }
+    public string? RootTurnId { get; init; }
+    public string? ResponseId { get; init; }
+    public string? SenderThreadId { get; init; }
+    public List<string> ReceiverThreadIds { get; init; } = [];
+    public bool IsNativeOperation { get; init; }
+    public bool IsHostWrapper { get; init; }
+    public string? UsageScope { get; init; }
     public string? Role { get; init; }
     public string? Text { get; init; }
     public string? ToolId { get; init; }
@@ -239,9 +266,17 @@ public sealed class CodexRollout
 public sealed class SpawnRecord
 {
     public string CallId { get; init; } = "";
+    public string? SenderThreadId { get; set; }
     public string? ChildThreadId { get; set; }
+    public List<string> ChildThreadIds { get; } = [];
     public string? Task { get; set; }
     public DateTimeOffset? Timestamp { get; init; }
+
+    [JsonIgnore]
+    public IEnumerable<string> Children =>
+        ChildThreadIds.Count > 0
+            ? ChildThreadIds
+            : ChildThreadId is null ? [] : [ChildThreadId];
 }
 
 public sealed class CodexStateSnapshot
@@ -298,6 +333,13 @@ public sealed class CodexRolloutReader
                 var item = Object(root, "item") ?? Object(payload, "item");
                 var eventObject = item ?? payload;
 
+                var lifecycle = NormalizeLifecycle(topType, payloadType);
+                var rawItemType = String(eventObject, "type") ?? type;
+                var itemKind = NormalizeItemKind(rawItemType);
+                var nativeOperation = itemKind is "CollabAgentToolCall" or "CommandExecution" or "FileChange";
+                var hostWrapper = topType == "response_item" ||
+                                  rawItemType is "function_call" or "custom_tool_call" or "mcp_tool_call" or "local_shell_call";
+
                 var role = String(eventObject, "role");
                 if (type == "user_message") role = "user";
                 if (type == "agent_message") role = "assistant";
@@ -305,6 +347,13 @@ public sealed class CodexRolloutReader
                 var text = ExtractText(eventObject);
                 if (text is null && item is not null)
                     text = ExtractText(payload);
+
+                var threadId = FindStringAcross([eventObject, payload, root], "thread_id", "threadId");
+                var turnId = FindStringAcross([eventObject, payload, root], "turn_id", "turnId");
+                var rootTurnId = FindStringAcross([eventObject, payload, root], "root_turn_id", "rootTurnId");
+                var responseId = FindStringAcross([eventObject, payload, root], "response_id", "responseId");
+                var senderThreadId = FindStringAcross([eventObject, payload, root], "sender_thread_id", "senderThreadId");
+                var receiverThreadIds = ExtractReceiverThreadIds(eventObject);
 
                 string? toolId = null;
                 string? toolName = null;
@@ -314,52 +363,60 @@ public sealed class CodexRolloutReader
                 string? spawnTask = null;
                 string? childThreadId = null;
 
-                var eventTypeForLifecycle = topType ?? type;
-                var itemType = String(eventObject, "type") ?? type;
-                var isToolItem = IsToolType(itemType);
-                if (eventTypeForLifecycle is "item.started" or "item.completed" && isToolItem)
+                if (lifecycle is "ItemStarted" or "ItemCompleted" && IsToolType(rawItemType))
                 {
                     toolId = String(eventObject, "id") ?? String(eventObject, "call_id");
-                    toolName = String(eventObject, "name") ?? String(eventObject, "tool") ?? itemType;
-                    toolPhase = eventTypeForLifecycle == "item.started" ? "started" : "completed";
+                    toolName = NormalizeToolName(itemKind, String(eventObject, "name") ?? String(eventObject, "tool"));
+                    toolPhase = lifecycle == "ItemStarted" ? "started" : "completed";
                     toolArguments = ExtractArguments(eventObject);
                     toolOutput = ExtractOutput(eventObject);
                 }
                 else if (topType == "response_item" || type is "function_call" or "mcp_tool_call" or "custom_tool_call" or "local_shell_call" or "command_execution")
                 {
-                    if (itemType is "function_call_output" or "custom_tool_call_output")
+                    if (rawItemType is "function_call_output" or "custom_tool_call_output")
                     {
                         toolId = String(eventObject, "call_id") ?? String(eventObject, "id");
                         toolPhase = "output";
                         toolOutput = ExtractOutput(eventObject);
                     }
-                    else if (IsToolType(itemType))
+                    else if (IsToolType(rawItemType))
                     {
                         toolId = String(eventObject, "call_id") ?? String(eventObject, "id");
-                        toolName = String(eventObject, "name") ?? String(eventObject, "tool") ?? itemType;
+                        toolName = NormalizeToolName(itemKind, String(eventObject, "name") ?? String(eventObject, "tool") ?? rawItemType);
                         toolPhase = "call";
                         toolArguments = ExtractArguments(eventObject);
                         toolOutput = ExtractOutput(eventObject);
                     }
                 }
 
-                if (toolName?.Contains("spawn_agent", StringComparison.OrdinalIgnoreCase) == true)
+                if (toolName == "spawn_agent")
                 {
                     spawnTask = ExtractSpawnTask(toolArguments);
-                    childThreadId = ExtractSpawnChildThreadId(eventObject);
+                    childThreadId = receiverThreadIds.FirstOrDefault() ?? ExtractSpawnChildThreadId(eventObject);
                 }
-                else if (itemType is "function_call_output" or "custom_tool_call_output")
+                else if (rawItemType is "function_call_output" or "custom_tool_call_output")
                 {
                     childThreadId = ExtractSpawnChildThreadId(eventObject);
                 }
 
-                var usage = ExtractUsage(root, payload, out var cumulative);
+                var usage = ExtractUsage(root, payload, out var cumulative, out var usageScope);
 
                 rollout.Events.Add(new CodexEvent
                 {
                     Ordinal = ordinal,
                     Timestamp = timestamp,
                     Type = type,
+                    Lifecycle = lifecycle,
+                    ItemKind = itemKind,
+                    ThreadId = threadId,
+                    TurnId = turnId,
+                    RootTurnId = rootTurnId,
+                    ResponseId = responseId,
+                    SenderThreadId = senderThreadId,
+                    ReceiverThreadIds = receiverThreadIds,
+                    IsNativeOperation = nativeOperation,
+                    IsHostWrapper = hostWrapper,
+                    UsageScope = usageScope,
                     Role = role,
                     Text = text,
                     ToolId = toolId,
@@ -375,7 +432,7 @@ public sealed class CodexRolloutReader
                     SpawnTask = spawnTask
                 });
 
-                if (metadataOnly && !string.IsNullOrWhiteSpace(rollout.ThreadId) && rollout.Cwd is not null && ordinal >= 16)
+                if (metadataOnly && !string.IsNullOrWhiteSpace(rollout.ThreadId) && rollout.Cwd is not null && ordinal >= 16)                if (metadataOnly && !string.IsNullOrWhiteSpace(rollout.ThreadId) && rollout.Cwd is not null && ordinal >= 16)
                     break;
             }
             catch (JsonException)
@@ -405,55 +462,93 @@ public sealed class CodexRolloutReader
             if (e.ToolId is null)
                 continue;
 
-            if (e.ToolName?.Contains("spawn_agent", StringComparison.OrdinalIgnoreCase) == true)
+            if (e.ToolName == "spawn_agent")
             {
                 if (!spawnByCall.TryGetValue(e.ToolId, out var record))
                 {
                     record = new SpawnRecord
                     {
                         CallId = e.ToolId,
+                        SenderThreadId = e.SenderThreadId ?? rollout.ThreadId,
                         Task = e.SpawnTask,
                         Timestamp = e.Timestamp
                     };
                     spawnByCall[e.ToolId] = record;
                     rollout.SpawnRecords[e.ToolId] = record;
                 }
-                else if (record.Task is null && e.SpawnTask is not null)
+                else
                 {
-                    record.Task = e.SpawnTask;
+                    record.SenderThreadId ??= e.SenderThreadId ?? rollout.ThreadId;
+                    if (record.Task is null && e.SpawnTask is not null)
+                        record.Task = e.SpawnTask;
                 }
 
-                var id = e.ChildThreadId ?? ExtractThreadId(e.ToolOutput);
-                if (!string.IsNullOrWhiteSpace(id))
+                foreach (var id in e.ReceiverThreadIds)
                 {
-                    record.ChildThreadId = id;
-                    e.ChildThreadId = id;
+                    if (!record.ChildThreadIds.Contains(id, StringComparer.Ordinal))
+                        record.ChildThreadIds.Add(id);
                 }
+
+                var fallbackId = e.ChildThreadId;
+                if (record.ChildThreadIds.Count == 0 && string.IsNullOrWhiteSpace(fallbackId))
+                    fallbackId = ExtractThreadId(e.ToolOutput);
+                if (!string.IsNullOrWhiteSpace(fallbackId) &&
+                    !record.ChildThreadIds.Contains(fallbackId, StringComparer.Ordinal))
+                    record.ChildThreadIds.Add(fallbackId);
+
+                record.ChildThreadId = record.ChildThreadIds.FirstOrDefault();
+                e.ChildThreadId = record.ChildThreadId;
             }
             else if (e.ToolPhase == "output" && spawnByCall.TryGetValue(e.ToolId, out var record))
             {
                 var id = e.ChildThreadId ?? ExtractThreadId(e.ToolOutput);
-                if (!string.IsNullOrWhiteSpace(id))
-                {
-                    record.ChildThreadId = id;
-                    e.ChildThreadId = id;
-                }
+                if (!string.IsNullOrWhiteSpace(id) &&
+                    !record.ChildThreadIds.Contains(id, StringComparer.Ordinal))
+                    record.ChildThreadIds.Add(id);
+                record.ChildThreadId = record.ChildThreadIds.FirstOrDefault();
+                e.ChildThreadId = record.ChildThreadId;
             }
         }
     }
 
-    public static string? ExtractThreadId(string? text)
+    public static string? ExtractThreadId    public static string? ExtractThreadId(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
             return null;
         return ThreadIdRegex.Match(text).Success ? ThreadIdRegex.Match(text).Value : null;
     }
 
-    private static TokenMetrics? ExtractUsage(JsonElement root, JsonElement payload, out bool cumulative)
+    private static TokenMetrics? ExtractUsage(
+        JsonElement root,
+        JsonElement payload,
+        out bool cumulative,
+        out string? scope)
     {
         cumulative = false;
-        JsonElement usage;
+        scope = null;
 
+        foreach (var container in new[] { payload, root })
+        {
+            if (container.ValueKind != JsonValueKind.Object)
+                continue;
+
+            if (container.TryGetProperty("thread_token_usage", out var threadUsage) &&
+                threadUsage.ValueKind == JsonValueKind.Object)
+            {
+                cumulative = true;
+                scope = "thread";
+                return ParseUsage(threadUsage);
+            }
+
+            if (container.TryGetProperty("turn_token_usage", out var turnUsage) &&
+                turnUsage.ValueKind == JsonValueKind.Object)
+            {
+                scope = "turn";
+                return ParseUsage(turnUsage);
+            }
+        }
+
+        JsonElement usage;
         if (payload.ValueKind == JsonValueKind.Object &&
             payload.TryGetProperty("info", out var info) &&
             info.ValueKind == JsonValueKind.Object)
@@ -461,11 +556,14 @@ public sealed class CodexRolloutReader
             if (info.TryGetProperty("total_token_usage", out usage) && usage.ValueKind == JsonValueKind.Object)
             {
                 cumulative = true;
+                scope = "legacy-total";
                 return ParseUsage(usage);
             }
-
             if (info.TryGetProperty("last_token_usage", out usage) && usage.ValueKind == JsonValueKind.Object)
+            {
+                scope = "legacy-turn";
                 return ParseUsage(usage);
+            }
         }
 
         if (payload.ValueKind == JsonValueKind.Object &&
@@ -473,6 +571,7 @@ public sealed class CodexRolloutReader
             usage.ValueKind == JsonValueKind.Object)
         {
             cumulative = FindString(payload, "usage_scope", "usageScope") == "cumulative";
+            scope = cumulative ? "legacy-total" : "legacy-turn";
             return ParseUsage(usage);
         }
 
@@ -481,13 +580,14 @@ public sealed class CodexRolloutReader
             usage.ValueKind == JsonValueKind.Object)
         {
             cumulative = FindString(root, "usage_scope", "usageScope") == "cumulative";
+            scope = cumulative ? "legacy-total" : "legacy-turn";
             return ParseUsage(usage);
         }
 
         return null;
     }
 
-    private static TokenMetrics ParseUsage(JsonElement usage)
+    private static TokenMetrics ParseUsage    private static TokenMetrics ParseUsage(JsonElement usage)
     {
         var input = FindLong(usage, "input_tokens", "inputTokens");
         var cached = FindLong(usage, "cached_input_tokens", "cachedInputTokens");
@@ -503,10 +603,88 @@ public sealed class CodexRolloutReader
         };
     }
 
-    private static bool IsToolType(string? type) =>
-        type is "function_call" or "mcp_tool_call" or "collab_tool_call" or "custom_tool_call"
-            or "local_shell_call" or "local_shell" or "shell_command" or "exec_command"
-            or "write_stdin" or "command_execution";
+    private static bool IsToolType(string? type)
+    {
+        var normalized = NormalizeItemKind(type);
+        return normalized is "CollabAgentToolCall" or "CommandExecution" or "FileChange" ||
+               type is "function_call" or "mcp_tool_call" or "custom_tool_call"
+                   or "local_shell_call" or "local_shell" or "shell_command" or "exec_command"
+                   or "write_stdin";
+    }
+
+    private static string? NormalizeLifecycle(string? topType, string? payloadType)
+    {
+        foreach (var value in new[] { payloadType, topType })
+        {
+            var key = NormalizeKey(value);
+            if (key == "itemstarted") return "ItemStarted";
+            if (key == "itemcompleted") return "ItemCompleted";
+        }
+        return null;
+    }
+
+    private static string NormalizeItemKind(string? value) => NormalizeKey(value) switch
+    {
+        "collabagenttoolcall" or "collabtoolcall" => "CollabAgentToolCall",
+        "commandexecution" => "CommandExecution",
+        "filechange" => "FileChange",
+        _ => value ?? ""
+    };
+
+    private static string? NormalizeToolName(string itemKind, string? rawName)
+    {
+        if (itemKind == "CommandExecution") return "command_execution";
+        if (itemKind == "FileChange") return "file_change";
+
+        var key = NormalizeKey(rawName);
+        if (key == "spawnagent") return "spawn_agent";
+        if (key is "waitagent" or "wait") return "wait_agent";
+        return rawName;
+    }
+
+    private static string NormalizeKey(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? ""
+            : new string(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+
+    private static string? FindStringAcross(IEnumerable<JsonElement> elements, params string[] names)
+    {
+        foreach (var element in elements)
+        {
+            var value = FindString(element, names);
+            if (!string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+        return null;
+    }
+
+    private static List<string> ExtractReceiverThreadIds(JsonElement element)
+    {
+        var result = new List<string>();
+        if (element.ValueKind != JsonValueKind.Object)
+            return result;
+
+        foreach (var name in new[] { "receiver_thread_ids", "receiverThreadIds" })
+        {
+            if (!element.TryGetProperty(name, out var ids))
+                continue;
+            if (ids.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var id in ids.EnumerateArray())
+                {
+                    if (id.ValueKind == JsonValueKind.String &&
+                        !string.IsNullOrWhiteSpace(id.GetString()))
+                        result.Add(id.GetString()!);
+                }
+            }
+            else if (ids.ValueKind == JsonValueKind.String &&
+                     !string.IsNullOrWhiteSpace(ids.GetString()))
+            {
+                result.Add(ids.GetString()!);
+            }
+        }
+        return result.Distinct(StringComparer.Ordinal).ToList();
+    }
 
     private static string? ExtractSpawnTask(string? arguments)
     {
@@ -843,11 +1021,13 @@ public sealed class FactoryReportEngine
         {
             foreach (var spawn in spawningRollout.SpawnRecords.Values)
             {
-                if (string.IsNullOrWhiteSpace(spawn.ChildThreadId) ||
-                    !byId.TryGetValue(spawn.ChildThreadId, out var child))
-                    continue;
+                foreach (var childId in spawn.Children)
+                {
+                    if (!byId.TryGetValue(childId, out var child))
+                        continue;
 
-                child.ParentThreadId ??= spawningRollout.ThreadId;
+                    child.ParentThreadId ??= spawn.SenderThreadId ?? spawningRollout.ThreadId;
+                }
             }
         }
 
@@ -976,6 +1156,7 @@ public sealed class FactoryReportEngine
         DateTimeOffset? end = null;
         string? endEvidence = null;
         var endConfidence = "unknown";
+        CodexEvent? terminalEvent = null;
 
         var structuredResult = FindStructuredFactoryResult(segmentRootEvents);
         if (structuredResult is not null)
@@ -984,6 +1165,7 @@ public sealed class FactoryReportEngine
             resultReason = structuredResult.Reason;
             resultEvidence.Add("structured_final_response");
             end = structuredResult.Event.Timestamp;
+            terminalEvent = structuredResult.Event;
             endEvidence = $"structured final response status={structuredResult.Status.ToUpperInvariant()}";
             endConfidence = "exact";
         }
@@ -1005,6 +1187,7 @@ public sealed class FactoryReportEngine
                 if (latestPlanner?.PlannerOutcome == "Done")
                     resultEvidence.Insert(0, "planner_done");
                 end = completion.Timestamp;
+                terminalEvent = completion;
                 endEvidence = "explicit Factory completion event";
                 endConfidence = "exact";
             }
@@ -1019,6 +1202,7 @@ public sealed class FactoryReportEngine
                     resultEvidence.Add("planner_done");
                     resultEvidence.Add("verification_success");
                     end = verification.Timestamp;
+                    terminalEvent = verification;
                     endEvidence = "planner # Done followed by successful verification command";
                     endConfidence = "derived";
                 }
@@ -1032,6 +1216,7 @@ public sealed class FactoryReportEngine
                 resultEvidence.Clear();
                 resultEvidence.Add("explicit_blocked");
                 end = blocked.Timestamp;
+                terminalEvent = blocked;
                 endEvidence = "explicit Factory blocked event";
                 endConfidence = "exact";
             }
@@ -1043,6 +1228,7 @@ public sealed class FactoryReportEngine
                 resultEvidence.Clear();
                 resultEvidence.Add("host_interruption");
                 end = interrupted.Timestamp;
+                terminalEvent = interrupted;
                 endEvidence = "host interruption/cancellation evidence";
                 endConfidence = "exact";
             }
@@ -1164,7 +1350,7 @@ public sealed class FactoryReportEngine
             });
         }
 
-        var rootAgent = BuildRootAgent(root, start.Timestamp, end, segmentRootEvents, verbose);
+        var rootAgent = BuildRootAgent(root, start.Timestamp, end, terminalEvent, segmentRootEvents, verbose);
         agents.Insert(0, rootAgent);
 
         AssignSequences(agents);
@@ -1188,14 +1374,8 @@ public sealed class FactoryReportEngine
             };
         }).ToList();
 
-        var rootReportedTokens = ComputeRootReportedTokens(root.Events, end);
+        var rootReportedTokens = ComputeRootReportedTokens(root.Events, end, terminalEvent);
         var tokenMetrics = AggregateTokens(agents, out var tokenMethod, out var tokenComplete);
-        if (rootReportedTokens.Available && agents.Any(x => x.Role != "root" && x.Tokens.Available))
-        {
-            tokenMetrics = new TokenMetrics();
-            tokenMethod = "overlap-unknown";
-            tokenComplete = false;
-        }
 
         var tokenStatus = tokenMethod == "overlap-unknown"
             ? "overlap-unknown"
@@ -1223,7 +1403,28 @@ public sealed class FactoryReportEngine
             });
         }
 
-        var timeline = BuildTimeline(start, end, result, agents, tools);
+        AddTopologyDiagnostics(agents, diagnostics);
+        var completionInfo = BuildCompletion(
+            agents,
+            segmentRootEvents,
+            result,
+            structuredResult is not null,
+            terminalEvent);
+
+        if (completionInfo.DeclaredResult == "completed" &&
+            workerAgents.Length > 0 &&
+            completionInfo.PlannerDone == false)
+        {
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "warning",
+                Category = "factory",
+                Code = "completed_without_planner_done",
+                Message = "Factory reported COMPLETED, but no final fresh planner '# Done' evidence was found."
+            });
+        }
+
+        var timeline = BuildTimeline(start, end, result, agents, tools, completionInfo);
 
         var maxDepth = ComputeMaximumDepth(agents);
         var otherAgents = agents.Count(x => x.Role is "subagent" or "unknown" && x.ThreadId != root.ThreadId);
@@ -1291,7 +1492,8 @@ public sealed class FactoryReportEngine
                 .GroupBy(x => (x.Category, x.Code, x.Message))
                 .Select(x => x.First())
                 .ToList(),
-            FactoryProjectState = stateInfo
+            FactoryProjectState = stateInfo,
+            Completion = completionInfo
         };
     }
 
@@ -1313,8 +1515,8 @@ public sealed class FactoryReportEngine
         {
             foreach (var spawn in spawningRollout.SpawnRecords.Values)
             {
-                if (!string.IsNullOrWhiteSpace(spawn.ChildThreadId))
-                    parentMap[spawn.ChildThreadId!] = spawningRollout.ThreadId;
+                foreach (var childId in spawn.Children)
+                    parentMap[childId] = spawn.SenderThreadId ?? spawningRollout.ThreadId;
             }
         }
 
@@ -1347,7 +1549,16 @@ public sealed class FactoryReportEngine
     }
 
     private static DateTimeOffset? ActivityStartedAt(CodexRollout rollout) =>
-        rollout.Events.FirstOrDefault(x => x.Type != "session_meta")?.Timestamp ?? rollout.StartedAt;
+        rollout.Events.FirstOrDefault(x =>
+            x.Type != "session_meta" &&
+            x.Usage is null)?.Timestamp ?? rollout.StartedAt;
+
+    private static DateTimeOffset? ExecutionFinishedAt(CodexRollout rollout) =>
+        rollout.Events
+            .Where(x => x.Type != "session_meta" && x.Usage is null)
+            .Select(x => x.Timestamp)
+            .Where(x => x is not null)
+            .LastOrDefault() ?? rollout.StartedAt;
 
     private static List<AgentReport> BuildAgents(
         CodexRollout root,
@@ -1359,22 +1570,26 @@ public sealed class FactoryReportEngine
         var agents = new List<AgentReport>();
         var spawningRollouts = new[] { root }.Concat(descendants).ToArray();
 
-        foreach (var child in descendants.OrderBy(x => x.StartedAt))
+        foreach (var child in descendants.OrderBy(ActivityStartedAt).ThenBy(x => x.ThreadId, StringComparer.Ordinal))
         {
             var spawn = FindSpawnRecord(spawningRollouts, child.ThreadId);
             var role = ClassifyRole(root, child, spawn);
-            var task = spawn?.Task is { } spawnTask ? Bound(spawnTask, 1000) : null;
-            var outcome = role == "planner" ? PlannerOutcome(child) : null;
+            var task = role == "worker" ? ExtractFactoryTask(spawn?.Task) : null;
+            var (outcome, outcomeAt) = role == "planner" ? PlannerOutcome(child) : (null, null);
+            var tokens = ComputeWholeThreadTokens(child, out var authoritativeTokens);
             agents.Add(new AgentReport
             {
                 ThreadId = child.ThreadId,
                 ParentThreadId = child.ParentThreadId ?? state.ParentByChild.GetValueOrDefault(child.ThreadId),
                 Role = role,
-                StartedAt = ActivityStartedAt(child),
-                FinishedAt = child.FinishedAt,
+                StartedAt = spawn?.Timestamp ?? ActivityStartedAt(child),
+                FinishedAt = ExecutionFinishedAt(child),
                 Task = task,
+                TaskTitle = TaskTitle(task),
                 PlannerOutcome = outcome,
-                Tokens = ComputeWholeThreadTokens(child),
+                PlannerOutcomeAt = outcomeAt,
+                Tokens = tokens,
+                TokensAuthoritative = authoritativeTokens,
                 Tools = AnalyzeTools(child.Events, role),
                 RolloutPath = verbose ? child.Path : null
             });
@@ -1382,30 +1597,33 @@ public sealed class FactoryReportEngine
         return agents;
     }
 
-    private static AgentReport BuildRootAgent(
+    private static AgentReport BuildRootAgent(    private static AgentReport BuildRootAgent(
         CodexRollout root,
         DateTimeOffset? start,
         DateTimeOffset? end,
+        CodexEvent? terminalEvent,
         IReadOnlyList<CodexEvent> segmentEvents,
         bool verbose)
     {
+        var tokens = ComputeSegmentTokens(root.Events, start, end, terminalEvent, out var authoritativeTokens);
         return new AgentReport
         {
             ThreadId = root.ThreadId,
             Role = "root",
             StartedAt = start,
             FinishedAt = end,
-            Tokens = ComputeSegmentTokens(root.Events, start, end),
+            Tokens = tokens,
+            TokensAuthoritative = authoritativeTokens,
             Tools = AnalyzeTools(
                 segmentEvents.Where(x =>
                     (start is null || x.Timestamp is null || x.Timestamp >= start) &&
-                    (end is null || x.Timestamp is null || x.Timestamp <= end)),
+                    (end is null || x.Timestamp is null || x.Timestamp <= end || Correlates(x, terminalEvent))),
                 "Factory root"),
             RolloutPath = verbose ? root.Path : null
         };
     }
 
-    private static string ClassifyRole(CodexRollout root, CodexRollout child, SpawnRecord? spawn)
+    private static string ClassifyRole    private static string ClassifyRole(CodexRollout root, CodexRollout child, SpawnRecord? spawn)
     {
         if (child.AgentRoleHint?.Contains("planner", StringComparison.OrdinalIgnoreCase) == true)
             return "planner";
@@ -1413,9 +1631,11 @@ public sealed class FactoryReportEngine
             return "worker";
 
         var spawnTask = spawn?.Task;
-        if (spawnTask?.Contains(PlannerSkill, StringComparison.OrdinalIgnoreCase) == true)
+        var spawnPlanner = HasFactoryMarker(spawnTask, PlannerSkill);
+        var spawnWorker = HasFactoryMarker(spawnTask, WorkerSkill);
+        if (spawnPlanner && !spawnWorker)
             return "planner";
-        if (spawnTask?.Contains(WorkerSkill, StringComparison.OrdinalIgnoreCase) == true)
+        if (spawnWorker && !spawnPlanner)
             return "worker";
 
         var initialInstructions = string.Join("\n",
@@ -1442,29 +1662,82 @@ public sealed class FactoryReportEngine
         foreach (var rollout in rollouts)
         {
             var record = rollout.SpawnRecords.Values.FirstOrDefault(
-                x => string.Equals(x.ChildThreadId, childId, StringComparison.Ordinal));
+                x => x.Children.Contains(childId, StringComparer.Ordinal));
             if (record is not null)
                 return record;
         }
         return null;
     }
 
-    private static string PlannerOutcome(CodexRollout rollout)
+    private static bool HasFactoryMarker(string? text, string marker) =>
+        !string.IsNullOrWhiteSpace(text) &&
+        text.Contains(marker, StringComparison.OrdinalIgnoreCase);
+
+    private static (string? Outcome, DateTimeOffset? Timestamp) PlannerOutcome(CodexRollout rollout)
     {
-        foreach (var text in rollout.Events.Select(x => x.Text).Where(x => !string.IsNullOrWhiteSpace(x)).Reverse())
+        foreach (var e in rollout.Events
+                     .Where(x => !string.IsNullOrWhiteSpace(x.Text))
+                     .Reverse())
         {
-            if (Regex.IsMatch(text!, @"(?m)^#\s*Question\s*$", RegexOptions.IgnoreCase))
-                return "Question";
-            if (Regex.IsMatch(text!, @"(?m)^#\s*Done\s*$", RegexOptions.IgnoreCase))
-                return "Done";
-            if (Regex.IsMatch(text!, @"(?m)^#\s*Task\s*$", RegexOptions.IgnoreCase))
-                return "Tasks";
+            if (Regex.IsMatch(e.Text!, @"(?m)^#\s*Question\s*$", RegexOptions.IgnoreCase))
+                return ("Question", e.Timestamp);
+            if (Regex.IsMatch(e.Text!, @"(?m)^#\s*Done\s*$", RegexOptions.IgnoreCase))
+                return ("Done", e.Timestamp);
+            if (Regex.IsMatch(e.Text!, @"(?m)^#\s*Task\s*$", RegexOptions.IgnoreCase))
+                return ("Tasks", e.Timestamp);
         }
-        return "Unknown";
+        return ("Unknown", null);
     }
 
-    private static TokenMetrics ComputeWholeThreadTokens(CodexRollout rollout)
+    private static string? ExtractFactoryTask(string? spawnTask)
     {
+        if (string.IsNullOrWhiteSpace(spawnTask))
+            return null;
+
+        var text = spawnTask.Replace("\r\n", "\n");
+        var taskMatch = Regex.Match(text, @"(?im)^\s*Task\s*:\s*(.+)$");
+        if (taskMatch.Success)
+            return Bound(taskMatch.Groups[1].Value, 1000);
+
+        var heading = Regex.Match(text, @"(?im)^\s*#\s*Task\s*$");
+        if (heading.Success)
+        {
+            var remainder = text[(heading.Index + heading.Length)..].Trim();
+            if (!string.IsNullOrWhiteSpace(remainder))
+                return Bound(remainder, 1000);
+        }
+
+        var lines = text.Split('\n')
+            .Select(x => x.Trim())
+            .Where(x => x.Length > 0 &&
+                        !x.Contains(WorkerSkill, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        return lines.Length == 0 ? null : Bound(string.Join(" ", lines), 1000);
+    }
+
+    private static string? TaskTitle(string? task)
+    {
+        if (string.IsNullOrWhiteSpace(task))
+            return null;
+        var first = task.Replace("\r\n", "\n")
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(x => x.Trim())
+            .FirstOrDefault(x => x.Length > 0);
+        return string.IsNullOrWhiteSpace(first) ? null : Bound(first, 80);
+    }
+
+    private static TokenMetrics ComputeWholeThreadTokens(CodexRollout rollout, out bool authoritative)
+    {
+        authoritative = false;
+        var threadUsage = rollout.Events
+            .Where(x => x.Usage is not null && x.UsageScope == "thread")
+            .LastOrDefault();
+        if (threadUsage?.Usage is not null)
+        {
+            authoritative = true;
+            return threadUsage.Usage;
+        }
+
         var usageEvents = rollout.Events.Where(x => x.Usage is not null).ToArray();
         var cumulative = usageEvents.Where(x => x.UsageIsCumulative).LastOrDefault();
         if (cumulative?.Usage is not null)
@@ -1477,10 +1750,46 @@ public sealed class FactoryReportEngine
     private static TokenMetrics ComputeSegmentTokens(
         IReadOnlyList<CodexEvent> events,
         DateTimeOffset? start,
-        DateTimeOffset? end)
+        DateTimeOffset? end,
+        CodexEvent? terminalEvent,
+        out bool authoritative)
     {
+        authoritative = false;
         if (start is null || end is null)
             return new TokenMetrics();
+
+        var native = events.Where(x => x.UsageScope == "thread" && x.Usage is not null).ToArray();
+        if (native.Length > 0)
+        {
+            var before = native.LastOrDefault(x => x.Timestamp < start);
+            TokenMetrics? baseline = before?.Usage;
+            if (baseline is null)
+            {
+                var priorExecution = events.Any(x =>
+                    x.Timestamp < start &&
+                    x.Type != "session_meta" &&
+                    x.Usage is null);
+                if (!priorExecution)
+                {
+                    baseline = new TokenMetrics
+                    {
+                        InputTokens = 0,
+                        CachedInputTokens = 0,
+                        NewInputTokens = 0,
+                        OutputTokens = 0
+                    };
+                }
+            }
+
+            var finish = native.LastOrDefault(x =>
+                x.Timestamp <= end || Correlates(x, terminalEvent));
+            if (baseline is not null && finish?.Usage is not null)
+            {
+                authoritative = true;
+                return TokenMetrics.Subtract(finish.Usage, baseline);
+            }
+            return new TokenMetrics();
+        }
 
         var cumulative = events.Where(x => x.UsageIsCumulative && x.Usage is not null).ToArray();
         if (cumulative.Length > 0)
@@ -1494,7 +1803,7 @@ public sealed class FactoryReportEngine
 
         var perTurn = events.Where(x =>
                 !x.UsageIsCumulative && x.Usage is not null &&
-                x.Timestamp >= start && x.Timestamp <= end)
+                x.Timestamp >= start && (x.Timestamp <= end || Correlates(x, terminalEvent)))
             .Select(x => x.Usage!)
             .ToArray();
         return perTurn.Length == 0 ? new TokenMetrics() : TokenMetrics.Sum(perTurn);
@@ -1502,11 +1811,17 @@ public sealed class FactoryReportEngine
 
     private static TokenMetrics ComputeRootReportedTokens(
         IReadOnlyList<CodexEvent> events,
-        DateTimeOffset? end)
+        DateTimeOffset? end,
+        CodexEvent? terminalEvent)
     {
         var eligible = events
-            .Where(x => x.Usage is not null && (end is null || x.Timestamp is null || x.Timestamp <= end))
+            .Where(x => x.Usage is not null &&
+                        (end is null || x.Timestamp is null || x.Timestamp <= end || Correlates(x, terminalEvent)))
             .ToArray();
+
+        var thread = eligible.LastOrDefault(x => x.UsageScope == "thread");
+        if (thread?.Usage is not null)
+            return thread.Usage;
 
         var cumulative = eligible.LastOrDefault(x => x.UsageIsCumulative);
         if (cumulative?.Usage is not null)
@@ -1516,12 +1831,26 @@ public sealed class FactoryReportEngine
         return perTurn.Length == 0 ? new TokenMetrics() : TokenMetrics.Sum(perTurn);
     }
 
-    private static ToolMetrics AnalyzeTools(IEnumerable<CodexEvent> source, string agent)
+    private static bool Correlates(CodexEvent usage, CodexEvent? terminal)
+    {
+        if (terminal is null || usage.Usage is null)
+            return false;
+
+        static bool Same(string? a, string? b) =>
+            !string.IsNullOrWhiteSpace(a) &&
+            !string.IsNullOrWhiteSpace(b) &&
+            string.Equals(a, b, StringComparison.Ordinal);
+
+        return Same(usage.ResponseId, terminal.ResponseId) ||
+               Same(usage.TurnId, terminal.TurnId) ||
+               Same(usage.RootTurnId, terminal.RootTurnId);
+    }
+
+    private static ToolMetrics AnalyzeTools    private static ToolMetrics AnalyzeTools(IEnumerable<CodexEvent> source, string agent)
     {
         var events = source.OrderBy(x => x.Ordinal).ToArray();
         var calls = new Dictionary<string, ToolCallState>(StringComparer.Ordinal);
-        var active = new HashSet<string>(StringComparer.Ordinal);
-        long batches = 0;
+        var wrapperIds = new HashSet<string>(StringComparer.Ordinal);
         var anonymous = 0;
 
         foreach (var e in events)
@@ -1529,7 +1858,7 @@ public sealed class FactoryReportEngine
             if (e.ToolPhase is null)
                 continue;
 
-            var id = e.ToolId ?? $"anonymous-{++anonymous}";
+            var id = e.ToolId ?? "anonymous-" + ++anonymous;
             if (!calls.TryGetValue(id, out var call))
             {
                 call = new ToolCallState { Id = id };
@@ -1545,31 +1874,38 @@ public sealed class FactoryReportEngine
             call.Timestamp ??= e.Timestamp;
             call.Status = e.Status ?? call.Status;
             call.ExitCode = e.ExitCode ?? call.ExitCode;
+            call.IsNative |= e.IsNativeOperation;
+            call.IsWrapper |= e.IsHostWrapper;
+            if (e.IsHostWrapper)
+                wrapperIds.Add(id);
 
             if (e.ToolPhase == "started")
             {
-                if (active.Count == 0)
-                    batches++;
-                active.Add(id);
+                call.StartedAt ??= e.Timestamp;
                 call.HadLifecycle = true;
             }
             else if (e.ToolPhase == "completed")
             {
-                active.Remove(id);
+                call.CompletedAt = e.Timestamp ?? call.CompletedAt;
                 call.HadLifecycle = true;
             }
         }
 
-        var noLifecycle = calls.Values.Count(x => !x.HadLifecycle);
-        batches += noLifecycle;
+        var hasNative = calls.Values.Any(x => x.IsNative);
+        var semantic = (hasNative
+                ? calls.Values.Where(x => x.IsNative)
+                : calls.Values)
+            .ToArray();
 
         var metrics = new ToolMetrics
         {
-            ToolCalls = calls.Count,
-            ToolBatches = batches
+            ToolCalls = semantic.Length,
+            NativeOperations = calls.Values.Count(x => x.IsNative),
+            HostWrapperCalls = wrapperIds.Count,
+            ToolBatches = ComputeToolBatches(semantic)
         };
 
-        foreach (var call in calls.Values)
+        foreach (var call in semantic)
         {
             var name = call.Name ?? "";
             var outputChars = call.Output?.Length ?? 0;
@@ -1588,16 +1924,21 @@ public sealed class FactoryReportEngine
                     metrics.FailedCommandItems.Add(new FailedCommand
                     {
                         Agent = agent,
-                        Timestamp = call.Timestamp,
+                        Timestamp = call.CompletedAt ?? call.Timestamp,
                         ExitCode = call.ExitCode,
                         Status = call.Status,
                         Command = Bound(ExtractCommand(call.Arguments), 500)
                     });
                 }
             }
-            else if (name.Contains("spawn_agent", StringComparison.OrdinalIgnoreCase))
+            else if (name == "file_change")
+            {
+                metrics.FileChanges++;
+                metrics.FileOperations++;
+            }
+            else if (name == "spawn_agent")
                 metrics.SpawnAgentCalls++;
-            else if (name.Contains("wait_agent", StringComparison.OrdinalIgnoreCase))
+            else if (name == "wait_agent")
                 metrics.WaitAgentCalls++;
             else if (name.Contains("search", StringComparison.OrdinalIgnoreCase) ||
                      name.Contains("find", StringComparison.OrdinalIgnoreCase))
@@ -1614,17 +1955,47 @@ public sealed class FactoryReportEngine
         return metrics;
     }
 
-    private static bool IsFailed(ToolCallState call) =>
+    private static long? ComputeToolBatches(IEnumerable<ToolCallState> source)
+    {
+        var calls = source.ToArray();
+        if (calls.Length == 0)
+            return 0;
+        if (calls.Any(x => x.StartedAt is null || x.CompletedAt is null))
+            return null;
+
+        var intervals = calls
+            .OrderBy(x => x.StartedAt)
+            .ThenBy(x => x.Id, StringComparer.Ordinal)
+            .ToArray();
+
+        long batches = 0;
+        DateTimeOffset? activeEnd = null;
+        foreach (var call in intervals)
+        {
+            if (activeEnd is null || call.StartedAt!.Value > activeEnd.Value)
+            {
+                batches++;
+                activeEnd = call.CompletedAt;
+            }
+            else if (call.CompletedAt!.Value > activeEnd.Value)
+            {
+                activeEnd = call.CompletedAt;
+            }
+        }
+        return batches;
+    }
+
+    private static bool IsFailed    private static bool IsFailed(ToolCallState call) =>
         call.ExitCode is not null && call.ExitCode != 0 ||
         call.Status is not null && call.Status is "failed" or "error" or "declined";
 
     private static bool IsCommand(CodexEvent e) => IsCommandName(e.ToolName ?? "");
 
     private static bool IsCommandName(string name) =>
+        name.Equals("command_execution", StringComparison.OrdinalIgnoreCase) ||
         name.Contains("exec_command", StringComparison.OrdinalIgnoreCase) ||
         name.Contains("write_stdin", StringComparison.OrdinalIgnoreCase) ||
-        name.Contains("local_shell", StringComparison.OrdinalIgnoreCase) ||
-        name.Contains("command_execution", StringComparison.OrdinalIgnoreCase);
+        name.Contains("local_shell", StringComparison.OrdinalIgnoreCase);
 
     private static string? ExtractCommand(string? arguments)
     {
@@ -1770,35 +2141,31 @@ public sealed class FactoryReportEngine
             return new TokenMetrics();
         }
 
-        var root = distinct.FirstOrDefault(x => x.Role == "root");
-        var children = distinct.Where(x => x.Role != "root").ToArray();
-        if (root?.Tokens.Available == true && children.Any(x => x.Tokens.Available))
+        if (distinct.Any(x => !x.TokensAuthoritative || !x.Tokens.Available))
         {
             complete = false;
-            method = "overlap-unknown";
+            method = distinct.Any(x => x.Tokens.Available) ? "overlap-unknown" : "unavailable";
             return new TokenMetrics();
         }
 
-        complete = distinct.All(x => x.Tokens.Available);
-        if (!complete)
-        {
-            method = "partial-distinct-thread-sum";
-            return new TokenMetrics();
-        }
-
-        method = "sum-distinct-threads";
+        complete = true;
+        method = "per-thread";
         return TokenMetrics.Sum(distinct.Select(x => x.Tokens));
     }
 
     private static ToolMetrics AggregateTools(IEnumerable<AgentReport> agents)
     {
         var total = new ToolMetrics();
+        long? batches = 0;
         foreach (var x in agents)
         {
             total.ToolCalls += x.Tools.ToolCalls;
-            total.ToolBatches += x.Tools.ToolBatches;
+            total.NativeOperations += x.Tools.NativeOperations;
+            total.HostWrapperCalls += x.Tools.HostWrapperCalls;
+            batches = batches is null || x.Tools.ToolBatches is null ? null : batches + x.Tools.ToolBatches;
             total.Commands += x.Tools.Commands;
             total.FailedCommands += x.Tools.FailedCommands;
+            total.FileChanges += x.Tools.FileChanges;
             total.FileOperations += x.Tools.FileOperations;
             total.SearchOperations += x.Tools.SearchOperations;
             total.SpawnAgentCalls += x.Tools.SpawnAgentCalls;
@@ -1808,39 +2175,156 @@ public sealed class FactoryReportEngine
             total.FailedToolOutputCharacters += x.Tools.FailedToolOutputCharacters;
             total.FailedCommandItems.AddRange(x.Tools.FailedCommandItems);
         }
+        total.ToolBatches = batches;
         return total;
     }
 
-    private static List<TimelineEvent> BuildTimeline(
+    private static CompletionReport BuildCompletion(
+        IReadOnlyList<AgentReport> agents,
+        IReadOnlyList<CodexEvent> rootEvents,
+        string result,
+        bool declaredResult,
+        CodexEvent? terminalEvent)
+    {
+        var planners = agents.Where(x => x.Role == "planner").ToArray();
+        var workers = agents.Where(x => x.Role == "worker").ToArray();
+        var done = planners.Where(x => x.PlannerOutcome == "Done").OrderBy(x => x.PlannerOutcomeAt).LastOrDefault();
+
+        bool? plannerDone;
+        if (done is null)
+        {
+            plannerDone = false;
+        }
+        else if (workers.Length == 0)
+        {
+            plannerDone = true;
+        }
+        else
+        {
+            var workerFinishes = workers.Select(x => x.FinishedAt).Where(x => x is not null).Select(x => x!.Value).ToArray();
+            var lastWorker = workerFinishes.Length == 0 ? (DateTimeOffset?)null : workerFinishes.Max();
+            plannerDone = lastWorker is null || done.PlannerOutcomeAt is null
+                ? null
+                : done.PlannerOutcomeAt >= lastWorker;
+        }
+
+        var verification = "unavailable";
+        if (plannerDone == true && done?.PlannerOutcomeAt is not null)
+        {
+            var doneAt = done.PlannerOutcomeAt.Value;
+            var terminalAt = terminalEvent?.Timestamp;
+            var commands = rootEvents
+                .Where(x => IsCommand(x) &&
+                            x.Timestamp is not null &&
+                            x.Timestamp.Value >= doneAt &&
+                            (terminalAt is null || x.Timestamp.Value <= terminalAt.Value))
+                .Where(x => x.ToolPhase is "completed" or "call")
+                .ToArray();
+
+            if (commands.Any(x => x.ExitCode is not null || x.Status is not null))
+            {
+                verification = commands.Any(x =>
+                    x.ExitCode is not null && x.ExitCode != 0 ||
+                    x.Status is "failed" or "error")
+                    ? "failed"
+                    : "passed";
+            }
+        }
+
+        var declared = declaredResult ? result : "unavailable";
+        var validation = declared == "completed"
+            ? plannerDone == false ? "warning" : "ok"
+            : declaredResult ? "ok" : "unavailable";
+
+        return new CompletionReport
+        {
+            PlannerDone = plannerDone,
+            ProjectVerification = verification,
+            DeclaredResult = declared,
+            ProtocolValidation = validation
+        };
+    }
+
+    private static void AddTopologyDiagnostics(
+        IReadOnlyList<AgentReport> agents,
+        List<Diagnostic> diagnostics)
+    {
+        var byId = agents.ToDictionary(x => x.ThreadId, StringComparer.Ordinal);
+        foreach (var agent in agents.Where(x => x.Role != "root"))
+        {
+            if (agent.ParentThreadId is not null && !byId.ContainsKey(agent.ParentThreadId))
+            {
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning",
+                    Category = "reporter",
+                    Code = "agent_parent_missing",
+                    Message = $"Agent {agent.ThreadId} references missing parent {agent.ParentThreadId}."
+                });
+            }
+
+            var current = agent;
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            while (seen.Add(current.ThreadId) &&
+                   current.ParentThreadId is not null &&
+                   byId.TryGetValue(current.ParentThreadId, out var parent))
+            {
+                current = parent;
+            }
+
+            if (current.ParentThreadId is not null &&
+                byId.TryGetValue(current.ParentThreadId, out var repeatedParent) &&
+                seen.Contains(repeatedParent.ThreadId))
+            {
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning",
+                    Category = "reporter",
+                    Code = "agent_topology_cycle",
+                    Message = $"Agent topology contains a cycle involving {agent.ThreadId}."
+                });
+            }
+        }
+    }
+
+    private static List<TimelineEvent> BuildTimeline(    private static List<TimelineEvent> BuildTimeline(
         CodexEvent start,
         DateTimeOffset? end,
         string result,
-        IEnumerable<AgentReport> agents,
-        ToolMetrics tools)
+        IEnumerable<AgentReport> agentsSource,
+        ToolMetrics tools,
+        CompletionReport completion)
     {
+        var agents = agentsSource.ToArray();
         var events = new List<TimelineEvent>
         {
             new() { Timestamp = start.Timestamp, Ordinal = start.Ordinal, Kind = "factory-start", Text = "Factory run started" }
         };
 
         var ordinal = start.Ordinal + 1;
-        foreach (var agent in agents.Where(x => x.Role != "root").OrderBy(x => x.StartedAt))
+        foreach (var agent in agents.Where(x => x.Role != "root")
+                     .OrderBy(x => x.StartedAt)
+                     .ThenBy(x => x.ThreadId, StringComparer.Ordinal))
         {
+            var label = AgentLabel(agent, agents);
+            var task = agent.Role == "worker" && !string.IsNullOrWhiteSpace(agent.TaskTitle)
+                ? ": " + agent.TaskTitle
+                : "";
             events.Add(new TimelineEvent
             {
                 Timestamp = agent.StartedAt,
                 Ordinal = ordinal++,
                 Kind = $"{agent.Role}-start",
-                Text = $"{DisplayRole(agent)} started"
+                Text = $"{label} started{task}"
             });
             if (agent.Role == "planner" && agent.PlannerOutcome is not null)
             {
                 events.Add(new TimelineEvent
                 {
-                    Timestamp = agent.FinishedAt,
+                    Timestamp = agent.PlannerOutcomeAt ?? agent.FinishedAt,
                     Ordinal = ordinal++,
                     Kind = "planner-outcome",
-                    Text = $"{DisplayRole(agent)} -> {agent.PlannerOutcome}"
+                    Text = $"{label} -> {agent.PlannerOutcome}"
                 });
             }
             else
@@ -1850,7 +2334,7 @@ public sealed class FactoryReportEngine
                     Timestamp = agent.FinishedAt,
                     Ordinal = ordinal++,
                     Kind = $"{agent.Role}-finish",
-                    Text = $"{DisplayRole(agent)} completed"
+                    Text = $"{label} completed"
                 });
             }
         }
@@ -1866,18 +2350,31 @@ public sealed class FactoryReportEngine
             });
         }
 
+        if (completion.ProjectVerification is "passed" or "failed")
+        {
+            events.Add(new TimelineEvent
+            {
+                Timestamp = end,
+                Ordinal = long.MaxValue - 1,
+                Kind = "project-verification",
+                Text = $"Project verification {completion.ProjectVerification}"
+            });
+        }
+
         events.Add(new TimelineEvent
         {
             Timestamp = end,
             Ordinal = long.MaxValue,
             Kind = "factory-result",
-            Text = $"Factory result: {result.ToUpperInvariant()}"
+            Text = completion.DeclaredResult != "unavailable"
+                ? $"Factory declared result: {completion.DeclaredResult.ToUpperInvariant()}"
+                : $"Factory result: {result.ToUpperInvariant()}"
         });
 
         return events.OrderBy(x => x.Timestamp ?? DateTimeOffset.MaxValue).ThenBy(x => x.Ordinal).ToList();
     }
 
-    private static void AssignSequences(List<AgentReport> agents)
+    private static void AssignSequences    private static void AssignSequences(List<AgentReport> agents)
     {
         foreach (var group in agents.Where(x => x.Role != "root").GroupBy(x => x.Role))
         {
@@ -1887,9 +2384,14 @@ public sealed class FactoryReportEngine
         }
     }
 
-    private static string DisplayRole(AgentReport agent) =>
-        agent.Role == "root" ? "Factory root" :
-        $"{char.ToUpperInvariant(agent.Role[0])}{agent.Role[1..]} #{agent.Sequence}";
+    private static string AgentLabel(AgentReport agent, IReadOnlyCollection<AgentReport> agents)
+    {
+        if (agent.Role == "root")
+            return "Factory root";
+        if (agent.Role == "planner" && agents.Count(x => x.Role == "planner") == 1)
+            return "Planner";
+        return $"{char.ToUpperInvariant(agent.Role[0])}{agent.Role[1..]} #{agent.Sequence}";
+    }
 
     private static int ComputeMaximumDepth(IReadOnlyList<AgentReport> agents)
     {
@@ -1990,6 +2492,10 @@ public sealed class FactoryReportEngine
         public string? Status { get; set; }
         public int? ExitCode { get; set; }
         public bool HadLifecycle { get; set; }
+        public bool IsNative { get; set; }
+        public bool IsWrapper { get; set; }
+        public DateTimeOffset? StartedAt { get; set; }
+        public DateTimeOffset? CompletedAt { get; set; }
     }
 }
 
@@ -2253,13 +2759,8 @@ public static class ReportWriters
         writer.WriteLine();
         writer.WriteLine("Agents");
         writer.WriteLine("------");
-        foreach (var agent in report.Agents)
-        {
-            var label = agent.Role == "root" ? "Factory root" :
-                $"{Cap(agent.Role)} #{agent.Sequence}";
-            writer.WriteLine($"{label,-20} {FormatDuration(agent.DurationMilliseconds),10}" +
-                             (verbose ? $"  {agent.ThreadId}" : ""));
-        }
+        foreach (var line in AgentTreeLines(report.Agents))
+            writer.WriteLine(line);
         writer.WriteLine();
         writer.WriteLine($"Planner invocations: {report.Metrics.PlannerInvocations}");
         writer.WriteLine($"Worker invocations:  {report.Metrics.WorkerInvocations}");
@@ -2273,13 +2774,24 @@ public static class ReportWriters
             writer.WriteLine("unavailable");
         foreach (var task in report.Tasks)
         {
-            writer.WriteLine($"{task.Number}. {task.Status.ToUpperInvariant(),-11} {FormatDuration(task.DurationMilliseconds),10}");
-            writer.WriteLine($"   {Short(task.Text, 180)}");
-            if (verbose)
-                writer.WriteLine($"   agent: {task.AgentThreadId}");
+            var agent = report.Agents.FirstOrDefault(x => x.ThreadId == task.AgentThreadId);
+            writer.WriteLine($"#{task.Number}  {agent?.TaskTitle ?? Short(task.Text, 80)}");
+            writer.WriteLine($"    Status:    {task.Status}");
+            writer.WriteLine($"    Worker:    {task.AgentThreadId}");
+            writer.WriteLine($"    Duration:  {FormatDuration(task.DurationMilliseconds)}");
+            writer.WriteLine($"    Tokens:    {FormatTaskTokens(agent?.Tokens)}");
         }
 
         writer.WriteLine();
+        writer.WriteLine("Completion");
+        writer.WriteLine("----------");
+        writer.WriteLine($"Planner done:          {BoolStatus(report.Completion.PlannerDone)}");
+        writer.WriteLine($"Project verification: {report.Completion.ProjectVerification}");
+        writer.WriteLine($"Declared result:       {report.Completion.DeclaredResult.ToUpperInvariant()}");
+        writer.WriteLine($"Protocol validation:   {report.Completion.ProtocolValidation}");
+
+        writer.WriteLine();
+        writer.WriteLine("Tokens");        writer.WriteLine();
         writer.WriteLine("Tokens");
         writer.WriteLine("------");
         if (report.Metrics.RootReportedTokens.Available)
@@ -2305,17 +2817,17 @@ public static class ReportWriters
         writer.WriteLine();
         writer.WriteLine("Tools");
         writer.WriteLine("-----");
-        writer.WriteLine($"Tool calls:       {report.Metrics.Tools.ToolCalls}");
-        writer.WriteLine($"Tool batches:     {report.Metrics.Tools.ToolBatches}");
-        writer.WriteLine($"Commands:         {report.Metrics.Tools.Commands}");
-        writer.WriteLine($"Failed commands:  {report.Metrics.Tools.FailedCommands}");
-        writer.WriteLine($"Spawn agent calls:{report.Metrics.Tools.SpawnAgentCalls,4}");
-        writer.WriteLine($"Wait agent calls: {report.Metrics.Tools.WaitAgentCalls,4}");
-        writer.WriteLine($"File operations:  {report.Metrics.Tools.FileOperations,4}");
-        writer.WriteLine($"Search operations:{report.Metrics.Tools.SearchOperations,4}");
-        writer.WriteLine($"Other:            {report.Metrics.Tools.OtherToolCalls,4}");
+        writer.WriteLine($"Native operations: {report.Metrics.Tools.NativeOperations}");
+        writer.WriteLine($"Commands:          {report.Metrics.Tools.Commands}");
+        writer.WriteLine($"File changes:      {report.Metrics.Tools.FileChanges}");
+        writer.WriteLine($"Spawn agent:       {report.Metrics.Tools.SpawnAgentCalls}");
+        writer.WriteLine($"Wait agent:        {report.Metrics.Tools.WaitAgentCalls}");
+        writer.WriteLine($"Failed commands:   {report.Metrics.Tools.FailedCommands}");
+        writer.WriteLine($"Tool batches:      {NullableNum(report.Metrics.Tools.ToolBatches)}");
+        if (verbose)
+            writer.WriteLine($"Host wrapper calls:{report.Metrics.Tools.HostWrapperCalls,4}");
 
-        if (report.Metrics.Tools.FailedCommandItems.Count > 0)
+        if (report.Metrics.Tools.FailedCommandItems.Count > 0)        if (report.Metrics.Tools.FailedCommandItems.Count > 0)
         {
             writer.WriteLine();
             writer.WriteLine("Failed commands");
@@ -2333,11 +2845,11 @@ public static class ReportWriters
         writer.WriteLine();
         writer.WriteLine("Factory project state");
         writer.WriteLine("---------------------");
-        writer.WriteLine($"current/request.md:       {Present(report.FactoryProjectState.CurrentRequestPresent)}");
-        writer.WriteLine($"current/plan.md:          {Present(report.FactoryProjectState.CurrentPlanPresent)}");
-        writer.WriteLine($"current/question.md:      {Present(report.FactoryProjectState.CurrentQuestionPresent)}");
-        writer.WriteLine($"verification-failure.md:  {Present(report.FactoryProjectState.VerificationFailurePresent)}");
-        writer.WriteLine($"archived result:          {Present(report.FactoryProjectState.ArchivedResultPresent)}");
+        writer.WriteLine($"Active request:          {Present(report.FactoryProjectState.CurrentRequestPresent)}");
+        writer.WriteLine($"Remaining plan:          {Present(report.FactoryProjectState.CurrentPlanPresent)}");
+        writer.WriteLine($"Pending question:        {Present(report.FactoryProjectState.CurrentQuestionPresent)}");
+        writer.WriteLine($"Verification failure:    {Present(report.FactoryProjectState.VerificationFailurePresent)}");
+        writer.WriteLine($"Archived result:         {Present(report.FactoryProjectState.ArchivedResultPresent)}");
 
         if (verbose)
         {
@@ -2387,21 +2899,38 @@ public static class ReportWriters
         writer.WriteLine();
         writer.WriteLine("## Agents");
         writer.WriteLine();
-        writer.WriteLine("| Agent | Duration | Input | Cached | New input | Output |");
-        writer.WriteLine("|---|---:|---:|---:|---:|---:|");
-        foreach (var agent in report.Agents)
-        {
-            var label = agent.Role == "root" ? "Factory root" : $"{Cap(agent.Role)} #{agent.Sequence}";
-            writer.WriteLine($"| {label} | {FormatDuration(agent.DurationMilliseconds)} | {Num(agent.Tokens.InputTokens)} | {Num(agent.Tokens.CachedInputTokens)} | {Num(agent.Tokens.NewInputTokens)} | {Num(agent.Tokens.OutputTokens)} |");
-        }
+        writer.WriteLine("``text");
+        foreach (var line in AgentTreeLines(report.Agents))
+            writer.WriteLine(line);
+        writer.WriteLine("```");
+
         writer.WriteLine();
+        writer.WriteLine("## Tasks");        writer.WriteLine();
         writer.WriteLine("## Tasks");
         writer.WriteLine();
         if (report.Tasks.Count == 0)
             writer.WriteLine("unavailable");
         foreach (var task in report.Tasks)
-            writer.WriteLine($"{task.Number}. **{task.Status.ToUpperInvariant()}** ({FormatDuration(task.DurationMilliseconds)}) — {Short(task.Text, 300)}");
+        {
+            var agent = report.Agents.FirstOrDefault(x => x.ThreadId == task.AgentThreadId);
+            writer.WriteLine($"### #{task.Number} {agent?.TaskTitle ?? Short(task.Text, 80)}");
+            writer.WriteLine();
+            writer.WriteLine($"- Status: {task.Status}");
+            writer.WriteLine("- Worker: " + task.AgentThreadId);
+            writer.WriteLine($"- Duration: {FormatDuration(task.DurationMilliseconds)}");
+            writer.WriteLine($"- Tokens: {FormatTaskTokens(agent?.Tokens)}");
+            writer.WriteLine();
+        }
+
+        writer.WriteLine("## Completion");
         writer.WriteLine();
+        writer.WriteLine($"- Planner done: {BoolStatus(report.Completion.PlannerDone)}");
+        writer.WriteLine($"- Project verification: {report.Completion.ProjectVerification}");
+        writer.WriteLine($"- Declared result: {report.Completion.DeclaredResult.ToUpperInvariant()}");
+        writer.WriteLine($"- Protocol validation: {report.Completion.ProtocolValidation}");
+
+        writer.WriteLine();
+        writer.WriteLine("## Token accounting");        writer.WriteLine();
         writer.WriteLine("## Token accounting");
         writer.WriteLine();
         writer.WriteLine($"- Root reported input: {Num(report.Metrics.RootReportedTokens.InputTokens)}");
@@ -2412,16 +2941,18 @@ public static class ReportWriters
         writer.WriteLine();
         writer.WriteLine("## Tools");
         writer.WriteLine();
-        writer.WriteLine($"- Tool calls: {report.Metrics.Tools.ToolCalls}");
-        writer.WriteLine($"- Tool batches: {report.Metrics.Tools.ToolBatches}");
+        writer.WriteLine($"- Native operations: {report.Metrics.Tools.NativeOperations}");
         writer.WriteLine($"- Commands: {report.Metrics.Tools.Commands}");
-        writer.WriteLine($"- Failed commands: {report.Metrics.Tools.FailedCommands}");
+        writer.WriteLine($"- File changes: {report.Metrics.Tools.FileChanges}");
         writer.WriteLine($"- Spawn agent calls: {report.Metrics.Tools.SpawnAgentCalls}");
         writer.WriteLine($"- Wait agent calls: {report.Metrics.Tools.WaitAgentCalls}");
-        writer.WriteLine($"- File operations: {report.Metrics.Tools.FileOperations}");
-        writer.WriteLine($"- Search operations: {report.Metrics.Tools.SearchOperations}");
-        writer.WriteLine($"- Other: {report.Metrics.Tools.OtherToolCalls}");
+        writer.WriteLine($"- Failed commands: {report.Metrics.Tools.FailedCommands}");
+        writer.WriteLine($"- Tool batches: {NullableNum(report.Metrics.Tools.ToolBatches)}");
+        if (verbose)
+            writer.WriteLine($"- Host wrapper calls: {report.Metrics.Tools.HostWrapperCalls}");
+
         writer.WriteLine();
+        writer.WriteLine("## Timeline");        writer.WriteLine();
         writer.WriteLine("## Timeline");
         writer.WriteLine();
         foreach (var e in report.Timeline)
@@ -2444,6 +2975,102 @@ public static class ReportWriters
             writer.WriteLine($"- End boundary: {report.Run.EndBoundary.Confidence} — {report.Run.EndBoundary.Evidence ?? "unavailable"}");
         }
     }
+
+    private static IEnumerable<string> AgentTreeLines(IReadOnlyList<AgentReport> agents)
+    {
+        var byParent = agents
+            .Where(x => x.Role != "root" && x.ParentThreadId is not null)
+            .GroupBy(x => x.ParentThreadId!, StringComparer.Ordinal)
+            .ToDictionary(
+                x => x.Key,
+                x => x.OrderBy(a => a.StartedAt).ThenBy(a => a.ThreadId, StringComparer.Ordinal).ToArray(),
+                StringComparer.Ordinal);
+
+        var root = agents.FirstOrDefault(x => x.Role == "root");
+        if (root is null)
+            yield break;
+
+        yield return FormatAgentTreeLine(root, agents);
+
+        var visited = new HashSet<string>(StringComparer.Ordinal) { root.ThreadId };
+        foreach (var line in RenderChildren(root.ThreadId, "", byParent, agents, visited))
+            yield return line;
+
+        foreach (var orphan in agents.Where(x => x.Role != "root" && !visited.Contains(x.ThreadId)))
+            yield return "?  " + FormatAgentTreeLine(orphan, agents);
+    }
+
+    private static IEnumerable<string> RenderChildren(
+        string parentId,
+        string prefix,
+        IReadOnlyDictionary<string, AgentReport[]> byParent,
+        IReadOnlyList<AgentReport> agents,
+        HashSet<string> visited)
+    {
+        if (!byParent.TryGetValue(parentId, out var children))
+            yield break;
+
+        for (var i = 0; i < children.Length; i++)
+        {
+            var child = children[i];
+            var last = i == children.Length - 1;
+            var branch = last ? "└─ " : "├─ ";
+            if (!visited.Add(child.ThreadId))
+            {
+                yield return prefix + branch + "[cycle] " + child.ThreadId;
+                continue;
+            }
+
+            yield return prefix + branch + FormatAgentTreeLine(child, agents);
+            foreach (var line in RenderChildren(
+                         child.ThreadId,
+                         prefix + (last ? "   " : "│  "),
+                         byParent,
+                         agents,
+                         visited))
+                yield return line;
+        }
+    }
+
+    private static string FormatAgentTreeLine(AgentReport agent, IReadOnlyList<AgentReport> agents)
+    {
+        var label = AgentDisplayName(agent, agents);
+        var tokenSuffix = agent.Tokens.Available
+            ? $"   {Compact(agent.Tokens.InputTokens)} in / {Compact(agent.Tokens.CachedInputTokens)} cached / {Compact(agent.Tokens.OutputTokens)} out"
+            : "";
+        var taskSuffix = agent.Role == "worker" && !string.IsNullOrWhiteSpace(agent.TaskTitle)
+            ? $"   {agent.TaskTitle}"
+            : "";
+        return $"{label,-18} {FormatDuration(agent.DurationMilliseconds),8}{tokenSuffix}{taskSuffix}";
+    }
+
+    private static string AgentDisplayName(AgentReport agent, IReadOnlyCollection<AgentReport> agents)
+    {
+        if (agent.Role == "root")
+            return "Factory root";
+        if (agent.Role == "planner" && agents.Count(x => x.Role == "planner") == 1)
+            return "Planner";
+        return $"{Cap(agent.Role)} #{agent.Sequence}";
+    }
+
+    private static string FormatTaskTokens(TokenMetrics? tokens) =>
+        tokens?.Available == true
+            ? $"{Compact(tokens.InputTokens)} input / {Compact(tokens.CachedInputTokens)} cached / {Compact(tokens.OutputTokens)} output"
+            : "unavailable";
+
+    private static string Compact(long? value)
+    {
+        if (value is null)
+            return "unavailable";
+        if (value >= 1_000_000)
+            return $"{value.Value / 1_000_000d:0.#}M";
+        if (value >= 1_000)
+            return $"{value.Value / 1_000d:0.#}k";
+        return value.Value.ToString();
+    }
+
+    private static string BoolStatus(bool? value) => value is null ? "unavailable" : value.Value ? "yes" : "no";
+    private static string NullableNum(long? value) => value?.ToString() ?? "unavailable";
 
     private static string FormatTime(DateTimeOffset? value) =>
         value is null ? "unavailable" : value.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz");

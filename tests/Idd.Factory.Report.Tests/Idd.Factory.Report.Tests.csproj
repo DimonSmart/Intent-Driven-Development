@@ -16,4 +16,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\tools\idd-factory-report\Idd.Factory.Report.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="Fixtures\**\*.jsonl" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
