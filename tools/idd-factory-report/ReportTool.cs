@@ -1695,7 +1695,7 @@ public sealed class FactoryReportEngine
             return null;
 
         var text = spawnTask.Replace("\r\n", "\n");
-        var taskMatch = Regex.Match(text, @"(?im)^\s*Task\s*:\s*(.+)$");
+        var taskMatch = Regex.Match(text, @"(?im)(?:^|\s)Task\s*:\s*(.+)$");
         if (taskMatch.Success)
             return Bound(taskMatch.Groups[1].Value, 1000);
 
