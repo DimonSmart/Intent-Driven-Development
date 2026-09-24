@@ -138,6 +138,7 @@
       ],
       "skills": [
         "idd-factory-run",
+        "idd-factory-configure",
         "idd-factory-decompose-task",
         "idd-factory-execute-subtask"
       ],
@@ -153,6 +154,16 @@
           "skill": "idd-factory-run",
           "source": "src/canonical/methodology/project-verification.md",
           "destination": "project-verification.md"
+        },
+        {
+          "skill": "idd-factory-run",
+          "source": "src/canonical/methodology/factory-execution-policy.md",
+          "destination": "factory-execution-policy.md"
+        },
+        {
+          "skill": "idd-factory-configure",
+          "source": "src/canonical/methodology/factory-execution-policy.md",
+          "destination": "factory-execution-policy.md"
         },
         {
           "skill": "idd-factory-run",
