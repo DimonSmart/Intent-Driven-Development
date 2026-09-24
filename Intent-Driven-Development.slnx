@@ -8,6 +8,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj" />
+    <Project Path="tests/Idd.Intent.LiveTests/Idd.Intent.LiveTests.csproj" />
     <Project Path="tests/Idd.Factory.Report.Tests/Idd.Factory.Report.Tests.csproj" />
     <Project Path="tests/Idd.Generation.Tests/Idd.Generation.Tests.csproj" />
   </Folder>
