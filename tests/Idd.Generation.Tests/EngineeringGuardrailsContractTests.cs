@@ -77,4 +77,76 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
             fixture.AssertMissing(Path.Combine(factory, ".mcp.json"));
         }
     }
+
+    [Fact]
+    public void MechanicalEngineeringValidation_IsSharedAndAllocatorRegexIsCanonical()
+    {
+        var guardrails = Canonical("methodology", "engineering-guardrails.md");
+        var engineeringChange = Canonical("skills", "idd-engineering-change.md");
+        var lint = Canonical("skills", "idd-intent-lint.md");
+
+        Assert.Contains("## Mechanical Engineering Validation", guardrails);
+        Assert.Contains("^Next ID: ENG-\\d{4}$", guardrails);
+        Assert.DoesNotContain("^Next ID: ENG-\\\\d{4}$", guardrails);
+        Assert.Contains("Mechanical Engineering Validation", engineeringChange);
+        Assert.Contains("Mechanical Engineering Validation", lint);
+        Assert.DoesNotContain("## Optional Engineering checks", lint);
+    }
+
+    [Fact]
+    public void EngineeringManagement_DoesNotRouteValidationThroughIntentLint()
+    {
+        var guardrails = Canonical("methodology", "engineering-guardrails.md");
+        var workflows = Canonical("methodology", "common-workflows.md");
+        var engineeringChange = Canonical("skills", "idd-engineering-change.md");
+
+        Assert.DoesNotContain("idd-intent-lint structural validation", guardrails);
+        Assert.DoesNotContain("structural validation through idd-intent-lint", workflows);
+        Assert.False(engineeringChange.Contains("idd-intent-lint", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("-> Mechanical Engineering Validation", guardrails);
+        Assert.Contains("-> direct Mechanical Engineering Validation", workflows);
+    }
+
+    [Fact]
+    public void ProjectLint_IsProjectOwnedAndForbidsAdHocValidatorPrograms()
+    {
+        var lint = Canonical("skills", "idd-intent-lint.md");
+        var engineeringChange = Canonical("skills", "idd-engineering-change.md");
+
+        Assert.Contains("Do not generate a general-purpose validator program solely to perform IDD lint.", lint);
+        Assert.Contains("Do not generate a general-purpose validator program", engineeringChange);
+        Assert.Contains("installed plugin cache", lint);
+        Assert.Contains("canonical IDD repository", lint);
+        Assert.DoesNotContain("skills do not contain an archive-enabling flag", lint);
+        Assert.DoesNotContain("skills do not contain an archive import action", lint);
+        Assert.DoesNotContain("docs describe archive as a normal lifecycle", lint);
+    }
+
+    [Fact]
+    public void EngineeringManagement_SupportsBatchPlanningAndSequentialAllocation()
+    {
+        var guardrails = Canonical("methodology", "engineering-guardrails.md");
+        var engineeringChange = Canonical("skills", "idd-engineering-change.md");
+
+        Assert.Contains("one or more durable Engineering decisions", guardrails);
+        Assert.Contains("One invocation may process multiple durable Engineering decisions.", engineeringChange);
+        Assert.Contains("allocate sequentially", guardrails);
+        Assert.Contains("allocate consecutive IDs only to `new` candidates", engineeringChange);
+        Assert.DoesNotContain("creates one Rule", guardrails);
+    }
+
+    [Fact]
+    public void EngineeringBootstrapAssets_RemainPackaged()
+    {
+        foreach (var platform in new[] { "claude", "codex" })
+        {
+            var root = Path.Combine(
+                fixture.MarketplaceRoot, "plugins", platform, "idd-intent", "skills",
+                "idd-engineering-change", "assets", "bootstrap", ".idd", "engineering");
+
+            fixture.AssertFile(Path.Combine(root, "README.md"));
+            fixture.AssertFile(Path.Combine(root, "INDEX.md"));
+        }
+    }
+
 }

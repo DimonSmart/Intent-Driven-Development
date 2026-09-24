@@ -353,10 +353,10 @@ Use this workflow only for an explicit durable implementation-only project decis
 ```text
 explicit durable engineering decision
 -> idd-engineering-change(operation: add | modify | remove)
--> structural validation through idd-intent-lint
+-> direct Mechanical Engineering Validation
 ```
 
-`idd-engineering-change` is the standard mutation owner for `.idd/engineering/`. It may lazily create the Engineering layer on the first add, but `idd-project-init` does not create it. The workflow does not infer Rules from current code patterns.
+`idd-engineering-change` is the standard mutation owner for `.idd/engineering/`. One request may contain one or more durable decisions; it plans the complete semantic batch before mutation, groups decisions into coherent Rules, and allocates IDs only to new Rules. It may lazily create the Engineering layer only after planning confirms a real add, but `idd-project-init` does not create it. The workflow does not infer Rules from current code patterns.
 
 When the same user request also asks to change implementation, the complete lifecycle may continue:
 
@@ -368,7 +368,7 @@ idd-engineering-change
 
 The Engineering mutation happens first. An active Factory run marked by `.idd/factory/current/request.md` blocks the mutation; management does not rewrite or re-plan active Factory state automatically.
 
-For `intent-only`, stop after Engineering management and structural validation. For `route-only`, do not start the management workflow.
+For `intent-only`, stop after Engineering management and direct Mechanical Engineering Validation. For `route-only`, do not start the management workflow.
 
 ## Workflow Family: Implementation Change
 
