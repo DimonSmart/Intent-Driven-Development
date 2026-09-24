@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Idd.Factory.Report;
+using Xunit;
 
 namespace Idd.Factory.Report.Tests;
 
