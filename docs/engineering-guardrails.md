@@ -38,9 +38,22 @@ ADRs may remain in `.idd/intent/` and explain why an Engineering Rule exists.
 
 ## Managing Engineering Rules
 
-Use `idd-engineering-change` for explicit durable Rule add, modify, or remove operations. It is the standard mutation owner inside the `idd-intent` plugin.
+Use `idd-engineering-change` for ordinary explicit durable Rule add, modify,
+or remove operations. It is the standard mutation owner inside the
+`idd-intent` plugin.
 
-A current code pattern is evidence, not a reason by itself to create policy. Existing IDD workflows may report an Engineering candidate, but mutation requires explicit confirmation.
+`idd-intent-import` has a narrow source-migration exception: when supplied
+authoritative material already states an accepted current durable
+implementation-only decision, import may create or update the corresponding
+Rule without repeating confirmation. Suggestions, alternatives, unresolved
+research, and historical statements are not decisions. A current code pattern,
+package reference, test, or repeated implementation structure is evidence, not
+authority to create policy.
+
+Import never removes a Rule merely because the source omits it. A conflicting
+source statement updates an existing semantic owner only when replacement/current
+truth is explicit; otherwise the Engineering batch remains unchanged and the
+conflict is reported.
 
 One request may contain multiple durable Engineering decisions. The complete semantic batch is planned before files change; independent decisions remain separate Rules, while naturally coherent decisions may share a Rule. The layer is created lazily only when that plan requires the first real add. `idd-project-init` still leaves it absent. When a Factory run is active, `.idd/factory/current/request.md` blocks Engineering mutation until the run is completed, cancelled, or explicitly restarted/replanned.
 

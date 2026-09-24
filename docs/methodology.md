@@ -124,7 +124,11 @@ Rule verification sections describe required evidence or properties; operational
 commands stay in `.idd/verification.yaml`.
 
 The layer is optional and is not created automatically by
-`idd-project-init`. Git owns its history and there is no Engineering archive.
+`idd-project-init`. `idd-engineering-change` owns ordinary Rule
+add/modify/remove operations. `idd-intent-import` may lazily create or update
+Rules only when migrating explicit durable Engineering decisions already present
+in supplied import sources; it does not infer policy from implementation
+reality. Git owns Engineering history and there is no Engineering archive.
 
 See [Engineering Guardrails](engineering-guardrails.md) for the exact format and
 direct/Factory protocol.

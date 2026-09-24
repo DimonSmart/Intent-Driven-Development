@@ -20,6 +20,7 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
             ("idd-intent", "idd-code-check-implementation"),
             ("idd-intent", "idd-intent-lint"),
             ("idd-intent", "idd-engineering-change"),
+            ("idd-intent", "idd-intent-import"),
             ("idd-factory", "idd-factory-run"),
             ("idd-factory", "idd-factory-decompose-task"),
             ("idd-factory", "idd-factory-execute-subtask")
@@ -140,12 +141,54 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
     {
         foreach (var platform in new[] { "claude", "codex" })
         {
+            foreach (var skill in new[] { "idd-engineering-change", "idd-intent-import" })
+            {
+                var root = Path.Combine(
+                    fixture.MarketplaceRoot, "plugins", platform, "idd-intent", "skills",
+                    skill, "assets", "bootstrap", ".idd", "engineering");
+
+                fixture.AssertFile(Path.Combine(root, "README.md"));
+                fixture.AssertFile(Path.Combine(root, "INDEX.md"));
+            }
+        }
+    }
+
+    [Fact]
+    public void IntentImport_HasBoundedEngineeringMigrationAuthority()
+    {
+        var import = Canonical("skills", "idd-intent-import.md");
+        var guardrails = Canonical("methodology", "engineering-guardrails.md");
+        var engineeringChange = Canonical("skills", "idd-engineering-change.md");
+
+        Assert.Contains("explicit durable Engineering decision", import);
+        Assert.Contains("Repository code, package references, tests, runtime wiring", import);
+        Assert.Contains("mutate no Engineering Rules in this invocation", import);
+        Assert.Contains("never changes `.idd/verification.yaml`", import);
+        Assert.Contains("Do not invoke `idd-engineering-change` as an executable subroutine.", import);
+        Assert.Contains("ENG-9999", import);
+        Assert.Contains(".idd/factory/current/request.md", import);
+        Assert.Contains("valid legacy layers gain an allocator", import);
+        Assert.Contains("idd-intent-import", guardrails);
+        Assert.Contains("narrow migration exception", guardrails);
+        Assert.Contains("sole bounded exception", engineeringChange);
+    }
+
+    [Fact]
+    public void IntentImport_PackagesSharedEngineeringReferenceAndBootstrap()
+    {
+        var source = GenerationFixture.NormalizeText(Canonical("methodology", "engineering-guardrails.md"));
+
+        foreach (var platform in new[] { "claude", "codex" })
+        {
             var root = Path.Combine(
                 fixture.MarketplaceRoot, "plugins", platform, "idd-intent", "skills",
-                "idd-engineering-change", "assets", "bootstrap", ".idd", "engineering");
+                "idd-intent-import");
 
-            fixture.AssertFile(Path.Combine(root, "README.md"));
-            fixture.AssertFile(Path.Combine(root, "INDEX.md"));
+            var reference = fixture.ReadText(Path.Combine(root, "references", "engineering-guardrails.md"));
+            Assert.Equal(source, GenerationFixture.NormalizeText(reference));
+
+            fixture.AssertFile(Path.Combine(root, "assets", "bootstrap", ".idd", "engineering", "README.md"));
+            fixture.AssertFile(Path.Combine(root, "assets", "bootstrap", ".idd", "engineering", "INDEX.md"));
         }
     }
 

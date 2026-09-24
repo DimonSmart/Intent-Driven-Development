@@ -66,12 +66,14 @@ Existing projects have two different starting situations.
 ### Existing knowledge already describes the product
 
 Use `idd-intent-import` when requirements, specifications, ADRs, public
-contracts, product documentation, or other source material already expresses
-the current product meaning:
+contracts, product documentation, technical-design material, or other supplied
+sources already express current durable knowledge. The workflow separates
+Product Intent from explicit accepted implementation-only Engineering decisions;
+it does not infer Engineering policy from current code:
 
 ```text
-Use idd-intent-import to propose current product intent from ./docs, the public
-API, relevant tests, and confirmed application behavior.
+Use idd-intent-import to propose migration of current Product Intent and any
+explicit accepted durable Engineering decisions already stated in ./docs.
 ```
 
 Import treats source material as evidence, not unquestionable truth. Historical
