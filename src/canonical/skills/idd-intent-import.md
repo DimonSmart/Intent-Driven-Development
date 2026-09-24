@@ -1,12 +1,18 @@
 # idd-intent-import
 
-Use this skill to import raw intent material into a normalized IDD
-`.idd/intent/` structure.
+Use this skill to migrate supplied durable knowledge into normalized IDD state:
+Product Intent under `.idd/intent/` and explicit durable implementation-only
+Engineering decisions under the optional `.idd/engineering/` layer.
 
 Formula:
 
 ```text
-idd-intent-import = import + mandatory normalization + lint gate
+idd-intent-import =
+    classify supplied durable knowledge
+    + import Product Intent
+    + import explicit durable Engineering decisions
+    + normalize
+    + mechanical validation
 ```
 
 Use it when old `.worklog` content, GitHub Spec Kit folders, issue/task docs,
@@ -16,8 +22,9 @@ coherent current product intent document set.
 Import is a migration of meaning, not a mechanical conversion from old files to
 new files. Source files are evidence. They are not the desired target structure.
 
-Import is not complete until the generated `.idd/intent` tree is mechanically
-consistent.
+Import is not complete until the resulting Intent state is mechanically
+consistent and, when Engineering state is read or changed, the Engineering layer
+passes the canonical Mechanical Engineering Validation.
 
 For successful apply-safe import, the expected final state is:
 
@@ -31,7 +38,8 @@ For successful apply-safe import, the expected final state is:
   current documents;
 - imported current specs, ADRs, and active spikes follow the current document
   shape;
-- `idd-intent-lint` would return no errors.
+- Intent mechanical validation has no errors;
+- when Engineering exists and was read or changed, canonical Mechanical Engineering Validation has no errors.
 
 Warnings may remain only for genuinely semantic ambiguity. Mechanical errors
 must be fixed before finishing the import.
@@ -54,8 +62,134 @@ conflictMode: report-only
 allowNewSpecs: true
 ```
 
-`apply-safe` may apply structural changes that preserve product meaning. It must
-not resolve product conflicts or invent new product decisions.
+`apply-safe` may apply safe durable-state changes whose meaning is already
+established by supplied authoritative material. It must not resolve product or
+Engineering conflicts, choose among technical alternatives, or invent new
+decisions.
+
+## Durable knowledge model
+
+Import answers two independent questions:
+
+```text
+What supplied material is current Product Intent?
+What explicit current implementation-only durable decisions must survive removal of the source?
+```
+
+Product Intent and Engineering remain separate durable layers. Import is a
+migration workflow, not a technology-selection, architecture-design, or
+reverse-engineering workflow.
+
+A supplied source authorizes migration of decisions it actually states. It does
+not turn suggestions into decisions, authorize choosing between alternatives,
+or authorize inferring policy from repository implementation.
+
+### Engineering authority
+
+An Engineering Rule is importable only when the supplied material explicitly
+expresses an accepted current target decision that is implementation-only,
+durable, intended to constrain future implementations, and sufficiently
+unambiguous to write as a canonical Rule.
+
+Typical authoritative sources include requirements/specification documents,
+architecture documents, ADRs, normative technical-design sections, documented
+engineering conventions, migration/design documents that explicitly describe
+the target design, and user-supplied text that states an accepted decision.
+
+Repository code, package references, tests, runtime wiring, solution structure,
+and repeated implementation patterns may provide context but are never authority
+for automatically creating Engineering policy.
+
+Accepted wording does not require the literal word `must`. Statements such as
+"We use MudBlazor for UI", "The geometry engine is Clipper2", "SVG is normalized
+into polygons before geometry processing", or "STL generation happens
+client-side" are importable when context clearly presents them as chosen current
+target design.
+
+Suggestions, examples, unresolved alternatives, research without a conclusion,
+and historical statements are not current Engineering policy. Classify them as
+review/skipped material rather than inventing a decision.
+
+### Engineering mutation authority
+
+`idd-engineering-change` remains the standard owner of ordinary explicit
+Engineering add/modify/remove requests.
+
+`idd-intent-import` has one narrow mutation exception: while migrating explicit
+durable Engineering knowledge already present in supplied import sources it may
+create Rules, update the single existing semantic owner, or record an equivalent
+Rule as a no-op.
+
+Import never treats absence from the source as a remove request. If supplied
+material explicitly calls for removing a current Rule and the change cannot be
+expressed as an unambiguous update of its current semantic owner, report an
+Engineering change candidate for ordinary management instead of deleting the
+Rule.
+
+Do not invoke `idd-engineering-change` as an executable subroutine.
+
+### Propose and apply-safe
+
+In `propose`, mutate neither `.idd/intent/` nor `.idd/engineering/`. Report
+proposed Product Intent, proposed Engineering Rules/updates, Engineering no-ops,
+Needs Review, skipped material, and verification-configuration candidates.
+
+In `apply-safe`, safe Product Intent and unambiguous supplied Engineering
+decisions may be written. Never auto-resolve semantic conflicts, competing
+technologies, unresolved research, material Intent/Engineering ambiguity,
+ambiguous Engineering ownership, or uncertainty about whether supplied material
+supersedes current Engineering policy.
+
+### Existing Engineering state and semantic atomicity
+
+If `.idd/engineering/` exists, read its README and INDEX and apply the canonical
+Mechanical Engineering Validation from
+`references/engineering-guardrails.md` before planning Engineering mutations.
+Structural errors block only the Engineering portion; never repair a malformed
+layer heuristically or bootstrap over a partial layer.
+
+For every explicit supplied decision classify the Engineering action as
+`new`, `equivalent`, `modify-existing`, or `ambiguous`. Preserve a stable
+`ENG-NNNN` when modifying its unique semantic owner. Equivalent decisions are
+no-ops and consume no ID.
+
+Complete grouping, ownership resolution, ambiguity detection, new-ID counting,
+allocator/capacity checks, and Factory safety checks before any Engineering
+mutation. If any real explicit Engineering mutation candidate is ambiguous,
+mutate no Engineering Rules in this invocation. Unconfirmed suggestions or
+research are not mutation candidates and therefore do not block an otherwise
+safe Engineering batch.
+
+A conflicting source statement does not silently supersede an existing current
+Rule. Modification is safe only when the source/context clearly establishes
+replacement/current-truth semantics.
+
+If the Engineering layer is absent, materialize the packaged canonical bootstrap
+only immediately before the first real new Rule after semantic planning has
+succeeded. Do not create `.idd/engineering/` for no-op, review-only, or
+Product-Intent-only imports.
+
+Use the canonical allocator semantics: new Rules consume consecutive IDs,
+equivalent/modified Rules consume none, valid legacy layers gain an allocator
+only immediately before a real mutation, and any allocation beyond
+`ENG-9999` blocks before files change.
+
+### Factory safety and partial import
+
+`.idd/factory/current/request.md` is the active-run marker. When it exists,
+Engineering mutation is blocked. Do not alter Factory state, plan, or
+`TaskRelatedEngineering`, and do not restart/re-plan automatically.
+
+Independent safe Product Intent may still be imported. The report must clearly
+state that the result is partial and that Engineering knowledge was not applied.
+
+### Verification configuration
+
+Operational commands such as `dotnet test`, `npm test`, or `pytest` are
+neither Product Intent nor Engineering Rules. Report them as verification
+configuration candidates when useful. `idd-intent-import` never changes
+`.idd/verification.yaml`; ownership remains with
+`idd-verification-configure`.
 
 ## Current spec test
 
@@ -80,11 +214,11 @@ Therefore current specs may contain:
 - verification rules.
 
 A durable implementation-only constraint is not automatically product intent.
-Classify it separately from imported Intent. This skill does not create or
-migrate `.idd/engineering/`; report a genuine Engineering candidate, explain
-the boundary, and offer `idd-engineering-change`. Only an explicit user
-confirmation that the constraint is durable project policy authorizes handoff.
-The import skill itself never mutates Engineering.
+Classify it separately. When supplied authoritative material already states an
+explicit durable Engineering decision, migrate that decision directly under the
+narrow import authority above; no repeated user confirmation is required.
+Suggestions, alternatives, code-derived patterns, and unresolved material remain
+non-authoritative.
 
 Current specs must not contain:
 
@@ -138,48 +272,51 @@ This is not a fixed enum. Prefer areas that match the actual product.
 
 ## Required Behavior
 
-1. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and existing current specs when
-   they exist.
-2. Read the requested source files or directories.
-3. Split source material into:
-   - durable product intent;
-   - architecture decision;
-   - unresolved research / spike;
-   - obsolete source material;
-   - task/progress/status notes;
-   - implementation-only cleanup/refactor notes;
-   - obsolete source-specific wrapper text.
-4. Classify every implementation-adjacent fragment as one of:
-   - durable-verification-property;
-   - verification-command;
-   - durable-architecture-boundary;
-   - implementation-structure;
-   - public-contract;
-   - private-code-detail;
-   - migration-step;
-   - source-scan-instruction.
-5. Do not import task/progress/status material as current specs.
-5. Do not preserve source file boundaries automatically.
-6. Build the normalized target structure before writing.
-7. Create a new spec only for a distinct durable product area.
-8. Update an existing spec when imported intent belongs to an existing area.
-9. Split mixed-scope source docs.
-10. Merge multiple source docs when they describe one small area.
-11. Extract repeated common models into shared specs.
-12. Keep semantic conflicts visible and do not resolve them automatically.
-13. Build and apply a source-to-target remap before writing final relations.
-14. Regenerate `.idd/intent/INDEX.md` from actual current `IDD-NNNN` documents
-    using the canonical ID-only `Document` representation.
-15. Run or simulate `idd-intent-lint` and fix mechanical errors before finishing.
-16. Keep a short source reference only when it helps traceability; do not turn a
-    spec into an imported journal.
+1. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and relevant current
+   Intent documents when they exist.
+2. If `.idd/engineering/` exists, read its README/INDEX and perform canonical
+   Mechanical Engineering Validation before using it as current policy.
+3. Read only the supplied source files/directories plus bounded context needed to
+   interpret them.
+4. Classify source fragments independently as Product Intent, explicit durable
+   Engineering decision, Engineering rationale, unconfirmed candidate,
+   alternative/research/history, verification configuration, or process/noise.
+5. Apply the Intent/Engineering boundary: product-visible/public/domain/
+   compatibility/security/operability contracts belong to Intent;
+   implementation-only durable policy belongs to Engineering.
+6. Treat code, package references, tests, runtime wiring, and repeated patterns
+   as evidence only, never Engineering authority.
+7. Build the normalized Intent target structure and source-to-target remap before
+   writing Intent.
+8. Build the complete Engineering semantic plan before any Engineering mutation:
+   group coherent decisions, resolve semantic owners, classify
+   new/equivalent/modify/ambiguous, determine IDs, and check capacity/safety.
+9. Do not treat suggestion/research/history as a mutating Engineering candidate.
+10. If any real Engineering candidate is ambiguous, mutate no Engineering Rules
+    in this invocation.
+11. In `propose`, write no durable state.
+12. In `apply-safe`, write only unambiguous Product Intent and explicit supplied
+    Engineering decisions allowed by this workflow.
+13. Preserve existing `ENG-NNNN` for an unambiguous semantic-owner update;
+    equivalent decisions are no-op.
+14. Never remove an existing Rule merely because the imported source omits it.
+15. Lazily bootstrap Engineering only before the first real new Rule and only
+    from packaged canonical assets.
+16. Never mutate `.idd/engineering/` while
+    `.idd/factory/current/request.md` exists.
+17. Never mutate `.idd/verification.yaml`; report operational commands as
+    configuration candidates instead.
+18. Regenerate Intent INDEX and Engineering INDEX projections as applicable.
+19. Apply Intent mechanical validation and, whenever Engineering was read or
+    changed, canonical Mechanical Engineering Validation directly.
+20. Return a report that makes additions, updates, no-ops, blocked changes,
+    review items, verification candidates, skipped material, and partial results
+    explicit.
 
-Do not import shell commands, build/test command blocks, private class or method
-names, file lists, implementation order, dependency-injection wiring steps,
-temporary allowlists, migration steps, or source-scan instructions as intent.
-Generalize an implementation-specific fragment only when its meaning can be
-preserved without adding a new product decision. If generalization needs a
-product decision, retain a finding for human review.
+Do not import task/progress/status material as current specs. Do not preserve
+source file boundaries automatically. Do not generate a validator program or
+semantic classifier. Semantic classification and ownership are model work;
+mechanical checks use bounded host/repository operations.
 
 ## Source Triage
 
@@ -228,6 +365,12 @@ import-current
 convert-to-adr
 convert-to-spike
 extract-fragments
+import-engineering-rule
+merge-into-engineering-rule
+update-engineering-rule
+engineering-no-op
+needs-engineering-review
+engineering-blocked
 skip-process-only
 skip-generated
 delete-obsolete
@@ -254,6 +397,13 @@ implementation-note
 durable-verification-property
 verification-command
 durable-architecture-boundary
+explicit-durable-engineering-decision
+engineering-rationale
+engineering-candidate-unconfirmed
+technical-alternative
+unresolved-technical-research
+historical-engineering-context
+temporary-implementation-note
 implementation-structure
 public-contract
 private-code-detail
@@ -391,8 +541,8 @@ constructor.
 
 Do not turn either fragment into product intent automatically. Build/test
 commands belong in verification configuration. Constructor wiring is incidental
-unless separately confirmed as a durable Engineering Rule, and this Intent
-import workflow does not create that rule.
+unless the supplied authoritative material itself establishes it as a durable
+Engineering decision; only in that case may import migrate it as a Rule.
 
 If the same source also states a product-visible requirement such as consistent
 dialog and overlay redraw behavior across viewport changes, import that product
@@ -431,7 +581,8 @@ operability, or another product-significant property.
 
 Do not put implementation-only durable conventions here merely because future
 implementations should follow them. Those belong in the optional Engineering
-layer and are outside this Intent import workflow.
+layer. This import workflow may migrate them there only when supplied source
+material already establishes an explicit durable decision.
 
 Do not include private class names, private methods, file names, constructor
 signatures, dependency-wiring steps, temporary workarounds, migration steps, or
@@ -601,44 +752,58 @@ Rules:
 
 ## Workflow
 
-1. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and relevant existing current
-   specs.
-2. Read the requested source roots.
-3. Discover source methodology and lifecycle conventions.
+1. Read current Intent state.
+2. Read and mechanically validate existing Engineering state when present.
+3. Read the supplied source roots and discover source methodology/lifecycle.
 4. Build the import inventory.
-5. Classify fragments into product intent, ADR, spike, historical context,
-   process noise, cleanup/refactor notes, wrappers, and conflicts.
-6. Build the source-to-target remap.
-7. Build a product area map.
-8. Perform structural normalization:
-   - split oversized or mixed-scope material;
-   - merge tiny related fragments into existing areas;
-   - extract shared models;
-   - separate ADR and spike material;
-   - reject task/refactor/cleanup notes as current specs.
-9. Propose or infer target files.
-10. Write normalized current specs, ADRs, or active spikes according to mode and
-    safety.
-11. Keep conflicts visible and unresolved.
-12. Run post-import cleanup.
-13. Return the import report in the assistant response, or write it outside
-    `.idd/intent` only when persistent output is explicitly needed.
-14. Run relevant repository checks.
+5. Classify fragments into Product Intent, explicit Engineering decisions,
+   Engineering rationale, review/research/history, verification configuration,
+   and process/noise.
+6. Build the Intent source-to-target remap and normalized product-area model.
+7. Group explicit Engineering decisions into the minimum semantically coherent
+   Rules.
+8. Match those groups to current Engineering Rules and classify each as
+   new/equivalent/modify-existing/ambiguous.
+9. Complete Engineering semantic atomicity checks, allocator/capacity planning,
+   Factory guard, and lazy-bootstrap decision before mutation.
+10. In `propose`, stop before durable mutation and return the full proposal.
+11. In `apply-safe`, write safe Product Intent.
+12. If the Engineering batch is safe and Factory is inactive, materialize
+    bootstrap only if needed, then apply new/modify/no-op Engineering actions.
+13. If Engineering is blocked or ambiguous, leave all Engineering files
+    unchanged while allowing semantically independent safe Product Intent.
+14. Regenerate affected INDEX projections.
+15. Run Intent mechanical validation directly.
+16. If Engineering existed or was changed, apply canonical Mechanical
+    Engineering Validation directly from `references/engineering-guardrails.md`.
+17. Return the import report; do not persist it inside either durable layer.
+18. Run relevant repository checks.
+
+Do not invoke `idd-engineering-change` or `idd-intent-lint` as an executable
+Engineering-validation subroutine. Do not add Python, PowerShell, C#, shell, MCP,
+or other validator subsystems.
 
 ## Post-import Cleanup
 
 Before finishing:
 
 1. Delete `.idd/intent/archive` if it exists.
-2. Remove import/process reports from `.idd/intent`.
-3. Regenerate `.idd/intent/INDEX.md` using the canonical ID-only `Document`
-   representation.
-4. Validate and rewrite `IDD-NNNN` relations through the source-to-target map.
+2. Remove import/process reports from `.idd/intent` and
+   `.idd/engineering/`.
+3. Regenerate `.idd/intent/INDEX.md` from current Intent documents.
+4. Validate and rewrite Intent relations through the source-to-target map.
 5. Normalize current specs, ADRs, and spikes to current section shapes.
 6. Reclassify resolved spikes.
-7. Remove or merge task-like, process-only, duplicate, and historical-only docs.
-8. Run or simulate `idd-intent-lint`.
-9. Continue fixing mechanical errors until none remain.
+7. Remove or merge task-like/process-only/duplicate/historical-only Intent docs.
+8. Ensure Engineering additions/updates use the canonical Rule format and INDEX
+   projection from `references/engineering-guardrails.md`.
+9. Preserve allocator semantics: no-op/modify do not consume IDs, and blocked
+   batches do not mutate allocator state.
+10. Apply Intent mechanical validation.
+11. Apply Mechanical Engineering Validation when Engineering exists and was read
+    or changed.
+12. Continue fixing only mechanical errors introduced by safe mutations; never
+    resolve semantic ambiguity merely to make validation pass.
 
 ## Import Report
 
@@ -656,19 +821,21 @@ report is explicitly needed, write it outside `.idd/intent`, for example:
 The report must not recommend creating `.idd/intent/archive` or link to
 `.idd/intent/archive/...`.
 
-Include:
+Include these sections (use `None` when empty):
 
-- source roots inspected;
-- source methodology detected;
-- source files skipped and why;
-- source files imported and target documents;
-- fragments extracted from task/process documents;
-- structural normalization decisions;
-- conflicts found;
-- obsolete documents skipped or deleted;
-- documents requiring human review;
-- shared topics consolidated;
-- source-to-target mapping.
+- Imported Product Intent;
+- Imported Engineering Rules;
+- Updated Existing Engineering Rules;
+- Engineering No-ops;
+- Blocked Engineering Changes;
+- Needs Review;
+- Verification Configuration Candidates;
+- Skipped Process / Temporary Material;
+- Mechanical Validation.
+
+Also identify source roots/methodology and enough source-to-target mapping or
+reasoning to explain non-obvious normalization. Make partial success explicit
+when Product Intent was applied but Engineering was blocked.
 
 The report is not normative product intent.
 
@@ -697,7 +864,19 @@ Before finishing, check:
 - imported specs, ADRs, and active spikes use current document shapes.
 - resolved spikes are converted, removed, or justified as still-active
   research.
-- `idd-intent-lint` would return no errors.
+- Intent mechanical validation has no errors.
+- Explicit supplied Engineering decisions are migrated without repeated
+  confirmation when authority and meaning are clear.
+- Suggestions, alternatives, historical statements, and unresolved research do
+  not become current Rules.
+- Repository implementation does not become Engineering authority.
+- Equivalent Rules are no-op; unambiguous replacements preserve stable IDs;
+  ambiguous real Engineering candidates mutate no Engineering state.
+- Engineering bootstrap is lazy and packaged, allocator/capacity semantics are
+  preserved, and Factory active-run safety is enforced.
+- `.idd/verification.yaml` is unchanged.
+- Mechanical Engineering Validation passes whenever the Engineering layer was
+  read or changed.
 - The resulting specs describe target product state, not work history.
 
 ## Examples

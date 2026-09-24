@@ -133,7 +133,18 @@ If a clean state cannot be obtained, return `blocked` and identify the remaining
 
 ## Ownership and implementation
 
-This skill changes durable Engineering knowledge, not application implementation. Other IDD skills may read/validate Engineering, report candidates, and hand off an explicitly confirmed candidate, but they do not mutate Rules themselves.
+This skill changes durable Engineering knowledge, not application implementation.
+It is the standard owner of ordinary explicit Engineering add/modify/remove
+requests.
+
+`idd-intent-import` is the sole bounded exception: while migrating explicit
+durable Engineering knowledge already present in supplied import sources, it may
+create a Rule, update its unique semantic owner, or record an equivalent no-op
+without repeating confirmation. It does not perform ordinary Rule removal and
+does not infer policy from implementation reality.
+
+All other IDD skills may read/validate Engineering, report candidates, and hand
+off an explicitly confirmed candidate, but they do not mutate Rules themselves.
 
 If the same request explicitly includes implementation, continue afterward with the normal implementation workflow. Existing consumers continue to apply every Always Rule plus semantically relevant Conditional Rules.
 

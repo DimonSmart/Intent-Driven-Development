@@ -40,12 +40,18 @@ Initial product truth discovery and raw imported knowledge are different:
 existing implementation + uncertain product meaning
     -> idd-intent-bootstrap
 
-existing source material that already expresses product meaning
+existing source material that already expresses durable product meaning
+or explicit durable Engineering decisions
     -> idd-intent-import
 ```
 
+Raw imported knowledge remains an import route even when the same supplied
+source contains both Product Intent and already-decided Engineering policy.
+Ordinary new Engineering decisions still route as `engineering-change`.
+
 Code may be evidence during both workflows, but import must not become an
-implicit reverse-engineering workflow.
+implicit reverse-engineering workflow or derive Engineering policy from current
+implementation.
 
 ### Product and Engineering Operation
 
@@ -58,7 +64,9 @@ Product operations and Engineering operations do not share semantic ownership. A
 Adding product behavior can still update an existing spec. Removing product behavior can still leave the owning spec in place when it contains other current intent. Engineering add may become a no-op or an explicit modify when an existing Rule already owns the durable constraint.
 
 Bootstrap establishes current product truth; it is not an `add` operation.
-Import normalizes source knowledge; it is not an `add` operation.
+Import migrates supplied durable knowledge; it is not an ordinary product or
+Engineering `add` operation. It may create/update Engineering Rules only for
+explicit decisions already present in supplied import sources.
 For classifications other than `product-change` and `engineering-change`, `Operation` is `not-applicable`.
 
 ### Request Clarity
@@ -140,8 +148,10 @@ routing or intent work.
   intent or Engineering Rules.
 - Git stores history.
 - Product `add`, `modify`, and `remove` mutate only `.idd/intent/`.
-- Engineering `add`, `modify`, and `remove` mutate only `.idd/engineering/`
-  and are owned by `idd-engineering-change`.
+- Ordinary Engineering `add`, `modify`, and `remove` target
+  `.idd/engineering/` and are owned by `idd-engineering-change`.
+- `idd-intent-import` may create or update Rules only while migrating explicit
+  durable Engineering knowledge already present in supplied import sources.
 - Other IDD skills may read or validate Engineering and may report or hand off
   explicitly confirmed candidates, but they do not independently mutate Rules.
 - Repeated implementation patterns are evidence, not authority for creating
