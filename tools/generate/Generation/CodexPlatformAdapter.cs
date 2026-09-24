@@ -85,6 +85,52 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                       unsupported on that host. Do not emulate the missing capability
                       with a packaged runtime, MCP transport, shell process supervisor,
                       or polling protocol.
+
+                    ## Codex Factory execution policy
+
+                    Immediately before each worker spawn, map the planner's
+                    `ExecutionProfile` through the validated project-owned
+                    `.idd/execution.yaml` policy.
+
+                    - `inherit` means omit Factory-specific model and reasoning
+                      overrides so the normal host/session/default model applies.
+                    - For an explicit active-platform mapping, pass the configured
+                      `codex.model` and optional `codex.reasoningEffort` through
+                      the host's native per-child override controls.
+                    - Do not reconsider task complexity or substitute a different
+                      model. The configured mapping is authoritative.
+                    - If the host rejects the configured model/settings or cannot
+                      honor an explicit per-child override, stop with a diagnostic
+                      and suggest `idd-factory-configure`; never pick a fallback
+                      model automatically.
+                    """))
+            };
+        }
+
+        if (StringComparer.Ordinal.Equals(skillName, "idd-factory-configure"))
+        {
+            var skill = files.Single(file => StringComparer.Ordinal.Equals(
+                file.RelativePath,
+                Path.Combine("skills", skillName, "SKILL.md")));
+            files[files.IndexOf(skill)] = skill with
+            {
+                Content = ContentNormalizer.NormalizeContent(ContentNormalizer.JoinBlocks(
+                    skill.Content!,
+                    """
+                    ## Codex Factory model configuration
+
+                    Use native `request_user_input` for blocking configuration
+                    choices when it is available; do not reproduce its tool schema.
+                    Prefer a native host model/capability catalog when Codex exposes
+                    one, then current platform-provided model information or current
+                    documentation/knowledge, and finally concrete model IDs supplied
+                    by the user. Do not claim account-specific availability unless
+                    the host can verify it.
+
+                    Persist Codex mappings under the `codex` platform key with a
+                    concrete `model` and optional `reasoningEffort`. Never embed a
+                    recommended concrete model ID in generated guidance, and never
+                    save an automatically proposed mapping before user confirmation.
                     """))
             };
         }
