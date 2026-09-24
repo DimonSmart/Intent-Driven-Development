@@ -11,8 +11,11 @@ and strict final verification validates the complete result.
 Projects may optionally keep durable implementation guardrails in
 `.idd/engineering/`. The layer is absent by default and is not created by
 `idd-project-init`. Direct implementation and Factory both apply it when
-present. Use `idd-engineering-change` for explicit durable Rule add, modify,
-and remove operations; current code patterns are not promoted automatically.
+present. Use `idd-engineering-change` for ordinary explicit durable Rule add, modify,
+and remove operations. When existing documentation already states accepted
+durable Engineering decisions, `idd-intent-import` can migrate those decisions
+alongside Product Intent without asking for the same decision again. Current
+code patterns are never promoted automatically.
 
 For project-specific commands, use `idd-verification-configure` to create
 `.idd/verification.yaml`. It assigns checks by `direct`, `subtask`,
@@ -28,7 +31,7 @@ Engineering boundary and rule format.
 | --- | --- |
 | An existing repository does not use IDD yet | Run `idd-project-init`. It can offer interactive bootstrap when implementation exists without current intent. |
 | Existing implementation has little or unreliable product documentation | Use `idd-intent-bootstrap` to discover and confirm the initial current intent model. |
-| Existing documents already express current product knowledge | Use `idd-intent-import` to normalize that knowledge into IDD. |
+| Existing documents already express current product knowledge and/or accepted durable Engineering decisions | Use `idd-intent-import` to migrate that supplied knowledge into the separate Intent and Engineering layers. |
 | Project terminology is genuinely ambiguous or project-specific | Explicitly run `idd-glossary-build` to create or update the optional glossary. |
 | You need to confirm that IDD is installed and initialized correctly | Follow [Verify Installation](verify-installation.md). |
 | You are starting from an idea | Run `idd-project-init`, then clarify the first product behavior with `idd-intent-brainstorm`. |
@@ -93,7 +96,11 @@ Use when existing documentation or other source material already expresses produ
 Use idd-intent-import to propose current product intent from ./docs, relevant tests, the public API, and confirmed application behavior.
 ```
 
-Import extracts durable behavior and constraints. It does not treat every old document or implementation detail as current product truth, and it is not the reverse-discovery workflow for an undocumented codebase.
+Import classifies supplied durable knowledge. Product behavior goes to Intent;
+explicit accepted implementation-only durable decisions may go to Engineering.
+Suggestions, alternatives, historical context, and code-derived patterns do not
+become Rules. Import is not the reverse-discovery workflow for an undocumented
+codebase.
 
 Like bootstrap, import may identify genuinely ambiguous terminology. For an apply workflow it asks for explicit consent before handing approved candidates to `idd-glossary-build`. Proposal-only import reports candidates as an optional follow-up without creating files.
 
@@ -244,7 +251,11 @@ idd-route
 
 Requests to reconstruct initial intent for an existing undocumented implementation route to `idd-intent-bootstrap`; existing source specifications that need normalization route to `idd-intent-import`.
 
-Explicit durable implementation-policy mutations route to `engineering-change` and `idd-engineering-change`. Product behavior continues to route to `product-change`; repeated implementation patterns alone do not select Engineering.
+Ordinary explicit durable implementation-policy mutations route to
+`engineering-change` and `idd-engineering-change`. Raw supplied knowledge
+continues to route to `idd-intent-import` even when it includes already-decided
+Engineering policy. Product behavior continues to route to `product-change`;
+repeated implementation patterns alone do not select Engineering.
 
 Glossary construction remains manual-only. Run `idd-glossary-build` explicitly or accept an explicit bootstrap/import offer.
 
