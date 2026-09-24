@@ -189,9 +189,15 @@ routing or intent work.
 idd-project-init
 -> create minimal project-owned IDD state
 -> maintain one managed agent-instruction block
+-> if Factory is explicitly enabled, offer idd-factory-configure model policy
 -> detect existing implementation without current IDD-NNNN documents
 -> offer optional idd-intent-bootstrap
 ```
+
+Factory model configuration is never offered for an `idd-intent`-only
+project. When Factory is explicitly enabled and no execution policy exists,
+initialization offers current-model inheritance versus fine-grained profile
+mapping and hands the choice to `idd-factory-configure`.
 
 The bootstrap offer requires explicit user consent.
 
@@ -492,6 +498,14 @@ fresh planner
 Each planner and worker receives a fresh isolated semantic context rather than
 the root transcript. Workers share the repository but do not share transcripts.
 The repository is authoritative implementation reality.
+
+Planner tasks may optionally classify required execution capability as
+`economy`, `standard`, or `strong`; missing metadata means `standard`. The
+planner never reads model policy. Immediately before each worker spawn, the root
+agent mechanically maps the profile through optional project-owned
+`.idd/execution.yaml` and either inherits host behavior or applies the exact
+configured native model/settings. It never substitutes another model or
+reclassifies the task.
 
 Temporary continuation state is limited to the original request, remaining
 current batch, short completed summaries, exact user answers, and optional

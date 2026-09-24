@@ -2,6 +2,28 @@
 
 This page records IDD changes that require action in repositories that already use the toolkit.
 
+## 2026-09-25 — Configurable Factory execution profiles
+
+Factory planner tasks may now declare optional `# ExecutionProfile` metadata:
+`economy`, `standard`, or `strong`. Missing metadata remains valid and means
+`standard`, so existing `plan.md` batches continue to work.
+
+Projects may optionally create `.idd/execution.yaml` with
+`idd-factory-configure`. Absence preserves previous behavior: all workers use
+the model the host would normally choose without a Factory-specific override.
+The file is project-owned execution policy, not Factory runtime/workflow
+configuration and not temporary state.
+
+The root Factory agent now performs a mechanical
+`profile -> project mapping -> native child spawn` step. It never reclassifies a
+task or silently substitutes a different model. Invalid or host-rejected
+explicit mappings stop with a diagnostic and can be changed by rerunning
+`idd-factory-configure`.
+
+The Factory plugin now contains four canonical skills because configuration is a
+separate reusable workflow. No programmatic Factory orchestrator or model-router
+service has been reintroduced.
+
 ## 2026-09-18 — Factory uses native agents; runtime and MCP removed
 
 Factory has been simplified to native-agent orchestration.

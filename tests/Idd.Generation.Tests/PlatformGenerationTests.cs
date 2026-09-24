@@ -69,7 +69,7 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
     }
 
     [Fact]
-    public void FactoryMetadata_HasOnlyCanonicalThreeSkillsAndNoGeneratedRoleSurface()
+    public void FactoryMetadata_HasOnlyCanonicalFourSkillsAndNoGeneratedRoleSurface()
     {
         foreach (var platform in new[] { "claude", "codex" })
         {
@@ -84,6 +84,7 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
             Assert.Equal(
                 new[]
                 {
+                    "idd-factory-configure",
                     "idd-factory-decompose-task",
                     "idd-factory-execute-subtask",
                     "idd-factory-run"
