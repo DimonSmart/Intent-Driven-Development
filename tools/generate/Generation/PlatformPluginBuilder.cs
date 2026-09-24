@@ -142,6 +142,7 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         {
             "idd-project-init" => ".idd/intent",
             "idd-engineering-change" => ".idd/engineering",
+            "idd-intent-import" => ".idd/engineering",
             _ => null
         };
         if (skillBootstrapDestination is not null)

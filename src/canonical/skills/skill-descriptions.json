@@ -91,7 +91,7 @@
     "description": "Check whether implementation behavior matches durable product intent in `.idd/intent/`."
   },
   "idd-intent-import": {
-    "description": "Import raw source material into structurally normalized IDD intent under `.idd/intent/`.",
+    "description": "Migrate supplied durable knowledge into normalized Product Intent and explicit source-owned Engineering Rules, with safe semantic planning, lazy Engineering bootstrap, conflict blocking, and shared mechanical validation.",
     "adapters": {
       "claude": {
         "frontmatter": {

@@ -87,6 +87,11 @@
           "destination": "glossary-integration.md"
         },
         {
+          "skill": "idd-intent-import",
+          "source": "src/canonical/methodology/engineering-guardrails.md",
+          "destination": "engineering-guardrails.md"
+        },
+        {
           "skill": "idd-code-implement",
           "source": "src/canonical/methodology/engineering-guardrails.md",
           "destination": "engineering-guardrails.md"
