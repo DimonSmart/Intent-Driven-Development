@@ -15,9 +15,12 @@ terminology must not trigger glossary maintenance.
 
 Use `idd-code-implement` for one focused implementation change covered by
 current intent. Use Factory workflows for temporary multi-task planning,
-sequencing, or coordinated execution across bounded tasks. Factory
-may be selected automatically for those conditions, but it never becomes
-product intent and must stop when current intent is missing or insufficient.
+sequencing, or coordinated execution across bounded tasks. Factory may be
+selected automatically for those conditions. For a new end-to-end run its entry
+preflight may coordinate required Product Intent preparation through normal
+Intent workflows and explicit durable Engineering preparation through
+`idd-engineering-change` before active Factory state exists. Planner and worker
+execution never mutates either durable layer.
 
 For Factory terminology, a Request is the original self-contained user
 instruction. A fresh planner repeatedly contracts the current bounded batch.

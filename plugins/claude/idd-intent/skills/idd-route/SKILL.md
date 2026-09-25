@@ -136,9 +136,9 @@ with the classification.
   or normalization as applicable. Do not implement product code or start Factory
   execution.
 - `implementation-only`: perform implementation or implementation checking from
-  current intent. Do not change product intent. If current intent is missing,
-  unclear, or wrong, stop and report the required intent workflow instead of
-  expanding scope.
+  current durable knowledge. Do not change `.idd/intent/*` or
+  `.idd/engineering/*`. If the request requires either durable mutation, stop
+  and report the required durable workflow instead of expanding scope.
 - `end-to-end`: continue through all requested workflow stages, subject to
   clarity gates and execution-depth selection.
 
@@ -151,9 +151,10 @@ classification or advice without changing files; otherwise use `end-to-end`.
 
 Do not assign route fields when another explicitly named skill or `idd-skip`
 bypasses routing. Those cases are direct skill invocation, not route results.
-An explicit `idd-factory-run` still performs its own required Intent Preflight
-for a new run; bypassing this router must not bypass end-to-end intent
-preparation.
+An explicit `idd-factory-run` still performs its own required Factory Preflight
+for a new run; bypassing this router must not bypass Product Intent analysis,
+explicit Engineering preparation when required, durable coverage validation, or
+the rule that active Factory state is created only afterward.
 
 ## First Skill
 
@@ -199,7 +200,7 @@ Apply these rules:
 - For `intent-only`, hand off only to the applicable intent-side skill and stop
   before implementation or Factory execution.
 - For `implementation-only`, hand off only to the applicable code or check skill
-  and do not modify intent.
+  and do not modify Product Intent or Engineering.
 - For `end-to-end`, continue with the recommended skill in the same user request
   when the Coding Agent can do so. Do not require a second user message only to
   confirm the route.
@@ -211,9 +212,17 @@ Apply these rules:
   must still obtain its own project-boundary and semantic proposal
   confirmations before writing current intent.
 
-Pass through the original request, classification fields, requested scope,
-relevant context, and any temporary preservation or discovery boundary
-identified from the required reference.
+Pass through the complete original request, classification fields, requested
+scope, relevant context, and any temporary preservation or discovery boundary
+identified from the required reference. Never replace a mixed request with a
+lossy summary.
+
+A single request may contain multiple durable concerns without requiring a new
+top-level classification enum. Preserve the primary route fields, but make
+`Expected complete workflow` include every required durable stage before
+implementation. In particular, a Product change plus explicit Engineering
+change plus orchestrated implementation must keep both durable concerns in the
+handoff so a new `idd-factory-run` can coordinate them during preflight.
 
 The route classification is temporary workflow evidence. Do not create route
 files, preservation records, discovery reports, Factory state, specs, or code

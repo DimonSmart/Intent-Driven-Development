@@ -170,7 +170,20 @@ The workflow performs semantic planning for the complete request before mutation
 
 The Engineering layer is created lazily only after semantic planning confirms at least one new Rule and `.idd/engineering/` is completely absent, using packaged canonical bootstrap assets. `idd-project-init` does not create it. Planning, ambiguity detection, allocator-capacity checks, and all other pre-mutation gates happen before bootstrap. An existing malformed or partial layer blocks mutation and is never overwritten by bootstrap.
 
-Before any mutation, `.idd/factory/current/request.md` is the canonical active simplified Factory marker. If it exists, block Engineering mutation until that run is completed, cancelled, or explicitly restarted/replanned. The management workflow does not patch `plan.md`, rewrite `TaskRelatedEngineering`, restart Factory, or re-plan automatically. A stale `.idd/factory/current/` directory without `request.md`, or legacy `state.json` alone, is not an active-run marker.
+Before any mutation, `.idd/factory/current/request.md` is the canonical active simplified Factory marker. If it exists, block Engineering mutation and return `blocked`. The management workflow does not patch `plan.md`, rewrite `TaskRelatedEngineering`, restart Factory, re-plan automatically, or accept a hidden bypass. A stale `.idd/factory/current/` directory without `request.md`, or legacy `state.json` alone, is not an active-run marker.
+
+A new Factory entry is a valid coordinator only before that marker exists. It
+may identify `EngineeringManagementRequired` and invoke normal
+`idd-engineering-change` with the complete logical request. Factory itself does
+not map decisions to ENG owners, decide semantic equivalence, allocate IDs, edit
+INDEX, or write Rules. `success` and `no-op` allow entry preflight to continue;
+`ambiguous` and `blocked` stop before active Factory state.
+
+If an explicit replacement request requires Engineering management while an
+active marker exists, the replacement is blocked in this iteration before any
+durable writes. Complete or cancel the current run, then start the complete
+replacement request as a new run. Do not add a guard bypass, temporary
+archive/unarchive trick, suspended lifecycle, or automatic cancel/restart.
 
 An add request may create one or more coherent Rules, modify an existing semantic owner, or be a no-op. After the complete batch is planned, only new Rules consume IDs: allocate sequentially from current `Next ID` and set the final allocator to the first unused ID after the batch. Equivalent and modified candidates consume no IDs. If the required allocation would exceed `ENG-9999`, block before any mutation. Modify preserves stable ID while synchronizing INDEX projection. Remove deletes the Rule and INDEX row, preserves the allocator, and creates no archive or tombstone. If any candidate is ambiguous, mutate nothing. Git remains the only history layer.
 

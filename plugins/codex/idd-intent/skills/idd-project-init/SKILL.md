@@ -78,17 +78,30 @@ the normal default. The installed plugin may contain canonical Engineering
 bootstrap definitions for future management workflows, but this skill must not
 materialize them.
 
-Write `.idd/plugins.json` as a declaration of the required product-memory plugin, not as a copy of its implementation:
+Write `.idd/plugins.json` as a project declaration, not as a copy of plugin
+implementation. `idd-intent` is always required.
+
+Treat Factory as enabled for this initialization only when either:
+
+- the existing project declaration already contains `idd-factory`; or
+- the current user request explicitly enables Factory workflows.
+
+Preserve an existing `idd-factory` declaration on idempotent re-runs. Add it
+when the user explicitly enables Factory. Otherwise keep only the required
+`idd-intent` declaration. For example, a project explicitly using Factory has:
 
 ```json
 {
   "plugins": [
-    "idd-intent"
+    "idd-intent",
+    "idd-factory"
   ]
 }
 ```
 
-`idd-factory` is a separate optional plugin. Do not add it to `.idd/plugins.json` and do not create `.idd/factory` unless the user explicitly enables Factory workflows.
+This declaration does not install plugins. Do not infer Factory enablement merely
+because the Coding Agent happens to have `idd-factory` installed. Do not create
+`.idd/factory` unless Factory workflows are explicitly enabled or actually used.
 
 ### 3. Maintain one minimal IDD instruction block
 
@@ -128,7 +141,42 @@ platform fallback. The latter creates no marker file. Do not repeat this offer
 on idempotent initialization and never modify an existing policy without an
 explicit request. This decision precedes the optional initial-intent bootstrap.
 
-### 5. Offer initial intent bootstrap for existing implementations
+### 5. Offer Factory model configuration only when Factory is enabled
+
+Do not ask about Factory models for an `idd-intent`-only project.
+
+When Factory is enabled for this initialization and `.idd/execution.yaml` is
+absent, offer one blocking choice with this semantic meaning:
+
+```text
+How should Factory choose models for worker tasks?
+
+- Use the current model for all tasks
+- Configure different models by task complexity
+```
+
+Use the current host's native structured interaction when available
+(`request_user_input` on Codex, `AskUserQuestion` on Claude Code). Do not
+reproduce the tool schema. Require explicit input; do not auto-resolve the
+choice.
+
+Handle the answer by handing off to `idd-factory-configure`:
+
+- current model for all tasks -> persist the intentional `modelStrategy: inherit`
+  policy;
+- different models by complexity -> let the configuration skill propose and
+  confirm concrete `economy` / `standard` / `strong` mappings.
+
+If a valid `.idd/execution.yaml` already exists, do not repeat the offer on an
+idempotent initialization unless the user explicitly asks to reconfigure it.
+The user can run `idd-factory-configure` at any later time.
+
+If Factory was explicitly enabled but the `idd-factory-configure` skill is not
+available because the optional Factory plugin is not installed, do not invent a
+policy file. Explain that the project declaration does not install the plugin
+and leave model configuration pending.
+
+### 6. Offer initial intent bootstrap for existing implementations
 
 After structural initialization, determine whether all of these conditions hold:
 
@@ -164,7 +212,7 @@ Use the structured user-question tool exposed by the current host:
 
 When either structured tool is available:
 
-1. MUST invoke that tool immediately after structural initialization.
+1. MUST invoke that tool immediately when this bootstrap decision gate is reached.
 2. MUST present the decision through the tool, not as an ordinary assistant
    message or Markdown menu.
 3. MUST ask one single-choice question.
@@ -253,6 +301,9 @@ product truth during the handoff.
 - Product intent lives only under `.idd/intent`. Optional durable
   implementation guardrails live separately under `.idd/engineering`.
 - Factory working data, when used, is temporary and belongs under `.idd/factory`.
+- `.idd/execution.yaml`, when present, is persistent project-owned Factory
+  execution policy; it is not Product Intent and does not belong under
+  `.idd/factory/current/`.
 - Optional bootstrap discovery remains a separate skill with a separate semantic
   confirmation gate.
 - Declining bootstrap is a successful initialization result.
