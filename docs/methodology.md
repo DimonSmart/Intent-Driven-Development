@@ -181,16 +181,25 @@ idd-factory   temporary implementation organization
 `idd-intent` owns durable product truth and remains fully usable without
 Factory.
 
-`idd-factory` owns only lightweight temporary semantic orchestration:
+`idd-factory` owns lightweight entry coordination plus temporary semantic
+orchestration:
 
 ```text
-Intent Preflight
+complete logical request
+-> Factory Preflight
+   -> Product Intent preparation through normal Intent workflows when required
+   -> explicit Engineering preparation through idd-engineering-change when required
+   -> durable coverage validation
+-> create active Factory state
 -> fresh planner
 -> current batch
 -> fresh sequential workers
 -> fresh planner
 -> Question | Done
 ```
+
+The entry workflow coordinates existing durable owners before active state;
+Factory planners and workers never mutate Product Intent or Engineering.
 
 Factory does not package or run a .NET workflow runtime. It has no Factory MCP
 transport, process supervisor, retry state machine, authoritative attempt
@@ -215,9 +224,11 @@ Future tasks are self-contained.
 Factory deliberately uses at-least-once execution. An interrupted task may run
 again against current repository reality.
 
-Planner `# Question` stops orchestration for one user decision. The outer IDD
-workflow decides whether the exact answer changes durable intent, then a fresh
-planner resumes.
+Planner `# Question` stops orchestration for one user decision. Product-Intent
+answers use the normal outer Intent workflow. Ordinary implementation answers do
+not alter durable knowledge. A new durable Engineering decision cannot be
+applied while the Factory active marker exists; the run stays paused until it is
+completed/cancelled and the decision is included in a new complete request.
 
 Planner `# Done` triggers existing project verification when configured.
 Failure is bounded input to a fresh planner; success completes the temporary

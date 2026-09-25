@@ -79,10 +79,24 @@ cannot provide fresh contexts, shared repository access, terminal waiting, final
 results, and child stop/close control, Factory may be unsupported there rather
 than emulating a runtime.
 
+For a new run, Factory entry preflight materializes one complete logical
+request, performs non-mutating Product Intent analysis, detects whether explicit
+durable Engineering management is required, invokes `idd-engineering-change`
+with the complete request when necessary, applies required Product Intent
+mutation through normal Intent workflows, validates durable coverage, and only
+then creates active `request.md`. Engineering `ambiguous` or `blocked` results
+stop before active state.
+
 Temporary state contains only `request.md`, remaining `plan.md`, short
 `completed.md`, `answers.md`, and optional question or verification-failure
-files. Intent decisions are resolved by preflight before implementation; Factory
-workers never modify durable intent.
+files. Factory planners and workers are implementation-only and never modify
+`.idd/intent/*` or `.idd/engineering/*`.
+
+An Engineering-changing explicit replacement is blocked while an active
+`.idd/factory/current/request.md` exists; do not bypass the Engineering guard or
+auto-cancel/restart the run. Likewise, if a planner answer introduces a new
+durable Engineering decision, keep the active run paused and require a later new
+complete run after completion/cancellation.
 
 An interrupted task remains in the plan and may execute again. The replacement
 worker inspects current repository reality and completes from that state. When a

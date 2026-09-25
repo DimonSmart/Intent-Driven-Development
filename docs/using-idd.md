@@ -10,9 +10,10 @@ and strict final verification validates the complete result.
 
 Projects may optionally keep durable implementation guardrails in
 `.idd/engineering/`. The layer is absent by default and is not created by
-`idd-project-init`. Direct implementation and Factory both apply it when
-present. Use `idd-engineering-change` for ordinary explicit durable Rule add, modify,
-and remove operations. When existing documentation already states accepted
+`idd-project-init`. Direct implementation and Factory workers both apply it when
+present. `idd-engineering-change` remains the ordinary owner of explicit durable
+Rule add, modify, and remove operations; a new Factory entry may invoke that
+owner during preflight before `.idd/factory/current/request.md` exists. When existing documentation already states accepted
 durable Engineering decisions, `idd-intent-import` can migrate those decisions
 alongside Product Intent without asking for the same decision again. Current
 code patterns are never promoted automatically.
@@ -226,7 +227,13 @@ Install optional `idd-factory`, then provide the complete task once:
 Use idd-factory-run to implement the task described in ./ui-audit.md.
 ```
 
-Factory completes the requested implementation work, decomposing it when useful and applying independent review before finalization. Factory must not create or change product intent and is not used for bootstrap or glossary maintenance.
+For a new end-to-end run, Factory first performs durable preflight: it may
+coordinate Product Intent preparation through the normal Intent workflows and
+explicit durable Engineering preparation through `idd-engineering-change`, then
+validates coverage before active Factory state is created. The planner and
+workers themselves remain implementation-only and never mutate
+`.idd/intent/*` or `.idd/engineering/*`. Factory is not used for bootstrap or
+glossary maintenance.
 
 A normal run continues automatically. Only after an unexpected interruption use:
 

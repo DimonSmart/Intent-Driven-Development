@@ -92,8 +92,8 @@ Classify how much of the workflow the user authorizes in the current request:
 - `intent-only`: perform only durable IDD knowledge-side work, including
   product Intent or Engineering management. Do not implement product code or
   start Factory execution.
-- `implementation-only`: implement or check against current intent without
-  changing product intent.
+- `implementation-only`: implement or check against current durable knowledge
+  without changing `.idd/intent/*` or `.idd/engineering/*`.
 - `end-to-end`: continue through all requested workflow stages.
 
 Requested scope is independent from what changes and from execution depth. Use
@@ -127,8 +127,9 @@ scope:
   that do not execute implementation.
 
 A broad repository scan does not make bootstrap `orchestrated`. Factory
-orchestration is for implementation work and must not be used to create or
-change product intent.
+planner/worker orchestration is for implementation work and never mutates
+Product Intent or Engineering. A new Factory entry may coordinate the normal
+durable owners during preflight before active Factory state exists.
 
 Diff size alone is not enough to choose Factory. Execution depth may describe a
 later implementation stage even when the current requested scope stops at
@@ -168,12 +169,14 @@ routing or intent work.
   approval.
 - Import uses existing product knowledge as evidence and does not reconstruct
   requirements primarily from code.
-- Factory planners and workers may read intent, but must not create or change
-  product intent. When Engineering exists, planners select only Conditional
-  `TaskRelatedEngineering` IDs, the orchestrator mechanically enumerates the
-  current Always set before each worker, and workers do not edit Engineering
-  Rules. An end-to-end Factory run completes the separate Intent Preflight
-  before native-agent orchestration starts.
+- Factory entry preflight may coordinate required Product Intent preparation
+  through normal Intent workflows and explicit Engineering preparation through
+  `idd-engineering-change` before active Factory state exists. Factory planners
+  and workers then remain implementation-only: they do not mutate Product
+  Intent or Engineering. When Engineering exists, planners select only
+  Conditional `TaskRelatedEngineering` IDs, the orchestrator mechanically
+  enumerates the current Always set before each worker, and workers do not edit
+  Engineering Rules.
 - Plans, route classifications, preservation records, discovery reports,
   confirmation transcripts, and review notes are temporary workflow evidence.
 - Obsolete ordinary specs are deleted, not archived.
@@ -394,7 +397,19 @@ idd-engineering-change
 -> idd-code-check-implementation
 ```
 
-The Engineering mutation happens first. An active Factory run marked by `.idd/factory/current/request.md` blocks the mutation; management does not rewrite or re-plan active Factory state automatically.
+For one new large end-to-end request that simultaneously changes Product Intent,
+contains explicit durable Engineering decisions, and requires orchestrated
+implementation, `idd-factory-run` may coordinate those existing durable owners
+during entry preflight. It passes the complete logical request to
+`idd-engineering-change`, performs any required Product Intent mutation through
+normal Intent workflows, validates durable coverage, and creates active Factory
+state only afterward. Factory does not duplicate Engineering ownership,
+equivalence, allocator, or mutation logic.
+
+The Engineering mutation happens before active Factory state is created. An
+already-active Factory run marked by `.idd/factory/current/request.md` blocks
+Engineering mutation; management does not rewrite or re-plan active Factory
+state automatically.
 
 For `intent-only`, stop after Engineering management and direct Mechanical Engineering Validation. For `route-only`, do not start the management workflow.
 
@@ -475,16 +490,32 @@ implementation, sequencing, temporary planning, or high-risk preservation
 boundaries. Factory remains optional and must not become a dependency of
 `idd-intent`.
 
-The logical request is materialized self-contained and stored in
-`.idd/factory/current/request.md`. Before a new run, apply Intent Preflight:
+The logical request is materialized once as complete self-contained input.
+Before a new run, apply Factory Preflight:
 
 ```text
-logical request + requested scope + relevant current intent
--> AlreadyCovered | ExplicitIntentChange | MissingIntentDecision | ImplementationOnly
--> optional intent update
--> coverage validation
+complete logical request
+-> requested scope
+-> Product Intent analysis
+-> explicit Engineering concern detection
+-> idd-engineering-change when required
+-> Product Intent workflow when required
+-> durable coverage validation
+-> create .idd/factory/current/request.md
 -> native-agent Factory orchestration
 ```
+
+The Product Intent sub-analysis retains
+`AlreadyCovered | ExplicitIntentChange | MissingIntentDecision | ImplementationOnly`.
+Factory-level Engineering disposition is only
+`NoEngineeringManagementNeeded | EngineeringManagementRequired |
+EngineeringDecisionMissing`; semantic equivalence and owner mapping stay inside
+`idd-engineering-change`.
+
+When both durable layers must change, analyze Product Intent first, perform
+Engineering management second, apply Product Intent mutation third, then validate
+coverage. `idd-engineering-change => ambiguous | blocked` stops before active
+Factory state. This ordering is not a rollback transaction.
 
 The Factory semantic loop is intentionally small:
 
@@ -520,12 +551,14 @@ correct partial work already exists.
 When the planner returns `# Done`, run configured project verification. A
 bounded verification failure becomes input to a new fresh planner. A successful
 verification completes Factory. Planner `# Question` persists one concrete
-question and stops until the user answers; durable-intent handling remains an
-ordinary outer IDD workflow.
+question and stops until the user answers. Product-Intent answers use the normal
+outer Intent workflow. A new durable Engineering decision cannot be applied
+inside the active run; keep Factory paused and require a later new complete run
+after the current one is completed or cancelled.
 
 Do not start or resume implementation when requested scope is `route-only` or
-`intent-only`. With `implementation-only`, Factory can run only when current
-intent is already sufficient.
+`intent-only`. With `implementation-only`, Factory can run only when no Product
+Intent or Engineering mutation is required.
 
 ## Preservation And Discovery Boundaries
 
@@ -561,10 +594,10 @@ Routing must distinguish:
 - the `Stop after` boundary, which follows requested scope and clarity gates.
 
 For `route-only`, the current handoff is none. For `intent-only`, stop before
-implementation. For `implementation-only`, do not modify intent. For
-`end-to-end`, continue through the complete workflow unless ambiguity, required
-research, missing intent, verification failure, or another safety gate blocks
-progress.
+implementation. For `implementation-only`, do not modify Product Intent or
+Engineering. For `end-to-end`, continue through the complete workflow unless
+ambiguity, required research, a missing durable decision, verification failure,
+or another safety gate blocks progress.
 
 A bootstrap handoff carries scope and temporary discovery context, but the
 bootstrap skill must still ask for product-boundary confirmation and semantic

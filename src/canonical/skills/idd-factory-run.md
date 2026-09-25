@@ -7,7 +7,8 @@ MCP transport, retry engine, or durable implementation database.
 
 ## Required references
 
-Read `references/engineering-guardrails.md` before using an optional
+Read `references/intent-preflight.md` before starting or replacing a Factory
+run. Read `references/engineering-guardrails.md` before using an optional
 `.idd/engineering/` layer. Read `references/project-verification.md` before
 project verification. Read `references/factory-execution-policy.md` before
 interpreting `ExecutionProfile` or `.idd/execution.yaml`.
@@ -31,24 +32,129 @@ loop to compensate.
 
 A new thread is not sufficient if it automatically receives the parent history.
 
-## Intent Preflight
+## Factory Preflight
 
-For a new request, first resolve one complete self-contained logical request and
-run the existing Intent Preflight. Update durable product intent before
-implementation when the request requires it. Factory workers never update
-durable intent themselves, and intent changes are not Factory tasks.
+For a new run, first resolve one complete self-contained logical request. Preserve
+the user request text and materialize pasted text, explicitly supplied textual
+content, and request-local textual documents that the user identifies as part of
+the task. Host-local paths and attachment identifiers are transport metadata, not
+durable semantics. The materialized request is authoritative for both preflight
+and the later Factory run; do not replace it with a route summary, generated
+summary, implementation plan, Engineering summary, or Intent diff.
+
+Resolve the requested scope before durable work:
+
+- `route-only`: report routing/diagnostics only; perform no durable mutation and
+  do not start Factory;
+- `intent-only`: durable Product Intent preparation and Engineering management
+  are allowed when required, but implementation and Factory orchestration do not
+  start;
+- `implementation-only`: neither `.idd/intent/*` nor
+  `.idd/engineering/*` may be mutated. If the request requires either durable
+  change, stop with the required durable-workflow diagnostic;
+- `end-to-end`: durable preparation may be followed by implementation and
+  verification.
+
+Run the existing Product Intent classification from Intent Preflight before any
+durable write:
+
+```text
+AlreadyCovered
+ExplicitIntentChange
+MissingIntentDecision
+ImplementationOnly
+```
+
+For `ExplicitIntentChange`, determine the safe Intent handoff/owner, but defer
+the actual Product Intent mutation until Engineering management has completed
+successfully or as a no-op. Product Intent mutations remain owned by
+`idd-intent-change` and its normal `idd-intent-new-document` handoff.
+
+Separately classify only whether Engineering management is a durable concern:
+
+```text
+NoEngineeringManagementNeeded
+EngineeringManagementRequired
+EngineeringDecisionMissing
+```
+
+`EngineeringManagementRequired` means that the complete request explicitly
+contains one or more durable implementation-only project decisions. It does not
+authorize Factory to determine `new`, semantic equivalence, owning ENG ID,
+add/modify/remove/no-op actions, allocator changes, or INDEX edits. Those remain
+exclusively owned by `idd-engineering-change`.
+
+Do not promote task-local implementation details into Engineering policy. A
+technology name, class/file name, DI wiring step, implementation order, test
+step, temporary migration instruction, or local library-use instruction is not
+by itself a durable project-wide Engineering decision.
+
+Before any durable write, detect every request-level blocker that can be decided
+without invoking a mutation owner, including `MissingIntentDecision`,
+`EngineeringDecisionMissing`, conflicting requirements inside the request,
+requested-scope violations, inability to materialize the complete request, and
+an Engineering-changing replacement while an active Factory request exists. A
+request-level blocker means no Product mutation, no Engineering mutation, and no
+new Factory state.
+
+For a new `end-to-end` run, the required order is:
+
+```text
+1. materialize complete logical request
+2. resolve requested scope
+3. non-mutating Product Intent analysis
+4. Factory-level Engineering disposition
+5. detect request-level blockers
+
+6. if EngineeringManagementRequired:
+       invoke idd-engineering-change with the complete logical request
+
+7. handle Engineering result:
+       success   -> continue
+       no-op     -> continue
+       ambiguous -> stop before Factory state creation
+       blocked   -> stop before Factory state creation
+
+8. apply required Product Intent mutation through existing intent workflows
+9. validate durable coverage against the complete logical request
+10. create .idd/factory/current/request.md
+11. start a fresh Factory planner
+```
+
+The Engineering step deliberately precedes the Product Intent write because
+`idd-engineering-change` owns authoritative Engineering ownership/ambiguity
+planning and has no separate dry-run protocol. This ordering avoids changing
+Product Intent first and discovering an Engineering ownership ambiguity only
+afterward. It is not a transaction: if Engineering succeeds and a later Intent
+workflow fails mechanically, report the blocker and do not create Factory state;
+do not add rollback machinery.
+
+Coverage validation is against the complete logical request, not a generated
+summary. Confirm that required Product behavior is represented, every explicit
+Engineering concern was handled by `idd-engineering-change` with `success` or
+`no-op`, material safety/compatibility constraints and explicit non-goals were
+not lost, implementation-only details did not leak into Product Intent,
+task-local details did not leak into Engineering, the two durable layers do not
+contradict one another, and no required durable decision remains unresolved.
+When `.idd/engineering/` exists, its structure must also be valid. Absence of
+the Engineering layer is valid and produces no warning.
+
+Only after successful durable preparation and coverage validation may a new run
+create `.idd/factory/current/request.md`. Persist the complete self-contained
+logical request itself, not a preflight report or rewrite.
 
 Continuation of an existing simplified run does not repeat initial preflight.
 
-If `.idd/engineering/` exists, run the deterministic structural validation
-defined in `references/engineering-guardrails.md` before planning or worker
-execution. A malformed Engineering layer is a blocking diagnostic. Absence of
-the layer is valid and produces no warning.
-
-For an explicit replacement request, resolve the complete replacement request,
-run replacement preflight, and only then replace the temporary Factory state. If
-the user supplied only a semantic delta and a complete replacement cannot be
-formed without guessing, ask for the complete replacement request.
+For an explicit replacement request, resolve the complete replacement request
+while leaving the current Factory state untouched. Replacement that needs no
+Engineering mutation keeps the existing replacement Product Intent semantics:
+run replacement preflight/coverage first and replace temporary state only after
+success. If the active replacement request is
+`EngineeringManagementRequired`, stop before any durable write. Do not bypass
+the `idd-engineering-change` active-run guard, auto-cancel/restart the current
+run, archive/unarchive it as a trick, or create a suspended/pending lifecycle.
+Report that the current run must be completed or cancelled and the complete
+replacement request then started as a new Factory run.
 
 ## Minimal temporary state
 
@@ -64,9 +170,10 @@ Use only the temporary files needed for continuation:
     verification-failure.md    # only when relevant
 ```
 
-`request.md` is the persisted original request. `plan.md` contains only the
-remaining tasks in the current batch. `completed.md` contains short semantic
-summaries useful to later planners. `answers.md` contains exact user answers.
+`request.md` is the complete self-contained logical request that passed Factory
+Preflight. `plan.md` contains only the remaining implementation/research tasks in
+the current batch. `completed.md` contains short semantic summaries useful to
+later planners. `answers.md` contains exact user answers.
 
 The repository is the authoritative implementation reality. These files are
 best-effort scheduling and semantic context, not proof that a change exists.
@@ -87,25 +194,29 @@ replacement request and may archive the old directory for diagnostics.
 ## User-level operations
 
 New:
-- materialize the self-contained request;
-- run Intent Preflight;
-- create the minimal current state;
+- materialize the complete self-contained logical request;
+- run Factory Preflight, including required Product Intent and Engineering
+  preparation;
+- validate durable coverage;
+- only then create the minimal current state;
 - enter the orchestration loop.
 
 Continue:
 - read `request.md` and the minimal current state;
-- continue from the repository reality;
+- continue from repository reality;
 - do not repeat initial preflight.
 
 Cancel:
 - archive or remove the temporary Factory state;
-- never roll back repository changes automatically.
+- never roll back repository or durable-knowledge changes automatically.
 
-Restart:
-- resolve one complete replacement request;
-- run replacement Intent Preflight;
-- archive or remove prior temporary state;
-- create a new simplified run.
+Restart / explicit replacement:
+- resolve one complete replacement request while preserving the active state;
+- run replacement preflight;
+- if the replacement requires Engineering management, return the active-run
+  blocker without changing Product Intent, Engineering, or Factory state;
+- otherwise replace temporary state only after successful replacement preflight
+  and coverage validation.
 
 These are skill-level operations. There are no `factory_run`,
 `factory_continue`, `factory_restart`, `factory_retry`, `factory_cancel`,
@@ -163,6 +274,11 @@ planner may read one when its content is necessary for correct decomposition.
 
 Do not forward the parent transcript or automatically load the complete intent
 or Engineering trees.
+
+The planner creates only implementation/research tasks. It must not create tasks
+to update Product Intent, create/modify Engineering Rules, run
+`idd-engineering-change`, import the request, or otherwise perform durable
+preparation. Factory Preflight finishes that work before active state exists.
 
 ### Worker execution profile
 
@@ -253,10 +369,20 @@ The planner returns exactly one of:
 Blank output is not `Done`. Do not mix forms.
 
 When a question is returned, save it to `question.md` and stop. After the user
-answers, let the normal IDD workflow decide whether durable intent changes.
-After any required intent update, append the exact question and answer to
-`answers.md`, remove `question.md`, and invoke a new fresh planner. Never
-continue the old planner thread.
+answers, classify the exact answer before resuming:
+
+- if it changes Product Intent, use the normal outer Product Intent workflow when
+  allowed, then append the exact Q/A and start a fresh planner;
+- if it is an ordinary implementation decision, change no durable knowledge,
+  append the exact Q/A, and start a fresh planner;
+- if it introduces a new durable Engineering decision, do not invoke
+  `idd-engineering-change` while `request.md` marks the run active. Keep Factory
+  paused and report that the user must complete/cancel this run and start a new
+  complete request containing the original request plus the Engineering decision.
+
+Never patch an Engineering Rule directly, turn the decision into a worker task,
+weaken the active-run guard, auto-cancel/restart the run, or continue the old
+planner thread.
 
 ## Project verification and completion
 
@@ -289,6 +415,12 @@ configured, planner `# Done` after ordinary worker checks completes Factory.
 
 Semantic relevance belongs to agents. Mechanical operations belong to code or
 the host.
+
+Factory entry preflight may coordinate durable preparation before active state
+exists, but Product Intent workflows remain the only Product Intent mutation
+owners and `idd-engineering-change` remains the ordinary Engineering mutation
+owner. Factory planners and workers own implementation against already prepared
+durable knowledge and never mutate `.idd/intent/*` or `.idd/engineering/*`.
 
 Do not solve semantic tasks with deterministic code. Execution-profile
 classification and Conditional Engineering applicability are model decisions.

@@ -55,7 +55,14 @@ source statement updates an existing semantic owner only when replacement/curren
 truth is explicit; otherwise the Engineering batch remains unchanged and the
 conflict is reported.
 
-One request may contain multiple durable Engineering decisions. The complete semantic batch is planned before files change; independent decisions remain separate Rules, while naturally coherent decisions may share a Rule. The layer is created lazily only when that plan requires the first real add. `idd-project-init` still leaves it absent. When a Factory run is active, `.idd/factory/current/request.md` blocks Engineering mutation until the run is completed, cancelled, or explicitly restarted/replanned.
+One request may contain multiple durable Engineering decisions. The complete semantic batch is planned before files change; independent decisions remain separate Rules, while naturally coherent decisions may share a Rule. The layer is created lazily only when that plan requires the first real add. `idd-project-init` still leaves it absent.
+
+A new Factory entry may invoke normal `idd-engineering-change` during preflight
+before `.idd/factory/current/request.md` exists. Factory itself does not map ENG
+owners, decide equivalence, allocate IDs, or write Rules. After active
+`request.md` exists, Engineering mutation is blocked. An Engineering-changing
+replacement or planner answer does not bypass that guard; complete/cancel the
+current run and start a new complete request instead.
 
 `INDEX.md` carries `Next ID: ENG-NNNN`. Only new Rules consume sequential IDs; modifications, no-ops, and removals consume none. Valid legacy layers without allocator remain readable and acquire `max(current IDs) + 1` only immediately before their first real management mutation. Structural validation uses the shared Mechanical Engineering Validation checklist directly rather than routing Engineering management through another skill.
 

@@ -56,8 +56,11 @@ Always rules are already mandatory. You may read a specific Always rule if its
 content is needed to form a correct task contract, but never decide whether an
 Always rule applies.
 
-Do not create or modify durable intent. If the current product decision is
-missing, use `# Question` rather than inventing it.
+Do not create or modify durable Product Intent or Engineering Rules. Factory
+Preflight must finish durable preparation before active state exists. Never emit
+a task whose purpose is to update `.idd/intent/*`, create/modify/remove an
+`ENG-NNNN`, run `idd-engineering-change`, or import durable knowledge. If the
+current product decision is missing, use `# Question` rather than inventing it.
 
 ## Output protocol
 

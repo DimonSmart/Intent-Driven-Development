@@ -1,33 +1,68 @@
 # Factory Workflow
 
 Factory is lightweight native-agent orchestration for implementation work that
-benefits from decomposition and fresh contexts.
+benefits from decomposition and fresh contexts. Its entry workflow may coordinate
+required durable preparation before orchestration starts; its planner and
+workers remain implementation-only.
 
-## Main loop
+## Entry preflight
+
+For a new run:
 
 ```text
-User request
--> Intent Preflight
+Complete logical request
+-> Factory Preflight
+   -> Product Intent analysis
+   -> explicit Engineering concern detection
+   -> idd-engineering-change when required
+   -> existing Product Intent workflows when required
+   -> durable coverage validation
+-> create .idd/factory/current/request.md
 -> fresh planner
 -> current batch
--> fresh worker
--> fresh worker
+-> fresh sequential workers
 -> fresh planner
 -> Question | Done
 ```
 
-The planner and every worker use separate semantic contexts. Workers share the
-repository, not transcripts.
+The request is materialized once and stays authoritative. A referenced local
+Markdown specification is read into the logical request so continuation does not
+depend on a temporary attachment/path.
+
+Product Intent mutations remain owned by normal Intent workflows. Engineering
+mutations remain owned by `idd-engineering-change`; Factory does not decide ENG
+ownership, semantic equivalence, allocator changes, or add/modify/remove/no-op
+actions itself.
+
+When Engineering management is required, it runs before Product Intent mutation
+and before active Factory state exists. `success` and `no-op` continue;
+`ambiguous` and `blocked` stop. Durable coverage is validated against the
+complete request before `request.md` is created.
+
+`implementation-only` permits no mutation of either `.idd/intent/*` or
+`.idd/engineering/*`. Projects without an Engineering layer remain valid and do
+not receive one merely because Factory starts.
+
+## Replacement and active-run safety
+
+Continuation of the current run does not repeat preflight.
+
+An explicit replacement that needs no Engineering mutation keeps the existing
+replacement semantics: resolve the complete replacement request, complete
+replacement Product preflight and coverage, and only then replace temporary
+state.
+
+If an active replacement requires an Engineering Rule change, it is blocked
+before durable writes. The Engineering active-run guard is not bypassed. Complete
+or cancel the current run, then start the complete replacement request as a new
+run. Factory does not auto-cancel/restart, temporarily archive state to bypass
+the guard, or introduce a suspended lifecycle.
 
 ## Planning
 
-The planner creates only tasks whose contracts are reliable now. It can return
-multiple tasks when they are already well-defined; workers execute them
-sequentially.
-
-If later work depends on evidence produced by an unfinished task, stop the
-current plan at that boundary. A new planner invocation observes repository
-reality and contracts the next work.
+The planner creates only implementation/research tasks whose contracts are
+reliable now. It never creates tasks to update Product Intent, create/modify
+Engineering Rules, or run durable-management workflows.
 
 Planner output is Markdown:
 
@@ -40,6 +75,9 @@ standard
 
 # TaskRelatedIntent
 IDD-0012
+
+# TaskRelatedEngineering
+ENG-0004
 
 # Question
 ...
@@ -59,6 +97,11 @@ inherit the host model. Explicit mappings are applied exactly through native
 child-agent controls; malformed/unavailable mappings never trigger silent model
 substitution.
 
+When Engineering exists, `TaskRelatedEngineering` contains only
+planner-selected Conditional Rules. The current Always set is mechanically
+enumerated separately before every worker. Workers read supplied Intent and
+Engineering documents but never edit either durable layer.
+
 ## Temporary state
 
 ```text
@@ -71,12 +114,14 @@ substitution.
     verification-failure.md    # optional
 ```
 
-The repository is authoritative. `plan.md` contains only remaining work in the
-current batch. `completed.md` contains short semantic summaries useful to the
-next planner.
+`request.md` is the complete self-contained logical request that passed
+preflight. The repository is authoritative implementation reality. `plan.md`
+contains only remaining implementation/research work in the current batch.
+`completed.md` contains short semantic summaries useful to the next planner.
 
 There is no authoritative `state.json`, work-item lifecycle graph, attempt
-history, process ownership, retry budget, or exact continuation protocol.
+history, process ownership, retry budget, transaction log, or exact continuation
+protocol.
 
 ## Interruption
 
@@ -92,9 +137,17 @@ Use native stop/close when possible and end the invocation.
 ## Questions
 
 When the planner returns one `# Question`, Factory persists the question and
-stops. After the user answers, normal IDD handling decides whether durable intent
-changes. The exact answer is stored and a fresh planner starts. The old planner
-thread is not resumed.
+stops.
+
+A Product-Intent answer uses the normal outer Intent workflow when allowed. An
+ordinary implementation decision changes no durable knowledge. If the answer
+introduces a new durable Engineering decision, Rules cannot be mutated while the
+active `request.md` exists: keep Factory paused and require the current run to
+be completed/cancelled before starting a new complete request that includes the
+decision.
+
+The exact answer is stored before a fresh planner starts. The old planner thread
+is never resumed.
 
 ## Done and verification
 

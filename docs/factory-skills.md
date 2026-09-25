@@ -7,10 +7,13 @@ configures persistent project execution policy.
 
 This is the orchestration entry point.
 
-It performs or reuses Intent Preflight, maintains minimal temporary continuation
-state, invokes a fresh planner, invokes fresh workers sequentially, handles one
-planner question, and runs configured project verification after planner
-`# Done`.
+For a new run it performs Factory Preflight: materialize the complete logical
+request, analyze Product Intent, hand explicit durable Engineering decisions to
+`idd-engineering-change` when required, apply required Product Intent through
+normal Intent workflows, validate durable coverage, and only then create active
+Factory state. It then maintains minimal temporary continuation state, invokes a
+fresh planner and sequential fresh workers, handles one planner question, and
+runs configured project verification after planner `# Done`.
 
 Immediately before each worker spawn it mechanically maps the task's
 `ExecutionProfile` through `.idd/execution.yaml`. Missing profile metadata
@@ -75,8 +78,10 @@ metadata and contains stable current intent IDs only. When
 planner-selected Conditional `ENG-NNNN` IDs. The planner never puts Always
 rules there.
 
-Planning is incremental. Contract only work knowable now; do not speculate about
-later tasks whose contracts depend on unfinished work.
+Planning is incremental. Contract only implementation/research work knowable
+now; do not speculate about later tasks whose contracts depend on unfinished
+work. The planner never creates a task to mutate Product Intent or Engineering
+Rules.
 
 ## `idd-factory-execute-subtask`
 
@@ -91,7 +96,8 @@ The worker receives one self-contained task plus optional `TaskRelatedIntent`
 IDs, optional Conditional `TaskRelatedEngineering` IDs, and the current
 mechanically enumerated `AlwaysEngineering` IDs. It resolves and reads those
 documents itself, performs the implementation, runs focused task-local checks,
-and returns a short semantic result.
+and returns a short semantic result. It never mutates `.idd/intent/*` or
+`.idd/engineering/*`.
 
 ## Context isolation
 

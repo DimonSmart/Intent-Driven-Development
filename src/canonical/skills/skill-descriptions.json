@@ -131,7 +131,7 @@
     "invocation": "manual"
   },
   "idd-factory-run": {
-    "description": "Prepare durable product intent when required, then orchestrate incremental planning and isolated native-agent workers while mechanically applying project-owned execution-profile mappings."
+    "description": "Prepare required durable Product Intent and explicit Engineering policy before starting a new run, then orchestrate incremental planning and isolated native-agent workers while mechanically applying project-owned execution-profile mappings."
   },
   "idd-factory-decompose-task": {
     "description": "In a fresh planner context, return the small current batch of self-contained Factory tasks that can be contracted reliably now, one user question, or Done."
