@@ -120,7 +120,7 @@ needed and no existing current document owns the area.
 
 Use `idd-code-implement` when current specs already describe the behavior to build.
 
-Use `idd-code-check-implementation` when the task is to compare implementation
+Use `idd-intent-drift-audit` when the task is to compare implementation
 behavior with current specs.
 
 Use `idd-code-update-intent` only when implementation behavior already
@@ -130,7 +130,7 @@ intent.
 Use `idd-intent-normalize-current` when accepted current specs need focused structural
 normalization without changing product meaning.
 
-Use `idd-intent-audit` for broad structural diagnostics over `.idd/intent/`.
+Use `idd-intent-structure-audit` for broad structural diagnostics over `.idd/intent/`.
 
 Use `idd-intent-lint` for cheap mechanical validation.
 
