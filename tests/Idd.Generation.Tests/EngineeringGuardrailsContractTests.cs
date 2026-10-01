@@ -17,7 +17,7 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
         var skills = new[]
         {
             ("idd-intent", "idd-code-implement"),
-            ("idd-intent", "idd-code-check-implementation"),
+            ("idd-intent", "idd-intent-drift-audit"),
             ("idd-intent", "idd-intent-lint"),
             ("idd-intent", "idd-engineering-change"),
             ("idd-intent", "idd-intent-import"),
