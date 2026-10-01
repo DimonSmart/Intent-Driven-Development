@@ -191,7 +191,7 @@ Other IDD skills may read or validate Engineering and report candidates. Apart
 from the bounded source-migration authority of `idd-intent-import`, they do not
 independently create, modify, or remove Rules.
 
-Engineering management changes durable knowledge, not implementation. If the user's request is end-to-end, implementation may follow through `idd-code-implement` or Factory and then `idd-code-check-implementation`. Existing consumers continue to apply every Always Rule plus semantically relevant Conditional Rules; management does not duplicate applicability logic.
+Engineering management changes durable knowledge, not implementation. If the user's request is end-to-end, implementation may follow through `idd-code-implement` or Factory and then `idd-intent-drift-audit`. Existing consumers continue to apply every Always Rule plus semantically relevant Conditional Rules; management does not duplicate applicability logic.
 
 ## Engineering import migration
 
@@ -301,7 +301,7 @@ If it exists but structural validation fails, implementation stops before code c
 
 ## Implementation conformance
 
-`idd-code-check-implementation` discovers Engineering Rules with the same policy as direct implementation: every Always rule plus semantically relevant Conditional rules.
+`idd-intent-drift-audit` discovers Engineering Rules with the same policy as direct implementation: every Always rule plus semantically relevant Conditional rules. Engineering findings remain separate from Product Intent drift and verification evidence.
 
 Report three dimensions separately:
 

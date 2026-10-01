@@ -47,8 +47,8 @@ Answer questions such as:
 - which IDD skill exists for a particular purpose;
 - why one workflow is preferred over another;
 - when Factory is useful and when direct execution is sufficient;
-- how bug fixes, refactoring, bootstrap, import, audits, linting, and
-  implementation checks fit the methodology;
+- how bug fixes, refactoring, bootstrap, import, structure audits, drift audits,
+  linting, and project verification fit the methodology;
 - how a current IDD rule should be interpreted;
 - what an installed IDD skill is expected to do or not do.
 - `.idd/verification.yaml`, its `direct`, `subtask`, `checkpoint`, and `final`
@@ -59,6 +59,34 @@ only when it is needed to answer accurately. Prefer `.idd/intent/README.md`,
 `.idd/intent/INDEX.md`, and only the relevant current `IDD-NNNN` documents. Keep
 that inspection read-only and avoid broad code review or Git-history analysis
 unless the user separately requests it.
+
+## Audit and Verification Model
+
+Explain these mechanisms distinctly:
+
+```text
+idd-intent-lint
+    mechanical validity of .idd/intent/
+
+idd-intent-structure-audit
+    semantic structure and ownership of Product Intent
+
+idd-intent-drift-audit
+    conformance of implementation to Product Intent for an explicit focused or project-wide scope
+
+.idd/verification.yaml
+    project-specific checks that provide implementation evidence
+```
+
+For long-lived code that may have drifted from intent, recommend
+`idd-intent-drift-audit` and require an explicit focused or project-wide scope.
+For split/merge, ownership, duplication, or organization questions, recommend
+`idd-intent-structure-audit`. For broken references, duplicate IDs, invalid
+metadata, or INDEX consistency, recommend `idd-intent-lint`.
+
+Build, test, lint, analyzer, CI, and repository-specific evidence belongs to
+project verification policy and the implementation/Factory workflows that
+consume it; do not invent a separate generic verification skill.
 
 ## Relationship to `idd-route`
 

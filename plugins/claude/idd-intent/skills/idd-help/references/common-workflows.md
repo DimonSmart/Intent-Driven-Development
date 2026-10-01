@@ -243,7 +243,7 @@ idd-project-init if needed
 Optional follow-up:
 
 ```text
--> idd-code-check-implementation
+-> idd-intent-drift-audit
 ```
 
 The optional conformance check is not permission to modify code.
@@ -334,7 +334,7 @@ brainstorm if the request is unclear
 -> idd-intent-change(operation: add)
 -> existing owner or new document handoff
 -> idd-code-implement or Factory
--> idd-code-check-implementation
+-> idd-intent-drift-audit
 ```
 
 ### Modify Behavior
@@ -344,7 +344,7 @@ find current owner
 -> idd-intent-change(operation: modify)
 -> identify changed and preserved behavior
 -> idd-code-implement or Factory
--> idd-code-check-implementation
+-> idd-intent-drift-audit
 ```
 
 ### Remove Behavior
@@ -394,7 +394,7 @@ When the same user request also asks to change implementation, the complete life
 ```text
 idd-engineering-change
 -> idd-code-implement or Factory
--> idd-code-check-implementation
+-> idd-intent-drift-audit
 ```
 
 For one new large end-to-end request that simultaneously changes Product Intent,
@@ -422,7 +422,7 @@ read relevant intent
 -> identify preservation boundary
 -> idd-code-implement(mode: preserve-current-intent) or Factory
 -> verification
--> idd-code-check-implementation
+-> idd-intent-drift-audit
 ```
 
 If implementation work reveals that product behavior must change, stop the
@@ -438,7 +438,7 @@ preservation boundary solely from code.
 ### Normalize Current Intent
 
 ```text
-idd-intent-audit if the problem is broad
+idd-intent-structure-audit if the problem is broad
 -> choose a concrete focus
 -> idd-intent-normalize-current --mode propose
 -> check for semantic movement
@@ -449,6 +449,29 @@ idd-intent-audit if the problem is broad
 Normalization may change ownership, location, grouping, references, and
 document boundaries. It must not change product behavior, constraints,
 exceptions, acceptance criteria, compatibility contracts, or non-goals.
+
+## Audit and Verification Separation
+
+Keep these responsibilities distinct:
+
+```text
+Intent mechanical consistency
+    -> idd-intent-lint
+
+Intent semantic organization
+    -> idd-intent-structure-audit
+
+Intent / implementation conformance
+    -> idd-intent-drift-audit
+
+Implementation technical verification
+    -> .idd/verification.yaml
+       consumed by implementation / Factory workflows
+```
+
+`idd-intent-drift-audit` is read-only and always uses an explicit audit scope.
+The scope may be focused or explicitly project-wide. Project-wide audit remains
+intent-driven and is not generic repository code review.
 
 ## Bug and Mismatch Entry Points
 
@@ -461,9 +484,9 @@ already clear from the request and focused implementation context.
   that the fix changes product truth, a public contract, compatibility, or a
   durable architecture boundary: investigate the implementation directly,
   apply `idd-code-implement` or an equivalent focused code fix, and run relevant
-  verification. Do not run `idd-code-check-implementation` first merely because
+  verification. Do not run `idd-intent-drift-audit` first merely because
   the request is a bug report.
-- Use `idd-code-check-implementation` before implementation when current intent
+- Use `idd-intent-drift-audit` before implementation when current intent
   is actually needed to determine what correct behavior is, when expected
   behavior is unclear, when the implementation may represent a deliberate
   product change, when the fix touches a public or durable contract, or when the
@@ -615,8 +638,8 @@ a deliberate review concludes that no change is required.
 
 For `end-to-end`, product changes complete after intent is updated and coverage
 is validated against the materialized logical request, implementation is
-performed, and `idd-code-check-implementation` verifies changed, removed, and
-preserved behavior. Engineering-only management completes after the requested
+performed, and a focused `idd-intent-drift-audit` with explicit caller-provided
+scope verifies changed, removed, and preserved behavior. Engineering-only management completes after the requested
 mutation or semantic no-op and clean structural validation; it does not imply
 repository implementation changes. End-to-end Engineering requests continue to
 implementation only when that implementation work was explicitly requested.

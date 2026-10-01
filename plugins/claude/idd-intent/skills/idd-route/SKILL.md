@@ -74,9 +74,9 @@ Classification:
 - engineering-change
 - implementation-change
 - intent-normalization
-- intent-audit
+- intent-structure-audit
 - intent-lint
-- implementation-intent-check
+- intent-drift-audit
 - implementation-to-intent
 - explicit-skip
 - unclear
@@ -115,6 +115,15 @@ Use `not-applicable` for `intent-bootstrap` and `verification-configuration`.
 Repository discovery may be broad, but it is intent-side investigation rather
 than implementation orchestration and must not start Factory.
 
+For `intent-drift-audit`, also return `Audit scope: focused | project-wide`. Use
+`project-wide` only when the user explicitly asks for the whole project, entire
+repository, or all current Product Intent. Otherwise use `focused` when a
+behavior, intent document, implementation area, or mismatch is identified.
+Routing does not load the whole intent tree; project-wide discovery belongs to
+`idd-intent-drift-audit`.
+
+For all other classifications, use `Audit scope: not-applicable`.
+
 Set `Requested scope` to one of:
 
 ```text
@@ -146,6 +155,11 @@ A request to understand an existing project and create its initial intent is
 normally `intent-only` unless it also explicitly asks for implementation
 changes after bootstrap.
 
+A structure audit is normally `intent-only` because it reads the Intent knowledge
+model. A drift audit is normally `implementation-only` because it reads Product
+Intent plus implementation evidence without mutating either layer. Use
+`route-only` when the user asks only for classification.
+
 For `verification-configuration`, use `route-only` only when the user asks for
 classification or advice without changing files; otherwise use `end-to-end`.
 
@@ -171,9 +185,9 @@ a handoff index:
 | `engineering-change` | `idd-engineering-change` |
 | `implementation-change` | `idd-code-implement` or Factory |
 | `intent-normalization` | `idd-intent-normalize-current` |
-| `intent-audit` | `idd-intent-audit` |
+| `intent-structure-audit` | `idd-intent-structure-audit` |
 | `intent-lint` | `idd-intent-lint` |
-| `implementation-intent-check` | `idd-code-check-implementation` |
+| `intent-drift-audit` | `idd-intent-drift-audit` |
 | `implementation-to-intent` | `idd-code-update-intent` |
 | `explicit-skip` | `idd-skip` |
 | `unclear` | `idd-intent-brainstorm` or a spike handoff |
@@ -224,6 +238,23 @@ implementation. In particular, a Product change plus explicit Engineering
 change plus orchestrated implementation must keep both durable concerns in the
 handoff so a new `idd-factory-run` can coordinate them during preflight.
 
+Examples:
+
+```text
+Does implementation match current intent?
+-> Classification: intent-drift-audit
+-> Recommended first skill: idd-intent-drift-audit
+
+Audit the whole project for intent drift.
+-> Classification: intent-drift-audit
+-> Audit scope: project-wide
+-> Recommended first skill: idd-intent-drift-audit
+
+Review whether our intent specs should be split or merged.
+-> Classification: intent-structure-audit
+-> Recommended first skill: idd-intent-structure-audit
+```
+
 The route classification is temporary workflow evidence. Do not create route
 files, preservation records, discovery reports, Factory state, specs, or code
 from this skill.
@@ -240,9 +271,10 @@ Operation: `modify`
 Clarity: `clear`
 Execution depth: `focused`
 Requested scope: `end-to-end`
+Audit scope: `not-applicable`
 
 Recommended first skill: `idd-intent-change`
-Expected complete workflow: `idd-intent-change -> idd-code-implement -> idd-code-check-implementation`
+Expected complete workflow: `idd-intent-change -> idd-code-implement -> idd-intent-drift-audit`
 Current handoff: `idd-intent-change`
 Stop after: `the requested end-to-end workflow completes, or an intent or verification gate blocks progress`
 

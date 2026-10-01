@@ -146,6 +146,24 @@ See `engineering-guardrails.md` in canonical skill references for the exact
 rule/index format, deterministic structural validation, and direct/Factory
 propagation protocol.
 
+## Audit and Verification Responsibilities
+
+IDD separates mechanical Intent validity, semantic Intent organization,
+implementation conformance, and technical verification:
+
+```text
+idd-intent-lint              mechanical validity of .idd/intent/
+idd-intent-structure-audit   semantic organization of Product Intent
+idd-intent-drift-audit       implementation conformance to Product Intent
+.idd/verification.yaml       project-specific evidence acquisition
+```
+
+`idd-intent-drift-audit` is read-only and requires an explicit focused or
+project-wide scope. A project-wide audit starts from current Intent ownership
+and maps outward to implementation evidence; it is not a generic code-quality
+review. Project verification supplies evidence and remains operational policy,
+not another public audit workflow.
+
 ## Optional Project Glossary
 
 A project may optionally keep `.idd/intent/GLOSSARY.md` as a small shared

@@ -226,5 +226,5 @@ Do not use this skill to:
 - build, expand, or prune the project glossary;
 - perform implementation conformance checks.
 
-Use `idd-intent-audit` for broad structural diagnostics. Use
+Use `idd-intent-structure-audit` for broad structural diagnostics. Use
 `idd-glossary-build` for explicit glossary creation or maintenance.

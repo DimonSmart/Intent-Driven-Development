@@ -478,7 +478,7 @@ Bootstrap may create its approved initial document set directly.
 Use `idd-code-update-intent` for later narrow transfer of explicitly confirmed
 implementation behavior into an established model.
 
-Use `idd-code-check-implementation` after bootstrap for a separate conformance
+Use `idd-intent-drift-audit` after bootstrap for a separate conformance
 review against the newly confirmed intent.
 
 ## Output

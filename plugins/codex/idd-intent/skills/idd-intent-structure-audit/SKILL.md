@@ -1,27 +1,31 @@
 ---
-name: idd-intent-audit
-description: Diagnose `.idd/intent/` product intent structure and recommend reorganizations without editing files.
+name: idd-intent-structure-audit
+description: Diagnose semantic structure, ownership, organization, and normalization opportunities in current `.idd/intent/` without editing files.
 ---
 
-# idd-intent-audit
+# idd-intent-structure-audit
 
-Use this skill to diagnose the structure of `.idd/intent` without editing files.
+Use this read-only skill to diagnose the semantic structure, ownership, organization, and normalization opportunities of current `.idd/intent/` without editing files.
 
 Formula:
 
 ```text
-idd-intent-audit = broad structural diagnostics, no file edits
+idd-intent-structure-audit = broad structural diagnostics, no file edits
 ```
 
 Use it for requests such as "review current `.idd/intent` structure", "find bad
 split/merge decisions", "find structural problems", or "look across all specs".
+
+This skill audits the Intent knowledge model itself. It does not compare Product
+Intent with implementation evidence. Use `idd-intent-drift-audit` for that.
 
 ## Rules
 
 - Do not edit files.
 - Do not reorganize specs.
 - Do not resolve product conflicts.
-- Do not read the whole project unless needed to understand spec references.
+- Do not read the whole project unless needed to understand intent references.
+- Do not inspect implementation to determine whether it conforms to Product Intent.
 - Treat `GLOSSARY.md` as an optional support file, not a numbered specification.
 - Do not create, rewrite, or expand the glossary.
 - Recommend `idd-intent-normalize-current` for focused spec-structure follow-up
@@ -131,7 +135,7 @@ material ambiguity exists, recommend focused review through
 ## Report Format
 
 ```md
-# IDD Intent Audit Report
+# IDD Intent Structure Audit Report
 
 ## Summary
 
@@ -184,7 +188,7 @@ Review current `.idd/intent` structure and find bad split/merge decisions.
 
 Expected behavior:
 
-- use `idd-intent-audit`;
+- use `idd-intent-structure-audit`;
 - do not edit files;
 - produce findings and a reorganization plan;
 - inspect the glossary only if it exists;
@@ -199,7 +203,7 @@ Do not use this skill to:
 - edit files;
 - perform focused reorganization;
 - import external source material;
-- verify implementation against specs;
+- compare implementation behavior with Product Intent;
 - build or update a glossary;
 - lint mechanical consistency only.
 

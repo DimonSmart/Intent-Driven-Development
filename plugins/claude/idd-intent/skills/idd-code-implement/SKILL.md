@@ -78,8 +78,8 @@ observable behavior change.
   confirmation, and record IDs, commands, and results. User instructions stay
   `Not verified` until confirmed. Without the file, use and report the
   repository/platform fallback.
-- After implementation, perform a focused implementation/spec check using
-  `idd-code-check-implementation`.
+- After implementation, perform a focused intent drift audit using
+  `idd-intent-drift-audit` and pass an explicit derived scope.
 
 ## Engineering Guardrails
 
@@ -116,7 +116,9 @@ Always rules are enumerated, not semantically selected.
 7. Add or update only the minimal high-value verification needed for meaningful
    behavior or regression risk.
 8. Run relevant verification.
-9. Run focused `idd-code-check-implementation`.
+9. Run focused `idd-intent-drift-audit` with an explicit scope derived from the
+   changed implementation, affected current requirements, preservation boundary,
+   compatibility boundary, and removed behavior when those elements exist.
 10. Report the required implementation result fields.
 
 ## Missing Spec Rule
@@ -137,7 +139,7 @@ intent sufficiently defines the observable behavior and durable contracts that
 must remain unchanged.
 
 If the preservation boundary cannot be determined from the request and current
-intent, stop and route to `idd-code-check-implementation`,
+intent, stop and route to `idd-intent-drift-audit`,
 `idd-intent-brainstorm`, or an intent change workflow instead of making code
 changes.
 
@@ -157,7 +159,7 @@ Code areas changed:
 Tests changed:
 Verification result:
 Engineering conformance:
-Conformance-check result:
+Intent-drift-audit result:
 Remaining risks:
 ```
 

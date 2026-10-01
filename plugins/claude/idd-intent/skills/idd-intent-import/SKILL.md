@@ -964,6 +964,6 @@ Do not use this skill for:
 - moving tasks into `.idd/intent/`;
 - creating a project plan or implementation backlog.
 
-Use `idd-intent-audit` for broad structural diagnostics without edits. Use
+Use `idd-intent-structure-audit` for broad structural diagnostics without edits. Use
 `idd-intent-normalize-current` only for later maintenance of an existing `.idd/intent`
 tree, not as a required manual cleanup after import.

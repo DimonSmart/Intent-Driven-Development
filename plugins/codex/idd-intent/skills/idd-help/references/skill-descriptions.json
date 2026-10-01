@@ -55,14 +55,14 @@
       }
     }
   },
-  "idd-intent-audit": {
-    "description": "Diagnose `.idd/intent/` product intent structure and recommend reorganizations without editing files.",
+  "idd-intent-structure-audit": {
+    "description": "Diagnose semantic structure, ownership, organization, and normalization opportunities in current `.idd/intent/` without editing files.",
     "adapters": {
       "claude": {
         "frontmatter": {
           "context": "fork",
           "agent": "Explore",
-          "argument-hint": "[scope or audit focus]",
+          "argument-hint": "[scope or structure audit focus]",
           "allowed-tools": "Read Glob Grep"
         }
       }
@@ -87,8 +87,18 @@
   "idd-intent-new-document": {
     "description": "Create a new owning IDD spec, ADR, or spike only when no existing current document owns the area or decision."
   },
-  "idd-code-check-implementation": {
-    "description": "Check whether implementation behavior matches durable product intent in `.idd/intent/`."
+  "idd-intent-drift-audit": {
+    "description": "Audit whether current implementation behavior conforms to durable Product Intent in `.idd/intent/` for an explicitly defined focused or project-wide scope.",
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "argument-hint": "[audit scope: feature, intent ID, implementation area, failure, or project-wide]",
+          "allowed-tools": "Read Glob Grep Bash"
+        }
+      }
+    }
   },
   "idd-intent-import": {
     "description": "Migrate supplied durable knowledge into normalized Product Intent and explicit source-owned Engineering Rules, with safe semantic planning, lazy Engineering bootstrap, conflict blocking, and shared mechanical validation.",

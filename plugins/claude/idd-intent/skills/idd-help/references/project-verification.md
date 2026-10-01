@@ -1,5 +1,11 @@
 # Project Verification Policy
 
+Project verification provides implementation evidence. It is distinct from
+`idd-intent-drift-audit`, which interprets implementation and verification
+evidence relative to current Product Intent. A drift audit does not define a new
+verification engine, and project-wide audit scope does not automatically run
+every repository check.
+
 `.idd/verification.yaml` is project-owned operational configuration, stored in Git beside `.idd/intent/`. It is not product intent, has no `IDD-NNNN` ID, and is not indexed in `.idd/intent/INDEX.md`. Intent specifications say what product behavior must be proved; this policy says which repository commands or user actions provide that evidence.
 
 The file is YAML and is parsed directly as a complete YAML document:
