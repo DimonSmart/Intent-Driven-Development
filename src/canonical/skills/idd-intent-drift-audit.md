@@ -307,7 +307,8 @@ Use when implementation satisfies an applicable Engineering Rule.
 
 Use when implementation violates an applicable `ENG-NNNN` rule. Cite that
 rule and keep the finding in the Engineering conformance dimension. Do not
-reclassify it as `missing-intent`.
+reclassify it as `missing-intent` or `implementation-drift` when Product Intent
+does not own that implementation detail.
 
 Example:
 

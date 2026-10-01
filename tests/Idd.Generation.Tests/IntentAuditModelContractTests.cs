@@ -52,6 +52,7 @@ public sealed class IntentAuditModelContractTests(GenerationFixture fixture)
         Assert.Contains("Please specify the drift audit scope", drift);
         Assert.Contains("project-wide", drift);
         Assert.Contains("A focused scope must not be silently widened", drift);
+        Assert.Contains("do not ask the user to repeat it", drift);
         Assert.Contains("intent-driven audit map", drift.ToLowerInvariant());
     }
 
@@ -182,7 +183,8 @@ public sealed class IntentAuditModelContractTests(GenerationFixture fixture)
             LegacyImplementationCheck,
             LegacyStructureAudit,
             GenericVerificationSkill,
-            LegacyRouteImplementationCheck
+            LegacyRouteImplementationCheck,
+            LegacyRouteAudit
         };
 
         foreach (var path in Directory.EnumerateFiles(fixture.RepoRoot, "*", SearchOption.AllDirectories))

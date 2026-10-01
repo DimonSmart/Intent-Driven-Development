@@ -146,6 +146,11 @@ A request to understand an existing project and create its initial intent is
 normally `intent-only` unless it also explicitly asks for implementation
 changes after bootstrap.
 
+A structure audit is normally `intent-only` because it reads the Intent knowledge
+model. A drift audit is normally `implementation-only` because it reads Product
+Intent plus implementation evidence without mutating either layer. Use
+`route-only` when the user asks only for classification.
+
 For `verification-configuration`, use `route-only` only when the user asks for
 classification or advice without changing files; otherwise use `end-to-end`.
 
