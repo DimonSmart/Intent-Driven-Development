@@ -11,7 +11,7 @@
         "idd-intent-bootstrap",
         "idd-glossary-build",
         "idd-skip",
-        "idd-intent-audit",
+        "idd-intent-structure-audit",
         "idd-intent-brainstorm",
         "idd-intent-change",
         "idd-engineering-change",
@@ -20,7 +20,7 @@
         "idd-intent-lint",
         "idd-intent-new-document",
         "idd-intent-normalize-current",
-        "idd-code-check-implementation",
+        "idd-intent-drift-audit",
         "idd-code-update-intent"
       ],
       "roles": [],
@@ -72,7 +72,7 @@
           "destination": "project-verification.md"
         },
         {
-          "skill": "idd-code-check-implementation",
+          "skill": "idd-intent-drift-audit",
           "source": "src/canonical/methodology/project-verification.md",
           "destination": "project-verification.md"
         },
@@ -97,7 +97,7 @@
           "destination": "engineering-guardrails.md"
         },
         {
-          "skill": "idd-code-check-implementation",
+          "skill": "idd-intent-drift-audit",
           "source": "src/canonical/methodology/engineering-guardrails.md",
           "destination": "engineering-guardrails.md"
         },

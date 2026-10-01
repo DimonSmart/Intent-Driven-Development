@@ -49,6 +49,34 @@ only when it is needed to answer accurately. Prefer `.idd/intent/README.md`,
 that inspection read-only and avoid broad code review or Git-history analysis
 unless the user separately requests it.
 
+## Audit and Verification Model
+
+Explain these mechanisms distinctly:
+
+```text
+idd-intent-lint
+    mechanical validity of .idd/intent/
+
+idd-intent-structure-audit
+    semantic structure and ownership of Product Intent
+
+idd-intent-drift-audit
+    conformance of implementation to Product Intent for an explicit focused or project-wide scope
+
+.idd/verification.yaml
+    project-specific checks that provide implementation evidence
+```
+
+For long-lived code that may have drifted from intent, recommend
+`idd-intent-drift-audit` and require an explicit focused or project-wide scope.
+For split/merge, ownership, duplication, or organization questions, recommend
+`idd-intent-structure-audit`. For broken references, duplicate IDs, invalid
+metadata, or INDEX consistency, recommend `idd-intent-lint`.
+
+Build, test, lint, analyzer, CI, and repository-specific evidence belongs to
+project verification policy and the implementation/Factory workflows that
+consume it; do not invent a separate generic verification skill.
+
 ## Relationship to `idd-route`
 
 `idd-help` explains IDD and answers questions about how or why the methodology

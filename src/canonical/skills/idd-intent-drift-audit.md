@@ -1,10 +1,19 @@
-# idd-code-check-implementation
+# idd-intent-drift-audit
 
-Use this skill to check whether the current implementation satisfies current
-`.idd/intent/` product intent.
+Use this read-only skill to audit whether current implementation behavior still
+conforms to current durable Product Intent in `.idd/intent/`.
 
-This skill compares implementation evidence with current specifications and
-classifies differences. It does not silently change specifications or code.
+Keep three independent dimensions:
+
+```text
+Product Intent conformance
+Engineering Rule conformance
+Verification evidence
+```
+
+Product Intent is normative. Implementation and verification are evidence.
+The skill never silently promotes implementation into product truth and never
+changes Product Intent, Engineering Rules, or implementation.
 
 ## Required Reference
 
@@ -14,64 +23,52 @@ or repository/platform fallback.
 Read `references/engineering-guardrails.md` before using an optional
 `.idd/engineering/` layer.
 
-## Required Input
+## Explicit Audit Scope
 
-The request must provide at least one concrete check focus:
+`idd-intent-drift-audit` always works with an explicitly defined audit scope.
 
-1. Implementation focus
-
-   A code area, feature, command, UI flow, API, module, test suite, or behavior to
-   check.
-
-   Examples:
-
-   - authentication flow
-   - console table mouse behavior
-   - background job retry behavior
-   - `src/Auth`
-   - `LoginForm`
-   - `GET /api/users`
-
-2. Specification focus
-
-   A current specification, ADR, section, or product area to verify against.
-
-   Examples:
-
-   - `IDD-0003.spec-authentication.md`
-   - the console controls specification
-   - session expiration behavior
-   - validation error behavior
-
-3. Failure focus
-
-   A failing test, build error, runtime problem, bug report, or observed behavior
-   that should be checked against current intent.
-
-   Examples:
-
-   - tests fail around OTP login
-   - table mouse wheel scrolls selection instead of content
-   - password reset works in code but is not mentioned in specs
-   - build fails after implementation
-
-## Missing Focus Rule
-
-Do not run this skill if the user only asks to:
-
-- check the whole project;
-- review everything;
-- fix all problems;
-- make implementation match specs generally;
-- improve code quality;
-- update specs from code.
-
-If no concrete check focus is provided, ask for one:
+Focused scopes may identify a feature or behavior, an `IDD-NNNN` document, an
+implementation area, or a failure/mismatch:
 
 ```text
-Please specify what implementation or specification area should be checked:
-a code area, a spec, a behavior, a test failure, or an observed mismatch.
+editor search/replace behavior
+IDD-0021
+src/Auth
+GET /api/users
+OTP retry failure
 ```
+
+Explicit project-wide scopes are also valid:
+
+```text
+project-wide
+whole project
+entire repository
+all current product intent
+```
+
+A focused scope must not be silently widened to project-wide.
+
+### Direct invocation without scope
+
+If the user directly invokes this skill and scope cannot be determined from the
+request, ask:
+
+```text
+Please specify the drift audit scope:
+a feature or behavior, an IDD-NNNN intent document, an implementation area,
+a failure/mismatch, or project-wide.
+```
+
+Do not start discovery until the scope is explicit.
+
+### Invocation from another workflow
+
+A caller such as `idd-code-implement` may pass an explicit derived focused
+scope. In that case do not ask the user to repeat it. The caller scope should
+cover changed implementation, affected current requirements, preservation
+boundary, relevant Engineering Rules, and any applicable compatibility or
+removed-behavior boundary.
 
 ## Rules
 
@@ -92,17 +89,17 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
   implementation represents current product intent.
 - Do not change code unless the user explicitly asks for implementation changes.
 - Do not classify every difference as a bug.
-- Do not classify every implementation behavior as a missing spec.
+- Do not classify every implementation behavior as missing intent. `missing-intent` is only for durable observable product behavior, public or compatibility contracts, product-significant constraints, user-visible scenarios, or other durable externally meaningful behavior without a current Product Intent owner.
 - Preserve the distinction between:
 
-  - implementation bug;
+  - implementation drift;
   - missing verification;
   - unclear intent;
-  - missing specification;
-  - confirmed intent change;
+  - missing Product Intent ownership;
+  - possible or confirmed intent change;
   - intentional non-goal.
 
-- If specification and implementation disagree, report the mismatch and propose
+- If Product Intent and implementation disagree, report the drift and propose
   the smallest safe next step.
 - If a preservation boundary is provided, check changed behavior, removed
   behavior, preserved behavior, public contracts, compatibility or data
@@ -110,111 +107,117 @@ a code area, a spec, a behavior, a test failure, or an observed mismatch.
 - If intent is unclear, ask for confirmation or recommend a spike.
 - If meaningful behavior or regression risk lacks adequate verification,
   recommend only the minimal high-value tests or checks needed to protect it.
-- If the specification is current and implementation violates it, classify the
-  issue as an implementation mismatch.
-- If implementation behavior may be desired but is not specified, classify it as
-  possible missing intent, not as current product truth.
+- If current Product Intent is clear and implementation violates it, classify the
+  issue as `implementation-drift`.
+- If implementation behavior may represent a desired change, classify it as
+  `possible-intent-change`, not as current product truth.
 
 ## Workflow
 
-1. Identify the concrete check focus from the request.
-2. If no concrete focus is present, stop and ask for one.
-3. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and relevant current numbered
-   documents directly under `.idd/intent/`.
-4. If `.idd/engineering/` exists, read its README and INDEX, run deterministic
-   structural validation, enumerate all Always rules, semantically select
-   relevant Conditional rules, resolve each selected `ENG-NNNN` uniquely, and
-   read only those full rule documents. Stop on malformed or ambiguous rules.
-5. Inspect the focused implementation evidence:
+### Focused drift audit
 
-   - code;
-   - tests;
-   - build output;
-   - runtime behavior;
-   - user-provided bug report;
-   - logs, when relevant.
+1. Resolve the explicit focused scope.
+2. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and the relevant current
+   numbered Product Intent documents.
+3. Determine the current intent owner for the scoped behavior.
+4. Resolve applicable Engineering Rules using the policy below.
+5. Gather focused implementation evidence: code, tests, runtime behavior, logs,
+   build output, or the user-provided mismatch when relevant.
+6. Use verification evidence when it materially helps determine conformance.
+7. Compare implementation evidence separately with Product Intent and applicable
+   Engineering Rules.
+8. Classify findings and assign Evidence Scope.
+9. Recommend the smallest next workflow.
+10. Change nothing.
 
-6. Compare observed implementation behavior separately with current product
-   intent and applicable Engineering Rules.
-7. Classify each finding as one of:
+### Project-wide drift audit
 
-   - `matches-spec`;
-   - `implementation-mismatch`;
-   - `engineering-match`;
-   - `engineering-mismatch`;
-   - `missing-verification`;
-   - `missing-spec`;
-   - `unclear-intent`;
-   - `possible-intent-change`;
-   - `non-goal-or-out-of-scope`.
+Project-wide is a first-class explicit scope, but it is not a generic code
+review. Start from Intent and build an intent-driven audit map.
 
-   Also assign an evidence scope:
+Use breadth-first discovery:
 
-   - `current-requirement`;
-   - `changed-requirement`;
-   - `preserved-requirement`;
-   - `removed-behavior`;
-   - `compatibility-boundary`.
-   - `unowned-behavior`.
+1. Read `.idd/intent/README.md` and `.idd/intent/INDEX.md`.
+2. Enumerate the complete current `IDD-NNNN` document set and ownership metadata.
+3. On the first pass, use headings, Intent, Scope/Behavior, Related specs,
+   Acceptance Criteria, and other information needed to build audit areas.
+4. Map each current intent area to expected observable behavior or durable
+   contracts, likely implementation evidence, and useful verification evidence.
+5. Read full intent documents and implementation evidence area by area rather
+   than loading the complete repository into one context.
+6. Resolve applicable Engineering Rules separately for each audit area when
+   needed.
+7. Compare each area and record findings.
+8. Separately identify durable observable implementation behavior for which no
+   current Product Intent owner can be found.
 
-   Use `current-requirement` for ordinary checks against an existing current
-   requirement when no specific change context is provided.
+The analysis direction is:
 
-8. For each mismatch, cite the relevant product spec section or Engineering
-   Rule. Do not use absence of product intent to explain a rule-owned Engineering
-   violation.
-9. Recommend the smallest next step:
+```text
+Intent
+-> expected observable behavior / durable contract
+-> implementation evidence
+-> verification evidence
+-> comparison
+```
 
-   - fix implementation;
-   - add or update minimal high-value verification;
-   - ask for product intent confirmation;
-   - update product intent using `idd-intent-change`;
-   - create a new spec, ADR, or spike using `idd-intent-new-document` only when no
-     existing current spec owns the area;
-   - update spec from implementation using `idd-code-update-intent`
-     only after explicit confirmation;
-   - create a spike if the correct intent requires research.
+Do not begin with random source scanning and search for a specification only
+after something interesting is found.
 
-10. Do not apply fixes unless the user explicitly asks for them.
-11. When repository commands are needed, resolve `.idd/verification.yaml` with
-    context `direct` for the focused changed paths. Run only assigned automatic
-    checks; request confirmation when required; and keep user instructions
-    `Not verified` until confirmed. If no policy exists, report the
-    repository/platform fallback. Assess conformance separately from execution
-    evidence.
+Do not report `missing-intent` for private helpers, ordinary dependency usage,
+internal refactoring structure, local naming conventions, private method
+behavior, or incidental architecture shape unless that detail is itself Product
+Intent or an applicable Engineering Rule.
+
+A large project-wide audit may use multiple internal passes or sub-agents when
+the host supports them, but the final result remains one `Intent Drift Audit`.
+
+### Verification use
+
+When repository commands are materially useful for a finding, resolve
+`.idd/verification.yaml` using `references/project-verification.md`. Run only
+checks allowed by that policy. Project-wide scope does not by itself authorize
+running every repository check. Verification evidence is interpreted relative
+to Product Intent; this skill does not create a verification engine.
 
 ## Output Format
 
 Use this structure:
 
 ```md
-# Implementation Check
+# Intent Drift Audit
 
 ## Scope
 
-What implementation or specification area was checked.
+Explicit audit scope and whether it is focused or project-wide.
 
 ## Relevant Current Intent
 
-Current specs and sections used as normative intent.
+Current Product Intent used as normative evidence.
 
 ## Relevant Engineering Guardrails
 
 Applicable Always rules and semantically selected Conditional rules, or
 `None (Engineering layer absent)`.
 
+## Audit Map
+
+For project-wide audits, summarize intent ownership and implementation evidence.
+For focused audits this section may be compact.
+
 ## Findings
 
 ### 1. Finding title
 
-Classification: `implementation-mismatch | engineering-mismatch | engineering-match | missing-verification | missing-spec | unclear-intent | possible-intent-change | matches-spec | non-goal-or-out-of-scope`
+Classification: `matches-intent | implementation-drift | engineering-match | engineering-mismatch | missing-verification | missing-intent | unclear-intent | possible-intent-change | non-goal-or-out-of-scope`
 
 Scope: `current-requirement | changed-requirement | preserved-requirement | removed-behavior | compatibility-boundary | unowned-behavior`
 
 Evidence:
-- Product intent evidence:
-- Engineering rule evidence:
+- Product Intent evidence:
+- Engineering Rule evidence:
 - Implementation evidence:
+- Verification evidence:
 
 Explanation:
 
@@ -222,12 +225,13 @@ Recommended next step:
 
 ## Summary
 
-### Product intent conformance
+### Product Intent conformance
 - Matches:
-- Mismatches:
-- Missing or unclear intent:
+- Drift:
+- Missing intent:
+- Unclear / possible intent changes:
 
-### Engineering guardrail conformance
+### Engineering Rule conformance
 - Matches:
 - Mismatches:
 
@@ -235,7 +239,7 @@ Recommended next step:
 - Evidence present:
 - Missing verification:
 
-### Recommended action
+### Recommended actions
 ```
 
 ## Classification Rules
@@ -257,7 +261,7 @@ contracts.
 Use `unowned-behavior` when implementation contains observable durable behavior
 for which no current owning intent exists.
 
-Do not use `current-requirement` for `missing-spec` when no current requirement exists.
+Do not use `current-requirement` for `missing-intent` when no current requirement exists. Use `unowned-behavior`.
 
 When no change context is provided and a current requirement exists, use:
 
@@ -265,9 +269,9 @@ When no change context is provided and a current requirement exists, use:
 Scope: current-requirement
 ```
 
-### `matches-spec`
+### `matches-intent`
 
-Use when implementation behavior satisfies current spec.
+Use when implementation behavior satisfies current Product Intent.
 
 Example:
 
@@ -276,9 +280,9 @@ The spec requires session expiration after 30 days. The implementation expires
 sessions after 30 days.
 ```
 
-### `implementation-mismatch`
+### `implementation-drift`
 
-Use when current spec is clear and implementation violates it.
+Use when current Product Intent is clear and implementation violates it.
 Also use this classification when preserved behavior regresses during a change.
 
 Example:
@@ -303,7 +307,7 @@ Use when implementation satisfies an applicable Engineering Rule.
 
 Use when implementation violates an applicable `ENG-NNNN` rule. Cite that
 rule and keep the finding in the Engineering conformance dimension. Do not
-reclassify it as `missing-spec`.
+reclassify it as `missing-intent`.
 
 Example:
 
@@ -320,7 +324,7 @@ Use when implementation appears to satisfy spec, but an important user scenario,
 critical invariant, meaningful boundary case, or real regression risk lacks
 adequate evidence.
 
-Do not classify `missing-verification` merely because a method or specification
+Do not classify `missing-verification` merely because a method or Product Intent
 sentence lacks a dedicated test, when the behavior is trivial, or when a
 higher-level automated scenario already covers the risk.
 
@@ -337,10 +341,10 @@ Add or update only verification that proves meaningful behavior or regression
 risk not already covered by a higher-level automated check.
 ```
 
-### `missing-spec`
+### `missing-intent`
 
-Use when implementation contains durable product behavior that is not described
-by current specs.
+Use when implementation contains durable observable product behavior for which no
+current Product Intent owner exists.
 
 Use this classification with:
 
@@ -354,7 +358,7 @@ Example:
 Password reset is implemented, but no current specification owns or describes
 password-reset behavior.
 
-Classification: missing-spec
+Classification: missing-intent
 Scope: unowned-behavior
 ```
 
@@ -416,43 +420,25 @@ implementation bug.
 
 ## Examples
 
-Good request:
+Focused:
 
 ```text
-Use idd-code-check-implementation to verify whether console table mouse behavior
-matches the current specs.
+Use idd-intent-drift-audit to audit editor search/replace behavior against current intent.
 ```
 
-Good request:
+Project-wide:
 
 ```text
-Use idd-code-check-implementation to check the authentication implementation against
-IDD-0003.spec-authentication.md.
+Use idd-intent-drift-audit project-wide.
 ```
 
-Good request:
+Direct invocation without a resolvable scope:
 
 ```text
-Use idd-code-check-implementation to classify why OTP login tests fail against the
-current product intent.
+Run idd-intent-drift-audit.
 ```
 
-Bad request:
-
-```text
-Use idd-code-check-implementation to check the whole project.
-```
-
-Response:
-
-```text
-Cannot run idd-code-check-implementation without a concrete check focus.
-
-Specify one of:
-- an implementation area;
-- a current spec or behavior;
-- a failing test, bug report, or observed mismatch.
-```
+Ask for the audit scope rather than assuming focused or project-wide.
 
 ## Relationship To Other Skills
 
@@ -471,8 +457,7 @@ that verified implementation behavior represents current product intent.
 Use `idd-intent-normalize-current` when existing intent should be moved to a better
 location without changing meaning.
 
-Use `idd-code-check-implementation` before those actions when the problem is a
-possible mismatch between implementation and current specs.
+Use `idd-intent-drift-audit` when the task is to compare implementation with current Product Intent.
 
 ## Routing After Findings
 
@@ -493,8 +478,8 @@ This skill does not:
 - update specs automatically;
 - create new product intent from implementation;
 - review code quality in general;
-- search for all possible project problems;
+- perform generic code-quality, style, performance, or refactoring review;
 - replace tests;
 - replace code review;
-- run broad repository audits without focus;
+- silently widen a focused audit to project-wide;
 - inspect deleted history as current intent.
