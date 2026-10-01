@@ -252,7 +252,7 @@ idd-intent-lint
 For a broader diagnostic review:
 
 ```text
-idd-intent-audit
+idd-intent-structure-audit
 ```
 
 Lint treats a missing glossary as valid. When a glossary exists, it checks its
@@ -263,7 +263,7 @@ After bootstrap, a separate conformance check can compare the implementation
 with the newly confirmed model:
 
 ```text
-Use idd-code-check-implementation for the bootstrapped product areas.
+Use idd-intent-drift-audit for the bootstrapped product areas.
 ```
 
 This check does not automatically authorize implementation changes.

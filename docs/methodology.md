@@ -133,6 +133,21 @@ reality. Git owns Engineering history and there is no Engineering archive.
 See [Engineering Guardrails](engineering-guardrails.md) for the exact format and
 direct/Factory protocol.
 
+## Audit and Verification Responsibilities
+
+IDD keeps four checks separate:
+
+```text
+idd-intent-lint              mechanical Intent validity
+idd-intent-structure-audit   semantic Intent organization
+idd-intent-drift-audit       implementation / Intent conformance
+.idd/verification.yaml       project-specific verification evidence
+```
+
+Drift audit is read-only and requires an explicit focused or project-wide
+scope. Project-wide audit starts from Intent ownership and is not generic
+code-quality review.
+
 ## Optional Project Glossary
 
 A project may optionally keep `.idd/intent/GLOSSARY.md` for a small amount of shared terminology.

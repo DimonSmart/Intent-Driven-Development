@@ -39,12 +39,36 @@ Engineering boundary and rule format.
 | The requested feature is still unclear | Use `idd-intent-brainstorm` before changing intent or code. |
 | Product behavior must be added, changed, or removed | Use `idd-intent-change`, then implement the updated intent. |
 | Current intent is already correct and only code must change | Use `idd-code-implement`. |
-| You need to check whether code still matches intent | Use `idd-code-check-implementation`. |
+| You need to check whether code still matches intent | Use `idd-intent-drift-audit` with an explicit focused or project-wide audit scope. |
 | Existing behavior has been confirmed as product truth but is missing from established intent | Use `idd-code-update-intent`. |
-| Intent documents need review or cleanup | Use `idd-intent-audit`, `idd-intent-lint`, or `idd-intent-normalize-current`. |
+| Intent documents need semantic structure/ownership review | Use `idd-intent-structure-audit`; use `idd-intent-lint` only for mechanical validity and `idd-intent-normalize-current` for actual focused reorganization. |
 | The implementation task is large or naturally multi-stage | Install `idd-factory` and use `idd-factory-run`. |
 | A new IDD release is available | Follow [Updating IDD](updating-idd.md), then start a new session. |
 | The request must deliberately bypass IDD | Use `idd-skip`. |
+
+## Audit Existing Intent and Implementation
+
+Use the mechanisms for different questions:
+
+```text
+idd-intent-lint
+    Is .idd/intent/ mechanically valid?
+
+idd-intent-structure-audit
+    Is Product Intent organized correctly as durable knowledge?
+
+idd-intent-drift-audit
+    Does current implementation still conform to Product Intent?
+```
+
+For drift audit, state the scope explicitly. It may be one feature, one intent
+document, an implementation area, a mismatch, or `project-wide`. A project-wide
+audit builds an Intent-driven map first rather than performing a generic code
+review.
+
+Build/test/lint/analyzer commands remain project verification policy in
+`.idd/verification.yaml`; they are evidence used by implementation and Factory
+workflows, not a separate audit command.
 
 ## Initialize a Repository
 
@@ -184,7 +208,7 @@ whenever implementation may have diverged from product intent or applicable
 Engineering Guardrails:
 
 ```text
-Use idd-code-check-implementation for the comparison workflow.
+Use idd-intent-drift-audit for the comparison workflow.
 ```
 
 ## Update Intent from Confirmed Behavior
@@ -202,7 +226,7 @@ Do not use this narrow workflow as a replacement for initial codebase bootstrap.
 Diagnostic review without edits:
 
 ```text
-idd-intent-audit
+idd-intent-structure-audit
 ```
 
 Mechanical consistency checks:

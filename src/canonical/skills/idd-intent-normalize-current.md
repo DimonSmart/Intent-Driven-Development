@@ -78,7 +78,7 @@ Do not run this skill if the user only asks to:
 - rewrite documentation.
 
 If the request is broad, such as "review all specs" or "find structural
-problems", do not run idd-intent-normalize-current. Use `idd-intent-audit` first.
+problems", do not run idd-intent-normalize-current. Use `idd-intent-structure-audit` first.
 
 If no concrete normalization focus is provided, do not inspect or rewrite the
 specification set. Respond with:
@@ -86,7 +86,7 @@ specification set. Respond with:
 ```text
 Cannot run idd-intent-normalize-current without a concrete normalization focus.
 
-For broad structural diagnostics, use idd-intent-audit first. For normalization,
+For broad structural diagnostics, use idd-intent-structure-audit first. For normalization,
 specify a topic to collect, a source spec or section to extract, or a target
 spec to consolidate into.
 ```
@@ -214,7 +214,7 @@ Support these scenarios:
 
 1. Identify the concrete normalization focus.
 2. If no concrete focus is present, stop and direct broad requests to
-   `idd-intent-audit`.
+   `idd-intent-structure-audit`.
 3. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and only relevant current
    numbered specs.
 4. Find current fragments related to the focus.
@@ -330,7 +330,7 @@ Expected response:
 ```text
 Cannot run idd-intent-normalize-current without a concrete normalization focus.
 
-Use idd-intent-audit first to find broad structural problems.
+Use idd-intent-structure-audit first to find broad structural problems.
 ```
 
 ## Non-goals
@@ -345,5 +345,5 @@ This skill does not:
 - create a new feature spec from a task;
 - normalize the whole `.idd/intent` directory.
 
-Use `idd-intent-audit` for broad structural diagnostics. Use `idd-intent-import` when raw
+Use `idd-intent-structure-audit` for broad structural diagnostics. Use `idd-intent-import` when raw
 external material is being imported.

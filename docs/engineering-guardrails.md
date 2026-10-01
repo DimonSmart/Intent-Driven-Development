@@ -141,7 +141,7 @@ relevant product intent
 
 Always rules are enumerated mechanically. Conditional rules are selected by the model. IDD deliberately does not use filename, keyword, path, extension, project type, glob, embedding, or similarity heuristics for Conditional applicability.
 
-`idd-code-check-implementation` uses the same rule selection policy and reports separately:
+`idd-intent-drift-audit` uses the same rule selection policy and keeps Engineering conformance separate from Product Intent drift and verification evidence:
 
 ```text
 Product intent conformance
