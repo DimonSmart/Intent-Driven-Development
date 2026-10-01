@@ -36,8 +36,8 @@ Answer questions such as:
 - which IDD skill exists for a particular purpose;
 - why one workflow is preferred over another;
 - when Factory is useful and when direct execution is sufficient;
-- how bug fixes, refactoring, bootstrap, import, audits, linting, and
-  implementation checks fit the methodology;
+- how bug fixes, refactoring, bootstrap, import, structure audits, drift audits,
+  linting, and project verification fit the methodology;
 - how a current IDD rule should be interpreted;
 - what an installed IDD skill is expected to do or not do.
 - `.idd/verification.yaml`, its `direct`, `subtask`, `checkpoint`, and `final`

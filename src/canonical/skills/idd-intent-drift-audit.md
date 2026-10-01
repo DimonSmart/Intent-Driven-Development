@@ -172,6 +172,24 @@ Intent or an applicable Engineering Rule.
 A large project-wide audit may use multiple internal passes or sub-agents when
 the host supports them, but the final result remains one `Intent Drift Audit`.
 
+### Engineering Rule applicability
+
+When `.idd/engineering/` exists, preserve the shared applicability algorithm:
+
+```text
+README
+-> INDEX
+-> mechanically enumerate every Always rule
+-> semantically select relevant Conditional rules from Applies when
+-> resolve selected ENG-NNNN IDs uniquely
+-> read the full bodies of all Always plus selected Conditional rules
+```
+
+Do not introduce filename, keyword, path, extension, glob, project-type,
+embedding, similarity, or other deterministic heuristics for Conditional
+selection. For project-wide audits, determine relevant Conditional rules
+separately for each audit area.
+
 ### Verification use
 
 When repository commands are materially useful for a finding, resolve

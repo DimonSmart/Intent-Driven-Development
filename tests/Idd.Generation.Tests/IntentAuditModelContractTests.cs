@@ -130,6 +130,22 @@ public sealed class IntentAuditModelContractTests(GenerationFixture fixture)
     }
 
     [Fact]
+    public void LintStructureAndDriftRemainSeparate()
+    {
+        var lint = Canonical("skills", "idd-intent-lint.md");
+        var structure = Canonical("skills", "idd-intent-structure-audit.md");
+        var drift = Canonical("skills", "idd-intent-drift-audit.md");
+        var route = Canonical("skills", "idd-route.md");
+
+        Assert.Contains("mechanical", lint.ToLowerInvariant());
+        Assert.Contains("semantic structure", structure.ToLowerInvariant());
+        Assert.Contains("implementation evidence", drift);
+        Assert.Contains("`intent-lint` | `idd-intent-lint`", route);
+        Assert.Contains("`intent-structure-audit` | `idd-intent-structure-audit`", route);
+        Assert.Contains("`intent-drift-audit` | `idd-intent-drift-audit`", route);
+    }
+
+    [Fact]
     public void Route_UsesNewAuditClassificationsAndProjectWideScope()
     {
         var route = Canonical("skills", "idd-route.md");
