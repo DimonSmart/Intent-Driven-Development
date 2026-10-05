@@ -1146,6 +1146,7 @@ public sealed class FactoryReportEngine
             root.Events.FirstOrDefault(x => x.Ordinal == nextStartOrdinal)?.Timestamp, all, byId, state);
 
         var agents = BuildAgents(root, segmentRootEvents, descendants, state, verbose);
+        PopulateMissingWorkerTasks(agents, byId);
         var plannerAgents = agents.Where(x => x.Role == "planner").OrderBy(x => x.StartedAt).ToArray();
         var workerAgents = agents.Where(x => x.Role == "worker").OrderBy(x => x.StartedAt).ToArray();
         var latestPlanner = plannerAgents.LastOrDefault();
@@ -1359,10 +1360,10 @@ public sealed class FactoryReportEngine
             var rollout = byId.GetValueOrDefault(x.ThreadId);
             var status = rollout is null
                 ? "unknown"
-                : HasThreadFailure(rollout)
-                    ? "failed"
-                    : HasTerminalEvidence(rollout)
-                        ? "completed"
+                : HasTerminalEvidence(rollout)
+                    ? "completed"
+                    : HasThreadFailure(rollout)
+                        ? "failed"
                         : "interrupted";
             return new TaskReport
             {
@@ -1724,6 +1725,51 @@ public sealed class FactoryReportEngine
             .Select(x => x.Trim())
             .FirstOrDefault(x => x.Length > 0);
         return string.IsNullOrWhiteSpace(first) ? null : Bound(first, 80);
+    }
+
+    private static void PopulateMissingWorkerTasks(
+        IReadOnlyList<AgentReport> agents,
+        IReadOnlyDictionary<string, CodexRollout> rollouts)
+    {
+        var pending = new Queue<string>();
+        foreach (var agent in agents.OrderBy(x => x.StartedAt).ThenBy(x => x.ThreadId, StringComparer.Ordinal))
+        {
+            if (agent.Role == "planner" && rollouts.TryGetValue(agent.ThreadId, out var planner))
+            {
+                foreach (var task in ExtractPlannerTasks(planner))
+                    pending.Enqueue(task);
+                continue;
+            }
+
+            if (agent.Role != "worker" || pending.Count == 0)
+                continue;
+
+            var plannedTask = pending.Dequeue();
+            if (!string.IsNullOrWhiteSpace(agent.Task))
+                continue;
+
+            agent.Task = plannedTask;
+            agent.TaskTitle = TaskTitle(plannedTask);
+        }
+    }
+
+    private static IReadOnlyList<string> ExtractPlannerTasks(CodexRollout rollout)
+    {
+        var text = rollout.Events
+            .Where(x => string.Equals(x.Role, "assistant", StringComparison.OrdinalIgnoreCase) &&
+                        !string.IsNullOrWhiteSpace(x.Text) &&
+                        Regex.IsMatch(x.Text!, @"(?m)^\s*#\s*Task\s*$", RegexOptions.IgnoreCase))
+            .Select(x => x.Text!)
+            .LastOrDefault();
+        if (text is null)
+            return [];
+
+        return Regex.Matches(text,
+                @"(?ms)^\s*#\s*Task\s*$\s*(?<task>.*?)(?=^\s*#\s*(?:Task|ExecutionProfile|TaskRelatedIntent|TaskRelatedEngineering)\s*$|\z)",
+                RegexOptions.IgnoreCase)
+            .Select(match => Bound(match.Groups["task"].Value.Trim(), 1000))
+            .Where(task => !string.IsNullOrWhiteSpace(task))
+            .ToArray();
     }
 
     private static TokenMetrics ComputeWholeThreadTokens(CodexRollout rollout, out bool authoritative)
@@ -2117,9 +2163,7 @@ public sealed class FactoryReportEngine
 
     private static bool HasTerminalEvidence(CodexRollout rollout) =>
         rollout.Events.Any(x =>
-            x.Type is "turn.completed" or "turn_completed" or "task_complete" ||
-            x.Type.Contains("completed", StringComparison.OrdinalIgnoreCase) ||
-            x.Type.Contains("failed", StringComparison.OrdinalIgnoreCase)) ||
+            x.Type is "turn.completed" or "turn_completed" or "task_complete") ||
         rollout.Events.Any(x => string.Equals(x.Role, "assistant", StringComparison.OrdinalIgnoreCase) &&
                                 !string.IsNullOrWhiteSpace(x.Text));
 
@@ -2471,8 +2515,41 @@ public sealed class FactoryReportEngine
         }
     }
 
-    private static string NormalizePath(string path) =>
-        Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    private static string NormalizePath(string path)
+    {
+        if (Uri.TryCreate(path, UriKind.Absolute, out var uri) && uri.IsFile)
+            path = uri.LocalPath;
+
+        var full = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return OperatingSystem.IsWindows() ? full : ResolveExistingSymlinks(full);
+    }
+
+    private static string ResolveExistingSymlinks(string path)
+    {
+        try
+        {
+            var start = new ProcessStartInfo("realpath")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            };
+            start.ArgumentList.Add(path);
+            using var process = Process.Start(start);
+            if (process is null)
+                return path;
+
+            var output = process.StandardOutput.ReadToEnd().Trim();
+            process.WaitForExit();
+            return process.ExitCode == 0 && !string.IsNullOrWhiteSpace(output)
+                ? output.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                : path;
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException)
+        {
+            return path;
+        }
+    }
 
     private static StringComparer PathComparer() =>
         OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
@@ -2791,7 +2868,6 @@ public static class ReportWriters
         writer.WriteLine($"Protocol validation:   {report.Completion.ProtocolValidation}");
 
         writer.WriteLine();
-        writer.WriteLine("Tokens");        writer.WriteLine();
         writer.WriteLine("Tokens");
         writer.WriteLine("------");
         if (report.Metrics.RootReportedTokens.Available)
@@ -2899,13 +2975,12 @@ public static class ReportWriters
         writer.WriteLine();
         writer.WriteLine("## Agents");
         writer.WriteLine();
-        writer.WriteLine("``text");
+        writer.WriteLine("```text");
         foreach (var line in AgentTreeLines(report.Agents))
             writer.WriteLine(line);
         writer.WriteLine("```");
 
         writer.WriteLine();
-        writer.WriteLine("## Tasks");        writer.WriteLine();
         writer.WriteLine("## Tasks");
         writer.WriteLine();
         if (report.Tasks.Count == 0)
@@ -2919,6 +2994,12 @@ public static class ReportWriters
             writer.WriteLine("- Worker: " + task.AgentThreadId);
             writer.WriteLine($"- Duration: {FormatDuration(task.DurationMilliseconds)}");
             writer.WriteLine($"- Tokens: {FormatTaskTokens(agent?.Tokens)}");
+            if (!string.IsNullOrWhiteSpace(task.Text))
+            {
+                writer.WriteLine("- Full task:");
+                writer.WriteLine();
+                writer.WriteLine("  " + task.Text.Replace("\r\n", "\n").Replace("\n", "\n  "));
+            }
             writer.WriteLine();
         }
 
@@ -2930,7 +3011,6 @@ public static class ReportWriters
         writer.WriteLine($"- Protocol validation: {report.Completion.ProtocolValidation}");
 
         writer.WriteLine();
-        writer.WriteLine("## Token accounting");        writer.WriteLine();
         writer.WriteLine("## Token accounting");
         writer.WriteLine();
         writer.WriteLine($"- Root reported input: {Num(report.Metrics.RootReportedTokens.InputTokens)}");

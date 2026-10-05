@@ -2,6 +2,8 @@
 setlocal EnableExtensions
 
 cd /d "%~dp0"
+call :ParseArguments %*
+if errorlevel 1 exit /b %ERRORLEVEL%
 set "CONFIGURATION=Debug"
 set "FRAMEWORK=net10.0"
 set "TEST_DLL=%CD%\tests\Idd.Factory.LiveTests\bin\%CONFIGURATION%\%FRAMEWORK%\Idd.Factory.LiveTests.dll"
@@ -16,6 +18,8 @@ set "IDD_FACTORY_EVAL_KEEP_TEMP=1"
 
 echo [%DATE% %TIME%] Starting IDD Factory live tests.
 echo Codex timeout: %IDD_FACTORY_EVAL_TIMEOUT_MINUTES% minutes
+if defined IDD_FACTORY_EVAL_MODEL (echo Model override: %IDD_FACTORY_EVAL_MODEL%) else (echo Model override: repository config)
+if defined IDD_FACTORY_EVAL_REASONING_EFFORT (echo Reasoning override: %IDD_FACTORY_EVAL_REASONING_EFFORT%) else (echo Reasoning override: repository config)
 echo Live artifacts: %IDD_FACTORY_EVAL_ARTIFACT_DIR%
 echo Eval temp root: %IDD_FACTORY_EVAL_TEMP_ROOT%
 
@@ -33,6 +37,13 @@ if not exist "%IDD_FACTORY_EVAL_TEMP_ROOT%\codex-home" goto ReportUnavailable
 
 dotnet run --project ".\tools\idd-factory-report\Idd.Factory.Report.csproj" -- latest --repo "%IDD_FACTORY_EVAL_TEMP_ROOT%\workspace" --codex-home "%IDD_FACTORY_EVAL_TEMP_ROOT%\codex-home" --json "%IDD_FACTORY_EVAL_ARTIFACT_DIR%\factory-report.json" --markdown "%IDD_FACTORY_EVAL_ARTIFACT_DIR%\factory-report.md"
 set "REPORT_EXIT_CODE=%ERRORLEVEL%"
+if not "%REPORT_EXIT_CODE%"=="0" goto Cleanup
+echo.
+echo ===== Human-readable Factory report =====
+type "%IDD_FACTORY_EVAL_ARTIFACT_DIR%\factory-report.md"
+echo ===== End Factory report =====
+echo Markdown report: %IDD_FACTORY_EVAL_ARTIFACT_DIR%\factory-report.md
+echo TRX results:     %IDD_FACTORY_EVAL_ARTIFACT_DIR%\live-tests.trx
 goto Cleanup
 
 :ReportUnavailable
@@ -46,6 +57,45 @@ if "%CLEANUP_EVAL_TEMP_ROOT%"=="1" (
 
 if not "%TEST_EXIT_CODE%"=="0" exit /b %TEST_EXIT_CODE%
 exit /b %REPORT_EXIT_CODE%
+
+:ParseArguments
+if "%~1"=="" exit /b 0
+if /I "%~1"=="--model" goto ParseModel
+if /I "%~1"=="--reasoning" goto ParseReasoning
+if /I "%~1"=="--help" goto PrintUsage
+if /I "%~1"=="-h" goto PrintUsage
+echo Unknown argument: %~1 >&2
+goto PrintUsageError
+
+:ParseModel
+if "%~2"=="" (
+  echo --model requires a value. >&2
+  goto PrintUsageError
+)
+set "IDD_FACTORY_EVAL_MODEL=%~2"
+set "IDD_FACTORY_EVAL_MODEL_SOURCE=argument"
+shift
+shift
+goto ParseArguments
+
+:ParseReasoning
+if "%~2"=="" (
+  echo --reasoning requires a value. >&2
+  goto PrintUsageError
+)
+set "IDD_FACTORY_EVAL_REASONING_EFFORT=%~2"
+set "IDD_FACTORY_EVAL_REASONING_EFFORT_SOURCE=argument"
+shift
+shift
+goto ParseArguments
+
+:PrintUsage
+echo Usage: %~nx0 [--model ^<model^>] [--reasoning ^<effort^>]
+exit /b 0
+
+:PrintUsageError
+echo Usage: %~nx0 [--model ^<model^>] [--reasoning ^<effort^>] >&2
+exit /b 2
 
 :CreateArtifactRoot
 for /f "usebackq delims=" %%I in (`powershell.exe -NoLogo -NoProfile -NonInteractive -Command "$id = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmssfff') + '-' + [Guid]::NewGuid().ToString('N'); [IO.Path]::Combine($pwd.Path, 'artifacts', 'factory-evals', $id)"`) do set "IDD_FACTORY_EVAL_ARTIFACT_DIR=%%I"

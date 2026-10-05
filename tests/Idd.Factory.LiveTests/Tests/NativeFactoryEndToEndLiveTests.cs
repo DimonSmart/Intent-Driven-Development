@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Idd.Factory.Report;
 using Xunit;
 
 namespace Idd.Factory.LiveTests.Tests;
@@ -33,8 +34,14 @@ public sealed class NativeFactoryEndToEndLiveTests
         var marketplace = Path.Combine(tempRoot, "marketplace");
         var codexHome = Path.Combine(tempRoot, "codex-home");
         var lastMessage = Path.Combine(tempRoot, "last-message.json");
-        var model = Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_MODEL") ?? "gpt-5.6-luna";
-        var reasoning = Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_REASONING_EFFORT") ?? "low";
+        var settings = LiveEvalSettings.Resolve(
+            repo,
+            Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_MODEL"),
+            Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_REASONING_EFFORT"),
+            Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_MODEL_SOURCE"),
+            Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_REASONING_EFFORT_SOURCE"));
+        var model = settings.Model;
+        var reasoning = settings.ReasoningEffort;
         var timeoutMinutes =
             int.TryParse(Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_TIMEOUT_MINUTES"), out var configuredTimeout)
                 ? configuredTimeout
@@ -43,6 +50,8 @@ public sealed class NativeFactoryEndToEndLiveTests
 
         try
         {
+            Console.WriteLine($"Live-eval model: {model} ({settings.ModelSource})");
+            Console.WriteLine($"Live-eval reasoning effort: {reasoning} ({settings.ReasoningEffortSource})");
             CopyDirectory(Path.Combine(caseRoot, "Template"), workspace);
             await InitializeGitRepositoryAsync(workspace, artifactRoot);
             PrepareCodexHome(codexHome);
@@ -123,13 +132,22 @@ public sealed class NativeFactoryEndToEndLiveTests
                 File.Copy(lastMessage, Path.Combine(artifactRoot, "last-message.json"), overwrite: true);
 
             var traceItems = ParseTraceItems(result.Stdout);
-            Assert.Contains(traceItems, item => IsToolCall(item, "collab_tool_call", "spawn_agent"));
+            var rootRollout = FindRootRollout(codexHome);
+            Assert.True(
+                rootRollout.SpawnRecords.Count >= 3,
+                "Expected a planner and two workers in the native Codex session rollout.");
             Assert.DoesNotContain(traceItems, item => IsToolCall(item, "mcp_tool_call", "factory_run"));
             Assert.DoesNotContain(traceItems, item => IsToolCall(item, "mcp_tool_call", "factory_status"));
             Assert.DoesNotContain(traceItems, IsLegacyFactoryRuntimeCommand);
 
             var finalJson = JsonDocument.Parse(await File.ReadAllTextAsync(lastMessage));
             Assert.Equal("COMPLETED", finalJson.RootElement.GetProperty("status").GetString());
+
+            var factoryReport = Assert.Single(new FactoryReportEngine().FindRuns(workspace, codexHome));
+            Assert.Equal("completed", factoryReport.Run.Result);
+            Assert.Equal("passed", factoryReport.Completion.ProjectVerification);
+            Assert.False(factoryReport.FactoryProjectState.CurrentRequestPresent);
+            Assert.All(factoryReport.Tasks, task => Assert.Equal("completed", task.Status));
 
             var verification = await RunAsync(
                 "dotnet",
@@ -162,7 +180,9 @@ public sealed class NativeFactoryEndToEndLiveTests
                 runId,
                 startedAtUtc,
                 model,
+                settings.ModelSource,
                 reasoning,
+                settings.ReasoningEffortSource,
                 timeoutMinutes,
                 failure);
 
@@ -184,6 +204,20 @@ public sealed class NativeFactoryEndToEndLiveTests
         }
 
         return items;
+    }
+
+    private static CodexRollout FindRootRollout(string codexHome)
+    {
+        var sessions = Path.Combine(codexHome, "sessions");
+        Assert.True(Directory.Exists(sessions), "Codex did not create a sessions directory.");
+
+        var reader = new CodexRolloutReader();
+        var rollouts = Directory.EnumerateFiles(sessions, "*.jsonl", SearchOption.AllDirectories)
+            .Select(path => reader.Read(path))
+            .ToArray();
+        return Assert.Single(rollouts, rollout =>
+            string.IsNullOrWhiteSpace(rollout.ParentThreadId) &&
+            rollout.SpawnRecords.Count > 0);
     }
 
     private static bool IsToolCall(JsonElement item, string itemType, string tool)
@@ -442,7 +476,9 @@ public sealed class NativeFactoryEndToEndLiveTests
         string runId,
         DateTimeOffset startedAtUtc,
         string model,
+        string modelSource,
         string reasoning,
+        string reasoningEffortSource,
         int timeoutMinutes,
         Exception? failure)
     {
@@ -456,7 +492,9 @@ public sealed class NativeFactoryEndToEndLiveTests
                     startedAtUtc,
                     finishedAtUtc = DateTimeOffset.UtcNow,
                     model,
+                    modelSource,
                     reasoningEffort = reasoning,
+                    reasoningEffortSource,
                     timeoutMinutes,
                     evalVersion = Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_VERSION"),
                     failure = failure?.ToString()

@@ -23,4 +23,7 @@ durable product intent, add external packages, or modify prepared tests except t
 repair an objective test infrastructure error.
 
 Complete configured/final project verification. After Factory finishes or
-stops, return only one JSON object matching final-response.schema.json.
+stops, return only one JSON object matching final-response.schema.json. Do not
+return `COMPLETED` until Factory itself has run every configured final check
+after the final planner result and has removed or archived
+`.idd/factory/current/`.
