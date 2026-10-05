@@ -127,6 +127,32 @@ public sealed class FactoryReportTests : IDisposable
     }
 
     [Fact]
+    public void Report_FindsRolloutWhenRepositoryPathUsesSymlink()
+    {
+        if (OperatingSystem.IsWindows())
+            return;
+
+        var repository = Path.Combine(_root, "physical-repository");
+        var aliasedRepository = Path.Combine(_root, "repository-alias");
+        var codex = Path.Combine(_root, "codex-symlink");
+        Directory.CreateDirectory(repository);
+        Directory.CreateSymbolicLink(aliasedRepository, repository);
+        var sessions = Path.Combine(codex, "sessions");
+        Directory.CreateDirectory(sessions);
+
+        Write(Path.Combine(sessions, "rollout.jsonl"),
+        [
+            Session("12121212-1212-1212-1212-121212121212", aliasedRepository),
+            User("2026-09-23T10:00:00Z", "idd-factory-run"),
+            Assistant("2026-09-23T10:01:00Z", "Factory completed.")
+        ]);
+
+        var report = Assert.Single(new FactoryReportEngine().FindRuns(repository, codex));
+
+        Assert.Equal("completed", report.Run.Result);
+    }
+
+    [Fact]
     public void ToolMetrics_DeduplicateLifecycleAndCountOverlappingBatch()
     {
         var path = Path.Combine(_root, "tools.jsonl");
@@ -187,6 +213,44 @@ public sealed class FactoryReportTests : IDisposable
     }
 
     [Fact]
+    public void MarkdownWriter_UsesSingleHeadingsAndIncludesFullTaskText()
+    {
+        var path = Path.Combine(_root, "report.md");
+        var task = "Implement the catalog value type with canonicalization and duplicate detection.";
+        var report = new FactoryRunReport
+        {
+            Agents =
+            [
+                new AgentReport
+                {
+                    ThreadId = "worker",
+                    Role = "worker",
+                    Task = task,
+                    TaskTitle = "Implement the catalog value type"
+                }
+            ],
+            Tasks =
+            [
+                new TaskReport
+                {
+                    Number = 1,
+                    AgentThreadId = "worker",
+                    Text = task,
+                    Status = "completed"
+                }
+            ]
+        };
+
+        ReportWriters.WriteMarkdown(report, path, verbose: false);
+        var markdown = File.ReadAllText(path);
+
+        Assert.Equal(1, markdown.Split("## Tasks", StringSplitOptions.None).Length - 1);
+        Assert.Equal(1, markdown.Split("## Token accounting", StringSplitOptions.None).Length - 1);
+        Assert.Contains("```text", markdown);
+        Assert.Contains(task, markdown);
+    }
+
+    [Fact]
     public void CodexHomeLocator_UsesExplicitThenEnvironment()
     {
         var explicitPath = Path.Combine(_root, "explicit");
@@ -241,6 +305,51 @@ public sealed class FactoryReportTests : IDisposable
     }
 
     [Fact]
+    public void Report_UsesPlannerTaskAndTerminalWorkerResultAfterExploratoryFailure()
+    {
+        var repo = Path.Combine(_root, "repo-worker-completed");
+        var codex = Path.Combine(_root, "codex-worker-completed");
+        Directory.CreateDirectory(repo);
+        var dir = Path.Combine(codex, "sessions");
+        Directory.CreateDirectory(dir);
+
+        const string rootId = "14141414-1414-1414-1414-141414141414";
+        const string plannerId = "24242424-2424-2424-2424-242424242424";
+        const string workerId = "34343434-3434-3434-3434-343434343434";
+
+        Write(Path.Combine(dir, "root.jsonl"),
+        [
+            Session(rootId, repo),
+            User("2026-09-23T10:00:00Z", "idd-factory-run"),
+            SpawnCall("2026-09-23T10:00:01Z", "p1", "Use idd-factory-decompose-task."),
+            SpawnOutput("2026-09-23T10:00:02Z", "p1", plannerId),
+            SpawnCall("2026-09-23T10:00:03Z", "w1", "Use idd-factory-execute-subtask."),
+            SpawnOutput("2026-09-23T10:00:04Z", "w1", workerId),
+            Assistant("2026-09-23T10:01:00Z", "Factory completed.")
+        ]);
+
+        Write(Path.Combine(dir, "planner.jsonl"),
+        [
+            Session(plannerId, repo, rootId),
+            Assistant("2026-09-23T10:00:10Z", "# Task\nImplement the catalog value type.\n\n# ExecutionProfile\nstandard")
+        ]);
+
+        Write(Path.Combine(dir, "worker.jsonl"),
+        [
+            Session(workerId, repo, rootId),
+            NativeCommandCompleted("2026-09-23T10:00:20Z", "probe", "dotnet test", 1),
+            Assistant("2026-09-23T10:00:30Z", "Implemented the catalog value type.")
+        ]);
+
+        var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
+
+        var task = Assert.Single(report.Tasks);
+        Assert.Equal("Implement the catalog value type.", task.Text);
+        Assert.Equal("completed", task.Status);
+        Assert.Equal(1, report.Metrics.Tools.FailedCommands);
+    }
+
+    [Fact]
     public void Report_ReconstructsNestedSpawnLinkageWithoutChildParentMetadata()
     {
         var repo = Path.Combine(_root, "repo-nested");
@@ -279,7 +388,7 @@ public sealed class FactoryReportTests : IDisposable
         ]);
 
         var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
-        var subagent = Assert.Single(report.Agents.Where(x => x.ThreadId == subagentId));
+        var subagent = Assert.Single(report.Agents, x => x.ThreadId == subagentId);
 
         Assert.Equal("subagent", subagent.Role);
         Assert.Equal(workerId, subagent.ParentThreadId);
