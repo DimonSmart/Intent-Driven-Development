@@ -447,6 +447,11 @@ Use native Codex child-agent delegation for Factory semantic work.
   on an inheritance default.
 - Prefer a read-only planner and a workspace-writing worker when the
   host exposes those sandbox choices.
+- Sandbox selection is an optional hardening feature, not a Factory
+  capability requirement. When Codex exposes no per-child sandbox
+  choice, continue with fresh no-parent-history children that share
+  repository access; do not report Factory as unsupported solely for
+  that reason.
 - Use the native `spawn_agent` operation (or its current native
   equivalent) and a blocking/event-driven `wait_agent` operation.
   Prefer one long wait on the critical path. Do not build a
@@ -461,6 +466,11 @@ Use native Codex child-agent delegation for Factory semantic work.
   unsupported on that host. Do not emulate the missing capability
   with a packaged runtime, MCP transport, shell process supervisor,
   or polling protocol.
+- Do not return a completed Factory result until the root has run
+  every configured final verification check after the last planner
+  returns `# Done`. On success, remove `.idd/factory/current/` or
+  move it under `.idd/factory/results/`; an active request must not
+  remain after a completed result.
 
 ## Codex Factory execution policy
 
