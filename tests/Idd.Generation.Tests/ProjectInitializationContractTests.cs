@@ -9,10 +9,13 @@ public sealed class ProjectInitializationContractTests(GenerationFixture fixture
     private string Repo(params string[] parts) =>
         fixture.ReadText(Path.Combine([fixture.RepoRoot, .. parts]));
 
+    private static string NormalizeLineEndings(string value) =>
+        value.Replace("\r\n", "\n", StringComparison.Ordinal);
+
     [Fact]
     public void ProjectInit_CreatesIntentStateWithoutProjectPluginManifest()
     {
-        var init = Repo("src", "canonical", "skills", "idd-project-init.md");
+        var init = NormalizeLineEndings(Repo("src", "canonical", "skills", "idd-project-init.md"));
 
         Assert.Contains("Create only the project-owned IDD state:", init);
         Assert.Contains(".idd/intent/", init);
@@ -40,7 +43,7 @@ public sealed class ProjectInitializationContractTests(GenerationFixture fixture
     [Fact]
     public void ExistingProjectDocs_ShowIntentOnlyMinimalStructureAndLegacyCompatibility()
     {
-        var docs = Repo("docs", "existing-project.md");
+        var docs = NormalizeLineEndings(Repo("docs", "existing-project.md"));
 
         Assert.Contains(".idd/\n  intent/\n", docs);
         Assert.DoesNotContain("  plugins.json", docs);
