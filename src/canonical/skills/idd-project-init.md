@@ -55,7 +55,6 @@ Create only the project-owned IDD state:
 ```text
 .idd/
 .idd/intent/
-.idd/plugins.json
 ```
 
 Create minimal bootstrap intent documents when they are missing:
@@ -73,30 +72,18 @@ the normal default. The installed plugin may contain canonical Engineering
 bootstrap definitions for future management workflows, but this skill must not
 materialize them.
 
-Write `.idd/plugins.json` as a project declaration, not as a copy of plugin
-implementation. `idd-intent` is always required.
+Do not create a project-level plugin declaration or any replacement manifest.
+Installed plugins are Coding Agent state, not project state.
 
 Treat Factory as enabled for this initialization only when either:
 
-- the existing project declaration already contains `idd-factory`; or
-- the current user request explicitly enables Factory workflows.
+- the current user request explicitly enables Factory workflows; or
+- existing Factory-specific project state shows that Factory has already been used,
+  primarily `.idd/execution.yaml` or `.idd/factory/`.
 
-Preserve an existing `idd-factory` declaration on idempotent re-runs. Add it
-when the user explicitly enables Factory. Otherwise keep only the required
-`idd-intent` declaration. For example, a project explicitly using Factory has:
-
-```json
-{
-  "plugins": [
-    "idd-intent",
-    "idd-factory"
-  ]
-}
-```
-
-This declaration does not install plugins. Do not infer Factory enablement merely
-because the Coding Agent happens to have `idd-factory` installed. Do not create
-`.idd/factory` unless Factory workflows are explicitly enabled or actually used.
+Do not infer Factory enablement merely because the Coding Agent happens to have
+`idd-factory` installed. Do not create `.idd/factory/` only to mark Factory as
+enabled; Factory state is created by the workflows that actually need it.
 
 ### 3. Maintain one minimal IDD instruction block
 
@@ -168,8 +155,8 @@ The user can run `idd-factory-configure` at any later time.
 
 If Factory was explicitly enabled but the `idd-factory-configure` skill is not
 available because the optional Factory plugin is not installed, do not invent a
-policy file. Explain that the project declaration does not install the plugin
-and leave model configuration pending.
+policy file. Explain that project initialization does not install the optional
+Factory plugin and leave model configuration pending.
 
 ### 6. Offer initial intent bootstrap for existing implementations
 
@@ -284,15 +271,15 @@ product truth during the handoff.
 ## Rules
 
 - Copy bootstrap files from `assets/bootstrap/.idd/intent/` without semantic rewriting.
-- Never replace an existing project file wholesale. Initialization authorizes only adding missing bootstrap files, normalizing `.idd/plugins.json`, and creating or updating the single managed IDD block in the active Coding Agent instruction file.
+- Never replace an existing project file wholesale. Initialization authorizes only adding missing bootstrap files and creating or updating the single managed IDD block in the active Coding Agent instruction file.
+- Treat a pre-existing `.idd/plugins.json` as an unused legacy file: do not read it, modify it, delete it, or use its contents for feature detection.
 - Do not create agent-specific skill directories in the user project.
 - Do not copy plugin skills into the user project.
 - Do not create generated plugin delivery artifacts. The root `AGENTS.md` or `CLAUDE.md` instruction file is project-owned and is intentionally maintained by the agent.
 - Do not implement instruction-file installation through program code.
-- Do not say that `.idd/plugins.json` installs plugins. It is a project-level IDD declaration for people and IDD workflows.
-- Do not create `.idd/factory` unless Factory work is explicitly requested.
-- Do not create `.idd/engineering` by default and do not add a separate
-  Engineering plugin declaration to `.idd/plugins.json`.
+- Do not create `.idd/factory/` unless Factory work is explicitly requested or existing Factory-specific project state already demonstrates prior use.
+- Do not create `.idd/engineering/` by default.
+- Do not create a replacement project manifest such as `.idd/config.json`, `.idd/manifest.json`, `.idd/features.json`, or `.idd/project.json`.
 - Product intent lives only under `.idd/intent`. Optional durable
   implementation guardrails live separately under `.idd/engineering`.
 - Factory working data, when used, is temporary and belongs under `.idd/factory`.
@@ -310,32 +297,13 @@ When `.idd/intent` already exists, preserve existing documents. Add only missing
 
 Always inspect and normalize the active Coding Agent instruction file so that it contains exactly one minimal managed IDD block while preserving unrelated instructions.
 
-Normalize legacy declarations as follows:
+Treat a pre-existing `.idd/plugins.json` as unused legacy state. Do not read it,
+normalize it, modify it, delete it, or use it to infer enabled features. Its
+presence or contents have no effect on initialization.
 
-- replace `idd` with `idd-intent`;
-- replace `idd-core` with `idd-intent`;
-- preserve `idd-factory` only when it is already declared or the user explicitly enables it;
-- remove duplicate plugin names.
-
-A project using only durable product memory should contain:
-
-```json
-{
-  "plugins": [
-    "idd-intent"
-  ]
-}
-```
-
-A project that explicitly uses Factory may contain:
-
-```json
-{
-  "plugins": [
-    "idd-intent",
-    "idd-factory"
-  ]
-}
-```
+For existing projects, Factory-specific behavior may be selected when the current
+request explicitly asks for Factory or when existing project state such as
+`.idd/execution.yaml` or `.idd/factory/` demonstrates prior Factory use. Do not
+introduce a replacement marker file.
 
 Do not otherwise rewrite existing intent documents during initialization.

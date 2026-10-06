@@ -27,7 +27,7 @@
     }
   },
   "idd-project-init": {
-    "description": "Initialize `.idd/intent` and the IDD plugin declaration, then pause for a blocking bootstrap decision when an existing implementation has no current intent.",
+    "description": "Initialize project-owned IDD intent state, then pause for a blocking bootstrap decision when an existing implementation has no current intent.",
     "invocation": "manual"
   },
   "idd-verification-configure": {
