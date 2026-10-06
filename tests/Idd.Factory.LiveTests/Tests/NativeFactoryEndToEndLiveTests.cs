@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using System.Text.Json;
 using Idd.Factory.Report;
 using Xunit;
@@ -39,7 +40,8 @@ public sealed class NativeFactoryEndToEndLiveTests
             Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_MODEL"),
             Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_REASONING_EFFORT"),
             Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_MODEL_SOURCE"),
-            Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_REASONING_EFFORT_SOURCE"));
+            Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_REASONING_EFFORT_SOURCE"),
+            profileEnvironment: Environment.GetEnvironmentVariable);
         var model = settings.Model;
         var reasoning = settings.ReasoningEffort;
         var timeoutMinutes =
@@ -52,7 +54,10 @@ public sealed class NativeFactoryEndToEndLiveTests
         {
             Console.WriteLine($"Live-eval model: {model} ({settings.ModelSource})");
             Console.WriteLine($"Live-eval reasoning effort: {reasoning} ({settings.ReasoningEffortSource})");
+            foreach (var mapping in settings.ExecutionProfiles)
+                Console.WriteLine($"Worker {mapping.Key}: model={mapping.Value.Model}, reasoning={mapping.Value.ReasoningEffort}");
             CopyDirectory(Path.Combine(caseRoot, "Template"), workspace);
+            ConfigureExecutionPolicy(workspace, settings.ExecutionProfiles);
             await InitializeGitRepositoryAsync(workspace, artifactRoot);
             PrepareCodexHome(codexHome);
 
@@ -134,16 +139,31 @@ public sealed class NativeFactoryEndToEndLiveTests
             var traceItems = ParseTraceItems(result.Stdout);
             var rootRollout = FindRootRollout(codexHome);
             Assert.True(
-                rootRollout.SpawnRecords.Count >= 3,
-                "Expected a planner and two workers in the native Codex session rollout.");
+                rootRollout.SpawnRecords.Count >= 4,
+                "Expected a planner and at least three workers in the native Codex session rollout.");
             Assert.DoesNotContain(traceItems, item => IsToolCall(item, "mcp_tool_call", "factory_run"));
             Assert.DoesNotContain(traceItems, item => IsToolCall(item, "mcp_tool_call", "factory_status"));
             Assert.DoesNotContain(traceItems, IsLegacyFactoryRuntimeCommand);
-
             var finalJson = JsonDocument.Parse(await File.ReadAllTextAsync(lastMessage));
             Assert.Equal("COMPLETED", finalJson.RootElement.GetProperty("status").GetString());
 
             var factoryReport = Assert.Single(new FactoryReportEngine().FindRuns(workspace, codexHome));
+            Assert.NotEmpty(factoryReport.Tasks);
+            FactoryRoutingAssertions.Verify(factoryReport, settings.ExecutionProfiles);
+            var childPaths = Directory.EnumerateFiles(Path.Combine(codexHome, "sessions"), "*.jsonl", SearchOption.AllDirectories)
+                .Select(path => new CodexRolloutReader().Read(path))
+                .ToDictionary(rollout => rollout.ThreadId, rollout => rollout.AgentPath, StringComparer.Ordinal);
+            foreach (var worker in factoryReport.Agents.Where(agent => agent.Role == "worker"))
+            {
+                var spawn = Assert.Single(rootRollout.SpawnRecords.Values, spawn =>
+                    spawn.Children.Contains(worker.ThreadId, StringComparer.Ordinal) ||
+                    spawn.ChildAgentPath is not null && spawn.ChildAgentPath == childPaths[worker.ThreadId]);
+                var expected = settings.ExecutionProfiles[worker.ExecutionProfile!];
+                Assert.Equal(expected.Model, spawn.RequestedModel);
+                Assert.Equal(expected.ReasoningEffort, spawn.RequestedReasoningEffort);
+            }
+            Assert.Equal(new[] { "standard", "strong", "economy" },
+                factoryReport.Tasks.Take(3).Select(task => task.ExecutionProfile).ToArray());
             Assert.Equal("completed", factoryReport.Run.Result);
             Assert.Equal("passed", factoryReport.Completion.ProjectVerification);
             Assert.False(factoryReport.FactoryProjectState.CurrentRequestPresent);
@@ -183,6 +203,7 @@ public sealed class NativeFactoryEndToEndLiveTests
                 settings.ModelSource,
                 reasoning,
                 settings.ReasoningEffortSource,
+                settings.ExecutionProfiles,
                 timeoutMinutes,
                 failure);
 
@@ -243,6 +264,26 @@ public sealed class NativeFactoryEndToEndLiveTests
         await RunAsync("git", ["config", "user.email", "idd-factory-eval@localhost"], workspace, null, null, artifactRoot, "03-git-config-email");
         await RunAsync("git", ["add", "--all"], workspace, null, null, artifactRoot, "04-git-add");
         await RunAsync("git", ["commit", "-m", "Initial eval workspace"], workspace, null, null, artifactRoot, "05-git-commit");
+    }
+
+    private static void ConfigureExecutionPolicy(string workspace,
+        IReadOnlyDictionary<string, WorkerExecutionSettings> mappings)
+    {
+        LiveEvalSettings.ValidateProfiles(mappings);
+        var idd = Path.Combine(workspace, ".idd");
+        Directory.CreateDirectory(idd);
+        var yaml = new StringBuilder("version: 1\n\nfactory:\n  executionProfiles:\n");
+        foreach (var profile in LiveEvalSettings.Profiles)
+        {
+            var mapping = mappings[profile];
+            var modelScalar = mapping.Model.Replace("'", "''", StringComparison.Ordinal);
+            var reasoningScalar = mapping.ReasoningEffort.Replace("'", "''", StringComparison.Ordinal);
+            yaml.AppendLine($"    {profile}:");
+            yaml.AppendLine("      codex:");
+            yaml.AppendLine($"        model: '{modelScalar}'");
+            yaml.AppendLine($"        reasoningEffort: '{reasoningScalar}'");
+        }
+        File.WriteAllText(Path.Combine(idd, "execution.yaml"), yaml.ToString().ReplaceLineEndings("\n"));
     }
 
     private static void PrepareCodexHome(string target)
@@ -479,6 +520,7 @@ public sealed class NativeFactoryEndToEndLiveTests
         string modelSource,
         string reasoning,
         string reasoningEffortSource,
+        IReadOnlyDictionary<string, WorkerExecutionSettings> executionProfiles,
         int timeoutMinutes,
         Exception? failure)
     {
@@ -495,6 +537,7 @@ public sealed class NativeFactoryEndToEndLiveTests
                     modelSource,
                     reasoningEffort = reasoning,
                     reasoningEffortSource,
+                    executionProfiles,
                     timeoutMinutes,
                     evalVersion = Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_VERSION"),
                     failure = failure?.ToString()

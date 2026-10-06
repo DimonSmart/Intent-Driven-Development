@@ -99,6 +99,259 @@ public sealed class FactoryReportTests : IDisposable
     }
 
     [Fact]
+    public void Report_RecordsProfileAndRequestedSettingsWithoutInferringUnknownActualSettings()
+    {
+        var repo = Path.Combine(_root, "repo-routing");
+        var codex = Path.Combine(_root, "codex-routing");
+        var dir = Path.Combine(codex, "sessions");
+        Directory.CreateDirectory(repo);
+        Directory.CreateDirectory(dir);
+
+        const string rootId = "01010101-0101-0101-0101-010101010101";
+        const string plannerId = "02020202-0202-0202-0202-020202020202";
+        const string economyId = "03030303-0303-0303-0303-030303030303";
+        const string standardId = "04040404-0404-0404-0404-040404040404";
+        const string strongId = "05050505-0505-0505-0505-050505050505";
+        const string doneId = "06060606-0606-0606-0606-060606060606";
+
+        Write(Path.Combine(dir, "root.jsonl"),
+        [
+            Session(rootId, repo),
+            User("2026-09-23T10:00:00Z", "idd-factory-run"),
+            SpawnCall("2026-09-23T10:00:01Z", "planner", "Use idd-factory-decompose-task."),
+            SpawnOutput("2026-09-23T10:00:02Z", "planner", plannerId),
+            SpawnCall("2026-09-23T10:00:03Z", "economy", "Use idd-factory-execute-subtask. Task: economy.", "model-a", "low"),
+            SpawnOutput("2026-09-23T10:00:04Z", "economy", economyId),
+            SpawnCall("2026-09-23T10:00:05Z", "standard", "Use idd-factory-execute-subtask. Task: standard.", "model-a", "medium"),
+            SpawnOutput("2026-09-23T10:00:06Z", "standard", standardId),
+            SpawnCall("2026-09-23T10:00:07Z", "strong", "Use idd-factory-execute-subtask. Task: strong.", "model-b", "high"),
+            SpawnOutput("2026-09-23T10:00:08Z", "strong", strongId, "model-c", "high"),
+            SpawnCall("2026-09-23T10:00:09Z", "done", "Use idd-factory-decompose-task."),
+            SpawnOutput("2026-09-23T10:00:10Z", "done", doneId),
+            Assistant("2026-09-23T10:00:20Z", "Factory completed.")
+        ]);
+        WriteChild(dir, "planner.jsonl", plannerId, rootId, repo,
+            Assistant("2026-09-23T10:00:02Z", "# Task\neconomy\n\n# ExecutionProfile\neconomy\n\n# Task\nstandard\n\n# ExecutionProfile\nstandard\n\n# Task\nstrong\n\n# ExecutionProfile\nstrong"));
+        WriteChild(dir, "economy.jsonl", economyId, rootId, repo, Assistant("2026-09-23T10:00:04Z", "done"));
+        WriteChild(dir, "standard.jsonl", standardId, rootId, repo, Assistant("2026-09-23T10:00:06Z", "done"));
+        WriteChild(dir, "strong.jsonl", strongId, rootId, repo, Assistant("2026-09-23T10:00:08Z", "done"));
+        WriteChild(dir, "done.jsonl", doneId, rootId, repo, Assistant("2026-09-23T10:00:10Z", "# Done"));
+
+        var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
+        Assert.Collection(report.Tasks.OrderBy(x => x.ExecutionProfile),
+            economy =>
+            {
+                Assert.Equal("economy", economy.ExecutionProfile);
+                Assert.Equal("model-a", economy.RequestedModel);
+                Assert.Null(economy.ActualModel);
+            },
+            standard =>
+            {
+                Assert.Equal("standard", standard.ExecutionProfile);
+                Assert.Equal("model-a", standard.RequestedModel);
+                Assert.Equal("medium", standard.RequestedReasoningEffort);
+            },
+            strong =>
+            {
+                Assert.Equal("strong", strong.ExecutionProfile);
+                Assert.Equal("model-b", strong.RequestedModel);
+                Assert.Equal("model-c", strong.ActualModel);
+            });
+        Assert.Contains(report.Diagnostics, x => x.Code == "worker_execution_settings_mismatch");
+    }
+
+    [Fact]
+    public void Report_PreservesPlannerProfileAndDiagnosesConflictingSpawnProfile()
+    {
+        var report = RoutingReport("# ExecutionProfile\neconomy", "strong", "unknown");
+        var task = Assert.Single(report.Tasks);
+        Assert.Equal("economy", task.ExecutionProfile);
+        Assert.Equal("strong", task.SpawnExecutionProfile);
+        var agent = Assert.Single(report.Agents, x => x.Role == "worker");
+        Assert.Equal(task.ExecutionProfile, agent.ExecutionProfile);
+        Assert.Equal(task.SpawnExecutionProfile, agent.SpawnExecutionProfile);
+        Assert.Contains(report.Diagnostics, x => x.Code == "worker_execution_profile_mismatch");
+        var markdown = Path.Combine(_root, "routing-report.md");
+        ReportWriters.WriteMarkdown(report, markdown, verbose: false);
+        Assert.Contains("Execution profile: economy", File.ReadAllText(markdown));
+        Assert.Contains("Spawn execution profile: strong", File.ReadAllText(markdown));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("# ExecutionProfile\neconomy\n\n# ExecutionProfile\nstrong")]
+    [InlineData("# ExecutionProfile\nunknown")]
+    public void Report_DoesNotReplaceMissingOrMalformedPlannerProfileWithSpawnProfile(string metadata)
+    {
+        var report = RoutingReport(metadata, "strong", "unknown");
+        var task = Assert.Single(report.Tasks);
+        Assert.Null(task.ExecutionProfile);
+        Assert.Equal("strong", task.SpawnExecutionProfile);
+    }
+
+    [Theory]
+    [InlineData("nested")]
+    [InlineData("output-event")]
+    [InlineData("native-event")]
+    [InlineData("child-event")]
+    public void Report_RecognizesExplicitActualSettingsAndReportsMismatch(string settingsLocation)
+    {
+        var report = RoutingReport("# ExecutionProfile\neconomy", "economy", settingsLocation);
+        var task = Assert.Single(report.Tasks);
+        Assert.Equal("model-a", task.RequestedModel);
+        Assert.Equal("low", task.RequestedReasoningEffort);
+        Assert.Equal("model-b", task.ActualModel);
+        Assert.Equal("high", task.ActualReasoningEffort);
+        Assert.Contains(report.Diagnostics, x => x.Code == "worker_execution_settings_mismatch");
+        Assert.DoesNotContain(report.Diagnostics, x => x.Code == "worker_execution_profile_mismatch");
+    }
+
+    [Theory]
+    [InlineData("unknown")]
+    [InlineData("grandchild-event")]
+    public void Report_DoesNotInferWorkerSettingsFromDefaultsOrGrandchildSpawns(string settingsLocation)
+    {
+        var report = RoutingReport("# ExecutionProfile\neconomy", "economy", settingsLocation);
+        var task = Assert.Single(report.Tasks);
+        Assert.Null(task.ActualModel);
+        Assert.Null(task.ActualReasoningEffort);
+        Assert.DoesNotContain(report.Diagnostics, x => x.Code == "worker_execution_settings_mismatch");
+    }
+
+    [Fact]
+    public void Report_DiagnosesReasoningMismatchEvenWhenTheModelMatches()
+    {
+        var report = RoutingReport("# ExecutionProfile\neconomy", "economy", "reasoning-only");
+        var task = Assert.Single(report.Tasks);
+        Assert.Equal(task.RequestedModel, task.ActualModel);
+        Assert.Equal("high", task.ActualReasoningEffort);
+        Assert.Contains(report.Diagnostics, x => x.Code == "worker_execution_settings_mismatch");
+    }
+
+    [Fact]
+    public void Report_DoesNotDiagnoseMatchingActualSettings()
+    {
+        var report = RoutingReport("# ExecutionProfile\neconomy", "economy", "matching");
+        var task = Assert.Single(report.Tasks);
+        Assert.Equal(task.RequestedModel, task.ActualModel);
+        Assert.Equal(task.RequestedReasoningEffort, task.ActualReasoningEffort);
+        Assert.DoesNotContain(report.Diagnostics, x => x.Code == "worker_execution_settings_mismatch");
+    }
+
+    [Fact]
+    public void Report_AssociatesOpaqueSpawnArgumentsWithPlannerProfilesUsingChildMetadata()
+    {
+        var report = RoutingReport("# ExecutionProfile\neconomy", "economy", "unknown", opaqueSpawn: true);
+        var task = Assert.Single(report.Tasks);
+        Assert.Equal("economy", task.ExecutionProfile);
+        Assert.Null(task.SpawnExecutionProfile);
+        Assert.Equal("model-a", task.RequestedModel);
+        Assert.Equal("low", task.RequestedReasoningEffort);
+        Assert.DoesNotContain(report.Diagnostics, x => x.Code == "agent_role_unresolved");
+    }
+
+    [Fact]
+    public void Report_ResolvesNativeTaskNameOutputToChildThreadAndKeepsRequestedSettings()
+    {
+        var report = RoutingReport("# ExecutionProfile\neconomy", "economy", "path-output", opaqueSpawn: true);
+        var task = Assert.Single(report.Tasks);
+        Assert.Equal("economy", task.ExecutionProfile);
+        Assert.Equal("33333333-3333-3333-3333-333333333333", task.AgentThreadId);
+        Assert.Equal("model-a", task.RequestedModel);
+        Assert.Equal("low", task.RequestedReasoningEffort);
+    }
+
+    private FactoryRunReport RoutingReport(string plannerMetadata, string spawnProfile, string settingsLocation,
+        bool opaqueSpawn = false)
+    {
+        var repo = Path.Combine(_root, "repo-routing-regression");
+        var codex = Path.Combine(_root, "codex-routing-regression");
+        var dir = Path.Combine(codex, "sessions");
+        Directory.CreateDirectory(repo);
+        Directory.CreateDirectory(dir);
+        const string rootId = "11111111-1111-1111-1111-111111111111";
+        const string plannerId = "22222222-2222-2222-2222-222222222222";
+        const string workerId = "33333333-3333-3333-3333-333333333333";
+        var prompt = opaqueSpawn ? "opaque encrypted spawn message" :
+            $"Use idd-factory-execute-subtask. Task: Implement A.\nExecutionProfile: {spawnProfile}";
+        var lines = new List<object>
+        {
+            Session(rootId, repo),
+            User("2026-09-23T10:00:00Z", "idd-factory-run"),
+            SpawnCall("2026-09-23T10:00:01Z", "planner",
+                opaqueSpawn ? "opaque encrypted planner message" : "Use idd-factory-decompose-task."),
+            SpawnOutput("2026-09-23T10:00:02Z", "planner", plannerId),
+            SpawnCall("2026-09-23T10:00:03Z", "worker", prompt, "model-a", "low")
+        };
+        lines.Add(settingsLocation switch
+        {
+            "nested" => SpawnOutput("2026-09-23T10:00:04Z", "worker", workerId, "model-b", "high"),
+            "reasoning-only" => SpawnOutput("2026-09-23T10:00:04Z", "worker", workerId, "model-a", "high"),
+            "matching" => SpawnOutput("2026-09-23T10:00:04Z", "worker", workerId, "model-a", "low"),
+            "path-output" => new
+            {
+                timestamp = "2026-09-23T10:00:04Z", type = "response_item",
+                payload = new
+                {
+                    type = "function_call_output", call_id = "worker",
+                    output = JsonSerializer.Serialize(new { task_name = "/root/worker" })
+                }
+            },
+            "output-event" => new
+            {
+                timestamp = "2026-09-23T10:00:04Z", type = "response_item",
+                payload = new
+                {
+                    type = "function_call_output", call_id = "worker",
+                    output = $"spawned child thread {workerId}",
+                    actual_model = "model-b", actual_reasoning_effort = "high"
+                }
+            },
+            "native-event" => new
+            {
+                timestamp = "2026-09-23T10:00:04Z", type = "item.completed",
+                item = new
+                {
+                    id = "worker", type = "collab_tool_call", tool = "spawn_agent", prompt,
+                    receiver_thread_ids = new[] { workerId }, status = "completed",
+                    resolved_model = "model-b", resolved_reasoning_effort = "high"
+                }
+            },
+            _ => SpawnOutput("2026-09-23T10:00:04Z", "worker", workerId)
+        });
+        lines.Add(Assistant("2026-09-23T10:00:20Z", "Factory completed."));
+        Write(Path.Combine(dir, "root.jsonl"), lines);
+        Write(Path.Combine(dir, "planner.jsonl"),
+        [
+            Session(plannerId, repo, rootId, "/root/planner"),
+            Assistant("2026-09-23T10:00:02Z", $"# Task\nImplement A.\n\n{plannerMetadata}")
+        ]);
+        var workerEvents = new List<object> { Session(workerId, repo, rootId, "/root/worker") };
+        if (settingsLocation == "child-event")
+            workerEvents.Add(new
+            {
+                timestamp = "2026-09-23T10:00:05Z", type = "event_msg",
+                payload = new { type = "execution_settings", resolved_model = "model-b", resolved_reasoning_effort = "high" }
+            });
+        if (settingsLocation == "grandchild-event")
+        {
+            workerEvents.Add(SpawnCall("2026-09-23T10:00:05Z", "grandchild", "Research helper."));
+            workerEvents.Add(SpawnOutput("2026-09-23T10:00:06Z", "grandchild",
+                "44444444-4444-4444-4444-444444444444", "model-b", "high"));
+        }
+        workerEvents.Add(Assistant("2026-09-23T10:00:10Z", "done"));
+        Write(Path.Combine(dir, "worker.jsonl"), workerEvents);
+        if (settingsLocation == "path-output")
+            Write(Path.Combine(dir, "unrelated-worker.jsonl"),
+            [
+                Session("55555555-5555-5555-5555-555555555555", repo,
+                    "66666666-6666-6666-6666-666666666666", "/root/worker"),
+                Assistant("2026-09-23T10:00:10Z", "Unrelated worker with the same path.")
+            ]);
+        return Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
+    }
+
+    [Fact]
     public void Report_DistinguishesMultipleRunsInOneThread()
     {
         var repo = Path.Combine(_root, "repo-multiple");
@@ -207,7 +460,7 @@ public sealed class FactoryReportTests : IDisposable
         ReportWriters.WriteJson(report, path);
 
         using var document = JsonDocument.Parse(File.ReadAllText(path));
-        Assert.Equal(2, document.RootElement.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(3, document.RootElement.GetProperty("schemaVersion").GetInt32());
         Assert.Equal(JsonValueKind.Null,
             document.RootElement.GetProperty("metrics").GetProperty("tokens").GetProperty("inputTokens").ValueKind);
     }
@@ -507,13 +760,13 @@ public sealed class FactoryReportTests : IDisposable
         try { Directory.Delete(_root, recursive: true); } catch { }
     }
 
-    private static void WriteChild(string dir, string file, string id, string parent, string cwd, object finalEvent)
+    private static void WriteChild(string dir, string file, string id, string parent, string cwd, params object[] events)
     {
         Write(Path.Combine(dir, file),
         [
             Session(id, cwd, parent),
             User("2026-09-23T10:00:06Z", "Factory child context"),
-            finalEvent
+            .. events
         ]);
     }
 
@@ -525,11 +778,11 @@ public sealed class FactoryReportTests : IDisposable
 
     private static string Line(object value) => JsonSerializer.Serialize(value) + "\n";
 
-    private static object Session(string id, string cwd, string? parent = null) => new
+    private static object Session(string id, string cwd, string? parent = null, string? agentPath = null) => new
     {
         timestamp = "2026-09-23T09:00:00Z",
         type = "session_meta",
-        payload = new { id, cwd, parent_thread_id = parent }
+        payload = new { id, cwd, parent_thread_id = parent, agent_path = agentPath }
     };
 
     private static object User(string timestamp, string text) => Message(timestamp, "user", "input_text", text);
@@ -566,7 +819,7 @@ public sealed class FactoryReportTests : IDisposable
         }
     };
 
-    private static object SpawnCall(string timestamp, string callId, string task) => new
+    private static object SpawnCall(string timestamp, string callId, string task, string? model = null, string? reasoningEffort = null) => new
     {
         timestamp,
         type = "response_item",
@@ -575,11 +828,11 @@ public sealed class FactoryReportTests : IDisposable
             type = "function_call",
             name = "spawn_agent",
             call_id = callId,
-            arguments = JsonSerializer.Serialize(new { message = task })
+            arguments = JsonSerializer.Serialize(new { message = task, model, reasoning_effort = reasoningEffort })
         }
     };
 
-    private static object SpawnOutput(string timestamp, string callId, string childId) => new
+    private static object SpawnOutput(string timestamp, string callId, string childId, string? actualModel = null, string? actualReasoningEffort = null) => new
     {
         timestamp,
         type = "response_item",
@@ -587,7 +840,9 @@ public sealed class FactoryReportTests : IDisposable
         {
             type = "function_call_output",
             call_id = callId,
-            output = $"spawned child thread {childId}"
+            output = actualModel is null
+                ? $"spawned child thread {childId}"
+                : JsonSerializer.Serialize(new { childThreadId = childId, actual_model = actualModel, actual_reasoning_effort = actualReasoningEffort })
         }
     };
 

@@ -553,13 +553,15 @@ Each planner and worker receives a fresh isolated semantic context rather than
 the root transcript. Workers share the repository but do not share transcripts.
 The repository is authoritative implementation reality.
 
-Planner tasks may optionally classify required execution capability as
-`economy`, `standard`, or `strong`; missing metadata means `standard`. The
-planner never reads model policy. Immediately before each worker spawn, the root
-agent mechanically maps the profile through optional project-owned
-`.idd/execution.yaml` and either inherits host behavior or applies the exact
-configured native model/settings. It never substitutes another model or
-reclassifies the task.
+Every planner task must contain exactly one `ExecutionProfile`: `economy`,
+`standard`, or `strong`. Missing, repeated, or unknown profiles invalidate the
+affected task. The planner never reads model policy. Immediately before each
+worker spawn, the root agent re-reads and validates the required project-owned
+`.idd/execution.yaml`. The policy must explicitly select `modelStrategy: inherit`
+or provide all three mappings for the active platform. Missing configuration or
+mappings block execution; they never imply inheritance. The root applies the
+exact configured native model/settings without substituting another model or
+reclassifying the task.
 
 Temporary continuation state is limited to the original request, remaining
 current batch, short completed summaries, exact user answers, and optional

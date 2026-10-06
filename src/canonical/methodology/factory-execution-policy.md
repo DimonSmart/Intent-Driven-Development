@@ -18,8 +18,7 @@ They describe required execution capability only.
 
 - `economy`: simple, well-bounded, mostly mechanical work with limited
   reasoning.
-- `standard`: ordinary engineering work of normal complexity. This is the
-  default profile.
+- `standard`: ordinary engineering work of normal complexity.
 - `strong`: work that needs materially stronger reasoning, such as architecture
   changes, multi-cause debugging, concurrency/lifecycle analysis, or substantial
   interacting constraints and uncertainty.
@@ -29,14 +28,15 @@ without reading model policy, model availability, price, or reasoning settings.
 
 ## Project-owned configuration
 
-The optional file is:
+The required file is:
 
 ```text
 .idd/execution.yaml
 ```
 
-Absence of the file means all Factory profiles inherit the host/session/default
-model behavior.
+Factory setup must complete before the first worker starts. Absence of this file
+is a blocking configuration diagnostic, not permission to inherit the
+host/session/default model.
 
 An explicit all-inherit policy is:
 
@@ -62,15 +62,19 @@ factory:
         model: <concrete-model-id>
         reasoningEffort: <optional-platform-value>
     standard:
-      claude:
+      codex:
         model: <concrete-model-id>
-        effort: <optional-platform-value>
+    strong:
+      codex:
+        model: <concrete-model-id>
+        reasoningEffort: <optional-platform-value>
 ```
 
-Mappings may be partial. A missing profile mapping, or a profile without a
-mapping for the active platform, means `inherit`. The same concrete model may be
-assigned to more than one profile; this is how a project can deliberately cap
-the models Factory is allowed to use.
+Mapping mode is complete for the active platform: it must contain `economy`,
+`standard`, and `strong`, each with one mapping for that platform. A profile
+without an active-platform mapping is invalid; it never inherits implicitly.
+The same concrete model may be assigned to more than one profile, including
+with different reasoning settings.
 
 Do not persist dynamic aliases such as `cheapest`, `best`, `strongest`,
 `latest`, or `recommended` as runtime model identifiers. Resolve such user
@@ -90,7 +94,9 @@ Require:
 - platform sections supported by the generated adapter set;
 - a non-empty `model` scalar for every explicit platform mapping;
 - optional reasoning settings to be non-empty scalars when present;
-- no conflicting strategy fields and no unknown required structure.
+- no conflicting strategy fields, unknown profiles, unknown platforms, or
+  unknown required structure;
+- in mapping mode, all three profile mappings for the active platform.
 
 For the current adapters, Codex mappings use `model` and optional
 `reasoningEffort`; Claude mappings use `model` and optional `effort`.
@@ -106,13 +112,13 @@ authoritative execution-time validation.
 
 ## Runtime lookup
 
-Immediately before each worker spawn, the root agent performs only this
-mechanical lookup:
+Immediately before each worker spawn, the root agent re-reads the policy once,
+validates that one document, and performs only this mechanical lookup:
 
 ```text
 planner ExecutionProfile
--> default missing profile to standard
--> structurally validate .idd/execution.yaml when present
+-> require exactly one canonical profile
+-> structurally validate .idd/execution.yaml
 -> select the active-platform mapping for that profile
 -> inherit OR exact configured model/settings
 -> native child-agent spawn
@@ -124,6 +130,10 @@ cost, substitute a stronger/weaker model, or reinterpret user policy.
 If the selected mapping is `inherit`, omit Factory-specific model/reasoning
 overrides. If it is explicit, pass exactly the configured model and optional
 reasoning setting through the host's native child-agent controls.
+
+An explicit `inherit` policy is the only inherit case. A configuration update
+after this lookup does not alter the already-created worker; the next worker
+reads the new policy without requiring a new plan.
 
 If the host rejects the configured model/settings, or cannot honor an explicit
 per-child override, do not substitute another model and do not change the

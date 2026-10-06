@@ -169,7 +169,7 @@ The user can run `idd-factory-configure` at any later time.
 If Factory was explicitly enabled but the `idd-factory-configure` skill is not
 available because the optional Factory plugin is not installed, do not invent a
 policy file. Explain that the project declaration does not install the plugin
-and leave model configuration pending.
+and that Factory workers remain blocked until configuration is completed.
 
 ### 6. Offer initial intent bootstrap for existing implementations
 

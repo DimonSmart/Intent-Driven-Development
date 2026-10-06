@@ -239,8 +239,8 @@ while true:
         Tasks    -> persist the planner output for the current batch in plan.md
 
     take the first remaining task
-    read its ExecutionProfile, defaulting missing metadata to standard
-    structurally validate .idd/execution.yaml when present
+    require exactly one canonical ExecutionProfile
+    re-read and structurally validate .idd/execution.yaml
     mechanically resolve the active-platform profile mapping
     deterministically re-read the current Engineering INDEX
     enumerate all current Always ENG IDs
@@ -287,8 +287,8 @@ Immediately before every worker spawn, apply the bounded lookup from
 
 ```text
 planner ExecutionProfile
--> default missing profile to standard
--> project configuration lookup
+-> require exactly one canonical value
+-> re-read one project configuration document
 -> inherit OR exact configured active-platform model/settings
 -> native child-agent spawn
 ```
@@ -297,9 +297,11 @@ This is a mechanical protocol step. Do not reconsider task complexity, compare
 candidate models, optimize cost, upgrade/downgrade the profile, or choose a
 model that is not the exact configured mapping.
 
-When `.idd/execution.yaml` is absent, all profiles inherit. For partial
-configuration, a missing profile or missing active-platform mapping also
-inherits. `inherit` means omit Factory-specific model and reasoning overrides.
+The file is required before the first worker. A missing file, missing profile,
+missing active-platform mapping, unknown profile/platform, repeated profile, or
+malformed policy blocks the affected worker with a concrete diagnostic. Only
+the explicit `modelStrategy: inherit` policy means omit Factory-specific model
+and reasoning overrides.
 
 Malformed explicit configuration blocks the worker spawn with a clear
 diagnostic; never silently fall back to `inherit`. If the native host rejects a
@@ -361,7 +363,7 @@ have produced them.
 
 The planner returns exactly one of:
 
-- one or more `# Task` sections with optional `# ExecutionProfile`, optional
+- one or more `# Task` sections with exactly one `# ExecutionProfile`, optional
   `# TaskRelatedIntent`, and optional `# TaskRelatedEngineering`;
 - exactly one `# Question`;
 - exactly `# Done`.

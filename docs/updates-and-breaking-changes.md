@@ -4,15 +4,14 @@ This page records IDD changes that require action in repositories that already u
 
 ## 2026-09-25 — Configurable Factory execution profiles
 
-Factory planner tasks may now declare optional `# ExecutionProfile` metadata:
-`economy`, `standard`, or `strong`. Missing metadata remains valid and means
-`standard`, so existing `plan.md` batches continue to work.
+Factory planner tasks must declare exactly one `# ExecutionProfile` metadata
+section: `economy`, `standard`, or `strong`. Missing or repeated metadata is
+invalid.
 
-Projects may optionally create `.idd/execution.yaml` with
-`idd-factory-configure`. Absence preserves previous behavior: all workers use
-the model the host would normally choose without a Factory-specific override.
-The file is project-owned execution policy, not Factory runtime/workflow
-configuration and not temporary state.
+Projects configure `.idd/execution.yaml` with `idd-factory-configure` before
+the first worker. The file is project-owned execution policy, not Factory
+runtime/workflow configuration and not temporary state. It must be explicit
+`inherit` or complete for the active platform.
 
 The root Factory agent now performs a mechanical
 `profile -> project mapping -> native child spawn` step. It never reclassifies a

@@ -2,9 +2,10 @@ Use $idd-factory-run to implement the current product intent described in
 .idd/intent/IDD-0001.spec-mini-catalog.md.
 
 This is an IDD Factory evaluation. It must exercise native-agent incremental
-orchestration and at least two separate fresh worker contexts.
+orchestration and at least three separate fresh worker contexts, covering all
+three execution profiles.
 
-The first contractable batch must contain these two implementation tasks in this
+The first contractable batch must contain these three tasks in this
 order:
 
 1. Implement the `MiniCatalog.ProductCode` value type only: canonicalization,
@@ -13,10 +14,19 @@ order:
 2. Update `MiniCatalog.Catalog` to use `ProductCode`: store canonical values,
    reject normalized duplicates, preserve read-only `Codes` access, and
    implement ordinal `Summary()` output.
+3. Run the focused ProductCode and Catalog tests and inspect that `Codes` does
+   not expose a mutable backing collection. Report the evidence; do not edit
+   product code in this verification task.
 
-The second task is self-contained and must inspect repository reality produced by
-the first worker. Do not use `RelevantCompletedWork`, runtime work-item IDs, or
-a Factory MCP/runtime transport.
+For this routing evaluation, the planner must emit `standard` for task 1,
+`strong` for task 2, and `economy` for task 3. These fixed fixture classifications
+isolate profile-to-model routing from classification variability. Give the
+planner these task contracts and profile expectations, without exposing model
+mappings. The root must use the profiles actually returned by the planner.
+
+The second and third tasks are self-contained and must inspect repository reality
+produced by preceding workers. Do not use `RelevantCompletedWork`, runtime
+work-item IDs, or a Factory MCP/runtime transport.
 
 Do not combine these responsibilities into one worker context. Do not change
 durable product intent, add external packages, or modify prepared tests except to

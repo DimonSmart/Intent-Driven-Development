@@ -66,9 +66,9 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                     Use native Codex child-agent delegation for Factory semantic work.
 
                     - Spawn every planner and worker in a fresh semantic context with
-                      parent-history inheritance explicitly disabled. Use
-                      `fork_turns = "none"` or the host-equivalent setting; never rely
-                      on an inheritance default.
+                      parent-history inheritance explicitly disabled. Pass
+                      `fork_turns: "none"` (or the host-equivalent setting); never
+                      rely on an inheritance default.
                     - Prefer a read-only planner and a workspace-writing worker when the
                       host exposes those sandbox choices.
                     - Sandbox selection is an optional hardening feature, not a Factory
@@ -104,15 +104,17 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
 
                     - `inherit` means omit Factory-specific model and reasoning
                       overrides so the normal host/session/default model applies.
-                    - For an explicit active-platform mapping, pass the configured
-                      `codex.model` and optional `codex.reasoningEffort` through
-                      the host's native per-child override controls.
+                    - For an explicit active-platform mapping, pass
+                      `codex.model` as the native spawn `model` argument and optional
+                      `codex.reasoningEffort` as `reasoning_effort`, together with
+                      `fork_turns: "none"`. Do not place a model-switching instruction
+                      in the worker prompt.
                     - Do not reconsider task complexity or substitute a different
                       model. The configured mapping is authoritative.
                     - If the host rejects the configured model/settings or cannot
                       honor an explicit per-child override, stop with a diagnostic
-                      and suggest `idd-factory-configure`; never pick a fallback
-                      model automatically.
+                      that names the profile, requested settings, and rejection reason;
+                      suggest `idd-factory-configure` and never pick a fallback model.
                     """))
             };
         }

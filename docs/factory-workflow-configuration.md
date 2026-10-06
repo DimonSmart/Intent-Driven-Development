@@ -6,7 +6,7 @@ There is no packaged `factory.yaml`, runtime schema, retry budget,
 state-transition configuration, capability registry, process-timeout policy, or
 Factory MCP transport configuration.
 
-Factory now has one separate optional project-owned execution policy:
+Factory now has one separate required project-owned execution policy:
 
 ```text
 .idd/execution.yaml
@@ -17,11 +17,10 @@ Factory runtime state, not workflow configuration, not Product Intent, and not
 an Engineering Rule. It survives individual Factory runs and must not be stored
 under `.idd/factory/current/`.
 
-## Default behavior
+## Explicit strategy
 
-If `.idd/execution.yaml` is absent, all profiles inherit normal
-host/session/default model behavior. Existing projects therefore continue to
-behave as before.
+Factory setup must create `.idd/execution.yaml` before the first worker starts.
+Its absence is a blocking configuration error; it does not imply inheritance.
 
 An explicit intentional all-inherit policy is:
 
@@ -37,7 +36,7 @@ model ID.
 
 ## Execution profiles
 
-Planner tasks may optionally declare:
+Every planner task declares exactly one of:
 
 ```text
 economy
@@ -45,13 +44,13 @@ standard
 strong
 ```
 
-Missing metadata means `standard`.
+Missing, repeated, or unknown metadata invalidates the affected task.
 
 Profiles express task complexity only. The planner does not know the project's
 profile-to-model mapping, and the root agent does not reconsider the planner's
 classification.
 
-Fine-grained policy is project-owned and may be partial:
+Fine-grained policy is project-owned and complete for the active platform:
 
 ```yaml
 version: 1
@@ -62,14 +61,17 @@ factory:
       codex:
         model: <concrete-model-id>
         reasoningEffort: <optional-platform-value>
-    strong:
-      claude:
+    standard:
+      codex:
         model: <concrete-model-id>
-        effort: <optional-platform-value>
+    strong:
+      codex:
+        model: <concrete-model-id>
+        reasoningEffort: <optional-platform-value>
 ```
 
-Missing profile/platform mappings inherit. A project may assign the same model
-to multiple profiles to cap what Factory is allowed to use.
+Each active platform needs all three mappings. A project may assign the same
+model to multiple profiles, including with different reasoning settings.
 
 ## Configuration workflow
 
@@ -96,7 +98,8 @@ ExecutionProfile
 -> native child spawn
 ```
 
-Malformed explicit configuration blocks execution. If the host rejects a
+Only explicit `modelStrategy: inherit` omits overrides. Malformed or incomplete
+configuration blocks execution. If the host rejects a
 configured model/settings or cannot honor the override, Factory reports the
 problem and suggests reconfiguration; it never silently substitutes another
 model or profile.

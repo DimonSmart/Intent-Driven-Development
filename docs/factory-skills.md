@@ -16,9 +16,10 @@ fresh planner and sequential fresh workers, handles one planner question, and
 runs configured project verification after planner `# Done`.
 
 Immediately before each worker spawn it mechanically maps the task's
-`ExecutionProfile` through `.idd/execution.yaml`. Missing profile metadata
-means `standard`; missing policy/mapping means `inherit`. Explicit mappings
-are applied exactly and are never semantically "improved" by the root agent.
+`ExecutionProfile` through `.idd/execution.yaml`. Each task must provide one
+canonical profile, and the policy must be explicit `inherit` or complete for
+the active platform. Explicit mappings are applied exactly and are never
+semantically "improved" by the root agent.
 
 It does not launch a packaged runtime, use Factory MCP tools, supervise child
 processes, poll status, maintain retry budgets, or own a workflow state machine.
@@ -31,7 +32,7 @@ It supports:
 
 - explicit `modelStrategy: inherit` for using the current host model everywhere;
 - concrete per-platform mappings for `economy`, `standard`, and `strong`;
-- partial mappings, with missing entries inheriting host behavior;
+- complete active-platform mappings, or an explicit `inherit` strategy;
 - optional platform-specific reasoning settings;
 - later reconfiguration or return to all-inherit.
 
@@ -68,8 +69,8 @@ IDD-NNNN
 ENG-NNNN
 ```
 
-`ExecutionProfile` is optional and belongs to the immediately preceding task.
-Its absence means `standard`. It expresses required execution capability only,
+`ExecutionProfile` is required exactly once and belongs to the immediately
+preceding task. It expresses required execution capability only,
 not a concrete model or cost policy.
 
 Tasks/Question/Done cannot be mixed. `TaskRelatedIntent` is optional task

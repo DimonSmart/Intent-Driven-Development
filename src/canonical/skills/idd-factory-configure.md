@@ -24,10 +24,11 @@ The project configuration is authoritative user policy.
 Read `.idd/execution.yaml` when it exists and validate it using the bounded
 structural rules in the reference.
 
-A malformed existing explicit policy is a blocking diagnostic. Do not silently
-replace it with `inherit`.
+A malformed existing policy is a blocking diagnostic. Show the diagnostic and
+repair it as part of configuration; do not silently replace its strategy.
 
-If the file is absent, the effective policy is all profiles `inherit`.
+If the file is absent, configure either explicit `inherit` or a complete mapping
+before Factory starts its first worker.
 
 ## Top-level choice
 
@@ -136,28 +137,18 @@ factory:
       codex:
         model: <concrete-model-id>
     strong:
-      claude:
+      codex:
         model: <concrete-model-id>
-        effort: <optional-platform-value>
+        reasoningEffort: <optional-platform-value>
 ```
 
-A project may contain mappings for more than one supported platform. Missing
-profiles and missing active-platform sections inherit host behavior.
+A project may contain mappings for more than one supported platform. For each
+platform that Factory will run on, the resulting mapping must include all three
+profiles: `economy`, `standard`, and `strong`. A missing active-platform
+profile is invalid and never inherits host behavior.
 
 Platform-specific reasoning values are optional and remain platform-defined.
 Do not invent a canonical list of allowed values.
-
-## Partial policies
-
-Partial override is valid. For example, configuring only `economy` means:
-
-```text
-economy  -> explicit mapping
-standard -> inherit
-strong   -> inherit
-```
-
-Do not expand missing mappings merely for symmetry.
 
 The user may intentionally assign the same model to multiple profiles. Preserve
 that choice exactly; do not "improve" a `strong` mapping to another model.
@@ -166,13 +157,13 @@ that choice exactly; do not "improve" a `strong` mapping to another model.
 
 Before writing:
 
-1. show the effective profile-to-model policy when it contains automatic
-   interpretation or a proposed mapping;
+1. show a table with profile, current model/reasoning, and proposed
+   model/reasoning when updating a mapping;
 2. obtain required confirmation;
 3. validate the complete document structurally;
 4. write `.idd/execution.yaml` atomically when the host permits;
-5. re-read the file and report the effective mappings, including inherited
-   profiles.
+5. re-read the file and report the final complete mapping, or the explicit
+   `inherit` strategy.
 
 Switching from explicit mappings back to all-inherit replaces the explicit
 mapping with `modelStrategy: inherit`.

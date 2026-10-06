@@ -51,6 +51,23 @@ A single planner is labeled `Planner`; multiple planners are numbered. Missing p
 
 Worker tasks are extracted from Factory spawn/direct instructions. A short task title is only a bounded presentation projection of that text.
 
+For each worker, the report preserves the planner `ExecutionProfile` and the
+model/reasoning settings requested in that worker's native spawn arguments.
+The planner profile is authoritative; a profile found in the spawn prompt is
+recorded separately as `spawnExecutionProfile`. Conflicting values emit
+`factory/worker_execution_profile_mismatch`; a missing planner profile remains
+unknown even when the spawn prompt supplies one.
+Native results containing only a canonical `task_name` are correlated with the
+child's `agent_path` and parent thread metadata to preserve requested settings.
+It reports actual settings only when a host trace explicitly supplies resolved
+or actual fields in spawn events, spawn output, or the worker's own events.
+Settings attached to a worker's child-agent tool calls are not its own settings.
+It never infers actual settings from the current `.idd/execution.yaml`
+or root session settings. Missing actual fields remain `unknown`. When explicit
+requested and actual values differ, the report emits
+`factory/worker_execution_settings_mismatch`. Later changes to
+`.idd/execution.yaml` cannot rewrite these historical spawn records.
+
 ## Native operations and wrappers
 
 Semantic metrics distinguish native operations from host/Code Mode wrapper calls. Native `CommandExecution`, `FileChange`, `spawn_agent`, and `wait_agent`/`wait` are counted once per logical operation. Wrappers are reported separately in verbose output.
@@ -78,7 +95,9 @@ Project verification is reported as passed/failed only from structured command/r
 
 ## JSON schema
 
-Schema version is `2`. `toolBatches` and other unavailable metrics use nullable representation so a real zero is distinct from unavailable evidence.
+Schema version is `3`. `toolBatches`, actual worker settings, and other
+unavailable metrics use nullable representation so a real zero is distinct from
+unavailable evidence.
 
 ## Usage
 

@@ -87,14 +87,16 @@ ENG-0004
 
 Exactly one form is used per planner invocation. Blank output is invalid.
 
-`# ExecutionProfile` is optional task metadata with exactly `economy`,
-`standard`, or `strong`; absence means `standard`. The planner selects the
-profile from task complexity only and does not read model mappings.
+Every task has exactly one `# ExecutionProfile`: `economy`, `standard`, or
+`strong`. Missing, repeated, or unknown profiles invalidate that task. The
+planner selects the profile from task complexity only and does not read model
+mappings.
 
 Immediately before a worker starts, the root agent mechanically resolves that
-profile through optional project-owned `.idd/execution.yaml`. Missing mappings
-inherit the host model. Explicit mappings are applied exactly through native
-child-agent controls; malformed/unavailable mappings never trigger silent model
+profile through project-owned `.idd/execution.yaml`. The file must either
+explicitly select `inherit` or provide all three mappings for the active
+platform. Explicit mappings are applied exactly through native child-agent
+controls; malformed/unavailable mappings never trigger silent model
 substitution.
 
 When Engineering exists, `TaskRelatedEngineering` contains only

@@ -11,15 +11,15 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         fixture.ReadText(Path.Combine([fixture.RepoRoot, "src", "canonical", .. parts]));
 
     [Fact]
-    public void Planner_UsesOnlyCanonicalExecutionProfilesAndDefaultsMissingToStandard()
+    public void Planner_RequiresExactlyOneCanonicalExecutionProfilePerTask()
     {
         var planner = Canonical("skills", "idd-factory-decompose-task.md");
 
         Assert.Contains("economy", planner);
         Assert.Contains("standard", planner);
         Assert.Contains("strong", planner);
-        Assert.Contains("If it is absent, the task means `standard`", planner);
-        Assert.Contains("Any other value is", planner);
+        Assert.Contains("Every `# Task` must contain exactly one `# ExecutionProfile`", planner);
+        Assert.Contains("A missing, repeated, or unknown profile", planner);
         Assert.Contains("malformed planner output", planner);
         Assert.Contains("belongs to the immediately preceding", planner);
         Assert.Contains("Do not read `.idd/execution.yaml`", planner);
@@ -28,14 +28,38 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
     }
 
     [Fact]
-    public void ExecutionPolicy_DefinesInheritPartialMappingsAndBlockingValidation()
+    public void PlannerTaskExamples_DeclareOneCanonicalProfileForEveryTask()
+    {
+        var planners = new[] { Canonical("skills", "idd-factory-decompose-task.md") }
+            .Concat(new[] { "codex", "claude" }.Select(platform => fixture.ReadText(Path.Combine(
+                fixture.MarketplaceRoot, "plugins", platform, "idd-factory", "skills",
+                "idd-factory-decompose-task", "SKILL.md"))));
+        foreach (var planner in planners)
+        {
+            var example = Regex.Match(planner, @"(?s)Tasks:\s*```text\s*(?<tasks>.*?)```");
+            Assert.True(example.Success);
+            var tasks = Regex.Matches(example.Groups["tasks"].Value,
+                @"(?ms)^# Task\s*$\s*(?<task>.*?)(?=^# Task\s*$|\z)");
+            Assert.NotEmpty(tasks);
+            foreach (Match task in tasks)
+            {
+                Assert.Single(Regex.Matches(task.Groups["task"].Value, @"(?m)^# ExecutionProfile\s*$"));
+                Assert.Matches(@"(?m)^# ExecutionProfile\s*\n\s*(economy|standard|strong)\s*$",
+                    task.Groups["task"].Value);
+            }
+        }
+    }
+
+    [Fact]
+    public void ExecutionPolicy_DefinesExplicitInheritCompleteMappingsAndBlockingValidation()
     {
         var policy = Canonical("methodology", "factory-execution-policy.md");
 
         Assert.Contains(".idd/execution.yaml", policy);
         Assert.Contains("modelStrategy: inherit", policy);
-        Assert.Contains("Mappings may be partial", policy);
-        Assert.Contains("missing profile mapping", policy);
+        Assert.Contains("Mapping mode is complete for the active platform", policy);
+        Assert.Contains("all three profile mappings for the active platform", policy);
+        Assert.Contains("Absence of this file", policy);
         Assert.Contains("version: 1", policy);
         Assert.Contains("Do not silently convert malformed explicit policy", policy);
         Assert.True(policy.Contains("do not substitute another model", StringComparison.OrdinalIgnoreCase));
@@ -54,7 +78,7 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("Never save an automatically proposed mapping before explicit confirmation", configure);
         Assert.Contains("request_user_input", configure);
         Assert.Contains("AskUserQuestion", configure);
-        Assert.Contains("Partial override is valid", configure);
+        Assert.Contains("all three", configure);
         Assert.Contains("modelStrategy: inherit", configure);
     }
 
@@ -64,10 +88,11 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         var run = Canonical("skills", "idd-factory-run.md");
 
         Assert.Contains("planner ExecutionProfile", run);
-        Assert.Contains("project configuration lookup", run);
+        Assert.Contains("re-read one project configuration document", run);
         Assert.Contains("native child-agent spawn", run);
         Assert.Contains("Do not reconsider task complexity", run);
         Assert.Contains("never silently fall back to `inherit`", run);
+        Assert.Contains("missing profile", run);
         Assert.Contains("idd-factory-configure", run);
         Assert.Contains("worker skill is always", run);
         Assert.Contains("idd-factory-execute-subtask", run);
@@ -105,6 +130,8 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
             fixture.MarketplaceRoot, "plugins", "codex", "idd-factory", "skills", "idd-factory-run", "SKILL.md"));
         Assert.Contains("codex.model", codexRun);
         Assert.Contains("codex.reasoningEffort", codexRun);
+        Assert.Contains("reasoning_effort", codexRun);
+        Assert.Contains("fork_turns: \"none\"", codexRun);
 
         var claudeRun = fixture.ReadText(Path.Combine(
             fixture.MarketplaceRoot, "plugins", "claude", "idd-factory", "skills", "idd-factory-run", "SKILL.md"));

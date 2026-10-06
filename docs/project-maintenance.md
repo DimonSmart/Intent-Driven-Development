@@ -15,7 +15,7 @@ idd-factory   temporary implementation organization
 
 `idd-intent` is standalone and is the default installation. `idd-factory` depends on `idd-intent` and is installed only when temporary multi-step orchestration is needed.
 
-Keep `.idd/verification.yaml` in Git as operational verification configuration, outside `.idd/intent/`. Keep optional `.idd/execution.yaml` in Git as project-owned Factory execution policy, also outside `.idd/intent/` and `.idd/factory/current/`. Neither file is product intent.
+Keep `.idd/verification.yaml` in Git as operational verification configuration, outside `.idd/intent/`. For a Factory-enabled project, keep required `.idd/execution.yaml` in Git as project-owned Factory execution policy, also outside `.idd/intent/` and `.idd/factory/current/`. Neither file is product intent.
 
 The split is part of the product contract, not an internal packaging detail. Durable product truth and temporary execution state must remain independently installable and independently owned.
 

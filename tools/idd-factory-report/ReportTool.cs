@@ -10,7 +10,7 @@ namespace Idd.Factory.Report;
 
 public sealed class FactoryRunReport
 {
-    public int SchemaVersion { get; init; } = 2;
+    public int SchemaVersion { get; init; } = 3;
     public string Repository { get; init; } = "";
     public HostInfo Host { get; init; } = new();
     public RunInfo Run { get; init; } = new();
@@ -79,6 +79,12 @@ public sealed class AgentReport
             : null;
     public string? Task { get; set; }
     public string? TaskTitle { get; set; }
+    public string? ExecutionProfile { get; set; }
+    public string? SpawnExecutionProfile { get; set; }
+    public string? RequestedModel { get; set; }
+    public string? RequestedReasoningEffort { get; set; }
+    public string? ActualModel { get; set; }
+    public string? ActualReasoningEffort { get; set; }
     public string? PlannerOutcome { get; set; }
     public DateTimeOffset? PlannerOutcomeAt { get; set; }
     public TokenMetrics Tokens { get; set; } = new();
@@ -94,6 +100,12 @@ public sealed class TaskReport
     public int Number { get; init; }
     public string AgentThreadId { get; init; } = "";
     public string? Text { get; init; }
+    public string? ExecutionProfile { get; init; }
+    public string? SpawnExecutionProfile { get; init; }
+    public string? RequestedModel { get; init; }
+    public string? RequestedReasoningEffort { get; init; }
+    public string? ActualModel { get; init; }
+    public string? ActualReasoningEffort { get; init; }
     public string Status { get; init; } = "unknown";
     public long? DurationMilliseconds { get; init; }
 }
@@ -243,6 +255,8 @@ public sealed class CodexEvent
     public bool UsageIsCumulative { get; init; }
     public string? ChildThreadId { get; set; }
     public string? SpawnTask { get; init; }
+    public string? ActualModel { get; init; }
+    public string? ActualReasoningEffort { get; init; }
 
     public bool Contains(string value) =>
         Text?.Contains(value, StringComparison.OrdinalIgnoreCase) == true ||
@@ -256,6 +270,7 @@ public sealed class CodexRollout
     public string? Cwd { get; set; }
     public string? ParentThreadId { get; set; }
     public string? AgentRoleHint { get; set; }
+    public string? AgentPath { get; set; }
     public List<CodexEvent> Events { get; init; } = [];
     public List<Diagnostic> Diagnostics { get; init; } = [];
     public Dictionary<string, SpawnRecord> SpawnRecords { get; init; } = new(StringComparer.Ordinal);
@@ -269,7 +284,13 @@ public sealed class SpawnRecord
     public string? SenderThreadId { get; set; }
     public string? ChildThreadId { get; set; }
     public List<string> ChildThreadIds { get; } = [];
+    public string? ChildAgentPath { get; set; }
     public string? Task { get; set; }
+    public string? ExecutionProfile { get; set; }
+    public string? RequestedModel { get; set; }
+    public string? RequestedReasoningEffort { get; set; }
+    public string? ActualModel { get; set; }
+    public string? ActualReasoningEffort { get; set; }
     public DateTimeOffset? Timestamp { get; init; }
 
     [JsonIgnore]
@@ -327,6 +348,7 @@ public sealed class CodexRolloutReader
                     rollout.Cwd = String(payload, "cwd") ?? rollout.Cwd;
                     rollout.ParentThreadId = FindString(payload, "parent_thread_id", "parentThreadId", "parent_id") ?? rollout.ParentThreadId;
                     rollout.AgentRoleHint = FindString(payload, "agent_role", "agentRole", "agent_path", "agentPath") ?? rollout.AgentRoleHint;
+                    rollout.AgentPath = FindString(payload, "agent_path", "agentPath") ?? rollout.AgentPath;
                 }
 
                 var timestamp = Timestamp(root) ?? Timestamp(payload);
@@ -429,7 +451,9 @@ public sealed class CodexRolloutReader
                     Usage = usage,
                     UsageIsCumulative = cumulative,
                     ChildThreadId = childThreadId,
-                    SpawnTask = spawnTask
+                    SpawnTask = spawnTask,
+                    ActualModel = FindString(eventObject, "actual_model", "actualModel", "model_used", "modelUsed", "resolved_model", "resolvedModel"),
+                    ActualReasoningEffort = FindString(eventObject, "actual_reasoning_effort", "actualReasoningEffort", "reasoning_effort_used", "reasoningEffortUsed", "resolved_reasoning_effort", "resolvedReasoningEffort")
                 });
 
                 if (metadataOnly && !string.IsNullOrWhiteSpace(rollout.ThreadId) && rollout.Cwd is not null && ordinal >= 16)                if (metadataOnly && !string.IsNullOrWhiteSpace(rollout.ThreadId) && rollout.Cwd is not null && ordinal >= 16)
@@ -471,6 +495,12 @@ public sealed class CodexRolloutReader
                         CallId = e.ToolId,
                         SenderThreadId = e.SenderThreadId ?? rollout.ThreadId,
                         Task = e.SpawnTask,
+                        ChildAgentPath = ExtractSpawnArgument(e.ToolOutput, "task_name"),
+                        ExecutionProfile = ExtractExecutionProfile(e.SpawnTask),
+                        RequestedModel = ExtractSpawnArgument(e.ToolArguments, "model"),
+                        RequestedReasoningEffort = ExtractSpawnArgument(e.ToolArguments, "reasoning_effort", "reasoningEffort"),
+                        ActualModel = e.ActualModel ?? ExtractSpawnArgument(e.ToolOutput, "actual_model", "actualModel", "model_used", "modelUsed", "resolved_model", "resolvedModel"),
+                        ActualReasoningEffort = e.ActualReasoningEffort ?? ExtractSpawnArgument(e.ToolOutput, "actual_reasoning_effort", "actualReasoningEffort", "reasoning_effort_used", "reasoningEffortUsed", "resolved_reasoning_effort", "resolvedReasoningEffort"),
                         Timestamp = e.Timestamp
                     };
                     spawnByCall[e.ToolId] = record;
@@ -481,6 +511,12 @@ public sealed class CodexRolloutReader
                     record.SenderThreadId ??= e.SenderThreadId ?? rollout.ThreadId;
                     if (record.Task is null && e.SpawnTask is not null)
                         record.Task = e.SpawnTask;
+                    record.ChildAgentPath ??= ExtractSpawnArgument(e.ToolOutput, "task_name");
+                    record.ExecutionProfile ??= ExtractExecutionProfile(e.SpawnTask);
+                    record.RequestedModel ??= ExtractSpawnArgument(e.ToolArguments, "model");
+                    record.RequestedReasoningEffort ??= ExtractSpawnArgument(e.ToolArguments, "reasoning_effort", "reasoningEffort");
+                    record.ActualModel ??= e.ActualModel ?? ExtractSpawnArgument(e.ToolOutput, "actual_model", "actualModel", "model_used", "modelUsed", "resolved_model", "resolvedModel");
+                    record.ActualReasoningEffort ??= e.ActualReasoningEffort ?? ExtractSpawnArgument(e.ToolOutput, "actual_reasoning_effort", "actualReasoningEffort", "reasoning_effort_used", "reasoningEffortUsed", "resolved_reasoning_effort", "resolvedReasoningEffort");
                 }
 
                 foreach (var id in e.ReceiverThreadIds)
@@ -501,6 +537,9 @@ public sealed class CodexRolloutReader
             }
             else if (e.ToolPhase == "output" && spawnByCall.TryGetValue(e.ToolId, out var record))
             {
+                record.ChildAgentPath ??= ExtractSpawnArgument(e.ToolOutput, "task_name");
+                record.ActualModel ??= e.ActualModel ?? ExtractSpawnArgument(e.ToolOutput, "actual_model", "actualModel", "model_used", "modelUsed", "resolved_model", "resolvedModel");
+                record.ActualReasoningEffort ??= e.ActualReasoningEffort ?? ExtractSpawnArgument(e.ToolOutput, "actual_reasoning_effort", "actualReasoningEffort", "reasoning_effort_used", "reasoningEffortUsed", "resolved_reasoning_effort", "resolvedReasoningEffort");
                 var id = e.ChildThreadId ?? ExtractThreadId(e.ToolOutput);
                 if (!string.IsNullOrWhiteSpace(id) &&
                     !record.ChildThreadIds.Contains(id, StringComparer.Ordinal))
@@ -699,6 +738,32 @@ public sealed class CodexRolloutReader
         {
             return arguments;
         }
+    }
+
+    private static string? ExtractSpawnArgument(string? payload, params string[] names)
+    {
+        if (string.IsNullOrWhiteSpace(payload))
+            return null;
+        try
+        {
+            using var document = JsonDocument.Parse(payload);
+            return FindString(document.RootElement, names);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string? ExtractExecutionProfile(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
+        var heading = Regex.Match(text, @"(?im)^\s*#\s*ExecutionProfile\s*$\s*^(?<value>economy|standard|strong)\s*$");
+        if (heading.Success)
+            return heading.Groups["value"].Value.ToLowerInvariant();
+        var inline = Regex.Match(text, @"(?im)\bExecutionProfile\s*:\s*(?<value>economy|standard|strong)\b");
+        return inline.Success ? inline.Groups["value"].Value.ToLowerInvariant() : null;
     }
 
     private static string? ExtractArguments(JsonElement element)
@@ -1021,6 +1086,18 @@ public sealed class FactoryReportEngine
         {
             foreach (var spawn in spawningRollout.SpawnRecords.Values)
             {
+                if (!spawn.Children.Any() && spawn.ChildAgentPath?.StartsWith('/') == true)
+                {
+                    // Current native spawn results may identify the child by canonical
+                    // agent path instead of UUID. Resolve only within the known parent.
+                    var matches = all.Where(child => child.AgentPath == spawn.ChildAgentPath &&
+                        child.ParentThreadId == (spawn.SenderThreadId ?? spawningRollout.ThreadId)).ToArray();
+                    if (matches.Length == 1)
+                    {
+                        spawn.ChildThreadId = matches[0].ThreadId;
+                        spawn.ChildThreadIds.Add(matches[0].ThreadId);
+                    }
+                }
                 foreach (var childId in spawn.Children)
                 {
                     if (!byId.TryGetValue(childId, out var child))
@@ -1370,10 +1447,39 @@ public sealed class FactoryReportEngine
                 Number = index + 1,
                 AgentThreadId = x.ThreadId,
                 Text = x.Task,
+                ExecutionProfile = x.ExecutionProfile,
+                SpawnExecutionProfile = x.SpawnExecutionProfile,
+                RequestedModel = x.RequestedModel,
+                RequestedReasoningEffort = x.RequestedReasoningEffort,
+                ActualModel = x.ActualModel,
+                ActualReasoningEffort = x.ActualReasoningEffort,
                 Status = status,
                 DurationMilliseconds = x.DurationMilliseconds
             };
         }).ToList();
+
+        foreach (var task in tasks.Where(x => x.ExecutionProfile is not null &&
+                     x.SpawnExecutionProfile is not null && x.ExecutionProfile != x.SpawnExecutionProfile))
+        {
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "warning",
+                Category = "factory",
+                Code = "worker_execution_profile_mismatch",
+                Message = $"Planner assigned {task.ExecutionProfile} to worker {task.AgentThreadId}, but its spawn prompt declares {task.SpawnExecutionProfile}."
+            });
+        }
+
+        foreach (var task in tasks.Where(HasConfirmedExecutionSettingsMismatch))
+        {
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "warning",
+                Category = "factory",
+                Code = "worker_execution_settings_mismatch",
+                Message = $"Worker {task.AgentThreadId} requested {FormatExecutionSettings(task.RequestedModel, task.RequestedReasoningEffort)} but the trace reports {FormatExecutionSettings(task.ActualModel, task.ActualReasoningEffort)}."
+            });
+        }
 
         var rootReportedTokens = ComputeRootReportedTokens(root.Events, end, terminalEvent);
         var tokenMetrics = AggregateTokens(agents, out var tokenMethod, out var tokenComplete);
@@ -1498,6 +1604,17 @@ public sealed class FactoryReportEngine
         };
     }
 
+    private static bool HasConfirmedExecutionSettingsMismatch(TaskReport task) =>
+        (!string.IsNullOrWhiteSpace(task.RequestedModel) &&
+         !string.IsNullOrWhiteSpace(task.ActualModel) &&
+         !string.Equals(task.RequestedModel, task.ActualModel, StringComparison.Ordinal)) ||
+        (!string.IsNullOrWhiteSpace(task.RequestedReasoningEffort) &&
+         !string.IsNullOrWhiteSpace(task.ActualReasoningEffort) &&
+         !string.Equals(task.RequestedReasoningEffort, task.ActualReasoningEffort, StringComparison.Ordinal));
+
+    private static string FormatExecutionSettings(string? model, string? reasoning) =>
+        $"model={model ?? "unknown"}, reasoning={reasoning ?? "unknown"}";
+
     private static List<CodexRollout> SelectDescendants(
         CodexRollout root,
         DateTimeOffset? runStart,
@@ -1577,6 +1694,7 @@ public sealed class FactoryReportEngine
             var role = ClassifyRole(root, child, spawn);
             var task = role == "worker" ? ExtractFactoryTask(spawn?.Task) : null;
             var (outcome, outcomeAt) = role == "planner" ? PlannerOutcome(child) : (null, null);
+            var actualSettings = ChildExecutionSettings(child);
             var tokens = ComputeWholeThreadTokens(child, out var authoritativeTokens);
             agents.Add(new AgentReport
             {
@@ -1587,6 +1705,11 @@ public sealed class FactoryReportEngine
                 FinishedAt = ExecutionFinishedAt(child),
                 Task = task,
                 TaskTitle = TaskTitle(task),
+                SpawnExecutionProfile = spawn?.ExecutionProfile,
+                RequestedModel = spawn?.RequestedModel,
+                RequestedReasoningEffort = spawn?.RequestedReasoningEffort,
+                ActualModel = spawn?.ActualModel ?? actualSettings.Model,
+                ActualReasoningEffort = spawn?.ActualReasoningEffort ?? actualSettings.ReasoningEffort,
                 PlannerOutcome = outcome,
                 PlannerOutcomeAt = outcomeAt,
                 Tokens = tokens,
@@ -1596,6 +1719,15 @@ public sealed class FactoryReportEngine
             });
         }
         return agents;
+    }
+
+    private static (string? Model, string? ReasoningEffort) ChildExecutionSettings(CodexRollout child)
+    {
+        // Tool events describe invoked operations, including grandchildren, not this worker.
+        var settings = child.Events.Where(x => x.ToolId is null &&
+            (x.ThreadId is null || x.ThreadId == child.ThreadId)).ToArray();
+        return (settings.FirstOrDefault(x => x.ActualModel is not null)?.ActualModel,
+            settings.FirstOrDefault(x => x.ActualReasoningEffort is not null)?.ActualReasoningEffort);
     }
 
     private static AgentReport BuildRootAgent(
@@ -1727,15 +1859,28 @@ public sealed class FactoryReportEngine
         return string.IsNullOrWhiteSpace(first) ? null : Bound(first, 80);
     }
 
+    private sealed record PlannedTask(string Text, string? ExecutionProfile);
+
+    private static string? ExtractPlannerExecutionProfile(string text)
+    {
+        var matches = Regex.Matches(text,
+            @"(?ims)^\s*#\s*ExecutionProfile\s*$\s*(?<value>.*?)(?=^\s*#|\z)");
+        if (matches.Count != 1)
+            return null;
+        var value = matches[0].Groups["value"].Value.Trim();
+        return value is "economy" or "standard" or "strong" ? value : null;
+    }
+
     private static void PopulateMissingWorkerTasks(
         IReadOnlyList<AgentReport> agents,
         IReadOnlyDictionary<string, CodexRollout> rollouts)
     {
-        var pending = new Queue<string>();
+        var pending = new Queue<PlannedTask>();
         foreach (var agent in agents.OrderBy(x => x.StartedAt).ThenBy(x => x.ThreadId, StringComparer.Ordinal))
         {
             if (agent.Role == "planner" && rollouts.TryGetValue(agent.ThreadId, out var planner))
             {
+                pending.Clear();
                 foreach (var task in ExtractPlannerTasks(planner))
                     pending.Enqueue(task);
                 continue;
@@ -1745,15 +1890,16 @@ public sealed class FactoryReportEngine
                 continue;
 
             var plannedTask = pending.Dequeue();
-            if (!string.IsNullOrWhiteSpace(agent.Task))
-                continue;
-
-            agent.Task = plannedTask;
-            agent.TaskTitle = TaskTitle(plannedTask);
+            if (string.IsNullOrWhiteSpace(agent.Task))
+            {
+                agent.Task = plannedTask.Text;
+                agent.TaskTitle = TaskTitle(plannedTask.Text);
+            }
+            agent.ExecutionProfile = plannedTask.ExecutionProfile;
         }
     }
 
-    private static IReadOnlyList<string> ExtractPlannerTasks(CodexRollout rollout)
+    private static IReadOnlyList<PlannedTask> ExtractPlannerTasks(CodexRollout rollout)
     {
         var text = rollout.Events
             .Where(x => string.Equals(x.Role, "assistant", StringComparison.OrdinalIgnoreCase) &&
@@ -1765,10 +1911,17 @@ public sealed class FactoryReportEngine
             return [];
 
         return Regex.Matches(text,
-                @"(?ms)^\s*#\s*Task\s*$\s*(?<task>.*?)(?=^\s*#\s*(?:Task|ExecutionProfile|TaskRelatedIntent|TaskRelatedEngineering)\s*$|\z)",
+                @"(?ms)^\s*#\s*Task\s*$\s*(?<section>.*?)(?=^\s*#\s*Task\s*$|\z)",
                 RegexOptions.IgnoreCase)
-            .Select(match => Bound(match.Groups["task"].Value.Trim(), 1000))
-            .Where(task => !string.IsNullOrWhiteSpace(task))
+            .Select(match =>
+            {
+                var section = match.Groups["section"].Value;
+                var task = Regex.Split(section,
+                        @"(?m)^\s*#\s*(?:ExecutionProfile|TaskRelatedIntent|TaskRelatedEngineering)\s*$",
+                        RegexOptions.IgnoreCase)[0];
+                return new PlannedTask(Bound(task.Trim(), 1000), ExtractPlannerExecutionProfile(section));
+            })
+            .Where(task => !string.IsNullOrWhiteSpace(task.Text))
             .ToArray();
     }
 
@@ -2802,6 +2955,9 @@ public static class ReportWriters
         DefaultIgnoreCondition = JsonIgnoreCondition.Never
     };
 
+    private static string FormatExecutionSettings(string? model, string? reasoning) =>
+        $"model={model ?? "unknown"}, reasoning={reasoning ?? "unknown"}";
+
     public static void WriteList(IEnumerable<FactoryRunReport> reports, TextWriter writer)
     {
         writer.WriteLine("#  Started                      Result       Thread");
@@ -2855,6 +3011,11 @@ public static class ReportWriters
             writer.WriteLine($"#{task.Number}  {agent?.TaskTitle ?? Short(task.Text, 80)}");
             writer.WriteLine($"    Status:    {task.Status}");
             writer.WriteLine($"    Worker:    {task.AgentThreadId}");
+            writer.WriteLine($"    Profile:   {task.ExecutionProfile ?? "unknown"}");
+            if (task.SpawnExecutionProfile is not null)
+                writer.WriteLine($"    Spawn profile: {task.SpawnExecutionProfile}");
+            writer.WriteLine($"    Requested: {FormatExecutionSettings(task.RequestedModel, task.RequestedReasoningEffort)}");
+            writer.WriteLine($"    Actual:    {FormatExecutionSettings(task.ActualModel, task.ActualReasoningEffort)}");
             writer.WriteLine($"    Duration:  {FormatDuration(task.DurationMilliseconds)}");
             writer.WriteLine($"    Tokens:    {FormatTaskTokens(agent?.Tokens)}");
         }
@@ -2992,6 +3153,11 @@ public static class ReportWriters
             writer.WriteLine();
             writer.WriteLine($"- Status: {task.Status}");
             writer.WriteLine("- Worker: " + task.AgentThreadId);
+            writer.WriteLine($"- Execution profile: {task.ExecutionProfile ?? "unknown"}");
+            if (task.SpawnExecutionProfile is not null)
+                writer.WriteLine($"- Spawn execution profile: {task.SpawnExecutionProfile}");
+            writer.WriteLine($"- Requested settings: {FormatExecutionSettings(task.RequestedModel, task.RequestedReasoningEffort)}");
+            writer.WriteLine($"- Actual settings: {FormatExecutionSettings(task.ActualModel, task.ActualReasoningEffort)}");
             writer.WriteLine($"- Duration: {FormatDuration(task.DurationMilliseconds)}");
             writer.WriteLine($"- Tokens: {FormatTaskTokens(agent?.Tokens)}");
             if (!string.IsNullOrWhiteSpace(task.Text))
