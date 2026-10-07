@@ -88,8 +88,9 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
             publicSkills);
         Assert.DoesNotContain("idd-factory-decompose-task", publicSkills);
 
-        var plannerReference = Assert.Single(factory.GetProperty("skillReferences").EnumerateArray()
-            .Where(reference => reference.GetProperty("destination").GetString() == "factory-planner.md"));
+        var plannerReference = Assert.Single(
+            factory.GetProperty("skillReferences").EnumerateArray(),
+            reference => reference.GetProperty("destination").GetString() == "factory-planner.md");
         AssertString(plannerReference, "skill", "idd-factory-run");
         AssertString(plannerReference, "source", "src/canonical/factory/planner.md");
         AssertString(plannerReference, "destination", "factory-planner.md");

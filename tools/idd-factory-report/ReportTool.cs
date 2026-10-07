@@ -2160,7 +2160,7 @@ public sealed class FactoryReportEngine
     }
 
     private static bool IsFactoryOwned(CodexEvent e) =>
-        e.Contains(RunSkill) || e.Contains(PlannerSkill) || e.Contains(WorkerSkill) ||
+        e.Contains(RunSkill) || e.Contains(PlannerMarker) || e.Contains(LegacyPlannerSkill) || e.Contains(WorkerSkill) ||
         e.ToolName?.Contains("spawn_agent", StringComparison.OrdinalIgnoreCase) == true ||
         e.ToolName?.Contains("wait_agent", StringComparison.OrdinalIgnoreCase) == true ||
         IsFactoryCompletion(e) ||
