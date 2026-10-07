@@ -13,7 +13,8 @@ MCP transport, retry engine, or durable implementation database.
 ## Required references
 
 Read `references/intent-preflight.md` before starting or replacing a Factory
-run. Read `references/engineering-guardrails.md` before using an optional
+run. Read `references/factory-planner.md` before spawning any planner. Read
+`references/engineering-guardrails.md` before using an optional
 `.idd/engineering/` layer. Read `references/project-verification.md` before
 project verification. Read `references/factory-execution-policy.md` before
 interpreting `ExecutionProfile` or `.idd/execution.yaml`.
@@ -265,25 +266,40 @@ state machine.
 
 ### Fresh planner
 
-Invoke `idd-factory-decompose-task` in a fresh semantic context. Give it only
-the self-contained request, current repository access, prior user answers, short
-completed summaries, and the latest bounded project-verification failure when
-present. The planner discovers current durable intent through the normal
+Before every planner spawn, read `references/factory-planner.md`. Create a
+fresh planner child context and provide the complete contents of that reference
+as the child's planner instructions. Preserve its stable semantic role marker,
+`You are the Factory planner.`, in the child instructions so native trace
+reporting can identify the planner without relying on a public skill name.
+
+Give the planner only:
+
+- the self-contained Factory request;
+- current repository access;
+- exact prior user answers;
+- bounded completed summaries;
+- the latest bounded project-verification failure, when present;
+- the complete canonical Engineering Guardrails contract from
+  `references/engineering-guardrails.md` when `.idd/engineering/` exists.
+
+The planner discovers current durable intent through the normal
 `.idd/intent/README.md` and `INDEX.md` flow and reads only relevant documents.
+When `.idd/engineering/` exists, also give it access to the repository's
+Engineering README and INDEX. The planner semantically selects only relevant
+Conditional rules and emits them as `TaskRelatedEngineering`. It does not emit
+Always rules. Full Always documents are not automatically loaded into planner
+context, though the planner may read one when its content is necessary for
+correct decomposition.
 
-When `.idd/engineering/` exists, also give the planner access to its README and
-INDEX. The planner semantically selects only relevant Conditional rules and
-emits them as `TaskRelatedEngineering`. It does not emit Always rules. Full
-Always documents are not automatically loaded into planner context, though the
-planner may read one when its content is necessary for correct decomposition.
+Do not rely on child skill discovery, automatic loading of parent-skill
+references, or inherited root transcript. Do not forward the parent transcript
+or automatically load the complete intent or Engineering trees.
 
-Do not forward the parent transcript or automatically load the complete intent
-or Engineering trees.
-
-The planner creates only implementation/research tasks. It must not create tasks
-to update Product Intent, create/modify Engineering Rules, run
-`idd-engineering-change`, import the request, or otherwise perform durable
-preparation. Factory Preflight finishes that work before active state exists.
+The planner creates only implementation/research tasks. It must not execute
+implementation and must not create tasks to update Product Intent,
+create/modify Engineering Rules, run `idd-engineering-change`, import the
+request, or otherwise perform durable preparation. Factory Preflight finishes
+that work before active state exists.
 
 ### Worker execution profile
 

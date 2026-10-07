@@ -394,4 +394,4 @@ Factory planners must consider relevant cross-cutting Intent when choosing TaskR
 
 Projects without `.idd/engineering/` behave exactly as before.
 
-Existing intent is never moved automatically. `.idd/plugins.json` does not require an Engineering plugin. `.idd/verification.yaml` remains separate operational configuration. Factory state remains lightweight Markdown.
+Existing intent is never moved automatically. `.idd/verification.yaml` remains separate operational configuration. Factory state remains lightweight Markdown.

@@ -1,6 +1,6 @@
 {
   "name": "idd-intent",
-  "version": "2.0.76",
+  "version": "2.0.77",
   "description": "Durable product intent plus optional project-owned Engineering Guardrails for Intent-Driven Development.",
   "skills": "./skills/",
   "author": {
