@@ -69,8 +69,43 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
     }
 
     [Fact]
-    public void FactoryMetadata_HasOnlyCanonicalFourSkillsAndNoGeneratedRoleSurface()
+    public void FactoryMetadata_HasOnlyPublicSkillsAndInternalPlannerReference()
     {
+        var manifestPath = Path.Combine(fixture.RepoRoot, "src", "canonical", "plugins", "plugin-manifest.json");
+        using var manifest = JsonDocument.Parse(fixture.ReadText(manifestPath));
+        var factory = manifest.RootElement.GetProperty("plugins").GetProperty("idd-factory");
+        var publicSkills = factory.GetProperty("skills").EnumerateArray()
+            .Select(value => value.GetString())
+            .ToArray();
+
+        Assert.Equal(
+            new[]
+            {
+                "idd-factory-run",
+                "idd-factory-configure",
+                "idd-factory-execute-subtask"
+            },
+            publicSkills);
+        Assert.DoesNotContain("idd-factory-decompose-task", publicSkills);
+
+        var plannerReference = Assert.Single(factory.GetProperty("skillReferences").EnumerateArray()
+            .Where(reference => reference.GetProperty("destination").GetString() == "factory-planner.md"));
+        AssertString(plannerReference, "skill", "idd-factory-run");
+        AssertString(plannerReference, "source", "src/canonical/factory/planner.md");
+        AssertString(plannerReference, "destination", "factory-planner.md");
+
+        var canonicalPlannerPath = Path.Combine(fixture.RepoRoot, "src", "canonical", "factory", "planner.md");
+        fixture.AssertFile(canonicalPlannerPath);
+        fixture.AssertMissing(Path.Combine(
+            fixture.RepoRoot, "src", "canonical", "skills", "idd-factory-decompose-task.md"));
+        var canonicalPlanner = GenerationFixture.NormalizeText(fixture.ReadText(canonicalPlannerPath));
+
+        using (var descriptions = JsonDocument.Parse(fixture.ReadText(Path.Combine(
+                   fixture.RepoRoot, "src", "canonical", "skills", "skill-descriptions.json"))))
+        {
+            Assert.False(descriptions.RootElement.TryGetProperty("idd-factory-decompose-task", out _));
+        }
+
         foreach (var platform in new[] { "claude", "codex" })
         {
             var root = Path.Combine(fixture.MarketplaceRoot, "plugins", platform, "idd-factory");
@@ -85,11 +120,39 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
                 new[]
                 {
                     "idd-factory-configure",
-                    "idd-factory-decompose-task",
                     "idd-factory-execute-subtask",
                     "idd-factory-run"
                 },
                 skills);
+            fixture.AssertMissing(Path.Combine(root, "skills", "idd-factory-decompose-task"));
+
+            var generatedPlanner = fixture.ReadText(Path.Combine(
+                root, "skills", "idd-factory-run", "references", "factory-planner.md"));
+            Assert.Equal(canonicalPlanner, GenerationFixture.NormalizeText(generatedPlanner));
+            fixture.AssertFile(Path.Combine(
+                root, "skills", "idd-factory-run", "references", "engineering-guardrails.md"));
+
+            var run = fixture.ReadText(Path.Combine(root, "skills", "idd-factory-run", "SKILL.md"));
+            Assert.Contains("references/factory-planner.md", run);
+            Assert.DoesNotContain("Invoke `idd-factory-decompose-task`", run);
+
+            if (platform == "codex")
+            {
+                Assert.Contains("fork_turns = \"none\"", run);
+                Assert.Contains("spawn_agent", run);
+                Assert.Contains("wait_agent", run);
+            }
+            else
+            {
+                Assert.Contains("fresh semantic context with controlled input", run);
+                Assert.Contains("Agent/subagent", run);
+                Assert.Contains("terminal", run);
+            }
+
+            var helpInventory = fixture.ReadText(Path.Combine(
+                fixture.MarketplaceRoot, "plugins", platform, "idd-intent", "skills", "idd-help",
+                "references", "skill-descriptions.json"));
+            Assert.DoesNotContain("idd-factory-decompose-task", helpInventory);
 
             using var metadata = JsonDocument.Parse(fixture.ReadText(Path.Combine(root, "idd-plugin.json")));
             if (metadata.RootElement.TryGetProperty("roleDefinitions", out var roleDefinitions))

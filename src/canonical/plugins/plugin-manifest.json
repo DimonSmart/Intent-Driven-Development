@@ -139,7 +139,6 @@
       "skills": [
         "idd-factory-run",
         "idd-factory-configure",
-        "idd-factory-decompose-task",
         "idd-factory-execute-subtask"
       ],
       "roles": [],
@@ -167,11 +166,11 @@
         },
         {
           "skill": "idd-factory-run",
-          "source": "src/canonical/methodology/engineering-guardrails.md",
-          "destination": "engineering-guardrails.md"
+          "source": "src/canonical/factory/planner.md",
+          "destination": "factory-planner.md"
         },
         {
-          "skill": "idd-factory-decompose-task",
+          "skill": "idd-factory-run",
           "source": "src/canonical/methodology/engineering-guardrails.md",
           "destination": "engineering-guardrails.md"
         },

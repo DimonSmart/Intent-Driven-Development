@@ -1,7 +1,7 @@
 # Factory skills
 
-IDD Factory has four canonical skills. Three participate in a run; the fourth
-configures persistent project execution policy.
+IDD Factory exposes three public skills. The planner is a separate internal
+canonical protocol owned by `idd-factory-run`, not a user-invokable skill.
 
 ## `idd-factory-run`
 
@@ -44,9 +44,11 @@ Dynamic aliases such as `cheapest`, `best`, `latest`, or `strongest` are
 resolved during configuration to concrete model IDs; they are not persisted as
 runtime identifiers.
 
-## `idd-factory-decompose-task`
+## Internal planner protocol
 
-This is the planner.
+The planner is not a user-invokable skill. `idd-factory-run` creates a fresh
+planner child and supplies the complete packaged
+`references/factory-planner.md` protocol.
 
 A fresh planner inspects the original request, repository, relevant current
 intent, exact user answers, bounded completed summaries, and the latest bounded

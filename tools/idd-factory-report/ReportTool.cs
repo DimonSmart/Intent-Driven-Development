@@ -998,7 +998,8 @@ public sealed class CodexStateDbReader
 public sealed class FactoryReportEngine
 {
     private const string RunSkill = "idd-factory-run";
-    private const string PlannerSkill = "idd-factory-decompose-task";
+    private const string PlannerMarker = "You are the Factory planner.";
+    private const string LegacyPlannerSkill = "idd-factory-decompose-task";
     private const string WorkerSkill = "idd-factory-execute-subtask";
     private readonly CodexRolloutReader _reader = new();
 
@@ -1119,9 +1120,9 @@ public sealed class FactoryReportEngine
             return explicitStarts;
 
         var fallback = root.Events.FirstOrDefault(x =>
-            x.Contains(PlannerSkill) || x.Contains(WorkerSkill) ||
+            x.Contains(PlannerMarker) || x.Contains(LegacyPlannerSkill) || x.Contains(WorkerSkill) ||
             x.ToolName?.Contains("spawn_agent", StringComparison.OrdinalIgnoreCase) == true &&
-            (x.SpawnTask?.Contains(PlannerSkill, StringComparison.OrdinalIgnoreCase) == true ||
+            (HasPlannerMarker(x.SpawnTask) ||
              x.SpawnTask?.Contains(WorkerSkill, StringComparison.OrdinalIgnoreCase) == true));
         return fallback is null ? [] : [fallback];
     }
@@ -1632,7 +1633,7 @@ public sealed class FactoryReportEngine
             return "worker";
 
         var spawnTask = spawn?.Task;
-        var spawnPlanner = HasFactoryMarker(spawnTask, PlannerSkill);
+        var spawnPlanner = HasPlannerMarker(spawnTask);
         var spawnWorker = HasFactoryMarker(spawnTask, WorkerSkill);
         if (spawnPlanner && !spawnWorker)
             return "planner";
@@ -1646,7 +1647,7 @@ public sealed class FactoryReportEngine
                 .Take(4)
                 .Select(x => x.Text ?? ""));
 
-        var mentionsPlanner = initialInstructions.Contains(PlannerSkill, StringComparison.OrdinalIgnoreCase);
+        var mentionsPlanner = HasPlannerMarker(initialInstructions);
         var mentionsWorker = initialInstructions.Contains(WorkerSkill, StringComparison.OrdinalIgnoreCase);
         if (mentionsPlanner && !mentionsWorker)
             return "planner";
@@ -1669,6 +1670,10 @@ public sealed class FactoryReportEngine
         }
         return null;
     }
+
+    private static bool HasPlannerMarker(string? text) =>
+        HasFactoryMarker(text, PlannerMarker) ||
+        HasFactoryMarker(text, LegacyPlannerSkill);
 
     private static bool HasFactoryMarker(string? text, string marker) =>
         !string.IsNullOrWhiteSpace(text) &&

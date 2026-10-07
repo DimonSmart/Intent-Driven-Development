@@ -2,6 +2,19 @@
 
 This page records IDD changes that require action in repositories that already use the toolkit.
 
+## 2026-10-07 — Factory planner is now an internal protocol
+
+`idd-factory-decompose-task` is no longer a public Factory skill. Planner
+behavior now lives in the canonical internal planner protocol owned by
+`idd-factory-run` and is packaged as
+`references/factory-planner.md` through the normal skill-reference generation
+pipeline.
+
+Normal `idd-factory-run` usage and planner semantics are unchanged. Existing
+installed versions may still physically contain the old public skill until the
+plugin is updated. Historical Factory traces may also contain the old name;
+`idd-factory-report` continues to recognize that legacy marker.
+
 ## 2026-09-25 — Configurable Factory execution profiles
 
 Factory planner tasks may now declare optional `# ExecutionProfile` metadata:

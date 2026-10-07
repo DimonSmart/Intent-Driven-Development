@@ -22,7 +22,6 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
             ("idd-intent", "idd-engineering-change"),
             ("idd-intent", "idd-intent-import"),
             ("idd-factory", "idd-factory-run"),
-            ("idd-factory", "idd-factory-decompose-task"),
             ("idd-factory", "idd-factory-execute-subtask")
         };
 
@@ -34,6 +33,18 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
                 "references", "engineering-guardrails.md"));
             Assert.Equal(source, GenerationFixture.NormalizeText(generated));
         }
+    }
+
+    [Fact]
+    public void FactoryPlanner_ReceivesEngineeringGuardrailsThroughRunOwner()
+    {
+        var run = Canonical("skills", "idd-factory-run.md");
+        var planner = Canonical("factory", "planner.md");
+
+        Assert.Contains("complete canonical Engineering Guardrails contract", run);
+        Assert.Contains("references/engineering-guardrails.md", run);
+        Assert.Contains("Engineering Guardrails contract explicitly supplied by `idd-factory-run`", planner);
+        Assert.Contains("Do not assume parent-skill references", planner);
     }
 
     [Fact]

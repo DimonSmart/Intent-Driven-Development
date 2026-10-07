@@ -56,13 +56,18 @@ Ownership rules:
 - Factory depends on Intent;
 - Intent must not depend on Factory.
 
-The canonical Factory skill set is exactly `idd-factory-run`,
-`idd-factory-configure`, `idd-factory-decompose-task`, and
-`idd-factory-execute-subtask`. The configuration skill owns persistent
-project model policy; the other three implement the run loop. The planner
-creates the current contractable batch and capability profile; the root agent
-mechanically maps that profile immediately before each fresh native worker; a
-fresh planner runs after the batch is exhausted.
+The canonical public Factory skill set is exactly `idd-factory-run`,
+`idd-factory-configure`, and `idd-factory-execute-subtask`. The configuration
+skill owns persistent project model policy; `idd-factory-run` owns the run loop
+and planner lifecycle; the worker skill executes each contracted task.
+
+The planner is canonical distributable content without being a skill:
+`src/canonical/factory/planner.md` is packaged through generic
+`skillReferences` as
+`skills/idd-factory-run/references/factory-planner.md`. The planner creates the
+current contractable batch and capability profile; the root agent mechanically
+maps that profile immediately before each fresh native worker; a fresh planner
+runs after the batch is exhausted.
 
 The generator publishes skills, references, adapter metadata, and bootstrap
 assets only. It must not publish `idd-factory.dll`, a runtime package, or a

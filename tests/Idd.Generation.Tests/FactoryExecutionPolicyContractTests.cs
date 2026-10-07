@@ -13,7 +13,7 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
     [Fact]
     public void Planner_UsesOnlyCanonicalExecutionProfilesAndDefaultsMissingToStandard()
     {
-        var planner = Canonical("skills", "idd-factory-decompose-task.md");
+        var planner = Canonical("factory", "planner.md");
 
         Assert.Contains("economy", planner);
         Assert.Contains("standard", planner);
@@ -25,6 +25,13 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("Do not read `.idd/execution.yaml`", planner);
         Assert.Contains("Do not emit concrete model IDs", planner);
         Assert.Contains("Do not classify based on model price", planner);
+        Assert.Contains("# Task", planner);
+        Assert.Contains("# Question", planner);
+        Assert.Contains("# Done", planner);
+        Assert.Contains("TaskRelatedIntent", planner);
+        Assert.Contains("TaskRelatedEngineering", planner);
+        Assert.Contains("## Incremental planning", planner);
+        Assert.Contains("Do not create or modify durable Product Intent or Engineering Rules", planner);
     }
 
     [Fact]
@@ -119,6 +126,7 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
                 Path.Combine(fixture.RepoRoot, "src", "canonical", "skills"),
                 "idd-factory-*.md")
             .Append(Path.Combine(fixture.RepoRoot, "src", "canonical", "methodology", "factory-execution-policy.md"))
+            .Append(Path.Combine(fixture.RepoRoot, "src", "canonical", "factory", "planner.md"))
             .Append(Path.Combine(fixture.RepoRoot, "tools", "generate", "Generation", "CodexPlatformAdapter.cs"))
             .Append(Path.Combine(fixture.RepoRoot, "tools", "generate", "Generation", "ClaudePlatformAdapter.cs"));
 
