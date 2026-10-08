@@ -95,7 +95,7 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("native child-agent spawn", run);
         Assert.Contains("Do not reconsider task complexity", run);
         Assert.Contains("never silently fall back to `inherit`", run);
-        Assert.Contains("missing profile", run);
+        Assert.Contains("missing task profile", run);
         Assert.Contains("idd-factory-configure", run);
         Assert.Contains("worker skill is always", run);
         Assert.Contains("idd-factory-execute-subtask", run);
