@@ -1721,7 +1721,7 @@ public sealed class FactoryReportEngine
 
     private static bool HasRoleLine(string? text, string marker) =>
         !string.IsNullOrWhiteSpace(text) &&
-        Regex.IsMatch(text, @"(?m)^\s*" + Regex.Escape(marker) + @"\s*$", RegexOptions.IgnoreCase);
+        Regex.IsMatch(text, @"(?m)^\s*" + Regex.Escape(marker) + @"(?:\s|$)", RegexOptions.IgnoreCase);
 
     private static bool HasFactoryMarker(string? text, string marker) =>
         !string.IsNullOrWhiteSpace(text) &&
@@ -1767,7 +1767,7 @@ public sealed class FactoryReportEngine
             if (!heading.Success)
                 return null;
             var task = heading.Groups["task"].Value.Trim();
-            return string.IsNullOrWhiteSpace(task) ? null : Bound(task, 1000);
+            return string.IsNullOrWhiteSpace(task) ? null : BoundAssignmentTask(task, 1000);
         }
 
         // Modern spawn instructions without a complete boundary are ambiguous.
@@ -1794,6 +1794,9 @@ public sealed class FactoryReportEngine
             .ToArray();
         return lines.Length == 0 ? null : Bound(string.Join(" ", lines), 1000);
     }
+
+    private static string BoundAssignmentTask(string task, int max) =>
+        task.Length <= max ? task : task[..max] + " [truncated]";
 
     private static string? TaskTitle(string? task)
     {
