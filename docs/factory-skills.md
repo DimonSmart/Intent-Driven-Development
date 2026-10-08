@@ -1,7 +1,7 @@
 # Factory skills
 
-IDD Factory has four canonical skills. Three participate in a run; the fourth
-configures persistent project execution policy.
+IDD Factory has five canonical skills. Three participate in a run; two support
+configuration and lifecycle updates of persistent project execution policy.
 
 ## `idd-factory-run`
 
@@ -45,6 +45,28 @@ source does not contain a built-in table of recommended concrete models.
 Dynamic aliases such as `cheapest`, `best`, `latest`, or `strongest` are
 resolved during configuration to concrete model IDs; they are not persisted as
 runtime identifiers.
+
+## `idd-factory-update-effort-models`
+
+Use this lifecycle workflow to refresh, upgrade, downgrade, or replace the LLMs
+assigned to `economy`, `standard`, and `strong`. For example, ask to reduce cost
+for economy only, strengthen standard, or replace an unavailable model.
+
+These effort levels are execution profiles; platform reasoning settings remain
+unchanged unless explicitly requested. The skill reads current policy and model
+information, preserves unselected levels and other platforms, and presents the
+current/proposed mapping with reasons and availability uncertainty. Concrete
+recommended model IDs are not built into the skill.
+
+Review-only requests return the proposal without writing. For application, the
+skill hands the complete proposal, baseline, and user authorization to
+`idd-factory-configure`, which remains the sole writer. Automatically selected
+models require confirmation; exact authorized replacements or an already
+confirmed proposal do not repeat that decision. Intervening edits are checked
+before saving, and an unchanged policy is not rewritten.
+
+Updates apply to the next worker spawn without a new plan. Running workers keep
+their model. The workflow does not start Factory or mutate its temporary state.
 
 ## `idd-factory-decompose-task`
 

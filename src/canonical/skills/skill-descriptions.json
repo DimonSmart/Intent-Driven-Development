@@ -140,6 +140,9 @@
     "description": "Create or deliberately update project-owned Factory execution-profile mappings in .idd/execution.yaml without hardcoded model recommendations.",
     "invocation": "manual"
   },
+  "idd-factory-update-effort-models": {
+    "description": "Refresh, upgrade, downgrade, or replace the LLMs assigned to Factory effort levels economy, standard, and strong over a project's lifetime, preserving reasoning settings and applying authorized changes through idd-factory-configure."
+  },
   "idd-factory-run": {
     "description": "Prepare required durable Product Intent and explicit Engineering policy before starting a new run, then orchestrate incremental planning and isolated native-agent workers while mechanically applying project-owned execution-profile mappings."
   },

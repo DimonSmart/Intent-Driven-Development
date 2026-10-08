@@ -155,6 +155,19 @@ The worker does not read this policy to choose its own model.
 `idd-factory-configure` is the only Factory workflow that creates or
 deliberately changes `.idd/execution.yaml`.
 
+`idd-factory-update-effort-models` is the lifecycle entry point for refreshing,
+upgrading, downgrading, or replacing the models assigned to those profiles. It
+prepares a proposal and hands it to `idd-factory-configure` with the original
+request, policy baseline, and user authorization. It does not introduce a second
+policy writer or change planner classification. Preserve unaffected mappings,
+other platform sections, and reasoning settings unless explicitly requested.
+
+The configuration owner compares current policy with the proposal baseline
+before saving. Intervening edits require a revised proposal, with a new decision
+when the authorized result changes. An unchanged policy is not rewritten. Exact
+user-authorized replacements or an already confirmed proposal do not require
+the same decision again; review-only requests never authorize a write.
+
 When proposing a mapping, obtain model information in this order when available:
 
 1. native host capability/model catalog;

@@ -57,9 +57,12 @@ Ownership rules:
 - Intent must not depend on Factory.
 
 The canonical Factory skill set is exactly `idd-factory-run`,
-`idd-factory-configure`, `idd-factory-decompose-task`, and
-`idd-factory-execute-subtask`. The configuration skill owns persistent
-project model policy; the other three implement the run loop. The planner
+`idd-factory-configure`, `idd-factory-update-effort-models`,
+`idd-factory-decompose-task`, and `idd-factory-execute-subtask`.
+The configuration skill owns persistent
+project model policy; the update skill prepares lifecycle model replacements
+and hands authorized proposals to that owner. The other three implement the
+run loop. The planner
 creates the current contractable batch and capability profile; the root agent
 mechanically maps that profile immediately before each fresh native worker; a
 fresh planner runs after the batch is exhausted.

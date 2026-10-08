@@ -82,6 +82,12 @@ mapping, or the project uses global `modelStrategy: inherit` for all three.
 
 Run `idd-factory-configure` to create or change the policy.
 
+For later refreshes, upgrades, or downgrades of the models assigned to effort
+levels, use `idd-factory-update-effort-models`. It prepares the change and applies
+it through `idd-factory-configure`. Unselected levels, other platform mappings,
+and reasoning settings are preserved unless explicitly requested. A review-only
+request returns a proposal without saving; an unchanged policy is not rewritten.
+
 For fine-grained configuration the active Coding Agent proposes a complete
 mapping from the best current host/platform information available, states when
 account-specific availability cannot be verified, and waits for user
@@ -114,6 +120,9 @@ problem and suggests reconfiguration; it never silently substitutes another
 model or profile.
 
 The worker remains `idd-factory-execute-subtask` for every profile.
+
+Already-created workers keep their model/settings. The next worker reads the
+updated policy without requiring a new plan.
 
 ## Project verification
 

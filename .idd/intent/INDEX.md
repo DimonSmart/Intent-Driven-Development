@@ -6,7 +6,7 @@ This index helps humans and Coding Agents find relevant current intent. The numb
 
 | Document | Role | Area | Notes | Replaces |
 | --- | --- | --- | --- | --- |
-| IDD-0001 | Spec | Factory orchestration | Native-agent planner/worker loop, execution profiles with project-owned model policy, fresh contexts, TaskRelatedIntent + Conditional Engineering selection, deterministic Always Engineering propagation, minimal state, at-least-once execution, questions and project verification | — |
+| IDD-0001 | Spec | Factory orchestration | Native-agent planner/worker loop, execution profiles with project-owned model policy and lifecycle LLM updates, fresh contexts, TaskRelatedIntent + Conditional Engineering selection, deterministic Always Engineering propagation, minimal state, at-least-once execution, questions and project verification | — |
 | IDD-0002 | ADR | Factory architecture | Superseded deterministic-runtime decision | — |
 | IDD-0003 | Spec | IDD core and distribution | Durable intent plus distinct lint/structure-audit/drift-audit responsibilities, optional Engineering Guardrails, separate verification/execution operational policy, source-knowledge import with bounded Engineering migration, ambiguity-only glossary, canonical generation, self-hosting boundary, and temporary references to durable project knowledge | — |
 | IDD-0004 | ADR | Factory transport | Superseded blocking runtime-transport decision | — |

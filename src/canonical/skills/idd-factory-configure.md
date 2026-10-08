@@ -14,15 +14,34 @@ This workflow owns only Factory model-selection policy. It does not:
 - edit Factory temporary state under `.idd/factory/current/`;
 - create a workflow runtime, resolver service, process supervisor, or MCP
   orchestration layer;
-- choose a model during a Factory run;
+- perform per-worker model selection during a Factory run;
 - modify mappings automatically after failures.
 
 The project configuration is authoritative user policy.
 
+## Model-update handoff
+
+`idd-factory-update-effort-models` may hand off a complete proposal, the original
+request, the baseline policy contents or absence, and user authorization. Load
+that context and finish configuration in the same request. Preserve unselected
+profiles, other platform sections, and existing reasoning settings, including
+omitted settings, unless their change is explicitly requested.
+
+Reuse an already confirmed proposal. Exact, unambiguous instructions to apply
+specified model replacements authorize those replacements; do not ask the same
+decision again. Automatically selected or interpreted replacements still need
+confirmation. A review-only request must not write the policy.
+
+Compare the current file with the supplied baseline before applying. If it has
+changed, rebase the requested replacements onto current policy and show the
+revised proposal. Obtain a new decision when the previously authorized result
+would change. Never save a stale snapshot over intervening edits.
+
 ## Read current state
 
 Read `.idd/execution.yaml` when it exists and validate it using the bounded
-structural rules in the reference.
+structural rules in the reference. Retain its contents or absence as the
+proposal baseline; a handed-off baseline must also be checked against this read.
 
 A malformed existing policy is a blocking diagnostic. Show the diagnostic and
 repair it as part of configuration; do not silently replace its strategy.
@@ -100,7 +119,9 @@ hardcode recommended concrete model IDs in IDD source and do not assume a model
 is available to this account/workspace merely because it exists. State any
 availability uncertainty.
 
-Present the whole proposed policy and obtain one blocking decision:
+When model selection or interpretation is needed, present the whole proposed
+policy and obtain one blocking decision. Reuse a complete already-authorized
+handoff instead of asking again:
 
 ```text
 Use proposed mapping
@@ -168,10 +189,13 @@ Before writing:
 1. show a table with profile, current model/reasoning, and proposed
    model/reasoning when updating a mapping;
 2. obtain required confirmation;
-3. validate the complete document structurally;
+3. re-read and compare the file with the proposal baseline; resolve intervening
+   changes as described above, then validate the complete document structurally;
 4. write `.idd/execution.yaml` atomically when the host permits;
 5. re-read the file and report the final complete mapping, or the explicit
    `inherit` strategy.
+
+If the final policy is unchanged, report a no-op without rewriting the file.
 
 Switching from explicit mappings back to all-inherit replaces the explicit
 mapping with `modelStrategy: inherit`.

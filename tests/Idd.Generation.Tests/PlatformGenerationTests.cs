@@ -69,7 +69,7 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
     }
 
     [Fact]
-    public void FactoryMetadata_HasOnlyCanonicalFourSkillsAndNoGeneratedRoleSurface()
+    public void FactoryMetadata_HasOnlyCanonicalFiveSkillsAndNoGeneratedRoleSurface()
     {
         foreach (var platform in new[] { "claude", "codex" })
         {
@@ -87,7 +87,8 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
                     "idd-factory-configure",
                     "idd-factory-decompose-task",
                     "idd-factory-execute-subtask",
-                    "idd-factory-run"
+                    "idd-factory-run",
+                    "idd-factory-update-effort-models"
                 },
                 skills);
 
