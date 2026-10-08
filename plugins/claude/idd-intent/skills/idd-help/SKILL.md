@@ -3,10 +3,11 @@ name: idd-help
 description: Manual-only, read-only help for questions about Intent-Driven Development methodology, concepts, workflows, skills, and expected Coding Agent behavior.
 context: fork
 agent: Explore
+background: false
 argument-hint: "[question about IDD]"
 allowed-tools: Read Glob Grep
-disable-model-invocation: true
 user-invocable: true
+disable-model-invocation: true
 ---
 
 # idd-help
@@ -21,6 +22,17 @@ implementation, Factory state, project files, or repository settings.
 Do not use `idd-help` as an automatic pre-step for ordinary feature, bug-fix,
 refactoring, review, or implementation requests. Do not invoke another IDD
 workflow unless the user explicitly asks to perform that workflow.
+
+## Question Input In An Isolated Context
+
+An explicit question supplied with this command is the question to answer,
+including any invocation arguments. The skill may run in an isolated child
+context without the caller's conversation history. Do not infer a question
+from an unavailable previous exchange.
+
+If the command is invoked without a question and none is present in the
+available input, ask the user for the question instead of guessing. Continue
+to answer read-only; do not automatically invoke other workflows.
 
 ## Required References
 

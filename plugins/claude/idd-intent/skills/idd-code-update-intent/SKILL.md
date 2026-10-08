@@ -1,6 +1,8 @@
 ---
 name: idd-code-update-intent
 description: Update `.idd/intent/` product intent from confirmed implementation behavior.
+user-invocable: false
+disable-model-invocation: false
 ---
 
 # idd-code-update-intent

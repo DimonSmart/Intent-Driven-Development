@@ -3,8 +3,11 @@ name: idd-intent-lint
 description: Run mechanical `.idd/intent/` consistency checks without editing files.
 context: fork
 agent: Explore
+background: false
 argument-hint: "[optional spec path or scope]"
 allowed-tools: Read Glob Grep Bash
+user-invocable: false
+disable-model-invocation: false
 ---
 
 # idd-intent-lint

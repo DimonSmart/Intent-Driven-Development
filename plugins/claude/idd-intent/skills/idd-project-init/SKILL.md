@@ -1,8 +1,8 @@
 ---
 name: idd-project-init
 description: Initialize project-owned IDD intent state, then pause for a blocking bootstrap decision when an existing implementation has no current intent.
-disable-model-invocation: true
 user-invocable: true
+disable-model-invocation: true
 ---
 
 # idd-project-init

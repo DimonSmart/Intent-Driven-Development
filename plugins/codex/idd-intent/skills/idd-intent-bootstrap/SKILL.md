@@ -472,8 +472,9 @@ that can be normalized without reconstructing meaning primarily from code.
 Use `idd-intent-brainstorm` to define future direction rather than recover the
 current product.
 
-Use `idd-intent-new-document` for a normal focused new owner after bootstrap.
-Bootstrap may create its approved initial document set directly.
+Use `idd-intent-change` for a normal focused new owner after bootstrap; its
+internal document-creation workflow handles new specs, ADRs, and spikes.
+Bootstrap may still create its approved initial document set directly.
 
 Use `idd-code-update-intent` for later narrow transfer of explicitly confirmed
 implementation behavior into an established model.

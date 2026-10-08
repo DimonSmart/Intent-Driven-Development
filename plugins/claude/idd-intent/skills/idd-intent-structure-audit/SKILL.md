@@ -3,8 +3,11 @@ name: idd-intent-structure-audit
 description: Diagnose semantic structure, ownership, organization, and normalization opportunities in current `.idd/intent/` without editing files.
 context: fork
 agent: Explore
+background: false
 argument-hint: "[scope or structure audit focus]"
 allowed-tools: Read Glob Grep
+user-invocable: false
+disable-model-invocation: false
 ---
 
 # idd-intent-structure-audit

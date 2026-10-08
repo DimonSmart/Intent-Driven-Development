@@ -1,2 +1,6 @@
+interface:
+  display_name: "IDD Project Init"
+  short_description: "Initialize IDD in a project"
+
 policy:
   allow_implicit_invocation: false

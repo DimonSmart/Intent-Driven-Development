@@ -1,8 +1,8 @@
 ---
 name: idd-skip
 description: Manual-only command. Perform the current request without applying Intent-Driven Development routing or updating durable intent.
-disable-model-invocation: true
 user-invocable: true
+disable-model-invocation: true
 ---
 
 # idd-skip

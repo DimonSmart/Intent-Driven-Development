@@ -1,2 +1,6 @@
+interface:
+  display_name: "IDD Verification"
+  short_description: "Configure project verification checks"
+
 policy:
   allow_implicit_invocation: false

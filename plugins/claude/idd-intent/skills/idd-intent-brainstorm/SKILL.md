@@ -1,6 +1,8 @@
 ---
 name: idd-intent-brainstorm
 description: Clarify real product intent before changing `.idd/intent/`, using focused customer-development questions and simplification options without editing product intent, planning implementation, or writing code.
+user-invocable: false
+disable-model-invocation: false
 ---
 
 # idd-intent-brainstorm
@@ -70,9 +72,8 @@ Do not use this skill when:
 `idd-intent-brainstorm` never edits files.
 
 If the user confirms a product direction and asks to persist it, route to
-`idd-intent-change` when an existing current document owns the area. Route to
-`idd-intent-new-document` when the result is a new durable product area, ADR, or
-spike.
+`idd-intent-change` whether the result updates an existing owner or needs a
+new owning spec, ADR, or spike. Brainstorm remains read-only until confirmation.
 
 It must not:
 
@@ -120,8 +121,8 @@ clear enough to write or update specs.
 Use `idd-intent-change` when the user has confirmed a desired product behavior change
 and `.idd/intent/` should be updated.
 
-Use `idd-intent-new-document` when a new durable product area, ADR, or spike is
-needed and no existing current document owns the area.
+For a new durable product area, ADR, or spike, use `idd-intent-change` after
+confirmation; its internal document-creation workflow performs ownership checks.
 
 Use `idd-code-implement` when current specs already describe the behavior to build.
 
@@ -362,8 +363,8 @@ Upgrade path:
 
 ## Next Step
 
-If the user confirms the direction, use `idd-intent-change` for an existing owner
-or `idd-intent-new-document` for a new owner, ADR, or spike.
+If the user confirms the direction, use `idd-intent-change` for both existing
+and new owners, ADRs, or spikes.
 ```
 
 ### Specification-ready intent
@@ -427,8 +428,8 @@ Use when the intent is clear enough to become a spec change.
 
 ## Next Step
 
-Use `idd-intent-change` to update the owning current spec, or
-`idd-intent-new-document` if no current document owns the area.
+Use `idd-intent-change` to update an existing owner or create a justified new
+spec, ADR, or spike through its internal workflow.
 ```
 
 ## Rules

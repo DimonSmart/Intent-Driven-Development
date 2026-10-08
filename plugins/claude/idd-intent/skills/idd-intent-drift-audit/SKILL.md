@@ -3,8 +3,11 @@ name: idd-intent-drift-audit
 description: Audit whether current implementation behavior conforms to durable Product Intent in `.idd/intent/` for an explicitly defined focused or project-wide scope.
 context: fork
 agent: Explore
+background: false
 argument-hint: "[audit scope: feature, intent ID, implementation area, failure, or project-wide]"
 allowed-tools: Read Glob Grep Bash
+user-invocable: false
+disable-model-invocation: false
 ---
 
 # idd-intent-drift-audit
@@ -476,8 +479,8 @@ implementation or wants to change current behavior.
 Use `idd-code-implement` when current specs are clear and implementation should be
 changed to match them.
 
-Use `idd-intent-new-document` when durable product intent needs a new spec, ADR, or
-spike.
+When durable product intent needs a new spec, ADR, or spike, recommend
+`idd-intent-change`; only that workflow creates the document.
 
 Use `idd-code-update-intent` only when the user explicitly confirms
 that verified implementation behavior represents current product intent.
@@ -495,8 +498,9 @@ Use `idd-intent-drift-audit` when the task is to compare implementation with cur
   changes.
 - If implementation contains desired behavior not yet specified, recommend
   `idd-code-update-intent` only after explicit user confirmation.
-- If product intent is missing and user describes desired behavior, recommend
-  `idd-intent-change`, not `idd-intent-new-document`, unless no existing spec owns the area.
+- If product intent is missing and the user describes desired behavior,
+  recommend `idd-intent-change` regardless of whether an existing spec owns the
+  area; the workflow resolves document ownership.
 
 ## Non-Goals
 

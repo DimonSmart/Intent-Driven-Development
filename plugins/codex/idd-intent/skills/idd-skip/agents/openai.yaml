@@ -1,2 +1,6 @@
+interface:
+  display_name: "Skip IDD"
+  short_description: "Perform a request without IDD routing"
+
 policy:
   allow_implicit_invocation: false

@@ -335,7 +335,7 @@ delete owning spec, or unclear product intent.
 ```text
 brainstorm if the request is unclear
 -> idd-intent-change(operation: add)
--> existing owner or new document handoff
+-> update existing owner or create new document internally in idd-intent-change
 -> idd-code-implement or Factory
 -> idd-intent-drift-audit
 ```

@@ -1,8 +1,8 @@
 ---
 name: idd-verification-configure
 description: Create or deliberately update project-specific `.idd/verification.yaml` rules without changing product intent.
-disable-model-invocation: true
 user-invocable: true
+disable-model-invocation: true
 ---
 
 # idd-verification-configure

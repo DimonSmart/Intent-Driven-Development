@@ -1,2 +1,6 @@
+interface:
+  display_name: "IDD Factory Config"
+  short_description: "Configure Factory execution profiles"
+
 policy:
   allow_implicit_invocation: false

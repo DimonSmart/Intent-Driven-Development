@@ -1,6 +1,8 @@
 ---
 name: idd-code-implement
 description: Implement current product intent or perform a behavior-preserving implementation change, then verify the result against relevant `.idd/intent/` specifications.
+user-invocable: false
+disable-model-invocation: false
 ---
 
 # idd-code-implement

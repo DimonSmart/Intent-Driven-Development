@@ -1,2 +1,6 @@
+interface:
+  display_name: "IDD Help"
+  short_description: "Explain IDD concepts and workflows"
+
 policy:
   allow_implicit_invocation: false

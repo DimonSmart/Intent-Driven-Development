@@ -1,0 +1,6 @@
+interface:
+  display_name: "IDD Factory Run"
+  short_description: "Execute an IDD Factory workflow"
+
+policy:
+  allow_implicit_invocation: true

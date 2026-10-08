@@ -1,6 +1,8 @@
 ---
 name: idd-engineering-change
 description: Manage explicit durable Engineering Rule add, modify, and remove mutations under `.idd/engineering/`, with batch semantic planning, lazy bootstrap, stable allocation, Factory safety guard, and direct shared mechanical validation.
+user-invocable: false
+disable-model-invocation: false
 ---
 
 # idd-engineering-change

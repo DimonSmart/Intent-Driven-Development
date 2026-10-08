@@ -1,0 +1,6 @@
+interface:
+  display_name: "IDD Route"
+  short_description: "Classify an IDD request and select a workflow"
+
+policy:
+  allow_implicit_invocation: true

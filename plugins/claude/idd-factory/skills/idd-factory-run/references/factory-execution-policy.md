@@ -130,8 +130,9 @@ per-child override, do not substitute another model and do not change the
 profile. Stop with a clear diagnostic and suggest rerunning
 `idd-factory-configure`.
 
-The worker definition remains `idd-factory-execute-subtask` for every profile.
-The worker does not read this policy to choose its own model.
+The same canonical Factory worker protocol is used for every execution profile.
+Profiles affect native child-agent model settings, not worker instructions.
+The worker never selects its own model.
 
 ## Configuration workflow
 

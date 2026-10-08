@@ -1,8 +1,8 @@
 ---
 name: idd-factory-configure
 description: Create or deliberately update project-owned Factory execution-profile mappings in .idd/execution.yaml without hardcoded model recommendations.
-disable-model-invocation: true
 user-invocable: true
+disable-model-invocation: true
 ---
 
 # IDD Factory Configure

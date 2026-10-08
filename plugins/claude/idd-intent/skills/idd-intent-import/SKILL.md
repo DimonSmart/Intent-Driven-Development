@@ -2,6 +2,8 @@
 name: idd-intent-import
 description: Migrate supplied durable knowledge into normalized Product Intent and explicit source-owned Engineering Rules, with safe semantic planning, lazy Engineering bootstrap, conflict blocking, and shared mechanical validation.
 argument-hint: "[source roots] [--mode propose|apply-safe]"
+user-invocable: false
+disable-model-invocation: false
 ---
 
 # idd-intent-import

@@ -78,8 +78,9 @@ write Product Intent.
 
 The request explicitly defines new or changed durable product behavior and
 contains enough decisions to record it safely. Resolve the safe current owner or
-normal `idd-intent-new-document` handoff during analysis, but defer the actual
-Product Intent mutation until required Engineering management has completed as
+possible internal document-creation path inside `idd-intent-change` during
+analysis, but defer the actual Product Intent mutation until required
+Engineering management has completed as
 `success` or `no-op`.
 
 Product Intent mutation remains owned by the normal Intent workflows, primarily

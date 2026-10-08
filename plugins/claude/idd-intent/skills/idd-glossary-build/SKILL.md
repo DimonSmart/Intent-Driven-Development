@@ -2,8 +2,8 @@
 name: idd-glossary-build
 description: Manual-only workflow to create or deliberately update the optional project glossary with only terminology whose incorrect interpretation could change the understanding of product intent.
 argument-hint: "[terms, product area, or terminology sources]"
-disable-model-invocation: true
 user-invocable: true
+disable-model-invocation: true
 ---
 
 # idd-glossary-build

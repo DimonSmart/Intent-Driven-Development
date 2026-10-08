@@ -1,7 +1,9 @@
 ---
 name: idd-intent-normalize-current
 description: Perform focused structural normalization of existing `.idd/intent/` product intent without changing product meaning.
-argument-hint: --documents <ids> --topic <topic> --target <file|new> --mode propose|apply
+argument-hint: "--documents \u003Cids\u003E --topic \u003Ctopic\u003E --target \u003Cfile|new\u003E --mode propose|apply"
+user-invocable: false
+disable-model-invocation: false
 ---
 
 # idd-intent-normalize-current

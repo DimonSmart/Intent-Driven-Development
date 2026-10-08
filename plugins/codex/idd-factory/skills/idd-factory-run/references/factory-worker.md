@@ -1,15 +1,15 @@
----
-name: idd-factory-execute-subtask
-description: Execute one self-contained Factory task from current repository reality in a fresh isolated workspace-writing agent context.
----
+# IDD Factory Worker Protocol
 
-# IDD Factory Execute Subtask
+You are the Factory worker.
 
-Execute exactly one Factory task in a fresh semantic context. You are a worker,
-not a planner or workflow controller.
+This is an internal protocol owned by `idd-factory-run`, not a user-invokable
+skill. Execute exactly one Factory task in a fresh semantic context. You are a
+worker, not a planner or workflow controller.
 
-Read `references/engineering-guardrails.md` before resolving optional
-Engineering inputs.
+When the optional Engineering layer exists, use the complete canonical
+Engineering Guardrails contract explicitly supplied by `idd-factory-run`.
+Do not assume inherited parent-skill references, parent context, or a
+worker-local references directory.
 
 ## Inputs
 
