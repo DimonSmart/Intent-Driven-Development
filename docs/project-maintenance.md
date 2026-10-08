@@ -87,6 +87,34 @@ skills/<skill>/references/<destination>
 
 Do not copy reference content into platform adapters or bootstrap assets.
 
+## Skill Invocation Metadata
+
+Every entry in `src/canonical/skills/skill-descriptions.json` must be an object
+with a non-empty `description` and explicit `exposure: command | workflow`.
+String-form entries and entries missing `exposure` are invalid. The generator
+rejects unknown skill-level fields and unknown keys in
+`adapters.<platform>` (currently only `frontmatter` is valid), while the
+platform-specific `frontmatter` map stays extensible. The optional
+`invocation` defaults to `auto`; `workflow + manual` is invalid.
+
+`exposure` describes whether IDD intends a skill as a user-facing command or
+as an automatic workflow. `invocation` separately controls whether the
+model may select it implicitly. Claude translates these to `user-invocable`
+and `disable-model-invocation`. Five read-only Claude skills use
+`context: fork`, `agent: Explore`, and `background: false` so a compatible
+Claude host waits for their result. Forks do not inherit the caller's history;
+the caller must pass the actual request and relevant constraints.
+
+Codex generates `skills/<skill>/agents/openai.yaml` for all eight commands,
+regardless of invocation mode. Six manual commands declare
+`allow_implicit_invocation: false`, while the two auto commands declare
+`true`. The eleven workflows remain published as `SKILL.md` without this
+user-facing metadata file. Codex does not guarantee that these choices exactly
+control which skills appear in every host's menu.
+
+This is a stricter format for canonical **source metadata**, not a change to
+existing project-owned `.idd/` files, Product Intent, or Factory state.
+
 ## Adapters
 
 The generator uses an `IPlatformAdapter` boundary:
