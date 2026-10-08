@@ -89,6 +89,11 @@ both. Do not route a new technical choice to import merely because it is written
 in the request, and do not route codebase reverse discovery to import merely
 because code is a source.
 
+Treat direct requests to create a new product specification, record an ADR, or
+investigate an unresolved decision in a spike as `product-change` (or `unclear`
+when a required product decision is missing). Route them through
+`idd-intent-change`, never a separate public document-creation skill.
+
 Use `engineering-change` when the user explicitly adds, modifies, or removes a durable implementation-only project constraint. Do not route to Engineering merely because current code repeats a pattern; source code alone is not an explicit durable policy decision.
 
 For `product-change` and `engineering-change`, set `Operation` to `add`, `modify`, or `remove` according to the required reference. For every other classification, set `Operation: not-applicable`.

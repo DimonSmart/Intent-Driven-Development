@@ -18,7 +18,6 @@
         "idd-intent-import",
         "idd-code-implement",
         "idd-intent-lint",
-        "idd-intent-new-document",
         "idd-intent-normalize-current",
         "idd-intent-drift-audit",
         "idd-code-update-intent"
@@ -115,6 +114,11 @@
           "skill": "idd-engineering-change",
           "source": "src/canonical/methodology/common-workflows.md",
           "destination": "common-workflows.md"
+        },
+        {
+          "skill": "idd-intent-change",
+          "source": "src/canonical/methodology/new-intent-document.md",
+          "destination": "new-intent-document.md"
         }
       ],
       "assets": [

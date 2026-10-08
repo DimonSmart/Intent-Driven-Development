@@ -76,16 +76,13 @@
     "description": "Clarify real product intent before changing `.idd/intent/`, using focused customer-development questions and simplification options without editing product intent, planning implementation, or writing code."
   },
   "idd-intent-change": {
-    "description": "Update current `.idd/intent/` product intent for add, modify, and remove product operations, preferring existing specs over new specs."
+    "description": "Update current `.idd/intent/` product intent for add, modify, and remove operations; update existing owners or create a new owning spec, ADR, or spike when required."
   },
   "idd-engineering-change": {
     "description": "Manage explicit durable Engineering Rule add, modify, and remove mutations under `.idd/engineering/`, with batch semantic planning, lazy bootstrap, stable allocation, Factory safety guard, and direct shared mechanical validation."
   },
   "idd-code-implement": {
     "description": "Implement current product intent or perform a behavior-preserving implementation change, then verify the result against relevant `.idd/intent/` specifications."
-  },
-  "idd-intent-new-document": {
-    "description": "Create a new owning IDD spec, ADR, or spike only when no existing current document owns the area or decision."
   },
   "idd-intent-drift-audit": {
     "description": "Audit whether current implementation behavior conforms to durable Product Intent in `.idd/intent/` for an explicitly defined focused or project-wide scope.",

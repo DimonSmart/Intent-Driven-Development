@@ -70,7 +70,8 @@ ImplementationOnly
 For `ExplicitIntentChange`, determine the safe Intent handoff/owner, but defer
 the actual Product Intent mutation until Engineering management has completed
 successfully or as a no-op. Product Intent mutations remain owned by
-`idd-intent-change` and its normal `idd-intent-new-document` handoff.
+`idd-intent-change`, including its internal document-creation workflow.
+Factory planners and workers cannot create or modify Product Intent.
 
 Separately classify only whether Engineering management is a durable concern:
 

@@ -186,7 +186,10 @@ Describe the product change rather than expected code edits:
 Use idd-intent-change. Users must be able to compare two local folders without modifying either side.
 ```
 
-The workflow updates the current owning intent document. It creates a new document only when no current document owns the product area.
+The workflow updates the current owning intent document. When required, it also
+creates a new owning spec, ADR, or spike through an internal document-creation
+workflow, without a separate public skill. A new spec is created only when no
+existing spec owns that product area.
 
 ## Implement from Current Intent
 

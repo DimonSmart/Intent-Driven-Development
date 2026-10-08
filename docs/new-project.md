@@ -72,11 +72,9 @@ When the first product area is sufficiently clear:
 Use idd-intent-change to record the confirmed behavior as current product intent.
 ```
 
-If no existing intent document owns the area, IDD may route to:
-
-```text
-idd-intent-new-document
-```
+If no existing intent document owns the area, `idd-intent-change` creates the
+justified new spec, ADR, or spike through its internal document-creation
+reference; there is no separate document-creation skill to invoke.
 
 Prefer a small number of clear owning documents over one document for every feature or conversation.
 
