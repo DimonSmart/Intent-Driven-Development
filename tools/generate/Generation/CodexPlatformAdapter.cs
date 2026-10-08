@@ -180,12 +180,18 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
 
     private static string BuildFallbackShortDescription(string description)
     {
-        var sentence = description.Split(['.', ';', '\r', '\n'], 2)[0].Trim();
+        var sentence = description.Trim().Split(['\r', '\n'], 2)[0].Trim();
+        var sentenceEnd = sentence.IndexOf(". ", StringComparison.Ordinal);
+        if (sentenceEnd >= 0)
+            sentence = sentence[..(sentenceEnd + 1)];
+
         if (sentence.Length <= 120)
             return sentence;
 
         var lastWordBoundary = sentence.LastIndexOf(' ', 116);
-        return lastWordBoundary >= 40 ? sentence[..lastWordBoundary].TrimEnd() + "..." : sentence[..117] + "...";
+        return lastWordBoundary > 0
+            ? sentence[..lastWordBoundary].TrimEnd() + "..."
+            : "Run an IDD workflow";
     }
 
     protected override string BuildIddPluginMetadata(
