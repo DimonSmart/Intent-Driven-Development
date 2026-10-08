@@ -28,8 +28,9 @@ public sealed class FactoryReportTests : IDisposable
         var rollout = new CodexRolloutReader().Read(path);
 
         Assert.Equal("11111111-1111-1111-1111-111111111111", rollout.ThreadId);
-        Assert.Single(rollout.Diagnostics);
-        Assert.Equal("malformed_rollout_line", rollout.Diagnostics[0].Code);
+        Assert.Equal(2, rollout.Diagnostics.Count);
+        Assert.All(rollout.Diagnostics, diagnostic => Assert.Equal("malformed_rollout_line", diagnostic.Code));
+        Assert.Contains("final line may be truncated", rollout.Diagnostics[1].Message);
         Assert.Contains(rollout.Events, e => e.Role == "user" && e.Text!.Contains("idd-factory-run"));
     }
 
@@ -187,6 +188,7 @@ public sealed class FactoryReportTests : IDisposable
         var task = Assert.Single(report.Tasks);
         Assert.Null(task.ExecutionProfile);
         Assert.Equal("strong", task.SpawnExecutionProfile);
+        Assert.Contains(report.Diagnostics, x => x.Code == "worker_execution_profile_unavailable");
     }
 
     [Theory]
@@ -194,6 +196,7 @@ public sealed class FactoryReportTests : IDisposable
     [InlineData("output-event")]
     [InlineData("native-event")]
     [InlineData("child-event")]
+    [InlineData("turn-context")]
     public void Report_RecognizesExplicitActualSettingsAndReportsMismatch(string settingsLocation)
     {
         var report = RoutingReport("# ExecutionProfile\neconomy", "economy", settingsLocation);
@@ -209,6 +212,7 @@ public sealed class FactoryReportTests : IDisposable
     [Theory]
     [InlineData("unknown")]
     [InlineData("grandchild-event")]
+    [InlineData("foreign-context")]
     public void Report_DoesNotInferWorkerSettingsFromDefaultsOrGrandchildSpawns(string settingsLocation)
     {
         var report = RoutingReport("# ExecutionProfile\neconomy", "economy", settingsLocation);
@@ -216,6 +220,30 @@ public sealed class FactoryReportTests : IDisposable
         Assert.Null(task.ActualModel);
         Assert.Null(task.ActualReasoningEffort);
         Assert.DoesNotContain(report.Diagnostics, x => x.Code == "worker_execution_settings_mismatch");
+        Assert.Contains(report.Diagnostics, x => x.Code == "worker_actual_settings_unavailable");
+    }
+
+    [Theory]
+    [InlineData("model-only-context", "reasoning effort")]
+    [InlineData("invalid-context", "model and reasoning effort")]
+    public void Report_ExplainsMissingActualSettingsInEveryFormat(string settingsLocation, string missing)
+    {
+        var report = RoutingReport("# ExecutionProfile\neconomy", "economy", settingsLocation);
+        var diagnostic = Assert.Single(report.Diagnostics, x => x.Code == "worker_actual_settings_unavailable");
+        Assert.Contains("actual " + missing, diagnostic.Message);
+        Assert.Contains(report.Tasks[0].AgentThreadId, diagnostic.Message);
+        if (settingsLocation == "invalid-context")
+            Assert.Equal(2, report.Diagnostics.Count(x => x.Code == "invalid_turn_context_setting"));
+
+        var markdown = Path.Combine(_root, "missing-settings.md");
+        var json = Path.Combine(_root, "missing-settings.json");
+        ReportWriters.WriteMarkdown(report, markdown, verbose: false);
+        ReportWriters.WriteJson(report, json);
+        using var console = new StringWriter();
+        ReportWriters.WriteConsole(report, console, verbose: false);
+        Assert.Contains(diagnostic.Message, File.ReadAllText(markdown));
+        Assert.Contains("worker_actual_settings_unavailable", File.ReadAllText(json));
+        Assert.Contains(diagnostic.Message, console.ToString());
     }
 
     [Fact]
@@ -248,6 +276,16 @@ public sealed class FactoryReportTests : IDisposable
         Assert.Equal("model-a", task.RequestedModel);
         Assert.Equal("low", task.RequestedReasoningEffort);
         Assert.DoesNotContain(report.Diagnostics, x => x.Code == "agent_role_unresolved");
+        Assert.Equal("Implement A.", task.Text);
+        Assert.Contains(report.Diagnostics, x => x.Code == "spawn_prompt_unreadable");
+    }
+
+    [Fact]
+    public void Report_CountsResponseItemSpawnsAlongsideNativeCommands()
+    {
+        var report = RoutingReport("# ExecutionProfile\neconomy", "economy", "mixed-native");
+        Assert.Equal(2, report.Metrics.Tools.SpawnAgentCalls);
+        Assert.Equal(1, report.Metrics.Tools.Commands);
     }
 
     [Fact]
@@ -272,12 +310,14 @@ public sealed class FactoryReportTests : IDisposable
         const string rootId = "11111111-1111-1111-1111-111111111111";
         const string plannerId = "22222222-2222-2222-2222-222222222222";
         const string workerId = "33333333-3333-3333-3333-333333333333";
-        var prompt = opaqueSpawn ? "opaque encrypted spawn message" :
+        var prompt = opaqueSpawn ? "gAAAAABopaque_encrypted_spawn_message==" :
             $"Use idd-factory-execute-subtask. Task: Implement A.\nExecutionProfile: {spawnProfile}";
         var lines = new List<object>
         {
             Session(rootId, repo),
             User("2026-09-23T10:00:00Z", "idd-factory-run"),
+            new { timestamp = "2026-09-23T10:00:00Z", type = "turn_context",
+                payload = new { model = "root-default", effort = "medium" } },
             SpawnCall("2026-09-23T10:00:01Z", "planner",
                 opaqueSpawn ? "opaque encrypted planner message" : "Use idd-factory-decompose-task."),
             SpawnOutput("2026-09-23T10:00:02Z", "planner", plannerId),
@@ -319,6 +359,8 @@ public sealed class FactoryReportTests : IDisposable
             },
             _ => SpawnOutput("2026-09-23T10:00:04Z", "worker", workerId)
         });
+        if (settingsLocation == "mixed-native")
+            lines.Add(NativeCommandCompleted("2026-09-23T10:00:15Z", "check", "dotnet test", 0));
         lines.Add(Assistant("2026-09-23T10:00:20Z", "Factory completed."));
         Write(Path.Combine(dir, "root.jsonl"), lines);
         Write(Path.Combine(dir, "planner.jsonl"),
@@ -327,6 +369,30 @@ public sealed class FactoryReportTests : IDisposable
             Assistant("2026-09-23T10:00:02Z", $"# Task\nImplement A.\n\n{plannerMetadata}")
         ]);
         var workerEvents = new List<object> { Session(workerId, repo, rootId, "/root/worker") };
+        if (settingsLocation == "turn-context")
+            workerEvents.Add(new
+            {
+                timestamp = "2026-09-23T10:00:05Z", type = "turn_context",
+                payload = new { model = "model-b", effort = "high" }
+            });
+        if (settingsLocation == "foreign-context")
+            workerEvents.Add(new
+            {
+                timestamp = "2026-09-23T10:00:05Z", type = "turn_context",
+                payload = new { thread_id = "44444444-4444-4444-4444-444444444444", model = "model-b", effort = "high" }
+            });
+        if (settingsLocation == "model-only-context")
+            workerEvents.Add(new
+            {
+                timestamp = "2026-09-23T10:00:05Z", type = "turn_context",
+                payload = new { model = "model-a", collaboration_mode = new { model = "nested-default", effort = "high" } }
+            });
+        if (settingsLocation == "invalid-context")
+            workerEvents.Add(new
+            {
+                timestamp = "2026-09-23T10:00:05Z", type = "turn_context",
+                payload = new { model = 42, effort = "" }
+            });
         if (settingsLocation == "child-event")
             workerEvents.Add(new
             {

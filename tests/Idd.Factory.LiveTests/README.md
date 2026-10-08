@@ -51,9 +51,11 @@ print the complete human-readable
 Factory report after the test run and save it as `factory-report.md` beside the
 TRX results.
 
-The host trace is authoritative for requested spawn arguments. If it does not
-publish resolved child-model fields, the report deliberately records actual
-model/reasoning as unknown rather than treating the request as confirmation.
+The host trace is authoritative for requested spawn arguments. Actual settings
+are read from each worker's own `turn_context.model` / `turn_context.effort` or
+explicit resolved/actual fields. If those values cannot be read, the report
+records `unknown` with a diagnostic and the routing evaluation fails rather
+than treating the requested settings as confirmation.
 
 `--model`, `--reasoning`, and their environment equivalents override only the
 root session. Worker profiles require explicit models in `live-eval.json`.
@@ -67,13 +69,13 @@ fails the evaluation without choosing a fallback.
 
 The fixture specifies planner profiles `standard`, `strong`, then `economy`
 to isolate routing from classification variability. Assertions compare each
-native spawn with the profile found in the planner trace and check actual
-settings when the host publishes them. Worker spawns are matched by child
+native spawn with the profile found in the planner trace and require matching
+actual model and reasoning settings. Worker spawns are matched by child
 thread ID or canonical agent path and role metadata, so encrypted spawn
 prompts and native `task_name` results remain supported.
 Ordinary local regression tests also prove that swapped mappings, inherited
 root defaults, missing profiles or spawn
-settings, and wrong actual settings fail the same routing assertion.
+settings, and missing or wrong actual settings fail the same routing assertion.
 
 `live-eval.json` configures only this evaluation. Its mappings are materialized
 as `.idd/execution.yaml` in the temporary test project. Real projects keep their

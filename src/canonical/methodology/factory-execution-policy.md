@@ -76,6 +76,11 @@ without an active-platform mapping is invalid; it never inherits implicitly.
 The same concrete model may be assigned to more than one profile, including
 with different reasoning settings.
 
+The two strategies do not mix. `modelStrategy: inherit` applies globally to all
+three profiles. Conversely, `executionProfiles` requires concrete mappings for
+all three profiles; it does not support a per-profile `default`, `inherit`, or
+implicit session-model fallback.
+
 Do not persist dynamic aliases such as `cheapest`, `best`, `strongest`,
 `latest`, or `recommended` as runtime model identifiers. Resolve such user
 requests during configuration to a concrete model ID, obtain confirmation, and

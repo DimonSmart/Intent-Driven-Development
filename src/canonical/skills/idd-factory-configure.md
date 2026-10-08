@@ -33,13 +33,13 @@ before Factory starts its first worker.
 ## Top-level choice
 
 When the user has not already supplied an unambiguous policy, ask one blocking
-single-choice question with this semantic meaning:
+single-choice question with these answer values and meanings:
 
 ```text
-How should Factory choose models for worker tasks?
+Which LLM strategy should Factory use for worker tasks?
 
-- Use the current model for all tasks
-- Configure different models by task complexity
+- default (inherit) — use the current session/host model for all tasks
+- configure — explicitly configure models for economy, standard, and strong
 ```
 
 Use native structured interaction when the active host exposes it:
@@ -50,7 +50,7 @@ Use native structured interaction when the active host exposes it:
 Do not reproduce the tool schema in this skill. If structured interaction is
 unavailable, ask one concise blocking plain-text question.
 
-## Use current model for all tasks
+## `default` / `inherit`: use the current model for all tasks
 
 Persist the explicit intentional choice:
 
@@ -65,9 +65,10 @@ This means Factory does not pass a Factory-specific model or reasoning override
 for `economy`, `standard`, or `strong`.
 
 Do not resolve `inherit` to the current model name and do not copy a session
-model ID into the file.
+model ID into the file. `default` and `inherit` are equivalent user answers;
+persist only `modelStrategy: inherit`.
 
-## Configure by task complexity
+## `configure`: configure all task-complexity levels
 
 Use exactly these semantic profiles:
 
@@ -79,6 +80,12 @@ strong
 
 First prepare one complete proposed mapping rather than asking three independent
 questions by default.
+
+`configure` is all-or-nothing: it requires one concrete active-platform mapping
+for each of `economy`, `standard`, and `strong`. Do not accept `default`,
+`inherit`, or a blank value for an individual profile. To return to the current
+session/host model, replace the complete mapping with the global
+`modelStrategy: inherit` strategy. Per-profile inheritance is invalid.
 
 Use the best current information available in this order:
 
@@ -97,7 +104,7 @@ Present the whole proposed policy and obtain one blocking decision:
 ```text
 Use proposed mapping
 Edit mapping
-Use current model for everything
+Use default (inherit) for everything
 ```
 
 Never save an automatically proposed mapping before explicit confirmation.

@@ -14,7 +14,7 @@ public sealed class FactoryRoutingAssertionsTests
         };
 
     [Fact]
-    public void Verify_AcceptsCorrectRoutingWithoutInventingActualSettings() =>
+    public void Verify_AcceptsConfirmedCorrectRouting() =>
         FactoryRoutingAssertions.Verify(Report(), Mappings);
 
     [Theory]
@@ -24,6 +24,8 @@ public sealed class FactoryRoutingAssertionsTests
     [InlineData("missing-spawn-settings")]
     [InlineData("missing-profile")]
     [InlineData("wrong-actual")]
+    [InlineData("missing-actual-model")]
+    [InlineData("missing-actual-reasoning")]
     public void Verify_RejectsBrokenRouting(string fault)
     {
         var report = Report();
@@ -38,7 +40,13 @@ public sealed class FactoryRoutingAssertionsTests
                 _ => economy.RequestedModel
             },
             RequestedReasoningEffort = fault == "missing-spawn-settings" ? null : economy.RequestedReasoningEffort,
-            ActualModel = fault == "wrong-actual" ? "unexpected-model" : null
+            ActualModel = fault switch
+            {
+                "wrong-actual" => "unexpected-model",
+                "missing-actual-model" => null,
+                _ => economy.ActualModel
+            },
+            ActualReasoningEffort = fault == "missing-actual-reasoning" ? null : economy.ActualReasoningEffort
         };
         if (fault == "wrong-profile")
             report.Tasks[1] = new TaskReport
@@ -66,7 +74,9 @@ public sealed class FactoryRoutingAssertionsTests
         {
             ExecutionProfile = mapping.Key,
             RequestedModel = mapping.Value.Model,
-            RequestedReasoningEffort = mapping.Value.ReasoningEffort
+            RequestedReasoningEffort = mapping.Value.ReasoningEffort,
+            ActualModel = mapping.Value.Model,
+            ActualReasoningEffort = mapping.Value.ReasoningEffort
         }).ToList()
     };
 }

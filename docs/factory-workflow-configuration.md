@@ -32,7 +32,8 @@ factory:
 ```
 
 `inherit` means "do not pass a Factory-specific model override"; it is not a
-model ID.
+model ID. In the interactive setup this is the `default` (or `inherit`) answer:
+the current Codex or Claude session/host model is used for every worker.
 
 ## Execution profiles
 
@@ -72,6 +73,8 @@ factory:
 
 Each active platform needs all three mappings. A project may assign the same
 model to multiple profiles, including with different reasoning settings.
+This explicit strategy cannot mix with `inherit`: each profile has a concrete
+mapping, or the project uses global `modelStrategy: inherit` for all three.
 
 ## Configuration workflow
 
@@ -81,6 +84,10 @@ For fine-grained configuration the active Coding Agent proposes a complete
 mapping from the best current host/platform information available, states when
 account-specific availability cannot be verified, and waits for user
 confirmation before saving.
+
+The initial question has two answers: `default`/`inherit` for the current
+session/host model at every level, or `configure` for a complete three-level
+mapping. It never asks for or accepts partial per-level inheritance.
 
 IDD does not ship a hardcoded table such as `economy -> Model X`. Dynamic
 requests such as "use the strongest available model" are resolved during

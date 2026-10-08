@@ -141,13 +141,13 @@ explicit request. This decision precedes the optional initial-intent bootstrap.
 Do not ask about Factory models for an `idd-intent`-only project.
 
 When Factory is enabled for this initialization and `.idd/execution.yaml` is
-absent, offer one blocking choice with this semantic meaning:
+absent, offer one blocking choice with these answer values and meanings:
 
 ```text
-How should Factory choose models for worker tasks?
+Which LLM strategy should Factory use for worker tasks?
 
-- Use the current model for all tasks
-- Configure different models by task complexity
+- default (inherit) — use the current session/host model for all tasks
+- configure — explicitly configure models for economy, standard, and strong
 ```
 
 Use the current host's native structured interaction when available
@@ -157,10 +157,12 @@ choice.
 
 Handle the answer by handing off to `idd-factory-configure`:
 
-- current model for all tasks -> persist the intentional `modelStrategy: inherit`
-  policy;
-- different models by complexity -> let the configuration skill propose and
-  confirm concrete `economy` / `standard` / `strong` mappings.
+- `default` or `inherit` -> persist the intentional `modelStrategy: inherit`
+  policy. This is one global strategy: do not ask for or save individual
+  profile mappings;
+- `configure` -> let the configuration skill propose and confirm concrete
+  mappings for all of `economy`, `standard`, and `strong`. Do not permit a
+  partial mapping or per-profile inheritance.
 
 If a valid `.idd/execution.yaml` already exists, do not repeat the offer on an
 idempotent initialization unless the user explicitly asks to reconfigure it.

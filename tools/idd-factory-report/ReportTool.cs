@@ -414,6 +414,17 @@ public sealed class CodexRolloutReader
                 if (toolName == "spawn_agent")
                 {
                     spawnTask = ExtractSpawnTask(toolArguments);
+                    if (IsOpaqueSpawnTask(spawnTask))
+                    {
+                        rollout.Diagnostics.Add(new Diagnostic
+                        {
+                            Severity = "warning",
+                            Category = "host-trace",
+                            Code = "spawn_prompt_unreadable",
+                            Message = $"Spawn {toolId} in {Path.GetFileName(path)} at line {ordinal} contains an encrypted prompt. The reporter cannot read its task or profile; readable planner output is used when available."
+                        });
+                        spawnTask = null;
+                    }
                     childThreadId = receiverThreadIds.FirstOrDefault() ?? ExtractSpawnChildThreadId(eventObject);
                 }
                 else if (rawItemType is "function_call_output" or "custom_tool_call_output")
@@ -422,6 +433,15 @@ public sealed class CodexRolloutReader
                 }
 
                 var usage = ExtractUsage(root, payload, out var cumulative, out var usageScope);
+                var actualModel = FindString(eventObject, "actual_model", "actualModel", "model_used", "modelUsed", "resolved_model", "resolvedModel");
+                var actualReasoning = FindString(eventObject, "actual_reasoning_effort", "actualReasoningEffort", "reasoning_effort_used", "reasoningEffortUsed", "resolved_reasoning_effort", "resolvedReasoningEffort");
+                // Only the direct fields of this thread's turn context describe its model.
+                // Nested collaboration settings or spawn arguments may describe other agents.
+                if (topType == "turn_context")
+                {
+                    actualModel = ReadContextSetting(payload, "model", rollout, ordinal);
+                    actualReasoning = ReadContextSetting(payload, "effort", rollout, ordinal);
+                }
 
                 rollout.Events.Add(new CodexEvent
                 {
@@ -452,31 +472,47 @@ public sealed class CodexRolloutReader
                     UsageIsCumulative = cumulative,
                     ChildThreadId = childThreadId,
                     SpawnTask = spawnTask,
-                    ActualModel = FindString(eventObject, "actual_model", "actualModel", "model_used", "modelUsed", "resolved_model", "resolvedModel"),
-                    ActualReasoningEffort = FindString(eventObject, "actual_reasoning_effort", "actualReasoningEffort", "reasoning_effort_used", "reasoningEffortUsed", "resolved_reasoning_effort", "resolvedReasoningEffort")
+                    ActualModel = actualModel,
+                    ActualReasoningEffort = actualReasoning
                 });
 
-                if (metadataOnly && !string.IsNullOrWhiteSpace(rollout.ThreadId) && rollout.Cwd is not null && ordinal >= 16)                if (metadataOnly && !string.IsNullOrWhiteSpace(rollout.ThreadId) && rollout.Cwd is not null && ordinal >= 16)
+                if (metadataOnly && !string.IsNullOrWhiteSpace(rollout.ThreadId) && rollout.Cwd is not null && ordinal >= 16)
                     break;
             }
             catch (JsonException)
             {
-                if (!isLastLine)
+                rollout.Diagnostics.Add(new Diagnostic
                 {
-                    rollout.Diagnostics.Add(new Diagnostic
-                    {
-                        Severity = "warning",
-                        Category = "host-trace",
-                        Code = "malformed_rollout_line",
-                        Message = $"Malformed JSONL line {ordinal} in {Path.GetFileName(path)}."
-                    });
-                }
+                    Severity = "warning",
+                    Category = "host-trace",
+                    Code = "malformed_rollout_line",
+                    Message = $"Could not read JSONL line {ordinal} in {Path.GetFileName(path)}{(isLastLine ? " (final line may be truncated)" : "")}. Its data was omitted."
+                });
             }
         }
 
         CorrelateSpawns(rollout);
         return rollout;
     }
+
+    private static string? ReadContextSetting(JsonElement payload, string name, CodexRollout rollout, long ordinal)
+    {
+        if (!payload.TryGetProperty(name, out var value))
+            return null;
+        if (value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString()))
+            return value.GetString();
+        rollout.Diagnostics.Add(new Diagnostic
+        {
+            Severity = "warning",
+            Category = "host-trace",
+            Code = "invalid_turn_context_setting",
+            Message = $"Could not read turn_context.{name} at line {ordinal} in {Path.GetFileName(rollout.Path)}: expected a non-empty string, got {value.ValueKind}."
+        });
+        return null;
+    }
+
+    private static bool IsOpaqueSpawnTask(string? task) =>
+        task is not null && Regex.IsMatch(task.Trim(), @"\AgAAAAA[A-Za-z0-9_-]+={0,2}\z");
 
     private static void CorrelateSpawns(CodexRollout rollout)
     {
@@ -1458,6 +1494,39 @@ public sealed class FactoryReportEngine
             };
         }).ToList();
 
+        foreach (var task in tasks)
+        {
+            if (task.RequestedModel is null || task.RequestedReasoningEffort is null)
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "info", Category = "reporter", Code = "worker_requested_settings_unspecified",
+                    Message = $"Worker {task.AgentThreadId} has no recorded explicit {(task.RequestedModel is null ? "model" : "reasoning effort")} override{(task.RequestedModel is null && task.RequestedReasoningEffort is null ? " or reasoning effort override" : "")}. This may be intentional inheritance; the reporter does not infer requested overrides from project policy."
+                });
+            if (task.ExecutionProfile is null)
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "reporter", Code = "worker_execution_profile_unavailable",
+                    Message = $"Could not determine the execution profile for worker {task.AgentThreadId}: no matching planner task with exactly one canonical ExecutionProfile was readable."
+                });
+            if (string.IsNullOrWhiteSpace(task.Text))
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "reporter", Code = "worker_task_unavailable",
+                    Message = $"Could not read the task for worker {task.AgentThreadId} from spawn instructions or matching planner output."
+                });
+            if (task.ActualModel is null || task.ActualReasoningEffort is null)
+            {
+                var missing = new List<string>();
+                if (task.ActualModel is null) missing.Add("model");
+                if (task.ActualReasoningEffort is null) missing.Add("reasoning effort");
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "reporter", Code = "worker_actual_settings_unavailable",
+                    Message = $"Could not determine actual {string.Join(" and ", missing)} for worker {task.AgentThreadId}: no readable values were found in its own turn_context or explicit resolved/actual settings. Requested settings and root defaults are not evidence of actual settings; routing could not be fully verified."
+                });
+            }
+        }
+
         foreach (var task in tasks.Where(x => x.ExecutionProfile is not null &&
                      x.SpawnExecutionProfile is not null && x.ExecutionProfile != x.SpawnExecutionProfile))
         {
@@ -1499,6 +1568,27 @@ public sealed class FactoryReportEngine
         }
 
         var tools = AggregateTools(agents);
+        if (tools.ToolBatches is null)
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "info", Category = "reporter", Code = "tool_batches_unavailable",
+                Message = "Could not calculate tool batches: the trace lacks complete, reliable started/completed intervals for tool calls."
+            });
+        foreach (var agent in agents)
+        {
+            var missing = new List<string>();
+            if (agent.StartedAt is null) missing.Add("start timestamp");
+            if (agent.FinishedAt is null) missing.Add("finish timestamp");
+            if (agent.Tokens.InputTokens is null) missing.Add("input tokens");
+            if (agent.Tokens.CachedInputTokens is null) missing.Add("cached input tokens");
+            if (agent.Tokens.OutputTokens is null) missing.Add("output tokens");
+            if (missing.Count > 0)
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "info", Category = "reporter", Code = "agent_data_unavailable",
+                    Message = $"Could not determine {string.Join(", ", missing)} for {agent.Role} thread {agent.ThreadId} from the available trace."
+                });
+        }
         foreach (var failed in tools.FailedCommandItems)
         {
             diagnostics.Add(new Diagnostic
@@ -1517,6 +1607,24 @@ public sealed class FactoryReportEngine
             result,
             structuredResult is not null,
             terminalEvent);
+        if (completionInfo.ProjectVerification == "unavailable")
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "info", Category = "reporter", Code = "project_verification_unavailable",
+                Message = "Could not determine final project verification: no recognized command/result evidence was found after a final planner # Done. Absence of this evidence does not mean verification was not configured."
+            });
+        if (completionInfo.DeclaredResult == "unavailable")
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "info", Category = "reporter", Code = "declared_result_unavailable",
+                Message = "Could not read an explicit structured Factory result; any derived run result is reported separately."
+            });
+        if (completionInfo.PlannerDone is null)
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "warning", Category = "reporter", Code = "planner_done_unavailable",
+                Message = "Could not establish the final planner # Done ordering relative to worker completion from the available trace."
+            });
 
         if (completionInfo.DeclaredResult == "completed" &&
             workerAgents.Length > 0 &&
@@ -2091,8 +2199,10 @@ public sealed class FactoryReportEngine
         }
 
         var hasNative = calls.Values.Any(x => x.IsNative);
+        // Some hosts emit native command events but only response-item spawn calls.
+        // Keep those collaboration calls; call IDs already deduplicate native wrappers.
         var semantic = (hasNative
-                ? calls.Values.Where(x => x.IsNative)
+                ? calls.Values.Where(x => x.IsNative || x.Name is "spawn_agent" or "wait_agent")
                 : calls.Values)
             .ToArray();
 
@@ -3198,7 +3308,6 @@ public static class ReportWriters
             writer.WriteLine($"- Host wrapper calls: {report.Metrics.Tools.HostWrapperCalls}");
 
         writer.WriteLine();
-        writer.WriteLine("## Timeline");        writer.WriteLine();
         writer.WriteLine("## Timeline");
         writer.WriteLine();
         foreach (var e in report.Timeline)

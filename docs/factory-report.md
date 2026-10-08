@@ -59,18 +59,31 @@ recorded separately as `spawnExecutionProfile`. Conflicting values emit
 unknown even when the spawn prompt supplies one.
 Native results containing only a canonical `task_name` are correlated with the
 child's `agent_path` and parent thread metadata to preserve requested settings.
-It reports actual settings only when a host trace explicitly supplies resolved
-or actual fields in spawn events, spawn output, or the worker's own events.
+It reports actual settings from direct `model` and `effort` fields in the
+worker's own `turn_context`, or explicit resolved/actual fields in spawn events,
+spawn output, or the worker's own events. Nested collaboration defaults and
+contexts explicitly belonging to other threads are excluded.
 Settings attached to a worker's child-agent tool calls are not its own settings.
 It never infers actual settings from the current `.idd/execution.yaml`
-or root session settings. Missing actual fields remain `unknown`. When explicit
+or root session settings. Missing actual fields remain `unknown` and emit
+`reporter/worker_actual_settings_unavailable`, naming the worker and missing
+fields. The live routing evaluation requires both actual settings to be present
+and match, so missing evidence cannot silently pass that check. When explicit
 requested and actual values differ, the report emits
 `factory/worker_execution_settings_mismatch`. Later changes to
 `.idd/execution.yaml` cannot rewrite these historical spawn records.
 
+Encrypted spawn prompts emit `host-trace/spawn_prompt_unreadable` and are not
+rendered as task titles or contracts. Readable planner tasks supply the task
+and profile when available; otherwise explicit unavailable-data diagnostics
+identify the missing task or profile.
+
 ## Native operations and wrappers
 
 Semantic metrics distinguish native operations from host/Code Mode wrapper calls. Native `CommandExecution`, `FileChange`, `spawn_agent`, and `wait_agent`/`wait` are counted once per logical operation. Wrappers are reported separately in verbose output.
+
+Response-item spawn/wait calls are retained when the host also emits native
+command events. Calls sharing an ID with native evidence are counted once.
 
 `Tool batches` is nullable. It is calculated only when reliable started/completed intervals are available; completed-only operations do not create synthetic batches.
 
@@ -112,7 +125,7 @@ Options: `--repo`, `--codex-home`, `--run`, `--json`, `--markdown`, `--verbose`.
 
 ## Partial/damaged traces
 
-Unknown unrelated Codex events are tolerated. Missing Factory-relevant evidence remains unavailable rather than being guessed. Malformed records, missing child rollouts, unavailable state DBs, topology damage, and incomplete accounting produce partial reports plus `factory`, `host-trace`, or `reporter` diagnostics.
+Unknown unrelated Codex events are tolerated. Missing Factory-relevant evidence remains unavailable rather than being guessed. Malformed records, including a damaged final JSONL line, missing child rollouts, unavailable state DBs, topology damage, and incomplete accounting produce partial reports plus `factory`, `host-trace`, or `reporter` diagnostics. Missing worker settings, task/profile, agent timestamps/token fields, final verification/result evidence, and tool-batch intervals are explicitly explained in Diagnostics in console, Markdown, and JSON output. Unspecified requested overrides are distinguished from unreadable actual settings: omitted overrides may intentionally inherit host defaults.
 
 ## Regression fixture
 

@@ -18,12 +18,11 @@ internal static class FactoryRoutingAssertions
             var expected = mappings[task.ExecutionProfile];
             Assert.Equal(expected.Model, task.RequestedModel);
             Assert.Equal(expected.ReasoningEffort, task.RequestedReasoningEffort);
-            if (task.ActualModel is not null)
-                Assert.Equal(expected.Model, task.ActualModel);
-            if (task.ActualReasoningEffort is not null)
-                Assert.Equal(expected.ReasoningEffort, task.ActualReasoningEffort);
+            Assert.Equal(expected.Model, task.ActualModel);
+            Assert.Equal(expected.ReasoningEffort, task.ActualReasoningEffort);
         }
         Assert.DoesNotContain(report.Diagnostics, diagnostic =>
-            diagnostic.Code is "worker_execution_profile_mismatch" or "worker_execution_settings_mismatch");
+            diagnostic.Code is "worker_execution_profile_mismatch" or "worker_execution_settings_mismatch"
+                or "worker_actual_settings_unavailable");
     }
 }

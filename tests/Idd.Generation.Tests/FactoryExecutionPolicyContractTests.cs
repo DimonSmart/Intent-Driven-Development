@@ -64,6 +64,8 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("Do not silently convert malformed explicit policy", policy);
         Assert.True(policy.Contains("do not substitute another model", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("same concrete model may be", policy);
+        Assert.Contains("The two strategies do not mix", policy);
+        Assert.Contains("per-profile `default`, `inherit`", policy);
     }
 
     [Fact]
@@ -71,8 +73,8 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
     {
         var configure = Canonical("skills", "idd-factory-configure.md");
 
-        Assert.Contains("Use the current model for all tasks", configure);
-        Assert.Contains("Configure different models by task complexity", configure);
+        Assert.Contains("default (inherit)", configure);
+        Assert.Contains("configure — explicitly configure models", configure);
         Assert.Contains("Use proposed mapping", configure);
         Assert.Contains("Edit mapping", configure);
         Assert.Contains("Never save an automatically proposed mapping before explicit confirmation", configure);
@@ -80,6 +82,8 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("AskUserQuestion", configure);
         Assert.Contains("all three", configure);
         Assert.Contains("modelStrategy: inherit", configure);
+        Assert.Contains("all-or-nothing", configure);
+        Assert.Contains("Per-profile inheritance", configure);
     }
 
     [Fact]
@@ -164,8 +168,9 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
 
         Assert.Contains("Do not ask about Factory models for an `idd-intent`-only project", init);
         Assert.Contains("When Factory is enabled for this initialization", init);
-        Assert.Contains("Use the current model for all tasks", init);
-        Assert.Contains("Configure different models by task complexity", init);
+        Assert.Contains("default (inherit)", init);
+        Assert.Contains("configure — explicitly configure models", init);
+        Assert.Contains("partial mapping or per-profile inheritance", init);
         Assert.Contains("idd-factory-configure", init);
     }
 }
