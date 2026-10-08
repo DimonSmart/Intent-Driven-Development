@@ -6,8 +6,8 @@ better location without changing product meaning.
 ## Request
 
 ```text
-Use idd-intent-normalize-current to collect all current intent about mouse support in
-console controls and move it into a dedicated specification.
+Collect all current Product Intent about mouse support in console controls and
+normalize it into a dedicated specification without changing product meaning.
 ```
 
 ## Before

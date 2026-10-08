@@ -11,6 +11,11 @@
           "allowed-tools": "Read Glob Grep"
         }
       }
+    },
+    "exposure": "command",
+    "interface": {
+      "displayName": "IDD Help",
+      "shortDescription": "Explain IDD concepts and workflows"
     }
   },
   "idd-route": {
@@ -24,15 +29,26 @@
           "allowed-tools": "Read Glob Grep"
         }
       }
-    }
+    },
+    "exposure": "command"
   },
   "idd-project-init": {
     "description": "Initialize project-owned IDD intent state, then pause for a blocking bootstrap decision when an existing implementation has no current intent.",
-    "invocation": "manual"
+    "invocation": "manual",
+    "exposure": "command",
+    "interface": {
+      "displayName": "IDD Project Init",
+      "shortDescription": "Initialize IDD in a project"
+    }
   },
   "idd-verification-configure": {
     "description": "Create or deliberately update project-specific `.idd/verification.yaml` rules without changing product intent.",
-    "invocation": "manual"
+    "invocation": "manual",
+    "exposure": "command",
+    "interface": {
+      "displayName": "IDD Verification",
+      "shortDescription": "Configure project verification checks"
+    }
   },
   "idd-intent-bootstrap": {
     "description": "Interactively discover, classify, confirm, and write initial current product intent using blocking user decisions for an existing implemented project without reliable IDD intent.",
@@ -42,7 +58,8 @@
           "argument-hint": "[whole repository or selected product roots and exclusions]"
         }
       }
-    }
+    },
+    "exposure": "workflow"
   },
   "idd-glossary-build": {
     "description": "Manual-only workflow to create or deliberately update the optional project glossary with only terminology whose incorrect interpretation could change the understanding of product intent.",
@@ -53,6 +70,11 @@
           "argument-hint": "[terms, product area, or terminology sources]"
         }
       }
+    },
+    "exposure": "command",
+    "interface": {
+      "displayName": "IDD Glossary",
+      "shortDescription": "Create or update the project glossary"
     }
   },
   "idd-intent-structure-audit": {
@@ -66,23 +88,33 @@
           "allowed-tools": "Read Glob Grep"
         }
       }
-    }
+    },
+    "exposure": "workflow"
   },
   "idd-skip": {
     "description": "Manual-only command. Perform the current request without applying Intent-Driven Development routing or updating durable intent.",
-    "invocation": "manual"
+    "invocation": "manual",
+    "exposure": "command",
+    "interface": {
+      "displayName": "Skip IDD",
+      "shortDescription": "Perform a request without IDD routing"
+    }
   },
   "idd-intent-brainstorm": {
-    "description": "Clarify real product intent before changing `.idd/intent/`, using focused customer-development questions and simplification options without editing product intent, planning implementation, or writing code."
+    "description": "Clarify real product intent before changing `.idd/intent/`, using focused customer-development questions and simplification options without editing product intent, planning implementation, or writing code.",
+    "exposure": "workflow"
   },
   "idd-intent-change": {
-    "description": "Update current `.idd/intent/` product intent for add, modify, and remove operations; update existing owners or create a new owning spec, ADR, or spike when required."
+    "description": "Update current `.idd/intent/` product intent for add, modify, and remove operations; update existing owners or create a new owning spec, ADR, or spike when required.",
+    "exposure": "workflow"
   },
   "idd-engineering-change": {
-    "description": "Manage explicit durable Engineering Rule add, modify, and remove mutations under `.idd/engineering/`, with batch semantic planning, lazy bootstrap, stable allocation, Factory safety guard, and direct shared mechanical validation."
+    "description": "Manage explicit durable Engineering Rule add, modify, and remove mutations under `.idd/engineering/`, with batch semantic planning, lazy bootstrap, stable allocation, Factory safety guard, and direct shared mechanical validation.",
+    "exposure": "workflow"
   },
   "idd-code-implement": {
-    "description": "Implement current product intent or perform a behavior-preserving implementation change, then verify the result against relevant `.idd/intent/` specifications."
+    "description": "Implement current product intent or perform a behavior-preserving implementation change, then verify the result against relevant `.idd/intent/` specifications.",
+    "exposure": "workflow"
   },
   "idd-intent-drift-audit": {
     "description": "Audit whether current implementation behavior conforms to durable Product Intent in `.idd/intent/` for an explicitly defined focused or project-wide scope.",
@@ -95,7 +127,8 @@
           "allowed-tools": "Read Glob Grep Bash"
         }
       }
-    }
+    },
+    "exposure": "workflow"
   },
   "idd-intent-import": {
     "description": "Migrate supplied durable knowledge into normalized Product Intent and explicit source-owned Engineering Rules, with safe semantic planning, lazy Engineering bootstrap, conflict blocking, and shared mechanical validation.",
@@ -105,7 +138,8 @@
           "argument-hint": "[source roots] [--mode propose|apply-safe]"
         }
       }
-    }
+    },
+    "exposure": "workflow"
   },
   "idd-intent-lint": {
     "description": "Run mechanical `.idd/intent/` consistency checks without editing files.",
@@ -118,7 +152,8 @@
           "allowed-tools": "Read Glob Grep Bash"
         }
       }
-    }
+    },
+    "exposure": "workflow"
   },
   "idd-intent-normalize-current": {
     "description": "Perform focused structural normalization of existing `.idd/intent/` product intent without changing product meaning.",
@@ -128,16 +163,24 @@
           "argument-hint": "--documents <ids> --topic <topic> --target <file|new> --mode propose|apply"
         }
       }
-    }
+    },
+    "exposure": "workflow"
   },
   "idd-code-update-intent": {
-    "description": "Update `.idd/intent/` product intent from confirmed implementation behavior."
+    "description": "Update `.idd/intent/` product intent from confirmed implementation behavior.",
+    "exposure": "workflow"
   },
   "idd-factory-configure": {
     "description": "Create or deliberately update project-owned Factory execution-profile mappings in .idd/execution.yaml without hardcoded model recommendations.",
-    "invocation": "manual"
+    "invocation": "manual",
+    "exposure": "command",
+    "interface": {
+      "displayName": "IDD Factory Config",
+      "shortDescription": "Configure Factory execution profiles"
+    }
   },
   "idd-factory-run": {
-    "description": "Prepare required durable Product Intent and explicit Engineering policy before starting a new run, then orchestrate incremental planning and isolated native-agent workers while mechanically applying project-owned execution-profile mappings."
+    "description": "Prepare required durable Product Intent and explicit Engineering policy before starting a new run, then orchestrate incremental planning and isolated native-agent workers while mechanically applying project-owned execution-profile mappings.",
+    "exposure": "command"
   }
 }

@@ -150,13 +150,48 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
         {
             files.Add(new GeneratedFile(
                 Path.Combine("skills", skillName, "agents", "openai.yaml"),
-                """
-                policy:
-                  allow_implicit_invocation: false
-                """.ReplaceLineEndings("\n") + "\n"));
+                BuildAgentMetadata(skillName, skillDescription)));
         }
 
         return files;
+    }
+
+    private static string BuildAgentMetadata(string skillName, SkillDescription description)
+    {
+        var displayName = description.Interface?.DisplayName ?? BuildFallbackDisplayName(skillName);
+        var shortDescription = description.Interface?.ShortDescription ??
+            BuildFallbackShortDescription(description.Description);
+
+        return string.Join("\n",
+            "interface:",
+            $"  display_name: {YamlFrontMatterWriter.QuoteYamlString(displayName)}",
+            $"  short_description: {YamlFrontMatterWriter.QuoteYamlString(shortDescription)}",
+            "",
+            "policy:",
+            "  allow_implicit_invocation: false",
+            "");
+    }
+
+    private static string BuildFallbackDisplayName(string skillName) =>
+        string.Join(' ', skillName.Split('-', StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => part == "idd"
+                ? "IDD"
+                : char.ToUpperInvariant(part[0]) + part[1..]));
+
+    private static string BuildFallbackShortDescription(string description)
+    {
+        var sentence = description.Trim().Split(['\r', '\n'], 2)[0].Trim();
+        var sentenceEnd = sentence.IndexOf(". ", StringComparison.Ordinal);
+        if (sentenceEnd >= 0)
+            sentence = sentence[..(sentenceEnd + 1)];
+
+        if (sentence.Length <= 120)
+            return sentence;
+
+        var lastWordBoundary = sentence.LastIndexOf(' ', 116);
+        return lastWordBoundary > 0
+            ? sentence[..lastWordBoundary].TrimEnd() + "..."
+            : "Run an IDD workflow";
     }
 
     protected override string BuildIddPluginMetadata(

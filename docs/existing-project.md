@@ -68,14 +68,14 @@ Existing projects have two different starting situations.
 
 ### Existing knowledge already describes the product
 
-Use `idd-intent-import` when requirements, specifications, ADRs, public
+Ask to import existing knowledge when requirements, specifications, ADRs, public
 contracts, product documentation, technical-design material, or other supplied
 sources already express current durable knowledge. The workflow separates
 Product Intent from explicit accepted implementation-only Engineering decisions;
 it does not infer Engineering policy from current code:
 
 ```text
-Use idd-intent-import to propose migration of current Product Intent and any
+Propose importing current Product Intent and any
 explicit accepted durable Engineering decisions already stated in ./docs.
 ```
 
@@ -89,13 +89,13 @@ exist.
 Use the interactive bootstrap workflow:
 
 ```text
-idd-intent-bootstrap
+Analyze this implemented project and propose its initial current Product Intent.
 ```
 
 Or identify the relevant scope:
 
 ```text
-Use idd-intent-bootstrap for ./src/Product and ./src/Product.Contracts.
+Reconstruct current Product Intent from ./src/Product and ./src/Product.Contracts.
 Exclude ./src/LegacyMigration and ./experiments.
 ```
 
@@ -246,16 +246,16 @@ decision.
 
 ## 8. Verify The Structure
 
-Run:
+Ask:
 
 ```text
-idd-intent-lint
+Check current IDD documents for mechanical consistency errors.
 ```
 
 For a broader diagnostic review:
 
 ```text
-idd-intent-structure-audit
+Check current Product Intent ownership and semantic structure.
 ```
 
 Lint treats a missing glossary as valid. When a glossary exists, it checks its
@@ -266,7 +266,7 @@ After bootstrap, a separate conformance check can compare the implementation
 with the newly confirmed model:
 
 ```text
-Use idd-intent-drift-audit for the bootstrapped product areas.
+Audit implementation conformance against current Product Intent for the bootstrapped product areas.
 ```
 
 This check does not automatically authorize implementation changes.
@@ -276,13 +276,13 @@ This check does not automatically authorize implementation changes.
 For a focused implementation from current intent:
 
 ```text
-Use idd-code-implement for <product area or requested behavior>.
+Implement <product area or requested behavior> according to current Product Intent, without changing requirements.
 ```
 
 When product behavior itself must change:
 
 ```text
-Use idd-intent-change for <confirmed product change>.
+Update current Product Intent for <confirmed product change> before implementing it.
 ```
 
 For a large implementation task requiring several coordinated stages:
