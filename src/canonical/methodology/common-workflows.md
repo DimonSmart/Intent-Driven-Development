@@ -556,12 +556,13 @@ The repository is authoritative implementation reality.
 Every planner task must contain exactly one `ExecutionProfile`: `economy`,
 `standard`, or `strong`. Missing, repeated, or unknown profiles invalidate the
 affected task. The planner never reads model policy. Immediately before each
-worker spawn, the root agent re-reads and validates the required project-owned
-`.idd/execution.yaml`. The policy must explicitly select `modelStrategy: inherit`
-or provide all three mappings for the active platform. Missing configuration or
-mappings block execution; they never imply inheritance. The root applies the
-exact configured native model/settings without substituting another model or
-reclassifying the task.
+worker spawn, the root agent checks the optional project-owned
+`.idd/execution.yaml`. Its absence means all profiles inherit host behavior.
+When present, the file is re-read and validated: it must explicitly select
+`modelStrategy: inherit` or provide all three mappings for the active platform.
+Malformed existing configuration or missing mappings block execution; they never
+trigger silent inheritance. The root applies the exact configured native
+model/settings without substituting another model or reclassifying the task.
 
 Temporary continuation state is limited to the original request, remaining
 current batch, short completed summaries, exact user answers, and optional

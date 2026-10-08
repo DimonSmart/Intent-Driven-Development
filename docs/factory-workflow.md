@@ -93,7 +93,8 @@ planner selects the profile from task complexity only and does not read model
 mappings.
 
 Immediately before a worker starts, the root agent mechanically resolves that
-profile through project-owned `.idd/execution.yaml`. The file must either
+profile through optional project-owned `.idd/execution.yaml`. If the file is
+absent, workers inherit host model/reasoning settings. An existing file must
 explicitly select `inherit` or provide all three mappings for the active
 platform. Explicit mappings are applied exactly through native child-agent
 controls; malformed/unavailable mappings never trigger silent model

@@ -16,10 +16,11 @@ fresh planner and sequential fresh workers, handles one planner question, and
 runs configured project verification after planner `# Done`.
 
 Immediately before each worker spawn it mechanically maps the task's
-`ExecutionProfile` through `.idd/execution.yaml`. Each task must provide one
-canonical profile, and the policy must be explicit `inherit` or complete for
-the active platform. Explicit mappings are applied exactly and are never
-semantically "improved" by the root agent.
+`ExecutionProfile` through optional `.idd/execution.yaml`. Each task must
+provide one canonical profile. If the file is absent, all profiles inherit
+host behavior; an existing policy must explicitly select `inherit` or be
+complete for the active platform. Explicit mappings are applied exactly and
+are never semantically "improved" by the root agent.
 
 It does not launch a packaged runtime, use Factory MCP tools, supervise child
 processes, poll status, maintain retry budgets, or own a workflow state machine.

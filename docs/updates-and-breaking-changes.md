@@ -8,10 +8,12 @@ Factory planner tasks must declare exactly one `# ExecutionProfile` metadata
 section: `economy`, `standard`, or `strong`. Missing or repeated metadata is
 invalid.
 
-Projects configure `.idd/execution.yaml` with `idd-factory-configure` before
-the first worker. The file is project-owned execution policy, not Factory
-runtime/workflow configuration and not temporary state. It must be explicit
-`inherit` or complete for the active platform.
+Projects may optionally configure `.idd/execution.yaml` with
+`idd-factory-configure`. Its absence preserves host/session model inheritance.
+The file is project-owned execution policy, not Factory runtime/workflow
+configuration and not temporary state. When present, it must explicitly select
+`inherit` or provide complete mappings for the active platform. Invalid
+existing policies block worker execution rather than silently inheriting.
 
 The root Factory agent now performs a mechanical
 `profile -> project mapping -> native child spawn` step. It never reclassifies a

@@ -28,15 +28,16 @@ without reading model policy, model availability, price, or reasoning settings.
 
 ## Project-owned configuration
 
-The required file is:
+The optional file is:
 
 ```text
 .idd/execution.yaml
 ```
 
-Factory setup must complete before the first worker starts. Absence of this file
-is a blocking configuration diagnostic, not permission to inherit the
-host/session/default model.
+Absence of this file means that all profiles inherit host/session/default
+model and reasoning behavior. Factory can run without configuring a policy.
+When the file exists, it must be valid; malformed existing configuration is a
+blocking diagnostic, not permission to inherit.
 
 An explicit all-inherit policy is:
 
@@ -112,14 +113,15 @@ authoritative execution-time validation.
 
 ## Runtime lookup
 
-Immediately before each worker spawn, the root agent re-reads the policy once,
-validates that one document, and performs only this mechanical lookup:
+Immediately before each worker spawn, the root agent checks for the optional
+policy, re-reads and validates it when present, and performs this mechanical
+lookup:
 
 ```text
 planner ExecutionProfile
 -> require exactly one canonical profile
--> structurally validate .idd/execution.yaml
--> select the active-platform mapping for that profile
+-> if .idd/execution.yaml is absent, inherit host model/reasoning settings
+-> otherwise validate .idd/execution.yaml and select the active-platform mapping
 -> inherit OR exact configured model/settings
 -> native child-agent spawn
 ```
@@ -131,9 +133,9 @@ If the selected mapping is `inherit`, omit Factory-specific model/reasoning
 overrides. If it is explicit, pass exactly the configured model and optional
 reasoning setting through the host's native child-agent controls.
 
-An explicit `inherit` policy is the only inherit case. A configuration update
-after this lookup does not alter the already-created worker; the next worker
-reads the new policy without requiring a new plan.
+An absent policy or an explicit `inherit` policy omits overrides. A policy
+update after this lookup does not alter the already-created worker; the next
+worker reads the current file (or observes its absence) without a new plan.
 
 If the host rejects the configured model/settings, or cannot honor an explicit
 per-child override, do not substitute another model and do not change the
