@@ -76,20 +76,53 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("Do not reconsider task complexity", run);
         Assert.Contains("never silently fall back to `inherit`", run);
         Assert.Contains("idd-factory-configure", run);
-        Assert.Contains("worker skill is always", run);
-        Assert.Contains("idd-factory-execute-subtask", run);
+        Assert.Contains("same canonical Factory", run);
+        Assert.Contains("references/factory-worker.md", run);
     }
 
     [Fact]
     public void Worker_DoesNotSelectOrReconfigureItsModel()
     {
-        var worker = Canonical("skills", "idd-factory-execute-subtask.md");
+        var worker = Canonical("factory", "worker.md");
 
         Assert.Contains("Do not read `.idd/execution.yaml`", worker);
         Assert.Contains("choose a model", worker);
         Assert.Contains("reinterpret an", worker);
         Assert.Contains("ExecutionProfile", worker);
         Assert.Contains(".idd/execution.yaml", worker);
+    }
+
+    [Fact]
+    public void WorkerProtocol_PreservesSingleTaskBoundaryAndWorkerRestrictions()
+    {
+        var worker = Canonical("factory", "worker.md");
+        var run = Canonical("skills", "idd-factory-run.md");
+
+        Assert.StartsWith("# IDD Factory Worker Protocol", worker);
+        Assert.Contains("You are the Factory worker.", worker);
+        Assert.Contains("internal protocol owned by `idd-factory-run`", worker);
+        Assert.Contains("exactly one Factory task", worker);
+        Assert.Contains("fresh semantic context", worker);
+        Assert.Contains("Do not read `.idd/execution.yaml`", worker);
+        Assert.Contains("choose a model", worker);
+        Assert.Contains("Do not modify `.idd/intent`, `.idd/engineering`", worker);
+        Assert.Contains("`.idd/factory/current`", worker);
+        Assert.Contains("Do not search for additional Conditional Engineering Rules", worker);
+        Assert.Contains("git ls-files --cached --others --exclude-standard", worker);
+        Assert.Contains("semantic idempotency", worker);
+        Assert.Contains("at-least-once", worker);
+        Assert.Contains("focused checks", worker);
+        Assert.Contains("short semantic result", worker);
+        Assert.Contains("perform Factory finalization", worker);
+        Assert.Contains("Do not assume inherited parent-skill references", worker);
+
+        Assert.Contains("Before **every** worker spawn", run);
+        Assert.Contains("If that reference is missing, empty, or", run);
+        Assert.Contains("complete worker", run);
+        Assert.Contains("--- Factory worker assignment ---", run);
+        Assert.Contains("--- End Factory worker assignment ---", run);
+        Assert.Contains("trusted terminal result", run);
+        Assert.DoesNotContain("invoke `idd-factory-execute-subtask`", run);
     }
 
     [Fact]
@@ -127,6 +160,7 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
                 "idd-factory-*.md")
             .Append(Path.Combine(fixture.RepoRoot, "src", "canonical", "methodology", "factory-execution-policy.md"))
             .Append(Path.Combine(fixture.RepoRoot, "src", "canonical", "factory", "planner.md"))
+            .Append(Path.Combine(fixture.RepoRoot, "src", "canonical", "factory", "worker.md"))
             .Append(Path.Combine(fixture.RepoRoot, "tools", "generate", "Generation", "CodexPlatformAdapter.cs"))
             .Append(Path.Combine(fixture.RepoRoot, "tools", "generate", "Generation", "ClaudePlatformAdapter.cs"));
 

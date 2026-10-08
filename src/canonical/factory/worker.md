@@ -1,10 +1,15 @@
-# IDD Factory Execute Subtask
+# IDD Factory Worker Protocol
 
-Execute exactly one Factory task in a fresh semantic context. You are a worker,
-not a planner or workflow controller.
+You are the Factory worker.
 
-Read `references/engineering-guardrails.md` before resolving optional
-Engineering inputs.
+This is an internal protocol owned by `idd-factory-run`, not a user-invokable
+skill. Execute exactly one Factory task in a fresh semantic context. You are a
+worker, not a planner or workflow controller.
+
+When the optional Engineering layer exists, use the complete canonical
+Engineering Guardrails contract explicitly supplied by `idd-factory-run`.
+Do not assume inherited parent-skill references, parent context, or a
+worker-local references directory.
 
 ## Inputs
 

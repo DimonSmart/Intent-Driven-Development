@@ -138,8 +138,7 @@
       ],
       "skills": [
         "idd-factory-run",
-        "idd-factory-configure",
-        "idd-factory-execute-subtask"
+        "idd-factory-configure"
       ],
       "roles": [],
       "skillRoleReferences": {},
@@ -171,11 +170,11 @@
         },
         {
           "skill": "idd-factory-run",
-          "source": "src/canonical/methodology/engineering-guardrails.md",
-          "destination": "engineering-guardrails.md"
+          "source": "src/canonical/factory/worker.md",
+          "destination": "factory-worker.md"
         },
         {
-          "skill": "idd-factory-execute-subtask",
+          "skill": "idd-factory-run",
           "source": "src/canonical/methodology/engineering-guardrails.md",
           "destination": "engineering-guardrails.md"
         }

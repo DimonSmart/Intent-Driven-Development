@@ -101,7 +101,7 @@ configured model/settings or cannot honor the override, Factory reports the
 problem and suggests reconfiguration; it never silently substitutes another
 model or profile.
 
-The worker remains `idd-factory-execute-subtask` for every profile.
+The same canonical Factory worker protocol is used for every profile. Execution profiles affect native child-agent model settings, not worker instructions.
 
 ## Project verification
 
