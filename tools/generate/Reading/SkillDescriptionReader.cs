@@ -28,20 +28,14 @@ internal sealed class SkillDescriptionReader
         JsonElement value,
         IReadOnlySet<string> knownAdapterNames)
     {
-        if (value.ValueKind == JsonValueKind.String)
-        {
-            var description = value.GetString();
-            SkillDescriptionValidator.GuardDescription(path, skillName, description);
-            return new SkillDescription(description!, SkillInvocation.Auto, SkillExposure.Command, Interface: null, Adapters: null);
-        }
-
         SkillDescriptionValidator.GuardDescriptionObject(path, skillName, value);
 
         var objectDescription = value.GetProperty("description").GetString();
         SkillDescriptionValidator.GuardDescription(path, skillName, objectDescription);
         SkillDescriptionValidator.GuardUniqueProperties(path, skillName, value, "skill description");
+        SkillDescriptionValidator.GuardSkillFields(path, skillName, value);
         var invocation = ReadInvocation(skillName, value);
-        var exposure = ReadExposure(skillName, value);
+        var exposure = ReadExposure(path, skillName, value);
         SkillDescriptionValidator.GuardInvocationExposure(skillName, invocation, exposure);
         var skillInterface = ReadInterface(path, skillName, value);
 
@@ -89,10 +83,11 @@ internal sealed class SkillDescriptionReader
         };
     }
 
-    private static SkillExposure ReadExposure(string skillName, JsonElement value)
+    private static SkillExposure ReadExposure(string path, string skillName, JsonElement value)
     {
         if (!value.TryGetProperty("exposure", out var element))
-            return SkillExposure.Command;
+            throw new InvalidOperationException(
+                $"Invalid skill description for '{skillName}' in {path}: required property 'exposure' is missing. Allowed values: command, workflow.");
 
         if (element.ValueKind != JsonValueKind.String)
             throw new InvalidOperationException(
@@ -128,6 +123,7 @@ internal sealed class SkillDescriptionReader
     {
         SkillDescriptionValidator.GuardAdapterMetadataObject(path, skillName, adapterName, value);
         SkillDescriptionValidator.GuardUniqueProperties(path, skillName, value, $"adapter '{adapterName}'");
+        SkillDescriptionValidator.GuardAdapterMetadataFields(path, skillName, adapterName, value);
 
         IReadOnlyDictionary<string, JsonElement>? frontMatter = null;
         if (value.TryGetProperty("frontmatter", out var frontMatterElement))
