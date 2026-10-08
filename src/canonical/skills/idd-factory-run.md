@@ -9,6 +9,7 @@ MCP transport, retry engine, or durable implementation database.
 
 Read `references/intent-preflight.md` before starting or replacing a Factory
 run. Read `references/factory-planner.md` before spawning any planner. Read
+`references/factory-worker.md` before every worker spawn. Read
 `references/engineering-guardrails.md` before using an optional
 `.idd/engineering/` layer. Read `references/project-verification.md` before
 project verification. Read `references/factory-execution-policy.md` before
@@ -245,7 +246,8 @@ while true:
     mechanically resolve the active-platform profile mapping
     deterministically re-read the current Engineering INDEX
     enumerate all current Always ENG IDs
-    spawn the same fresh worker with the resolved native model override
+    read complete factory-worker.md and prepare the isolated worker assignment
+    spawn a fresh native worker with the resolved native model override
     wait natively for its terminal result
 
     if no trusted completed result:
@@ -323,34 +325,75 @@ configured model/reasoning value or cannot honor an explicit per-child override,
 stop without spawning a substitute worker and suggest rerunning
 `idd-factory-configure`.
 
-Model selection changes only native spawn settings. The worker skill is always
-`idd-factory-execute-subtask`.
+Model selection changes only native spawn settings. The same canonical Factory
+worker protocol is used for every execution profile; profiles change native
+child-agent settings, never worker instructions. The worker does not choose its
+own model.
 
 ### Fresh worker
 
-For the first remaining task, invoke `idd-factory-execute-subtask` in another
-fresh semantic context. Give it:
+Before **every** worker spawn, read the complete, current packaged
+`references/factory-worker.md`. If that reference is missing, empty, or
+unreadable, block the spawn and leave the task first in `plan.md`; never
+reconstruct instructions from memory, invoke the removed public worker skill,
+or fall back to a generic agent.
+
+For the first remaining task, prepare one self-contained worker assignment.
+Immediately before execution, check whether `.idd/engineering/` exists.
+Absence is normal: do not bootstrap the layer, invent ENG identifiers, or
+require a nonexistent INDEX. When present, mechanically validate its structure,
+re-read the current INDEX, enumerate every `Always` entry, and ensure that
+each ID resolves uniquely to a valid matching document. Pass those IDs
+separately from the planner-selected Conditional `TaskRelatedEngineering`
+IDs. A missing, duplicated, malformed, or metadata-inconsistent mandatory
+rule blocks execution without repairing the Engineering layer. Do not
+semantically reselect Conditional rules.
+
+Give the child the **complete** canonical Engineering Guardrails contract
+from `references/engineering-guardrails.md` when the layer exists, not just
+its path or filename. The root resolves the execution profile and native model
+settings before spawn; the worker never selects a model or reads execution
+policy.
+
+Use this logical native spawn instruction structure, keeping role instructions
+separate from the one-task assignment:
 
 ```text
-Task
-TaskRelatedIntent IDs, when present
-TaskRelatedEngineering IDs, when present
-AlwaysEngineering IDs, mechanically enumerated immediately before this worker
-current repository
+<complete contents of references/factory-worker.md>
+<complete contents of references/engineering-guardrails.md, if Engineering exists>
+--- Factory worker assignment ---
+# Task
+<exactly one self-contained Task>
+# TaskRelatedIntent
+<optional IDD-NNNN identifiers>
+# TaskRelatedEngineering
+<optional planner-selected Conditional ENG-NNNN identifiers>
+# AlwaysEngineering
+<all current Always ENG-NNNN identifiers, if Engineering exists>
+--- End Factory worker assignment ---
 ```
 
-Do not give it previous worker transcripts. The worker resolves selected
-Intent and Engineering IDs from the current repository and performs reasonable
-task-local checks.
+Omit empty optional sections. The delimiters define a delivery boundary for
+native traces, not a persistent Factory task schema. When the native adapter
+provides separate instruction and task fields, supply the same complete role
+contracts and bounded assignment, with trace-visible equivalent boundaries.
+Never place task metadata into the worker protocol itself.
 
-`AlwaysEngineering` is not planner output and does not need to be persisted in
-`plan.md`. Before every worker execution, mechanically enumerate all current
-INDEX entries whose Applicability is `Always`, validate that they resolve
-uniquely to matching current rule documents, and pass those IDs separately.
-Always rules are enumerated, never semantically selected.
+Spawn a **fresh native child agent**, explicitly supplying the complete worker
+protocol and task packet. Use the current shared repository, but do not inherit
+the parent conversation, the planner transcript, or any previous worker
+transcript. Do not assume automatic discovery of parent skill references, and
+do not load the worker through a public skill handoff. Native child spawn must
+honor the already resolved per-child settings or stop without fallback.
 
-Workers run sequentially against the shared workspace. Do not add parallel
-write workers in this workflow.
+The worker mechanically resolves and reads every supplied current Intent and
+Engineering ID before implementation, performs focused task-local checks, and
+returns a short semantic result. Workers run sequentially against the shared
+workspace; no next writer may start until a trusted terminal result is received
+and the prior child is no longer writing.
+
+`AlwaysEngineering` is not planner output and is never persisted in
+`plan.md`. Preserve the existing task format and continuation state.
 
 ### Waiting and interruption
 

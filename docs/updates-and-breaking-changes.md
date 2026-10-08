@@ -2,6 +2,25 @@
 
 This page records IDD changes that require action in repositories that already use the toolkit.
 
+## 2026-10-08 — Factory worker is now an internal protocol
+
+The public `idd-factory-execute-subtask` skill has been removed. Worker
+instructions now live in the canonical internal Factory worker protocol,
+packaged as `idd-factory-run/references/factory-worker.md` for Claude and Codex.
+`idd-factory-run` supplies it directly to every fresh native worker child.
+The two public Factory skills are now `idd-factory-run` and
+`idd-factory-configure`.
+
+Normal Factory execution, execution profiles, and existing `plan.md` /
+`completed.md` continuation state are unchanged; no task-state migration is
+needed. Update the installed Factory plugin to remove the old public skill.
+If the host retains stale skill files after a normal update, use its standard
+uninstall/reinstall procedure to remove the old installation/cache. Regenerating
+the marketplace alone does not remove files from already installed plugins.
+Historical traces using the old worker skill remain supported by
+`idd-factory-report`. Direct invocation of the old worker skill is no longer
+supported.
+
 ## 2026-10-07 — Factory planner is now an internal protocol
 
 `idd-factory-decompose-task` is no longer a public Factory skill. Planner

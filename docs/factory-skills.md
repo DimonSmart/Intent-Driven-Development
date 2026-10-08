@@ -1,7 +1,8 @@
 # Factory skills
 
-IDD Factory exposes three public skills. The planner is a separate internal
-canonical protocol owned by `idd-factory-run`, not a user-invokable skill.
+IDD Factory exposes two public skills: `idd-factory-run` and
+`idd-factory-configure`. Planner and worker are internal canonical protocols
+owned by `idd-factory-run`, not user-invokable skills.
 
 ## `idd-factory-run`
 
@@ -85,9 +86,13 @@ now; do not speculate about later tasks whose contracts depend on unfinished
 work. The planner never creates a task to mutate Product Intent or Engineering
 Rules.
 
-## `idd-factory-execute-subtask`
+## Internal worker protocol
 
-This is the worker.
+The worker is not a public skill. Before every spawn, `idd-factory-run` reads
+and explicitly supplies the complete packaged `references/factory-worker.md`
+protocol to a fresh native child agent, together with a separate, single-task
+assignment. When the optional Engineering layer exists, it also supplies the
+complete `references/engineering-guardrails.md` contract.
 
 Every task runs in a fresh isolated context against the shared current
 repository. The root agent has already selected the model/context before the

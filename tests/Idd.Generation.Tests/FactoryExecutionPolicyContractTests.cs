@@ -76,14 +76,14 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("Do not reconsider task complexity", run);
         Assert.Contains("never silently fall back to `inherit`", run);
         Assert.Contains("idd-factory-configure", run);
-        Assert.Contains("worker skill is always", run);
-        Assert.Contains("idd-factory-execute-subtask", run);
+        Assert.Contains("same canonical Factory", run);
+        Assert.Contains("references/factory-worker.md", run);
     }
 
     [Fact]
     public void Worker_DoesNotSelectOrReconfigureItsModel()
     {
-        var worker = Canonical("skills", "idd-factory-execute-subtask.md");
+        var worker = Canonical("factory", "worker.md");
 
         Assert.Contains("Do not read `.idd/execution.yaml`", worker);
         Assert.Contains("choose a model", worker);
@@ -127,6 +127,7 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
                 "idd-factory-*.md")
             .Append(Path.Combine(fixture.RepoRoot, "src", "canonical", "methodology", "factory-execution-policy.md"))
             .Append(Path.Combine(fixture.RepoRoot, "src", "canonical", "factory", "planner.md"))
+            .Append(Path.Combine(fixture.RepoRoot, "src", "canonical", "factory", "worker.md"))
             .Append(Path.Combine(fixture.RepoRoot, "tools", "generate", "Generation", "CodexPlatformAdapter.cs"))
             .Append(Path.Combine(fixture.RepoRoot, "tools", "generate", "Generation", "ClaudePlatformAdapter.cs"));
 

@@ -56,10 +56,10 @@ Ownership rules:
 - Factory depends on Intent;
 - Intent must not depend on Factory.
 
-The canonical public Factory skill set is exactly `idd-factory-run`,
-`idd-factory-configure`, and `idd-factory-execute-subtask`. The configuration
-skill owns persistent project model policy; `idd-factory-run` owns the run loop
-and planner lifecycle; the worker skill executes each contracted task.
+The canonical public Factory skill set is exactly `idd-factory-run` and
+`idd-factory-configure`. Configuration owns persistent project model policy;
+`idd-factory-run` owns the orchestration loop and the internal planner and
+worker protocols. Each worker child executes exactly one contracted task.
 
 The planner is canonical distributable content without being a skill:
 `src/canonical/factory/planner.md` is packaged through generic

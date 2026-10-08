@@ -142,8 +142,5 @@
   },
   "idd-factory-run": {
     "description": "Prepare required durable Product Intent and explicit Engineering policy before starting a new run, then orchestrate incremental planning and isolated native-agent workers while mechanically applying project-owned execution-profile mappings."
-  },
-  "idd-factory-execute-subtask": {
-    "description": "Execute one self-contained Factory task from current repository reality in a fresh isolated workspace-writing agent context."
   }
 }
