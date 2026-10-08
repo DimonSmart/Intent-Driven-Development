@@ -1000,7 +1000,10 @@ public sealed class FactoryReportEngine
     private const string RunSkill = "idd-factory-run";
     private const string PlannerMarker = "You are the Factory planner.";
     private const string LegacyPlannerSkill = "idd-factory-decompose-task";
-    private const string WorkerSkill = "idd-factory-execute-subtask";
+    private const string WorkerMarker = "You are the Factory worker.";
+    private const string LegacyWorkerSkill = "idd-factory-execute-subtask";
+    private const string WorkerAssignmentStart = "--- Factory worker assignment ---";
+    private const string WorkerAssignmentEnd = "--- End Factory worker assignment ---";
     private readonly CodexRolloutReader _reader = new();
 
     public IReadOnlyList<FactoryRunReport> FindRuns(string repository, string codexHome, bool verbose = false)
@@ -1119,11 +1122,9 @@ public sealed class FactoryReportEngine
         if (explicitStarts.Count > 0)
             return explicitStarts;
 
+        // A quoted marker in root dialogue is not proof of a Factory run.
         var fallback = root.Events.FirstOrDefault(x =>
-            x.Contains(PlannerMarker) || x.Contains(LegacyPlannerSkill) || x.Contains(WorkerSkill) ||
-            x.ToolName?.Contains("spawn_agent", StringComparison.OrdinalIgnoreCase) == true &&
-            (HasPlannerMarker(x.SpawnTask) ||
-             x.SpawnTask?.Contains(WorkerSkill, StringComparison.OrdinalIgnoreCase) == true));
+            IsNativeSpawn(x) && HasUnambiguousFactoryRole(x.SpawnTask));
         return fallback is null ? [] : [fallback];
     }
 
@@ -1627,37 +1628,52 @@ public sealed class FactoryReportEngine
 
     private static string ClassifyRole(CodexRollout root, CodexRollout child, SpawnRecord? spawn)
     {
-        if (child.AgentRoleHint?.Contains("planner", StringComparison.OrdinalIgnoreCase) == true)
-            return "planner";
-        if (child.AgentRoleHint?.Contains("worker", StringComparison.OrdinalIgnoreCase) == true)
-            return "worker";
+        // Only explicit native Factory role values are trusted, not arbitrary
+        // agent_path text containing "worker" or "planner".
+        var nativeRole = TrustedFactoryRole(child.AgentRoleHint);
+        if (nativeRole is not null)
+            return nativeRole;
 
-        var spawnTask = spawn?.Task;
-        var spawnPlanner = HasPlannerMarker(spawnTask);
-        var spawnWorker = HasFactoryMarker(spawnTask, WorkerSkill);
-        if (spawnPlanner && !spawnWorker)
-            return "planner";
-        if (spawnWorker && !spawnPlanner)
-            return "worker";
+        var initialInstructions = child.Events
+            .Where(x => string.Equals(x.Role, "user", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(x.Role, "system", StringComparison.OrdinalIgnoreCase))
+            .Select(x => x.Text)
+            .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
 
-        var initialInstructions = string.Join("\n",
-            child.Events
-                .Where(x => string.Equals(x.Role, "user", StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(x.Role, "system", StringComparison.OrdinalIgnoreCase))
-                .Take(4)
-                .Select(x => x.Text ?? ""));
+        var spawnRole = ExplicitFactoryRole(spawn?.Task);
+        if (spawnRole == "ambiguous")
+            return FallbackRole(root, child);
+        if (spawnRole is not null)
+            return spawnRole;
 
-        var mentionsPlanner = HasPlannerMarker(initialInstructions);
-        var mentionsWorker = initialInstructions.Contains(WorkerSkill, StringComparison.OrdinalIgnoreCase);
-        if (mentionsPlanner && !mentionsWorker)
-            return "planner";
-        if (mentionsWorker && !mentionsPlanner)
-            return "worker";
+        var initialRole = ExplicitFactoryRole(initialInstructions);
+        if (initialRole == "ambiguous")
+            return FallbackRole(root, child);
+        if (initialRole is not null)
+            return initialRole;
 
-        if (child.ParentThreadId is not null && child.ParentThreadId != root.ThreadId)
-            return "subagent";
-        return "unknown";
+        var legacySpawn = LegacyFactoryRole(spawn?.Task);
+        if (legacySpawn == "ambiguous")
+            return FallbackRole(root, child);
+        if (legacySpawn is not null)
+            return legacySpawn;
+
+        var legacyInitial = LegacyFactoryRole(initialInstructions);
+        return legacyInitial is null or "ambiguous"
+            ? FallbackRole(root, child) : legacyInitial;
     }
+
+    private static string FallbackRole(CodexRollout root, CodexRollout child) =>
+        child.ParentThreadId is not null && child.ParentThreadId != root.ThreadId
+            ? "subagent" : "unknown";
+
+    private static string? TrustedFactoryRole(string? hint) =>
+        hint?.Trim().ToLowerInvariant() switch
+        {
+            "planner" or "factory-planner" or "factory_planner" or "idd-factory-planner" => "planner",
+            "worker" or "factory-worker" or "factory_worker" or "idd-factory-worker" => "worker",
+            _ => null
+        };
 
     private static SpawnRecord? FindSpawnRecord(IEnumerable<CodexRollout> rollouts, string childId)
     {
@@ -1671,13 +1687,48 @@ public sealed class FactoryReportEngine
         return null;
     }
 
-    private static bool HasPlannerMarker(string? text) =>
-        HasFactoryMarker(text, PlannerMarker) ||
-        HasFactoryMarker(text, LegacyPlannerSkill);
+    private static string? ExplicitFactoryRole(string? instructions)
+    {
+        var preamble = BeforeWorkerAssignment(instructions);
+        var planner = HasRoleLine(preamble, PlannerMarker);
+        var worker = HasRoleLine(preamble, WorkerMarker);
+        return planner && worker ? "ambiguous" : planner ? "planner" : worker ? "worker" : null;
+    }
+
+    private static string? LegacyFactoryRole(string? instructions)
+    {
+        var preamble = BeforeWorkerAssignment(instructions);
+        var planner = HasFactoryMarker(preamble, LegacyPlannerSkill);
+        var worker = HasFactoryMarker(preamble, LegacyWorkerSkill);
+        return planner && worker ? "ambiguous" : planner ? "planner" : worker ? "worker" : null;
+    }
+
+    private static bool HasUnambiguousFactoryRole(string? instructions)
+    {
+        var explicitRole = ExplicitFactoryRole(instructions);
+        if (explicitRole is "planner" or "worker")
+            return true;
+        return explicitRole is null && LegacyFactoryRole(instructions) is "planner" or "worker";
+    }
+
+    private static string BeforeWorkerAssignment(string? instructions)
+    {
+        if (string.IsNullOrWhiteSpace(instructions))
+            return "";
+        var boundary = instructions.IndexOf(WorkerAssignmentStart, StringComparison.OrdinalIgnoreCase);
+        return boundary < 0 ? instructions : instructions[..boundary];
+    }
+
+    private static bool HasRoleLine(string? text, string marker) =>
+        !string.IsNullOrWhiteSpace(text) &&
+        Regex.IsMatch(text, @"(?m)^\s*" + Regex.Escape(marker) + @"\s*$", RegexOptions.IgnoreCase);
 
     private static bool HasFactoryMarker(string? text, string marker) =>
         !string.IsNullOrWhiteSpace(text) &&
         text.Contains(marker, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsNativeSpawn(CodexEvent e) =>
+        e.ToolName?.Contains("spawn_agent", StringComparison.OrdinalIgnoreCase) == true;
 
     private static (string? Outcome, DateTimeOffset? Timestamp) PlannerOutcome(CodexRollout rollout)
     {
@@ -1701,14 +1752,37 @@ public sealed class FactoryReportEngine
             return null;
 
         var text = spawnTask.Replace("\r\n", "\n");
+        var start = text.IndexOf(WorkerAssignmentStart, StringComparison.OrdinalIgnoreCase);
+        if (start >= 0)
+        {
+            var begin = start + WorkerAssignmentStart.Length;
+            var end = text.IndexOf(WorkerAssignmentEnd, begin, StringComparison.OrdinalIgnoreCase);
+            if (end < 0)
+                return null;
+
+            // Never extract a task from role instructions or Engineering Guardrails.
+            var assignment = text[begin..end];
+            var heading = Regex.Match(assignment,
+                @"(?ims)^\s*#\s*Task\s*$\s*(?<task>.*?)(?=^\s*#\s*(?:Task|ExecutionProfile|TaskRelatedIntent|TaskRelatedEngineering|AlwaysEngineering)\s*$|\z)");
+            if (!heading.Success)
+                return null;
+            var task = heading.Groups["task"].Value.Trim();
+            return string.IsNullOrWhiteSpace(task) ? null : Bound(task, 1000);
+        }
+
+        // Modern spawn instructions without a complete boundary are ambiguous.
+        if (HasRoleLine(text, WorkerMarker))
+            return null;
+
+        // Retain historical inline task extraction for the public worker skill.
         var taskMatch = Regex.Match(text, @"(?im)(?:^|\s)Task\s*:\s*(.+)$");
         if (taskMatch.Success)
             return Bound(taskMatch.Groups[1].Value, 1000);
 
-        var heading = Regex.Match(text, @"(?im)^\s*#\s*Task\s*$");
-        if (heading.Success)
+        var headingLegacy = Regex.Match(text, @"(?im)^\s*#\s*Task\s*$");
+        if (headingLegacy.Success)
         {
-            var remainder = text[(heading.Index + heading.Length)..].Trim();
+            var remainder = text[(headingLegacy.Index + headingLegacy.Length)..].Trim();
             if (!string.IsNullOrWhiteSpace(remainder))
                 return Bound(remainder, 1000);
         }
@@ -1716,7 +1790,7 @@ public sealed class FactoryReportEngine
         var lines = text.Split('\n')
             .Select(x => x.Trim())
             .Where(x => x.Length > 0 &&
-                        !x.Contains(WorkerSkill, StringComparison.OrdinalIgnoreCase))
+                        !x.Contains(LegacyWorkerSkill, StringComparison.OrdinalIgnoreCase))
             .ToArray();
         return lines.Length == 0 ? null : Bound(string.Join(" ", lines), 1000);
     }
@@ -2160,8 +2234,8 @@ public sealed class FactoryReportEngine
     }
 
     private static bool IsFactoryOwned(CodexEvent e) =>
-        e.Contains(RunSkill) || e.Contains(PlannerMarker) || e.Contains(LegacyPlannerSkill) || e.Contains(WorkerSkill) ||
-        e.ToolName?.Contains("spawn_agent", StringComparison.OrdinalIgnoreCase) == true ||
+        (string.Equals(e.Role, "user", StringComparison.OrdinalIgnoreCase) && e.Contains(RunSkill)) ||
+        IsNativeSpawn(e) ||
         e.ToolName?.Contains("wait_agent", StringComparison.OrdinalIgnoreCase) == true ||
         IsFactoryCompletion(e) ||
         TryParseStructuredFactoryResult(e, out _, out _);
