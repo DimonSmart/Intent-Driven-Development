@@ -25,6 +25,52 @@ internal static partial class SkillDescriptionValidator
         }
     }
 
+    public static void GuardUniqueProperties(string path, string skillName, JsonElement element, string context)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var property in element.EnumerateObject())
+        {
+            if (!names.Add(property.Name))
+                throw new InvalidOperationException(
+                    $"Duplicate JSON property '{property.Name}' in {context} for skill '{skillName}' in {path}.");
+        }
+    }
+
+    public static void GuardInvocationExposure(string skillName, SkillInvocation invocation, SkillExposure exposure)
+    {
+        if (invocation == SkillInvocation.Manual && exposure == SkillExposure.Workflow)
+            throw new InvalidOperationException(
+                $"Invalid invocation/exposure for skill '{skillName}': manual + workflow has no activation path.");
+    }
+
+    public static void GuardInterfaceObject(string path, string skillName, JsonElement element)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+            throw new InvalidOperationException(
+                $"Invalid interface for skill '{skillName}' in {path}: expected an object.");
+    }
+
+    public static void GuardInterfaceFields(string path, string skillName, JsonElement element)
+    {
+        foreach (var property in element.EnumerateObject())
+        {
+            if (property.Name is not ("displayName" or "shortDescription"))
+                throw new InvalidOperationException(
+                    $"Invalid interface property '{property.Name}' for skill '{skillName}' in {path}.");
+        }
+
+        foreach (var name in new[] { "displayName", "shortDescription" })
+        {
+            if (!element.TryGetProperty(name, out var field) ||
+                field.ValueKind != JsonValueKind.String ||
+                string.IsNullOrWhiteSpace(field.GetString()))
+            {
+                throw new InvalidOperationException(
+                    $"Invalid interface.{name} for skill '{skillName}' in {path}: a non-empty string is required.");
+            }
+        }
+    }
+
     public static void GuardPublicSkillName(string path, string skillName)
     {
         if (!PublicSkillNamePattern().IsMatch(skillName))
