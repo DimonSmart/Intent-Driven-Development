@@ -6,6 +6,20 @@ namespace MiniCatalog.Tests;
 public sealed class CatalogIntegrationTests
 {
     [Fact]
+    public void Codes_does_not_expose_a_mutable_collection()
+    {
+        var catalog = new Catalog();
+        catalog.Add("ab");
+        if (catalog.Codes is ICollection<string> collection)
+        {
+            Assert.True(collection.IsReadOnly);
+            Assert.Throws<NotSupportedException>(() => collection.Add("CD"));
+            Assert.Throws<NotSupportedException>(() => collection.Clear());
+        }
+        Assert.Equal("AB", Assert.Single(catalog.Codes));
+    }
+
+    [Fact]
     public void Stores_canonical_values()
     {
         var catalog = new Catalog(); catalog.Add(" ab ");

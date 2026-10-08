@@ -411,6 +411,13 @@ bounded relevant diagnostic
 Then invoke a fresh planner. The planner decides whether a correction task is
 needed.
 
+This also applies to infrastructure failures such as missing restore assets.
+Do not repair a failed final check directly in the orchestration context and
+retry it without the diagnostic and fresh planner handoff. After any correction,
+wait for a new planner `# Done` and run every configured final check again.
+An exit code of zero without evidence that tests actually executed is not proof
+that those tests passed; report the missing evidence to the planner.
+
 Do not create verification attempts, retry budgets, confirmation state,
 correction workflows, or final-review roles. If project verification is not
 configured, planner `# Done` after ordinary worker checks completes Factory.

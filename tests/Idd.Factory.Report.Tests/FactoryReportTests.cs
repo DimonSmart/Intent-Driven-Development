@@ -5,13 +5,66 @@ using Xunit;
 
 namespace Idd.Factory.Report.Tests;
 
-public sealed class FactoryReportTests : IDisposable
+public sealed partial class FactoryReportTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "idd-factory-report-tests-" + Guid.NewGuid().ToString("N"));
 
     public FactoryReportTests()
     {
         Directory.CreateDirectory(_root);
+    }
+
+    [Fact]
+    public void Report_PreservesRemovedModelRejectionWithoutInventingAWorker()
+    {
+        var repo = Path.Combine(_root, "repo-removed-model");
+        var codex = Path.Combine(_root, "codex-removed-model");
+        var sessions = Path.Combine(codex, "sessions");
+        Directory.CreateDirectory(repo);
+        Directory.CreateDirectory(sessions);
+        const string rootId = "11111111-1111-1111-1111-111111111111";
+        const string plannerId = "22222222-2222-2222-2222-222222222222";
+        const string removedModel = "removed-model";
+        const string rejection = "Model 'removed-model' has been removed and is no longer available.";
+        var reason = "standard worker requested model=removed-model, reasoning=medium. " + rejection +
+                     " Rerun idd-factory-configure; no substitute worker was started.";
+        Write(Path.Combine(sessions, "root.jsonl"),
+        [
+            Session(rootId, repo),
+            User("2026-10-08T10:00:00Z", "Use idd-factory-run."),
+            SpawnCall("2026-10-08T10:00:01Z", "planner", "Use idd-factory-decompose-task."),
+            SpawnOutput("2026-10-08T10:00:02Z", "planner", plannerId),
+            SpawnCall("2026-10-08T10:00:03Z", "worker", "Use idd-factory-execute-subtask. Task: Implement A.\nExecutionProfile: standard", removedModel, "medium"),
+            new
+            {
+                timestamp = "2026-10-08T10:00:04Z", type = "response_item",
+                payload = new
+                {
+                    type = "function_call_output", call_id = "worker",
+                    output = JsonSerializer.Serialize(new { error = new { code = "model_not_found", message = rejection } })
+                }
+            },
+            Assistant("2026-10-08T10:00:05Z", JsonSerializer.Serialize(new { schemaVersion = 2, status = "BLOCKED", reason }))
+        ]);
+        WriteChild(sessions, "planner.jsonl", plannerId, rootId, repo,
+            Assistant("2026-10-08T10:00:02Z", "# Task\nImplement A.\n\n# ExecutionProfile\nstandard"));
+
+        var root = new CodexRolloutReader().Read(Path.Combine(sessions, "root.jsonl"));
+        var rejectedSpawn = root.SpawnRecords["worker"];
+        Assert.Equal(removedModel, rejectedSpawn.RequestedModel);
+        Assert.Empty(rejectedSpawn.Children);
+        Assert.Null(rejectedSpawn.ActualModel);
+        var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
+        Assert.Equal("blocked", report.Run.Result);
+        Assert.Equal("blocked", report.Completion.DeclaredResult);
+        Assert.Equal(reason, report.Run.Reason);
+        Assert.Empty(report.Tasks);
+        Assert.DoesNotContain(report.Agents, agent => agent.Role == "worker");
+        Assert.Equal(2, report.Metrics.Tools.SpawnAgentCalls);
+        var markdown = Path.Combine(_root, "removed-model-report.md");
+        ReportWriters.WriteMarkdown(report, markdown, verbose: false);
+        Assert.Contains(rejection, File.ReadAllText(markdown));
+        Assert.Contains("BLOCKED", File.ReadAllText(markdown));
     }
 
     [Fact]

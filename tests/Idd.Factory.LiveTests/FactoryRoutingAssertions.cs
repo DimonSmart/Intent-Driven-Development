@@ -5,6 +5,32 @@ namespace Idd.Factory.LiveTests.Tests;
 
 internal static class FactoryRoutingAssertions
 {
+    internal static void VerifyUnavailableModel(FactoryRunReport report, CodexRollout root, string unavailableModel)
+    {
+        Assert.Equal("blocked", report.Run.Result);
+        Assert.Equal("blocked", report.Completion.DeclaredResult);
+        Assert.NotNull(report.Run.Reason);
+        Assert.Contains(unavailableModel, report.Run.Reason, StringComparison.Ordinal);
+        Assert.NotEqual("passed", report.Completion.ProjectVerification);
+        Assert.DoesNotContain(report.Agents, agent => agent.Role is "unknown" or "subagent");
+
+        var workerSpawns = root.SpawnRecords.Values.Where(spawn =>
+            spawn.RequestedModel is not null ||
+            spawn.Task?.Contains("idd-factory-execute-subtask", StringComparison.Ordinal) == true ||
+            report.Agents.Any(agent => agent.Role == "worker" &&
+                spawn.Children.Contains(agent.ThreadId, StringComparer.Ordinal))).ToArray();
+        // A host may reject a known-unavailable model before creating a child.
+        Assert.All(workerSpawns, spawn => Assert.Equal(unavailableModel, spawn.RequestedModel));
+        Assert.All(report.Tasks, task =>
+        {
+            Assert.Equal("standard", task.ExecutionProfile);
+            Assert.Equal(unavailableModel, task.RequestedModel);
+            Assert.True(task.ActualModel is null || task.ActualModel == unavailableModel,
+                "An unavailable model must never be replaced by another model.");
+            Assert.NotEqual("completed", task.Status);
+        });
+    }
+
     internal static void Verify(FactoryRunReport report,
         IReadOnlyDictionary<string, WorkerExecutionSettings> mappings)
     {

@@ -102,6 +102,28 @@ A structured root response such as `{"status":"COMPLETED"}` is authoritative for
 
 Project verification is reported as passed/failed only from structured command/result evidence after the final planner `# Done`. Absence of a verification command is not treated as `not configured`.
 
+When `.idd/verification.yaml` is available, the reporter reads its final check
+selection and matches standalone command argv against those checks. Every
+selected check must have conclusive evidence; the latest recorded result for
+each check determines its outcome. A recovered failure remains in failed-command
+metrics and diagnostics but does not override a later successful execution of
+the same check. `dotnet test` additionally requires a nonempty successful VSTest
+execution summary; a silent zero exit code is unavailable evidence.
+
+The policy is read from the supplied repository snapshot, not reconstructed from
+Git history. Use the run's saved workspace for historical inspection. Invalid
+policy, final path rules without authoritative changed scope, manual checks,
+unsupported shell expressions, and missing results remain `unavailable`. Without
+policy, only recognizable platform verification commands are considered;
+`restore`, `git status`, or an archive command cannot prove verification.
+
+After an observed final-check failure, the reporter expects a fresh planner
+before root verification resumes. A missing handoff emits
+`factory/verification_failure_without_fresh_planner` and makes protocol validation
+`warning`, even when the repeated checks pass. Declared `COMPLETED` without all
+configured final checks also produces a protocol warning. These checks inspect
+trace evidence; they do not execute checks or create Factory lifecycle state.
+
 ## Factory project state
 
 `.idd/factory/current/` and `.idd/factory/results/` are supplemental project-state evidence only. They are never used to reconstruct execution history. Missing request/plan after a successful run is normal; a missing archived result is not itself a warning.

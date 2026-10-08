@@ -162,6 +162,11 @@ When a fresh planner returns `# Done`, run configured project verification.
 
 Factory does not own a separate verification engine.
 
+Infrastructure failures follow the same diagnostic and fresh-planner handoff as
+other final-check failures. After a new planner `# Done`, repeat all configured
+final checks. A successful command exit without actual test execution is not
+successful test verification.
+
 ## Native host requirement
 
 A host must provide child spawn, fresh context without parent-history

@@ -17,6 +17,59 @@ public sealed class FactoryRoutingAssertionsTests
     public void Verify_AcceptsConfirmedCorrectRouting() =>
         FactoryRoutingAssertions.Verify(Report(), Mappings);
 
+    [Fact]
+    public void VerifyUnavailableModel_AcceptsBlockedRejectionWithoutAWorker()
+    {
+        var (report, root) = UnavailableModelReport();
+        FactoryRoutingAssertions.VerifyUnavailableModel(report, root, "removed-model");
+    }
+
+    [Theory]
+    [InlineData("completed")]
+    [InlineData("missing-reason")]
+    [InlineData("fallback-model")]
+    [InlineData("inherited-fallback")]
+    [InlineData("completed-worker")]
+    public void VerifyUnavailableModel_RejectsSilentFallbackOrFalseSuccess(string fault)
+    {
+        var (blocked, root) = UnavailableModelReport();
+        var report = new FactoryRunReport
+        {
+            Run = new RunInfo
+            {
+                Result = fault == "completed" ? "completed" : "blocked",
+                Reason = fault == "missing-reason" ? "An error occurred." : blocked.Run.Reason
+            },
+            Completion = blocked.Completion
+        };
+        if (fault is "fallback-model" or "inherited-fallback")
+            root.SpawnRecords["fallback"] = new SpawnRecord
+            {
+                Task = "Use idd-factory-execute-subtask.",
+                RequestedModel = fault == "inherited-fallback" ? null : "root-default"
+            };
+        if (fault == "completed-worker")
+            report.Tasks.Add(new TaskReport
+            {
+                ExecutionProfile = "standard", RequestedModel = "removed-model",
+                ActualModel = "removed-model", Status = "completed"
+            });
+        var exception = Record.Exception(() =>
+            FactoryRoutingAssertions.VerifyUnavailableModel(report, root, "removed-model"));
+        Assert.IsAssignableFrom<Xunit.Sdk.XunitException>(exception);
+    }
+
+    private static (FactoryRunReport Report, CodexRollout Root) UnavailableModelReport()
+    {
+        var root = new CodexRollout();
+        root.SpawnRecords["rejected"] = new SpawnRecord { RequestedModel = "removed-model" };
+        return (new FactoryRunReport
+        {
+            Run = new RunInfo { Result = "blocked", Reason = "Model 'removed-model' has been removed; rerun idd-factory-configure." },
+            Completion = new CompletionReport { DeclaredResult = "blocked" }
+        }, root);
+    }
+
     [Theory]
     [InlineData("wrong-profile")]
     [InlineData("swapped-mappings")]

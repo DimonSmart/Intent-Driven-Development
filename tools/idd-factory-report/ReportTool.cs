@@ -249,6 +249,7 @@ public sealed class CodexEvent
     public string? ToolPhase { get; init; }
     public string? ToolArguments { get; init; }
     public string? ToolOutput { get; init; }
+    public string? CommandWorkingDirectory { get; init; }
     public int? ExitCode { get; init; }
     public string? Status { get; init; }
     public TokenMetrics? Usage { get; init; }
@@ -466,6 +467,7 @@ public sealed class CodexRolloutReader
                     ToolPhase = toolPhase,
                     ToolArguments = toolArguments,
                     ToolOutput = toolOutput,
+                    CommandWorkingDirectory = String(eventObject, "cwd"),
                     ExitCode = FindInt(eventObject, "exit_code", "exitCode"),
                     Status = FindString(eventObject, "status", "outcome"),
                     Usage = usage,
@@ -1263,6 +1265,7 @@ public sealed class FactoryReportEngine
         var plannerAgents = agents.Where(x => x.Role == "planner").OrderBy(x => x.StartedAt).ToArray();
         var workerAgents = agents.Where(x => x.Role == "worker").OrderBy(x => x.StartedAt).ToArray();
         var latestPlanner = plannerAgents.LastOrDefault();
+        var verificationPolicy = FinalVerificationEvidence.Load(repository, root.Cwd);
 
         var resultEvidence = new List<string>();
         var result = "unknown";
@@ -1307,17 +1310,15 @@ public sealed class FactoryReportEngine
             }
             else if (latestPlanner?.PlannerOutcome == "Done")
             {
-                var verification = segmentRootEvents
-                    .Where(x => IsCommand(x) && x.Timestamp >= latestPlanner.FinishedAt)
-                    .LastOrDefault();
-                if (verification is not null && verification.ExitCode == 0)
+                var verification = verificationPolicy.Evaluate(segmentRootEvents, latestPlanner.PlannerOutcomeAt);
+                if (verification.Result == "passed")
                 {
                     result = "completed";
                     resultEvidence.Add("planner_done");
                     resultEvidence.Add("verification_success");
-                    end = verification.Timestamp;
-                    terminalEvent = verification;
-                    endEvidence = "planner # Done followed by successful verification command";
+                    terminalEvent = verification.Observations.Last().Event;
+                    end = terminalEvent.Timestamp;
+                    endEvidence = "planner # Done followed by successful final verification evidence";
                     endConfidence = "derived";
                 }
             }
@@ -1606,7 +1607,9 @@ public sealed class FactoryReportEngine
             segmentRootEvents,
             result,
             structuredResult is not null,
-            terminalEvent);
+            terminalEvent,
+            verificationPolicy,
+            diagnostics);
         if (completionInfo.ProjectVerification == "unavailable")
             diagnostics.Add(new Diagnostic
             {
@@ -2491,11 +2494,14 @@ public sealed class FactoryReportEngine
         IReadOnlyList<CodexEvent> rootEvents,
         string result,
         bool declaredResult,
-        CodexEvent? terminalEvent)
+        CodexEvent? terminalEvent,
+        FinalVerificationEvidence policy,
+        List<Diagnostic> diagnostics)
     {
         var planners = agents.Where(x => x.Role == "planner").ToArray();
         var workers = agents.Where(x => x.Role == "worker").ToArray();
-        var done = planners.Where(x => x.PlannerOutcome == "Done").OrderBy(x => x.PlannerOutcomeAt).LastOrDefault();
+        var latestPlanner = planners.OrderBy(x => x.StartedAt).LastOrDefault();
+        var done = latestPlanner?.PlannerOutcome == "Done" ? latestPlanner : null;
 
         bool? plannerDone;
         if (done is null)
@@ -2515,33 +2521,47 @@ public sealed class FactoryReportEngine
                 : done.PlannerOutcomeAt >= lastWorker;
         }
 
-        var verification = "unavailable";
-        if (plannerDone == true && done?.PlannerOutcomeAt is not null)
-        {
-            var doneAt = done.PlannerOutcomeAt.Value;
-            var terminalAt = terminalEvent?.Timestamp;
-            var commands = rootEvents
-                .Where(x => IsCommand(x) &&
-                            x.Timestamp is not null &&
-                            x.Timestamp.Value >= doneAt &&
-                            (terminalAt is null || x.Timestamp.Value <= terminalAt.Value))
-                .Where(x => x.ToolPhase is "completed" or "call")
-                .ToArray();
-
-            if (commands.Any(x => x.ExitCode is not null || x.Status is not null))
+        var terminalAt = terminalEvent?.Timestamp;
+        var verification = plannerDone == true
+            ? policy.Evaluate(rootEvents, done?.PlannerOutcomeAt, terminalAt).Result : "unavailable";
+        if (policy.Error is not null)
+            diagnostics.Add(new Diagnostic
             {
-                verification = commands.Any(x =>
-                    x.ExitCode is not null && x.ExitCode != 0 ||
-                    x.Status is "failed" or "error")
-                    ? "failed"
-                    : "passed";
-            }
+                Severity = "warning", Category = "reporter", Code = "verification_policy_unavailable",
+                Message = $"Cannot establish configured final checks: {policy.Error} No fallback was used."
+            });
+
+        var firstDone = planners.Where(x => x.PlannerOutcome == "Done")
+            .Select(x => x.PlannerOutcomeAt).Where(x => x is not null).OrderBy(x => x).FirstOrDefault();
+        var observations = policy.Evaluate(rootEvents, firstDone, terminalAt).Observations;
+        var recoveryMissing = false;
+        foreach (var failure in observations.Where(x => x.Result == "failed"))
+        {
+            var nextCheck = observations.FirstOrDefault(x => x.Event.Timestamp > failure.Event.Timestamp);
+            var recoveryPlanner = planners.FirstOrDefault(x => x.StartedAt > failure.Event.Timestamp &&
+                (nextCheck is null || x.StartedAt < nextCheck.Event.Timestamp));
+            if (recoveryPlanner is not null) continue;
+            recoveryMissing = true;
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "warning", Category = "factory", Code = "verification_failure_without_fresh_planner",
+                Message = $"Final check {failure.Check} failed at {failure.Event.Timestamp:O}, but no fresh planner was observed before verification resumed or the run ended."
+            });
         }
 
         var declared = declaredResult ? result : "unavailable";
         var validation = declared == "completed"
-            ? plannerDone == false ? "warning" : "ok"
+            ? plannerDone != true || verification == "failed" || recoveryMissing ? "warning" : "ok"
             : declaredResult ? "ok" : "unavailable";
+        if (declared == "completed" && policy.HasPolicy && verification != "passed")
+        {
+            validation = "warning";
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "warning", Category = "factory", Code = "completed_without_final_verification",
+                Message = "Factory declared COMPLETED without conclusive successful evidence for every configured final check."
+            });
+        }
 
         return new CompletionReport
         {
