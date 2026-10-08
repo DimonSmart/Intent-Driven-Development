@@ -110,7 +110,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
     public void Reader_RejectsInvalidPolicyAndUiMetadata(string description)
     {
         var error = Assert.Throws<InvalidOperationException>(() => ReadDescription(description));
-        Assert.Contains("idd-example", error.Message);
+        Assert.Contains("idd-intent-example", error.Message);
     }
 
     [Fact]
@@ -143,9 +143,9 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
         var adapter = new AdapterConfig("claude", "", null, true, true);
 
         var exception = Assert.Throws<InvalidOperationException>(
-            () => YamlFrontMatterWriter.BuildClaudeSkillFrontMatter("idd-example", description, adapter, []));
+            () => YamlFrontMatterWriter.BuildClaudeSkillFrontMatter("idd-intent-example", description, adapter, []));
         Assert.Contains(field, exception.Message);
-        Assert.Contains("idd-example", exception.Message);
+        Assert.Contains("idd-intent-example", exception.Message);
         Assert.Contains("claude", exception.Message);
         Assert.Contains(expected, exception.Message);
     }
@@ -158,7 +158,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
             new Dictionary<string, JsonElement> { ["user-invocable"] = element.RootElement.Clone() });
         var description = new SkillDescription("Example", SkillInvocation.Auto, SkillExposure.Command, null,
             new Dictionary<string, AdapterSkillMetadata> { ["claude"] = metadata });
-        var yaml = YamlFrontMatterWriter.BuildClaudeSkillFrontMatter("idd-example", description,
+        var yaml = YamlFrontMatterWriter.BuildClaudeSkillFrontMatter("idd-intent-example", description,
             new AdapterConfig("claude", "", null, true, true), []);
 
         Assert.Contains("user-invocable: true", yaml);
@@ -171,8 +171,8 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
         var filename = Path.GetTempFileName();
         try
         {
-            File.WriteAllText(filename, "{\"idd-example\":" + description + "}");
-            return new SkillDescriptionReader().Read(filename, new HashSet<string> { "claude", "codex" })["idd-example"];
+            File.WriteAllText(filename, "{\"idd-intent-example\":" + description + "}");
+            return new SkillDescriptionReader().Read(filename, new HashSet<string> { "claude", "codex" })["idd-intent-example"];
         }
         finally
         {
@@ -182,8 +182,14 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
 
     private static YamlMappingNode ParseYaml(string text)
     {
+        var yamlText = text.Trim();
+        if (yamlText.StartsWith("---\n", StringComparison.Ordinal))
+            yamlText = yamlText[4..];
+        if (yamlText.EndsWith("\n---", StringComparison.Ordinal))
+            yamlText = yamlText[..^4];
+
         var stream = new YamlStream();
-        stream.Load(new StringReader(text));
+        stream.Load(new StringReader(yamlText));
         var document = Assert.Single(stream.Documents);
         return Assert.IsType<YamlMappingNode>(document.RootNode);
     }
