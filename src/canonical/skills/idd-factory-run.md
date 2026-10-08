@@ -240,7 +240,8 @@ while true:
 
     take the first remaining task
     require exactly one canonical ExecutionProfile
-    re-read and structurally validate .idd/execution.yaml
+    if .idd/execution.yaml is absent, inherit host settings
+    otherwise re-read and structurally validate .idd/execution.yaml
     mechanically resolve the active-platform profile mapping
     deterministically re-read the current Engineering INDEX
     enumerate all current Always ENG IDs
@@ -288,8 +289,8 @@ Immediately before every worker spawn, apply the bounded lookup from
 ```text
 planner ExecutionProfile
 -> require exactly one canonical value
--> re-read one project configuration document
--> inherit OR exact configured active-platform model/settings
+-> re-read one project configuration document when present
+-> absent policy means inherit OR use exact configured active-platform model/settings
 -> native child-agent spawn
 ```
 
@@ -297,11 +298,12 @@ This is a mechanical protocol step. Do not reconsider task complexity, compare
 candidate models, optimize cost, upgrade/downgrade the profile, or choose a
 model that is not the exact configured mapping.
 
-The file is required before the first worker. A missing file, missing profile,
-missing active-platform mapping, unknown profile/platform, repeated profile, or
-malformed policy blocks the affected worker with a concrete diagnostic. Only
-the explicit `modelStrategy: inherit` policy means omit Factory-specific model
-and reasoning overrides.
+If the file is absent, inherit normal host model/reasoning settings without
+writing a default file. A missing task profile, missing active-platform mapping
+in an existing policy, unknown profile/platform, repeated profile, or malformed
+existing policy blocks the affected worker with a concrete diagnostic. Only
+absence of the file or explicit `modelStrategy: inherit` means omit
+Factory-specific model and reasoning overrides.
 
 Malformed explicit configuration blocks the worker spawn with a clear
 diagnostic; never silently fall back to `inherit`. If the native host rejects a

@@ -27,8 +27,9 @@ structural rules in the reference.
 A malformed existing policy is a blocking diagnostic. Show the diagnostic and
 repair it as part of configuration; do not silently replace its strategy.
 
-If the file is absent, configure either explicit `inherit` or a complete mapping
-before Factory starts its first worker.
+If the file is absent, the effective policy is `inherit` for every profile;
+Factory can run without creating the file. When the user invokes this workflow
+to configure a policy, save either explicit `inherit` or a complete mapping.
 
 ## Top-level choice
 

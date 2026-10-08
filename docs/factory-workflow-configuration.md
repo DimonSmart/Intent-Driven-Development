@@ -6,7 +6,7 @@ There is no packaged `factory.yaml`, runtime schema, retry budget,
 state-transition configuration, capability registry, process-timeout policy, or
 Factory MCP transport configuration.
 
-Factory now has one separate required project-owned execution policy:
+Factory has one separate optional project-owned execution policy:
 
 ```text
 .idd/execution.yaml
@@ -17,10 +17,12 @@ Factory runtime state, not workflow configuration, not Product Intent, and not
 an Engineering Rule. It survives individual Factory runs and must not be stored
 under `.idd/factory/current/`.
 
-## Explicit strategy
+## Default and explicit strategies
 
-Factory setup must create `.idd/execution.yaml` before the first worker starts.
-Its absence is a blocking configuration error; it does not imply inheritance.
+If `.idd/execution.yaml` is absent, all profiles inherit normal host/session
+model behavior. No configuration file needs to be created to run Factory.
+If the file exists, it must be structurally valid; malformed or incomplete
+configuration blocks execution rather than silently falling back to inheritance.
 
 An explicit intentional all-inherit policy is:
 
@@ -99,14 +101,14 @@ Immediately before each worker spawn:
 
 ```text
 ExecutionProfile
--> validate .idd/execution.yaml
--> exact active-platform lookup
--> inherit OR configured model/settings
+-> read .idd/execution.yaml when present
+-> if absent, inherit; otherwise validate the existing policy
+-> inherit OR exact active-platform mapping
 -> native child spawn
 ```
 
-Only explicit `modelStrategy: inherit` omits overrides. Malformed or incomplete
-configuration blocks execution. If the host rejects a
+Absent configuration or explicit `modelStrategy: inherit` omits overrides.
+Malformed or incomplete existing configuration blocks execution. If the host rejects a
 configured model/settings or cannot honor the override, Factory reports the
 problem and suggests reconfiguration; it never silently substitutes another
 model or profile.

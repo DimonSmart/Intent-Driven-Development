@@ -59,7 +59,8 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("modelStrategy: inherit", policy);
         Assert.Contains("Mapping mode is complete for the active platform", policy);
         Assert.Contains("all three profile mappings for the active platform", policy);
-        Assert.Contains("Absence of this file", policy);
+        Assert.Contains("Absence of this file means", policy);
+        Assert.Contains("malformed existing configuration is a", policy);
         Assert.Contains("version: 1", policy);
         Assert.Contains("Do not silently convert malformed explicit policy", policy);
         Assert.True(policy.Contains("do not substitute another model", StringComparison.OrdinalIgnoreCase));
@@ -92,11 +93,13 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         var run = Canonical("skills", "idd-factory-run.md");
 
         Assert.Contains("planner ExecutionProfile", run);
-        Assert.Contains("re-read one project configuration document", run);
+        Assert.Contains("re-read one project configuration document when present", run);
+        Assert.Contains("If the file is absent, inherit normal host model/reasoning settings", run);
+        Assert.Matches(@"malformed\s+existing policy blocks", run);
         Assert.Contains("native child-agent spawn", run);
         Assert.Contains("Do not reconsider task complexity", run);
         Assert.Contains("never silently fall back to `inherit`", run);
-        Assert.Contains("missing profile", run);
+        Assert.Contains("missing task profile", run);
         Assert.Contains("idd-factory-configure", run);
         Assert.Contains("worker skill is always", run);
         Assert.Contains("idd-factory-execute-subtask", run);
