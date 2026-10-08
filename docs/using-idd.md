@@ -26,22 +26,34 @@ or Engineering Rules.
 See [Engineering Guardrails](engineering-guardrails.md) for the Intent versus
 Engineering boundary and rule format.
 
+## Selecting a workflow
+
+Use the explicit user commands when you want to invoke one directly. Other
+registered workflows are automatically selected from requests phrased in
+ordinary language. In Claude Code these automatic workflows are hidden from
+the slash-command menu while remaining available to the model. Codex retains
+all skills and may still show them for explicit invocation because the platform
+does not provide an equivalent documented menu-visibility setting.
+
+Internal protocols (Factory planner, Factory worker and Intent document creation)
+are references belonging to other skills, not standalone commands.
+
 ## Find the Right Action
 
 | Situation | What to do |
 | --- | --- |
 | An existing repository does not use IDD yet | Run `idd-project-init`. It can offer interactive bootstrap when implementation exists without current intent. |
-| Existing implementation has little or unreliable product documentation | Use `idd-intent-bootstrap` to discover and confirm the initial current intent model. |
-| Existing documents already express current product knowledge and/or accepted durable Engineering decisions | Use `idd-intent-import` to migrate that supplied knowledge into the separate Intent and Engineering layers. |
+| Existing implementation has little or unreliable product documentation | Ask to reconstruct and confirm the current Product Intent from the implementation. |
+| Existing documents already express current product knowledge and/or accepted durable Engineering decisions | Ask to import the supplied knowledge into separate Intent and Engineering layers. |
 | Project terminology is genuinely ambiguous or project-specific | Explicitly run `idd-glossary-build` to create or update the optional glossary. |
 | You need to confirm that IDD is installed and initialized correctly | Follow [Verify Installation](verify-installation.md). |
-| You are starting from an idea | Run `idd-project-init`, then clarify the first product behavior with `idd-intent-brainstorm`. |
-| The requested feature is still unclear | Use `idd-intent-brainstorm` before changing intent or code. |
-| Product behavior must be added, changed, or removed | Use `idd-intent-change`, then implement the updated intent. |
-| Current intent is already correct and only code must change | Use `idd-code-implement`. |
-| You need to check whether code still matches intent | Use `idd-intent-drift-audit` with an explicit focused or project-wide audit scope. |
-| Existing behavior has been confirmed as product truth but is missing from established intent | Use `idd-code-update-intent`. |
-| Intent documents need semantic structure/ownership review | Use `idd-intent-structure-audit`; use `idd-intent-lint` only for mechanical validity and `idd-intent-normalize-current` for actual focused reorganization. |
+| You are starting from an idea | Run `idd-project-init`, then ask to clarify the first product behavior. |
+| The requested feature is still unclear | Ask for product clarification without changing intent or code. |
+| Product behavior must be added, changed, or removed | Describe the new behavior and ask to update Product Intent before implementation. |
+| Current intent is already correct and only code must change | Ask to implement the already-confirmed behavior without changing Product Intent. |
+| You need to check whether code still matches intent | Ask to audit implementation conformance with an explicit focused or project-wide scope. |
+| Existing behavior has been confirmed as product truth but is missing from established intent | Ask to record the confirmed existing behavior in current Product Intent. |
+| Intent documents need semantic structure/ownership review | Ask for a semantic structure audit, a mechanical validity check, or focused normalization, as appropriate. |
 | The implementation task is large or naturally multi-stage | Install `idd-factory` and use `idd-factory-run`. |
 | A new IDD release is available | Follow [Updating IDD](updating-idd.md), then start a new session. |
 | The request must deliberately bypass IDD | Use `idd-skip`. |
@@ -51,14 +63,11 @@ Engineering boundary and rule format.
 Use the mechanisms for different questions:
 
 ```text
-idd-intent-lint
-    Is .idd/intent/ mechanically valid?
+Check .idd/intent/ for mechanical consistency errors.
 
-idd-intent-structure-audit
-    Is Product Intent organized correctly as durable knowledge?
+Check whether Product Intent documents have correct ownership and structure.
 
-idd-intent-drift-audit
-    Does current implementation still conform to Product Intent?
+Audit whether the implementation conforms to current Product Intent.
 ```
 
 For drift audit, state the scope explicitly. It may be one feature, one intent
@@ -93,13 +102,13 @@ After setup, or when IDD commands are unavailable in a new session, follow [Veri
 Use when the project already works but its durable product meaning is not reliably documented:
 
 ```text
-idd-intent-bootstrap
+Analyze the existing implementation and propose an initial current Product Intent.
 ```
 
 Or limit discovery:
 
 ```text
-Use idd-intent-bootstrap for the desktop application and shared contracts.
+Reconstruct and propose current Product Intent for the desktop application and shared contracts.
 Exclude the legacy migration utility and experiments.
 ```
 
@@ -118,7 +127,7 @@ When bootstrap finds a small set of terminology candidates whose incorrect inter
 Use when existing documentation or other source material already expresses product meaning:
 
 ```text
-Use idd-intent-import to propose current product intent from ./docs, relevant tests, the public API, and confirmed application behavior.
+Import and propose current product intent from ./docs, relevant tests, the public API, and confirmed application behavior.
 ```
 
 Import classifies supplied durable knowledge. Product behavior goes to Intent;
@@ -161,7 +170,7 @@ The glossary defines vocabulary, not behavior. Behavioral rules remain in number
 Clarify the product before creating unnecessary structure:
 
 ```text
-Use idd-intent-brainstorm to clarify the first useful product behavior.
+Help me clarify the first useful product behavior. Do not change files yet.
 ```
 
 After the intent is clear, record it and implement the smallest useful slice.
@@ -173,7 +182,7 @@ After the intent is clear, record it and implement the smallest useful slice.
 Use when product behavior, boundaries, constraints, or expected outcomes are not yet clear:
 
 ```text
-Use idd-intent-brainstorm to clarify this feature before changing product intent.
+Clarify this feature before changing product intent or code.
 ```
 
 The result should clarify product meaning rather than produce an implementation plan.
@@ -183,7 +192,7 @@ The result should clarify product meaning rather than produce an implementation 
 Describe the product change rather than expected code edits:
 
 ```text
-Use idd-intent-change. Users must be able to compare two local folders without modifying either side.
+Users must be able to compare two local folders without modifying either side. Update Product Intent before implementing the behavior.
 ```
 
 The workflow updates the current owning intent document. When required, it also
@@ -196,7 +205,7 @@ existing spec owns that product area.
 For focused implementation when current intent is already correct:
 
 ```text
-Use idd-code-implement for the folder comparison behavior.
+Implement the folder comparison behavior from current Product Intent. Do not change product requirements.
 ```
 
 The workflow reads relevant intent, applies every Always Engineering Rule plus
@@ -211,7 +220,7 @@ whenever implementation may have diverged from product intent or applicable
 Engineering Guardrails:
 
 ```text
-Use idd-intent-drift-audit for the comparison workflow.
+Audit the comparison workflow implementation against current Product Intent.
 ```
 
 ## Update Intent from Confirmed Behavior
@@ -219,7 +228,7 @@ Use idd-intent-drift-audit for the comparison workflow.
 When one existing implementation behavior has been explicitly confirmed as product truth and an established intent model already exists:
 
 ```text
-Use idd-code-update-intent for the confirmed retry behavior.
+Record the confirmed retry behavior in the existing Product Intent model.
 ```
 
 Do not use this narrow workflow as a replacement for initial codebase bootstrap. Do not promote accidental implementation details into requirements.
@@ -229,19 +238,19 @@ Do not use this narrow workflow as a replacement for initial codebase bootstrap.
 Diagnostic review without edits:
 
 ```text
-idd-intent-structure-audit
+Check Product Intent documents for semantic structure and ownership problems.
 ```
 
 Mechanical consistency checks:
 
 ```text
-idd-intent-lint
+Check current IDD documents for mechanical consistency errors.
 ```
 
 Focused structural cleanup without changing product meaning:
 
 ```text
-idd-intent-normalize-current
+Normalize the documents for topic X without changing product meaning. Propose the changes first.
 ```
 
 Audit and lint may inspect an existing glossary, but they do not build or maintain it. Use `idd-glossary-build` explicitly for glossary changes.

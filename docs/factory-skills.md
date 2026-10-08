@@ -1,8 +1,12 @@
 # Factory skills
 
-IDD Factory exposes two public skills: `idd-factory-run` and
-`idd-factory-configure`. Planner and worker are internal canonical protocols
-owned by `idd-factory-run`, not user-invokable skills.
+IDD Factory exposes two registered user commands: `idd-factory-run` and
+`idd-factory-configure`. Both retain their previous invocation rules;
+`idd-factory-run` can also be selected automatically. Planner and worker are
+internal canonical protocols owned by `idd-factory-run`, not user-invokable
+skills. Automatic Intent workflows remain registered separately, but are hidden
+from the Claude Code slash menu. Codex currently has no equivalent documented
+visibility switch, so its automatic workflows may remain visible.
 
 ## `idd-factory-run`
 

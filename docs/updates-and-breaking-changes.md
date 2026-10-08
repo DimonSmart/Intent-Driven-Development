@@ -2,6 +2,27 @@
 
 This page records IDD changes that require action in repositories that already use the toolkit.
 
+## 2026-10-08 — User commands separated from automatic workflows
+
+IDD keeps all 19 registered skills (17 Intent, 2 Factory), but categorizes them
+as eight user commands and eleven automatic workflows. In Claude Code, the
+eleven automatic workflows are no longer available as direct slash commands;
+the Coding Agent continues to discover and invoke them based on natural-language
+requests. Direct `/idd-intent-change`, `/idd-intent-import`, and other hidden
+workflow invocations in scripts or personal instructions must be replaced with
+requests describing the intended behavior and scope. Existing user commands
+retain their manual/automatic invocation policy.
+
+In Codex, all 19 registered skills remain available and implicit invocation
+is unchanged. Codex has no equivalent documented setting for hiding a skill
+only from the user menu. The six manual-only Codex skills now include required
+`agents/openai.yaml` interface labels and descriptions as well as their existing
+`allow_implicit_invocation: false` policy.
+
+Factory planner, Factory worker and Intent document creation remain internal
+references, not automatic skills. No Product Intent, Engineering, routing,
+Factory execution, or project-state semantics change.
+
 ## 2026-10-08 — Factory worker is now an internal protocol
 
 The public `idd-factory-execute-subtask` skill has been removed. Worker
