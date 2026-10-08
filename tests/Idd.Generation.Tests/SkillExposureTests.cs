@@ -150,6 +150,28 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
         Assert.Contains(expected, exception.Message);
     }
 
+    [Theory]
+    [InlineData("false")]
+    [InlineData("null")]
+    [InlineData("yes")]
+    [InlineData("42")]
+    [InlineData("- item")]
+    public void ClaudeWriter_QuotesAmbiguousAdapterStrings(string value)
+    {
+        using var element = JsonDocument.Parse(JsonSerializer.Serialize(value));
+        var metadata = new AdapterSkillMetadata(
+            new Dictionary<string, JsonElement> { ["argument-hint"] = element.RootElement.Clone() });
+        var description = new SkillDescription("Example", SkillInvocation.Auto, SkillExposure.Command, null,
+            new Dictionary<string, AdapterSkillMetadata> { ["claude"] = metadata });
+        var yaml = YamlFrontMatterWriter.BuildClaudeSkillFrontMatter("idd-intent-example", description,
+            new AdapterConfig("claude", "", null, true, true), []);
+        var scalar = Assert.IsType<YamlScalarNode>(
+            ParseYaml(yaml).Children[new YamlScalarNode("argument-hint")]);
+
+        Assert.Equal(value, scalar.Value);
+        Assert.Equal(YamlDotNet.Core.ScalarStyle.DoubleQuoted, scalar.Style);
+    }
+
     [Fact]
     public void ClaudeWriter_AcceptsMatchingAdapterFieldsWithoutDuplicates()
     {

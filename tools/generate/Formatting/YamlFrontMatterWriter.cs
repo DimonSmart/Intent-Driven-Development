@@ -104,6 +104,23 @@ internal static class YamlFrontMatterWriter
             return true;
         }
 
-        return value.Any(character => character is ':' or '[' or ']' or '{' or '}' or '#' or '\r' or '\n' or '"' or '\'');
+        if (value is "~" || value.Equals("null", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("false", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("no", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("on", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("off", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (char.IsDigit(value[0]) || value[0] is '-' or '?' or '!' or '@' or '`' or '&' or '*' or '|' or '>' or '%' or '.')
+        {
+            return true;
+        }
+
+        return value.Any(character => char.IsControl(character) ||
+            character is ':' or '[' or ']' or '{' or '}' or '#' or '"' or '\'');
     }
 }
