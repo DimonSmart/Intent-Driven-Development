@@ -160,8 +160,10 @@ For `operation: remove`:
 6. Classify the ownership outcome.
 7. If the ownership outcome is `task-only-no-idd-intent-change`, stop without
    editing `.idd/intent` and report the implementation-work recommendation.
-8. If an existing spec owns the area, update that spec instead of creating a
-   duplicate.
+8. For `existing-spec-update`, update the owning current spec instead of
+   creating a duplicate. For `adr-required` or `spike-required`, retain any
+   existing behavior-owning spec and evaluate the distinct decision or
+   investigation in the internal workflow.
 9. If `new-spec-required`, `adr-required`, or `spike-required`, read
    `references/new-intent-document.md` and follow its complete internal
    document creation workflow inside this same execution. Use the already

@@ -47,6 +47,40 @@ public sealed class GeneratorCliTests(GenerationFixture fixture)
         }
     }
 
+    [Theory]
+    [InlineData("claude")]
+    [InlineData("codex")]
+    public void StaleIntentNewDocumentSkill_IsDetectedAndRemovedByOrdinaryGeneration(string platform)
+    {
+        var intentRoot = Path.Combine(fixture.MarketplaceRoot, "plugins", platform, "idd-intent");
+        var stale = Path.Combine(intentRoot, "skills", "idd-intent-new-document");
+        Directory.CreateDirectory(stale);
+        File.WriteAllText(Path.Combine(stale, "SKILL.md"), "# Obsolete public document creator");
+
+        try
+        {
+            var checkStale = fixture.RunGenerator(checkOnly: true);
+            Assert.NotEqual(0, checkStale.ExitCode);
+            Assert.Contains("Unexpected generated file", checkStale.Stdout + checkStale.Stderr);
+
+            var generated = fixture.RunGenerator();
+            Assert.Equal(0, generated.ExitCode);
+            fixture.AssertMissing(stale);
+            fixture.AssertFile(Path.Combine(intentRoot, "skills", "idd-intent-change",
+                "references", "new-intent-document.md"));
+
+            var checkClean = fixture.RunGenerator(checkOnly: true);
+            Assert.Equal(0, checkClean.ExitCode);
+        }
+        finally
+        {
+            if (Directory.Exists(stale))
+                Directory.Delete(stale, recursive: true);
+            var restored = fixture.RunGenerator();
+            Assert.Equal(0, restored.ExitCode);
+        }
+    }
+
     [Fact]
     public void Generation_IsDeterministicAndIdempotent()
     {
