@@ -100,13 +100,13 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
 
         Assert.StartsWith("# IDD Factory Worker Protocol", worker);
         Assert.Contains("You are the Factory worker.", worker);
-        Assert.Contains("internal protocol owned by \`idd-factory-run\`", worker);
+        Assert.Contains("internal protocol owned by `idd-factory-run`", worker);
         Assert.Contains("exactly one Factory task", worker);
         Assert.Contains("fresh semantic context", worker);
-        Assert.Contains("Do not read \`.idd/execution.yaml\`", worker);
+        Assert.Contains("Do not read `.idd/execution.yaml`", worker);
         Assert.Contains("choose a model", worker);
-        Assert.Contains("Do not modify \`.idd/intent\`, \`.idd/engineering\`", worker);
-        Assert.Contains("\`.idd/factory/current\`", worker);
+        Assert.Contains("Do not modify `.idd/intent`, `.idd/engineering`", worker);
+        Assert.Contains("`.idd/factory/current`", worker);
         Assert.Contains("Do not search for additional Conditional Engineering Rules", worker);
         Assert.Contains("git ls-files --cached --others --exclude-standard", worker);
         Assert.Contains("semantic idempotency", worker);
@@ -122,7 +122,7 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("--- Factory worker assignment ---", run);
         Assert.Contains("--- End Factory worker assignment ---", run);
         Assert.Contains("trusted terminal result", run);
-        Assert.DoesNotContain("invoke \`idd-factory-execute-subtask\`", run);
+        Assert.DoesNotContain("invoke `idd-factory-execute-subtask`", run);
     }
 
     [Fact]
