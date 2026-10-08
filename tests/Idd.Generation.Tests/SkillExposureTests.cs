@@ -81,15 +81,15 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
     }
 
     [Theory]
-    [InlineData("\"Example\"", SkillInvocation.Auto, SkillExposure.Command)]
-    [InlineData("{\"description\":\"Example\"}", SkillInvocation.Auto, SkillExposure.Command)]
-    [InlineData("{\"description\":\"Example\",\"invocation\":\"manual\",\"exposure\":\"command\"}", SkillInvocation.Manual, SkillExposure.Command)]
-    [InlineData("{\"description\":\"Example\",\"exposure\":\"workflow\"}", SkillInvocation.Auto, SkillExposure.Workflow)]
-    public void Reader_AcceptsCompatibleDescriptions(string description, SkillInvocation expectedInvocation, SkillExposure expectedExposure)
+    [InlineData("\"Example\"", "Auto", "Command")]
+    [InlineData("{\"description\":\"Example\"}", "Auto", "Command")]
+    [InlineData("{\"description\":\"Example\",\"invocation\":\"manual\",\"exposure\":\"command\"}", "Manual", "Command")]
+    [InlineData("{\"description\":\"Example\",\"exposure\":\"workflow\"}", "Auto", "Workflow")]
+    public void Reader_AcceptsCompatibleDescriptions(string description, string expectedInvocation, string expectedExposure)
     {
         var value = ReadDescription(description);
-        Assert.Equal(expectedInvocation, value.Invocation);
-        Assert.Equal(expectedExposure, value.Exposure);
+        Assert.Equal(expectedInvocation, value.Invocation.ToString());
+        Assert.Equal(expectedExposure, value.Exposure.ToString());
     }
 
     [Theory]
@@ -138,7 +138,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
         using var value = JsonDocument.Parse(actual);
         var adapterMetadata = new AdapterSkillMetadata(
             new Dictionary<string, JsonElement> { [field] = value.RootElement.Clone() });
-        var description = new SkillDescription("Example", SkillInvocation.Auto, SkillExposure.Command, null,
+        var description = new SkillDescription("Example", "Auto", "Command", null,
             new Dictionary<string, AdapterSkillMetadata> { ["claude"] = adapterMetadata });
         var adapter = new AdapterConfig("claude", "", null, true, true);
 
@@ -156,7 +156,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
         using var element = JsonDocument.Parse("true");
         var metadata = new AdapterSkillMetadata(
             new Dictionary<string, JsonElement> { ["user-invocable"] = element.RootElement.Clone() });
-        var description = new SkillDescription("Example", SkillInvocation.Auto, SkillExposure.Command, null,
+        var description = new SkillDescription("Example", "Auto", "Command", null,
             new Dictionary<string, AdapterSkillMetadata> { ["claude"] = metadata });
         var yaml = YamlFrontMatterWriter.BuildClaudeSkillFrontMatter("idd-example", description,
             new AdapterConfig("claude", "", null, true, true), []);
