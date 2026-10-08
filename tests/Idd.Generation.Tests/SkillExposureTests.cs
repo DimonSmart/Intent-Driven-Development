@@ -20,6 +20,12 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
         "idd-glossary-build", "idd-skip", "idd-factory-configure"
     };
 
+    private static readonly HashSet<string> ClaudeForked = new(StringComparer.Ordinal)
+    {
+        "idd-help", "idd-route", "idd-intent-structure-audit",
+        "idd-intent-drift-audit", "idd-intent-lint"
+    };
+
     [Fact]
     public void AllRegisteredSkills_KeepTheirInvocationAndPlatformAvailability()
     {
@@ -48,21 +54,44 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
                     var yaml = ParseYaml(GenerationFixture.ReadFrontMatter(skill));
                     AssertScalar(yaml, "user-invocable", Commands.Contains(name) ? "true" : "false");
                     AssertScalar(yaml, "disable-model-invocation", Manual.Contains(name) ? "true" : "false");
+                    if (ClaudeForked.Contains(name))
+                    {
+                        AssertScalar(yaml, "context", "fork");
+                        AssertScalar(yaml, "agent", "Explore");
+                        AssertScalar(yaml, "background", "false");
+                        var background = Assert.IsType<YamlScalarNode>(yaml.Children[new YamlScalarNode("background")]);
+                        Assert.Equal(YamlDotNet.Core.ScalarStyle.Plain, background.Style);
+                    }
+                    else
+                    {
+                        Assert.False(yaml.Children.ContainsKey(new YamlScalarNode("background")));
+                    }
+
                     Assert.Equal(1, yaml.Children.Keys.Count(key => ((YamlScalarNode)key).Value == "user-invocable"));
                     Assert.Equal(1, yaml.Children.Keys.Count(key => ((YamlScalarNode)key).Value == "disable-model-invocation"));
                 }
                 else
                 {
                     var metadata = Path.Combine(folder, "agents", "openai.yaml");
-                    if (Manual.Contains(name))
+                    if (Commands.Contains(name))
                     {
                         var text = fixture.ReadText(metadata);
                         var yaml = ParseYaml(text);
                         var ui = Assert.IsType<YamlMappingNode>(yaml.Children[new YamlScalarNode("interface")]);
                         Assert.False(string.IsNullOrWhiteSpace(GetScalar(ui, "display_name")));
                         Assert.False(string.IsNullOrWhiteSpace(GetScalar(ui, "short_description")));
+                        if (name == "idd-route")
+                        {
+                            AssertScalar(ui, "display_name", "IDD Route");
+                            AssertScalar(ui, "short_description", "Classify an IDD request and select a workflow");
+                        }
+                        if (name == "idd-factory-run")
+                        {
+                            AssertScalar(ui, "display_name", "IDD Factory Run");
+                            AssertScalar(ui, "short_description", "Execute an IDD Factory workflow");
+                        }
                         var policy = Assert.IsType<YamlMappingNode>(yaml.Children[new YamlScalarNode("policy")]);
-                        AssertScalar(policy, "allow_implicit_invocation", "false");
+                        AssertScalar(policy, "allow_implicit_invocation", Manual.Contains(name) ? "false" : "true");
                     }
                     else
                     {
@@ -81,8 +110,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
     }
 
     [Theory]
-    [InlineData("\"Example\"", "Auto", "Command")]
-    [InlineData("{\"description\":\"Example\"}", "Auto", "Command")]
+    [InlineData("{\"description\":\"Example\",\"exposure\":\"command\"}", "Auto", "Command")]
     [InlineData("{\"description\":\"Example\",\"invocation\":\"manual\",\"exposure\":\"command\"}", "Manual", "Command")]
     [InlineData("{\"description\":\"Example\",\"exposure\":\"workflow\"}", "Auto", "Workflow")]
     public void Reader_AcceptsCompatibleDescriptions(string description, string expectedInvocation, string expectedExposure)
@@ -102,28 +130,41 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
     [InlineData("{\"description\":\"Example\",\"exposure\":[]}")]
     [InlineData("{\"description\":\"Example\",\"exposure\":{}}")]
     [InlineData("{\"description\":\"Example\",\"exposure\":\"command\",\"exposure\":\"workflow\"}")]
-    [InlineData("{\"description\":\"Example\",\"interface\":null}")]
-    [InlineData("{\"description\":\"Example\",\"interface\":{\"displayName\":\"Demo\"}}")]
-    [InlineData("{\"description\":\"Example\",\"interface\":{\"displayName\":\"Demo\",\"shortDescription\":\"\"}}")]
-    [InlineData("{\"description\":\"Example\",\"interface\":{\"displayName\":\"Demo\",\"shortDescription\":\"Short\",\"extra\":\"Bad\"}}")]
-    [InlineData("{\"description\":\"Example\",\"interface\":{\"displayName\":\"Demo\",\"displayName\":\"Other\",\"shortDescription\":\"Short\"}}")]
+    [InlineData("{\"description\":\"Example\",\"exposure\":\"command\",\"interface\":null}")]
+    [InlineData("{\"description\":\"Example\",\"exposure\":\"command\",\"interface\":{\"displayName\":\"Demo\"}}")]
+    [InlineData("{\"description\":\"Example\",\"exposure\":\"command\",\"interface\":{\"displayName\":\"Demo\",\"shortDescription\":\"\"}}")]
+    [InlineData("{\"description\":\"Example\",\"exposure\":\"command\",\"interface\":{\"displayName\":\"Demo\",\"shortDescription\":\"Short\",\"extra\":\"Bad\"}}")]
+    [InlineData("{\"description\":\"Example\",\"exposure\":\"command\",\"interface\":{\"displayName\":\"Demo\",\"displayName\":\"Other\",\"shortDescription\":\"Short\"}}")]
     public void Reader_RejectsInvalidPolicyAndUiMetadata(string description)
     {
         var error = Assert.Throws<InvalidOperationException>(() => ReadDescription(description));
         Assert.Contains("idd-intent-example", error.Message);
     }
 
+    [Theory]
+    [InlineData("\"Example\"", "object")]
+    [InlineData("{\"description\":\"Example\"}", "exposure")]
+    [InlineData("{\"description\":\"Example\",\"exposuer\":\"command\"}", "exposuer")]
+    [InlineData("{\"description\":\"Example\",\"exposure\":\"command\",\"unexpected\":true}", "unexpected")]
+    [InlineData("{\"description\":\"Example\",\"exposure\":\"command\",\"adapters\":{\"claude\":{\"frontmater\":{}}}}", "frontmater")]
+    public void Reader_RejectsUnsupportedDescriptionShapesAndUnknownFields(string description, string field)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => ReadDescription(description));
+        Assert.Contains("idd-intent-example", error.Message);
+        Assert.Contains(field, error.Message);
+    }
+
     [Fact]
     public void Reader_AcceptsExplicitInterfaceAndRejectsDuplicatedAdapterMetadata()
     {
         var valid = ReadDescription("""
-            {"description":"Example","interface":{"displayName":"A: B","shortDescription":"Quoted \"text\""}}
+            {"description":"Example","exposure":"command","interface":{"displayName":"A: B","shortDescription":"Quoted \"text\""}}
             """);
         Assert.Equal("A: B", valid.Interface?.DisplayName);
         Assert.Equal("Quoted \"text\"", valid.Interface?.ShortDescription);
 
         var invalid = """
-            {"description":"Example","adapters":{"claude":{"frontmatter":{"context":"fork","context":"other"}}}}
+            {"description":"Example","exposure":"command","adapters":{"claude":{"frontmatter":{"context":"fork","context":"other"}}}}
             """;
         Assert.Contains("Duplicate JSON property", Assert.Throws<InvalidOperationException>(
             () => ReadDescription(invalid)).Message);

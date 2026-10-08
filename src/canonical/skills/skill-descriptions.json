@@ -7,6 +7,7 @@
         "frontmatter": {
           "context": "fork",
           "agent": "Explore",
+          "background": false,
           "argument-hint": "[question about IDD]",
           "allowed-tools": "Read Glob Grep"
         }
@@ -25,12 +26,17 @@
         "frontmatter": {
           "context": "fork",
           "agent": "Explore",
+          "background": false,
           "argument-hint": "[request or workflow question]",
           "allowed-tools": "Read Glob Grep"
         }
       }
     },
-    "exposure": "command"
+    "exposure": "command",
+    "interface": {
+      "displayName": "IDD Route",
+      "shortDescription": "Classify an IDD request and select a workflow"
+    }
   },
   "idd-project-init": {
     "description": "Initialize project-owned IDD intent state, then pause for a blocking bootstrap decision when an existing implementation has no current intent.",
@@ -84,6 +90,7 @@
         "frontmatter": {
           "context": "fork",
           "agent": "Explore",
+          "background": false,
           "argument-hint": "[scope or structure audit focus]",
           "allowed-tools": "Read Glob Grep"
         }
@@ -123,6 +130,7 @@
         "frontmatter": {
           "context": "fork",
           "agent": "Explore",
+          "background": false,
           "argument-hint": "[audit scope: feature, intent ID, implementation area, failure, or project-wide]",
           "allowed-tools": "Read Glob Grep Bash"
         }
@@ -148,6 +156,7 @@
         "frontmatter": {
           "context": "fork",
           "agent": "Explore",
+          "background": false,
           "argument-hint": "[optional spec path or scope]",
           "allowed-tools": "Read Glob Grep Bash"
         }
@@ -181,6 +190,10 @@
   },
   "idd-factory-run": {
     "description": "Prepare required durable Product Intent and explicit Engineering policy before starting a new run, then orchestrate incremental planning and isolated native-agent workers while mechanically applying project-owned execution-profile mappings.",
-    "exposure": "command"
+    "exposure": "command",
+    "interface": {
+      "displayName": "IDD Factory Run",
+      "shortDescription": "Execute an IDD Factory workflow"
+    }
   }
 }

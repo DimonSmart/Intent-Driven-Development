@@ -13,15 +13,29 @@ workflow invocations in scripts or personal instructions must be replaced with
 requests describing the intended behavior and scope. Existing user commands
 retain their manual/automatic invocation policy.
 
-In Codex, all 19 registered skills remain available and implicit invocation
-is unchanged. Codex has no equivalent documented setting for hiding a skill
-only from the user menu. The six manual-only Codex skills now include required
-`agents/openai.yaml` interface labels and descriptions as well as their existing
-`allow_implicit_invocation: false` policy.
+In Codex, all 19 registered skills remain available. All eight commands
+now generate `agents/openai.yaml` with interface metadata: six manual commands
+use `allow_implicit_invocation: false`, while the two auto commands
+(`idd-route` and `idd-factory-run`) use `true`. The eleven automatic
+workflows remain published without this additional UI metadata. Codex has no
+documented guarantee that these files alone show or hide particular skills in
+every user menu.
 
-Factory planner, Factory worker and Intent document creation remain internal
-references, not automatic skills. No Product Intent, Engineering, routing,
-Factory execution, or project-state semantics change.
+For Claude Code v2.1.218+, the five read-only forked skills (`idd-help`,
+`idd-route`, `idd-intent-structure-audit`, `idd-intent-drift-audit`, and
+`idd-intent-lint`) now set `background: false` to wait for the result before
+the caller continues. Forked contexts still do not inherit the caller's
+conversation history: the relevant request and constraints must be supplied.
+`idd-route` classifies without executing its recommended handoff; the caller
+owns any permitted follow-up in the same request.
+
+Canonical inventory entries must now be objects with explicit `exposure`;
+the generator rejects string entries, absent or unknown exposure values,
+unknown skill properties, and unknown adapter metadata keys. This tightens
+canonical source validation, not user-owned `.idd/` data. Factory planner,
+Factory worker and Intent document creation remain internal references.
+No Product Intent, Engineering, routing decisions, Factory execution, or
+project-state migration is required.
 
 ## 2026-10-08 — Factory worker is now an internal protocol
 

@@ -11,6 +11,17 @@ Do not use `idd-help` as an automatic pre-step for ordinary feature, bug-fix,
 refactoring, review, or implementation requests. Do not invoke another IDD
 workflow unless the user explicitly asks to perform that workflow.
 
+## Question Input In An Isolated Context
+
+An explicit question supplied with this command is the question to answer,
+including any invocation arguments. The skill may run in an isolated child
+context without the caller's conversation history. Do not infer a question
+from an unavailable previous exchange.
+
+If the command is invoked without a question and none is present in the
+available input, ask the user for the question instead of guessing. Continue
+to answer read-only; do not automatically invoke other workflows.
+
 ## Required References
 
 Before answering, read:

@@ -146,7 +146,7 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
         }
 
         if (skillDescriptions.TryGetValue(skillName, out var skillDescription) &&
-            skillDescription.Invocation == SkillInvocation.Manual)
+            skillDescription.Exposure == SkillExposure.Command)
         {
             files.Add(new GeneratedFile(
                 Path.Combine("skills", skillName, "agents", "openai.yaml"),
@@ -168,7 +168,7 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
             $"  short_description: {YamlFrontMatterWriter.QuoteYamlString(shortDescription)}",
             "",
             "policy:",
-            "  allow_implicit_invocation: false",
+            $"  allow_implicit_invocation: {(description.Invocation == SkillInvocation.Auto ? "true" : "false")}",
             "");
     }
 
