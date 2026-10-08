@@ -82,7 +82,8 @@ conflicting number.
 ## Create And Normalize
 
 1. Use the matching canonical template installed in
-   `.idd/intent/_templates/spec.md`, `adr.md`, or `spike.md`. Those
+   `.idd/intent/_templates/spec.md`, `.idd/intent/_templates/adr.md`, or
+   `.idd/intent/_templates/spike.md`. Those
    templates originate from
    `src/canonical/project-files/intent/_templates/`; do not invent a
    parallel template or a new document schema.
