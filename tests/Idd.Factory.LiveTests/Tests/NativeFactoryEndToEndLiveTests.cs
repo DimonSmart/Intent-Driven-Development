@@ -160,7 +160,7 @@ public sealed class NativeFactoryEndToEndLiveTests
                 codex,
                 [
                     "exec", "--json", "--ignore-rules",
-                    "--enable", "multi_agent", "--disable", "multi_agent_v2",
+                    "--enable", "multi_agent", "--enable", "multi_agent_v2",
                     "--enable", "plugins", "--disable", "remote_plugin",
                     "-c", "agents.max_depth=2",
                     "-c", "agents.max_threads=10",
@@ -185,7 +185,8 @@ public sealed class NativeFactoryEndToEndLiveTests
                 File.Copy(lastMessage, Path.Combine(artifactRoot, "last-message.json"), overwrite: true);
 
             var traceItems = ParseTraceItems(result.Stdout);
-            var rootRollout = FindRootRollout(codexHome, requireSpawn: !unavailableWorkerModel);
+            var rootRollout = FindRootRollout(codexHome);
+            AssertMultiAgentV2(rootRollout);
             Assert.DoesNotContain(traceItems, item => IsToolCall(item, "mcp_tool_call", "factory_run"));
             Assert.DoesNotContain(traceItems, item => IsToolCall(item, "mcp_tool_call", "factory_status"));
             Assert.DoesNotContain(traceItems, IsLegacyFactoryRuntimeCommand);
@@ -211,14 +212,13 @@ public sealed class NativeFactoryEndToEndLiveTests
                 Assert.Equal(initialPolicy, await File.ReadAllTextAsync(Path.Combine(workspace, ".idd", "execution.yaml")));
                 Assert.Equal(initialCatalog, await File.ReadAllTextAsync(Path.Combine(workspace, "src", "MiniCatalog", "Catalog.cs")));
                 Assert.False(File.Exists(Path.Combine(workspace, "src", "MiniCatalog", "ProductCode.cs")));
-                if (factoryReport.Agents.Any(agent => agent.Role == "planner"))
-                {
-                    Assert.True(factoryReport.FactoryProjectState.CurrentRequestPresent);
-                    Assert.True(factoryReport.FactoryProjectState.CurrentPlanPresent);
-                    var plan = await File.ReadAllTextAsync(Path.Combine(workspace, ".idd", "factory", "current", "plan.md"));
-                    Assert.Contains("# Task", plan);
-                    Assert.Contains("standard", plan);
-                }
+                Assert.Contains(factoryReport.Agents, agent => agent.Role == "planner");
+                Assert.True(factoryReport.FactoryProjectState.CurrentRequestPresent);
+                Assert.True(factoryReport.FactoryProjectState.CurrentPlanPresent);
+                var plan = await File.ReadAllTextAsync(Path.Combine(workspace, ".idd", "factory", "current", "plan.md"));
+                Assert.Contains("# Task", plan);
+                Assert.Contains("# ExecutionProfile", plan);
+                Assert.Contains("standard", plan);
                 return;
             }
 
@@ -239,6 +239,9 @@ public sealed class NativeFactoryEndToEndLiveTests
                 var expected = settings.ExecutionProfiles[worker.ExecutionProfile!];
                 Assert.Equal(expected.Model, spawn.RequestedModel);
                 Assert.Equal(expected.ReasoningEffort, spawn.RequestedReasoningEffort);
+                Assert.Contains(rootRollout.Events, item =>
+                    item.ToolName == "spawn_agent" && item.ToolId == spawn.CallId &&
+                    HasExplicitNoHistoryFork(item.ToolArguments));
             }
             Assert.Equal(new[] { "standard", "strong", "economy" },
                 factoryReport.Tasks.Take(3).Select(task => task.ExecutionProfile).ToArray());
@@ -297,6 +300,48 @@ public sealed class NativeFactoryEndToEndLiveTests
             {
                 try { Directory.Delete(tempRoot, recursive: true); } catch { }
             }
+        }
+    }
+
+    private static void AssertMultiAgentV2(CodexRollout root)
+    {
+        // Feature flags alone do not establish the effective backend: the host
+        // may select V1 or V2 based on the model catalog. Trust turn_context.
+        var observedV2 = false;
+        foreach (var line in File.ReadLines(root.Path))
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            try
+            {
+                using var document = JsonDocument.Parse(line);
+                var item = document.RootElement;
+                if (item.TryGetProperty("type", out var type) && type.ValueEquals("turn_context") &&
+                    item.TryGetProperty("payload", out var payload) && payload.ValueKind == JsonValueKind.Object &&
+                    payload.TryGetProperty("multi_agent_version", out var version) &&
+                    version.ValueKind == JsonValueKind.String && version.ValueEquals("v2"))
+                {
+                    observedV2 = true;
+                    break;
+                }
+            }
+            catch (JsonException) { /* Truncated trace lines are not proof of a V2 run. */ }
+        }
+        Assert.True(observedV2, "Cannot confirm a MultiAgentV2 run from the root turn_context.");
+    }
+
+    private static bool HasExplicitNoHistoryFork(string? arguments)
+    {
+        if (string.IsNullOrWhiteSpace(arguments)) return false;
+        try
+        {
+            using var document = JsonDocument.Parse(arguments);
+            return document.RootElement.ValueKind == JsonValueKind.Object &&
+                   document.RootElement.TryGetProperty("fork_turns", out var fork) &&
+                   fork.ValueKind == JsonValueKind.String && fork.ValueEquals("none");
+        }
+        catch (JsonException)
+        {
+            return false;
         }
     }
 
