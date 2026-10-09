@@ -184,6 +184,16 @@ public sealed partial class FactoryReportTests
         Assert.NotEqual("completed", report.Run.Result);
     }
 
+    [Fact]
+    public void Report_AcceptsMatchingCommandWorkingDirectoryInsideArguments()
+    {
+        var command = JsonSerializer.Serialize(new { cmd = "dotnet test", workdir = Path.Combine(_root, "repo") });
+        var report = ReportWithPolicyAndCommands(null, false,
+            VerificationCommand("2026-09-23T10:03:00Z", "test", command, 0, TestSummary));
+        Assert.Equal("passed", report.Completion.ProjectVerification);
+        Assert.Equal("completed", report.Run.Result);
+    }
+
     [Theory]
     [InlineData("git status")]
     [InlineData("echo done")]
