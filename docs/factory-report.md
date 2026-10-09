@@ -63,7 +63,17 @@ Native results containing only a canonical `task_name` are correlated with the
 child's `agent_path` and parent thread metadata to preserve requested settings.
 It reports actual settings from direct `model` and `effort` fields in the
 worker's own `turn_context`, or explicit resolved/actual fields in spawn events,
-spawn output, or the worker's own events. Nested collaboration defaults and
+spawn output, or the worker's own events. Readable worker `turn_context` fields
+take precedence over spawn metadata and other worker events. A disagreement
+between spawn metadata and the worker context emits
+`host-trace/worker_spawn_settings_conflict`, preserving both sources in the
+diagnostic. When multiple worker contexts contain different model or effort
+values, `host-trace/worker_turn_context_settings_conflict` lists the evidence.
+Each conflicting field remains `unknown` rather than selecting the first turn
+or falling back to spawn metadata; stable fields are retained. Routing cannot
+be fully verified in that case. Repeated identical contexts are consistent.
+Absent context fields may still use explicit resolved/actual evidence.
+Nested collaboration defaults and
 contexts explicitly belonging to other threads are excluded.
 Settings attached to a worker's child-agent tool calls are not its own settings.
 It never infers actual settings from the current `.idd/execution.yaml`

@@ -1262,7 +1262,8 @@ public sealed class FactoryReportEngine
         var descendants = SelectDescendants(root, start.Timestamp, nextStartOrdinal == long.MaxValue ? null :
             root.Events.FirstOrDefault(x => x.Ordinal == nextStartOrdinal)?.Timestamp, all, byId, state);
 
-        var agents = BuildAgents(root, segmentRootEvents, descendants, state, verbose);
+        var diagnostics = new List<Diagnostic>();
+        var agents = BuildAgents(root, segmentRootEvents, descendants, state, verbose, diagnostics);
         PopulateMissingWorkerTasks(agents, byId);
         var plannerAgents = agents.Where(x => x.Role == "planner").OrderBy(x => x.StartedAt).ToArray();
         var workerAgents = agents.Where(x => x.Role == "worker").OrderBy(x => x.StartedAt).ToArray();
@@ -1388,7 +1389,6 @@ public sealed class FactoryReportEngine
             workerAgents = agents.Where(x => x.Role == "worker").OrderBy(x => x.StartedAt).ToArray();
         }
 
-        var diagnostics = new List<Diagnostic>();
         diagnostics.AddRange(state.Diagnostics);
         diagnostics.AddRange(root.Diagnostics);
         diagnostics.AddRange(descendants.SelectMany(x => x.Diagnostics));
@@ -1525,7 +1525,7 @@ public sealed class FactoryReportEngine
                 diagnostics.Add(new Diagnostic
                 {
                     Severity = "warning", Category = "reporter", Code = "worker_actual_settings_unavailable",
-                    Message = $"Could not determine actual {string.Join(" and ", missing)} for worker {task.AgentThreadId}: no readable values were found in its own turn_context or explicit resolved/actual settings. Requested settings and root defaults are not evidence of actual settings; routing could not be fully verified."
+                    Message = $"Could not determine actual {string.Join(" and ", missing)} for worker {task.AgentThreadId}: its own turn_context and explicit resolved/actual settings contain missing or conflicting evidence. Requested settings and root defaults are not evidence of actual settings; routing could not be fully verified."
                 });
             }
         }
@@ -1796,7 +1796,8 @@ public sealed class FactoryReportEngine
         IReadOnlyList<CodexEvent> rootEvents,
         IReadOnlyList<CodexRollout> descendants,
         CodexStateSnapshot state,
-        bool verbose)
+        bool verbose,
+        List<Diagnostic> diagnostics)
     {
         var agents = new List<AgentReport>();
         var spawningRollouts = new[] { root }.Concat(descendants).ToArray();
@@ -1807,7 +1808,7 @@ public sealed class FactoryReportEngine
             var role = ClassifyRole(root, child, spawn);
             var task = role == "worker" ? ExtractFactoryTask(spawn?.Task) : null;
             var (outcome, outcomeAt) = role == "planner" ? PlannerOutcome(child) : (null, null);
-            var actualSettings = ChildExecutionSettings(child);
+            var actualSettings = ChildExecutionSettings(child, spawn, role == "worker" ? diagnostics : null);
             var tokens = ComputeWholeThreadTokens(child, out var authoritativeTokens);
             agents.Add(new AgentReport
             {
@@ -1821,8 +1822,8 @@ public sealed class FactoryReportEngine
                 SpawnExecutionProfile = spawn?.ExecutionProfile,
                 RequestedModel = spawn?.RequestedModel,
                 RequestedReasoningEffort = spawn?.RequestedReasoningEffort,
-                ActualModel = spawn?.ActualModel ?? actualSettings.Model,
-                ActualReasoningEffort = spawn?.ActualReasoningEffort ?? actualSettings.ReasoningEffort,
+                ActualModel = actualSettings.Model,
+                ActualReasoningEffort = actualSettings.ReasoningEffort,
                 PlannerOutcome = outcome,
                 PlannerOutcomeAt = outcomeAt,
                 Tokens = tokens,
@@ -1834,14 +1835,44 @@ public sealed class FactoryReportEngine
         return agents;
     }
 
-    private static (string? Model, string? ReasoningEffort) ChildExecutionSettings(CodexRollout child)
+    private static (string? Model, string? ReasoningEffort) ChildExecutionSettings(
+        CodexRollout child, SpawnRecord? spawn, List<Diagnostic>? diagnostics)
     {
         // Tool events describe invoked operations, including grandchildren, not this worker.
         var settings = child.Events.Where(x => x.ToolId is null &&
             (x.ThreadId is null || x.ThreadId == child.ThreadId)).ToArray();
-        return (settings.FirstOrDefault(x => x.ActualModel is not null)?.ActualModel,
-            settings.FirstOrDefault(x => x.ActualReasoningEffort is not null)?.ActualReasoningEffort);
+        var contexts = settings.Where(x => x.Type == "turn_context").ToArray();
+        var models = contexts.Select(x => x.ActualModel).OfType<string>().Distinct(StringComparer.Ordinal).ToArray();
+        var efforts = contexts.Select(x => x.ActualReasoningEffort).OfType<string>().Distinct(StringComparer.Ordinal).ToArray();
+        var contextEvidence = string.Join("; ", contexts.Select(x =>
+            $"turn_context at line {x.Ordinal}: {FormatExecutionSettings(x.ActualModel, x.ActualReasoningEffort)}"));
+
+        if (models.Length > 1 || efforts.Length > 1)
+            diagnostics?.Add(new Diagnostic
+            {
+                Severity = "warning", Category = "host-trace", Code = "worker_turn_context_settings_conflict",
+                Message = $"Worker {child.ThreadId} has differing turn_context settings: {contextEvidence}. Conflicting fields remain unknown; spawn metadata cannot resolve changes between turns, so routing could not be fully verified."
+            });
+
+        if (contexts.Any(x =>
+                SettingsDisagree(spawn?.ActualModel, x.ActualModel) ||
+                SettingsDisagree(spawn?.ActualReasoningEffort, x.ActualReasoningEffort)))
+            diagnostics?.Add(new Diagnostic
+            {
+                Severity = "warning", Category = "host-trace", Code = "worker_spawn_settings_conflict",
+                Message = $"Worker {child.ThreadId} spawn metadata reports {FormatExecutionSettings(spawn?.ActualModel, spawn?.ActualReasoningEffort)}, but its own context disagrees: {contextEvidence}. The worker's turn_context takes precedence; conflicting values across turns remain unknown."
+            });
+
+        // A changing field must not fall back to spawn metadata or an earlier event.
+        // Stable context fields are primary; other explicit evidence fills absent fields only.
+        return (models.Length > 1 ? null : models.SingleOrDefault() ?? spawn?.ActualModel ??
+                settings.FirstOrDefault(x => x.ActualModel is not null)?.ActualModel,
+            efforts.Length > 1 ? null : efforts.SingleOrDefault() ?? spawn?.ActualReasoningEffort ??
+                settings.FirstOrDefault(x => x.ActualReasoningEffort is not null)?.ActualReasoningEffort);
     }
+
+    private static bool SettingsDisagree(string? first, string? second) =>
+        first is not null && second is not null && !string.Equals(first, second, StringComparison.Ordinal);
 
     private static AgentReport BuildRootAgent(
         CodexRollout root,
