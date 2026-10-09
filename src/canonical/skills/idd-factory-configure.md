@@ -6,6 +6,20 @@ change, simplify, or refresh model mappings.
 
 Read `references/factory-execution-policy.md` before editing the policy.
 
+## Activation and authorization
+
+People may select this command directly. The agent may also activate it for
+explicitly requested configuration during project initialization or an
+`idd-factory-update-effort-models` handoff. Automatic activation alone does not
+authorize a policy write. Preserve the original request and its scope through
+every handoff; a review-only request must remain read-only.
+
+Apply only exact user-authorized changes or an explicitly confirmed proposal.
+Automatically selected or interpreted mappings require confirmation before
+saving. Reuse existing authorization without repeating the same decision.
+An absent policy or worker failure alone does not authorize configuration.
+This skill remains the sole owner of policy validation and persistence.
+
 ## Scope
 
 This workflow owns only Factory model-selection policy. It does not:

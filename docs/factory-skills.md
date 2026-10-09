@@ -2,8 +2,7 @@
 
 IDD Factory exposes three registered user commands: `idd-factory-run`,
 `idd-factory-configure`, and `idd-factory-update-effort-models`.
-`idd-factory-run` and `idd-factory-update-effort-models` can also be selected
-by the agent automatically. `idd-factory-configure` remains manual-only.
+All three can also be selected by the agent for the relevant user request.
 Planner and worker are internal canonical protocols owned by `idd-factory-run`.
 Automatic Intent workflows remain available to the agent and are hidden from
 the Claude Code slash menu. Codex currently has no equivalent documented
@@ -33,7 +32,11 @@ processes, poll status, maintain retry budgets, or own a workflow state machine.
 
 ## `idd-factory-configure`
 
-This reusable manual workflow owns `.idd/execution.yaml`.
+This reusable command owns `.idd/execution.yaml`. It can be invoked directly
+or activated by the agent to finish requested configuration or a model-update
+handoff. Automatic activation alone does not authorize a write: review-only
+requests remain read-only, and automatically proposed changes need explicit
+confirmation. Exact prior authorization is reused.
 
 It supports:
 

@@ -180,8 +180,8 @@
     "exposure": "workflow"
   },
   "idd-factory-configure": {
-    "description": "Create or deliberately update project-owned Factory execution-profile mappings in .idd/execution.yaml without hardcoded model recommendations.",
-    "invocation": "manual",
+    "description": "Configure project-owned Factory execution-profile mappings in .idd/execution.yaml for an explicit user request or authorized workflow handoff; confirm automatically proposed changes before saving, without hardcoded model recommendations.",
+    "invocation": "auto",
     "exposure": "command",
     "interface": {
       "displayName": "IDD Factory Config",

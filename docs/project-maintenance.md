@@ -110,11 +110,16 @@ Claude host waits for their result. Forks do not inherit the caller's history;
 the caller must pass the actual request and relevant constraints.
 
 Codex generates `skills/<skill>/agents/openai.yaml` for all nine commands,
-regardless of invocation mode. Six manual commands declare
-`allow_implicit_invocation: false`, while the three auto commands declare
+regardless of invocation mode. Five manual commands declare
+`allow_implicit_invocation: false`, while the four auto commands declare
 `true`. The eleven workflows remain published as `SKILL.md` without this
 user-facing metadata file. Codex does not guarantee that these choices exactly
 control which skills appear in every host's menu.
+
+`idd-factory-configure` is a command with automatic invocation so initialization
+and model-update workflows can hand off to the sole configuration owner.
+Activation and write authorization are separate: the command preserves scope,
+obtains required confirmation, validates policy, and reuses existing approval.
 
 This is a stricter format for canonical **source metadata**, not a change to
 existing project-owned `.idd/` files, Product Intent, or Factory state.

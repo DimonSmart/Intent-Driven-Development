@@ -2,6 +2,19 @@
 
 This page records IDD changes that require action in repositories that already use the toolkit.
 
+## 2026-10-09 — Factory configuration allows authorized workflow handoffs
+
+`idd-factory-configure` retains `exposure: command` and now uses
+`invocation: auto`. It remains directly selectable by people and can be
+activated by the agent during requested initialization or model updates.
+Claude generates `disable-model-invocation: false`; Codex generates
+`allow_implicit_invocation: true`.
+
+This permits activation, not automatic persistence. Scope, review-only limits,
+confirmation of automatic proposals, baseline checks, and structural validation
+remain inside the sole configuration owner. Exact user-authorized changes and
+confirmed handoffs reuse their authorization.
+
 ## 2026-10-09 — Factory model routing preserves existing plans and policy
 
 New planner output includes one explicit `ExecutionProfile` per task. Existing
