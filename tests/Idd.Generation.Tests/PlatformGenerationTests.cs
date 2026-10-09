@@ -69,12 +69,12 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
     }
 
     [Fact]
-    public void FactoryMetadata_HasOnlyPublicSkillsAndInternalProtocols()
+    public void FactoryMetadata_HasOnlyRegisteredSkillsAndInternalProtocols()
     {
         var manifestPath = Path.Combine(fixture.RepoRoot, "src", "canonical", "plugins", "plugin-manifest.json");
         using var manifest = JsonDocument.Parse(fixture.ReadText(manifestPath));
         var factory = manifest.RootElement.GetProperty("plugins").GetProperty("idd-factory");
-        var publicSkills = factory.GetProperty("skills").EnumerateArray()
+        var registeredSkills = factory.GetProperty("skills").EnumerateArray()
             .Select(value => value.GetString())
             .ToArray();
 
@@ -82,11 +82,12 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
             new[]
             {
                 "idd-factory-run",
-                "idd-factory-configure"
+                "idd-factory-configure",
+                "idd-factory-update-effort-models"
             },
-            publicSkills);
-        Assert.DoesNotContain("idd-factory-decompose-task", publicSkills);
-        Assert.DoesNotContain("idd-factory-execute-subtask", publicSkills);
+            registeredSkills);
+        Assert.DoesNotContain("idd-factory-decompose-task", registeredSkills);
+        Assert.DoesNotContain("idd-factory-execute-subtask", registeredSkills);
 
         var plannerReference = Assert.Single(
             factory.GetProperty("skillReferences").EnumerateArray(),
@@ -136,7 +137,8 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
                 new[]
                 {
                     "idd-factory-configure",
-                    "idd-factory-run"
+                    "idd-factory-run",
+                    "idd-factory-update-effort-models"
                 },
                 skills);
             fixture.AssertMissing(Path.Combine(root, "skills", "idd-factory-decompose-task"));
@@ -160,7 +162,7 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
 
             if (platform == "codex")
             {
-                Assert.Contains("fork_turns = \"none\"", run);
+                Assert.Contains("fork_turns: \"none\"", run);
                 Assert.Contains("spawn_agent", run);
                 Assert.Contains("wait_agent", run);
             }

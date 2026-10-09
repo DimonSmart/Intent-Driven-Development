@@ -1,11 +1,11 @@
 # Factory skills
 
-IDD Factory exposes two registered user commands: `idd-factory-run` and
-`idd-factory-configure`. Both retain their previous invocation rules;
-`idd-factory-run` can also be selected automatically. Planner and worker are
-internal canonical protocols owned by `idd-factory-run`, not user-invokable
-skills. Automatic Intent workflows remain registered separately, but are hidden
-from the Claude Code slash menu. Codex currently has no equivalent documented
+IDD Factory exposes three registered user commands: `idd-factory-run`,
+`idd-factory-configure`, and `idd-factory-update-effort-models`.
+All three can also be selected by the agent for the relevant user request.
+Planner and worker are internal canonical protocols owned by `idd-factory-run`.
+Automatic Intent workflows remain available to the agent and are hidden from
+the Claude Code slash menu. Codex currently has no equivalent documented
 visibility switch, so its automatic workflows may remain visible.
 
 ## `idd-factory-run`
@@ -21,33 +21,62 @@ fresh planner and sequential fresh workers, handles one planner question, and
 runs configured project verification after planner `# Done`.
 
 Immediately before each worker spawn it mechanically maps the task's
-`ExecutionProfile` through `.idd/execution.yaml`. Missing profile metadata
-means `standard`; missing policy/mapping means `inherit`. Explicit mappings
-are applied exactly and are never semantically "improved" by the root agent.
+`ExecutionProfile` through optional `.idd/execution.yaml`. New planner output
+requires one canonical profile per task. Existing pending tasks in `plan.md`
+without the section use `standard`. An absent policy or missing profile/platform
+mapping inherits host settings. Partial mappings are valid; malformed existing
+mappings block execution. Explicit overrides are applied exactly.
 
 It does not launch a packaged runtime, use Factory MCP tools, supervise child
 processes, poll status, maintain retry budgets, or own a workflow state machine.
 
 ## `idd-factory-configure`
 
-This reusable manual workflow owns `.idd/execution.yaml`.
+This reusable command owns `.idd/execution.yaml`. It can be invoked directly
+or activated by the agent to finish requested configuration or a model-update
+handoff. Automatic activation alone does not authorize a write: review-only
+requests remain read-only, and automatically proposed changes need explicit
+confirmation. Exact prior authorization is reused.
 
 It supports:
 
 - explicit `modelStrategy: inherit` for using the current host model everywhere;
 - concrete per-platform mappings for `economy`, `standard`, and `strong`;
-- partial mappings, with missing entries inheriting host behavior;
+- partial mappings with inheritance for absent profiles or platforms;
 - optional platform-specific reasoning settings;
 - later reconfiguration or return to all-inherit.
 
 When fine-grained configuration is requested, the active Coding Agent first
-proposes one complete mapping from currently available information, clearly
+proposes overrides for the requested profiles from current information, clearly
 states any account-availability uncertainty, and asks for confirmation. IDD
 source does not contain a built-in table of recommended concrete models.
 
 Dynamic aliases such as `cheapest`, `best`, `latest`, or `strongest` are
 resolved during configuration to concrete model IDs; they are not persisted as
 runtime identifiers.
+
+## `idd-factory-update-effort-models`
+
+Select `idd-factory-update-effort-models` directly or describe the requested
+model update in natural language. Use it to refresh, upgrade, downgrade, or
+replace the LLMs assigned to `economy`, `standard`, and `strong`. For example, ask to reduce cost
+for economy only, strengthen standard, or replace an unavailable model.
+
+These effort levels are execution profiles; platform reasoning settings remain
+unchanged unless explicitly requested. The skill reads current policy and model
+information, preserves unselected levels and other platforms, and presents the
+current/proposed mapping with reasons and availability uncertainty. Concrete
+recommended model IDs are not built into the skill.
+
+Review-only requests return the proposal without writing. For application, the
+skill hands the complete proposal, baseline, and user authorization to
+`idd-factory-configure`, which remains the sole writer. Automatically selected
+models require confirmation; exact authorized replacements or an already
+confirmed proposal do not repeat that decision. Intervening edits are checked
+before saving, and an unchanged policy is not rewritten.
+
+Updates apply to the next worker spawn without a new plan. Running workers keep
+their model. The workflow does not start Factory or mutate its temporary state.
 
 ## Internal planner protocol
 
@@ -75,8 +104,10 @@ IDD-NNNN
 ENG-NNNN
 ```
 
-`ExecutionProfile` is optional and belongs to the immediately preceding task.
-Its absence means `standard`. It expresses required execution capability only,
+New planner output requires `ExecutionProfile` exactly once for the immediately
+preceding task. Existing `plan.md` tasks without it use `standard`. Empty,
+repeated, or unknown explicit profiles are invalid. A profile expresses required
+execution capability only,
 not a concrete model or cost policy.
 
 Tasks/Question/Done cannot be mixed. `TaskRelatedIntent` is optional task

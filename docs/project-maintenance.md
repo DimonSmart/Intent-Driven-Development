@@ -15,7 +15,7 @@ idd-factory   temporary implementation organization
 
 `idd-intent` is standalone and is the default installation. `idd-factory` depends on `idd-intent` and is installed only when temporary multi-step orchestration is needed.
 
-Keep `.idd/verification.yaml` in Git as operational verification configuration, outside `.idd/intent/`. Keep optional `.idd/execution.yaml` in Git as project-owned Factory execution policy, also outside `.idd/intent/` and `.idd/factory/current/`. Neither file is product intent.
+Keep `.idd/verification.yaml` in Git as operational verification configuration, outside `.idd/intent/`. For a Factory-enabled project, keep optional `.idd/execution.yaml` in Git when configured as project-owned Factory execution policy, also outside `.idd/intent/` and `.idd/factory/current/`. Neither file is product intent.
 
 The split is part of the product contract, not an internal packaging detail. Durable product truth and temporary execution state must remain independently installable and independently owned.
 
@@ -56,10 +56,14 @@ Ownership rules:
 - Factory depends on Intent;
 - Intent must not depend on Factory.
 
-The canonical public Factory skill set is exactly `idd-factory-run` and
-`idd-factory-configure`. Configuration owns persistent project model policy;
+The canonical Factory command set is exactly `idd-factory-run`,
+`idd-factory-configure`, and `idd-factory-update-effort-models`. Configuration
+owns persistent project model policy;
 `idd-factory-run` owns the orchestration loop and the internal planner and
-worker protocols. Each worker child executes exactly one contracted task.
+worker protocols. The `idd-factory-update-effort-models` command
+prepares lifecycle model replacements and hands authorized proposals to
+`idd-factory-configure`, which remains the sole writer. Each worker child
+executes exactly one contracted task.
 
 The planner is canonical distributable content without being a skill:
 `src/canonical/factory/planner.md` is packaged through generic
@@ -105,12 +109,17 @@ and `disable-model-invocation`. Five read-only Claude skills use
 Claude host waits for their result. Forks do not inherit the caller's history;
 the caller must pass the actual request and relevant constraints.
 
-Codex generates `skills/<skill>/agents/openai.yaml` for all eight commands,
-regardless of invocation mode. Six manual commands declare
-`allow_implicit_invocation: false`, while the two auto commands declare
+Codex generates `skills/<skill>/agents/openai.yaml` for all nine commands,
+regardless of invocation mode. Five manual commands declare
+`allow_implicit_invocation: false`, while the four auto commands declare
 `true`. The eleven workflows remain published as `SKILL.md` without this
 user-facing metadata file. Codex does not guarantee that these choices exactly
 control which skills appear in every host's menu.
+
+`idd-factory-configure` is a command with automatic invocation so initialization
+and model-update workflows can hand off to the sole configuration owner.
+Activation and write authorization are separate: the command preserves scope,
+obtains required confirmation, validates policy, and reuses existing approval.
 
 This is a stricter format for canonical **source metadata**, not a change to
 existing project-owned `.idd/` files, Product Intent, or Factory state.

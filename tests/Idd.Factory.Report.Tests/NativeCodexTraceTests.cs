@@ -56,7 +56,7 @@ public sealed class NativeCodexTraceTests : IDisposable
 
         var report = Assert.Single(new FactoryReportEngine().FindRuns(repository, codex));
 
-        Assert.Equal(2, report.SchemaVersion);
+        Assert.Equal(3, report.SchemaVersion);
         Assert.Equal(1, report.Metrics.PlannerInvocations);
         Assert.Equal(2, report.Metrics.WorkerInvocations);
         Assert.Equal(0, report.Metrics.OtherChildAgents);

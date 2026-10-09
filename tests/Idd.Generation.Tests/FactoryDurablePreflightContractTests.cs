@@ -83,7 +83,7 @@ public sealed class FactoryDurablePreflightContractTests(GenerationFixture fixtu
         var intent = Repo(".idd", "intent", "IDD-0001.spec-factory-orchestration.md");
         var route = Canonical("skills", "idd-route.md");
 
-        Assert.Contains("Public Factory skills are", intent);
+        Assert.Contains("Registered Factory skills are", intent);
         Assert.Contains("Internal Factory protocols", intent);
         Assert.Contains("worker                        owned by idd-factory-run", intent);
         Assert.Contains("owned by idd-factory-run", intent);

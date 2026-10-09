@@ -128,13 +128,13 @@ explicit request. This decision precedes the optional initial-intent bootstrap.
 Do not ask about Factory models for an `idd-intent`-only project.
 
 When Factory is enabled for this initialization and `.idd/execution.yaml` is
-absent, offer one blocking choice with this semantic meaning:
+absent, offer one blocking choice with these answer values and meanings:
 
 ```text
-How should Factory choose models for worker tasks?
+Which LLM strategy should Factory use for worker tasks?
 
-- Use the current model for all tasks
-- Configure different models by task complexity
+- default (inherit) — use the current session/host model for all tasks
+- configure — explicitly configure models for selected economy, standard, or strong profiles
 ```
 
 Use the current host's native structured interaction when available
@@ -144,10 +144,13 @@ choice.
 
 Handle the answer by handing off to `idd-factory-configure`:
 
-- current model for all tasks -> persist the intentional `modelStrategy: inherit`
-  policy;
-- different models by complexity -> let the configuration skill propose and
-  confirm concrete `economy` / `standard` / `strong` mappings.
+- `default` or `inherit` -> persist the intentional `modelStrategy: inherit`
+  policy. This is one global strategy: do not ask for or save individual
+  profile mappings;
+- `configure` -> let the configuration skill propose and confirm concrete
+  mappings for the requested profiles and platform. Partial mappings are valid;
+  unconfigured profiles/platforms inherit host settings. Do not require model
+  IDs for unselected levels or copy session defaults into absent mappings.
 
 If a valid `.idd/execution.yaml` already exists, do not repeat the offer on an
 idempotent initialization unless the user explicitly asks to reconfigure it.
@@ -156,7 +159,8 @@ The user can run `idd-factory-configure` at any later time.
 If Factory was explicitly enabled but the `idd-factory-configure` skill is not
 available because the optional Factory plugin is not installed, do not invent a
 policy file. Explain that project initialization does not install the optional
-Factory plugin and leave model configuration pending.
+Factory plugin and that Factory workers may inherit host model/reasoning settings
+without a policy file. A malformed existing policy still blocks workers.
 
 ### 6. Offer initial intent bootstrap for existing implementations
 

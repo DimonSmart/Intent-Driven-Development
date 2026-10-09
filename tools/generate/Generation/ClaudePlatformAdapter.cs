@@ -52,12 +52,15 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
                     - `inherit` means omit Factory-specific model and effort overrides.
                     - For an explicit active-platform mapping, pass the configured
                       `claude.model` and optional `claude.effort` through the native
-                      Agent/subagent invocation when the host supports those controls.
+                      Agent/subagent invocation. If the host has no corresponding
+                      explicit per-child parameter, block the worker instead of
+                      embedding an override request in its prompt.
                     - Do not reconsider task complexity or substitute a different
                       model. The configured mapping is authoritative.
                     - If the host rejects the configured settings or cannot honor an
-                      explicit per-child override, stop with a diagnostic and suggest
-                      `idd-factory-configure`; never pick a fallback model automatically.
+                      explicit per-child override, stop with a diagnostic that names
+                      the profile, requested settings, and rejection reason; suggest
+                      `idd-factory-configure` and never pick a fallback model.
                     """))
             };
         }

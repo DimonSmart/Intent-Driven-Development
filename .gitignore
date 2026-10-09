@@ -26,3 +26,4 @@ Thumbs.db
 
 #IDD
 .idd/factory
+.idd/tmp/

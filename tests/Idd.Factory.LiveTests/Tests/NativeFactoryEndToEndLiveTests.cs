@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using System.Text.Json;
 using Idd.Factory.Report;
 using Xunit;
@@ -9,7 +10,20 @@ public sealed class NativeFactoryEndToEndLiveTests
 {
     [LiveFactoryEvalFact]
     [Trait("Category", "LiveFactoryEval")]
-    public async Task Factory_UsesNativeAgentsAndCompletesTwoStepCatalog()
+    public Task Factory_UsesNativeAgentsAndCompletesTwoStepCatalog() =>
+        RunFactoryEvaluationAsync(unavailableWorkerModel: false);
+
+    [LiveFactoryEvalFact]
+    [Trait("Category", "LiveFactoryEval")]
+    public Task Factory_BlocksWhenConfiguredWorkerModelIsUnavailable() =>
+        RunFactoryEvaluationAsync(unavailableWorkerModel: true);
+
+    [LiveFactoryEvalFact]
+    [Trait("Category", "LiveFactoryEval")]
+    public Task Factory_ReplansAfterFinalVerificationFailure() =>
+        RunFactoryEvaluationAsync(unavailableWorkerModel: false, verificationRecovery: true);
+
+    private async Task RunFactoryEvaluationAsync(bool unavailableWorkerModel, bool verificationRecovery = false)
     {
         var repo = FindRepositoryRoot();
         var startedAtUtc = DateTimeOffset.UtcNow;
@@ -18,6 +32,10 @@ public sealed class NativeFactoryEndToEndLiveTests
         var artifactRoot = string.IsNullOrWhiteSpace(configuredArtifactRoot)
             ? Path.Combine(repo, "artifacts", "factory-evals", generatedRunId)
             : Path.GetFullPath(configuredArtifactRoot);
+        if (unavailableWorkerModel)
+            artifactRoot = Path.Combine(artifactRoot, "model-unavailable");
+        if (verificationRecovery)
+            artifactRoot = Path.Combine(artifactRoot, "verification-recovery");
         var runId = Path.GetFileName(Path.TrimEndingDirectorySeparator(artifactRoot));
         Directory.CreateDirectory(artifactRoot);
 
@@ -26,6 +44,10 @@ public sealed class NativeFactoryEndToEndLiveTests
         var tempRoot = string.IsNullOrWhiteSpace(configuredTempRoot)
             ? Path.Combine(Path.GetTempPath(), "idd-factory-native-eval", Guid.NewGuid().ToString("N"))
             : Path.GetFullPath(configuredTempRoot);
+        if (unavailableWorkerModel)
+            tempRoot = Path.Combine(tempRoot, "model-unavailable");
+        if (verificationRecovery)
+            tempRoot = Path.Combine(tempRoot, "verification-recovery");
         var preserveTempRoot = string.Equals(
             Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_KEEP_TEMP"),
             "1",
@@ -39,7 +61,15 @@ public sealed class NativeFactoryEndToEndLiveTests
             Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_MODEL"),
             Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_REASONING_EFFORT"),
             Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_MODEL_SOURCE"),
-            Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_REASONING_EFFORT_SOURCE"));
+            Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_REASONING_EFFORT_SOURCE"),
+            profileEnvironment: Environment.GetEnvironmentVariable);
+        const string unavailableModel = "idd-eval-removed-worker-model";
+        if (unavailableWorkerModel)
+        {
+            var mappings = settings.ExecutionProfiles.ToDictionary(mapping => mapping.Key, mapping => mapping.Value);
+            mappings["standard"] = new WorkerExecutionSettings(unavailableModel, settings.ExecutionProfiles["standard"].ReasoningEffort);
+            settings = settings with { ExecutionProfiles = mappings };
+        }
         var model = settings.Model;
         var reasoning = settings.ReasoningEffort;
         var timeoutMinutes =
@@ -52,8 +82,28 @@ public sealed class NativeFactoryEndToEndLiveTests
         {
             Console.WriteLine($"Live-eval model: {model} ({settings.ModelSource})");
             Console.WriteLine($"Live-eval reasoning effort: {reasoning} ({settings.ReasoningEffortSource})");
+            foreach (var mapping in settings.ExecutionProfiles)
+                Console.WriteLine($"Worker {mapping.Key}: model={mapping.Value.Model}, reasoning={mapping.Value.ReasoningEffort}");
             CopyDirectory(Path.Combine(caseRoot, "Template"), workspace);
+            ConfigureExecutionPolicy(workspace, settings.ExecutionProfiles);
+            if (verificationRecovery)
+            {
+                CopyDirectory(Path.Combine(repo, "tests", "Idd.Factory.LiveTests", "Cases", "VerificationRecovery", "Gate"),
+                    Path.Combine(workspace, "tools", "RecoveryGate"));
+                var policyPath = Path.Combine(workspace, ".idd", "verification.yaml");
+                var policy = (await File.ReadAllTextAsync(policyPath)).ReplaceLineEndings("\n")
+                    .Replace("checks:\n", "checks:\n  recovery-gate:\n    run: dotnet run --project tools/RecoveryGate/RecoveryGate.csproj --no-restore -- .idd/factory/current/verification-failure.md\n\n", StringComparison.Ordinal)
+                    .Replace("final:\n  use:\n", "final:\n  use:\n    - recovery-gate\n", StringComparison.Ordinal);
+                await File.WriteAllTextAsync(policyPath, policy);
+            }
+            var initialPolicy = await File.ReadAllTextAsync(Path.Combine(workspace, ".idd", "execution.yaml"));
+            var initialCatalog = await File.ReadAllTextAsync(Path.Combine(workspace, "src", "MiniCatalog", "Catalog.cs"));
             await InitializeGitRepositoryAsync(workspace, artifactRoot);
+            await RunAsync("dotnet", ["restore", "MiniCatalog.sln", "--nologo"],
+                workspace, null, null, artifactRoot, "05-workspace-restore");
+            if (verificationRecovery)
+                await RunAsync("dotnet", ["restore", "tools/RecoveryGate/RecoveryGate.csproj", "--nologo"],
+                    workspace, null, null, artifactRoot, "05-recovery-gate-restore");
             PrepareCodexHome(codexHome);
 
             await RunAsync(
@@ -99,7 +149,10 @@ public sealed class NativeFactoryEndToEndLiveTests
                 artifactRoot,
                 "09-codex-plugin-add");
 
-            var task = await File.ReadAllTextAsync(Path.Combine(caseRoot, "task.md"));
+            var task = await File.ReadAllTextAsync(Path.Combine(caseRoot,
+                unavailableWorkerModel ? "task-model-unavailable.md" : "task.md"));
+            if (verificationRecovery)
+                task += "\n\n" + await File.ReadAllTextAsync(Path.Combine(repo, "tests", "Idd.Factory.LiveTests", "Cases", "VerificationRecovery", "task.md"));
             var schema = await File.ReadAllTextAsync(Path.Combine(caseRoot, "final-response.schema.json"));
             var prompt = task + "\n\nReturn only JSON matching this schema:\n" + schema;
 
@@ -107,7 +160,7 @@ public sealed class NativeFactoryEndToEndLiveTests
                 codex,
                 [
                     "exec", "--json", "--ignore-rules",
-                    "--enable", "multi_agent", "--disable", "multi_agent_v2",
+                    "--enable", "multi_agent", "--enable", "multi_agent_v2",
                     "--enable", "plugins", "--disable", "remote_plugin",
                     "-c", "agents.max_depth=2",
                     "-c", "agents.max_threads=10",
@@ -133,31 +186,87 @@ public sealed class NativeFactoryEndToEndLiveTests
 
             var traceItems = ParseTraceItems(result.Stdout);
             var rootRollout = FindRootRollout(codexHome);
-            Assert.True(
-                rootRollout.SpawnRecords.Count >= 3,
-                "Expected a planner and two workers in the native Codex session rollout.");
+            AssertMultiAgentV2(rootRollout);
             Assert.DoesNotContain(traceItems, item => IsToolCall(item, "mcp_tool_call", "factory_run"));
             Assert.DoesNotContain(traceItems, item => IsToolCall(item, "mcp_tool_call", "factory_status"));
             Assert.DoesNotContain(traceItems, IsLegacyFactoryRuntimeCommand);
-
-            var finalJson = JsonDocument.Parse(await File.ReadAllTextAsync(lastMessage));
-            Assert.Equal("COMPLETED", finalJson.RootElement.GetProperty("status").GetString());
+            using var finalJson = JsonDocument.Parse(await File.ReadAllTextAsync(lastMessage));
 
             var factoryReport = Assert.Single(new FactoryReportEngine().FindRuns(workspace, codexHome));
+            ReportWriters.WriteMarkdown(factoryReport, Path.Combine(artifactRoot, "factory-report.md"), verbose: false);
+            ReportWriters.WriteJson(factoryReport, Path.Combine(artifactRoot, "factory-report.json"));
+            RunResult? verification = null;
+            if (!unavailableWorkerModel)
+            {
+                // Capture independent evidence even when a subsequent report assertion fails.
+                verification = await RunAsync(
+                    "dotnet",
+                    ["test", "MiniCatalog.sln", "--no-restore", "--nologo",
+                        "--logger", "trx;LogFileName=project-verification.trx", "--results-directory", artifactRoot],
+                    workspace, null, null, artifactRoot, "11-project-verification", requireSuccess: false);
+            }
+            if (unavailableWorkerModel)
+            {
+                Assert.Equal("BLOCKED", finalJson.RootElement.GetProperty("status").GetString());
+                FactoryRoutingAssertions.VerifyUnavailableModel(factoryReport, rootRollout, unavailableModel);
+                Assert.Equal(initialPolicy, await File.ReadAllTextAsync(Path.Combine(workspace, ".idd", "execution.yaml")));
+                Assert.Equal(initialCatalog, await File.ReadAllTextAsync(Path.Combine(workspace, "src", "MiniCatalog", "Catalog.cs")));
+                Assert.False(File.Exists(Path.Combine(workspace, "src", "MiniCatalog", "ProductCode.cs")));
+                Assert.Contains(factoryReport.Agents, agent => agent.Role == "planner");
+                Assert.True(factoryReport.FactoryProjectState.CurrentRequestPresent);
+                Assert.True(factoryReport.FactoryProjectState.CurrentPlanPresent);
+                var plan = await File.ReadAllTextAsync(Path.Combine(workspace, ".idd", "factory", "current", "plan.md"));
+                Assert.Contains("# Task", plan);
+                Assert.Contains("# ExecutionProfile", plan);
+                Assert.Contains("standard", plan);
+                return;
+            }
+
+            Assert.True(
+                rootRollout.SpawnRecords.Count >= 4,
+                "Expected a planner and at least three workers in the native Codex session rollout.");
+            Assert.Equal("COMPLETED", finalJson.RootElement.GetProperty("status").GetString());
+            Assert.NotEmpty(factoryReport.Tasks);
+            FactoryRoutingAssertions.Verify(factoryReport, settings.ExecutionProfiles);
+            var childPaths = Directory.EnumerateFiles(Path.Combine(codexHome, "sessions"), "*.jsonl", SearchOption.AllDirectories)
+                .Select(path => new CodexRolloutReader().Read(path))
+                .ToDictionary(rollout => rollout.ThreadId, rollout => rollout.AgentPath, StringComparer.Ordinal);
+            foreach (var worker in factoryReport.Agents.Where(agent => agent.Role == "worker"))
+            {
+                var spawn = Assert.Single(rootRollout.SpawnRecords.Values, spawn =>
+                    spawn.Children.Contains(worker.ThreadId, StringComparer.Ordinal) ||
+                    spawn.ChildAgentPath is not null && spawn.ChildAgentPath == childPaths[worker.ThreadId]);
+                var expected = settings.ExecutionProfiles[worker.ExecutionProfile!];
+                Assert.Equal(expected.Model, spawn.RequestedModel);
+                Assert.Equal(expected.ReasoningEffort, spawn.RequestedReasoningEffort);
+                Assert.Contains(rootRollout.Events, item =>
+                    item.ToolName == "spawn_agent" && item.ToolId == spawn.CallId &&
+                    HasExplicitNoHistoryFork(item.ToolArguments));
+            }
+            Assert.Equal(new[] { "standard", "strong", "economy" },
+                factoryReport.Tasks.Take(3).Select(task => task.ExecutionProfile).ToArray());
             Assert.Equal("completed", factoryReport.Run.Result);
             Assert.Equal("passed", factoryReport.Completion.ProjectVerification);
+            Assert.Equal("ok", factoryReport.Completion.ProtocolValidation);
+            if (verificationRecovery)
+            {
+                Assert.True(factoryReport.Metrics.PlannerInvocations >= 3,
+                    "Expected a fresh recovery planner after the deliberate final verification failure.");
+                Assert.Contains(factoryReport.Metrics.Tools.FailedCommandItems,
+                    command => command.Agent == "Factory root" &&
+                        command.Command?.Contains("RecoveryGate.csproj", StringComparison.Ordinal) == true);
+                Assert.DoesNotContain(factoryReport.Diagnostics,
+                    diagnostic => diagnostic.Code == "verification_failure_without_fresh_planner");
+                var archives = Path.Combine(workspace, ".idd", "factory", "results");
+                Assert.Contains(Directory.EnumerateFiles(archives, "verification-failure.md", SearchOption.AllDirectories),
+                    path => new FileInfo(path).Length > 0);
+            }
             Assert.False(factoryReport.FactoryProjectState.CurrentRequestPresent);
             Assert.All(factoryReport.Tasks, task => Assert.Equal("completed", task.Status));
 
-            var verification = await RunAsync(
-                "dotnet",
-                ["test", "MiniCatalog.sln", "--nologo"],
-                workspace,
-                null,
-                null,
-                artifactRoot,
-                "11-project-verification");
-            Assert.Equal(0, verification.ExitCode);
+            Assert.Equal(0, verification!.ExitCode);
+            ProjectTestEvidence.AssertPassed(
+                Path.Combine(artifactRoot, "project-verification.trx"), expectedTests: 9);
 
             Assert.True(File.Exists(Path.Combine(workspace, "src", "MiniCatalog", "ProductCode.cs")));
             var catalog = await File.ReadAllTextAsync(Path.Combine(workspace, "src", "MiniCatalog", "Catalog.cs"));
@@ -183,6 +292,7 @@ public sealed class NativeFactoryEndToEndLiveTests
                 settings.ModelSource,
                 reasoning,
                 settings.ReasoningEffortSource,
+                settings.ExecutionProfiles,
                 timeoutMinutes,
                 failure);
 
@@ -190,6 +300,48 @@ public sealed class NativeFactoryEndToEndLiveTests
             {
                 try { Directory.Delete(tempRoot, recursive: true); } catch { }
             }
+        }
+    }
+
+    private static void AssertMultiAgentV2(CodexRollout root)
+    {
+        // Feature flags alone do not establish the effective backend: the host
+        // may select V1 or V2 based on the model catalog. Trust turn_context.
+        var observedV2 = false;
+        foreach (var line in File.ReadLines(root.Path))
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            try
+            {
+                using var document = JsonDocument.Parse(line);
+                var item = document.RootElement;
+                if (item.TryGetProperty("type", out var type) && type.ValueEquals("turn_context") &&
+                    item.TryGetProperty("payload", out var payload) && payload.ValueKind == JsonValueKind.Object &&
+                    payload.TryGetProperty("multi_agent_version", out var version) &&
+                    version.ValueKind == JsonValueKind.String && version.ValueEquals("v2"))
+                {
+                    observedV2 = true;
+                    break;
+                }
+            }
+            catch (JsonException) { /* Truncated trace lines are not proof of a V2 run. */ }
+        }
+        Assert.True(observedV2, "Cannot confirm a MultiAgentV2 run from the root turn_context.");
+    }
+
+    private static bool HasExplicitNoHistoryFork(string? arguments)
+    {
+        if (string.IsNullOrWhiteSpace(arguments)) return false;
+        try
+        {
+            using var document = JsonDocument.Parse(arguments);
+            return document.RootElement.ValueKind == JsonValueKind.Object &&
+                   document.RootElement.TryGetProperty("fork_turns", out var fork) &&
+                   fork.ValueKind == JsonValueKind.String && fork.ValueEquals("none");
+        }
+        catch (JsonException)
+        {
+            return false;
         }
     }
 
@@ -206,7 +358,7 @@ public sealed class NativeFactoryEndToEndLiveTests
         return items;
     }
 
-    private static CodexRollout FindRootRollout(string codexHome)
+    private static CodexRollout FindRootRollout(string codexHome, bool requireSpawn = true)
     {
         var sessions = Path.Combine(codexHome, "sessions");
         Assert.True(Directory.Exists(sessions), "Codex did not create a sessions directory.");
@@ -217,7 +369,7 @@ public sealed class NativeFactoryEndToEndLiveTests
             .ToArray();
         return Assert.Single(rollouts, rollout =>
             string.IsNullOrWhiteSpace(rollout.ParentThreadId) &&
-            rollout.SpawnRecords.Count > 0);
+            (!requireSpawn || rollout.SpawnRecords.Count > 0));
     }
 
     private static bool IsToolCall(JsonElement item, string itemType, string tool)
@@ -243,6 +395,26 @@ public sealed class NativeFactoryEndToEndLiveTests
         await RunAsync("git", ["config", "user.email", "idd-factory-eval@localhost"], workspace, null, null, artifactRoot, "03-git-config-email");
         await RunAsync("git", ["add", "--all"], workspace, null, null, artifactRoot, "04-git-add");
         await RunAsync("git", ["commit", "-m", "Initial eval workspace"], workspace, null, null, artifactRoot, "05-git-commit");
+    }
+
+    private static void ConfigureExecutionPolicy(string workspace,
+        IReadOnlyDictionary<string, WorkerExecutionSettings> mappings)
+    {
+        LiveEvalSettings.ValidateProfiles(mappings);
+        var idd = Path.Combine(workspace, ".idd");
+        Directory.CreateDirectory(idd);
+        var yaml = new StringBuilder("version: 1\n\nfactory:\n  executionProfiles:\n");
+        foreach (var profile in LiveEvalSettings.Profiles)
+        {
+            var mapping = mappings[profile];
+            var modelScalar = mapping.Model.Replace("'", "''", StringComparison.Ordinal);
+            var reasoningScalar = mapping.ReasoningEffort.Replace("'", "''", StringComparison.Ordinal);
+            yaml.AppendLine($"    {profile}:");
+            yaml.AppendLine("      codex:");
+            yaml.AppendLine($"        model: '{modelScalar}'");
+            yaml.AppendLine($"        reasoningEffort: '{reasoningScalar}'");
+        }
+        File.WriteAllText(Path.Combine(idd, "execution.yaml"), yaml.ToString().ReplaceLineEndings("\n"));
     }
 
     private static void PrepareCodexHome(string target)
@@ -479,6 +651,7 @@ public sealed class NativeFactoryEndToEndLiveTests
         string modelSource,
         string reasoning,
         string reasoningEffortSource,
+        IReadOnlyDictionary<string, WorkerExecutionSettings> executionProfiles,
         int timeoutMinutes,
         Exception? failure)
     {
@@ -495,6 +668,7 @@ public sealed class NativeFactoryEndToEndLiveTests
                     modelSource,
                     reasoningEffort = reasoning,
                     reasoningEffortSource,
+                    executionProfiles,
                     timeoutMinutes,
                     evalVersion = Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_VERSION"),
                     failure = failure?.ToString()

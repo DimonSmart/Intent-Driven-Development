@@ -32,6 +32,8 @@ Classify the request by the thing that changes:
 - `project initialization`: the project needs an `.idd/intent/` structure.
 - `project verification configuration`: `.idd/verification.yaml` needs creation or
   deliberate update.
+- `Factory model update`: the LLMs assigned to effort levels need refreshing,
+  upgrading, downgrading, or explicit replacement.
 - `unknown`: the request does not provide enough information to choose safely.
 
 Initial product truth discovery and raw imported knowledge are different:
@@ -123,7 +125,7 @@ scope:
   risk, sequenced phases, multiple roles, review gates, or major capability
   removal.
 - `not-applicable`: routing, initialization, verification configuration,
-  bootstrap, imports, audits, lint checks, brainstorms, and pure intent reads
+  Factory model updates, bootstrap, imports, audits, lint checks, brainstorms, and pure intent reads
   that do not execute implementation.
 
 A broad repository scan does not make bootstrap `orchestrated`. Factory
@@ -224,6 +226,41 @@ idd-verification-configure
 
 Do not use it to run checks, fix failing tests, or define product acceptance
 criteria.
+
+## Workflow Family: Factory Model Updates
+
+Use this workflow when the user asks to refresh, upgrade, downgrade, or replace
+LLMs assigned to Factory effort levels during the life of the project:
+
+```text
+idd-factory-update-effort-models
+-> current policy and model evidence
+-> proposed policy with requested overrides and preserved settings
+-> idd-factory-configure for authorized validation and persistence
+```
+
+Routing uses `Classification: factory-model-update`, `Operation: not-applicable`,
+and `Execution depth: not-applicable`. Use `Requested scope: route-only` for
+classification or routing advice, and `end-to-end` for a requested model review
+or update. Preserve a review-only limit through the handoff so the skill returns
+its analysis/proposal without persistence. This workflow needs the Factory
+plugin but does not start Factory.
+
+Effort levels are the three existing execution profiles, distinct from vendor
+reasoning settings. Persistent policy remains in `.idd/execution.yaml`, outside
+Product Intent, Engineering Rules, and temporary Factory state. Unselected
+levels, other platforms, and reasoning settings are preserved. Automatic model
+recommendations require confirmation; exact user-authorized replacements and
+previously confirmed proposals reuse that decision through the handoff.
+
+Missing policy means inheritance. Partial mappings are valid; missing profile
+or platform mappings remain inherited. Configure only requested overrides and
+preserve unselected mappings and intentional absence. Malformed existing policy
+is diagnosed and repaired through the configuration owner, never silently replaced
+with inherit.
+The owner checks for intervening edits and skips writes for an unchanged policy.
+Updates affect the next worker without reclassifying tasks or changing a running
+worker. Review-only requests stop before persistence.
 
 ## Workflow Family: Initial Intent Bootstrap
 
@@ -556,13 +593,17 @@ Each planner and worker receives a fresh isolated semantic context rather than
 the root transcript. Workers share the repository but do not share transcripts.
 The repository is authoritative implementation reality.
 
-Planner tasks may optionally classify required execution capability as
-`economy`, `standard`, or `strong`; missing metadata means `standard`. The
-planner never reads model policy. Immediately before each worker spawn, the root
-agent mechanically maps the profile through optional project-owned
-`.idd/execution.yaml` and either inherits host behavior or applies the exact
-configured native model/settings. It never substitutes another model or
-reclassifies the task.
+New planner output must contain exactly one `ExecutionProfile` per task:
+`economy`, `standard`, or `strong`. Missing, empty, repeated, or unknown profiles
+invalidate new output before it is saved. Existing pending tasks in `plan.md`
+without the section remain valid and use `standard`; explicit empty, repeated,
+or unknown profiles still block execution. The planner never reads model policy.
+Immediately before each worker spawn, the root agent checks optional
+`.idd/execution.yaml`, re-reading and validating it when present. An absent
+policy or missing profile/platform mapping means inherit host settings. Partial
+mappings are valid. Malformed existing mappings block execution and never trigger
+silent inheritance. The root applies exact configured native model/settings
+without substituting another model or reclassifying the task.
 
 Temporary continuation state is limited to the original request, remaining
 current batch, short completed summaries, exact user answers, and optional

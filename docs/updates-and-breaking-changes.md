@@ -2,6 +2,46 @@
 
 This page records IDD changes that require action in repositories that already use the toolkit.
 
+## 2026-10-09 — Factory configuration allows authorized workflow handoffs
+
+`idd-factory-configure` retains `exposure: command` and now uses
+`invocation: auto`. It remains directly selectable by people and can be
+activated by the agent during requested initialization or model updates.
+Claude generates `disable-model-invocation: false`; Codex generates
+`allow_implicit_invocation: true`.
+
+This permits activation, not automatic persistence. Scope, review-only limits,
+confirmation of automatic proposals, baseline checks, and structural validation
+remain inside the sole configuration owner. Exact user-authorized changes and
+confirmed handoffs reuse their authorization.
+
+## 2026-10-09 — Factory model routing preserves existing plans and policy
+
+New planner output includes one explicit `ExecutionProfile` per task. Existing
+pending tasks in `plan.md` without the section continue as `standard`, with no
+migration or restart. Empty, repeated, or unknown explicit profiles remain
+invalid.
+
+Partial `.idd/execution.yaml` mappings remain supported. Missing profiles or
+platform mappings inherit host model/reasoning settings; malformed present
+mappings block execution. A Codex-only override remains usable from Claude
+without requiring another set of model IDs. Configuration and model updates
+preserve unselected mappings and intentional absence.
+
+## 2026-10-09 — Factory model updates use the skill exposure policy
+
+The new `idd-factory-update-effort-models` skill is registered with
+`exposure: command` and `invocation: auto`. People can select it directly,
+and the agent can select it for routed model-update requests. Codex publishes
+its display name and short description in `agents/openai.yaml`.
+The distribution now contains 20 skills (17 Intent, 3 Factory), including
+nine user commands and eleven automatic workflows. Factory planner and worker
+remain internal references owned by `idd-factory-run`.
+
+Exposure controls the user command surface; invocation independently controls
+automatic skill selection. Manual commands retain their invocation restrictions,
+and automatic workflows retain their activation path.
+
 ## 2026-10-08 — User commands separated from automatic workflows
 
 IDD keeps all 19 registered skills (17 Intent, 2 Factory), but categorizes them
@@ -71,15 +111,16 @@ plugin is updated. Historical Factory traces may also contain the old name;
 
 ## 2026-09-25 — Configurable Factory execution profiles
 
-Factory planner tasks may now declare optional `# ExecutionProfile` metadata:
-`economy`, `standard`, or `strong`. Missing metadata remains valid and means
-`standard`, so existing `plan.md` batches continue to work.
+Factory task metadata may declare `# ExecutionProfile`: `economy`, `standard`,
+or `strong`. An absent section means `standard`. New planner output now always
+includes one explicit profile, while existing pending plans remain compatible.
 
-Projects may optionally create `.idd/execution.yaml` with
-`idd-factory-configure`. Absence preserves previous behavior: all workers use
-the model the host would normally choose without a Factory-specific override.
+Projects may optionally configure `.idd/execution.yaml` with
+`idd-factory-configure`. Its absence preserves host/session model inheritance.
 The file is project-owned execution policy, not Factory runtime/workflow
-configuration and not temporary state.
+configuration and not temporary state. Partial mappings remain valid: missing
+profiles or active-platform mappings inherit host settings. Malformed existing
+policies block worker execution rather than silently inheriting.
 
 The root Factory agent now performs a mechanical
 `profile -> project mapping -> native child spawn` step. It never reclassifies a

@@ -10,7 +10,7 @@ namespace Idd.Factory.Report;
 
 public sealed class FactoryRunReport
 {
-    public int SchemaVersion { get; init; } = 2;
+    public int SchemaVersion { get; init; } = 3;
     public string Repository { get; init; } = "";
     public HostInfo Host { get; init; } = new();
     public RunInfo Run { get; init; } = new();
@@ -79,6 +79,12 @@ public sealed class AgentReport
             : null;
     public string? Task { get; set; }
     public string? TaskTitle { get; set; }
+    public string? ExecutionProfile { get; set; }
+    public string? SpawnExecutionProfile { get; set; }
+    public string? RequestedModel { get; set; }
+    public string? RequestedReasoningEffort { get; set; }
+    public string? ActualModel { get; set; }
+    public string? ActualReasoningEffort { get; set; }
     public string? PlannerOutcome { get; set; }
     public DateTimeOffset? PlannerOutcomeAt { get; set; }
     public TokenMetrics Tokens { get; set; } = new();
@@ -94,6 +100,12 @@ public sealed class TaskReport
     public int Number { get; init; }
     public string AgentThreadId { get; init; } = "";
     public string? Text { get; init; }
+    public string? ExecutionProfile { get; init; }
+    public string? SpawnExecutionProfile { get; init; }
+    public string? RequestedModel { get; init; }
+    public string? RequestedReasoningEffort { get; init; }
+    public string? ActualModel { get; init; }
+    public string? ActualReasoningEffort { get; init; }
     public string Status { get; init; } = "unknown";
     public long? DurationMilliseconds { get; init; }
 }
@@ -237,12 +249,15 @@ public sealed class CodexEvent
     public string? ToolPhase { get; init; }
     public string? ToolArguments { get; init; }
     public string? ToolOutput { get; init; }
+    public string? CommandWorkingDirectory { get; init; }
     public int? ExitCode { get; init; }
     public string? Status { get; init; }
     public TokenMetrics? Usage { get; init; }
     public bool UsageIsCumulative { get; init; }
     public string? ChildThreadId { get; set; }
     public string? SpawnTask { get; init; }
+    public string? ActualModel { get; init; }
+    public string? ActualReasoningEffort { get; init; }
 
     public bool Contains(string value) =>
         Text?.Contains(value, StringComparison.OrdinalIgnoreCase) == true ||
@@ -256,6 +271,7 @@ public sealed class CodexRollout
     public string? Cwd { get; set; }
     public string? ParentThreadId { get; set; }
     public string? AgentRoleHint { get; set; }
+    public string? AgentPath { get; set; }
     public List<CodexEvent> Events { get; init; } = [];
     public List<Diagnostic> Diagnostics { get; init; } = [];
     public Dictionary<string, SpawnRecord> SpawnRecords { get; init; } = new(StringComparer.Ordinal);
@@ -269,7 +285,13 @@ public sealed class SpawnRecord
     public string? SenderThreadId { get; set; }
     public string? ChildThreadId { get; set; }
     public List<string> ChildThreadIds { get; } = [];
+    public string? ChildAgentPath { get; set; }
     public string? Task { get; set; }
+    public string? ExecutionProfile { get; set; }
+    public string? RequestedModel { get; set; }
+    public string? RequestedReasoningEffort { get; set; }
+    public string? ActualModel { get; set; }
+    public string? ActualReasoningEffort { get; set; }
     public DateTimeOffset? Timestamp { get; init; }
 
     [JsonIgnore]
@@ -327,6 +349,7 @@ public sealed class CodexRolloutReader
                     rollout.Cwd = String(payload, "cwd") ?? rollout.Cwd;
                     rollout.ParentThreadId = FindString(payload, "parent_thread_id", "parentThreadId", "parent_id") ?? rollout.ParentThreadId;
                     rollout.AgentRoleHint = FindString(payload, "agent_role", "agentRole", "agent_path", "agentPath") ?? rollout.AgentRoleHint;
+                    rollout.AgentPath = FindString(payload, "agent_path", "agentPath") ?? rollout.AgentPath;
                 }
 
                 var timestamp = Timestamp(root) ?? Timestamp(payload);
@@ -392,6 +415,17 @@ public sealed class CodexRolloutReader
                 if (toolName == "spawn_agent")
                 {
                     spawnTask = ExtractSpawnTask(toolArguments);
+                    if (IsOpaqueSpawnTask(spawnTask))
+                    {
+                        rollout.Diagnostics.Add(new Diagnostic
+                        {
+                            Severity = "warning",
+                            Category = "host-trace",
+                            Code = "spawn_prompt_unreadable",
+                            Message = $"Spawn {toolId} in {Path.GetFileName(path)} at line {ordinal} contains an encrypted prompt. The reporter cannot read its task or profile; readable planner output is used when available."
+                        });
+                        spawnTask = null;
+                    }
                     childThreadId = receiverThreadIds.FirstOrDefault() ?? ExtractSpawnChildThreadId(eventObject);
                 }
                 else if (rawItemType is "function_call_output" or "custom_tool_call_output")
@@ -400,6 +434,15 @@ public sealed class CodexRolloutReader
                 }
 
                 var usage = ExtractUsage(root, payload, out var cumulative, out var usageScope);
+                var actualModel = FindString(eventObject, "actual_model", "actualModel", "model_used", "modelUsed", "resolved_model", "resolvedModel");
+                var actualReasoning = FindString(eventObject, "actual_reasoning_effort", "actualReasoningEffort", "reasoning_effort_used", "reasoningEffortUsed", "resolved_reasoning_effort", "resolvedReasoningEffort");
+                // Only the direct fields of this thread's turn context describe its model.
+                // Nested collaboration settings or spawn arguments may describe other agents.
+                if (topType == "turn_context")
+                {
+                    actualModel = ReadContextSetting(payload, "model", rollout, ordinal);
+                    actualReasoning = ReadContextSetting(payload, "effort", rollout, ordinal);
+                }
 
                 rollout.Events.Add(new CodexEvent
                 {
@@ -424,35 +467,54 @@ public sealed class CodexRolloutReader
                     ToolPhase = toolPhase,
                     ToolArguments = toolArguments,
                     ToolOutput = toolOutput,
+                    CommandWorkingDirectory = ExtractCommandWorkingDirectory(eventObject, toolArguments),
                     ExitCode = FindInt(eventObject, "exit_code", "exitCode"),
                     Status = FindString(eventObject, "status", "outcome"),
                     Usage = usage,
                     UsageIsCumulative = cumulative,
                     ChildThreadId = childThreadId,
-                    SpawnTask = spawnTask
+                    SpawnTask = spawnTask,
+                    ActualModel = actualModel,
+                    ActualReasoningEffort = actualReasoning
                 });
 
-                if (metadataOnly && !string.IsNullOrWhiteSpace(rollout.ThreadId) && rollout.Cwd is not null && ordinal >= 16)                if (metadataOnly && !string.IsNullOrWhiteSpace(rollout.ThreadId) && rollout.Cwd is not null && ordinal >= 16)
+                if (metadataOnly && !string.IsNullOrWhiteSpace(rollout.ThreadId) && rollout.Cwd is not null && ordinal >= 16)
                     break;
             }
             catch (JsonException)
             {
-                if (!isLastLine)
+                rollout.Diagnostics.Add(new Diagnostic
                 {
-                    rollout.Diagnostics.Add(new Diagnostic
-                    {
-                        Severity = "warning",
-                        Category = "host-trace",
-                        Code = "malformed_rollout_line",
-                        Message = $"Malformed JSONL line {ordinal} in {Path.GetFileName(path)}."
-                    });
-                }
+                    Severity = "warning",
+                    Category = "host-trace",
+                    Code = "malformed_rollout_line",
+                    Message = $"Could not read JSONL line {ordinal} in {Path.GetFileName(path)}{(isLastLine ? " (final line may be truncated)" : "")}. Its data was omitted."
+                });
             }
         }
 
         CorrelateSpawns(rollout);
         return rollout;
     }
+
+    private static string? ReadContextSetting(JsonElement payload, string name, CodexRollout rollout, long ordinal)
+    {
+        if (!payload.TryGetProperty(name, out var value))
+            return null;
+        if (value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString()))
+            return value.GetString();
+        rollout.Diagnostics.Add(new Diagnostic
+        {
+            Severity = "warning",
+            Category = "host-trace",
+            Code = "invalid_turn_context_setting",
+            Message = $"Could not read turn_context.{name} at line {ordinal} in {Path.GetFileName(rollout.Path)}: expected a non-empty string, got {value.ValueKind}."
+        });
+        return null;
+    }
+
+    private static bool IsOpaqueSpawnTask(string? task) =>
+        task is not null && Regex.IsMatch(task.Trim(), @"\AgAAAAA[A-Za-z0-9_-]+={0,2}\z");
 
     private static void CorrelateSpawns(CodexRollout rollout)
     {
@@ -471,6 +533,12 @@ public sealed class CodexRolloutReader
                         CallId = e.ToolId,
                         SenderThreadId = e.SenderThreadId ?? rollout.ThreadId,
                         Task = e.SpawnTask,
+                        ChildAgentPath = ExtractSpawnArgument(e.ToolOutput, "task_name"),
+                        ExecutionProfile = ExtractExecutionProfile(e.SpawnTask),
+                        RequestedModel = ExtractSpawnArgument(e.ToolArguments, "model"),
+                        RequestedReasoningEffort = ExtractSpawnArgument(e.ToolArguments, "reasoning_effort", "reasoningEffort"),
+                        ActualModel = e.ActualModel ?? ExtractSpawnArgument(e.ToolOutput, "actual_model", "actualModel", "model_used", "modelUsed", "resolved_model", "resolvedModel"),
+                        ActualReasoningEffort = e.ActualReasoningEffort ?? ExtractSpawnArgument(e.ToolOutput, "actual_reasoning_effort", "actualReasoningEffort", "reasoning_effort_used", "reasoningEffortUsed", "resolved_reasoning_effort", "resolvedReasoningEffort"),
                         Timestamp = e.Timestamp
                     };
                     spawnByCall[e.ToolId] = record;
@@ -481,6 +549,12 @@ public sealed class CodexRolloutReader
                     record.SenderThreadId ??= e.SenderThreadId ?? rollout.ThreadId;
                     if (record.Task is null && e.SpawnTask is not null)
                         record.Task = e.SpawnTask;
+                    record.ChildAgentPath ??= ExtractSpawnArgument(e.ToolOutput, "task_name");
+                    record.ExecutionProfile ??= ExtractExecutionProfile(e.SpawnTask);
+                    record.RequestedModel ??= ExtractSpawnArgument(e.ToolArguments, "model");
+                    record.RequestedReasoningEffort ??= ExtractSpawnArgument(e.ToolArguments, "reasoning_effort", "reasoningEffort");
+                    record.ActualModel ??= e.ActualModel ?? ExtractSpawnArgument(e.ToolOutput, "actual_model", "actualModel", "model_used", "modelUsed", "resolved_model", "resolvedModel");
+                    record.ActualReasoningEffort ??= e.ActualReasoningEffort ?? ExtractSpawnArgument(e.ToolOutput, "actual_reasoning_effort", "actualReasoningEffort", "reasoning_effort_used", "reasoningEffortUsed", "resolved_reasoning_effort", "resolvedReasoningEffort");
                 }
 
                 foreach (var id in e.ReceiverThreadIds)
@@ -501,6 +575,9 @@ public sealed class CodexRolloutReader
             }
             else if (e.ToolPhase == "output" && spawnByCall.TryGetValue(e.ToolId, out var record))
             {
+                record.ChildAgentPath ??= ExtractSpawnArgument(e.ToolOutput, "task_name");
+                record.ActualModel ??= e.ActualModel ?? ExtractSpawnArgument(e.ToolOutput, "actual_model", "actualModel", "model_used", "modelUsed", "resolved_model", "resolvedModel");
+                record.ActualReasoningEffort ??= e.ActualReasoningEffort ?? ExtractSpawnArgument(e.ToolOutput, "actual_reasoning_effort", "actualReasoningEffort", "reasoning_effort_used", "reasoningEffortUsed", "resolved_reasoning_effort", "resolvedReasoningEffort");
                 var id = e.ChildThreadId ?? ExtractThreadId(e.ToolOutput);
                 if (!string.IsNullOrWhiteSpace(id) &&
                     !record.ChildThreadIds.Contains(id, StringComparer.Ordinal))
@@ -699,6 +776,52 @@ public sealed class CodexRolloutReader
         {
             return arguments;
         }
+    }
+
+    private static string? ExtractCommandWorkingDirectory(JsonElement eventObject, string? toolArguments)
+    {
+        // Native command items may expose cwd directly; function-call wrappers
+        // put workdir in the JSON arguments alongside cmd/command.
+        var direct = FindString(eventObject, "cwd", "workdir", "working_directory", "workingDirectory");
+        if (direct is not null || string.IsNullOrWhiteSpace(toolArguments))
+            return direct;
+        try
+        {
+            using var json = JsonDocument.Parse(toolArguments);
+            return json.RootElement.ValueKind == JsonValueKind.Object
+                ? FindString(json.RootElement, "cwd", "workdir", "working_directory", "workingDirectory")
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string? ExtractSpawnArgument(string? payload, params string[] names)
+    {
+        if (string.IsNullOrWhiteSpace(payload))
+            return null;
+        try
+        {
+            using var document = JsonDocument.Parse(payload);
+            return FindString(document.RootElement, names);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string? ExtractExecutionProfile(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
+        var heading = Regex.Match(text, @"(?im)^\s*#\s*ExecutionProfile\s*$\s*^(?<value>economy|standard|strong)\s*$");
+        if (heading.Success)
+            return heading.Groups["value"].Value.ToLowerInvariant();
+        var inline = Regex.Match(text, @"(?im)\bExecutionProfile\s*:\s*(?<value>economy|standard|strong)\b");
+        return inline.Success ? inline.Groups["value"].Value.ToLowerInvariant() : null;
     }
 
     private static string? ExtractArguments(JsonElement element)
@@ -1025,6 +1148,18 @@ public sealed class FactoryReportEngine
         {
             foreach (var spawn in spawningRollout.SpawnRecords.Values)
             {
+                if (!spawn.Children.Any() && spawn.ChildAgentPath?.StartsWith('/') == true)
+                {
+                    // Current native spawn results may identify the child by canonical
+                    // agent path instead of UUID. Resolve only within the known parent.
+                    var matches = all.Where(child => child.AgentPath == spawn.ChildAgentPath &&
+                        child.ParentThreadId == (spawn.SenderThreadId ?? spawningRollout.ThreadId)).ToArray();
+                    if (matches.Length == 1)
+                    {
+                        spawn.ChildThreadId = matches[0].ThreadId;
+                        spawn.ChildThreadIds.Add(matches[0].ThreadId);
+                    }
+                }
                 foreach (var childId in spawn.Children)
                 {
                     if (!byId.TryGetValue(childId, out var child))
@@ -1147,11 +1282,13 @@ public sealed class FactoryReportEngine
         var descendants = SelectDescendants(root, start.Timestamp, nextStartOrdinal == long.MaxValue ? null :
             root.Events.FirstOrDefault(x => x.Ordinal == nextStartOrdinal)?.Timestamp, all, byId, state);
 
-        var agents = BuildAgents(root, segmentRootEvents, descendants, state, verbose);
+        var diagnostics = new List<Diagnostic>();
+        var agents = BuildAgents(root, segmentRootEvents, descendants, state, verbose, diagnostics);
         PopulateMissingWorkerTasks(agents, byId);
         var plannerAgents = agents.Where(x => x.Role == "planner").OrderBy(x => x.StartedAt).ToArray();
         var workerAgents = agents.Where(x => x.Role == "worker").OrderBy(x => x.StartedAt).ToArray();
         var latestPlanner = plannerAgents.LastOrDefault();
+        var verificationPolicy = FinalVerificationEvidence.Load(repository, root.Cwd);
 
         var resultEvidence = new List<string>();
         var result = "unknown";
@@ -1196,17 +1333,15 @@ public sealed class FactoryReportEngine
             }
             else if (latestPlanner?.PlannerOutcome == "Done")
             {
-                var verification = segmentRootEvents
-                    .Where(x => IsCommand(x) && x.Timestamp >= latestPlanner.FinishedAt)
-                    .LastOrDefault();
-                if (verification is not null && verification.ExitCode == 0)
+                var verification = verificationPolicy.Evaluate(segmentRootEvents, latestPlanner.PlannerOutcomeAt);
+                if (verification.Result == "passed")
                 {
                     result = "completed";
                     resultEvidence.Add("planner_done");
                     resultEvidence.Add("verification_success");
-                    end = verification.Timestamp;
-                    terminalEvent = verification;
-                    endEvidence = "planner # Done followed by successful verification command";
+                    terminalEvent = verification.Observations.Last().Event;
+                    end = terminalEvent.Timestamp;
+                    endEvidence = "planner # Done followed by successful final verification evidence";
                     endConfidence = "derived";
                 }
             }
@@ -1274,7 +1409,6 @@ public sealed class FactoryReportEngine
             workerAgents = agents.Where(x => x.Role == "worker").OrderBy(x => x.StartedAt).ToArray();
         }
 
-        var diagnostics = new List<Diagnostic>();
         diagnostics.AddRange(state.Diagnostics);
         diagnostics.AddRange(root.Diagnostics);
         diagnostics.AddRange(descendants.SelectMany(x => x.Diagnostics));
@@ -1372,10 +1506,72 @@ public sealed class FactoryReportEngine
                 Number = index + 1,
                 AgentThreadId = x.ThreadId,
                 Text = x.Task,
+                ExecutionProfile = x.ExecutionProfile,
+                SpawnExecutionProfile = x.SpawnExecutionProfile,
+                RequestedModel = x.RequestedModel,
+                RequestedReasoningEffort = x.RequestedReasoningEffort,
+                ActualModel = x.ActualModel,
+                ActualReasoningEffort = x.ActualReasoningEffort,
                 Status = status,
                 DurationMilliseconds = x.DurationMilliseconds
             };
         }).ToList();
+
+        foreach (var task in tasks)
+        {
+            if (task.RequestedModel is null || task.RequestedReasoningEffort is null)
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "info", Category = "reporter", Code = "worker_requested_settings_unspecified",
+                    Message = $"Worker {task.AgentThreadId} has no recorded explicit {(task.RequestedModel is null ? "model" : "reasoning effort")} override{(task.RequestedModel is null && task.RequestedReasoningEffort is null ? " or reasoning effort override" : "")}. This may be intentional inheritance; the reporter does not infer requested overrides from project policy."
+                });
+            if (task.ExecutionProfile is null)
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "reporter", Code = "worker_execution_profile_unavailable",
+                    Message = $"Could not determine the execution profile for worker {task.AgentThreadId}: no matching planner task was readable, or its explicit ExecutionProfile was empty, repeated, or unknown."
+                });
+            if (string.IsNullOrWhiteSpace(task.Text))
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "reporter", Code = "worker_task_unavailable",
+                    Message = $"Could not read the task for worker {task.AgentThreadId} from spawn instructions or matching planner output."
+                });
+            if (task.ActualModel is null || task.ActualReasoningEffort is null)
+            {
+                var missing = new List<string>();
+                if (task.ActualModel is null) missing.Add("model");
+                if (task.ActualReasoningEffort is null) missing.Add("reasoning effort");
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "reporter", Code = "worker_actual_settings_unavailable",
+                    Message = $"Could not determine actual {string.Join(" and ", missing)} for worker {task.AgentThreadId}: its own turn_context and explicit resolved/actual settings contain missing or conflicting evidence. Requested settings and root defaults are not evidence of actual settings; routing could not be fully verified."
+                });
+            }
+        }
+
+        foreach (var task in tasks.Where(x => x.ExecutionProfile is not null &&
+                     x.SpawnExecutionProfile is not null && x.ExecutionProfile != x.SpawnExecutionProfile))
+        {
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "warning",
+                Category = "factory",
+                Code = "worker_execution_profile_mismatch",
+                Message = $"Planner assigned {task.ExecutionProfile} to worker {task.AgentThreadId}, but its spawn prompt declares {task.SpawnExecutionProfile}."
+            });
+        }
+
+        foreach (var task in tasks.Where(HasConfirmedExecutionSettingsMismatch))
+        {
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "warning",
+                Category = "factory",
+                Code = "worker_execution_settings_mismatch",
+                Message = $"Worker {task.AgentThreadId} requested {FormatExecutionSettings(task.RequestedModel, task.RequestedReasoningEffort)} but the trace reports {FormatExecutionSettings(task.ActualModel, task.ActualReasoningEffort)}."
+            });
+        }
 
         var rootReportedTokens = ComputeRootReportedTokens(root.Events, end, terminalEvent);
         var tokenMetrics = AggregateTokens(agents, out var tokenMethod, out var tokenComplete);
@@ -1395,6 +1591,27 @@ public sealed class FactoryReportEngine
         }
 
         var tools = AggregateTools(agents);
+        if (tools.ToolBatches is null)
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "info", Category = "reporter", Code = "tool_batches_unavailable",
+                Message = "Could not calculate tool batches: the trace lacks complete, reliable started/completed intervals for tool calls."
+            });
+        foreach (var agent in agents)
+        {
+            var missing = new List<string>();
+            if (agent.StartedAt is null) missing.Add("start timestamp");
+            if (agent.FinishedAt is null) missing.Add("finish timestamp");
+            if (agent.Tokens.InputTokens is null) missing.Add("input tokens");
+            if (agent.Tokens.CachedInputTokens is null) missing.Add("cached input tokens");
+            if (agent.Tokens.OutputTokens is null) missing.Add("output tokens");
+            if (missing.Count > 0)
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "info", Category = "reporter", Code = "agent_data_unavailable",
+                    Message = $"Could not determine {string.Join(", ", missing)} for {agent.Role} thread {agent.ThreadId} from the available trace."
+                });
+        }
         foreach (var failed in tools.FailedCommandItems)
         {
             diagnostics.Add(new Diagnostic
@@ -1412,7 +1629,27 @@ public sealed class FactoryReportEngine
             segmentRootEvents,
             result,
             structuredResult is not null,
-            terminalEvent);
+            terminalEvent,
+            verificationPolicy,
+            diagnostics);
+        if (completionInfo.ProjectVerification == "unavailable")
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "info", Category = "reporter", Code = "project_verification_unavailable",
+                Message = "Could not determine final project verification: no recognized command/result evidence was found after a final planner # Done. Absence of this evidence does not mean verification was not configured."
+            });
+        if (completionInfo.DeclaredResult == "unavailable")
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "info", Category = "reporter", Code = "declared_result_unavailable",
+                Message = "Could not read an explicit structured Factory result; any derived run result is reported separately."
+            });
+        if (completionInfo.PlannerDone is null)
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "warning", Category = "reporter", Code = "planner_done_unavailable",
+                Message = "Could not establish the final planner # Done ordering relative to worker completion from the available trace."
+            });
 
         if (completionInfo.DeclaredResult == "completed" &&
             workerAgents.Length > 0 &&
@@ -1500,6 +1737,17 @@ public sealed class FactoryReportEngine
         };
     }
 
+    private static bool HasConfirmedExecutionSettingsMismatch(TaskReport task) =>
+        (!string.IsNullOrWhiteSpace(task.RequestedModel) &&
+         !string.IsNullOrWhiteSpace(task.ActualModel) &&
+         !string.Equals(task.RequestedModel, task.ActualModel, StringComparison.Ordinal)) ||
+        (!string.IsNullOrWhiteSpace(task.RequestedReasoningEffort) &&
+         !string.IsNullOrWhiteSpace(task.ActualReasoningEffort) &&
+         !string.Equals(task.RequestedReasoningEffort, task.ActualReasoningEffort, StringComparison.Ordinal));
+
+    private static string FormatExecutionSettings(string? model, string? reasoning) =>
+        $"model={model ?? "unknown"}, reasoning={reasoning ?? "unknown"}";
+
     private static List<CodexRollout> SelectDescendants(
         CodexRollout root,
         DateTimeOffset? runStart,
@@ -1568,7 +1816,8 @@ public sealed class FactoryReportEngine
         IReadOnlyList<CodexEvent> rootEvents,
         IReadOnlyList<CodexRollout> descendants,
         CodexStateSnapshot state,
-        bool verbose)
+        bool verbose,
+        List<Diagnostic> diagnostics)
     {
         var agents = new List<AgentReport>();
         var spawningRollouts = new[] { root }.Concat(descendants).ToArray();
@@ -1579,6 +1828,7 @@ public sealed class FactoryReportEngine
             var role = ClassifyRole(root, child, spawn);
             var task = role == "worker" ? ExtractFactoryTask(spawn?.Task) : null;
             var (outcome, outcomeAt) = role == "planner" ? PlannerOutcome(child) : (null, null);
+            var actualSettings = ChildExecutionSettings(child, spawn, role == "worker" ? diagnostics : null);
             var tokens = ComputeWholeThreadTokens(child, out var authoritativeTokens);
             agents.Add(new AgentReport
             {
@@ -1589,6 +1839,11 @@ public sealed class FactoryReportEngine
                 FinishedAt = ExecutionFinishedAt(child),
                 Task = task,
                 TaskTitle = TaskTitle(task),
+                SpawnExecutionProfile = spawn?.ExecutionProfile,
+                RequestedModel = spawn?.RequestedModel,
+                RequestedReasoningEffort = spawn?.RequestedReasoningEffort,
+                ActualModel = actualSettings.Model,
+                ActualReasoningEffort = actualSettings.ReasoningEffort,
                 PlannerOutcome = outcome,
                 PlannerOutcomeAt = outcomeAt,
                 Tokens = tokens,
@@ -1599,6 +1854,45 @@ public sealed class FactoryReportEngine
         }
         return agents;
     }
+
+    private static (string? Model, string? ReasoningEffort) ChildExecutionSettings(
+        CodexRollout child, SpawnRecord? spawn, List<Diagnostic>? diagnostics)
+    {
+        // Tool events describe invoked operations, including grandchildren, not this worker.
+        var settings = child.Events.Where(x => x.ToolId is null &&
+            (x.ThreadId is null || x.ThreadId == child.ThreadId)).ToArray();
+        var contexts = settings.Where(x => x.Type == "turn_context").ToArray();
+        var models = contexts.Select(x => x.ActualModel).OfType<string>().Distinct(StringComparer.Ordinal).ToArray();
+        var efforts = contexts.Select(x => x.ActualReasoningEffort).OfType<string>().Distinct(StringComparer.Ordinal).ToArray();
+        var contextEvidence = string.Join("; ", contexts.Select(x =>
+            $"turn_context at line {x.Ordinal}: {FormatExecutionSettings(x.ActualModel, x.ActualReasoningEffort)}"));
+
+        if (models.Length > 1 || efforts.Length > 1)
+            diagnostics?.Add(new Diagnostic
+            {
+                Severity = "warning", Category = "host-trace", Code = "worker_turn_context_settings_conflict",
+                Message = $"Worker {child.ThreadId} has differing turn_context settings: {contextEvidence}. Conflicting fields remain unknown; spawn metadata cannot resolve changes between turns, so routing could not be fully verified."
+            });
+
+        if (contexts.Any(x =>
+                SettingsDisagree(spawn?.ActualModel, x.ActualModel) ||
+                SettingsDisagree(spawn?.ActualReasoningEffort, x.ActualReasoningEffort)))
+            diagnostics?.Add(new Diagnostic
+            {
+                Severity = "warning", Category = "host-trace", Code = "worker_spawn_settings_conflict",
+                Message = $"Worker {child.ThreadId} spawn metadata reports {FormatExecutionSettings(spawn?.ActualModel, spawn?.ActualReasoningEffort)}, but its own context disagrees: {contextEvidence}. The worker's turn_context takes precedence; conflicting values across turns remain unknown."
+            });
+
+        // A changing field must not fall back to spawn metadata or an earlier event.
+        // Stable context fields are primary; other explicit evidence fills absent fields only.
+        return (models.Length > 1 ? null : models.SingleOrDefault() ?? spawn?.ActualModel ??
+                settings.FirstOrDefault(x => x.ActualModel is not null)?.ActualModel,
+            efforts.Length > 1 ? null : efforts.SingleOrDefault() ?? spawn?.ActualReasoningEffort ??
+                settings.FirstOrDefault(x => x.ActualReasoningEffort is not null)?.ActualReasoningEffort);
+    }
+
+    private static bool SettingsDisagree(string? first, string? second) =>
+        first is not null && second is not null && !string.Equals(first, second, StringComparison.Ordinal);
 
     private static AgentReport BuildRootAgent(
         CodexRollout root,
@@ -1809,15 +2103,32 @@ public sealed class FactoryReportEngine
         return string.IsNullOrWhiteSpace(first) ? null : Bound(first, 80);
     }
 
+    private sealed record PlannedTask(string Text, string? ExecutionProfile);
+
+    private static string? ExtractPlannerExecutionProfile(string text)
+    {
+        var matches = Regex.Matches(text,
+            @"(?ims)^\s*#\s*ExecutionProfile\s*$\s*(?<value>.*?)(?=^\s*#|\z)");
+        // Readable legacy tasks omitted the section and used standard. An
+        // explicitly malformed section must never be treated as absence.
+        if (matches.Count == 0)
+            return "standard";
+        if (matches.Count != 1)
+            return null;
+        var value = matches[0].Groups["value"].Value.Trim();
+        return value is "economy" or "standard" or "strong" ? value : null;
+    }
+
     private static void PopulateMissingWorkerTasks(
         IReadOnlyList<AgentReport> agents,
         IReadOnlyDictionary<string, CodexRollout> rollouts)
     {
-        var pending = new Queue<string>();
+        var pending = new Queue<PlannedTask>();
         foreach (var agent in agents.OrderBy(x => x.StartedAt).ThenBy(x => x.ThreadId, StringComparer.Ordinal))
         {
             if (agent.Role == "planner" && rollouts.TryGetValue(agent.ThreadId, out var planner))
             {
+                pending.Clear();
                 foreach (var task in ExtractPlannerTasks(planner))
                     pending.Enqueue(task);
                 continue;
@@ -1827,15 +2138,16 @@ public sealed class FactoryReportEngine
                 continue;
 
             var plannedTask = pending.Dequeue();
-            if (!string.IsNullOrWhiteSpace(agent.Task))
-                continue;
-
-            agent.Task = plannedTask;
-            agent.TaskTitle = TaskTitle(plannedTask);
+            if (string.IsNullOrWhiteSpace(agent.Task))
+            {
+                agent.Task = plannedTask.Text;
+                agent.TaskTitle = TaskTitle(plannedTask.Text);
+            }
+            agent.ExecutionProfile = plannedTask.ExecutionProfile;
         }
     }
 
-    private static IReadOnlyList<string> ExtractPlannerTasks(CodexRollout rollout)
+    private static IReadOnlyList<PlannedTask> ExtractPlannerTasks(CodexRollout rollout)
     {
         var text = rollout.Events
             .Where(x => string.Equals(x.Role, "assistant", StringComparison.OrdinalIgnoreCase) &&
@@ -1847,10 +2159,17 @@ public sealed class FactoryReportEngine
             return [];
 
         return Regex.Matches(text,
-                @"(?ms)^\s*#\s*Task\s*$\s*(?<task>.*?)(?=^\s*#\s*(?:Task|ExecutionProfile|TaskRelatedIntent|TaskRelatedEngineering)\s*$|\z)",
+                @"(?ms)^\s*#\s*Task\s*$\s*(?<section>.*?)(?=^\s*#\s*Task\s*$|\z)",
                 RegexOptions.IgnoreCase)
-            .Select(match => Bound(match.Groups["task"].Value.Trim(), 1000))
-            .Where(task => !string.IsNullOrWhiteSpace(task))
+            .Select(match =>
+            {
+                var section = match.Groups["section"].Value;
+                var task = Regex.Split(section,
+                        @"(?m)^\s*#\s*(?:ExecutionProfile|TaskRelatedIntent|TaskRelatedEngineering)\s*$",
+                        RegexOptions.IgnoreCase)[0];
+                return new PlannedTask(Bound(task.Trim(), 1000), ExtractPlannerExecutionProfile(section));
+            })
+            .Where(task => !string.IsNullOrWhiteSpace(task.Text))
             .ToArray();
     }
 
@@ -2020,8 +2339,10 @@ public sealed class FactoryReportEngine
         }
 
         var hasNative = calls.Values.Any(x => x.IsNative);
+        // Some hosts emit native command events but only response-item spawn calls.
+        // Keep those collaboration calls; call IDs already deduplicate native wrappers.
         var semantic = (hasNative
-                ? calls.Values.Where(x => x.IsNative)
+                ? calls.Values.Where(x => x.IsNative || x.Name is "spawn_agent" or "wait_agent")
                 : calls.Values)
             .ToArray();
 
@@ -2310,11 +2631,14 @@ public sealed class FactoryReportEngine
         IReadOnlyList<CodexEvent> rootEvents,
         string result,
         bool declaredResult,
-        CodexEvent? terminalEvent)
+        CodexEvent? terminalEvent,
+        FinalVerificationEvidence policy,
+        List<Diagnostic> diagnostics)
     {
         var planners = agents.Where(x => x.Role == "planner").ToArray();
         var workers = agents.Where(x => x.Role == "worker").ToArray();
-        var done = planners.Where(x => x.PlannerOutcome == "Done").OrderBy(x => x.PlannerOutcomeAt).LastOrDefault();
+        var latestPlanner = planners.OrderBy(x => x.StartedAt).LastOrDefault();
+        var done = latestPlanner?.PlannerOutcome == "Done" ? latestPlanner : null;
 
         bool? plannerDone;
         if (done is null)
@@ -2334,33 +2658,47 @@ public sealed class FactoryReportEngine
                 : done.PlannerOutcomeAt >= lastWorker;
         }
 
-        var verification = "unavailable";
-        if (plannerDone == true && done?.PlannerOutcomeAt is not null)
-        {
-            var doneAt = done.PlannerOutcomeAt.Value;
-            var terminalAt = terminalEvent?.Timestamp;
-            var commands = rootEvents
-                .Where(x => IsCommand(x) &&
-                            x.Timestamp is not null &&
-                            x.Timestamp.Value >= doneAt &&
-                            (terminalAt is null || x.Timestamp.Value <= terminalAt.Value))
-                .Where(x => x.ToolPhase is "completed" or "call")
-                .ToArray();
-
-            if (commands.Any(x => x.ExitCode is not null || x.Status is not null))
+        var terminalAt = terminalEvent?.Timestamp;
+        var verification = plannerDone == true
+            ? policy.Evaluate(rootEvents, done?.PlannerOutcomeAt, terminalAt).Result : "unavailable";
+        if (policy.Error is not null)
+            diagnostics.Add(new Diagnostic
             {
-                verification = commands.Any(x =>
-                    x.ExitCode is not null && x.ExitCode != 0 ||
-                    x.Status is "failed" or "error")
-                    ? "failed"
-                    : "passed";
-            }
+                Severity = "warning", Category = "reporter", Code = "verification_policy_unavailable",
+                Message = $"Cannot establish configured final checks: {policy.Error} No fallback was used."
+            });
+
+        var firstDone = planners.Where(x => x.PlannerOutcome == "Done")
+            .Select(x => x.PlannerOutcomeAt).Where(x => x is not null).OrderBy(x => x).FirstOrDefault();
+        var observations = policy.Evaluate(rootEvents, firstDone, terminalAt).Observations;
+        var recoveryMissing = false;
+        foreach (var failure in observations.Where(x => x.Result == "failed"))
+        {
+            var nextCheck = observations.FirstOrDefault(x => x.Event.Timestamp > failure.Event.Timestamp);
+            var recoveryPlanner = planners.FirstOrDefault(x => x.StartedAt > failure.Event.Timestamp &&
+                (nextCheck is null || x.StartedAt < nextCheck.Event.Timestamp));
+            if (recoveryPlanner is not null) continue;
+            recoveryMissing = true;
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "warning", Category = "factory", Code = "verification_failure_without_fresh_planner",
+                Message = $"Final check {failure.Check} failed at {failure.Event.Timestamp:O}, but no fresh planner was observed before verification resumed or the run ended."
+            });
         }
 
         var declared = declaredResult ? result : "unavailable";
         var validation = declared == "completed"
-            ? plannerDone == false ? "warning" : "ok"
+            ? plannerDone != true || verification == "failed" || recoveryMissing ? "warning" : "ok"
             : declaredResult ? "ok" : "unavailable";
+        if (declared == "completed" && policy.HasPolicy && verification != "passed")
+        {
+            validation = "warning";
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "warning", Category = "factory", Code = "completed_without_final_verification",
+                Message = "Factory declared COMPLETED without conclusive successful evidence for every configured final check."
+            });
+        }
 
         return new CompletionReport
         {
@@ -2884,6 +3222,9 @@ public static class ReportWriters
         DefaultIgnoreCondition = JsonIgnoreCondition.Never
     };
 
+    private static string FormatExecutionSettings(string? model, string? reasoning) =>
+        $"model={model ?? "unknown"}, reasoning={reasoning ?? "unknown"}";
+
     public static void WriteList(IEnumerable<FactoryRunReport> reports, TextWriter writer)
     {
         writer.WriteLine("#  Started                      Result       Thread");
@@ -2937,6 +3278,11 @@ public static class ReportWriters
             writer.WriteLine($"#{task.Number}  {agent?.TaskTitle ?? Short(task.Text, 80)}");
             writer.WriteLine($"    Status:    {task.Status}");
             writer.WriteLine($"    Worker:    {task.AgentThreadId}");
+            writer.WriteLine($"    Profile:   {task.ExecutionProfile ?? "unknown"}");
+            if (task.SpawnExecutionProfile is not null)
+                writer.WriteLine($"    Spawn profile: {task.SpawnExecutionProfile}");
+            writer.WriteLine($"    Requested: {FormatExecutionSettings(task.RequestedModel, task.RequestedReasoningEffort)}");
+            writer.WriteLine($"    Actual:    {FormatExecutionSettings(task.ActualModel, task.ActualReasoningEffort)}");
             writer.WriteLine($"    Duration:  {FormatDuration(task.DurationMilliseconds)}");
             writer.WriteLine($"    Tokens:    {FormatTaskTokens(agent?.Tokens)}");
         }
@@ -3074,6 +3420,11 @@ public static class ReportWriters
             writer.WriteLine();
             writer.WriteLine($"- Status: {task.Status}");
             writer.WriteLine("- Worker: " + task.AgentThreadId);
+            writer.WriteLine($"- Execution profile: {task.ExecutionProfile ?? "unknown"}");
+            if (task.SpawnExecutionProfile is not null)
+                writer.WriteLine($"- Spawn execution profile: {task.SpawnExecutionProfile}");
+            writer.WriteLine($"- Requested settings: {FormatExecutionSettings(task.RequestedModel, task.RequestedReasoningEffort)}");
+            writer.WriteLine($"- Actual settings: {FormatExecutionSettings(task.ActualModel, task.ActualReasoningEffort)}");
             writer.WriteLine($"- Duration: {FormatDuration(task.DurationMilliseconds)}");
             writer.WriteLine($"- Tokens: {FormatTaskTokens(agent?.Tokens)}");
             if (!string.IsNullOrWhiteSpace(task.Text))
@@ -3114,7 +3465,6 @@ public static class ReportWriters
             writer.WriteLine($"- Host wrapper calls: {report.Metrics.Tools.HostWrapperCalls}");
 
         writer.WriteLine();
-        writer.WriteLine("## Timeline");        writer.WriteLine();
         writer.WriteLine("## Timeline");
         writer.WriteLine();
         foreach (var e in report.Timeline)

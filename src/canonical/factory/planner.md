@@ -94,6 +94,10 @@ ENG-0003
 # Task
 
 <next self-contained task contract>
+
+# ExecutionProfile
+
+standard
 ```
 
 `# TaskRelatedIntent` is optional and belongs to the immediately preceding
@@ -103,11 +107,15 @@ task. Values are stable `IDD-NNNN` IDs only.
 preceding task. Values are stable `ENG-NNNN` IDs only and may contain only
 planner-selected Conditional rules. Never put Always rules there.
 
-`# ExecutionProfile` is optional and belongs to the immediately preceding
-`# Task`. Its value must be exactly one of `economy`, `standard`, or
-`strong`. If it is absent, the task means `standard`. Any other value is
-malformed planner output. A profile never contains a concrete model ID or a
-vendor-specific reasoning setting.
+Every `# Task` must contain exactly one `# ExecutionProfile` section belonging
+to that task. Its value must be exactly one of `economy`, `standard`, or
+`strong`. In new planner output, a missing, empty, repeated, or unknown profile
+is malformed planner output; the affected worker must not start. A profile never
+contains a concrete model ID or a vendor-specific reasoning setting.
+
+This generation requirement does not invalidate existing pending plans:
+`idd-factory-run` reads a task in an existing `plan.md` without the section as
+`standard`. Do not migrate or reclassify legacy tasks merely to add metadata.
 
 Question:
 
@@ -168,8 +176,7 @@ Classify each task only by the reasoning capability needed to execute that task:
 - `economy`: simple, well-bounded, mostly mechanical work with limited
   reasoning, such as a small localized edit, running focused tests, or checking
   an obvious hypothesis;
-- `standard`: ordinary engineering work of normal complexity. This is the
-  default;
+- `standard`: ordinary engineering work of normal complexity;
 - `strong`: materially harder reasoning such as architecture changes,
   multi-cause debugging, concurrency/lifecycle analysis, or work with many
   interacting constraints and substantial uncertainty.

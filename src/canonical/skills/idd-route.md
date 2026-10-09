@@ -76,6 +76,7 @@ Return these semantic fields:
 Classification:
 - project-initialization
 - verification-configuration
+- factory-model-update
 - intent-bootstrap
 - intent-import
 - product-change
@@ -93,6 +94,11 @@ Classification:
 Use `verification-configuration` when the user asks to create or deliberately
 update project-owned `.idd/verification.yaml` rules. Do not use it for running
 checks, fixing tests, or changing product acceptance criteria.
+
+Use `factory-model-update` when the user asks to refresh, upgrade, downgrade,
+or replace the LLMs assigned to Factory effort levels. These levels are
+`ExecutionProfile` values, distinct from platform reasoning settings. Do not
+route ordinary task execution or a question about models to a model update.
 
 Use `intent-bootstrap` when the repository already contains implementation but
 lacks an adequate current IDD product model and the user asks to discover,
@@ -124,7 +130,8 @@ not yet known: the requested workflow is clear, and
 Set `Execution depth` to `focused`, `orchestrated`, or `not-applicable`
 according to the required reference.
 
-Use `not-applicable` for `intent-bootstrap` and `verification-configuration`.
+Use `not-applicable` for `intent-bootstrap`, `verification-configuration`, and
+`factory-model-update`.
 Repository discovery may be broad, but it is intent-side investigation rather
 than implementation orchestration and must not start Factory.
 
@@ -176,6 +183,10 @@ Intent plus implementation evidence without mutating either layer. Use
 For `verification-configuration`, use `route-only` only when the user asks for
 classification or advice without changing files; otherwise use `end-to-end`.
 
+For `factory-model-update`, use `route-only` only for classification or routing
+advice. Use `end-to-end` for a requested model review or update, preserving a
+review-only limit so the selected skill returns its proposal without saving.
+
 Do not assign route fields when another explicitly named skill or `idd-skip`
 bypasses routing. Those cases are direct skill invocation, not route results.
 An explicit `idd-factory-run` still performs its own required Factory Preflight
@@ -192,6 +203,7 @@ a handoff index:
 | --- | --- |
 | `project-initialization` | `idd-project-init` |
 | `verification-configuration` | `idd-verification-configure` |
+| `factory-model-update` | `idd-factory-update-effort-models` |
 | `intent-bootstrap` | `idd-intent-bootstrap` |
 | `intent-import` | `idd-intent-import` |
 | `product-change` | `idd-intent-change` |
@@ -240,6 +252,11 @@ Apply these rules:
   temporary context, or known compatibility information. The bootstrap skill
   must still obtain its own project-boundary and semantic proposal
   confirmations before writing current intent.
+- For `factory-model-update`, preserve selected levels, target platform, exact
+  model IDs, cost/quality/latency goals, and review-only limits. Continue through
+  `idd-factory-update-effort-models -> idd-factory-configure` when application is
+  requested. If the Factory plugin is unavailable, report that requirement;
+  do not turn this request into product implementation or start a Factory run.
 
 Pass through the complete original request, classification fields, requested
 scope, relevant context, and any temporary preservation or discovery boundary

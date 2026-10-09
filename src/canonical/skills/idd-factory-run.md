@@ -239,12 +239,15 @@ while true:
 
         Question -> persist question.md and stop
         Done     -> run project verification
-        Tasks    -> persist the planner output for the current batch in plan.md
+        Tasks    -> require one canonical ExecutionProfile per new task, then persist in plan.md
 
     take the first remaining task
-    read its ExecutionProfile, defaulting missing metadata to standard
-    structurally validate .idd/execution.yaml when present
+    read its ExecutionProfile; missing metadata in existing plan.md means standard
+    reject empty, repeated, or unknown explicit profiles
+    if .idd/execution.yaml is absent, inherit host settings
+    otherwise re-read and structurally validate .idd/execution.yaml
     mechanically resolve the active-platform profile mapping
+    if that profile/platform mapping is absent, inherit host settings
     deterministically re-read the current Engineering INDEX
     enumerate all current Always ENG IDs
     read complete factory-worker.md and prepare the isolated worker assignment
@@ -306,19 +309,31 @@ Immediately before every worker spawn, apply the bounded lookup from
 
 ```text
 planner ExecutionProfile
--> default missing profile to standard
--> project configuration lookup
--> inherit OR exact configured active-platform model/settings
+-> missing ExecutionProfile in an existing plan.md means standard
+-> reject empty, repeated, or unknown explicit profiles
+-> re-read one project configuration document when present
+-> absent policy or absent profile/platform mapping means inherit
+-> otherwise use exact configured active-platform model/settings
 -> native child-agent spawn
 ```
+
+New planner output must include exactly one canonical profile per task; validate
+it before saving a new batch. When continuing an existing run, pending tasks in
+`.idd/factory/current/plan.md` without `# ExecutionProfile` remain valid and use
+`standard`. Do not require a restart, migrate the plan, or reconsider complexity
+solely because that legacy metadata is absent.
 
 This is a mechanical protocol step. Do not reconsider task complexity, compare
 candidate models, optimize cost, upgrade/downgrade the profile, or choose a
 model that is not the exact configured mapping.
 
-When `.idd/execution.yaml` is absent, all profiles inherit. For partial
-configuration, a missing profile or missing active-platform mapping also
-inherits. `inherit` means omit Factory-specific model and reasoning overrides.
+If the file is absent, inherit normal host model/reasoning settings without
+writing a default file. Partial mappings are valid: a missing profile or missing
+active-platform mapping also inherits host model/reasoning settings. Validate
+all present mappings. A malformed existing policy blocks the affected worker
+with a concrete diagnostic, as do unknown profile/platform names and empty or
+repeated explicit task profiles. Inheritance omits Factory-specific model and reasoning
+overrides; it does not copy the current model into the policy.
 
 Malformed explicit configuration blocks the worker spawn with a clear
 diagnostic; never silently fall back to `inherit`. If the native host rejects a
@@ -421,7 +436,7 @@ have produced them.
 
 The planner returns exactly one of:
 
-- one or more `# Task` sections with optional `# ExecutionProfile`, optional
+- one or more `# Task` sections with exactly one `# ExecutionProfile`, optional
   `# TaskRelatedIntent`, and optional `# TaskRelatedEngineering`;
 - exactly one `# Question`;
 - exactly `# Done`.
@@ -466,6 +481,13 @@ bounded relevant diagnostic
 
 Then invoke a fresh planner. The planner decides whether a correction task is
 needed.
+
+This also applies to infrastructure failures such as missing restore assets.
+Do not repair a failed final check directly in the orchestration context and
+retry it without the diagnostic and fresh planner handoff. After any correction,
+wait for a new planner `# Done` and run every configured final check again.
+An exit code of zero without evidence that tests actually executed is not proof
+that those tests passed; report the missing evidence to the planner.
 
 Do not create verification attempts, retry budgets, confirmation state,
 correction workflows, or final-review roles. If project verification is not

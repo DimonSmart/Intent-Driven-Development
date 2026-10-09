@@ -51,9 +51,51 @@ A single planner is labeled `Planner`; multiple planners are numbered. Missing p
 
 Worker tasks are extracted from Factory spawn/direct instructions. A short task title is only a bounded presentation projection of that text.
 
+For each worker, the report preserves the planner `ExecutionProfile` and the
+model/reasoning settings requested in that worker's native spawn arguments.
+The planner profile is authoritative; a profile found in the spawn prompt is
+recorded separately as `spawnExecutionProfile`. Conflicting values emit
+`factory/worker_execution_profile_mismatch`. A readable legacy planner task
+without the profile section uses `standard`, independently of the spawn profile.
+Empty, repeated, or unknown explicit profiles remain unknown; so does a worker
+without readable matching planner evidence.
+Native results containing only a canonical `task_name` are correlated with the
+child's `agent_path` and parent thread metadata to preserve requested settings.
+It reports actual settings from direct `model` and `effort` fields in the
+worker's own `turn_context`, or explicit resolved/actual fields in spawn events,
+spawn output, or the worker's own events. Readable worker `turn_context` fields
+take precedence over spawn metadata and other worker events. A disagreement
+between spawn metadata and the worker context emits
+`host-trace/worker_spawn_settings_conflict`, preserving both sources in the
+diagnostic. When multiple worker contexts contain different model or effort
+values, `host-trace/worker_turn_context_settings_conflict` lists the evidence.
+Each conflicting field remains `unknown` rather than selecting the first turn
+or falling back to spawn metadata; stable fields are retained. Routing cannot
+be fully verified in that case. Repeated identical contexts are consistent.
+Absent context fields may still use explicit resolved/actual evidence.
+Nested collaboration defaults and
+contexts explicitly belonging to other threads are excluded.
+Settings attached to a worker's child-agent tool calls are not its own settings.
+It never infers actual settings from the current `.idd/execution.yaml`
+or root session settings. Missing actual fields remain `unknown` and emit
+`reporter/worker_actual_settings_unavailable`, naming the worker and missing
+fields. The live routing evaluation requires both actual settings to be present
+and match, so missing evidence cannot silently pass that check. When explicit
+requested and actual values differ, the report emits
+`factory/worker_execution_settings_mismatch`. Later changes to
+`.idd/execution.yaml` cannot rewrite these historical spawn records.
+
+Encrypted spawn prompts emit `host-trace/spawn_prompt_unreadable` and are not
+rendered as task titles or contracts. Readable planner tasks supply the task
+and profile when available; otherwise explicit unavailable-data diagnostics
+identify the missing task or profile.
+
 ## Native operations and wrappers
 
 Semantic metrics distinguish native operations from host/Code Mode wrapper calls. Native `CommandExecution`, `FileChange`, `spawn_agent`, and `wait_agent`/`wait` are counted once per logical operation. Wrappers are reported separately in verbose output.
+
+Response-item spawn/wait calls are retained when the host also emits native
+command events. Calls sharing an ID with native evidence are counted once.
 
 `Tool batches` is nullable. It is calculated only when reliable started/completed intervals are available; completed-only operations do not create synthetic batches.
 
@@ -70,7 +112,29 @@ Protocol validation:   ok / warning / unavailable
 
 A structured root response such as `{"status":"COMPLETED"}` is authoritative for the declared result, but it does not prove protocol compliance. If workers ran and no fresh planner `# Done` follows them, the declared result remains COMPLETED and diagnostic `factory/completed_without_planner_done` is emitted.
 
-Project verification is reported as passed/failed only from structured command/result evidence after the final planner `# Done`. Absence of a verification command is not treated as `not configured`.
+Project verification is reported as passed/failed only from structured command/result evidence after the final planner `# Done`. Command evidence is matched using its effective working directory, including an explicit `workdir` or `cwd` carried inside native tool arguments; checks from another directory are not credited. A configured `confirmation: required` check cannot be approved by a successful process exit alone: in the absence of independently verifiable user confirmation in the trace, a successful command remains `unavailable`. Failed commands still count as failed. Absence of a verification command is not treated as `not configured`.
+
+When `.idd/verification.yaml` is available, the reporter reads its final check
+selection and matches standalone command argv against those checks. Every
+selected check must have conclusive evidence; the latest recorded result for
+each check determines its outcome. A recovered failure remains in failed-command
+metrics and diagnostics but does not override a later successful execution of
+the same check. `dotnet test` additionally requires a nonempty successful VSTest
+execution summary; a silent zero exit code is unavailable evidence.
+
+The policy is read from the supplied repository snapshot, not reconstructed from
+Git history. Use the run's saved workspace for historical inspection. Invalid
+policy, final path rules without authoritative changed scope, manual checks,
+unsupported shell expressions, and missing results remain `unavailable`. Without
+policy, only recognizable platform verification commands are considered;
+`restore`, `git status`, or an archive command cannot prove verification.
+
+After an observed final-check failure, the reporter expects a fresh planner
+before root verification resumes. A missing handoff emits
+`factory/verification_failure_without_fresh_planner` and makes protocol validation
+`warning`, even when the repeated checks pass. Declared `COMPLETED` without all
+configured final checks also produces a protocol warning. These checks inspect
+trace evidence; they do not execute checks or create Factory lifecycle state.
 
 ## Factory project state
 
@@ -78,7 +142,9 @@ Project verification is reported as passed/failed only from structured command/r
 
 ## JSON schema
 
-Schema version is `2`. `toolBatches` and other unavailable metrics use nullable representation so a real zero is distinct from unavailable evidence.
+Schema version is `3`. `toolBatches`, actual worker settings, and other
+unavailable metrics use nullable representation so a real zero is distinct from
+unavailable evidence.
 
 ## Usage
 
@@ -93,7 +159,7 @@ Options: `--repo`, `--codex-home`, `--run`, `--json`, `--markdown`, `--verbose`.
 
 ## Partial/damaged traces
 
-Unknown unrelated Codex events are tolerated. Missing Factory-relevant evidence remains unavailable rather than being guessed. Malformed records, missing child rollouts, unavailable state DBs, topology damage, and incomplete accounting produce partial reports plus `factory`, `host-trace`, or `reporter` diagnostics.
+Unknown unrelated Codex events are tolerated. Missing Factory-relevant evidence remains unavailable rather than being guessed. Malformed records, including a damaged final JSONL line, missing child rollouts, unavailable state DBs, topology damage, and incomplete accounting produce partial reports plus `factory`, `host-trace`, or `reporter` diagnostics. Missing worker settings, task/profile, agent timestamps/token fields, final verification/result evidence, and tool-batch intervals are explicitly explained in Diagnostics in console, Markdown, and JSON output. Unspecified requested overrides are distinguished from unreadable actual settings: omitted overrides may intentionally inherit host defaults.
 
 ## Regression fixture
 
