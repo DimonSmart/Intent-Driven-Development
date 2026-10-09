@@ -112,7 +112,7 @@ Protocol validation:   ok / warning / unavailable
 
 A structured root response such as `{"status":"COMPLETED"}` is authoritative for the declared result, but it does not prove protocol compliance. If workers ran and no fresh planner `# Done` follows them, the declared result remains COMPLETED and diagnostic `factory/completed_without_planner_done` is emitted.
 
-Project verification is reported as passed/failed only from structured command/result evidence after the final planner `# Done`. Absence of a verification command is not treated as `not configured`.
+Project verification is reported as passed/failed only from structured command/result evidence after the final planner `# Done`. Command evidence is matched using its effective working directory, including an explicit `workdir` or `cwd` carried inside native tool arguments; checks from another directory are not credited. A configured `confirmation: required` check cannot be approved by a successful process exit alone: in the absence of independently verifiable user confirmation in the trace, a successful command remains `unavailable`. Failed commands still count as failed. Absence of a verification command is not treated as `not configured`.
 
 When `.idd/verification.yaml` is available, the reporter reads its final check
 selection and matches standalone command argv against those checks. Every
