@@ -17,9 +17,13 @@ internal static class FactoryRoutingAssertions
         var workerSpawns = root.SpawnRecords.Values.Where(spawn =>
             spawn.RequestedModel is not null ||
             spawn.Task?.Contains("idd-factory-execute-subtask", StringComparison.Ordinal) == true ||
+            spawn.Task?.Contains("You are the Factory worker.", StringComparison.Ordinal) == true ||
+            spawn.Task?.Contains("--- Factory worker assignment ---", StringComparison.Ordinal) == true ||
             report.Agents.Any(agent => agent.Role == "worker" &&
                 spawn.Children.Contains(agent.ThreadId, StringComparer.Ordinal))).ToArray();
-        // A host may reject a known-unavailable model before creating a child.
+        // A rejected native spawn may have no child rollout, but the attempted
+        // worker spawn itself must be trace-visible. A mere BLOCKED message is not proof.
+        Assert.NotEmpty(workerSpawns);
         Assert.All(workerSpawns, spawn => Assert.Equal(unavailableModel, spawn.RequestedModel));
         Assert.All(report.Tasks, task =>
         {
