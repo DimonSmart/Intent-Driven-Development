@@ -1,0 +1,124 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "How Intent-Driven Development Works",
+    "subtitle": "Durable product intent. Disposable implementation workflows.",
+    "output": "site/index.html",
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/DimonSmart/Intent-Driven-Development.git",
+      "provider": "github",
+      "revision": "7399d8fef567e438a357a7ce23f8f80c5d786878"
+    }
+  },
+  "lanes": [
+    { "id": "request", "label": "Request & routing" },
+    { "id": "durable", "label": "Current durable knowledge" },
+    { "id": "execution", "label": "Implementation choices" },
+    { "id": "evidence", "label": "Evidence & history" },
+    { "id": "exception", "label": "Questions & bounded failures", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "classify", "label": "Classify", "fromCol": 0, "toCol": 0 },
+    { "id": "prepare", "label": "Prepare current knowledge", "fromCol": 1, "toCol": 1, "variant": "emphasis" },
+    { "id": "execute", "label": "Choose + execute", "fromCol": 2, "toCol": 3, "variant": "dashed" },
+    { "id": "prove", "label": "Verify + audit", "fromCol": 4, "toCol": 5, "variant": "emphasis" }
+  ],
+  "groups": [
+    { "id": "product_change", "label": "Durable product change", "lane": "durable", "fromCol": 1, "toCol": 2, "variant": "emphasis" },
+    { "id": "implementation_only", "label": "Implementation-only preparation", "lane": "durable", "fromCol": 1, "toCol": 3, "variant": "dashed" },
+    { "id": "factory_loop", "label": "Optional Factory: fresh contexts", "lane": "execution", "fromCol": 1, "toCol": 5, "variant": "emphasis" },
+    { "id": "audit_path", "label": "Independent read-only audit", "lane": "evidence", "fromCol": 2, "toCol": 5, "variant": "dashed" },
+    { "id": "stops", "label": "Stops and bounded feedback", "lane": "exception", "fromCol": 2, "toCol": 5, "variant": "security" }
+  ],
+  "mainPath": ["request", "classification", "implementation_only"],
+  "nodes": [
+    { "id": "request", "lane": "request", "col": 0, "type": "external", "label": "User Request", "sublabel": "scope + outcome", "width": 116 },
+    { "id": "classification", "lane": "request", "col": 1, "type": "frontend", "label": "Classify Request", "sublabel": "separate routes", "width": 125 },
+    { "id": "product_change_route", "lane": "request", "col": 2, "type": "security", "label": "Product Change", "sublabel": "durable truth changes", "width": 132, "yOffset": -34 },
+    { "id": "implementation_only", "lane": "request", "col": 1, "type": "backend", "label": "Implementation Only", "sublabel": "preserve current truth", "width": 142, "yOffset": 84 },
+    { "id": "audit_route", "lane": "request", "col": 4, "type": "database", "label": "Audit", "sublabel": "compare, do not implement", "width": 128 },
+
+    { "id": "product_intent", "lane": "durable", "col": 1, "type": "database", "label": "Product Intent", "sublabel": "current .idd truth", "tag": "durable", "width": 130,
+      "sources": [{ "path": ".idd/intent/IDD-0003.spec-core-intent-and-generation.md", "line": 3, "label": "Core intent" }] },
+    { "id": "smallest_owner", "lane": "durable", "col": 2, "type": "backend", "label": "Update Owner", "sublabel": "only when truth changes", "width": 130,
+      "sources": [{ "path": "src/canonical/methodology/common-workflows.md", "line": 201, "label": "Product change" }] },
+    { "id": "clarify_or_research", "lane": "durable", "col": 3, "type": "external", "label": "Clarify / Research", "sublabel": "may stop before code", "width": 142 },
+    { "id": "read_intent", "lane": "durable", "col": 1, "type": "database", "label": "Read Current Intent", "sublabel": "implementation boundary", "width": 152, "yOffset": 82 },
+    { "id": "engineering_rules", "lane": "durable", "col": 2, "type": "security", "label": "Engineering Rules", "sublabel": "optional separate layer", "tag": "optional", "width": 130, "yOffset": 82 },
+    { "id": "verification_policy", "lane": "durable", "col": 3, "type": "security", "label": "Verification Policy", "sublabel": "optional project checks", "tag": "optional", "width": 130, "yOffset": 82 },
+
+    { "id": "choose_execution", "lane": "execution", "col": 2, "type": "messagebus", "label": "Execution Choice", "sublabel": "direct workflow or Factory", "width": 130 },
+    { "id": "direct_workflow", "lane": "execution", "col": 3, "type": "backend", "label": "Direct Workflow", "sublabel": "focused implementation", "width": 142, "yOffset": -42 },
+    { "id": "factory_preflight", "lane": "execution", "col": 1, "type": "security", "label": "Factory Preflight", "sublabel": "prep + coverage first", "width": 130, "yOffset": 100,
+      "sources": [{ "path": ".idd/intent/IDD-0001.spec-factory-orchestration.md", "line": 63, "label": "Factory preflight" }] },
+    { "id": "fresh_planner_1", "lane": "execution", "col": 2, "type": "backend", "label": "Fresh Planner", "sublabel": "contracts current tasks", "width": 132, "yOffset": 100 },
+    { "id": "worker", "lane": "execution", "col": 3, "type": "backend", "label": "Worker", "sublabel": "implement or research", "width": 130, "yOffset": 100 },
+    { "id": "fresh_planner_2", "lane": "execution", "col": 4, "type": "backend", "label": "Fresh Planner", "sublabel": "observe repository reality", "width": 130, "yOffset": 100 },
+    { "id": "done", "lane": "execution", "col": 5, "type": "messagebus", "label": "Done", "sublabel": "then project verification", "width": 126, "yOffset": 100 },
+
+    { "id": "verification", "lane": "evidence", "col": 4, "type": "database", "label": "Verification Evidence", "sublabel": "project checks + results", "width": 140 },
+    { "id": "audit", "lane": "evidence", "col": 5, "type": "security", "label": "Intent Audit", "sublabel": "read-only comparison", "width": 125,
+      "sources": [{ "path": ".idd/intent/IDD-0003.spec-core-intent-and-generation.md", "line": 39, "label": "Audit separation" }] },
+    { "id": "git_history", "lane": "evidence", "col": 1, "type": "database", "label": "Git History", "sublabel": "history, not requirements", "width": 130 },
+    { "id": "factory_artifacts", "lane": "evidence", "col": 3, "type": "messagebus", "label": "Factory Artifacts", "sublabel": "temporary, not intent", "width": 130,
+      "sources": [{ "path": ".idd/intent/IDD-0001.spec-factory-orchestration.md", "line": 180, "label": "Temporary state" }] },
+
+    { "id": "question", "lane": "exception", "col": 5, "type": "external", "label": "Question", "sublabel": "stop for an answer", "width": 132 },
+    { "id": "verification_failure", "lane": "exception", "col": 4, "type": "security", "label": "Verification Failure", "sublabel": "bounded input to fresh planner", "width": 145 },
+    { "id": "no_durable_mutation", "lane": "exception", "col": 3, "type": "security", "label": "No Durable Mutation", "sublabel": "Intent/Rules: no writes", "width": 125,
+      "sources": [{ "path": ".idd/intent/IDD-0001.spec-factory-orchestration.md", "line": 125, "label": "Planner protocol" }] }
+  ],
+  "edges": [
+    { "id": "request-classify", "from": "request", "to": "classification", "variant": "emphasis", "role": "main" },
+    { "id": "classify-product", "from": "classification", "to": "product_change_route", "label": "product change", "variant": "emphasis", "role": "branch" },
+    { "id": "classify-implementation", "from": "classification", "to": "implementation_only", "label": "implementation only", "variant": "default", "role": "main" },
+    { "id": "classify-audit", "from": "classification", "to": "audit_route", "label": "audit", "variant": "dashed", "role": "branch" },
+    { "id": "owner-intent", "from": "smallest_owner", "to": "product_intent", "label": "current truth", "variant": "emphasis", "role": "return" },
+    { "id": "implementation-read", "from": "implementation_only", "to": "read_intent", "label": "read", "variant": "default" },
+    { "id": "intent-rules", "from": "read_intent", "to": "engineering_rules", "label": "when present", "variant": "dashed" },
+    { "id": "intent-execution", "from": "read_intent", "to": "choose_execution", "variant": "emphasis" },
+    { "id": "choose-direct", "from": "choose_execution", "to": "direct_workflow", "label": "direct", "variant": "default", "role": "branch" },
+    { "id": "choose-factory", "from": "choose_execution", "to": "factory_preflight", "label": "optional Factory", "variant": "emphasis", "role": "branch" },
+    { "id": "preflight-plan", "from": "factory_preflight", "to": "fresh_planner_1", "variant": "emphasis" },
+    { "id": "plan-worker", "from": "fresh_planner_1", "to": "worker", "variant": "emphasis" },
+    { "id": "worker-replan", "from": "worker", "to": "fresh_planner_2", "variant": "emphasis" },
+    { "id": "replan-done", "from": "fresh_planner_2", "to": "done", "label": "done", "variant": "emphasis", "role": "branch" },
+    { "id": "replan-question", "from": "fresh_planner_2", "to": "question", "label": "question", "variant": "security", "role": "error" },
+    { "id": "done-verify", "from": "done", "to": "verification", "label": "project verification", "variant": "emphasis" },
+    { "id": "failure-replan", "from": "verification", "to": "verification_failure", "label": "bounded failure", "variant": "security", "role": "error" },
+    { "id": "failure-planner", "from": "verification_failure", "to": "fresh_planner_2", "label": "fresh planner", "variant": "security", "role": "return" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Durable boundary",
+      "items": [
+        "Product Intent is current durable product truth",
+        "Engineering Rules and verification policy are optional, separate operational layers",
+        "Clarification or research may stop before implementation"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Factory is optional orchestration",
+      "items": [
+        "Durable preparation and coverage complete before active orchestration",
+        "Fresh planners and workers use repository reality, not inherited transcripts",
+        "Tasks, plans, and state are temporary; Git preserves revision history"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "No hidden lifecycle machine",
+      "items": [
+        "Question stops for an answer",
+        "Verification failure is bounded input to a fresh planner",
+        "Factory does not own retries, process supervision, or a verification engine"
+      ]
+    }
+  ]
+}

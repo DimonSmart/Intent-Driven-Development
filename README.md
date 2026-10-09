@@ -146,6 +146,7 @@ Release-specific migration instructions are maintained on the dedicated [Updates
 - [Existing Project Guide](docs/existing-project.md)
 - [New Project Guide](docs/new-project.md)
 - [Methodology](docs/methodology.md)
+- [Interactive IDD Overview](docs/diagram/README.md)
 - [Factory Workflow](docs/factory-workflow.md)
 - [Factory Skills Reference](docs/factory-skills.md)
 - [Factory Token Efficiency](docs/factory-token-efficiency.md)
