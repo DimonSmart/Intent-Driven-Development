@@ -24,10 +24,20 @@ public sealed class FactoryRoutingAssertionsTests
         FactoryRoutingAssertions.VerifyUnavailableModel(report, root, "removed-model");
     }
 
+    [Fact]
+    public void VerifyUnavailableModel_RejectsBlockedWithoutAnAttemptedSpawn()
+    {
+        var (report, root) = UnavailableModelReport();
+        root.SpawnRecords.Clear();
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+            FactoryRoutingAssertions.VerifyUnavailableModel(report, root, "removed-model"));
+    }
+
     [Theory]
     [InlineData("completed")]
     [InlineData("missing-reason")]
     [InlineData("fallback-model")]
+    [InlineData("fallback-modern")]
     [InlineData("inherited-fallback")]
     [InlineData("completed-worker")]
     public void VerifyUnavailableModel_RejectsSilentFallbackOrFalseSuccess(string fault)
@@ -42,10 +52,12 @@ public sealed class FactoryRoutingAssertionsTests
             },
             Completion = blocked.Completion
         };
-        if (fault is "fallback-model" or "inherited-fallback")
+        if (fault is "fallback-model" or "fallback-modern" or "inherited-fallback")
             root.SpawnRecords["fallback"] = new SpawnRecord
             {
-                Task = "Use idd-factory-execute-subtask.",
+                Task = fault == "fallback-modern"
+                    ? "You are the Factory worker.\\n--- Factory worker assignment ---"
+                    : "Use idd-factory-execute-subtask.",
                 RequestedModel = fault == "inherited-fallback" ? null : "root-default"
             };
         if (fault == "completed-worker")
