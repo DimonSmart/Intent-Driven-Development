@@ -1,0 +1,3 @@
+{"timestamp":"2026-10-08T10:00:00Z","type":"session_meta","payload":{"id":"33333333-0000-4000-8000-000000000001","cwd":"__REPO__","parent_thread_id":"11111111-0000-4000-8000-000000000001"}}
+{"timestamp":"2026-10-08T10:01:06Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Factory worker context."}]}}
+{"timestamp":"2026-10-08T10:01:55Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Catalog refresh implemented."}]}}

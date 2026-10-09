@@ -56,10 +56,10 @@ This creates the minimal `.idd/intent/` structure and connects the repository to
 
 ## 5. Clarify the First Product Area
 
-Invoke:
+Ask in ordinary language:
 
 ```text
-Use idd-intent-brainstorm to help me clarify the first useful version of this product.
+Help me clarify the first useful version of this product without editing files.
 ```
 
 Provide the informal vision from step 1. The brainstorming workflow should focus on product meaning, boundaries, trade-offs, and missing decisions—not implementation planning.
@@ -69,14 +69,12 @@ Provide the informal vision from step 1. The brainstorming workflow should focus
 When the first product area is sufficiently clear:
 
 ```text
-Use idd-intent-change to record the confirmed behavior as current product intent.
+Record the confirmed behavior as current Product Intent before implementing it.
 ```
 
-If no existing intent document owns the area, IDD may route to:
-
-```text
-idd-intent-new-document
-```
+If no existing intent document owns the area, `idd-intent-change` creates the
+justified new spec, ADR, or spike through its internal document-creation
+reference; there is no separate document-creation skill to invoke.
 
 Prefer a small number of clear owning documents over one document for every feature or conversation.
 
@@ -85,7 +83,7 @@ Prefer a small number of clear owning documents over one document for every feat
 For focused work:
 
 ```text
-Use idd-code-implement for the first confirmed product behavior.
+Implement the first confirmed product behavior according to current Product Intent.
 ```
 
 For a larger task with several implementation stages:

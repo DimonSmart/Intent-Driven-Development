@@ -8,14 +8,11 @@ internal static class YamlFrontMatterWriter
         AdapterConfig adapter,
         IReadOnlyList<string> allowedTools)
     {
-        var generatedManualFields = adapter.SupportsManualOnlySkills &&
-            skillDescription.Invocation == SkillInvocation.Manual
-                ? new Dictionary<string, bool>(StringComparer.Ordinal)
-                {
-                    ["disable-model-invocation"] = true,
-                    ["user-invocable"] = true
-                }
-                : null;
+        var invocationFields = new Dictionary<string, bool>(StringComparer.Ordinal)
+        {
+            ["user-invocable"] = skillDescription.Exposure == SkillExposure.Command,
+            ["disable-model-invocation"] = skillDescription.Invocation == SkillInvocation.Manual
+        };
         var lines = new List<string>
         {
             "---",
@@ -34,14 +31,13 @@ internal static class YamlFrontMatterWriter
 
             foreach (var field in adapterMetadata.Frontmatter)
             {
-                if (generatedManualFields is not null &&
-                    generatedManualFields.TryGetValue(field.Key, out var expectedValue))
+                if (invocationFields.TryGetValue(field.Key, out var expectedValue))
                 {
                     if (field.Value.ValueKind is not JsonValueKind.True and not JsonValueKind.False ||
                         field.Value.GetBoolean() != expectedValue)
                     {
                         throw new InvalidOperationException(
-                            $"Skill '{skillName}' frontmatter field '{field.Key}' conflicts with manual invocation policy for adapter '{adapter.CodingAgent}'.");
+                            $"Skill '{skillName}' adapter '{adapter.CodingAgent}' frontmatter field '{field.Key}' has value {field.Value.GetRawText()}, expected {expectedValue.ToString().ToLowerInvariant()} from canonical invocation/exposure policy.");
                     }
 
                     continue;
@@ -51,12 +47,9 @@ internal static class YamlFrontMatterWriter
             }
         }
 
-        if (generatedManualFields is not null)
+        foreach (var field in invocationFields)
         {
-            foreach (var field in generatedManualFields)
-            {
-                lines.Add($"{field.Key}: true");
-            }
+            lines.Add($"{field.Key}: {field.Value.ToString().ToLowerInvariant()}");
         }
 
         if (allowedTools.Count > 0)
@@ -80,6 +73,8 @@ internal static class YamlFrontMatterWriter
 
         return string.Join(Environment.NewLine, lines);
     }
+
+    public static string QuoteYamlString(string value) => JsonSerializer.Serialize(value);
 
     private static string ToYamlValue(JsonElement value) =>
         value.ValueKind switch
@@ -109,6 +104,23 @@ internal static class YamlFrontMatterWriter
             return true;
         }
 
-        return value.Any(character => character is ':' or '[' or ']' or '{' or '}' or '#' or '\r' or '\n' or '"' or '\'');
+        if (value is "~" || value.Equals("null", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("false", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("no", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("on", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("off", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (char.IsDigit(value[0]) || value[0] is '-' or '?' or '!' or '@' or '`' or '&' or '*' or '|' or '>' or '%' or '.')
+        {
+            return true;
+        }
+
+        return value.Any(character => char.IsControl(character) ||
+            character is ':' or '[' or ']' or '{' or '}' or '#' or '"' or '\'');
     }
 }

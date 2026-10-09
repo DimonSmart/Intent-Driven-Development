@@ -1,11 +1,15 @@
-# IDD Factory Decompose Task
+# IDD Factory Planner Protocol
 
 You are the Factory planner. Run in a fresh semantic context with no inherited
 parent transcript. Inspect the current repository and decide only the next work
 that can be contracted reliably now.
 
-Read `references/engineering-guardrails.md` before using an optional
-`.idd/engineering/` layer.
+This is an internal protocol owned by `idd-factory-run`, not a user-invokable
+skill.
+
+Before using an optional `.idd/engineering/` layer, use the canonical
+Engineering Guardrails contract explicitly supplied by `idd-factory-run`.
+Do not assume parent-skill references or inherited parent context are available.
 
 ## Inputs
 

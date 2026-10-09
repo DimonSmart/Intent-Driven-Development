@@ -8,6 +8,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="YamlDotNet" Version="18.1.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -16,6 +17,15 @@
   <ItemGroup>
     <Compile Include="..\..\tools\generate\Validation\SkillReferencePathValidator.cs" Link="Generator\Validation\SkillReferencePathValidator.cs" />
     <Compile Include="..\..\tools\generate\Validation\SkillDescriptionValidator.cs" Link="Generator\Validation\SkillDescriptionValidator.cs" />
+    <Compile Include="..\..\tools\generate\Models\AdapterConfig.cs" Link="Generator\Models\AdapterConfig.cs" />
+    <Compile Include="..\..\tools\generate\Models\AdapterSkillMetadata.cs" Link="Generator\Models\AdapterSkillMetadata.cs" />
+    <Compile Include="..\..\tools\generate\Models\SkillDescription.cs" Link="Generator\Models\SkillDescription.cs" />
+    <Compile Include="..\..\tools\generate\Models\SkillInvocation.cs" Link="Generator\Models\SkillInvocation.cs" />
+    <Compile Include="..\..\tools\generate\Models\SkillExposure.cs" Link="Generator\Models\SkillExposure.cs" />
+    <Compile Include="..\..\tools\generate\Models\SkillInterfaceMetadata.cs" Link="Generator\Models\SkillInterfaceMetadata.cs" />
+    <Compile Include="..\..\tools\generate\Reading\SkillDescriptionReader.cs" Link="Generator\Reading\SkillDescriptionReader.cs" />
+    <Compile Include="..\..\tools\generate\Reading\RequiredFileReader.cs" Link="Generator\Reading\RequiredFileReader.cs" />
+    <Compile Include="..\..\tools\generate\Formatting\YamlFrontMatterWriter.cs" Link="Generator\Formatting\YamlFrontMatterWriter.cs" />
     <Compile Include="..\..\tools\generate\Models\RoleDefinition.cs" Link="Generator\Models\RoleDefinition.cs" />
     <Compile Include="..\..\tools\generate\Models\RoleTool.cs" Link="Generator\Models\RoleTool.cs" />
     <Compile Include="..\..\tools\generate\Models\RoleToolNames.cs" Link="Generator\Models\RoleToolNames.cs" />

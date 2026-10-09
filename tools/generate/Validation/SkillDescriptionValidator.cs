@@ -15,13 +15,79 @@ internal static partial class SkillDescriptionValidator
     {
         if (value.ValueKind != JsonValueKind.Object)
         {
-            throw new InvalidOperationException($"Invalid skill description for {skillName} in {path}: expected string or object.");
+            throw new InvalidOperationException($"Invalid skill description for '{skillName}' in {path}: expected an object with 'description' and required 'exposure' (command, workflow); string entries are not supported.");
         }
 
         if (!value.TryGetProperty("description", out var descriptionElement) ||
             descriptionElement.ValueKind != JsonValueKind.String)
         {
             throw new InvalidOperationException($"Invalid skill description for {skillName} in {path}: description is required.");
+        }
+    }
+
+    public static void GuardUniqueProperties(string path, string skillName, JsonElement element, string context)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var property in element.EnumerateObject())
+        {
+            if (!names.Add(property.Name))
+                throw new InvalidOperationException(
+                    $"Duplicate JSON property '{property.Name}' in {context} for skill '{skillName}' in {path}.");
+        }
+    }
+
+    public static void GuardSkillFields(string path, string skillName, JsonElement element)
+    {
+        foreach (var property in element.EnumerateObject())
+        {
+            if (property.Name is not ("description" or "invocation" or "exposure" or "interface" or "adapters"))
+                throw new InvalidOperationException(
+                    $"Invalid skill description for '{skillName}' in {path}: unknown property '{property.Name}'. Allowed properties: description, invocation, exposure, interface, adapters.");
+        }
+    }
+
+    public static void GuardAdapterMetadataFields(string path, string skillName, string adapterName, JsonElement element)
+    {
+        foreach (var property in element.EnumerateObject())
+        {
+            if (property.Name != "frontmatter")
+                throw new InvalidOperationException(
+                    $"Invalid adapter metadata for skill '{skillName}' in {path}: unknown property 'adapters.{adapterName}.{property.Name}'. Allowed property: frontmatter.");
+        }
+    }
+
+    public static void GuardInvocationExposure(string skillName, SkillInvocation invocation, SkillExposure exposure)
+    {
+        if (invocation == SkillInvocation.Manual && exposure == SkillExposure.Workflow)
+            throw new InvalidOperationException(
+                $"Invalid invocation/exposure for skill '{skillName}': manual + workflow has no activation path.");
+    }
+
+    public static void GuardInterfaceObject(string path, string skillName, JsonElement element)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+            throw new InvalidOperationException(
+                $"Invalid interface for skill '{skillName}' in {path}: expected an object.");
+    }
+
+    public static void GuardInterfaceFields(string path, string skillName, JsonElement element)
+    {
+        foreach (var property in element.EnumerateObject())
+        {
+            if (property.Name is not ("displayName" or "shortDescription"))
+                throw new InvalidOperationException(
+                    $"Invalid interface property '{property.Name}' for skill '{skillName}' in {path}.");
+        }
+
+        foreach (var name in new[] { "displayName", "shortDescription" })
+        {
+            if (!element.TryGetProperty(name, out var field) ||
+                field.ValueKind != JsonValueKind.String ||
+                string.IsNullOrWhiteSpace(field.GetString()))
+            {
+                throw new InvalidOperationException(
+                    $"Invalid interface.{name} for skill '{skillName}' in {path}: a non-empty string is required.");
+            }
         }
     }
 

@@ -1,7 +1,14 @@
 # Factory skills
 
-IDD Factory has five canonical skills. Three participate in a run; two support
-configuration and lifecycle updates of persistent project execution policy.
+IDD Factory exposes two registered user commands: `idd-factory-run` and
+`idd-factory-configure`. Both retain their previous invocation rules;
+`idd-factory-run` can also be selected automatically. Planner and worker are
+internal canonical protocols owned by `idd-factory-run`, not user-invokable
+skills. `idd-factory-update-effort-models` is registered as an automatic internal
+workflow for lifecycle model updates. Automatic workflows remain available to
+the agent and are hidden from the Claude Code slash menu. Codex currently has
+no equivalent documented visibility switch, so its automatic workflows may
+remain visible.
 
 ## `idd-factory-run`
 
@@ -68,9 +75,11 @@ before saving, and an unchanged policy is not rewritten.
 Updates apply to the next worker spawn without a new plan. Running workers keep
 their model. The workflow does not start Factory or mutate its temporary state.
 
-## `idd-factory-decompose-task`
+## Internal planner protocol
 
-This is the planner.
+The planner is not a user-invokable skill. `idd-factory-run` creates a fresh
+planner child and supplies the complete packaged
+`references/factory-planner.md` protocol.
 
 A fresh planner inspects the original request, repository, relevant current
 intent, exact user answers, bounded completed summaries, and the latest bounded
@@ -107,9 +116,13 @@ now; do not speculate about later tasks whose contracts depend on unfinished
 work. The planner never creates a task to mutate Product Intent or Engineering
 Rules.
 
-## `idd-factory-execute-subtask`
+## Internal worker protocol
 
-This is the worker.
+The worker is not a public skill. Before every spawn, `idd-factory-run` reads
+and explicitly supplies the complete packaged `references/factory-worker.md`
+protocol to a fresh native child agent, together with a separate, single-task
+assignment. When the optional Engineering layer exists, it also supplies the
+complete `references/engineering-guardrails.md` contract.
 
 Every task runs in a fresh isolated context against the shared current
 repository. The root agent has already selected the model/context before the

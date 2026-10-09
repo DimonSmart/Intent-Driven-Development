@@ -18,7 +18,6 @@
         "idd-intent-import",
         "idd-code-implement",
         "idd-intent-lint",
-        "idd-intent-new-document",
         "idd-intent-normalize-current",
         "idd-intent-drift-audit",
         "idd-code-update-intent"
@@ -115,6 +114,11 @@
           "skill": "idd-engineering-change",
           "source": "src/canonical/methodology/common-workflows.md",
           "destination": "common-workflows.md"
+        },
+        {
+          "skill": "idd-intent-change",
+          "source": "src/canonical/methodology/new-intent-document.md",
+          "destination": "new-intent-document.md"
         }
       ],
       "assets": [
@@ -139,9 +143,7 @@
       "skills": [
         "idd-factory-run",
         "idd-factory-configure",
-        "idd-factory-update-effort-models",
-        "idd-factory-decompose-task",
-        "idd-factory-execute-subtask"
+        "idd-factory-update-effort-models"
       ],
       "roles": [],
       "skillRoleReferences": {},
@@ -173,16 +175,16 @@
         },
         {
           "skill": "idd-factory-run",
-          "source": "src/canonical/methodology/engineering-guardrails.md",
-          "destination": "engineering-guardrails.md"
+          "source": "src/canonical/factory/planner.md",
+          "destination": "factory-planner.md"
         },
         {
-          "skill": "idd-factory-decompose-task",
-          "source": "src/canonical/methodology/engineering-guardrails.md",
-          "destination": "engineering-guardrails.md"
+          "skill": "idd-factory-run",
+          "source": "src/canonical/factory/worker.md",
+          "destination": "factory-worker.md"
         },
         {
-          "skill": "idd-factory-execute-subtask",
+          "skill": "idd-factory-run",
           "source": "src/canonical/methodology/engineering-guardrails.md",
           "destination": "engineering-guardrails.md"
         }

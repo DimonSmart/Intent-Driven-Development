@@ -21,9 +21,10 @@ idd-intent-change =
 - Treat the user request as proposed product intent.
 - First find whether the behavior belongs to an existing current spec.
 - Prefer updating an existing current spec when the product area already exists.
-- Do not create a new document locally. When the change defines a distinct
-  durable product area, ADR, or spike, prepare a semantic handoff to
-  `idd-intent-new-document`.
+- Create a new document only through the internal on-demand
+  `references/new-intent-document.md` workflow when ownership classification
+  requires a new spec, ADR, or spike. Ordinary existing-spec updates do not
+  load that reference.
 - Do not create a new spec for a local implementation task.
 - Do not create a new spec for a small behavior change inside an existing
   feature area.
@@ -44,8 +45,9 @@ idd-intent-change =
   implementation plan.
 - Do not archive old specs.
 - If behavior changes inside the same product area, edit the existing spec.
-- If product area identity changes, delegate creation of the new owning spec to
-  `idd-intent-new-document`; do not duplicate document-creation logic here.
+- If product area identity changes, use the internal document-creation
+  reference after confirming that a distinct new owner is required; do not
+  duplicate document-creation instructions in this skill.
 - If a document becomes obsolete, duplicated, task-like, process-only, or
   incorrect, delete it.
 - For `operation: remove`, delete an owning spec only when no current product
@@ -106,14 +108,14 @@ Use `existing-spec-update` when an existing current spec already owns the produc
 area.
 
 Use `new-spec-required` only when no existing current spec owns the product area
-and the change describes durable product behavior. This classification must be
-delegated to `idd-intent-new-document`.
+and the change describes durable product behavior. Create the new owning spec
+through the internal document-creation workflow only after its ownership check.
 
 Use `adr-required` when the change is primarily a durable architecture decision;
-delegate creation to `idd-intent-new-document`.
+create its decision record through the internal document-creation workflow.
 
 Use `spike-required` when the right product or architecture decision requires
-research; delegate creation to `idd-intent-new-document`.
+research; create its investigation record through the internal workflow.
 
 Use `delete-owning-spec` for `operation: remove` only when the removed document
 does not own any remaining current product intent.
@@ -158,11 +160,17 @@ For `operation: remove`:
 6. Classify the ownership outcome.
 7. If the ownership outcome is `task-only-no-idd-intent-change`, stop without
    editing `.idd/intent` and report the implementation-work recommendation.
-8. If an existing spec owns the area, update that spec instead of creating a
-   duplicate.
-9. If `new-spec-required`, `adr-required`, or `spike-required`, prepare a
-   semantic handoff and invoke `idd-intent-new-document`; do not create the
-   document locally.
+8. For `existing-spec-update`, update the owning current spec instead of
+   creating a duplicate. For `adr-required` or `spike-required`, retain any
+   existing behavior-owning spec and evaluate the distinct decision or
+   investigation in the internal workflow.
+9. If `new-spec-required`, `adr-required`, or `spike-required`, read
+   `references/new-intent-document.md` and follow its complete internal
+   document creation workflow inside this same execution. Use the already
+   confirmed Product Intent, without a child agent or additional confirmation
+   merely for this step. If its ownership check finds an existing spec owner,
+   return to step 8 without recursively invoking this skill. Block on a
+   genuinely unresolved durable decision as before.
 10. If the change affects behavior, update acceptance criteria.
 11. If the change affects testable behavior, update verification.
 12. When invoked by Factory Intent Preflight, validate the resulting current
@@ -185,8 +193,10 @@ For `operation: remove`:
       caller requested Factory Intent Preflight.
 
 `existing-spec-update` means this skill updates the current owning document.
-The three new-document classifications always hand off creation to
-`idd-intent-new-document`, which repeats the ownership check before writing.
+The three new-document classifications use the lazy internal reference
+`references/new-intent-document.md`, which repeats the ownership check before
+writing. `idd-intent-change` owns the complete final result and consistency
+validation for both existing and newly created documents.
 
 ## Example
 

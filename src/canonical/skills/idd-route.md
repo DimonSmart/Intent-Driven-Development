@@ -3,8 +3,8 @@
 Use this skill to classify an IDD-related request and select the smallest safe
 end-to-end workflow.
 
-This skill is read-only. It does not change intent, implementation, Factory
-state, or project files.
+This skill is a read-only classifier. It does not change intent, implementation,
+Factory state, or project files, and does not execute the selected workflow.
 
 ## Required Reference
 
@@ -27,6 +27,23 @@ bootstrap request, or an explicit limit such as "classify only", "update intent
 only", or "do not change specs".
 
 Do not require JSON or a special parameter structure.
+
+## Forked Request Contract
+
+This skill may run in an isolated child context. Classify only the request
+explicitly supplied with the invocation; do not assume the caller's conversation
+history is available. Direct invocation arguments are part of that request.
+
+For automatic invocation, the caller must supply the complete available
+original user request, including relevant constraints, prohibitions, requested
+scope, and preservation boundaries. Do not replace it with a lossy summary.
+For file or source references, pass resolvable references rather than inventing
+their contents. Passing input to a child does not imply byte-for-byte identity
+or access to unprovided parent context.
+
+If no meaningful request reaches this skill and it cannot be recovered from
+available input, do not guess a route. Ask for the missing request or return
+an explicit missing-input diagnostic to the caller.
 
 ## Context Reading Rules
 
@@ -94,6 +111,11 @@ may contain Product Intent, explicit accepted durable Engineering decisions, or
 both. Do not route a new technical choice to import merely because it is written
 in the request, and do not route codebase reverse discovery to import merely
 because code is a source.
+
+Treat direct requests to create a new product specification, record an ADR, or
+investigate an unresolved decision in a spike as `product-change` (or `unclear`
+when a required product decision is missing). Route them through
+`idd-intent-change`, never a separate public document-creation skill.
 
 Use `engineering-change` when the user explicitly adds, modifies, or removes a durable implementation-only project constraint. Do not route to Engineering merely because current code repeats a pattern; source code alone is not an explicit durable policy decision.
 
@@ -204,7 +226,8 @@ Distinguish the complete workflow from the current handoff:
 
 - `Expected complete workflow` describes the normal lifecycle needed to finish
   the request safely.
-- `Current handoff` describes what may start in this user request.
+- `Current handoff` recommends what the caller may start in this user request;
+  it does not authorize this skill's child agent to execute the handoff.
 - `Stop after` defines the requested-scope boundary or clarity gate.
 
 The complete workflow is informative. It is not permission to execute stages
@@ -218,9 +241,10 @@ Apply these rules:
   before implementation or Factory execution.
 - For `implementation-only`, hand off only to the applicable code or check skill
   and do not modify Product Intent or Engineering.
-- For `end-to-end`, continue with the recommended skill in the same user request
-  when the Coding Agent can do so. Do not require a second user message only to
-  confirm the route.
+- For `end-to-end`, the caller continues with the recommended skill in the
+  same user request when scope and clarity gates permit. Do not require a
+  second user message only to confirm the route. This classifier returns
+  the routing decision and never performs that mutation itself.
 - When clarity is `ambiguous` or `research-required`, stop at the corresponding
   brainstorm, check, ADR, or spike gate even when the requested scope is
   `end-to-end`. Continue only after the missing decision or evidence exists.
@@ -297,9 +321,10 @@ Why:
 - Short routing rationale grounded in `references/common-workflows.md`.
 
 Handoff:
-- Invoke the current handoff skill with the original request, route fields, and
-  preservation or discovery boundary, or state that no handoff is allowed for
-  `route-only`.
+- Recommend that the caller invoke the current handoff skill with the original
+  request, route fields, and preservation or discovery boundary, or state that
+  no handoff is allowed for `route-only`. The caller waits for this routing
+  result, applies the scope and clarity gates, and owns any subsequent invocation.
 ```
 
 For `intent-bootstrap`, use a discovery boundary instead of inventing a product

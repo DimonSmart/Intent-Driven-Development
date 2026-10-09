@@ -69,12 +69,26 @@ public sealed class FactoryDurablePreflightContractTests(GenerationFixture fixtu
     [Fact]
     public void PlannerAndWorker_CannotMutateDurableKnowledge()
     {
-        var planner = Canonical("skills", "idd-factory-decompose-task.md");
-        var worker = Canonical("skills", "idd-factory-execute-subtask.md");
+        var planner = Canonical("factory", "planner.md");
+        var worker = Canonical("factory", "worker.md");
 
         Assert.Contains("Do not create or modify durable Product Intent or Engineering Rules", planner);
         Assert.Contains("run `idd-engineering-change`", planner);
         Assert.Contains("Do not modify `.idd/intent`, `.idd/engineering`", worker);
+    }
+
+    [Fact]
+    public void FactoryIntent_ModelsPlannerAsInternalProtocolOwnedByRun()
+    {
+        var intent = Repo(".idd", "intent", "IDD-0001.spec-factory-orchestration.md");
+        var route = Canonical("skills", "idd-route.md");
+
+        Assert.Contains("Registered Factory skills are", intent);
+        Assert.Contains("Internal Factory protocols", intent);
+        Assert.Contains("worker                        owned by idd-factory-run", intent);
+        Assert.Contains("owned by idd-factory-run", intent);
+        Assert.DoesNotContain("idd-factory-decompose-task", intent);
+        Assert.DoesNotContain("idd-factory-decompose-task", route);
     }
 
     [Fact]

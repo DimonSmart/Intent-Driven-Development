@@ -2,6 +2,86 @@
 
 This page records IDD changes that require action in repositories that already use the toolkit.
 
+## 2026-10-09 — Factory model updates use the skill exposure policy
+
+The new `idd-factory-update-effort-models` skill is registered with
+`exposure: workflow` and `invocation: auto`. It remains available to the agent
+for routed model-update requests and is hidden from the Claude Code slash menu.
+The distribution now contains 20 skills (17 Intent, 3 Factory), including the
+existing eight user commands. Factory planner and worker remain internal
+references owned by `idd-factory-run`.
+
+Exposure controls the user command surface; invocation independently controls
+automatic skill selection. Manual commands retain their invocation restrictions,
+and automatic workflows retain their activation path.
+
+## 2026-10-08 — User commands separated from automatic workflows
+
+IDD keeps all 19 registered skills (17 Intent, 2 Factory), but categorizes them
+as eight user commands and eleven automatic workflows. In Claude Code, the
+eleven automatic workflows are no longer available as direct slash commands;
+the Coding Agent continues to discover and invoke them based on natural-language
+requests. Direct `/idd-intent-change`, `/idd-intent-import`, and other hidden
+workflow invocations in scripts or personal instructions must be replaced with
+requests describing the intended behavior and scope. Existing user commands
+retain their manual/automatic invocation policy.
+
+In Codex, all 19 registered skills remain available. All eight commands
+now generate `agents/openai.yaml` with interface metadata: six manual commands
+use `allow_implicit_invocation: false`, while the two auto commands
+(`idd-route` and `idd-factory-run`) use `true`. The eleven automatic
+workflows remain published without this additional UI metadata. Codex has no
+documented guarantee that these files alone show or hide particular skills in
+every user menu.
+
+For Claude Code v2.1.218+, the five read-only forked skills (`idd-help`,
+`idd-route`, `idd-intent-structure-audit`, `idd-intent-drift-audit`, and
+`idd-intent-lint`) now set `background: false` to wait for the result before
+the caller continues. Forked contexts still do not inherit the caller's
+conversation history: the relevant request and constraints must be supplied.
+`idd-route` classifies without executing its recommended handoff; the caller
+owns any permitted follow-up in the same request.
+
+Canonical inventory entries must now be objects with explicit `exposure`;
+the generator rejects string entries, absent or unknown exposure values,
+unknown skill properties, and unknown adapter metadata keys. This tightens
+canonical source validation, not user-owned `.idd/` data. Factory planner,
+Factory worker and Intent document creation remain internal references.
+No Product Intent, Engineering, routing decisions, Factory execution, or
+project-state migration is required.
+
+## 2026-10-08 — Factory worker is now an internal protocol
+
+The public `idd-factory-execute-subtask` skill has been removed. Worker
+instructions now live in the canonical internal Factory worker protocol,
+packaged as `idd-factory-run/references/factory-worker.md` for Claude and Codex.
+`idd-factory-run` supplies it directly to every fresh native worker child.
+The two public Factory skills are now `idd-factory-run` and
+`idd-factory-configure`.
+
+Normal Factory execution, execution profiles, and existing `plan.md` /
+`completed.md` continuation state are unchanged; no task-state migration is
+needed. Update the installed Factory plugin to remove the old public skill.
+If the host retains stale skill files after a normal update, use its standard
+uninstall/reinstall procedure to remove the old installation/cache. Regenerating
+the marketplace alone does not remove files from already installed plugins.
+Historical traces using the old worker skill remain supported by
+`idd-factory-report`. Direct invocation of the old worker skill is no longer
+supported.
+
+## 2026-10-07 — Factory planner is now an internal protocol
+
+`idd-factory-decompose-task` is no longer a public Factory skill. Planner
+behavior now lives in the canonical internal planner protocol owned by
+`idd-factory-run` and is packaged as
+`references/factory-planner.md` through the normal skill-reference generation
+pipeline.
+
+Normal `idd-factory-run` usage and planner semantics are unchanged. Existing
+installed versions may still physically contain the old public skill until the
+plugin is updated. Historical Factory traces may also contain the old name;
+`idd-factory-report` continues to recognize that legacy marker.
+
 ## 2026-09-25 — Configurable Factory execution profiles
 
 Factory planner tasks must declare exactly one `# ExecutionProfile` metadata

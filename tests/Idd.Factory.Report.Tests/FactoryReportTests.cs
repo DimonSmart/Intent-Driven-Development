@@ -418,10 +418,10 @@ public sealed partial class FactoryReportTests : IDisposable
         Write(Path.Combine(dir, "root.jsonl"), lines);
         Write(Path.Combine(dir, "planner.jsonl"),
         [
-            Session(plannerId, repo, rootId, "/root/planner"),
+            Session(plannerId, repo, rootId, "/root/planner", agentRole: "factory-planner"),
             Assistant("2026-09-23T10:00:02Z", $"# Task\nImplement A.\n\n{plannerMetadata}")
         ]);
-        var workerEvents = new List<object> { Session(workerId, repo, rootId, "/root/worker") };
+        var workerEvents = new List<object> { Session(workerId, repo, rootId, "/root/worker", agentRole: "factory-worker") };
         if (settingsLocation == "turn-context")
             workerEvents.Add(new
             {
@@ -897,11 +897,11 @@ public sealed partial class FactoryReportTests : IDisposable
 
     private static string Line(object value) => JsonSerializer.Serialize(value) + "\n";
 
-    private static object Session(string id, string cwd, string? parent = null, string? agentPath = null) => new
+    private static object Session(string id, string cwd, string? parent = null, string? agentPath = null, string? agentRole = null) => new
     {
         timestamp = "2026-09-23T09:00:00Z",
         type = "session_meta",
-        payload = new { id, cwd, parent_thread_id = parent, agent_path = agentPath }
+        payload = new { id, cwd, parent_thread_id = parent, agent_path = agentPath, agent_role = agentRole }
     };
 
     private static object User(string timestamp, string text) => Message(timestamp, "user", "input_text", text);
@@ -937,6 +937,183 @@ public sealed partial class FactoryReportTests : IDisposable
             }
         }
     };
+
+    [Fact]
+    public void InternalWorker_ExtractsOnlyAssignmentAndRetainsMultilineTask()
+    {
+        var repo = Path.Combine(_root, "repo-internal");
+        var codex = Path.Combine(_root, "codex-internal");
+        Directory.CreateDirectory(repo);
+        var dir = Path.Combine(codex, "sessions");
+        Directory.CreateDirectory(dir);
+        const string rootId = "a1111111-1111-1111-1111-111111111111";
+        const string workerId = "b1111111-1111-1111-1111-111111111111";
+
+        var instructions = """
+            # IDD Factory Worker Protocol
+            You are the Factory worker.
+            Example Task: a protocol example to ignore.
+            Engineering Guardrails:
+            # Task
+            A Guardrails example to ignore.
+            --- Factory worker assignment ---
+            # Task
+            Implement Catalog refresh.
+
+            Preserve the existing public behavior.
+            This task quotes: You are the Factory planner.
+            # TaskRelatedIntent
+            IDD-0001
+            # TaskRelatedEngineering
+            ENG-0003
+            # AlwaysEngineering
+            ENG-0002
+            --- End Factory worker assignment ---
+            """;
+        Write(Path.Combine(dir, "root.jsonl"),
+        [
+            Session(rootId, repo),
+            User("2026-09-23T10:00:00Z", "Run idd-factory-run"),
+            SpawnCall("2026-09-23T10:00:01Z", "w1", instructions),
+            SpawnOutput("2026-09-23T10:00:02Z", "w1", workerId),
+            Assistant("2026-09-23T10:01:00Z", "Factory completed.")
+        ]);
+        WriteChild(dir, "worker.jsonl", workerId, rootId, repo,
+            Assistant("2026-09-23T10:00:50Z", "Implemented."));
+
+        var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
+        var worker = Assert.Single(report.Agents.Where(x => x.Role == "worker"));
+        Assert.Equal(1, report.Metrics.WorkerInvocations);
+        Assert.Equal("Implement Catalog refresh.", worker.TaskTitle);
+        Assert.Equal("Implement Catalog refresh.\n\nPreserve the existing public behavior.\nThis task quotes: You are the Factory planner.", worker.Task);
+        Assert.DoesNotContain("Guardrails", worker.Task);
+        Assert.DoesNotContain("TaskRelatedIntent", worker.Task);
+        Assert.StartsWith("Implement Catalog refresh.", Assert.Single(report.Tasks).Text);
+    }
+
+    [Fact]
+    public void InternalWorker_MissingTaskOrEndBoundary_NeverFallsBackToProtocol()
+    {
+        foreach (var assignment in new[]
+        {
+            "--- Factory worker assignment ---\n# TaskRelatedIntent\nIDD-0001\n--- End Factory worker assignment ---",
+            "--- Factory worker assignment ---\n# Task\nExample with missing end"
+        })
+        {
+            var repo = Path.Combine(_root, "repo-no-task-" + Guid.NewGuid().ToString("N"));
+            var codex = Path.Combine(_root, "codex-no-task-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(repo);
+            var dir = Path.Combine(codex, "sessions");
+            Directory.CreateDirectory(dir);
+            const string rootId = "a2222222-2222-2222-2222-222222222222";
+            const string workerId = "b2222222-2222-2222-2222-222222222222";
+            Write(Path.Combine(dir, "root.jsonl"),
+            [
+                Session(rootId, repo),
+                User("2026-09-23T10:00:00Z", "idd-factory-run"),
+                SpawnCall("2026-09-23T10:00:01Z", "w1",
+                    "You are the Factory worker.\n# Task\nProtocol example.\n" + assignment),
+                SpawnOutput("2026-09-23T10:00:02Z", "w1", workerId)
+            ]);
+            WriteChild(dir, "worker.jsonl", workerId, rootId, repo,
+                Assistant("2026-09-23T10:00:30Z", "No task."));
+
+            var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
+            var worker = Assert.Single(report.Agents.Where(x => x.Role == "worker"));
+            Assert.Null(worker.Task);
+            Assert.Null(worker.TaskTitle);
+        }
+    }
+
+    [Fact]
+    public void WorkerMarkerInRootDialogue_IsNotAFactoryRunWithoutNativeSpawn()
+    {
+        var repo = Path.Combine(_root, "repo-discussion");
+        var codex = Path.Combine(_root, "codex-discussion");
+        Directory.CreateDirectory(repo);
+        var dir = Path.Combine(codex, "sessions");
+        Directory.CreateDirectory(dir);
+        Write(Path.Combine(dir, "discussion.jsonl"),
+        [
+            Session("a3333333-3333-3333-3333-333333333333", repo),
+            User("2026-09-23T10:00:00Z", "Explain the Factory worker protocol."),
+            Assistant("2026-09-23T10:00:01Z", "You are the Factory worker.")
+        ]);
+
+        Assert.Empty(new FactoryReportEngine().FindRuns(repo, codex));
+    }
+
+    [Fact]
+    public void NativeSpawnWithWorkerMarker_DerivesFactoryStartWithoutExplicitRunName()
+    {
+        var repo = Path.Combine(_root, "repo-derived");
+        var codex = Path.Combine(_root, "codex-derived");
+        Directory.CreateDirectory(repo);
+        var dir = Path.Combine(codex, "sessions");
+        Directory.CreateDirectory(dir);
+        const string rootId = "a4444444-4444-4444-4444-444444444444";
+        const string workerId = "b4444444-4444-4444-4444-444444444444";
+        Write(Path.Combine(dir, "root.jsonl"),
+        [
+            Session(rootId, repo),
+            User("2026-09-23T10:00:00Z", "Start the requested implementation."),
+            SpawnCall("2026-09-23T10:00:01Z", "w1", """
+                You are the Factory worker.
+                --- Factory worker assignment ---
+                # Task
+                Implement Catalog refresh.
+                --- End Factory worker assignment ---
+                """),
+            SpawnOutput("2026-09-23T10:00:02Z", "w1", workerId)
+        ]);
+        WriteChild(dir, "worker.jsonl", workerId, rootId, repo,
+            Assistant("2026-09-23T10:00:50Z", "Implemented."));
+
+        var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
+        Assert.Equal("derived", report.Run.StartBoundary.Confidence);
+        Assert.Equal(1, report.Metrics.WorkerInvocations);
+        Assert.Equal("Implement Catalog refresh.", Assert.Single(report.Tasks).Text);
+    }
+
+    [Theory]
+    [InlineData(null, "unknown")]
+    [InlineData("path/to/generic-worker.md", "unknown")]
+    [InlineData("factory-worker", "worker")]
+    [InlineData("factory-planner", "planner")]
+    public void ConflictingRoleMarkers_OnlyTrustedNativeHintsResolveRole(string? roleHint, string expectedRole)
+    {
+        var repo = Path.Combine(_root, "repo-conflict-" + (roleHint ?? "none").Replace('/', '_'));
+        var codex = Path.Combine(_root, "codex-conflict-" + (roleHint ?? "none").Replace('/', '_'));
+        Directory.CreateDirectory(repo);
+        var dir = Path.Combine(codex, "sessions");
+        Directory.CreateDirectory(dir);
+        const string rootId = "a5555555-5555-5555-5555-555555555555";
+        const string childId = "b5555555-5555-5555-5555-555555555555";
+        Write(Path.Combine(dir, "root.jsonl"),
+        [
+            Session(rootId, repo),
+            User("2026-09-23T10:00:00Z", "idd-factory-run"),
+            SpawnCall("2026-09-23T10:00:01Z", "c1", """
+                You are the Factory planner.
+                You are the Factory worker.
+                --- Factory worker assignment ---
+                # Task
+                Implement Catalog refresh.
+                --- End Factory worker assignment ---
+                """),
+            SpawnOutput("2026-09-23T10:00:02Z", "c1", childId)
+        ]);
+        Write(Path.Combine(dir, "child.jsonl"),
+        [
+            Session(childId, repo, rootId, agentRole: roleHint),
+            User("2026-09-23T10:00:03Z", "Factory child context"),
+            Assistant("2026-09-23T10:00:20Z", "Completed.")
+        ]);
+
+        var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
+        Assert.Equal(expectedRole, Assert.Single(report.Agents.Where(x => x.Role != "root")).Role);
+        Assert.Equal(expectedRole == "worker" ? 1 : 0, report.Metrics.WorkerInvocations);
+    }
 
     private static object SpawnCall(string timestamp, string callId, string task, string? model = null, string? reasoningEffort = null) => new
     {

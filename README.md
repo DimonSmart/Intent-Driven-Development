@@ -78,10 +78,11 @@ idd-project-init
 
 For an existing implementation without current intent documents, initialization can offer the interactive `idd-intent-bootstrap` workflow to analyze the project and propose its initial intent model.
 
-Then describe what you need naturally. For example:
+Then describe what you need naturally. The Coding Agent selects the applicable
+registered workflow automatically. For example:
 
 ```text
-Use idd-intent-brainstorm to help me clarify a feature that lets users compare two local folders without modifying either side.
+Help me clarify a feature that lets users compare two local folders without modifying either side. Do not change files yet.
 ```
 
 For a complex implementation task, add the optional Factory plugin later:
@@ -97,6 +98,27 @@ claude plugin install idd-factory@intent-driven-development
 ```bash
 codex plugin add idd-factory@intent-driven-development
 ```
+
+## Commands, automatic workflows, and internal protocols
+
+IDD distinguishes three kinds of capabilities:
+
+- **User commands** are registered skills intended for direct invocation: `idd-help`,
+  `idd-route`, `idd-project-init`, `idd-verification-configure`,
+  `idd-glossary-build`, `idd-skip`, and (with Factory installed)
+  `idd-factory-run` and `idd-factory-configure`.
+- **Automatic workflows** are registered skills selected by the Coding Agent from
+  a natural-language request (for example: intent change, import, lint,
+  conformance audit, or implementation). They are not separate user commands.
+- **Internal protocols** are not registered skills: Factory planner, Factory
+  worker, and Intent document creation are supplied as references to their
+  owning workflows.
+
+Claude Code hides automatic workflows from the slash-command menu but retains
+model invocation. Codex retains all registered skills and implicit invocation;
+its current skill metadata has no equivalent guaranteed user-menu visibility
+control. Describe the outcome and scope instead of invoking hidden Claude skills
+directly. See [IDD Use Cases](docs/using-idd.md) for examples.
 
 ## Update an Existing Installation
 

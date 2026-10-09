@@ -194,15 +194,18 @@ routing or intent work.
 idd-project-init
 -> create minimal project-owned IDD state
 -> maintain one managed agent-instruction block
--> if Factory is explicitly enabled, offer idd-factory-configure model policy
+-> if Factory is explicitly requested or existing Factory state is present, offer idd-factory-configure model policy
 -> detect existing implementation without current IDD-NNNN documents
 -> offer optional idd-intent-bootstrap
 ```
 
-Factory model configuration is never offered for an `idd-intent`-only
-project. When Factory is explicitly enabled and no execution policy exists,
-initialization offers current-model inheritance versus fine-grained profile
-mapping and hands the choice to `idd-factory-configure`.
+Factory model configuration is never offered merely because `idd-factory` is
+installed. Treat Factory as relevant to initialization only when the user
+explicitly requests Factory workflows or existing Factory-specific project state
+such as `.idd/execution.yaml` or `.idd/factory/` demonstrates prior use. When
+Factory is relevant and no execution policy exists, initialization offers
+current-model inheritance versus fine-grained profile mapping and hands the
+choice to `idd-factory-configure`.
 
 The bootstrap offer requires explicit user consent.
 
@@ -367,7 +370,7 @@ delete owning spec, or unclear product intent.
 ```text
 brainstorm if the request is unclear
 -> idd-intent-change(operation: add)
--> existing owner or new document handoff
+-> update existing owner or create new document internally in idd-intent-change
 -> idd-code-implement or Factory
 -> idd-intent-drift-audit
 ```
