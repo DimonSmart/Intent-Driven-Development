@@ -235,7 +235,7 @@ LLMs assigned to Factory effort levels during the life of the project:
 ```text
 idd-factory-update-effort-models
 -> current policy and model evidence
--> complete proposed mapping with preserved settings
+-> proposed policy with requested overrides and preserved settings
 -> idd-factory-configure for authorized validation and persistence
 ```
 
@@ -253,9 +253,11 @@ levels, other platforms, and reasoning settings are preserved. Automatic model
 recommendations require confirmation; exact user-authorized replacements and
 previously confirmed proposals reuse that decision through the handoff.
 
-Missing policy means inheritance. Switching to explicit models requires a
-complete active-platform mapping. Invalid existing policy is diagnosed and
-repaired through the configuration owner, never silently replaced with inherit.
+Missing policy means inheritance. Partial mappings are valid; missing profile
+or platform mappings remain inherited. Configure only requested overrides and
+preserve unselected mappings and intentional absence. Malformed existing policy
+is diagnosed and repaired through the configuration owner, never silently replaced
+with inherit.
 The owner checks for intervening edits and skips writes for an unchanged policy.
 Updates affect the next worker without reclassifying tasks or changing a running
 worker. Review-only requests stop before persistence.
@@ -591,16 +593,17 @@ Each planner and worker receives a fresh isolated semantic context rather than
 the root transcript. Workers share the repository but do not share transcripts.
 The repository is authoritative implementation reality.
 
-Every planner task must contain exactly one `ExecutionProfile`: `economy`,
-`standard`, or `strong`. Missing, repeated, or unknown profiles invalidate the
-affected task. The planner never reads model policy. Immediately before each
-worker spawn, the root agent checks the optional project-owned
-`.idd/execution.yaml`. Its absence means all profiles inherit host behavior.
-When present, the file is re-read and validated: it must explicitly select
-`modelStrategy: inherit` or provide all three mappings for the active platform.
-Malformed existing configuration or missing mappings block execution; they never
-trigger silent inheritance. The root applies the exact configured native
-model/settings without substituting another model or reclassifying the task.
+New planner output must contain exactly one `ExecutionProfile` per task:
+`economy`, `standard`, or `strong`. Missing, empty, repeated, or unknown profiles
+invalidate new output before it is saved. Existing pending tasks in `plan.md`
+without the section remain valid and use `standard`; explicit empty, repeated,
+or unknown profiles still block execution. The planner never reads model policy.
+Immediately before each worker spawn, the root agent checks optional
+`.idd/execution.yaml`, re-reading and validating it when present. An absent
+policy or missing profile/platform mapping means inherit host settings. Partial
+mappings are valid. Malformed existing mappings block execution and never trigger
+silent inheritance. The root applies exact configured native model/settings
+without substituting another model or reclassifying the task.
 
 Temporary continuation state is limited to the original request, remaining
 current batch, short completed summaries, exact user answers, and optional

@@ -55,8 +55,10 @@ For each worker, the report preserves the planner `ExecutionProfile` and the
 model/reasoning settings requested in that worker's native spawn arguments.
 The planner profile is authoritative; a profile found in the spawn prompt is
 recorded separately as `spawnExecutionProfile`. Conflicting values emit
-`factory/worker_execution_profile_mismatch`; a missing planner profile remains
-unknown even when the spawn prompt supplies one.
+`factory/worker_execution_profile_mismatch`. A readable legacy planner task
+without the profile section uses `standard`, independently of the spawn profile.
+Empty, repeated, or unknown explicit profiles remain unknown; so does a worker
+without readable matching planner evidence.
 Native results containing only a canonical `task_name` are correlated with the
 child's `agent_path` and parent thread metadata to preserve requested settings.
 It reports actual settings from direct `model` and `effort` fields in the

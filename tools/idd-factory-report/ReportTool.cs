@@ -1509,7 +1509,7 @@ public sealed class FactoryReportEngine
                 diagnostics.Add(new Diagnostic
                 {
                     Severity = "warning", Category = "reporter", Code = "worker_execution_profile_unavailable",
-                    Message = $"Could not determine the execution profile for worker {task.AgentThreadId}: no matching planner task with exactly one canonical ExecutionProfile was readable."
+                    Message = $"Could not determine the execution profile for worker {task.AgentThreadId}: no matching planner task was readable, or its explicit ExecutionProfile was empty, repeated, or unknown."
                 });
             if (string.IsNullOrWhiteSpace(task.Text))
                 diagnostics.Add(new Diagnostic
@@ -2058,6 +2058,10 @@ public sealed class FactoryReportEngine
     {
         var matches = Regex.Matches(text,
             @"(?ims)^\s*#\s*ExecutionProfile\s*$\s*(?<value>.*?)(?=^\s*#|\z)");
+        // Readable legacy tasks omitted the section and used standard. An
+        // explicitly malformed section must never be treated as absence.
+        if (matches.Count == 0)
+            return "standard";
         if (matches.Count != 1)
             return null;
         var value = matches[0].Groups["value"].Value.Trim();

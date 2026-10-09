@@ -2,6 +2,19 @@
 
 This page records IDD changes that require action in repositories that already use the toolkit.
 
+## 2026-10-09 — Factory model routing preserves existing plans and policy
+
+New planner output includes one explicit `ExecutionProfile` per task. Existing
+pending tasks in `plan.md` without the section continue as `standard`, with no
+migration or restart. Empty, repeated, or unknown explicit profiles remain
+invalid.
+
+Partial `.idd/execution.yaml` mappings remain supported. Missing profiles or
+platform mappings inherit host model/reasoning settings; malformed present
+mappings block execution. A Codex-only override remains usable from Claude
+without requiring another set of model IDs. Configuration and model updates
+preserve unselected mappings and intentional absence.
+
 ## 2026-10-09 — Factory model updates use the skill exposure policy
 
 The new `idd-factory-update-effort-models` skill is registered with
@@ -85,16 +98,16 @@ plugin is updated. Historical Factory traces may also contain the old name;
 
 ## 2026-09-25 — Configurable Factory execution profiles
 
-Factory planner tasks must declare exactly one `# ExecutionProfile` metadata
-section: `economy`, `standard`, or `strong`. Missing or repeated metadata is
-invalid.
+Factory task metadata may declare `# ExecutionProfile`: `economy`, `standard`,
+or `strong`. An absent section means `standard`. New planner output now always
+includes one explicit profile, while existing pending plans remain compatible.
 
 Projects may optionally configure `.idd/execution.yaml` with
 `idd-factory-configure`. Its absence preserves host/session model inheritance.
 The file is project-owned execution policy, not Factory runtime/workflow
-configuration and not temporary state. When present, it must explicitly select
-`inherit` or provide complete mappings for the active platform. Invalid
-existing policies block worker execution rather than silently inheriting.
+configuration and not temporary state. Partial mappings remain valid: missing
+profiles or active-platform mappings inherit host settings. Malformed existing
+policies block worker execution rather than silently inheriting.
 
 The root Factory agent now performs a mechanical
 `profile -> project mapping -> native child spawn` step. It never reclassifies a

@@ -232,10 +232,27 @@ public sealed partial class FactoryReportTests : IDisposable
     }
 
     [Theory]
-    [InlineData("")]
+    [InlineData("", "standard")]
+    [InlineData("", "strong")]
+    [InlineData("# TaskRelatedIntent\nIDD-0001", "economy")]
+    [InlineData("# TaskRelatedEngineering\nENG-0001", "strong")]
+    public void Report_ReadsLegacyTaskWithoutProfileAsStandard(string metadata, string spawnProfile)
+    {
+        var report = RoutingReport(metadata, spawnProfile, "unknown");
+        var task = Assert.Single(report.Tasks);
+        Assert.Equal("standard", task.ExecutionProfile);
+        Assert.Equal("standard", Assert.Single(report.Agents, agent => agent.Role == "worker").ExecutionProfile);
+        Assert.Equal(spawnProfile, task.SpawnExecutionProfile);
+        Assert.DoesNotContain(report.Diagnostics, x => x.Code == "worker_execution_profile_unavailable");
+        Assert.Equal(spawnProfile != "standard",
+            report.Diagnostics.Any(x => x.Code == "worker_execution_profile_mismatch"));
+    }
+
+    [Theory]
+    [InlineData("# ExecutionProfile\n")]
     [InlineData("# ExecutionProfile\neconomy\n\n# ExecutionProfile\nstrong")]
     [InlineData("# ExecutionProfile\nunknown")]
-    public void Report_DoesNotReplaceMissingOrMalformedPlannerProfileWithSpawnProfile(string metadata)
+    public void Report_DoesNotReplaceMalformedPlannerProfileWithSpawnProfile(string metadata)
     {
         var report = RoutingReport(metadata, "strong", "unknown");
         var task = Assert.Single(report.Tasks);

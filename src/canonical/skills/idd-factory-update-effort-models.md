@@ -25,9 +25,12 @@ the reference. Report malformed policy and hand any requested repair to
 silently.
 
 When the file is absent or globally `inherit`, there are no concrete per-level
-models to replace. A move to explicit mappings needs all three active-platform
-assignments. Do not copy the session model into unspecified levels or create
-partial inheritance. Resolve missing choices through `idd-factory-configure`.
+models to replace. A move to explicit mappings may override only requested
+profiles and platforms. Missing mappings remain inherited; do not copy the
+session model into unspecified levels or require model IDs for unselected
+profiles. Show inherited levels as `inherit` in the proposal without persisting
+that word as a model ID. Resolve missing choices only for requested overrides
+through `idd-factory-configure`.
 
 For an explicit mapping, preserve unselected levels and other platform
 sections. Keep the three semantic profile names and the planner's classification

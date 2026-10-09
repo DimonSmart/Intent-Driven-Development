@@ -22,11 +22,11 @@ fresh planner and sequential fresh workers, handles one planner question, and
 runs configured project verification after planner `# Done`.
 
 Immediately before each worker spawn it mechanically maps the task's
-`ExecutionProfile` through optional `.idd/execution.yaml`. Each task must
-provide one canonical profile. If the file is absent, all profiles inherit
-host behavior; an existing policy must explicitly select `inherit` or be
-complete for the active platform. Explicit mappings are applied exactly and
-are never semantically "improved" by the root agent.
+`ExecutionProfile` through optional `.idd/execution.yaml`. New planner output
+requires one canonical profile per task. Existing pending tasks in `plan.md`
+without the section use `standard`. An absent policy or missing profile/platform
+mapping inherits host settings. Partial mappings are valid; malformed existing
+mappings block execution. Explicit overrides are applied exactly.
 
 It does not launch a packaged runtime, use Factory MCP tools, supervise child
 processes, poll status, maintain retry budgets, or own a workflow state machine.
@@ -39,12 +39,12 @@ It supports:
 
 - explicit `modelStrategy: inherit` for using the current host model everywhere;
 - concrete per-platform mappings for `economy`, `standard`, and `strong`;
-- complete active-platform mappings, or an explicit `inherit` strategy;
+- partial mappings with inheritance for absent profiles or platforms;
 - optional platform-specific reasoning settings;
 - later reconfiguration or return to all-inherit.
 
 When fine-grained configuration is requested, the active Coding Agent first
-proposes one complete mapping from currently available information, clearly
+proposes overrides for the requested profiles from current information, clearly
 states any account-availability uncertainty, and asks for confirmation. IDD
 source does not contain a built-in table of recommended concrete models.
 
@@ -101,8 +101,10 @@ IDD-NNNN
 ENG-NNNN
 ```
 
-`ExecutionProfile` is required exactly once and belongs to the immediately
-preceding task. It expresses required execution capability only,
+New planner output requires `ExecutionProfile` exactly once for the immediately
+preceding task. Existing `plan.md` tasks without it use `standard`. Empty,
+repeated, or unknown explicit profiles are invalid. A profile expresses required
+execution capability only,
 not a concrete model or cost policy.
 
 Tasks/Question/Done cannot be mixed. `TaskRelatedIntent` is optional task

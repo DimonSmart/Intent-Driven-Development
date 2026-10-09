@@ -134,7 +134,7 @@ absent, offer one blocking choice with these answer values and meanings:
 Which LLM strategy should Factory use for worker tasks?
 
 - default (inherit) — use the current session/host model for all tasks
-- configure — explicitly configure models for economy, standard, and strong
+- configure — explicitly configure models for selected economy, standard, or strong profiles
 ```
 
 Use the current host's native structured interaction when available
@@ -148,8 +148,9 @@ Handle the answer by handing off to `idd-factory-configure`:
   policy. This is one global strategy: do not ask for or save individual
   profile mappings;
 - `configure` -> let the configuration skill propose and confirm concrete
-  mappings for all of `economy`, `standard`, and `strong`. Do not permit a
-  partial mapping or per-profile inheritance.
+  mappings for the requested profiles and platform. Partial mappings are valid;
+  unconfigured profiles/platforms inherit host settings. Do not require model
+  IDs for unselected levels or copy session defaults into absent mappings.
 
 If a valid `.idd/execution.yaml` already exists, do not repeat the offer on an
 idempotent initialization unless the user explicitly asks to reconfigure it.

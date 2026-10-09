@@ -87,18 +87,20 @@ ENG-0004
 
 Exactly one form is used per planner invocation. Blank output is invalid.
 
-Every task has exactly one `# ExecutionProfile`: `economy`, `standard`, or
-`strong`. Missing, repeated, or unknown profiles invalidate that task. The
-planner selects the profile from task complexity only and does not read model
+Every newly generated task has exactly one `# ExecutionProfile`: `economy`,
+`standard`, or `strong`. Validate new output before saving it. Existing pending
+tasks in `plan.md` without the section use `standard`, preserving continuation
+without migration or restart. Explicit empty, repeated, or unknown profiles
+remain invalid. The planner classifies complexity only and does not read model
 mappings.
 
 Immediately before a worker starts, the root agent mechanically resolves that
 profile through optional project-owned `.idd/execution.yaml`. If the file is
-absent, workers inherit host model/reasoning settings. An existing file must
-explicitly select `inherit` or provide all three mappings for the active
-platform. Explicit mappings are applied exactly through native child-agent
-controls; malformed/unavailable mappings never trigger silent model
-substitution.
+absent, workers inherit host model/reasoning settings. Partial mappings are
+valid; missing profiles or active-platform mappings also inherit. Every present
+mapping must be structurally valid. Explicit overrides are applied exactly
+through native child-agent controls; malformed or host-rejected mappings never
+trigger silent model substitution.
 
 When Engineering exists, `TaskRelatedEngineering` contains only
 planner-selected Conditional Rules. The current Always set is mechanically

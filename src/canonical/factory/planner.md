@@ -109,9 +109,13 @@ planner-selected Conditional rules. Never put Always rules there.
 
 Every `# Task` must contain exactly one `# ExecutionProfile` section belonging
 to that task. Its value must be exactly one of `economy`, `standard`, or
-`strong`. A missing, repeated, or unknown profile is malformed planner output;
-the affected worker must not start. A profile never contains a concrete model
-ID or a vendor-specific reasoning setting.
+`strong`. In new planner output, a missing, empty, repeated, or unknown profile
+is malformed planner output; the affected worker must not start. A profile never
+contains a concrete model ID or a vendor-specific reasoning setting.
+
+This generation requirement does not invalidate existing pending plans:
+`idd-factory-run` reads a task in an existing `plan.md` without the section as
+`standard`. Do not migrate or reclassify legacy tasks merely to add metadata.
 
 Question:
 

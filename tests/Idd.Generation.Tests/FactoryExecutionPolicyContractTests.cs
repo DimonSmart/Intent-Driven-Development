@@ -19,7 +19,7 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("standard", planner);
         Assert.Contains("strong", planner);
         Assert.Contains("Every `# Task` must contain exactly one `# ExecutionProfile`", planner);
-        Assert.Contains("A missing, repeated, or unknown profile", planner);
+        Assert.Contains("a missing, empty, repeated, or unknown profile", planner);
         Assert.Contains("malformed planner output", planner);
         Assert.Contains("belongs to the immediately preceding", planner);
         Assert.Contains("Do not read `.idd/execution.yaml`", planner);
@@ -58,14 +58,18 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
     }
 
     [Fact]
-    public void ExecutionPolicy_DefinesExplicitInheritCompleteMappingsAndBlockingValidation()
+    public void ExecutionPolicy_DefinesPartialMappingsInheritanceAndBlockingValidation()
     {
         var policy = Canonical("methodology", "factory-execution-policy.md");
 
         Assert.Contains(".idd/execution.yaml", policy);
         Assert.Contains("modelStrategy: inherit", policy);
-        Assert.Contains("Mapping mode is complete for the active platform", policy);
-        Assert.Contains("all three profile mappings for the active platform", policy);
+        Assert.Contains("Partial mappings are valid", policy);
+        Assert.Contains("A missing profile or missing active-platform mapping", policy);
+        Assert.Contains("Codex-only mapping", policy);
+        Assert.Contains("Codex `economy` and `standard`, and every Claude profile, inherit host settings", policy);
+        Assert.Contains("validate every explicit mapping", policy);
+        Assert.Contains("a platform mapping with a missing/blank `model`", policy);
         Assert.Contains("Absence of this file means", policy);
         Assert.Contains("malformed existing configuration is a", policy);
         Assert.Contains("version: 1", policy);
@@ -73,7 +77,7 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.True(policy.Contains("do not substitute another model", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("same concrete model may be", policy);
         Assert.Contains("The two strategies do not mix", policy);
-        Assert.Contains("per-profile `default`, `inherit`", policy);
+        Assert.Contains("Per-profile inheritance is represented by an absent mapping", policy);
     }
 
     [Fact]
@@ -88,10 +92,43 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("Never save an automatically proposed mapping before explicit confirmation", configure);
         Assert.Contains("request_user_input", configure);
         Assert.Contains("AskUserQuestion", configure);
-        Assert.Contains("all three", configure);
+        Assert.Contains("Partial mappings are valid", configure);
+        Assert.Contains("Do not require model IDs", configure);
         Assert.Contains("modelStrategy: inherit", configure);
-        Assert.Contains("all-or-nothing", configure);
-        Assert.Contains("Per-profile inheritance", configure);
+        Assert.Contains("inheritance removes that mapping", configure);
+        Assert.Contains("Codex-only policy remains valid for Claude", configure);
+        Assert.DoesNotContain("all-or-nothing", configure);
+    }
+
+    [Theory]
+    [InlineData("claude")]
+    [InlineData("codex")]
+    public void PublishedFactorySkills_PreserveExistingPlansAndPartialPolicy(string platform)
+    {
+        var skills = Path.Combine(fixture.MarketplaceRoot, "plugins", platform, "idd-factory", "skills");
+        var run = fixture.ReadText(Path.Combine(skills, "idd-factory-run", "SKILL.md"));
+        Assert.Contains("missing ExecutionProfile in an existing plan.md means standard", run);
+        Assert.Contains("validate\nit before saving a new batch", run.ReplaceLineEndings("\n"));
+        Assert.Contains("Do not require a restart", run);
+        Assert.Contains("Partial mappings are valid", run);
+
+        foreach (var name in new[] { "idd-factory-run", "idd-factory-configure", "idd-factory-update-effort-models" })
+        {
+            var policy = fixture.ReadText(Path.Combine(skills, name, "references", "factory-execution-policy.md"));
+            Assert.Contains("missing profile/platform mapping means inherit", policy);
+            Assert.Contains("Codex-only mapping", policy);
+            Assert.Contains("a platform mapping with a missing/blank `model`", policy);
+            Assert.Contains("malformed and blocks execution", policy);
+            Assert.DoesNotContain("all three profile mappings for the active platform", policy);
+        }
+
+        var configure = fixture.ReadText(Path.Combine(skills, "idd-factory-configure", "SKILL.md"));
+        Assert.Contains("inheritance removes that mapping", configure);
+        Assert.Contains("Codex-only policy remains valid for Claude", configure);
+        var update = fixture.ReadText(Path.Combine(skills, "idd-factory-update-effort-models", "SKILL.md"));
+        Assert.Contains("Missing mappings remain inherited", update);
+        Assert.Contains("do not copy the", update);
+        Assert.Contains("session model into unspecified levels", update);
     }
 
     [Fact]
@@ -106,7 +143,9 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("native child-agent spawn", run);
         Assert.Contains("Do not reconsider task complexity", run);
         Assert.Contains("never silently fall back to `inherit`", run);
-        Assert.Contains("missing task profile", run);
+        Assert.Contains("missing ExecutionProfile in an existing plan.md means standard", run);
+        Assert.Contains("Partial mappings are valid", run);
+        Assert.Contains("New planner output must include exactly one canonical profile", run);
         Assert.Contains("idd-factory-configure", run);
         Assert.Contains("same canonical Factory", run);
         Assert.Contains("references/factory-worker.md", run);
@@ -215,7 +254,7 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("When Factory is enabled for this initialization", init);
         Assert.Contains("default (inherit)", init);
         Assert.Contains("configure — explicitly configure models", init);
-        Assert.Contains("partial mapping or per-profile inheritance", init);
+        Assert.Contains("Partial mappings are valid", init);
         Assert.Contains("idd-factory-configure", init);
     }
 }

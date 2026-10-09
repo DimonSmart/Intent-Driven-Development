@@ -71,16 +71,29 @@ factory:
         reasoningEffort: <optional-platform-value>
 ```
 
-Mapping mode is complete for the active platform: it must contain `economy`,
-`standard`, and `strong`, each with one mapping for that platform. A profile
-without an active-platform mapping is invalid; it never inherits implicitly.
+Partial mappings are valid. A missing profile or missing active-platform mapping
+means inherit host model/reasoning settings for that task. A Codex-only mapping
+does not require a Claude mapping; Claude inherits when its mapping is absent.
 The same concrete model may be assigned to more than one profile, including
 with different reasoning settings.
 
 The two strategies do not mix. `modelStrategy: inherit` applies globally to all
-three profiles. Conversely, `executionProfiles` requires concrete mappings for
-all three profiles; it does not support a per-profile `default`, `inherit`, or
-implicit session-model fallback.
+three profiles. `executionProfiles` may override only selected profiles and
+platforms. Per-profile inheritance is represented by an absent mapping, not by
+a `default` or `inherit` model ID or a blank mapping.
+
+For example, this valid partial policy overrides only Codex `strong`:
+
+```yaml
+version: 1
+factory:
+  executionProfiles:
+    strong:
+      codex:
+        model: <concrete-model-id>
+```
+
+Codex `economy` and `standard`, and every Claude profile, inherit host settings.
 
 Do not persist dynamic aliases such as `cheapest`, `best`, `strongest`,
 `latest`, or `recommended` as runtime model identifiers. Resolve such user
@@ -96,13 +109,19 @@ Require:
 - `version: 1`;
 - exactly one Factory strategy shape: either `modelStrategy: inherit` or
   `executionProfiles`;
+- `executionProfiles` and each present profile/platform section are mappings;
 - only canonical profile names `economy`, `standard`, and `strong`;
 - platform sections supported by the generated adapter set;
 - a non-empty `model` scalar for every explicit platform mapping;
 - optional reasoning settings to be non-empty scalars when present;
 - no conflicting strategy fields, unknown profiles, unknown platforms, or
   unknown required structure;
-- in mapping mode, all three profile mappings for the active platform.
+- validate every explicit mapping, including mappings for inactive platforms.
+
+An absent mapping is valid inheritance. A present null, scalar, or list where a
+mapping is required, or a platform mapping with a missing/blank `model`, is
+malformed and blocks execution. An empty `executionProfiles` mapping supplies
+no overrides. Never fill absent mappings with the current session model ID.
 
 For the current adapters, Codex mappings use `model` and optional
 `reasoningEffort`; Claude mappings use `model` and optional `effort`.
@@ -124,12 +143,19 @@ lookup:
 
 ```text
 planner ExecutionProfile
--> require exactly one canonical profile
+-> when reading an existing plan.md, missing ExecutionProfile means standard
+-> reject empty, repeated, or unknown explicit profiles
 -> if .idd/execution.yaml is absent, inherit host model/reasoning settings
 -> otherwise validate .idd/execution.yaml and select the active-platform mapping
+-> missing profile/platform mapping means inherit
 -> inherit OR exact configured model/settings
 -> native child-agent spawn
 ```
+
+New planner output must contain exactly one canonical `# ExecutionProfile` per
+task. Validate that output before saving it to `plan.md`. Existing pending tasks
+without the section remain valid and use `standard`; do not require migration,
+rewrite the plan, or reclassify those tasks to continue an active run.
 
 The root agent must not reconsider task complexity, compare models, optimize
 cost, substitute a stronger/weaker model, or reinterpret user policy.
@@ -138,7 +164,8 @@ If the selected mapping is `inherit`, omit Factory-specific model/reasoning
 overrides. If it is explicit, pass exactly the configured model and optional
 reasoning setting through the host's native child-agent controls.
 
-An absent policy or an explicit `inherit` policy omits overrides. A policy
+An absent policy, an explicit `inherit` policy, or an absent selected mapping
+omits overrides. A policy
 update after this lookup does not alter the already-created worker; the next
 worker reads the current file (or observes its absence) without a new plan.
 

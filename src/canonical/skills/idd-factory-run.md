@@ -239,13 +239,15 @@ while true:
 
         Question -> persist question.md and stop
         Done     -> run project verification
-        Tasks    -> persist the planner output for the current batch in plan.md
+        Tasks    -> require one canonical ExecutionProfile per new task, then persist in plan.md
 
     take the first remaining task
-    require exactly one canonical ExecutionProfile
+    read its ExecutionProfile; missing metadata in existing plan.md means standard
+    reject empty, repeated, or unknown explicit profiles
     if .idd/execution.yaml is absent, inherit host settings
     otherwise re-read and structurally validate .idd/execution.yaml
     mechanically resolve the active-platform profile mapping
+    if that profile/platform mapping is absent, inherit host settings
     deterministically re-read the current Engineering INDEX
     enumerate all current Always ENG IDs
     read complete factory-worker.md and prepare the isolated worker assignment
@@ -307,22 +309,31 @@ Immediately before every worker spawn, apply the bounded lookup from
 
 ```text
 planner ExecutionProfile
--> require exactly one canonical value
+-> missing ExecutionProfile in an existing plan.md means standard
+-> reject empty, repeated, or unknown explicit profiles
 -> re-read one project configuration document when present
--> absent policy means inherit OR use exact configured active-platform model/settings
+-> absent policy or absent profile/platform mapping means inherit
+-> otherwise use exact configured active-platform model/settings
 -> native child-agent spawn
 ```
+
+New planner output must include exactly one canonical profile per task; validate
+it before saving a new batch. When continuing an existing run, pending tasks in
+`.idd/factory/current/plan.md` without `# ExecutionProfile` remain valid and use
+`standard`. Do not require a restart, migrate the plan, or reconsider complexity
+solely because that legacy metadata is absent.
 
 This is a mechanical protocol step. Do not reconsider task complexity, compare
 candidate models, optimize cost, upgrade/downgrade the profile, or choose a
 model that is not the exact configured mapping.
 
 If the file is absent, inherit normal host model/reasoning settings without
-writing a default file. A missing task profile, missing active-platform mapping
-in an existing policy, unknown profile/platform, repeated profile, or malformed
-existing policy blocks the affected worker with a concrete diagnostic. Only
-absence of the file or explicit `modelStrategy: inherit` means omit
-Factory-specific model and reasoning overrides.
+writing a default file. Partial mappings are valid: a missing profile or missing
+active-platform mapping also inherits host model/reasoning settings. Validate
+all present mappings. A malformed existing policy blocks the affected worker
+with a concrete diagnostic, as do unknown profile/platform names and empty or
+repeated explicit task profiles. Inheritance omits Factory-specific model and reasoning
+overrides; it does not copy the current model into the policy.
 
 Malformed explicit configuration blocks the worker spawn with a clear
 diagnostic; never silently fall back to `inherit`. If the native host rejects a

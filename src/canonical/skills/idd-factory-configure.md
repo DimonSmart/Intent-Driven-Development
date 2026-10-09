@@ -48,7 +48,8 @@ repair it as part of configuration; do not silently replace its strategy.
 
 If the file is absent, the effective policy is `inherit` for every profile;
 Factory can run without creating the file. When the user invokes this workflow
-to configure a policy, save either explicit `inherit` or a complete mapping.
+to configure a policy, save either explicit `inherit` or the requested partial
+or full mapping.
 
 ## Top-level choice
 
@@ -59,7 +60,7 @@ single-choice question with these answer values and meanings:
 Which LLM strategy should Factory use for worker tasks?
 
 - default (inherit) — use the current session/host model for all tasks
-- configure — explicitly configure models for economy, standard, and strong
+- configure — explicitly configure models for selected economy, standard, or strong profiles
 ```
 
 Use native structured interaction when the active host exposes it:
@@ -88,7 +89,7 @@ Do not resolve `inherit` to the current model name and do not copy a session
 model ID into the file. `default` and `inherit` are equivalent user answers;
 persist only `modelStrategy: inherit`.
 
-## `configure`: configure all task-complexity levels
+## `configure`: configure selected task-complexity levels
 
 Use exactly these semantic profiles:
 
@@ -98,14 +99,13 @@ standard
 strong
 ```
 
-First prepare one complete proposed mapping rather than asking three independent
-questions by default.
-
-`configure` is all-or-nothing: it requires one concrete active-platform mapping
-for each of `economy`, `standard`, and `strong`. Do not accept `default`,
-`inherit`, or a blank value for an individual profile. To return to the current
-session/host model, replace the complete mapping with the global
-`modelStrategy: inherit` strategy. Per-profile inheritance is invalid.
+Prepare one proposed policy for the requested scope. Do not require model IDs
+for unselected profiles or platforms. Partial mappings are valid; absent
+mappings inherit host model/reasoning settings. Preserve unselected existing
+mappings and intentional absence. A request to return one profile/platform to
+inheritance removes that mapping; do not persist `default`, `inherit`, a null,
+or a blank model as a placeholder. Clean up an empty profile section if needed.
+To return every profile/platform to inheritance, use `modelStrategy: inherit`.
 
 Use the best current information available in this order:
 
@@ -149,7 +149,7 @@ recommended
 
 ## Platform sections
 
-Store only concrete configuration or `inherit`.
+Store concrete overrides only where requested, or global `modelStrategy: inherit`.
 
 Conceptually:
 
@@ -171,10 +171,11 @@ factory:
         reasoningEffort: <optional-platform-value>
 ```
 
-A project may contain mappings for more than one supported platform. For each
-platform that Factory will run on, the resulting mapping must include all three
-profiles: `economy`, `standard`, and `strong`. A missing active-platform
-profile is invalid and never inherits host behavior.
+A project may contain mappings for more than one supported platform. A missing
+profile or missing active-platform mapping means inherit host settings. A
+Codex-only policy remains valid for Claude without requiring Claude model IDs.
+Validate the structure of every present mapping. A present platform mapping
+without a non-empty model is malformed; it is not the same as absence.
 
 Platform-specific reasoning values are optional and remain platform-defined.
 Do not invent a canonical list of allowed values.
@@ -192,7 +193,7 @@ Before writing:
 3. re-read and compare the file with the proposal baseline; resolve intervening
    changes as described above, then validate the complete document structurally;
 4. write `.idd/execution.yaml` atomically when the host permits;
-5. re-read the file and report the final complete mapping, or the explicit
+5. re-read the file and report explicit mappings and inherited profiles, or the explicit
    `inherit` strategy.
 
 If the final policy is unchanged, report a no-op without rewriting the file.
