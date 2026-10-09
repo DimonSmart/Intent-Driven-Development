@@ -56,10 +56,11 @@ Ownership rules:
 - Factory depends on Intent;
 - Intent must not depend on Factory.
 
-The canonical Factory command set is exactly `idd-factory-run` and
-`idd-factory-configure`. Configuration owns persistent project model policy;
+The canonical Factory command set is exactly `idd-factory-run`,
+`idd-factory-configure`, and `idd-factory-update-effort-models`. Configuration
+owns persistent project model policy;
 `idd-factory-run` owns the orchestration loop and the internal planner and
-worker protocols. The internal `idd-factory-update-effort-models` workflow
+worker protocols. The `idd-factory-update-effort-models` command
 prepares lifecycle model replacements and hands authorized proposals to
 `idd-factory-configure`, which remains the sole writer. Each worker child
 executes exactly one contracted task.
@@ -108,10 +109,10 @@ and `disable-model-invocation`. Five read-only Claude skills use
 Claude host waits for their result. Forks do not inherit the caller's history;
 the caller must pass the actual request and relevant constraints.
 
-Codex generates `skills/<skill>/agents/openai.yaml` for all eight commands,
+Codex generates `skills/<skill>/agents/openai.yaml` for all nine commands,
 regardless of invocation mode. Six manual commands declare
-`allow_implicit_invocation: false`, while the two auto commands declare
-`true`. The twelve workflows remain published as `SKILL.md` without this
+`allow_implicit_invocation: false`, while the three auto commands declare
+`true`. The eleven workflows remain published as `SKILL.md` without this
 user-facing metadata file. Codex does not guarantee that these choices exactly
 control which skills appear in every host's menu.
 

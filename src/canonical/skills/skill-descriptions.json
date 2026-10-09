@@ -189,8 +189,12 @@
     }
   },
   "idd-factory-update-effort-models": {
-    "exposure": "workflow",
+    "exposure": "command",
     "invocation": "auto",
+    "interface": {
+      "displayName": "IDD Factory Models",
+      "shortDescription": "Update models assigned to Factory effort levels"
+    },
     "description": "Refresh, upgrade, downgrade, or replace the LLMs assigned to Factory effort levels economy, standard, and strong over a project's lifetime, preserving reasoning settings and applying authorized changes through idd-factory-configure."
   },
   "idd-factory-run": {

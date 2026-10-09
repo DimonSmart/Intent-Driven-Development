@@ -5,11 +5,12 @@ This page records IDD changes that require action in repositories that already u
 ## 2026-10-09 — Factory model updates use the skill exposure policy
 
 The new `idd-factory-update-effort-models` skill is registered with
-`exposure: workflow` and `invocation: auto`. It remains available to the agent
-for routed model-update requests and is hidden from the Claude Code slash menu.
-The distribution now contains 20 skills (17 Intent, 3 Factory), including the
-existing eight user commands. Factory planner and worker remain internal
-references owned by `idd-factory-run`.
+`exposure: command` and `invocation: auto`. People can select it directly,
+and the agent can select it for routed model-update requests. Codex publishes
+its display name and short description in `agents/openai.yaml`.
+The distribution now contains 20 skills (17 Intent, 3 Factory), including
+nine user commands and eleven automatic workflows. Factory planner and worker
+remain internal references owned by `idd-factory-run`.
 
 Exposure controls the user command surface; invocation independently controls
 automatic skill selection. Manual commands retain their invocation restrictions,

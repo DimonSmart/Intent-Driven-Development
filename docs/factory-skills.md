@@ -1,14 +1,13 @@
 # Factory skills
 
-IDD Factory exposes two registered user commands: `idd-factory-run` and
-`idd-factory-configure`. Both retain their previous invocation rules;
-`idd-factory-run` can also be selected automatically. Planner and worker are
-internal canonical protocols owned by `idd-factory-run`, not user-invokable
-skills. `idd-factory-update-effort-models` is registered as an automatic internal
-workflow for lifecycle model updates. Automatic workflows remain available to
-the agent and are hidden from the Claude Code slash menu. Codex currently has
-no equivalent documented visibility switch, so its automatic workflows may
-remain visible.
+IDD Factory exposes three registered user commands: `idd-factory-run`,
+`idd-factory-configure`, and `idd-factory-update-effort-models`.
+`idd-factory-run` and `idd-factory-update-effort-models` can also be selected
+by the agent automatically. `idd-factory-configure` remains manual-only.
+Planner and worker are internal canonical protocols owned by `idd-factory-run`.
+Automatic Intent workflows remain available to the agent and are hidden from
+the Claude Code slash menu. Codex currently has no equivalent documented
+visibility switch, so its automatic workflows may remain visible.
 
 ## `idd-factory-run`
 
@@ -55,8 +54,9 @@ runtime identifiers.
 
 ## `idd-factory-update-effort-models`
 
-Use this lifecycle workflow to refresh, upgrade, downgrade, or replace the LLMs
-assigned to `economy`, `standard`, and `strong`. For example, ask to reduce cost
+Select `idd-factory-update-effort-models` directly or describe the requested
+model update in natural language. Use it to refresh, upgrade, downgrade, or
+replace the LLMs assigned to `economy`, `standard`, and `strong`. For example, ask to reduce cost
 for economy only, strengthen standard, or replace an unavailable model.
 
 These effort levels are execution profiles; platform reasoning settings remain

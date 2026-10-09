@@ -11,7 +11,8 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
     private static readonly HashSet<string> Commands = new(StringComparer.Ordinal)
     {
         "idd-help", "idd-route", "idd-project-init", "idd-verification-configure",
-        "idd-glossary-build", "idd-skip", "idd-factory-run", "idd-factory-configure"
+        "idd-glossary-build", "idd-skip", "idd-factory-run", "idd-factory-configure",
+        "idd-factory-update-effort-models"
     };
 
     private static readonly HashSet<string> Manual = new(StringComparer.Ordinal)
@@ -33,8 +34,8 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
             Path.Combine(fixture.RepoRoot, "src", "canonical", "skills", "skill-descriptions.json"),
             new HashSet<string>(StringComparer.Ordinal) { "claude", "codex" });
         Assert.Equal(20, inventory.Count);
-        Assert.Equal(8, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Command));
-        Assert.Equal(12, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Workflow));
+        Assert.Equal(9, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Command));
+        Assert.Equal(11, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Workflow));
         Assert.Equal(6, inventory.Count(skill => skill.Value.Invocation == SkillInvocation.Manual));
         Assert.Equal(14, inventory.Count(skill => skill.Value.Invocation == SkillInvocation.Auto));
 
@@ -110,7 +111,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
     }
 
     [Fact]
-    public void FactoryModelUpdate_RemainsAnAutomaticWorkflowWithRoutingAndPackagedPolicy()
+    public void FactoryModelUpdate_IsUserSelectableAndAutomaticWithRoutingAndPackagedPolicy()
     {
         const string name = "idd-factory-update-effort-models";
         foreach (var platform in new[] { "claude", "codex" })
@@ -125,12 +126,17 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
             if (platform == "claude")
             {
                 var yaml = ParseYaml(GenerationFixture.ReadFrontMatter(skill));
-                AssertScalar(yaml, "user-invocable", "false");
+                AssertScalar(yaml, "user-invocable", "true");
                 AssertScalar(yaml, "disable-model-invocation", "false");
             }
             else
             {
-                fixture.AssertMissing(Path.Combine(folder, "agents", "openai.yaml"));
+                var yaml = ParseYaml(fixture.ReadText(Path.Combine(folder, "agents", "openai.yaml")));
+                var ui = Assert.IsType<YamlMappingNode>(yaml.Children[new YamlScalarNode("interface")]);
+                AssertScalar(ui, "display_name", "IDD Factory Models");
+                AssertScalar(ui, "short_description", "Update models assigned to Factory effort levels");
+                var policy = Assert.IsType<YamlMappingNode>(yaml.Children[new YamlScalarNode("policy")]);
+                AssertScalar(policy, "allow_implicit_invocation", "true");
             }
         }
     }
