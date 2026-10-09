@@ -131,6 +131,60 @@ public sealed partial class FactoryReportTests
     }
 
     [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Report_RequiredConfirmationCannotBeInferredFromSuccessfulCommand(bool declared)
+    {
+        const string policy = """
+            version: 1
+            checks:
+              build:
+                run: dotnet build
+                confirmation: required
+            default:
+              use: [build]
+            """;
+        var report = ReportWithPolicyAndCommands(policy, declared,
+            VerificationCommand("2026-09-23T10:03:00Z", "build", "dotnet build", 0, "Build succeeded."));
+        Assert.Equal("unavailable", report.Completion.ProjectVerification);
+        if (declared)
+            Assert.Equal("warning", report.Completion.ProtocolValidation);
+        else
+            Assert.NotEqual("completed", report.Run.Result);
+    }
+
+    [Fact]
+    public void Report_RequiredConfirmationDoesNotHideCommandFailure()
+    {
+        const string policy = """
+            version: 1
+            checks:
+              build:
+                run: dotnet build
+                confirmation: required
+            default:
+              use: [build]
+            """;
+        var report = ReportWithPolicyAndCommands(policy, true,
+            VerificationCommand("2026-09-23T10:03:00Z", "build", "dotnet build", 1, "Build failed."));
+        Assert.Equal("failed", report.Completion.ProjectVerification);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Report_RejectsCommandWorkingDirectoryInsideNativeArguments(bool asArgv)
+    {
+        var command = asArgv
+            ? JsonSerializer.Serialize(new { cmd = new[] { "dotnet", "test" }, workdir = "/other-repo" })
+            : JsonSerializer.Serialize(new { cmd = "dotnet test", workdir = "/other-repo" });
+        var report = ReportWithPolicyAndCommands(null, false,
+            VerificationCommand("2026-09-23T10:03:00Z", "test", command, 0, TestSummary));
+        Assert.Equal("unavailable", report.Completion.ProjectVerification);
+        Assert.NotEqual("completed", report.Run.Result);
+    }
+
+    [Theory]
     [InlineData("git status")]
     [InlineData("echo done")]
     [InlineData("dotnet restore")]
