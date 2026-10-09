@@ -7,11 +7,16 @@ native-agent Factory architecture. They are skipped unless
 The scenario builds the current generator, generates and installs the Codex
 `idd-factory` plugin, copies the `TwoStepCatalog` workspace, and invokes a real
 Codex host with `$idd-factory-run`.
+The host is started with MultiAgentV2 explicitly enabled; a model-selected
+runtime that does not report V2 fails the evaluation instead of silently
+testing a different spawn protocol.
 
 The evaluation checks observable properties:
 
 - the generated plugin contains no Factory runtime directory or `.mcp.json`;
 - the host uses native child-agent delegation;
+- the effective root runtime is MultiAgentV2 (verified from `turn_context`), and
+  every worker spawn explicitly uses `fork_turns: "none"`;
 - legacy `factory_run` / `factory_status` tools are absent from the trace;
 - the generated live-eval `execution.yaml` supplies a complete Codex mapping
   with three distinct models; every worker spawn receives the
@@ -93,9 +98,11 @@ without relying on a real vendor model's changing availability.
 
 The evaluation requires `BLOCKED` with the unavailable model named in the
 reason, no substitute or completed worker, no successful final verification,
-and unchanged execution policy and product code. If planning already occurred,
-the pending task must remain in active Factory state. Rejection before creating
-a child is valid; requested settings never prove successful execution.
+and unchanged execution policy and product code. The test requires a readable planner result, an active pending plan, and
+trace evidence of an attempted native worker spawn with the unavailable model.
+Rejection before creating a child is valid, but a mere `BLOCKED` response
+without an attempted spawn is not evidence of model unavailability. Requested
+settings never prove successful execution.
 
 When launchers supply shared artifact/temp directories, this case uses their
 `model-unavailable/` subdirectories. Its Markdown/JSON reports and source traces
