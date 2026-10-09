@@ -8,7 +8,7 @@ namespace Idd.Factory.Report;
 // Read-only interpretation of existing policy and trace evidence, not an execution engine.
 internal sealed class FinalVerificationEvidence
 {
-    private sealed record Check(string Id, string? Command);
+    private sealed record Check(string Id, string? Command, bool RequiresConfirmation = false);
     internal sealed record Observation(CodexEvent Event, string Check, string Result);
     internal sealed record Evaluation(string Result, IReadOnlyList<Observation> Observations);
 
@@ -55,10 +55,10 @@ internal sealed class FinalVerificationEvidence
                 if (check.TryGetValue("timeout", out var timeout) &&
                     !Regex.IsMatch(Scalar(timeout), @"^[1-9]\d*[smh]$"))
                     throw new FormatException($"Invalid timeout for {id}.");
-                if (check.TryGetValue("confirmation", out var confirmation) &&
-                    (command is null || Scalar(confirmation) != "required"))
+                var requiresConfirmation = check.TryGetValue("confirmation", out var confirmation);
+                if (requiresConfirmation && (command is null || Scalar(confirmation!) != "required"))
                     throw new FormatException($"Invalid confirmation for {id}.");
-                all.Add(id, new(id, command));
+                all.Add(id, new(id, command, requiresConfirmation));
             }
             var defaults = Map(Required(root, "default"));
             Only(defaults, "use");
@@ -131,6 +131,10 @@ internal sealed class FinalVerificationEvidence
             var status = item.ExitCode is not null && item.ExitCode != 0 || item.Status is "failed" or "error"
                 ? "failed" : item.ExitCode == 0 ? "passed" : "unavailable";
             if (status == "passed" && IsDotnetTest(command) && !HasExecutedTests(item.ToolOutput))
+                status = "unavailable";
+            // A successful command does not prove the user's required approval.
+            // Native command traces contain no authoritative confirmation event.
+            if (status == "passed" && check.RequiresConfirmation)
                 status = "unavailable";
             result.Add(new(item, check.Id, status));
         }
