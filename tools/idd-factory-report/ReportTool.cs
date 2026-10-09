@@ -467,7 +467,7 @@ public sealed class CodexRolloutReader
                     ToolPhase = toolPhase,
                     ToolArguments = toolArguments,
                     ToolOutput = toolOutput,
-                    CommandWorkingDirectory = String(eventObject, "cwd"),
+                    CommandWorkingDirectory = ExtractCommandWorkingDirectory(eventObject, toolArguments),
                     ExitCode = FindInt(eventObject, "exit_code", "exitCode"),
                     Status = FindString(eventObject, "status", "outcome"),
                     Usage = usage,
@@ -775,6 +775,26 @@ public sealed class CodexRolloutReader
         catch (JsonException)
         {
             return arguments;
+        }
+    }
+
+    private static string? ExtractCommandWorkingDirectory(JsonElement eventObject, string? toolArguments)
+    {
+        // Native command items may expose cwd directly; function-call wrappers
+        // put workdir in the JSON arguments alongside cmd/command.
+        var direct = FindString(eventObject, "cwd", "workdir", "working_directory", "workingDirectory");
+        if (direct is not null || string.IsNullOrWhiteSpace(toolArguments))
+            return direct;
+        try
+        {
+            using var json = JsonDocument.Parse(toolArguments);
+            return json.RootElement.ValueKind == JsonValueKind.Object
+                ? FindString(json.RootElement, "cwd", "workdir", "working_directory", "workingDirectory")
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 
