@@ -102,6 +102,21 @@
         },
         {
           "skill": "idd-intent-lint",
+          "source": "src/canonical/methodology/glossary-integration.md",
+          "destination": "glossary-integration.md"
+        },
+        {
+          "skill": "idd-intent-lint",
+          "source": "src/canonical/methodology/document-types.md",
+          "destination": "document-types.md"
+        },
+        {
+          "skill": "idd-intent-lint",
+          "source": "src/canonical/methodology/numbering.md",
+          "destination": "numbering.md"
+        },
+        {
+          "skill": "idd-intent-lint",
           "source": "src/canonical/methodology/engineering-guardrails.md",
           "destination": "engineering-guardrails.md"
         },
