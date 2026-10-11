@@ -61,9 +61,9 @@ workflows remain published without this additional UI metadata. Codex has no
 documented guarantee that these files alone show or hide particular skills in
 every user menu.
 
-For Claude Code v2.1.218+, the five read-only forked skills (`idd-help`,
-`idd-route`, `idd-intent-structure-audit`, `idd-intent-drift-audit`, and
-`idd-intent-lint`) now set `background: false` to wait for the result before
+For Claude Code v2.1.218+, the four read-only forked skills (`idd-help`,
+`idd-route`, `idd-intent-structure-audit`, and `idd-intent-drift-audit`) plus
+`idd-intent-lint` now set `background: false` to wait for the result before
 the caller continues. Forked contexts still do not inherit the caller's
 conversation history: the relevant request and constraints must be supplied.
 `idd-route` classifies without executing its recommended handoff; the caller
