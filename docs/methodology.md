@@ -144,6 +144,18 @@ idd-intent-drift-audit       implementation / Intent conformance
 .idd/verification.yaml       project-specific verification evidence
 ```
 
+Mechanical Intent lint defaults to `mode: check` (no writes). An explicitly
+authorized `mode: fix` repairs only unambiguous technical faults in
+project-owned Intent: stable filename prefixes, first headings, INDEX
+identifiers and roles, exact local references, managed formatting, and
+missing canonical README/INDEX/templates when the project is initialized.
+After one repair pass it re-checks and reports remaining errors and actual
+changed paths. No automatic Git commit, `dry-run`, or rollback is performed.
+Stable IDs are never reassigned. Semantic reorganization remains in
+`idd-intent-normalize-current`, glossary edits in `idd-glossary-build`,
+and Engineering edits in `idd-engineering-change`. Both lint modes treat
+Glossary and Engineering as read-only.
+
 Drift audit is read-only and requires an explicit focused or project-wide
 scope. Project-wide audit starts from Intent ownership and is not generic
 code-quality review.
