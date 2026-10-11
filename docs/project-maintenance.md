@@ -104,10 +104,14 @@ platform-specific `frontmatter` map stays extensible. The optional
 `exposure` describes whether IDD intends a skill as a user-facing command or
 as an automatic workflow. `invocation` separately controls whether the
 model may select it implicitly. Claude translates these to `user-invocable`
-and `disable-model-invocation`. Five read-only Claude skills use
+and `disable-model-invocation`. Four read-only Claude skills use
 `context: fork`, `agent: Explore`, and `background: false` so a compatible
 Claude host waits for their result. Forks do not inherit the caller's history;
 the caller must pass the actual request and relevant constraints.
+`idd-intent-lint` is also forked with `background: false`, but now uses
+`agent: general-purpose` and grants Edit/Write for explicit `mode: fix`.
+`mode: check` is behaviorally read-only, not sandbox-isolated: the skill
+must enforce its no-write contract, including via Bash.
 
 Codex generates `skills/<skill>/agents/openai.yaml` for all nine commands,
 regardless of invocation mode. Five manual commands declare
