@@ -66,7 +66,7 @@ public sealed class IntentLintEndToEndLiveTests
 
             var idx = Path.Combine(intent, "INDEX.md");
             File.AppendAllText(idx,
-                "| \`0001.spec-timer.md\` | Spec | Clock | Author note | — |\n" +
+                "| `0001.spec-timer.md` | Spec | Clock | Author note | — |\n" +
                 "| IDD-0002 | Spec | Integration | Keep untouched | — |\n");
 
             File.WriteAllText(Path.Combine(intent, "0001.spec-timer.md"), """
