@@ -58,7 +58,12 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
                     if (ClaudeForked.Contains(name))
                     {
                         AssertScalar(yaml, "context", "fork");
-                        AssertScalar(yaml, "agent", "Explore");
+                        AssertScalar(yaml, "agent", name == "idd-intent-lint" ? "general-purpose" : "Explore");
+                        if (name == "idd-intent-lint")
+                        {
+                            AssertScalar(yaml, "argument-hint", "[scope] [mode: check|fix]");
+                            AssertScalar(yaml, "allowed-tools", "Read Glob Grep Edit Write Bash");
+                        }
                         AssertScalar(yaml, "background", "false");
                         var background = Assert.IsType<YamlScalarNode>(yaml.Children[new YamlScalarNode("background")]);
                         Assert.Equal(YamlDotNet.Core.ScalarStyle.Plain, background.Style);
