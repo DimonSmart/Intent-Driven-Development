@@ -57,5 +57,10 @@ completes. On failure, persist only a bounded diagnostic containing the failed
 check/command, exit result, and relevant output, then invoke a fresh planner.
 That planner decides whether a correction task is required.
 
+Infrastructure failures follow the same handoff. The orchestration layer must
+not repair and retry a failed final check directly. After correction and a new
+planner `# Done`, repeat every assigned final check. A test command that exits
+zero without executing tests does not establish successful test verification.
+
 If no project verification policy is configured, `# Done` after normal worker
 checks is sufficient for Factory completion.

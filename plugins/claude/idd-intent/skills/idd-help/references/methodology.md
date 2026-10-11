@@ -152,7 +152,7 @@ IDD separates mechanical Intent validity, semantic Intent organization,
 implementation conformance, and technical verification:
 
 ```text
-idd-intent-lint              mechanical validity of .idd/intent/
+idd-intent-lint              mechanical check (default) or authorized safe fix of .idd/intent/
 idd-intent-structure-audit   semantic organization of Product Intent
 idd-intent-drift-audit       implementation conformance to Product Intent
 .idd/verification.yaml       project-specific evidence acquisition

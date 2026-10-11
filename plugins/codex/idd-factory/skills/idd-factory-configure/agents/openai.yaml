@@ -3,4 +3,4 @@ interface:
   short_description: "Configure Factory execution profiles"
 
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

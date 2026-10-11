@@ -1,0 +1,74 @@
+# Document Types
+
+## spec
+
+`spec` describes what the system should be. It is not a task list.
+
+Use `spec` when the change affects product behavior, domain contracts,
+product-significant architecture or operational constraints, compatibility
+expectations, non-goals, acceptance criteria, verification rules, or shared
+behavior.
+
+A durable technical constraint is not automatically product intent. If another
+implementation could preserve the complete product contract while still being
+forbidden by the constraint, the constraint normally belongs in the optional
+`.idd/engineering/` layer. Do not migrate existing intent automatically merely
+because it now fits this classification better.
+
+A spec document has no lifecycle status. Its presence in the current intent
+directory means that it is current. Do not mark a spec as `Current`,
+`Completed`, `Deprecated`, `Retired`, or `Superseded`. Edit the owning spec in
+place when its product area remains current; migrate remaining current intent
+and delete it when obsolete. Git history is the only history of spec revisions.
+
+Shared specification is a normal `spec`. Common rendering, input, validation,
+or dialog behavior should be a separate specification when multiple product
+areas depend on it.
+
+## adr
+
+`adr` describes a durable architectural decision, including decisions that later
+turned out to be wrong.
+
+An ADR answers why a decision seemed correct, which alternatives were
+considered, and which consequences were accepted.
+
+Accepted ADRs must not be rewritten semantically. If the decision changes,
+mark the old ADR as `Superseded` and create a new ADR that replaces it.
+
+ADR status values are:
+
+```text
+Proposed | Accepted | Superseded | Rejected
+```
+
+ADR status is part of the decision record lifecycle and does not apply to specs.
+
+ADRs are decision records, not current behavior specs. Do not archive ADRs. The
+replacing ADR should reference the superseded ADR.
+
+## spike
+
+`spike` describes an experiment, research task, or hypothesis check before a
+product or architecture decision.
+
+A spike should state the question, constraints, evaluation method, result, and
+recommended follow-up.
+
+A spike is active research only while the question is unresolved. When resolved,
+move durable product behavior into a spec, move durable architecture decisions
+into an ADR, and delete the spike unless it remains useful as active research.
+
+## Optional glossary support file
+
+`GLOSSARY.md` is not an IDD document type. It is an optional unnumbered support
+file for project-specific vocabulary.
+
+The glossary contains not all project terms, but only terms whose incorrect
+interpretation could change the understanding of product intent. It does not own
+behavior, constraints, decisions, acceptance criteria, or verification rules.
+
+Do not assign it an `IDD-NNNN` identifier and do not list it in `INDEX.md`. Its
+absence is valid and means that the project does not use a managed glossary.
+Create or change it only through the explicit manual-only
+`idd-glossary-build` workflow.

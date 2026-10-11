@@ -1,0 +1,6 @@
+interface:
+  display_name: "IDD Factory Models"
+  short_description: "Update models assigned to Factory effort levels"
+
+policy:
+  allow_implicit_invocation: true

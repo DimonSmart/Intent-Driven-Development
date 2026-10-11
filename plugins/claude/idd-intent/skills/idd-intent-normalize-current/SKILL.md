@@ -50,9 +50,10 @@ The request must provide at least one concrete focus:
 1. Topic focus: a topic to collect across current specifications.
 2. Source focus: a specific spec, section, or fragment to extract or move.
 3. Target focus: an existing or desired target specification.
-4. Mechanical cleanup focus: an existing lint failure such as stale archive
-   directory, process report under `.idd/intent`, broken obvious relation remap,
-   stale index, or legacy section shape.
+4. Semantic cleanup focus: process-only documents, legacy content sections
+   requiring meaning-preserving restructuring, archive cleanup, or disputed
+   ownership. **Purely mechanical** filename, INDEX, H1, or normative-link
+   corrections belong to `idd-intent-lint` with explicit `mode: fix`.
 
 Examples:
 
@@ -211,8 +212,10 @@ Support these scenarios:
   use `IDD-NNNN` identifiers and point to existing current documents.
 - Remove historical-only relations or rewrite them when the current target is
   obvious from the existing document set.
-- Regenerate `INDEX.md` from actual current `IDD-NNNN` documents when the index is
-  stale.
+- Maintain `INDEX.md` as required by a deliberate semantic document operation;
+  retain all existing user metadata, columns, comments and notes. Do not
+  regenerate it merely because a cell/row is mechanically malformed;
+  delegate that correction to `idd-intent-lint` `mode: fix`.
 - If deleting a document would lose current product intent, stop and report the
   conflict.
 - Report unresolved semantic ambiguity instead of guessing.
@@ -244,13 +247,14 @@ Support these scenarios:
 10. Preserve local exceptions and feature-specific behavior.
 11. Keep conflicts visible and unresolved.
 12. Update `INDEX.md` when the document set or document roles change.
-13. For mechanical cleanup focus:
-    - delete `.idd/intent/archive` if it exists;
-    - remove process reports from `.idd/intent`;
-    - regenerate `INDEX.md`;
-    - fix broken relation references where the remap is obvious;
-    - normalize document shapes;
-    - report unresolved semantic ambiguity.
+13. For semantic cleanup focus, and only after verifying meaning preservation:
+    - remove obsolete archive/process-only material with appropriate ownership;
+    - normalize substantial document shapes when semantic movement is needed;
+    - update INDEX and affected relations only as dependencies of that semantic
+      operation, preserving user metadata and stable IDs;
+    - refer standalone filename, heading, INDEX cell, and exact relation
+      representation defects to `idd-intent-lint` `mode: fix`;
+    - report unresolved semantic ambiguity without inventing a mapping.
 14. Run relevant verification.
 
 ## Conflict Handling
