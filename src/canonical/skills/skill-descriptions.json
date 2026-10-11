@@ -150,15 +150,15 @@
     "exposure": "workflow"
   },
   "idd-intent-lint": {
-    "description": "Run mechanical `.idd/intent/` consistency checks without editing files.",
+    "description": "Check mechanical `.idd/intent/` consistency (default) or safely repair unambiguous technical defects when explicitly authorized.",
     "adapters": {
       "claude": {
         "frontmatter": {
           "context": "fork",
-          "agent": "Explore",
+          "agent": "general-purpose",
           "background": false,
-          "argument-hint": "[optional spec path or scope]",
-          "allowed-tools": "Read Glob Grep Bash"
+          "argument-hint": "[scope] [mode: check|fix]",
+          "allowed-tools": "Read Glob Grep Edit Write Bash"
         }
       }
     },
