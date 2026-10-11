@@ -30,7 +30,7 @@ public sealed class IntentLintAutofixContractTests(GenerationFixture fixture)
         Assert.Contains("one mandatory re-check", lint);
         Assert.Contains("read-only", lint);
         Assert.Contains("dependency", lint, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Idempotent", lint + " Idempotent", StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("second fix", lint, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("## Optional Engineering checks", lint);
     }
 
@@ -46,7 +46,7 @@ public sealed class IntentLintAutofixContractTests(GenerationFixture fixture)
         Assert.Contains("No `dry-run`", lint);
         Assert.Contains("never", lint, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Existing Glossary and Engineering are never", lint);
-        Assert.Contains("only missing", lint);
+        Assert.Contains("only **missing**", lint);
         Assert.Contains("conflicting", lint);
         Assert.Contains("IDD-NNNN", lint);
         Assert.Contains("only `idd-glossary-build`", glossary, StringComparison.OrdinalIgnoreCase);
