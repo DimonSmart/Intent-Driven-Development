@@ -46,7 +46,7 @@ public sealed class IntentLintAutofixContractTests(GenerationFixture fixture)
         Assert.Contains("No `dry-run`", lint);
         Assert.Contains("never", lint, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Existing Glossary and Engineering are never", lint);
-        Assert.Contains("only **missing**", lint);
+        Assert.Contains("copy **only missing** files", lint);
         Assert.Contains("conflicting", lint);
         Assert.Contains("IDD-NNNN", lint);
         Assert.Contains("only `idd-glossary-build`", glossary, StringComparison.OrdinalIgnoreCase);
