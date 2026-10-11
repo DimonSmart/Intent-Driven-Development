@@ -27,6 +27,30 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
             intentRoot, "skills", "idd-project-init", "assets", "bootstrap", ".idd", "intent", "README.md"));
         fixture.AssertMissing(Path.Combine(
             intentRoot, "skills", "idd-project-init", "assets", "bootstrap", ".idd", "engineering"));
+        var lintRoot = Path.Combine(intentRoot, "skills", "idd-intent-lint");
+        foreach (var path in new[] { "README.md", "INDEX.md",
+                     Path.Combine("_templates", "spec.md"),
+                     Path.Combine("_templates", "adr.md"),
+                     Path.Combine("_templates", "spike.md") })
+        {
+            var canonical = fixture.ReadText(Path.Combine(
+                fixture.RepoRoot, "src", "canonical", "project-files", "intent", path));
+            var packaged = fixture.ReadText(Path.Combine(
+                lintRoot, "assets", "bootstrap", ".idd", "intent", path));
+            Assert.Equal(GenerationFixture.NormalizeText(canonical),
+                         GenerationFixture.NormalizeText(packaged));
+        }
+        fixture.AssertMissing(Path.Combine(
+            lintRoot, "assets", "bootstrap", ".idd", "engineering"));
+        foreach (var reference in new[] { "numbering.md", "document-types.md",
+                                          "glossary-integration.md", "engineering-guardrails.md" })
+        {
+            var canonical = fixture.ReadText(Path.Combine(
+                fixture.RepoRoot, "src", "canonical", "methodology", reference));
+            var packaged = fixture.ReadText(Path.Combine(lintRoot, "references", reference));
+            Assert.Equal(GenerationFixture.NormalizeText(canonical),
+                         GenerationFixture.NormalizeText(packaged));
+        }
         fixture.AssertFile(Path.Combine(
             intentRoot, "skills", "idd-engineering-change", "assets", "bootstrap", ".idd", "engineering", "README.md"));
         fixture.AssertFile(Path.Combine(

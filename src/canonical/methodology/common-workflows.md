@@ -475,6 +475,30 @@ preservation boundary solely from code.
 
 ## Workflow Family: Intent Maintenance
 
+### Mechanical Intent check and repair
+
+```text
+Check IDD formal consistency -> idd-intent-lint mode: check (default, read-only)
+Check and explicitly fix mechanical IDD errors -> idd-intent-lint mode: fix
+```
+
+Lint preserves all existing checks and reports remaining mechanical errors
+after repair. Only uniquely determined technical repairs (stable filename
+prefixes and H1, INDEX Document/Role cells, local links and formal relations,
+missing canonical project bootstrap files, and managed heading/separator
+syntax) can be fixed. There is no `dry-run` or automatic commit/rollback:
+use `git diff` and `git status` to inspect the actual work. Scope is
+project-owned `.idd/intent/` by default; optional Glossary and Engineering
+validation remains read-only in both modes. A missing `.idd/intent/` belongs
+to `idd-project-init`.
+
+Lint never deletes obsolete documents, process reports or archives, makes
+Product Intent decisions, edits `GLOSSARY.md`, or changes Engineering Rules
+and allocator state. It reports those findings and hands them to their owning
+semantic workflow. Existing write-workflows remain responsible for the
+mechanical correctness of their own output without requiring a separate
+user invocation or recursively dispatching lint.
+
 ### Normalize Current Intent
 
 ```text
@@ -485,6 +509,11 @@ idd-intent-structure-audit if the problem is broad
 -> idd-intent-normalize-current --mode apply
 -> idd-intent-lint
 ```
+
+Mechanical filename, INDEX, H1, and normative-reference corrections are
+owned by `idd-intent-lint` in `mode: fix`, not by a normalization pass.
+Substantive deletion of archive/process-only documents, ownership remapping,
+and split/merge/move remain deliberate semantic normalization.
 
 Normalization may change ownership, location, grouping, references, and
 document boundaries. It must not change product behavior, constraints,

@@ -117,6 +117,21 @@ investigate an unresolved decision in a spike as `product-change` (or `unclear`
 when a required product decision is missing). Route them through
 `idd-intent-change`, never a separate public document-creation skill.
 
+Route mechanical Intent validation and permitted technical corrections to
+`intent-lint`: "check", "validate", or "find errors" means `mode: check`
+with no writes; "check and fix", "repair IDs/INDEX/technical references"
+means `mode: fix` only with explicit write authorization. Preserve the
+original scope, permissions and prohibitions in the handoff. "Fix the lint
+skill itself" is an implementation-change request, not permission to
+run project `idd-intent-lint` in fix mode. Semantic duplications belong to
+`intent-structure-audit`; moves, splits, merges and substantive deletions
+belong to `intent-normalization`; changing product behavior belongs to
+`product-change`; Glossary changes belong to `idd-glossary-build`,
+Engineering changes to `engineering-change`. If the user asks to bring all
+documents into the latest format, do not infer authorization for semantic
+migrations or blanket formatting: apply only the requested canonical
+mechanical fixes and diagnose the rest.
+
 Use `engineering-change` when the user explicitly adds, modifies, or removes a durable implementation-only project constraint. Do not route to Engineering merely because current code repeats a pattern; source code alone is not an explicit durable policy decision.
 
 For `product-change` and `engineering-change`, set `Operation` to `add`, `modify`, or `remove` according to the required reference. For every other classification, set `Operation: not-applicable`.
@@ -252,6 +267,10 @@ Apply these rules:
   temporary context, or known compatibility information. The bootstrap skill
   must still obtain its own project-boundary and semantic proposal
   confirmations before writing current intent.
+- For `intent-lint`, pass the complete original request, explicit
+  `mode: check|fix`, the requested scope, and read-only restrictions.
+  Only an unambiguous user request can authorize `fix`. The router
+  remains read-only and must not apply lint fixes itself.
 - For `factory-model-update`, preserve selected levels, target platform, exact
   model IDs, cost/quality/latency goals, and review-only limits. Continue through
   `idd-factory-update-effort-models -> idd-factory-configure` when application is

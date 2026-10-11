@@ -69,7 +69,7 @@ Explain these mechanisms distinctly:
 
 ```text
 idd-intent-lint
-    mechanical validity of .idd/intent/
+    mechanical validity of .idd/intent/ (check by default; safe fix on explicit request)
 
 idd-intent-structure-audit
     semantic structure and ownership of Product Intent
@@ -85,7 +85,11 @@ For long-lived code that may have drifted from intent, recommend
 `idd-intent-drift-audit` and require an explicit focused or project-wide scope.
 For split/merge, ownership, duplication, or organization questions, recommend
 `idd-intent-structure-audit`. For broken references, duplicate IDs, invalid
-metadata, or INDEX consistency, recommend `idd-intent-lint`.
+metadata, or INDEX consistency, recommend `idd-intent-lint` in
+`mode: check` for read-only inspection or `mode: fix` only with explicit
+permission to make unambiguous mechanical changes. This does not give
+`idd-help` permission to mutate anything; semantic normalization,
+Glossary and Engineering edits stay in their owning workflows.
 
 Build, test, lint, analyzer, CI, and repository-specific evidence belongs to
 project verification policy and the implementation/Factory workflows that

@@ -141,6 +141,7 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
         var skillBootstrapDestination = skillName switch
         {
             "idd-project-init" => ".idd/intent",
+            "idd-intent-lint" => ".idd/intent",
             "idd-engineering-change" => ".idd/engineering",
             "idd-intent-import" => ".idd/engineering",
             _ => null
