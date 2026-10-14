@@ -48,13 +48,16 @@ The direction is maximum economy: native child agents, no model-driven polling, 
 
 ## Quick Start
 
-Start with the standalone `idd-intent` plugin.
+Install the core `idd-intent` plugin. For complex, multi-step implementation tasks, you can also install the optional `idd-factory` plugin.
 
 ### Claude Code
 
 ```bash
 claude plugin marketplace add DimonSmart/Intent-Driven-Development@marketplace
 claude plugin install idd-intent@intent-driven-development
+
+# Optional: Factory orchestration
+claude plugin install idd-factory@intent-driven-development
 ```
 
 ### Codex
@@ -62,6 +65,9 @@ claude plugin install idd-intent@intent-driven-development
 ```bash
 codex plugin marketplace add DimonSmart/Intent-Driven-Development --ref marketplace
 codex plugin add idd-intent@intent-driven-development
+
+# Optional: Factory orchestration
+codex plugin add idd-factory@intent-driven-development
 ```
 
 Questions about IDD itself can be addressed at any time by manually invoking `idd-help`. Use it to ask how the methodology works, why a workflow is chosen, what a skill does, or how a particular IDD rule should be interpreted.
@@ -85,19 +91,7 @@ registered workflow automatically. For example:
 Help me clarify a feature that lets users compare two local folders without modifying either side. Do not change files yet.
 ```
 
-For a complex implementation task, add the optional Factory plugin later:
-
-### Claude Code
-
-```bash
-claude plugin install idd-factory@intent-driven-development
-```
-
-### Codex
-
-```bash
-codex plugin add idd-factory@intent-driven-development
-```
+For complex implementation tasks, use `idd-factory-run` after installing the optional Factory plugin above.
 
 ## Commands, automatic workflows, and internal protocols
 
