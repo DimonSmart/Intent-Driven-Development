@@ -1,6 +1,6 @@
 interface:
-  display_name: "IDD Factory Config"
-  short_description: "Configure Factory execution profiles"
+  display_name: "IDD Factory Configure"
+  short_description: "Configure, review, and refresh Factory models"
 
 policy:
   allow_implicit_invocation: true

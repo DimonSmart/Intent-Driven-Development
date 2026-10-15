@@ -178,33 +178,42 @@ The same canonical Factory worker protocol is used for every execution profile.
 Profiles affect native child-agent model settings, not worker instructions.
 The worker never selects its own model.
 
-## Configuration workflow
+## Configuration lifecycle
 
-`idd-factory-configure` is the only Factory workflow that creates or
-deliberately changes `.idd/execution.yaml`.
+`idd-factory-configure` is the **single** Factory configuration, model-review,
+and lifecycle refresh skill. It owns initial setup, exact assignments, read-only
+reviews, alternative selection, and authorized persistence to
+`.idd/execution.yaml`. No second update skill or persistence handoff exists.
 
-`idd-factory-update-effort-models` is the lifecycle entry point for refreshing,
-upgrading, downgrading, or replacing the models assigned to those profiles. It
-prepares a proposal and hands it to `idd-factory-configure` with the original
-request, policy baseline, and user authorization. It does not introduce a second
-policy writer or change planner classification. Preserve unaffected mappings,
-other platform sections, and reasoning settings unless explicitly requested.
+An absent policy means inheritance, not a prompt to create a policy during
+read-only review. Exact, unambiguous user-authorized model IDs do not require
+separate approval or autonomous research. Automatically selected or interpreted
+alternatives require explicit confirmation; review-only requests never write.
+Only an initial configuration with an absent policy and no previously chosen
+strategy needs a blocking `default (inherit)` versus `configure` choice.
 
-The configuration owner compares current policy with the proposal baseline
-before saving. Intervening edits require a revised proposal, with a new decision
-when the authorized result changes. An unchanged policy is not rewritten. Exact
-user-authorized replacements or an already confirmed proposal do not require
-the same decision again; review-only requests never authorize a write.
+Preserve unselected profiles, platform mappings, and optional reasoning values
+(including absence). One-model-for-many-profiles is valid. A reasoning-only
+override without a concrete model is invalid. To inherit one mapping, remove
+that mapping; to inherit all profiles, use global `modelStrategy: inherit`.
+The final mapping may be an empty `executionProfiles: {}` when the last
+explicit override was removed without a request to change the global strategy.
 
-When proposing a mapping, obtain model information in this order when available:
+Research alternative models only when needed. Prefer native host capabilities,
+platform-provided information, and fresh verifiable vendor documentation.
+For exact user assignments, this hierarchy does not override the provided ID.
+Never infer vendor model quality, price, latency, reasoning compatibility, or
+per-account availability from names. If a proposed model is known to conflict
+with preserved reasoning, block that candidate until separately resolved;
+unknown compatibility is reported as uncertainty, not a forced fallback.
 
-1. native host capability/model catalog;
-2. current platform-provided model information;
-3. current platform documentation or knowledge available to the agent;
-4. concrete model IDs supplied by the user.
+Before an authorized save, validate every mapping (including inactive-platform
+ones), preserve a baseline of the file or its absence, show the relevant diff,
+and re-read immediately before writing. Rebase **only** authorized operations
+onto a valid concurrent version; get a new decision when the approved result
+would change. Stop on unsafe conflicts. Perform a no-op without a file write
+when nothing changes; prefer supported atomic persistence and re-read after
+saving. Never silently reset malformed input to inheritance.
 
-Do not claim account/workspace availability merely because a vendor model exists.
-If account-specific availability cannot be verified, say so in the proposal.
-
-Automatically proposed mappings require explicit user confirmation before they
-are persisted.
+Policy changes apply at the next worker spawn; the planner's complexity
+classification and already running workers are unaffected.

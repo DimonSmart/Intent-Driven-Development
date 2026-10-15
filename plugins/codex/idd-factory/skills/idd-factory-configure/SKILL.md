@@ -1,79 +1,69 @@
 ---
 name: idd-factory-configure
-description: Configure project-owned Factory execution-profile mappings in .idd/execution.yaml for an explicit user request or authorized workflow handoff; confirm automatically proposed changes before saving, without hardcoded model recommendations.
+description: "Configure and review project-owned Factory model policy in .idd/execution.yaml: initial setup, exact edits, read-only comparisons, and evidence-based model refresh, with authorization before selected changes are saved."
 ---
 
 # IDD Factory Configure
 
-Configure the project-owned Factory execution policy in `.idd/execution.yaml`.
-This skill is reusable: use it during initial Factory enablement or later to
-change, simplify, or refresh model mappings.
+Manage project-owned Factory model-selection policy in `.idd/execution.yaml` throughout
+the project lifecycle: initial setup, exact edits, read-only review, and
+evidence-based model refresh. This is the **only** skill that validates and
+writes Factory model policy; no separate model-update command or writer exists.
 
-Read `references/factory-execution-policy.md` before editing the policy.
+**First** read `references/factory-execution-policy.md`. Do not read or change
+`.idd/factory/current/`, Product Intent, Engineering Rules, the Factory runtime,
+planner classification, or existing child agents. Configuration is operational
+policy, not durable product or engineering intent.
 
-## Activation and authorization
+## Interpret the request and authorization
 
-People may select this command directly. The agent may also activate it for
-explicitly requested configuration during project initialization or an
-`idd-factory-update-effort-models` handoff. Automatic activation alone does not
-authorize a policy write. Preserve the original request and its scope through
-every handoff; a review-only request must remain read-only.
+Read the original user request, not merely a router summary. Direct invocation
+of this skill does not require `idd-route`. Recognize these modes:
 
-Apply only exact user-authorized changes or an explicitly confirmed proposal.
-Automatically selected or interpreted mappings require confirmation before
-saving. Reuse existing authorization without repeating the same decision.
-An absent policy or worker failure alone does not authorize configuration.
-This skill remains the sole owner of policy validation and persistence.
+- **Initial setup:** Factory is being explicitly configured, the policy is absent,
+  and no strategy was chosen previously. Ask one blocking strategy choice below.
+  Reuse an answer already obtained by `idd-project-init` or by the user.
+- **Exact edit:** user specifies concrete model IDs and/or explicit reasoning
+  edits, platforms and profiles, or requests inheritance. Apply only those
+  unambiguous authorized operations; do not research alternatives or ask for
+  redundant confirmation. A request to apply an exact ID is authorization for
+  that edit even if its availability cannot be verified.
+- **Review-only:** read, compare, or recommend without writing, including
+  "propose but do not change." Return findings/proposals only; do not create
+  `.idd/execution.yaml`, request write permission, or start Factory.
+- **Refresh/selection:** cheaper economy, faster standard, stronger strong,
+  upgrade/downgrade, outdated model review, or comparing available options.
+  Research only the requested platforms/profiles/criteria, propose changes with
+  evidence, and obtain explicit approval before writing. A newer release alone
+  is not a reason to change a working assignment.
 
-## Scope
+Automatic activation alone does not authorize a policy write. An absent file,
+an observed worker failure, and an agent-selected recommendation do not authorize
+a change. **A review-only request must not write the policy.** Reuse already
+confirmed, unchanged choices instead of asking again. If scope is ambiguous,
+request the specific missing decision; never silently expand scope.
 
-This workflow owns only Factory model-selection policy. It does not:
+Use the active host platform unless the user names another supported platform.
+Factory supports only `economy`, `standard`, `strong`; these describe task
+complexity, **not** vendor-specific `reasoningEffort` or `effort`.
 
-- change Product Intent or Engineering Rules;
-- edit Factory temporary state under `.idd/factory/current/`;
-- create a workflow runtime, resolver service, process supervisor, or MCP
-  orchestration layer;
-- perform per-worker model selection during a Factory run;
-- modify mappings automatically after failures.
+## Read and validate existing policy
 
-The project configuration is authoritative user policy.
+Read `.idd/execution.yaml`, or record that it is absent, and preserve its
+complete contents/absence as the baseline. Validate **all** present mappings
+with the referenced structural contract, including mappings for the inactive
+platform. A malformed existing policy is a blocking diagnostic, not permission
+to reset it or treat it as absent. Repair only with explicit authorization.
 
-## Model-update handoff
+Missing policy means `inherit (host)` for every platform/profile, with no
+concrete model ID known or implied. Global `modelStrategy: inherit` has the same
+effective inheritance. Do not claim to know the actual host model or copy it
+into mappings. Review-only use must not create the file.
 
-`idd-factory-update-effort-models` may hand off a complete proposal, the original
-request, the baseline policy contents or absence, and user authorization. Load
-that context and finish configuration in the same request. Preserve unselected
-profiles, other platform sections, and existing reasoning settings, including
-omitted settings, unless their change is explicitly requested.
+## Initial strategy choice
 
-Reuse an already confirmed proposal. Exact, unambiguous instructions to apply
-specified model replacements authorize those replacements; do not ask the same
-decision again. Automatically selected or interpreted replacements still need
-confirmation. A review-only request must not write the policy.
-
-Compare the current file with the supplied baseline before applying. If it has
-changed, rebase the requested replacements onto current policy and show the
-revised proposal. Obtain a new decision when the previously authorized result
-would change. Never save a stale snapshot over intervening edits.
-
-## Read current state
-
-Read `.idd/execution.yaml` when it exists and validate it using the bounded
-structural rules in the reference. Retain its contents or absence as the
-proposal baseline; a handed-off baseline must also be checked against this read.
-
-A malformed existing policy is a blocking diagnostic. Show the diagnostic and
-repair it as part of configuration; do not silently replace its strategy.
-
-If the file is absent, the effective policy is `inherit` for every profile;
-Factory can run without creating the file. When the user invokes this workflow
-to configure a policy, save either explicit `inherit` or the requested partial
-or full mapping.
-
-## Top-level choice
-
-When the user has not already supplied an unambiguous policy, ask one blocking
-single-choice question with these answer values and meanings:
+Only when actual first-time configuration requires a strategy choice that the
+user has not already made, ask one blocking question:
 
 ```text
 Which LLM strategy should Factory use for worker tasks?
@@ -82,145 +72,125 @@ Which LLM strategy should Factory use for worker tasks?
 - configure — explicitly configure models for selected economy, standard, or strong profiles
 ```
 
-Use native structured interaction when the active host exposes it:
+Use native interaction when available: Codex `request_user_input`, Claude Code
+`AskUserQuestion`; otherwise use a concise plain-text question. No second
+question when the answer came from `idd-project-init`.
 
-- Codex: `request_user_input`;
-- Claude Code: `AskUserQuestion`.
-
-Do not reproduce the tool schema in this skill. If structured interaction is
-unavailable, ask one concise blocking plain-text question.
-
-## `default` / `inherit`: use the current model for all tasks
-
-Persist the explicit intentional choice:
+An explicitly selected `default`/`inherit` may be saved, when authorized, as:
 
 ```yaml
 version: 1
-
 factory:
   modelStrategy: inherit
 ```
 
-This means Factory does not pass a Factory-specific model or reasoning override
-for `economy`, `standard`, or `strong`.
+For `configure`, create `executionProfiles` only for requested platform/profile
+mappings. All missing mappings inherit host behavior. Do not require a model
+for every profile, install-time defaults, or an automatic configuration merely
+because the policy is absent.
 
-Do not resolve `inherit` to the current model name and do not copy a session
-model ID into the file. `default` and `inherit` are equivalent user answers;
-persist only `modelStrategy: inherit`.
+## Exact changes and minimality
 
-## `configure`: configure selected task-complexity levels
+Express changes as a set of authorized operations on specific
+`platform / profile / field` entries (or an explicitly requested global strategy).
+Preserve every other profile, other platform, model, and reasoning field,
+including intentionally absent optional fields. Examples:
 
-Use exactly these semantic profiles:
+- Replacing `economy.codex.model` preserves its `reasoningEffort` if present,
+  every `claude` mapping, and every unselected profile.
+- Editing only `reasoningEffort` or Claude `effort` requires an existing model
+  mapping. Never create a reasoning-only mapping: ask for a concrete model or
+  report the operation cannot be represented.
+- Returning one mapping to inheritance **removes** the corresponding platform
+  mapping and removes an empty profile section. Never persist `model: inherit`,
+  `model: default`, null, or blank.
+- Explicitly returning **all** Factory profiles to inheritance writes global
+  `modelStrategy: inherit` and removes `executionProfiles`.
+- Removing the final mapping without a global-strategy request may leave valid
+  `executionProfiles: {}` instead; do not silently change strategies.
+- Switching from absent policy or global inherit to selected explicit overrides
+  uses **only** `executionProfiles`; never mix the two strategy shapes.
 
-```text
-economy
-standard
-strong
-```
+A concrete model ID can be shared by several profiles. Do not substitute an
+agent-preferred model for an exact requested ID or reject an otherwise valid ID
+merely because native model availability is unknown. State uncertainty rather
+than inventing model-validation results.
 
-Prepare one proposed policy for the requested scope. Do not require model IDs
-for unselected profiles or platforms. Partial mappings are valid; absent
-mappings inherit host model/reasoning settings. Preserve unselected existing
-mappings and intentional absence. A request to return one profile/platform to
-inheritance removes that mapping; do not persist `default`, `inherit`, a null,
-or a blank model as a placeholder. Clean up an empty profile section if needed.
-To return every profile/platform to inheritance, use `modelStrategy: inherit`.
+## Refresh, research, and comparison
 
-Use the best current information available in this order:
+When the request actually requires selecting alternatives, prefer:
 
-1. native host capability/model catalog;
-2. current platform-provided model information;
-3. current platform documentation or knowledge available to the agent;
-4. concrete model IDs supplied by the user.
+1. the active host's native model catalog and validation capabilities;
+2. current platform information and models available to the user;
+3. fresh vendor documentation, verified with available tools;
+4. user information as supplementary evidence.
 
-The proposal may include optional platform-supported reasoning settings. Do not
-hardcode recommended concrete model IDs in IDD source and do not assume a model
-is available to this account/workspace merely because it exists. State any
-availability uncertainty.
+This precedence is for **researching alternatives**, not overriding exact user
+instructions. Consider target complexity, quality, cost, latency, available
+reasoning controls, and user constraints. Explain which source was used and
+how current it is. Never infer these properties or account availability from
+the model's spelling. IDD must not hardcode a table of recommended concrete IDs
+or require distinct models for different profiles. Do not persist the aliases
+`cheapest`, `best`, `strongest`, `latest`, or `recommended` as model IDs.
 
-When model selection or interpretation is needed, present the whole proposed
-policy and obtain one blocking decision. Reuse a complete already-authorized
-handoff instead of asking again:
+An inherited current value is displayed as `inherit (host)`, not a guessed
+model. A request to "update existing models" with no explicit mappings does
+not authorize creating overrides: explain the inherited state and propose
+concrete options only for an explicitly chosen scope. If current evidence is
+insufficient for reliable comparison or host compatibility, state the unknowns
+and request concrete IDs or a bounded alternative rather than inventing a winner.
 
-```text
-Use proposed mapping
-Edit mapping
-Use default (inherit) for everything
-```
+Preserve existing optional reasoning settings during model replacements.
+If a candidate is **known** to be incompatible with a preserved
+`reasoningEffort`/`effort`, show the conflict and block that candidate until
+a compatible model or a separately authorized reasoning edit is selected.
+Unknown compatibility is uncertainty, not proof of incompatibility. A host
+rejection at spawn is the authoritative error: do not silently switch models,
+drop reasoning, or revert to inherit in response.
 
-Never save an automatically proposed mapping before explicit confirmation.
+For review or proposals involving existing mappings, show a comparison with at
+least platform/profile, current model, proposed model, previous/proposed reasoning,
+and rationale. Identify targeted and unchanged scope, recommendation sources
+and freshness, unverified account availability, and confirmation required.
+For global inherit, a short resulting-strategy explanation is sufficient.
 
-If the user chooses edit, accept either structured edits or a natural-language
-policy such as using a cheaper model only for simple tasks and one specified
-model for the other profiles. Resolve dynamic descriptions during this
-configuration turn to concrete model IDs. Show the resulting concrete mapping
-before saving whenever interpretation was needed.
+Ask one explicit decision for automatically chosen or ambiguously interpreted
+changes: **Apply**, **Edit**, or **Reject**. An edited proposal requiring
+interpretation must be presented again; do not ask again for an unchanged
+previously approved decision. An exact unambiguous user-authored mapping needs
+no further approval. If rejected or review-only, stop with no writes.
 
-Do not persist runtime aliases such as:
+## Validate and persist authorized changes safely
 
-```text
-cheapest
-best
-strongest
-latest
-recommended
-```
+1. Record the baseline (including absence versus presence), validate all
+   existing sections, and derive only operations authorized by the user.
+2. Prepare the minimal candidate, show the comparison/diff and collect any
+   required approval. Do not write in review-only, rejected, or unapproved modes.
+3. **Immediately before saving**, re-read the file and compare with the
+   baseline, including absent-to-present and present-to-absent transitions.
+   If changed, revalidate and rebase only the authorized operations onto the
+   new current policy; never overwrite intervening edits with a stale snapshot.
+   If changes conflict or alter an already approved result, show the revised
+   proposal and seek a new decision. Stop rather than risk loss of user edits.
+4. Validate the **complete** resulting document: `version: 1`; exactly one
+   `factory.modelStrategy: inherit` or `factory.executionProfiles` mapping;
+   only supported profiles and `codex`/`claude` platforms; valid nonempty
+   explicit `model`; optional nonempty `reasoningEffort` for Codex or
+   `effort` for Claude. No malformed inactive-platform mapping, mixed
+   strategy, placeholder alias, or invented effort-value allowlist.
+5. If semantically/structurally unchanged, report **no-op**, without rewriting
+   formatting or timestamps. Otherwise use the host's supported safe/atomic
+   write if available, preserving unrelated user data and formatting.
+   If preservation or safe conflict handling is unavailable, stop with
+   diagnostics rather than overwrite changes.
+6. Re-read the saved policy; report exact overrides and inherited profiles.
+   Updated policy applies only at the **next worker spawn**, without
+   replanning. Already running workers and the planner profile do not change.
 
-## Platform sections
-
-Store concrete overrides only where requested, or global `modelStrategy: inherit`.
-
-Conceptually:
-
-```yaml
-version: 1
-
-factory:
-  executionProfiles:
-    economy:
-      codex:
-        model: <concrete-model-id>
-        reasoningEffort: <optional-platform-value>
-    standard:
-      codex:
-        model: <concrete-model-id>
-    strong:
-      codex:
-        model: <concrete-model-id>
-        reasoningEffort: <optional-platform-value>
-```
-
-A project may contain mappings for more than one supported platform. A missing
-profile or missing active-platform mapping means inherit host settings. A
-Codex-only policy remains valid for Claude without requiring Claude model IDs.
-Validate the structure of every present mapping. A present platform mapping
-without a non-empty model is malformed; it is not the same as absence.
-
-Platform-specific reasoning values are optional and remain platform-defined.
-Do not invent a canonical list of allowed values.
-
-The user may intentionally assign the same model to multiple profiles. Preserve
-that choice exactly; do not "improve" a `strong` mapping to another model.
-
-## Save
-
-Before writing:
-
-1. show a table with profile, current model/reasoning, and proposed
-   model/reasoning when updating a mapping;
-2. obtain required confirmation;
-3. re-read and compare the file with the proposal baseline; resolve intervening
-   changes as described above, then validate the complete document structurally;
-4. write `.idd/execution.yaml` atomically when the host permits;
-5. re-read the file and report explicit mappings and inherited profiles, or the explicit
-   `inherit` strategy.
-
-If the final policy is unchanged, report a no-op without rewriting the file.
-
-Switching from explicit mappings back to all-inherit replaces the explicit
-mapping with `modelStrategy: inherit`.
-
-Do not modify `.idd/factory/current/` while configuring execution policy.
+The only project-owned model policy is optional `.idd/execution.yaml`.
+Do not modify `.idd/factory/current/`, run Factory, spawn workers, migrate
+valid policies, or introduce a second persistence service. Git provides
+configuration history.
 
 ## Codex Factory model configuration
 

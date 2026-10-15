@@ -180,22 +180,13 @@
     "exposure": "workflow"
   },
   "idd-factory-configure": {
-    "description": "Configure project-owned Factory execution-profile mappings in .idd/execution.yaml for an explicit user request or authorized workflow handoff; confirm automatically proposed changes before saving, without hardcoded model recommendations.",
+    "description": "Configure and review project-owned Factory model policy in .idd/execution.yaml: initial setup, exact edits, read-only comparisons, and evidence-based model refresh, with authorization before selected changes are saved.",
     "invocation": "auto",
     "exposure": "command",
     "interface": {
-      "displayName": "IDD Factory Config",
-      "shortDescription": "Configure Factory execution profiles"
+      "displayName": "IDD Factory Configure",
+      "shortDescription": "Configure, review, and refresh Factory models"
     }
-  },
-  "idd-factory-update-effort-models": {
-    "exposure": "command",
-    "invocation": "auto",
-    "interface": {
-      "displayName": "IDD Factory Models",
-      "shortDescription": "Update models assigned to Factory effort levels"
-    },
-    "description": "Refresh, upgrade, downgrade, or replace the LLMs assigned to Factory effort levels economy, standard, and strong over a project's lifetime, preserving reasoning settings and applying authorized changes through idd-factory-configure."
   },
   "idd-factory-run": {
     "description": "Prepare required durable Product Intent and explicit Engineering policy before starting a new run, then orchestrate incremental planning and isolated native-agent workers while mechanically applying project-owned execution-profile mappings.",
