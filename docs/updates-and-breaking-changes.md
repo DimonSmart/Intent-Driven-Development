@@ -1,5 +1,22 @@
 # Updates and Breaking Changes
 
+## 2026-10-15 — IDD Intent router is an automatic workflow
+
+`idd-route` changed from a user command to an automatic, read-only workflow.
+IDD Intent now has five user commands and twelve workflows; Factory keeps its
+two commands. All nineteen registered skills remain packaged, and existing
+routing classifications, handoffs, and manual-only command restrictions remain
+unchanged. For route diagnostics, describe the request naturally and ask to
+classify without execution.
+
+Claude Code now generates `user-invocable: false` and
+`disable-model-invocation: false` for `idd-route`. Codex still includes
+`idd-route/SKILL.md`, but no longer generates its
+`agents/openai.yaml`; this is not a guaranteed UI-hiding control for every
+Codex host. Update/reinstall `idd-intent` and start a new session to discard
+obsolete installed metadata. No project-owned `.idd/` migration is required.
+See [Updating IDD](updating-idd.md).
+
 ## 2026-10-15 — One Factory model-management command
 
 `idd-factory-configure` now handles initial setup, exact model/reasoning edits,

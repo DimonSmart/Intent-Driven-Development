@@ -97,13 +97,16 @@ For complex implementation tasks, use `idd-factory-run` after installing the opt
 
 IDD distinguishes three kinds of capabilities:
 
-- **User commands** are registered skills intended for direct invocation: `idd-help`,
-  `idd-route`, `idd-project-init`, `idd-verification-configure`,
-  `idd-glossary-build`, `idd-skip`, and (with Factory installed)
-  `idd-factory-run` and `idd-factory-configure` (setup, exact edits, review, and model refresh).
+- **User commands** are the five IDD Intent skills intended for direct invocation:
+  `idd-help`, `idd-project-init`, `idd-verification-configure`,
+  `idd-glossary-build`, and `idd-skip`. The optional Factory plugin adds
+  `idd-factory-run` and `idd-factory-configure` (setup, exact edits, review,
+  and model refresh).
 - **Automatic workflows** are registered skills selected by the Coding Agent from
-  a natural-language request (for example: intent change, import, lint,
-  conformance audit, or implementation). They are not separate user commands.
+  a natural-language request (for example: `idd-route`, intent change, import,
+  lint, conformance audit, or implementation). `idd-route` is an internal
+  read-only classifier, not a separate user command. To inspect a route, ask
+  naturally which workflow would apply and explicitly say not to execute it.
 - **Internal protocols** are not registered skills: Factory planner, Factory
   worker, and Intent document creation are supplied as references to their
   owning workflows.
@@ -111,7 +114,8 @@ IDD distinguishes three kinds of capabilities:
 Claude Code hides automatic workflows from the slash-command menu but retains
 model invocation. Codex retains all registered skills and implicit invocation;
 its current skill metadata has no equivalent guaranteed user-menu visibility
-control. Describe the outcome and scope instead of invoking hidden Claude skills
+control. Hiding a command does not change manual-only invocation restrictions.
+Describe the outcome and scope instead of invoking hidden Claude skills
 directly. See [IDD Use Cases](docs/using-idd.md) for examples.
 
 ## Update an Existing Installation

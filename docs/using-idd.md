@@ -28,12 +28,16 @@ Engineering boundary and rule format.
 
 ## Selecting a workflow
 
-Use the explicit user commands when you want to invoke one directly. Other
-registered workflows are automatically selected from requests phrased in
-ordinary language. In Claude Code these automatic workflows are hidden from
-the slash-command menu while remaining available to the model. Codex retains
-all skills and may still show them for explicit invocation because the platform
-does not provide an equivalent documented menu-visibility setting.
+The five explicit IDD Intent commands are `idd-help`, `idd-project-init`,
+`idd-verification-configure`, `idd-glossary-build`, and `idd-skip`.
+Each is manual-only: routing may recommend it but cannot invoke it automatically.
+The optional Factory plugin exposes `idd-factory-run` and `idd-factory-configure`.
+Other registered workflows, including the read-only `idd-route` router, are
+automatically selected from natural-language requests. In Claude Code these
+automatic workflows are hidden from the slash-command menu while remaining
+available to the model. Codex retains all registered skills; omitting
+`agents/openai.yaml` for workflows does not guarantee their absence from
+every host's user-visible skill list.
 
 Internal protocols (Factory planner, Factory worker and Intent document creation)
 are references belonging to other skills, not standalone commands.
@@ -286,11 +290,19 @@ IDD is actively developed, and new versions are released periodically. Follow [U
 
 ## Inspect Routing
 
-You can describe requests naturally and let IDD choose the smallest safe workflow. To inspect the selected route without changing files:
+You can describe requests naturally and let the internal `idd-route` workflow
+choose the smallest safe path. For a read-only diagnostic, send a self-contained
+request and explicitly forbid execution:
 
 ```text
-idd-route
+Classify this request using IDD: "Check whether the authorization implementation
+matches the current Product Intent." Show the chosen route and recommended
+first skill, but do not execute the workflow or change any files.
 ```
+
+For such a request the route is `route-only`, with `Current handoff: none`.
+The router does not invoke the recommended workflow. If it recommends a
+manual-only command, you must still invoke or select that command explicitly.
 
 Requests to reconstruct initial intent for an existing undocumented implementation route to `idd-intent-bootstrap`; existing source specifications that need normalization route to `idd-intent-import`.
 

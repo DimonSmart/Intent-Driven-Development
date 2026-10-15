@@ -111,12 +111,19 @@ the caller must pass the actual request and relevant constraints.
 `mode: check` is behaviorally read-only, not sandbox-isolated: the skill
 must enforce its no-write contract, including via Bash.
 
-Codex generates `skills/<skill>/agents/openai.yaml` for all nine commands,
-regardless of invocation mode. Five manual commands declare
-`allow_implicit_invocation: false`, while the four auto commands declare
-`true`. The eleven workflows remain published as `SKILL.md` without this
-user-facing metadata file. Codex does not guarantee that these choices exactly
-control which skills appear in every host's menu.
+The 19 skills contain seven user commands (five in Intent and two in Factory)
+and twelve automatic workflows. Five commands have manual-only invocation and
+fourteen skills allow automatic invocation. `idd-route` is an automatic
+workflow with no `interface` metadata; Claude emits `user-invocable: false`
+and `disable-model-invocation: false` for it.
+
+Codex generates `skills/<skill>/agents/openai.yaml` for seven commands:
+five manual-only commands declare `allow_implicit_invocation: false`,
+and the two automatic Factory commands declare `true`. All twelve workflows,
+including `idd-route`, remain published as `SKILL.md` without
+`agents/openai.yaml`. Codex does not guarantee this hides them from every
+host's user-visible skill list, and local disabling would also remove
+automatic invocation. Do not use undocumented visibility fields.
 
 `idd-factory-configure` is a command with automatic invocation so initialization
 and model-review/refresh requests can select the sole configuration owner.

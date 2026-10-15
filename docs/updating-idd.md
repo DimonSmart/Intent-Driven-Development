@@ -46,6 +46,20 @@ codex plugin add idd-factory@intent-driven-development
 
 Repositories that already use IDD do not need to run `idd-project-init` again. Project-owned intent remains in the repository, while the installed plugin provides the updated workflows.
 
+## IDD Intent router visibility after an update
+
+`idd-route` is now an automatically selected internal workflow rather than
+a user command. After updating or reinstalling **idd-intent**, start a new
+Claude Code or Codex session. Old installed snapshots and caches can continue
+to expose the former command until refreshed; marketplace regeneration alone
+does not remove host-local cached files. If it still appears, inspect the
+installed version and remove stale local copies using supported host plugin
+management. Claude Code excludes the new workflow from its slash-command menu.
+Codex may still list it because no documented portable hide-but-auto-invoke
+setting is available. To inspect a route, ask in natural language for a
+classification without execution. The five manual-only Intent commands are
+unchanged.
+
 ## Obsolete Factory commands after an update
 
 Starting with the unified model-management interface, use
