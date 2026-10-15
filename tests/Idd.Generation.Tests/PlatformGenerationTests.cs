@@ -106,12 +106,14 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
             new[]
             {
                 "idd-factory-run",
-                "idd-factory-configure",
-                "idd-factory-update-effort-models"
+                "idd-factory-configure"
             },
             registeredSkills);
         Assert.DoesNotContain("idd-factory-decompose-task", registeredSkills);
         Assert.DoesNotContain("idd-factory-execute-subtask", registeredSkills);
+        Assert.DoesNotContain("idd-factory-update-effort-models", registeredSkills);
+        Assert.DoesNotContain(factory.GetProperty("skillReferences").EnumerateArray(),
+            reference => reference.GetProperty("skill").GetString() == "idd-factory-update-effort-models");
 
         var plannerReference = Assert.Single(
             factory.GetProperty("skillReferences").EnumerateArray(),
@@ -145,6 +147,7 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
         {
             Assert.False(descriptions.RootElement.TryGetProperty("idd-factory-decompose-task", out _));
             Assert.False(descriptions.RootElement.TryGetProperty("idd-factory-execute-subtask", out _));
+            Assert.False(descriptions.RootElement.TryGetProperty("idd-factory-update-effort-models", out _));
         }
 
         foreach (var platform in new[] { "claude", "codex" })
@@ -161,12 +164,12 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
                 new[]
                 {
                     "idd-factory-configure",
-                    "idd-factory-run",
-                    "idd-factory-update-effort-models"
+                    "idd-factory-run"
                 },
                 skills);
             fixture.AssertMissing(Path.Combine(root, "skills", "idd-factory-decompose-task"));
             fixture.AssertMissing(Path.Combine(root, "skills", "idd-factory-execute-subtask"));
+            fixture.AssertMissing(Path.Combine(root, "skills", "idd-factory-update-effort-models"));
 
             var generatedPlanner = fixture.ReadText(Path.Combine(
                 root, "skills", "idd-factory-run", "references", "factory-planner.md"));
@@ -202,6 +205,7 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
                 "references", "skill-descriptions.json"));
             Assert.DoesNotContain("idd-factory-decompose-task", helpInventory);
             Assert.DoesNotContain("idd-factory-execute-subtask", helpInventory);
+            Assert.DoesNotContain("idd-factory-update-effort-models", helpInventory);
 
             using var metadata = JsonDocument.Parse(fixture.ReadText(Path.Combine(root, "idd-plugin.json")));
             if (metadata.RootElement.TryGetProperty("roleDefinitions", out var roleDefinitions))

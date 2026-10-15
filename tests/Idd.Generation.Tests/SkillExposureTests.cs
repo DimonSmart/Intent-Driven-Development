@@ -11,8 +11,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
     private static readonly HashSet<string> Commands = new(StringComparer.Ordinal)
     {
         "idd-help", "idd-route", "idd-project-init", "idd-verification-configure",
-        "idd-glossary-build", "idd-skip", "idd-factory-run", "idd-factory-configure",
-        "idd-factory-update-effort-models"
+        "idd-glossary-build", "idd-skip", "idd-factory-run", "idd-factory-configure"
     };
 
     private static readonly HashSet<string> Manual = new(StringComparer.Ordinal)
@@ -33,11 +32,11 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
         var inventory = new SkillDescriptionReader().Read(
             Path.Combine(fixture.RepoRoot, "src", "canonical", "skills", "skill-descriptions.json"),
             new HashSet<string>(StringComparer.Ordinal) { "claude", "codex" });
-        Assert.Equal(20, inventory.Count);
-        Assert.Equal(9, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Command));
+        Assert.Equal(19, inventory.Count);
+        Assert.Equal(8, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Command));
         Assert.Equal(11, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Workflow));
         Assert.Equal(5, inventory.Count(skill => skill.Value.Invocation == SkillInvocation.Manual));
-        Assert.Equal(15, inventory.Count(skill => skill.Value.Invocation == SkillInvocation.Auto));
+        Assert.Equal(14, inventory.Count(skill => skill.Value.Invocation == SkillInvocation.Auto));
 
         foreach (var (name, description) in inventory)
         {
@@ -111,50 +110,61 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
         {
             var root = Path.Combine(fixture.MarketplaceRoot, "plugins", platform);
             Assert.Equal(17, Directory.GetDirectories(Path.Combine(root, "idd-intent", "skills")).Length);
-            Assert.Equal(3, Directory.GetDirectories(Path.Combine(root, "idd-factory", "skills")).Length);
+            Assert.Equal(2, Directory.GetDirectories(Path.Combine(root, "idd-factory", "skills")).Length);
         }
     }
 
     [Fact]
-    public void FactoryModelUpdate_IsUserSelectableAndAutomaticWithRoutingAndPackagedPolicy()
+    public void FactoryConfigure_IsSoleUserSelectableAndAutomaticWithRoutingAndPackagedPolicy()
     {
-        const string name = "idd-factory-update-effort-models";
+        const string retired = "idd-factory-update-effort-models";
+        var sourceRoot = Path.Combine(fixture.RepoRoot, "src", "canonical", "skills");
+        fixture.AssertMissing(Path.Combine(sourceRoot, retired + ".md"));
+        using (var descriptions = JsonDocument.Parse(fixture.ReadText(Path.Combine(sourceRoot, "skill-descriptions.json"))))
+        {
+            Assert.True(descriptions.RootElement.TryGetProperty("idd-factory-configure", out _));
+            Assert.False(descriptions.RootElement.TryGetProperty(retired, out _));
+        }
+
         foreach (var platform in new[] { "claude", "codex" })
         {
             var plugins = Path.Combine(fixture.MarketplaceRoot, "plugins", platform);
-            var folder = Path.Combine(plugins, "idd-factory", "skills", name);
-            var skill = fixture.ReadText(Path.Combine(folder, "SKILL.md"));
-            Assert.Contains("Continue through the installed `idd-factory-configure`", skill);
+            var factory = Path.Combine(plugins, "idd-factory");
+            var folder = Path.Combine(factory, "skills", "idd-factory-configure");
+            var configure = fixture.ReadText(Path.Combine(folder, "SKILL.md"));
             fixture.AssertFile(Path.Combine(folder, "references", "factory-execution-policy.md"));
+            fixture.AssertMissing(Path.Combine(factory, "skills", retired));
+            fixture.AssertMissing(Path.Combine(factory, "skills", retired, "SKILL.md"));
+            fixture.AssertMissing(Path.Combine(factory, "skills", retired, "agents", "openai.yaml"));
+            fixture.AssertMissing(Path.Combine(factory, "skills", retired, "references"));
+
+            Assert.Contains("Automatic activation alone does not authorize a policy write", configure);
+            Assert.Contains("A review-only request must not write the policy", configure);
+            Assert.Contains("Direct invocation", configure);
+            Assert.Contains("next worker spawn", configure);
+
             var route = fixture.ReadText(Path.Combine(plugins, "idd-intent", "skills", "idd-route", "SKILL.md"));
-            Assert.Contains("| `factory-model-update` | `idd-factory-update-effort-models` |", route);
-            var ownerFolder = Path.Combine(plugins, "idd-factory", "skills", "idd-factory-configure");
-            var owner = fixture.ReadText(Path.Combine(ownerFolder, "SKILL.md"));
-            Assert.Contains("Automatic activation alone does not", owner);
-            Assert.Contains("authorize a policy write", owner);
-            Assert.Contains("A review-only request must not write the policy", owner);
-            Assert.Contains("Never save an automatically proposed mapping before explicit confirmation", owner);
-            Assert.Contains("This skill remains the sole owner of policy validation and persistence", owner);
+            Assert.Contains("| `factory-model-update` | `idd-factory-configure` |", route);
+            Assert.DoesNotContain(retired, route);
+            var help = fixture.ReadText(Path.Combine(plugins, "idd-intent", "skills", "idd-help", "SKILL.md"));
+            Assert.Contains("Installing `idd-factory`", help);
+            var inventory = fixture.ReadText(Path.Combine(plugins, "idd-intent", "skills",
+                "idd-help", "references", "skill-descriptions.json"));
+            Assert.DoesNotContain(retired, inventory);
             if (platform == "claude")
             {
-                var yaml = ParseYaml(GenerationFixture.ReadFrontMatter(skill));
+                var yaml = ParseYaml(GenerationFixture.ReadFrontMatter(configure));
                 AssertScalar(yaml, "user-invocable", "true");
                 AssertScalar(yaml, "disable-model-invocation", "false");
-                var ownerYaml = ParseYaml(GenerationFixture.ReadFrontMatter(owner));
-                AssertScalar(ownerYaml, "user-invocable", "true");
-                AssertScalar(ownerYaml, "disable-model-invocation", "false");
             }
             else
             {
                 var yaml = ParseYaml(fixture.ReadText(Path.Combine(folder, "agents", "openai.yaml")));
                 var ui = Assert.IsType<YamlMappingNode>(yaml.Children[new YamlScalarNode("interface")]);
-                AssertScalar(ui, "display_name", "IDD Factory Models");
-                AssertScalar(ui, "short_description", "Update models assigned to Factory effort levels");
+                AssertScalar(ui, "display_name", "IDD Factory Configure");
+                AssertScalar(ui, "short_description", "Configure, review, and refresh Factory models");
                 var policy = Assert.IsType<YamlMappingNode>(yaml.Children[new YamlScalarNode("policy")]);
                 AssertScalar(policy, "allow_implicit_invocation", "true");
-                var ownerYaml = ParseYaml(fixture.ReadText(Path.Combine(ownerFolder, "agents", "openai.yaml")));
-                var ownerPolicy = Assert.IsType<YamlMappingNode>(ownerYaml.Children[new YamlScalarNode("policy")]);
-                AssertScalar(ownerPolicy, "allow_implicit_invocation", "true");
             }
         }
     }

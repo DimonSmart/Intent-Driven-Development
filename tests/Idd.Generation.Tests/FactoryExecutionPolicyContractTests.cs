@@ -81,22 +81,24 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
     }
 
     [Fact]
-    public void ConfigurationWorkflow_RequiresConfirmationBeforeAutomaticProposalIsSaved()
+    public void ConfigurationWorkflow_RequiresAuthorizationForSelectionAndPreservesExactEdits()
     {
         var configure = Canonical("skills", "idd-factory-configure.md");
 
         Assert.Contains("default (inherit)", configure);
         Assert.Contains("configure — explicitly configure models", configure);
-        Assert.Contains("Use proposed mapping", configure);
-        Assert.Contains("Edit mapping", configure);
-        Assert.Contains("Never save an automatically proposed mapping before explicit confirmation", configure);
+        Assert.Contains("Apply", configure);
+        Assert.Contains("Edit", configure);
+        Assert.Contains("Reject", configure);
+        Assert.Contains("confirmation", configure);
         Assert.Contains("request_user_input", configure);
         Assert.Contains("AskUserQuestion", configure);
-        Assert.Contains("Partial mappings are valid", configure);
-        Assert.Contains("Do not require model IDs", configure);
+        Assert.Contains("Missing policy means", configure);
+        Assert.Contains("Unselected", configure, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("modelStrategy: inherit", configure);
-        Assert.Contains("inheritance removes that mapping", configure);
-        Assert.Contains("Codex-only policy remains valid for Claude", configure);
+        Assert.Contains("removes", configure);
+        Assert.Contains("All missing mappings inherit host behavior", configure);
+        Assert.Contains("a concrete model", configure, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("all-or-nothing", configure);
     }
 
@@ -112,7 +114,7 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("Do not require a restart", run);
         Assert.Contains("Partial mappings are valid", run);
 
-        foreach (var name in new[] { "idd-factory-run", "idd-factory-configure", "idd-factory-update-effort-models" })
+        foreach (var name in new[] { "idd-factory-run", "idd-factory-configure" })
         {
             var policy = fixture.ReadText(Path.Combine(skills, name, "references", "factory-execution-policy.md"));
             Assert.Contains("missing profile/platform mapping means inherit", policy);
@@ -123,12 +125,54 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         }
 
         var configure = fixture.ReadText(Path.Combine(skills, "idd-factory-configure", "SKILL.md"));
-        Assert.Contains("inheritance removes that mapping", configure);
-        Assert.Contains("Codex-only policy remains valid for Claude", configure);
-        var update = fixture.ReadText(Path.Combine(skills, "idd-factory-update-effort-models", "SKILL.md"));
-        Assert.Contains("Missing mappings remain inherited", update);
-        Assert.Contains("do not copy the", update);
-        Assert.Contains("session model into unspecified levels", update);
+        Assert.Contains("returning one mapping to inheritance", configure);
+        Assert.Contains("All missing mappings inherit host behavior", configure);
+        Assert.Contains("Missing policy means `inherit (host)`", configure);
+        Assert.Contains("Do not claim to know the actual host model", configure);
+        Assert.Contains("All missing mappings inherit host behavior", configure);
+    }
+
+    [Theory]
+    [InlineData("Review-only use must not create the file")]
+    [InlineData("An explicitly selected")]
+    [InlineData("create `executionProfiles` only for requested")]
+    [InlineData("shared by several profiles")]
+    [InlineData("Preserve every other profile")]
+    [InlineData("returning one mapping to inheritance")]
+    [InlineData("removes")]
+    [InlineData("never mix the two strategy shapes")]
+    [InlineData("exact requested ID")]
+    [InlineData("Automatically chosen or ambiguously interpreted")]
+    [InlineData("stop with no writes")]
+    [InlineData("block that candidate")]
+    [InlineData("Never create a reasoning-only mapping")]
+    [InlineData("A malformed existing policy is a blocking diagnostic")]
+    [InlineData("semantically/structurally unchanged")]
+    [InlineData("rebase only the authorized operations")]
+    [InlineData("account availability")]
+    [InlineData("Direct invocation")]
+    [InlineData("next worker spawn")]
+    public void ConfigurationSkill_CoversModelManagementScenariosAsTextContracts(string instruction)
+    {
+        // This checks written instructions, not execution of LLM decisions.
+        Assert.Contains(instruction, Canonical("skills", "idd-factory-configure.md"),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RoutingAndReference_KeepOneLifecycleOwnerAndNoStaleEntryPoint()
+    {
+        var configure = Canonical("skills", "idd-factory-configure.md");
+        var reference = Canonical("methodology", "factory-execution-policy.md");
+        var route = Canonical("skills", "idd-route.md");
+
+        Assert.Contains("no separate model-update command", configure);
+        Assert.Contains("Stop rather than risk loss of user edits", configure);
+        Assert.Contains("No second update skill or persistence handoff exists", reference);
+        Assert.Contains("A reasoning-only override without a concrete model is invalid", reference);
+        Assert.Contains("| `factory-model-update` | `idd-factory-configure` |", route);
+        Assert.DoesNotContain("idd-factory-update-effort-models", route);
+        Assert.DoesNotContain("idd-factory-update-effort-models", reference);
     }
 
     [Fact]
