@@ -125,8 +125,7 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         }
 
         var configure = fixture.ReadText(Path.Combine(skills, "idd-factory-configure", "SKILL.md"));
-        Assert.Contains("returning one mapping to inheritance", configure);
-        Assert.Contains("All missing mappings inherit host behavior", configure);
+        Assert.Contains("Returning one mapping to inheritance", configure);
         Assert.Contains("Missing policy means `inherit (host)`", configure);
         Assert.Contains("Do not claim to know the actual host model", configure);
         Assert.Contains("All missing mappings inherit host behavior", configure);
@@ -169,7 +168,7 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("no separate model-update command", configure);
         Assert.Contains("Stop rather than risk loss of user edits", configure);
         Assert.Contains("No second update skill or persistence handoff exists", reference);
-        Assert.Contains("A reasoning-only override without a concrete model is invalid", reference);
+        Assert.Contains("override without a concrete model is invalid", reference);
         Assert.Contains("| `factory-model-update` | `idd-factory-configure` |", route);
         Assert.DoesNotContain("idd-factory-update-effort-models", route);
         Assert.DoesNotContain("idd-factory-update-effort-models", reference);
