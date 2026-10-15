@@ -169,9 +169,73 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("Stop rather than risk loss of user edits", configure);
         Assert.Contains("No second update skill or persistence handoff exists", reference);
         Assert.Contains("override without a concrete model is invalid", reference);
-        Assert.Contains("| `factory-model-update` | `idd-factory-configure` |", route);
+        Assert.Contains("## Direct Factory Model-Policy Route", route);
+        Assert.Contains("Before assigning any `Classification`", route);
+        Assert.Contains("`idd-factory-configure` directly as the recommended first skill", route);
+        Assert.DoesNotContain("factory-model-update", route);
         Assert.DoesNotContain("idd-factory-update-effort-models", route);
         Assert.DoesNotContain("idd-factory-update-effort-models", reference);
+    }
+
+
+    [Theory]
+    [InlineData("Perform initial Factory model setup")]
+    [InlineData("Change only an existing mapping's reasoning settings")]
+    [InlineData("return one mapping to host inheritance")]
+    [InlineData("Review current model assignments")]
+    [InlineData("Refresh/upgrade/downgrade models")]
+    public void DirectFactoryRoute_DescribesSupportedStandaloneModes(string scenario)
+    {
+        // These assert written routing contracts, not the model's semantic behavior.
+        var route = Canonical("skills", "idd-route.md");
+        var workflows = Canonical("methodology", "common-workflows.md");
+
+        Assert.Contains(scenario, route);
+        Assert.Contains("## Direct Factory Model-Policy Route", route);
+        Assert.Contains("## Workflow Family: Factory Model Configuration and Review", workflows);
+        Assert.Contains("selects `Recommended first skill: idd-factory-configure` directly", workflows);
+        Assert.DoesNotContain("factory-model-update", route);
+        Assert.DoesNotContain("factory-model-update", workflows);
+        Assert.DoesNotContain("factory-model-configuration", route);
+        Assert.DoesNotContain("factory-model-management", route);
+    }
+
+    [Fact]
+    public void DirectFactoryRoute_KeepsSeparateExamplesAndAuthorizationBoundaries()
+    {
+        var route = Canonical("skills", "idd-route.md");
+        var workflows = Canonical("methodology", "common-workflows.md");
+        var examples = route[route.IndexOf("## Direct Factory Model-Policy Output Examples",
+            StringComparison.Ordinal)..];
+        var blocks = Regex.Matches(examples, @"(?s)```text\s*(.*?)```");
+        Assert.Equal(2, blocks.Count);
+
+        var apply = blocks[0].Groups[1].Value;
+        var review = blocks[1].Groups[1].Value;
+        foreach (var example in new[] { apply, review })
+        {
+            Assert.Contains("Recommended first skill: idd-factory-configure", example);
+            Assert.Contains("Expected complete workflow: idd-factory-configure", example);
+            Assert.Contains("Stop after:", example);
+            Assert.DoesNotContain("Classification:", example);
+            Assert.DoesNotContain("Operation:", example);
+            Assert.DoesNotContain("Clarity:", example);
+            Assert.DoesNotContain("Execution depth:", example);
+            Assert.DoesNotContain("Audit scope:", example);
+        }
+
+        Assert.Contains("Requested scope: end-to-end", apply);
+        Assert.Contains("Current handoff: idd-factory-configure", apply);
+        Assert.Contains("Requested scope: route-only", review);
+        Assert.Contains("Current handoff: none", review);
+        Assert.Contains("read-only", route);
+        Assert.Contains("does not authorize writes", workflows);
+        Assert.Contains("For **mixed requests**", workflows);
+        Assert.Contains("general workflow classification and handoff", route);
+        Assert.Contains("the separate `idd-factory` plugin", route);
+        Assert.Contains("Current handoff: none", workflows);
+        Assert.Contains("For ordinary classified workflows", route);
+        Assert.Contains("| `product-change` | `idd-intent-change` |", route);
     }
 
     [Fact]

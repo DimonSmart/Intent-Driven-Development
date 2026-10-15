@@ -1,14 +1,15 @@
 # idd-route
 
-Use this skill to classify an IDD-related request and select the smallest safe
-end-to-end workflow.
+Use this skill to select the smallest safe IDD workflow. Standalone Factory
+model-policy requests select their skill directly; all other requests use
+the ordinary classification rules.
 
-This skill is a read-only classifier. It does not change intent, implementation,
+This skill is a read-only router. It does not change intent, implementation,
 Factory state, or project files, and does not execute the selected workflow.
 
 ## Required Reference
 
-Before classifying the request, read:
+Before routing the request, read:
 
 `references/common-workflows.md`
 
@@ -47,7 +48,7 @@ an explicit missing-input diagnostic to the caller.
 
 ## Context Reading Rules
 
-First classify the request from its wording and the required reference.
+First choose the route from the request wording and the required reference.
 
 Read project context only when needed to determine whether a current owner
 exists, product truth changes, the problem is structural, implementation and
@@ -68,15 +69,84 @@ distinguish an existing implementation without adequate current intent from an
 empty new project or an already documented product. The bootstrap skill owns
 broad discovery.
 
+## Direct Factory Model-Policy Route
+
+Before assigning any `Classification`, check whether the **only** independent
+task is to configure or inspect project-owned Factory model policy. Select
+`idd-factory-configure` directly as the recommended first skill, not as a
+classification value, for standalone requests to:
+
+- Perform initial Factory model setup or change an exact model ID for a
+  `codex`/`claude` `economy`, `standard`, or `strong` mapping.
+- Change only an existing mapping's reasoning settings (such as
+  `reasoningEffort`), or return one mapping to host inheritance.
+- Review current model assignments, compare them with available alternatives,
+  or make a read-only proposal without writing.
+- Refresh/upgrade/downgrade models, replace unavailable models, or select
+  cheaper, faster, or stronger candidates.
+
+The direct choice covers initial, exact-edit, review-only, and refresh/selection
+requests. The selected `idd-factory-configure` skill, **not** this router,
+determines that mode, validates the operation, chooses evidence sources, applies
+confirmation gates, and owns any policy write. The router must not research the
+model catalog, choose model values, or read, validate, or change
+`.idd/execution.yaml` to make a routing decision. It never runs
+`idd-factory-configure` in its isolated child context or starts
+`idd-factory-run`.
+
+Do **not** use this branch for an explicit `idd-factory-run` request, general
+project configuration, Product Intent changes, or unrelated implementation.
+Explicit invocation of `idd-factory-configure` bypasses routing altogether.
+
+If a request includes Factory model management **and** another independent
+task (Product Intent, Engineering, implementation, audit, Factory execution,
+etc.), use the existing **general workflow classification and handoff**.
+Preserve **all** requested stages and the complete original intent, including
+the model-policy subtask. Route that subtask to `idd-factory-configure` as a
+separate authorized stage only when the general workflow requires it. Do not
+replace the whole request with configuration or start Factory automatically.
+If the primary workflow is unclear, use the existing clarity gate; do not
+invent a new classification or choose Factory arbitrarily.
+
+For a standalone Factory model-policy request, select only these result fields:
+`Recommended first skill`, `Expected complete workflow`, `Requested scope`,
+`Current handoff`, and `Stop after`. Add `Why`, `Handoff`, and user
+constraints where useful. Do **not** invent or return `Classification`,
+`Operation`, `Clarity`, `Execution depth`, or `Audit scope`, even with
+`not-applicable` values; the ordinary fields still apply to other routes.
+
+- Use `Requested scope: route-only` for routing advice: return the
+  recommendation, set `Current handoff: none`, and stop after routing.
+- Use `Requested scope: end-to-end` for a requested configuration **or**
+  read-only review/comparison: the caller may hand the complete request to
+  `idd-factory-configure` in the same user request, without a second routing
+  confirmation. `end-to-end` is not permission to write. Preserve explicit
+  `review-only`/`do not write` and all other authorization limits.
+- Do not mechanically map `intent-only` or `implementation-only` to a
+  standalone Factory model-policy request. Carry explicit restrictions as
+  constraints, or diagnose incompatible scope without expanding permission.
+- Preserve all exact selected platforms, profiles, model IDs, reasoning
+  settings, inheritance operations, price/quality/latency goals, prohibitions,
+  and previously confirmed decisions in the handoff. Do not substitute a
+  lossy summary. Exact authorized edits do not require new router confirmation;
+  selections and proposals retain the configure skill's confirmation gates.
+- `idd-route` is part of `idd-intent`; `idd-factory-configure` requires
+  the separate `idd-factory` plugin. Recommending the skill does not prove
+  that it is installed. If it is known to be unavailable, diagnose the missing
+  plugin and use `Current handoff: none` with a blocking `Stop after`.
+  If availability cannot be checked using the caller's existing context,
+  state the requirement conditionally, without assuming installation. Do not
+  invent a plugin-check API, substitute another skill, or write policy.
+
 ## Classification Fields
 
-Return these semantic fields:
+For requests not handled by the direct Factory model-policy route, return
+these ordinary semantic fields:
 
 ```text
 Classification:
 - project-initialization
 - verification-configuration
-- factory-model-update
 - intent-bootstrap
 - intent-import
 - product-change
@@ -94,11 +164,6 @@ Classification:
 Use `verification-configuration` when the user asks to create or deliberately
 update project-owned `.idd/verification.yaml` rules. Do not use it for running
 checks, fixing tests, or changing product acceptance criteria.
-
-Use `factory-model-update` when the user asks to configure, review, compare,
-refresh, upgrade, downgrade, or replace Factory model policy, including an exact
-model or reasoning edit. These levels are `ExecutionProfile` values, distinct
-from platform reasoning settings. Do not route ordinary task execution here.
 
 Use `intent-bootstrap` when the repository already contains implementation but
 lacks an adequate current IDD product model and the user asks to discover,
@@ -145,10 +210,10 @@ not yet known: the requested workflow is clear, and
 Set `Execution depth` to `focused`, `orchestrated`, or `not-applicable`
 according to the required reference.
 
-Use `not-applicable` for `intent-bootstrap`, `verification-configuration`, and
-`factory-model-update`.
-Repository discovery may be broad, but it is intent-side investigation rather
-than implementation orchestration and must not start Factory.
+Use `not-applicable` for `intent-bootstrap` and
+`verification-configuration`. Repository discovery may be broad, but it is
+intent-side investigation rather than implementation orchestration and must
+not start Factory.
 
 For `intent-drift-audit`, also return `Audit scope: focused | project-wide`. Use
 `project-wide` only when the user explicitly asks for the whole project, entire
@@ -198,10 +263,6 @@ Intent plus implementation evidence without mutating either layer. Use
 For `verification-configuration`, use `route-only` only when the user asks for
 classification or advice without changing files; otherwise use `end-to-end`.
 
-For `factory-model-update`, use `route-only` only for classification or routing
-advice. Use `end-to-end` for a requested model review or update, preserving a
-review-only limit so the selected skill returns its proposal without saving.
-
 Do not assign route fields when another explicitly named skill or `idd-skip`
 bypasses routing. Those cases are direct skill invocation, not route results.
 An explicit `idd-factory-run` still performs its own required Factory Preflight
@@ -211,14 +272,14 @@ the rule that active Factory state is created only afterward.
 
 ## First Skill
 
-Use the required reference to select the first skill. This compact table is only
-a handoff index:
+For ordinary classified routes, use the required reference to select the first
+skill. This compact table is only a handoff index; the standalone Factory
+model-policy route above is selected before the table:
 
 | Classification | Recommended first skill |
 | --- | --- |
 | `project-initialization` | `idd-project-init` |
 | `verification-configuration` | `idd-verification-configure` |
-| `factory-model-update` | `idd-factory-configure` |
 | `intent-bootstrap` | `idd-intent-bootstrap` |
 | `intent-import` | `idd-intent-import` |
 | `product-change` | `idd-intent-change` |
@@ -271,17 +332,12 @@ Apply these rules:
   `mode: check|fix`, the requested scope, and read-only restrictions.
   Only an unambiguous user request can authorize `fix`. The router
   remains read-only and must not apply lint fixes itself.
-- For `factory-model-update`, preserve selected levels, target platform, exact
-  model IDs, reasoning settings, cost/quality/latency goals, and review-only limits. Continue through
-  `idd-factory-configure` directly in an authorized end-to-end request; the
-  router never invokes it in its own isolated context, writes the policy, or
-  starts Factory. If the Factory plugin is unavailable, report that requirement;
-  do not turn this request into product implementation or start a Factory run.
-
-Pass through the complete original request, classification fields, requested
-scope, relevant context, and any temporary preservation or discovery boundary
-identified from the required reference. Never replace a mixed request with a
-lossy summary.
+For general classified workflows, pass through the complete original request,
+classification fields, requested scope, relevant context, and any temporary
+preservation or discovery boundary identified from the required reference.
+For direct Factory routing, pass the complete original request and its
+constraints instead of nonexistent classification fields. Never replace a
+mixed request with a lossy summary.
 
 A single request may contain multiple durable concerns without requiring a new
 top-level classification enum. Preserve the primary route fields, but make
@@ -289,6 +345,9 @@ top-level classification enum. Preserve the primary route fields, but make
 implementation. In particular, a Product change plus explicit Engineering
 change plus orchestrated implementation must keep both durable concerns in the
 handoff so a new `idd-factory-run` can coordinate them during preflight.
+A mixed request such as "change Factory economy model and implement a feature"
+must also preserve both tasks and must not be reduced to the direct Factory
+model-policy route.
 
 Examples:
 
@@ -313,7 +372,9 @@ from this skill.
 
 ## Output Format
 
-Use compact Markdown, not JSON:
+Use compact Markdown, not JSON. For ordinary classified workflows, return the
+semantic fields below; the direct Factory model-policy route uses the compact
+examples following this section:
 
 ```md
 # IDD Route
@@ -358,3 +419,40 @@ Discovery boundary:
 - Known public or compatibility contracts:
 - Unresolved scope questions:
 ```
+
+## Direct Factory Model-Policy Output Examples
+
+These are semantic examples, not byte-for-byte templates. Set `Stop after`
+based on the actual scope, blockers, and available skills. No artificial
+classification, operation, clarity, execution-depth, or audit-scope fields apply.
+
+Standalone authorized model change:
+
+```text
+# IDD Route
+
+Recommended first skill: idd-factory-configure
+Expected complete workflow: idd-factory-configure
+Requested scope: end-to-end
+Current handoff: idd-factory-configure
+Stop after: requested configuration workflow completes or a required decision blocks it
+
+Handoff: pass the complete original request and its constraints to idd-factory-configure
+```
+
+Route recommendation only:
+
+```text
+# IDD Route
+
+Recommended first skill: idd-factory-configure
+Expected complete workflow: idd-factory-configure
+Requested scope: route-only
+Current handoff: none
+Stop after: routing recommendation
+```
+
+For a requested read-only review with `end-to-end`, use the first format but
+pass the read-only restriction unchanged; the selected skill must not write.
+When `idd-factory` is known to be missing, keep the recommended skill name
+but set `Current handoff: none` and stop at the dependency diagnostic.

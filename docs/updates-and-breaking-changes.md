@@ -10,6 +10,13 @@ as an alias. Factory now exposes only `idd-factory-run` and
 inheritance, and next-worker-spawn behavior do not change; no project policy
 migration is required.
 
+The `idd-route` router now recommends `idd-factory-configure` directly for
+standalone Factory model configuration, review, and refresh requests, without
+the former internal `factory-model-update` classification. Other workflow
+classifications are unchanged. This is a routing-instruction change only:
+the two public Factory commands and `.idd/execution.yaml` stay the same;
+no user policy migration is needed.
+
 Update/reinstall the `idd-factory` plugin for Codex or Claude Code and open a
 new session. Old host-local cached installations may still show the removed
 command until cleaned up; marketplace regeneration does not purge those caches.

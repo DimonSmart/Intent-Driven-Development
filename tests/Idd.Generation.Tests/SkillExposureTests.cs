@@ -144,8 +144,16 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
             Assert.Contains("next worker spawn", configure);
 
             var route = fixture.ReadText(Path.Combine(plugins, "idd-intent", "skills", "idd-route", "SKILL.md"));
-            Assert.Contains("| `factory-model-update` | `idd-factory-configure` |", route);
+            Assert.Contains("## Direct Factory Model-Policy Route", route);
+            Assert.Contains("Recommended first skill: idd-factory-configure", route);
+            Assert.DoesNotContain("factory-model-update", route);
             Assert.DoesNotContain(retired, route);
+            var routingReference = fixture.ReadText(Path.Combine(plugins, "idd-intent",
+                "skills", "idd-route", "references", "common-workflows.md"));
+            Assert.Contains("selects `Recommended first skill: idd-factory-configure` directly",
+                routingReference);
+            Assert.Contains("For **mixed requests**", routingReference);
+            Assert.DoesNotContain("factory-model-update", routingReference);
             var help = fixture.ReadText(Path.Combine(plugins, "idd-intent", "skills", "idd-help", "SKILL.md"));
             Assert.Contains("Installing `idd-factory`", help);
             var inventory = fixture.ReadText(Path.Combine(plugins, "idd-intent", "skills",

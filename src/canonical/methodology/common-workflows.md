@@ -12,7 +12,8 @@ route itself durable product intent.
 
 ### What Changes
 
-Classify the request by the thing that changes:
+Identify the requested concern before applying ordinary workflow classification.
+Standalone Factory model-policy requests select their skill directly:
 
 - `product truth`: desired product behavior, constraint, acceptance rule,
   public contract, or durable architecture changes.
@@ -32,8 +33,11 @@ Classify the request by the thing that changes:
 - `project initialization`: the project needs an `.idd/intent/` structure.
 - `project verification configuration`: `.idd/verification.yaml` needs creation or
   deliberate update.
-- `Factory model update`: the LLMs assigned to effort levels need refreshing,
-  upgrading, downgrading, or explicit replacement.
+- `Factory model configuration and review`: project-owned Factory model
+  mappings or reasoning settings need initial setup, exact edits, inspection,
+  comparison, refresh, upgrade, downgrade, or inheritance changes. For this
+  standalone concern, select `idd-factory-configure` directly instead of
+  creating a classification.
 - `unknown`: the request does not provide enough information to choose safely.
 
 Initial product truth discovery and raw imported knowledge are different:
@@ -125,7 +129,7 @@ scope:
   risk, sequenced phases, multiple roles, review gates, or major capability
   removal.
 - `not-applicable`: routing, initialization, verification configuration,
-  Factory model updates, bootstrap, imports, audits, lint checks, brainstorms, and pure intent reads
+  bootstrap, imports, audits, lint checks, brainstorms, and pure intent reads
   that do not execute implementation.
 
 A broad repository scan does not make bootstrap `orchestrated`. Factory
@@ -243,14 +247,44 @@ idd-factory-configure
 -> re-check baseline, validate and persist or no-op
 ```
 
-Routing retains `Classification: factory-model-update`, `Operation:
-not-applicable`, and `Execution depth: not-applicable`. Use `route-only` for
-classification advice; `end-to-end` can continue through configure in the
-same user request, preserving review-only restrictions. Direct configure
-invocation needs no router. The router never writes policy, invokes Factory, or
-runs the selected skill inside its read-only isolated routing context. With
-only `idd-intent` installed, explain that model management needs
-`idd-factory` rather than pretending the command exists.
+Before ordinary classification, a **standalone** Factory model-policy request
+selects `Recommended first skill: idd-factory-configure` directly. Initial
+setup, exact edit (including reasoning-only changes or returning to host
+inheritance), review/compare without writes, and refresh/selection all use this
+one skill. `idd-factory-configure` is a skill name, not a `Classification`
+value. Do not introduce a replacement classification or alias.
+
+For this direct route, return `Recommended first skill`,
+`Expected complete workflow`, `Requested scope`, `Current handoff`, and
+`Stop after`; do not require `Classification`, `Operation`, `Clarity`,
+`Execution depth`, or `Audit scope` (including fake `not-applicable` values).
+`Expected complete workflow` is `idd-factory-configure`. Use `route-only`
+with `Current handoff: none` and stop after the routing recommendation when
+the user requests routing advice. For an authorized operation or read-only
+review, use `end-to-end` and hand the complete request to
+`idd-factory-configure` from the **caller**, not from the isolated router.
+`end-to-end` does not authorize writes: preserve review-only limits and the
+configure skill's confirmation and exact-edit rules. Carry exact platform,
+profile, model ID, reasoning, inheritance, cost/latency/quality, prohibition,
+and confirmation context without summarizing away constraints. Explicit
+`intent-only` or `implementation-only` restrictions are not automatically
+mapped to this route; preserve them or diagnose incompatible scope.
+
+The router neither reads/writes model policy nor researches model alternatives,
+and it does not execute configure or Factory run. Direct user invocation of
+`idd-factory-configure` bypasses routing, and a request to **run Factory**
+belongs to `idd-factory-run`. Only `idd-intent` may be installed: the
+`idd-factory` plugin is required to execute the recommended skill. If its
+absence is known, use `Current handoff: none` and stop with a diagnostic;
+if availability is unknown, describe the dependency conditionally. Do not
+invent an installation API or treat recommendation as proof of availability.
+
+For **mixed requests** that also change Product Intent, Engineering, code,
+audits, or Factory execution, keep ordinary primary classification, scope,
+clarity gates, and every independent workflow stage. Include any authorized
+`idd-factory-configure` step without losing the other tasks or automatically
+running Factory. If the primary route is unresolved, apply the existing
+clarity gate, not an invented Factory classification.
 
 Only `.idd/execution.yaml` stores project-owned Factory model policy.
 Missing policy and absent mappings inherit host settings. A review request
@@ -684,14 +718,17 @@ approval.
 
 ## Complete Workflow and Current Handoff
 
-Routing must distinguish:
+Routing must distinguish these fields for both ordinary classified workflows
+and direct standalone Factory model-policy selection:
 
 - the `Expected complete workflow`, which describes the safe lifecycle;
 - the `Current handoff`, which is allowed in the current request;
 - the `Stop after` boundary, which follows requested scope and clarity gates.
 
-For `route-only`, the current handoff is none. For `intent-only`, stop before
-implementation. For `implementation-only`, do not modify Product Intent or
+For `route-only`, the current handoff is none. The standalone Factory
+model-policy route has no classification fields; its `end-to-end` review-only
+case remains read-only. For ordinary classified workflows, `intent-only`
+stops before implementation. For `implementation-only`, do not modify Product Intent or
 Engineering. For `end-to-end`, continue through the complete workflow unless
 ambiguity, required research, a missing durable decision, verification failure,
 or another safety gate blocks progress.
