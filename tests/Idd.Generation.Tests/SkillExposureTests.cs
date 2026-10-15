@@ -10,7 +10,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
 {
     private static readonly HashSet<string> Commands = new(StringComparer.Ordinal)
     {
-        "idd-help", "idd-route", "idd-project-init", "idd-verification-configure",
+        "idd-help", "idd-project-init", "idd-verification-configure",
         "idd-glossary-build", "idd-skip", "idd-factory-run", "idd-factory-configure"
     };
 
@@ -33,8 +33,8 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
             Path.Combine(fixture.RepoRoot, "src", "canonical", "skills", "skill-descriptions.json"),
             new HashSet<string>(StringComparer.Ordinal) { "claude", "codex" });
         Assert.Equal(19, inventory.Count);
-        Assert.Equal(8, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Command));
-        Assert.Equal(11, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Workflow));
+        Assert.Equal(7, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Command));
+        Assert.Equal(12, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Workflow));
         Assert.Equal(5, inventory.Count(skill => skill.Value.Invocation == SkillInvocation.Manual));
         Assert.Equal(14, inventory.Count(skill => skill.Value.Invocation == SkillInvocation.Auto));
 
@@ -63,6 +63,11 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
                             AssertScalar(yaml, "argument-hint", "[scope] [mode: check|fix]");
                             AssertScalar(yaml, "allowed-tools", "Read Glob Grep Edit Write Bash");
                         }
+                        if (name == "idd-route")
+                        {
+                            AssertScalar(yaml, "allowed-tools", "Read Glob Grep");
+                            AssertScalar(yaml, "argument-hint", "[request or workflow question]");
+                        }
                         AssertScalar(yaml, "background", "false");
                         var background = Assert.IsType<YamlScalarNode>(yaml.Children[new YamlScalarNode("background")]);
                         Assert.Equal(YamlDotNet.Core.ScalarStyle.Plain, background.Style);
@@ -85,11 +90,6 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
                         var ui = Assert.IsType<YamlMappingNode>(yaml.Children[new YamlScalarNode("interface")]);
                         Assert.False(string.IsNullOrWhiteSpace(GetScalar(ui, "display_name")));
                         Assert.False(string.IsNullOrWhiteSpace(GetScalar(ui, "short_description")));
-                        if (name == "idd-route")
-                        {
-                            AssertScalar(ui, "display_name", "IDD Route");
-                            AssertScalar(ui, "short_description", "Classify an IDD request and select a workflow");
-                        }
                         if (name == "idd-factory-run")
                         {
                             AssertScalar(ui, "display_name", "IDD Factory Run");
@@ -101,6 +101,13 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
                     else
                     {
                         fixture.AssertMissing(metadata);
+                        if (name == "idd-route")
+                        {
+                            var frontMatter = ParseYaml(GenerationFixture.ReadFrontMatter(skill));
+                            AssertScalar(frontMatter, "name", "idd-route");
+                            Assert.False(frontMatter.Children.ContainsKey(new YamlScalarNode("user-invocable")));
+                            Assert.False(frontMatter.Children.ContainsKey(new YamlScalarNode("disable-model-invocation")));
+                        }
                     }
                 }
             }
@@ -112,6 +119,36 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
             Assert.Equal(17, Directory.GetDirectories(Path.Combine(root, "idd-intent", "skills")).Length);
             Assert.Equal(2, Directory.GetDirectories(Path.Combine(root, "idd-factory", "skills")).Length);
         }
+    }
+
+    [Fact]
+    public void Route_IsInternalAutomaticAndPreservesReadOnlyDiagnosticContracts()
+    {
+        var sourceRoot = Path.Combine(fixture.RepoRoot, "src", "canonical", "skills");
+        using var descriptions = JsonDocument.Parse(fixture.ReadText(
+            Path.Combine(sourceRoot, "skill-descriptions.json")));
+        var routeDescription = descriptions.RootElement.GetProperty("idd-route");
+        Assert.Equal("workflow", routeDescription.GetProperty("exposure").GetString());
+        Assert.False(routeDescription.TryGetProperty("invocation", out _));
+        Assert.False(routeDescription.TryGetProperty("interface", out _));
+
+        var inventory = new SkillDescriptionReader().Read(
+            Path.Combine(sourceRoot, "skill-descriptions.json"),
+            new HashSet<string>(StringComparer.Ordinal) { "claude", "codex" });
+        Assert.Equal(SkillInvocation.Auto, inventory["idd-route"].Invocation);
+        Assert.Equal(SkillExposure.Workflow, inventory["idd-route"].Exposure);
+
+        var instructions = fixture.ReadText(Path.Combine(sourceRoot, "idd-route.md"));
+        Assert.Contains("This skill is a read-only router", instructions);
+        Assert.Contains("complete available", instructions);
+        Assert.Contains("manual-only commands", instructions);
+        Assert.Contains("require explicit user", instructions);
+        Assert.Contains("Requested scope: route-only", instructions);
+        Assert.Contains("Current handoff: none", instructions);
+        Assert.Contains("change project files", instructions);
+        Assert.Contains("## Direct Factory Model-Policy Route", instructions);
+        Assert.Contains("If a request includes Factory model management", instructions);
+        Assert.Contains("Never select `idd-skip` automatically", instructions);
     }
 
     [Fact]

@@ -82,6 +82,52 @@ public sealed class GeneratorCliTests(GenerationFixture fixture)
     }
 
     [Fact]
+    public void StaleCodexRouteAgentMetadata_IsDetectedAndRemovedWithoutDroppingWorkflow()
+    {
+        var codexRoot = Path.Combine(fixture.MarketplaceRoot, "plugins", "codex");
+        var route = Path.Combine(codexRoot, "idd-intent", "skills", "idd-route");
+        var stale = Path.Combine(route, "agents", "openai.yaml");
+        var factoryBefore = fixture.SnapshotMarketplace()
+            .Where(path => path.Contains("/idd-factory/", StringComparison.Ordinal))
+            .ToArray();
+        fixture.AssertFile(Path.Combine(route, "SKILL.md"));
+        fixture.AssertFile(Path.Combine(route, "references", "common-workflows.md"));
+        fixture.AssertMissing(stale);
+        Directory.CreateDirectory(Path.GetDirectoryName(stale)!);
+        File.WriteAllText(stale, "interface:\n  display_name: Obsolete IDD Route\n");
+
+        try
+        {
+            var checkStale = fixture.RunGenerator(checkOnly: true);
+            Assert.NotEqual(0, checkStale.ExitCode);
+            Assert.Contains("Unexpected generated file", checkStale.Stdout + checkStale.Stderr);
+
+            var generated = fixture.RunGenerator();
+            Assert.Equal(0, generated.ExitCode);
+            fixture.AssertMissing(stale);
+            fixture.AssertFile(Path.Combine(route, "SKILL.md"));
+            fixture.AssertFile(Path.Combine(route, "references", "common-workflows.md"));
+
+            var checkClean = fixture.RunGenerator(checkOnly: true);
+            Assert.Equal(0, checkClean.ExitCode);
+            var cleanSnapshot = fixture.SnapshotMarketplace();
+            var again = fixture.RunGenerator();
+            Assert.Equal(0, again.ExitCode);
+            Assert.Equal(cleanSnapshot, fixture.SnapshotMarketplace());
+            Assert.Equal(factoryBefore, fixture.SnapshotMarketplace()
+                .Where(path => path.Contains("/idd-factory/", StringComparison.Ordinal))
+                .ToArray());
+        }
+        finally
+        {
+            if (File.Exists(stale))
+                File.Delete(stale);
+            var restored = fixture.RunGenerator();
+            Assert.Equal(0, restored.ExitCode);
+        }
+    }
+
+    [Fact]
     public void Generation_IsDeterministicAndIdempotent()
     {
         var before = fixture.SnapshotMarketplace();

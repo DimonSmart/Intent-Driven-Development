@@ -113,8 +113,12 @@ depth, so Factory selection is independent of whether the product operation is
 add, modify, or remove.
 
 When the routed request asks for an actual change, continue from routing into the
-recommended next skill in the same user request when possible. Do not ask for a
-second message only to confirm the selected route.
+recommended next skill in the same user request when scope, clarity, and invocation
+permissions allow. A recommendation never overrides a manual-only skill's explicit
+invocation requirement; ask the user to select that command or use a supported
+direct-invocation equivalent. Otherwise, do not ask for a second message only
+to confirm the selected route. For route-only diagnostics, return the result
+without starting any downstream workflow.
 
 Use `idd-skip` only when the user explicitly invokes it for the current request.
 Never select `idd-skip` automatically; it is not a project or future-request
