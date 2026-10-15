@@ -6,7 +6,7 @@ agent: Explore
 background: false
 argument-hint: "[request or workflow question]"
 allowed-tools: Read Glob Grep
-user-invocable: true
+user-invocable: false
 disable-model-invocation: false
 ---
 
@@ -57,6 +57,23 @@ or access to unprovided parent context.
 If no meaningful request reaches this skill and it cannot be recovered from
 available input, do not guess a route. Ask for the missing request or return
 an explicit missing-input diagnostic to the caller.
+
+## Automatic Selection and Route-Only Diagnostics
+
+This is an internal automatic workflow, not a user-facing command. When the user
+asks in natural language to classify a request, explain which IDD workflow would
+apply, or show the route without execution, the caller may invoke this router
+automatically with the complete request. Set `Requested scope: route-only`,
+`Current handoff: none`, and stop after the routing result; do not run the
+recommended skill, start Factory, or change project files.
+
+A recommended first skill is not permission to invoke it. In particular,
+`idd-help`, `idd-project-init`, `idd-verification-configure`,
+`idd-glossary-build`, and `idd-skip` are manual-only commands. The caller
+must not automatically invoke any of them after routing, even for an
+`end-to-end` request. Explain the recommendation and require explicit user
+selection of the command or a host-supported direct-invocation equivalent.
+Do not treat an automatic routing step as that selection.
 
 ## Context Reading Rules
 
