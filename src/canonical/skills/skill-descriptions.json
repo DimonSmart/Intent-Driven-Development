@@ -32,11 +32,7 @@
         }
       }
     },
-    "exposure": "command",
-    "interface": {
-      "displayName": "IDD Route",
-      "shortDescription": "Classify an IDD request and select a workflow"
-    }
+    "exposure": "workflow"
   },
   "idd-project-init": {
     "description": "Initialize project-owned IDD intent state, then pause for a blocking bootstrap decision when an existing implementation has no current intent.",
