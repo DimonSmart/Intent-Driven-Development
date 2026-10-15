@@ -45,3 +45,19 @@ codex plugin add idd-factory@intent-driven-development
 3. Start a new Claude Code or Codex session so the updated skills and instructions are loaded cleanly.
 
 Repositories that already use IDD do not need to run `idd-project-init` again. Project-owned intent remains in the repository, while the installed plugin provides the updated workflows.
+
+## Obsolete Factory commands after an update
+
+Starting with the unified model-management interface, use
+`idd-factory-configure` for both configuration and model refresh. The former
+`idd-factory-update-effort-models` skill was removed from newly generated
+Codex and Claude Code plugin packages; it is not an alias.
+
+Already installed plugin snapshots, caches or open sessions can still display
+the old command. Update or reinstall the **idd-factory** plugin using the steps
+above, inspect the installed skills if it remains, remove stale local copies
+according to your host's supported plugin management workflow, and start a
+**new session**. Regenerating the marketplace alone does not delete host-local
+plugin caches or change a running session. A separate `idd-intent` installation
+may explain or route Factory requests, but requires the `idd-factory` plugin
+for applying model policy.

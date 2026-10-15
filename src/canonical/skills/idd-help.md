@@ -51,9 +51,11 @@ Answer questions such as:
   linting, and project verification fit the methodology;
 - how a current IDD rule should be interpreted;
 - what an installed IDD skill is expected to do or not do.
-- how `idd-factory-update-effort-models` refreshes the LLMs assigned to Factory
-  effort levels while preserving reasoning settings, with persistence owned by
-  `idd-factory-configure` and application at the next worker spawn;
+- how `idd-factory-configure` handles initial configuration, exact model edits,
+  read-only review, and evidence-based model refresh while preserving reasoning
+  settings; updates apply at the next worker spawn. Installing `idd-factory`
+  is required for configuration; the standalone `idd-intent` plugin only
+  explains and routes Factory requests;
 - `.idd/verification.yaml`, its `direct`, `subtask`, `checkpoint`, and `final`
   contexts, confirmation checks, user instructions, and missing-policy fallback.
 

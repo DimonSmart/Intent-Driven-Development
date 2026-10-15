@@ -157,8 +157,7 @@
       ],
       "skills": [
         "idd-factory-run",
-        "idd-factory-configure",
-        "idd-factory-update-effort-models"
+        "idd-factory-configure"
       ],
       "roles": [],
       "skillRoleReferences": {},
@@ -180,11 +179,6 @@
         },
         {
           "skill": "idd-factory-configure",
-          "source": "src/canonical/methodology/factory-execution-policy.md",
-          "destination": "factory-execution-policy.md"
-        },
-        {
-          "skill": "idd-factory-update-effort-models",
           "source": "src/canonical/methodology/factory-execution-policy.md",
           "destination": "factory-execution-policy.md"
         },

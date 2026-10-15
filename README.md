@@ -100,7 +100,7 @@ IDD distinguishes three kinds of capabilities:
 - **User commands** are registered skills intended for direct invocation: `idd-help`,
   `idd-route`, `idd-project-init`, `idd-verification-configure`,
   `idd-glossary-build`, `idd-skip`, and (with Factory installed)
-  `idd-factory-run`, `idd-factory-configure`, and `idd-factory-update-effort-models`.
+  `idd-factory-run` and `idd-factory-configure` (setup, exact edits, review, and model refresh).
 - **Automatic workflows** are registered skills selected by the Coding Agent from
   a natural-language request (for example: intent change, import, lint,
   conformance audit, or implementation). They are not separate user commands.

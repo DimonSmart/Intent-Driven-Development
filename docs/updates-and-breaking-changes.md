@@ -1,5 +1,20 @@
 # Updates and Breaking Changes
 
+## 2026-10-15 — One Factory model-management command
+
+`idd-factory-configure` now handles initial setup, exact model/reasoning edits,
+read-only reviews and model refresh/selection. The public
+`idd-factory-update-effort-models` command was removed rather than retained
+as an alias. Factory now exposes only `idd-factory-run` and
+`idd-factory-configure`. The existing `.idd/execution.yaml` format, partial
+inheritance, and next-worker-spawn behavior do not change; no project policy
+migration is required.
+
+Update/reinstall the `idd-factory` plugin for Codex or Claude Code and open a
+new session. Old host-local cached installations may still show the removed
+command until cleaned up; marketplace regeneration does not purge those caches.
+See [Updating IDD](updating-idd.md).
+
 This page records IDD changes that require action in repositories that already use the toolkit.
 
 ## 2026-10-09 — Factory configuration allows authorized workflow handoffs

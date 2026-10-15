@@ -227,40 +227,41 @@ idd-verification-configure
 Do not use it to run checks, fix failing tests, or define product acceptance
 criteria.
 
-## Workflow Family: Factory Model Updates
+## Workflow Family: Factory Model Configuration and Review
 
-Use this workflow when the user asks to refresh, upgrade, downgrade, or replace
-LLMs assigned to Factory effort levels during the life of the project:
+Use `idd-factory-configure` for initial setup, exact model/reasoning edits,
+read-only comparisons, and lifecycle refreshes (cheaper/faster/stronger,
+upgrades, downgrades, or unavailable-model replacements):
 
 ```text
-idd-factory-update-effort-models
--> current policy and model evidence
--> proposed policy with requested overrides and preserved settings
--> idd-factory-configure for authorized validation and persistence
+idd-factory-configure
+-> read and validate existing policy or absence
+-> recognize exact / initial / review-only / refresh intent
+-> research alternatives only if selection is requested
+-> propose the smallest authorized edit or read-only report
+-> confirm automatically selected mappings
+-> re-check baseline, validate and persist or no-op
 ```
 
-Routing uses `Classification: factory-model-update`, `Operation: not-applicable`,
-and `Execution depth: not-applicable`. Use `Requested scope: route-only` for
-classification or routing advice, and `end-to-end` for a requested model review
-or update. Preserve a review-only limit through the handoff so the skill returns
-its analysis/proposal without persistence. This workflow needs the Factory
-plugin but does not start Factory.
+Routing retains `Classification: factory-model-update`, `Operation:
+not-applicable`, and `Execution depth: not-applicable`. Use `route-only` for
+classification advice; `end-to-end` can continue through configure in the
+same user request, preserving review-only restrictions. Direct configure
+invocation needs no router. The router never writes policy, invokes Factory, or
+runs the selected skill inside its read-only isolated routing context. With
+only `idd-intent` installed, explain that model management needs
+`idd-factory` rather than pretending the command exists.
 
-Effort levels are the three existing execution profiles, distinct from vendor
-reasoning settings. Persistent policy remains in `.idd/execution.yaml`, outside
-Product Intent, Engineering Rules, and temporary Factory state. Unselected
-levels, other platforms, and reasoning settings are preserved. Automatic model
-recommendations require confirmation; exact user-authorized replacements and
-previously confirmed proposals reuse that decision through the handoff.
-
-Missing policy means inheritance. Partial mappings are valid; missing profile
-or platform mappings remain inherited. Configure only requested overrides and
-preserve unselected mappings and intentional absence. Malformed existing policy
-is diagnosed and repaired through the configuration owner, never silently replaced
-with inherit.
-The owner checks for intervening edits and skips writes for an unchanged policy.
-Updates affect the next worker without reclassifying tasks or changing a running
-worker. Review-only requests stop before persistence.
+Only `.idd/execution.yaml` stores project-owned Factory model policy.
+Missing policy and absent mappings inherit host settings. A review request
+never creates a policy; an exact authorized ID never triggers mandatory
+research or repeat confirmation. Preserve untouched profiles, platforms and
+reasoning values, including their absence. Automatically recommended or
+interpreted models require confirmation. A known reasoning incompatibility
+blocks the candidate without silently resetting effort. Malformed input
+blocks unauthorized writes; intervening edits must not be lost; no-op does
+not rewrite policy. Changes affect the next worker, not an existing worker
+or planner classification.
 
 ## Workflow Family: Initial Intent Bootstrap
 

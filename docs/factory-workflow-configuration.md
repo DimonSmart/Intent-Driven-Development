@@ -108,13 +108,16 @@ or a present platform mapping with no non-empty model, is invalid.
 
 ## Configuration workflow
 
-Run `idd-factory-configure` to create or change the policy.
-
-For later refreshes, upgrades, or downgrades of the models assigned to effort
-levels, use `idd-factory-update-effort-models`. It prepares the change and applies
-it through `idd-factory-configure`. Unselected levels, other platform mappings,
-and reasoning settings are preserved unless explicitly requested. A review-only
-request returns a proposal without saving; an unchanged policy is not rewritten.
+Run `idd-factory-configure` for all model management: initial setup, exact
+model/reasoning edits, read-only review, and later refreshes, upgrades or
+downgrades. There is no separate model-update command. An exact specified ID
+needs no additional approval or independent model search. Alternatives chosen
+by the agent require explicit confirmation; a review-only request returns a
+comparison without saving. Unselected levels, other platform mappings and
+existing optional reasoning settings (including their absence) are preserved.
+Known effort incompatibilities must be resolved explicitly. Before writing,
+revalidate the full policy and check for intervening edits; stop on unsafe
+conflicts. A no-op does not rewrite the file.
 
 For fine-grained configuration the active Coding Agent proposes overrides for
 the requested profiles from current host/platform information, states when

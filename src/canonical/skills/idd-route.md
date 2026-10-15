@@ -95,10 +95,10 @@ Use `verification-configuration` when the user asks to create or deliberately
 update project-owned `.idd/verification.yaml` rules. Do not use it for running
 checks, fixing tests, or changing product acceptance criteria.
 
-Use `factory-model-update` when the user asks to refresh, upgrade, downgrade,
-or replace the LLMs assigned to Factory effort levels. These levels are
-`ExecutionProfile` values, distinct from platform reasoning settings. Do not
-route ordinary task execution or a question about models to a model update.
+Use `factory-model-update` when the user asks to configure, review, compare,
+refresh, upgrade, downgrade, or replace Factory model policy, including an exact
+model or reasoning edit. These levels are `ExecutionProfile` values, distinct
+from platform reasoning settings. Do not route ordinary task execution here.
 
 Use `intent-bootstrap` when the repository already contains implementation but
 lacks an adequate current IDD product model and the user asks to discover,
@@ -218,7 +218,7 @@ a handoff index:
 | --- | --- |
 | `project-initialization` | `idd-project-init` |
 | `verification-configuration` | `idd-verification-configure` |
-| `factory-model-update` | `idd-factory-update-effort-models` |
+| `factory-model-update` | `idd-factory-configure` |
 | `intent-bootstrap` | `idd-intent-bootstrap` |
 | `intent-import` | `idd-intent-import` |
 | `product-change` | `idd-intent-change` |
@@ -272,9 +272,10 @@ Apply these rules:
   Only an unambiguous user request can authorize `fix`. The router
   remains read-only and must not apply lint fixes itself.
 - For `factory-model-update`, preserve selected levels, target platform, exact
-  model IDs, cost/quality/latency goals, and review-only limits. Continue through
-  `idd-factory-update-effort-models -> idd-factory-configure` when application is
-  requested. If the Factory plugin is unavailable, report that requirement;
+  model IDs, reasoning settings, cost/quality/latency goals, and review-only limits. Continue through
+  `idd-factory-configure` directly in an authorized end-to-end request; the
+  router never invokes it in its own isolated context, writes the policy, or
+  starts Factory. If the Factory plugin is unavailable, report that requirement;
   do not turn this request into product implementation or start a Factory run.
 
 Pass through the complete original request, classification fields, requested

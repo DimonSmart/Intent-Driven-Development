@@ -1,8 +1,8 @@
 # Factory skills
 
-IDD Factory exposes three registered user commands: `idd-factory-run`,
-`idd-factory-configure`, and `idd-factory-update-effort-models`.
-All three can also be selected by the agent for the relevant user request.
+IDD Factory exposes two registered user commands: `idd-factory-run` and
+`idd-factory-configure`. Configure can also be selected automatically by the agent;
+selection alone never authorizes a write.
 Planner and worker are internal canonical protocols owned by `idd-factory-run`.
 Automatic Intent workflows remain available to the agent and are hidden from
 the Claude Code slash menu. Codex currently has no equivalent documented
@@ -32,51 +32,40 @@ processes, poll status, maintain retry budgets, or own a workflow state machine.
 
 ## `idd-factory-configure`
 
-This reusable command owns `.idd/execution.yaml`. It can be invoked directly
-or activated by the agent to finish requested configuration or a model-update
-handoff. Automatic activation alone does not authorize a write: review-only
-requests remain read-only, and automatically proposed changes need explicit
-confirmation. Exact prior authorization is reused.
+The sole Factory model-management command handles initial configuration, exact
+model or reasoning edits, targeted inheritance, read-only reviews/comparisons,
+and evidence-based refreshes of `economy`, `standard` and `strong`.
+It owns validation and authorized persistence of optional `.idd/execution.yaml`.
+No other Factory model-update command or persistence entry point is published.
 
-It supports:
+- **Initial setup:** choose once between `default (inherit)` and
+  `configure` for explicit partial platform/profile mappings. An absent
+  policy already means inheritance; review-only requests do not create one.
+- **Exact changes:** user-specified model IDs are applied without autonomous
+  substitution or duplicate confirmation. Only requested mappings/settings
+  change, including independent Codex and Claude assignments. Returning one
+  mapping to inherit removes it; requesting global inherit replaces the strategy.
+- **Review-only:** compares the existing policy and candidates, but never
+  writes or starts Factory, even when automatically invoked.
+- **Refresh:** compare candidates against current host and platform information,
+  fresh vendor documentation, and user constraints (cost, quality, latency,
+  reasoning). Display current versus proposed mappings, supporting evidence,
+  unchanged settings and availability uncertainty. Automatically chosen or
+  interpreted mappings require explicit Apply/Edit/Reject confirmation.
 
-- explicit `modelStrategy: inherit` for using the current host model everywhere;
-- concrete per-platform mappings for `economy`, `standard`, and `strong`;
-- partial mappings with inheritance for absent profiles or platforms;
-- optional platform-specific reasoning settings;
-- later reconfiguration or return to all-inherit.
+Unselected profiles/platforms inherit host settings. The same model may be used
+for multiple profiles. Optional `reasoningEffort` (Codex) and `effort` (Claude)
+are preserved, including absence; a reasoning-only override without a model is
+invalid. Known incompatibility with a preserved setting blocks the proposal
+until separately resolved. Unknown availability or compatibility is reported
+honestly instead of prompting silent fallback.
 
-When fine-grained configuration is requested, the active Coding Agent first
-proposes overrides for the requested profiles from current information, clearly
-states any account-availability uncertainty, and asks for confirmation. IDD
-source does not contain a built-in table of recommended concrete models.
-
-Dynamic aliases such as `cheapest`, `best`, `latest`, or `strongest` are
-resolved during configuration to concrete model IDs; they are not persisted as
-runtime identifiers.
-
-## `idd-factory-update-effort-models`
-
-Select `idd-factory-update-effort-models` directly or describe the requested
-model update in natural language. Use it to refresh, upgrade, downgrade, or
-replace the LLMs assigned to `economy`, `standard`, and `strong`. For example, ask to reduce cost
-for economy only, strengthen standard, or replace an unavailable model.
-
-These effort levels are execution profiles; platform reasoning settings remain
-unchanged unless explicitly requested. The skill reads current policy and model
-information, preserves unselected levels and other platforms, and presents the
-current/proposed mapping with reasons and availability uncertainty. Concrete
-recommended model IDs are not built into the skill.
-
-Review-only requests return the proposal without writing. For application, the
-skill hands the complete proposal, baseline, and user authorization to
-`idd-factory-configure`, which remains the sole writer. Automatically selected
-models require confirmation; exact authorized replacements or an already
-confirmed proposal do not repeat that decision. Intervening edits are checked
-before saving, and an unchanged policy is not rewritten.
-
-Updates apply to the next worker spawn without a new plan. Running workers keep
-their model. The workflow does not start Factory or mutate its temporary state.
+Before saving, configure validates the full existing policy, checks for
+intervening edits, rebases only authorized operations, and either safely writes
+and re-reads or reports no-op/conflict. It never modifies temporary Factory
+state. The next worker spawn uses the updated policy, without replanning or
+changing a running worker. Model IDs and account availability are never assumed
+from model names.
 
 ## Internal planner protocol
 

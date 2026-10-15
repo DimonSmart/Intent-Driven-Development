@@ -56,13 +56,11 @@ Ownership rules:
 - Factory depends on Intent;
 - Intent must not depend on Factory.
 
-The canonical Factory command set is exactly `idd-factory-run`,
-`idd-factory-configure`, and `idd-factory-update-effort-models`. Configuration
-owns persistent project model policy;
-`idd-factory-run` owns the orchestration loop and the internal planner and
-worker protocols. The `idd-factory-update-effort-models` command
-prepares lifecycle model replacements and hands authorized proposals to
-`idd-factory-configure`, which remains the sole writer. Each worker child
+The canonical Factory command set is exactly `idd-factory-run` and
+`idd-factory-configure`. Configure owns initial policy setup, exact changes,
+read-only reviews, lifecycle model refresh and authorized persistence;
+`idd-factory-run` owns the orchestration loop and internal planner/worker
+protocols. No separate model-update entry point is published. Each worker child
 executes exactly one contracted task.
 
 The planner is canonical distributable content without being a skill:
@@ -121,7 +119,7 @@ user-facing metadata file. Codex does not guarantee that these choices exactly
 control which skills appear in every host's menu.
 
 `idd-factory-configure` is a command with automatic invocation so initialization
-and model-update workflows can hand off to the sole configuration owner.
+and model-review/refresh requests can select the sole configuration owner.
 Activation and write authorization are separate: the command preserves scope,
 obtains required confirmation, validates policy, and reuses existing approval.
 
