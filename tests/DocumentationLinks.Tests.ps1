@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$repositoryRoot = (& git rev-parse --show-toplevel).Trim()
+$repositoryRoot = [IO.Path]::GetFullPath((& git rev-parse --show-toplevel).Trim())
 if ($LASTEXITCODE -ne 0) { throw "Could not locate repository root." }
 
 $documents = @((Join-Path $repositoryRoot "README.md")) +
