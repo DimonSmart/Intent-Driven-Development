@@ -1,9 +1,16 @@
 @echo off
 setlocal EnableExtensions
 
-cd /d "%~dp0"
 call :ParseArguments %*
 if errorlevel 1 exit /b %ERRORLEVEL%
+if defined SHOW_USAGE exit /b 0
+pushd "%~dp0..\.." || exit /b 1
+call :RunLive
+set "LAUNCHER_EXIT_CODE=%ERRORLEVEL%"
+popd
+exit /b %LAUNCHER_EXIT_CODE%
+
+:RunLive
 set "CONFIGURATION=Debug"
 set "FRAMEWORK=net10.0"
 set "TEST_DLL=%CD%\tests\Idd.Factory.LiveTests\bin\%CONFIGURATION%\%FRAMEWORK%\Idd.Factory.LiveTests.dll"
@@ -90,6 +97,7 @@ shift
 goto ParseArguments
 
 :PrintUsage
+set "SHOW_USAGE=1"
 echo Usage: %~nx0 [--model ^<model^>] [--reasoning ^<effort^>]
 exit /b 0
 

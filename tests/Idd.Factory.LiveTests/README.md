@@ -4,7 +4,7 @@ This project contains explicit token-consuming end-to-end evaluations of the
 native-agent Factory architecture. They are skipped unless
 `IDD_RUN_LIVE_FACTORY_EVALS=1`.
 
-The scenario builds the current generator, generates and installs the Codex
+The primary scenario builds the current generator, generates and installs the Codex
 `idd-factory` plugin, copies the `TwoStepCatalog` workspace, and invokes a real
 Codex host with `$idd-factory-run`.
 The host is started with MultiAgentV2 explicitly enabled; a model-selected
@@ -46,8 +46,12 @@ which take precedence over `IDD_FACTORY_EVAL_MODEL` and
 `IDD_FACTORY_EVAL_REASONING_EFFORT` environment overrides:
 
 ```zsh
-./run-live-factory-evals.zsh --model gpt-6-luna --reasoning medium
+./scripts/evals/run-live-factory-evals.zsh --model gpt-6-luna --reasoning medium
 ```
+
+On Windows CMD, use `scripts\evals\run-live-factory-evals.bat --model MODEL_NAME --reasoning medium` from the repository root.
+Both launchers can also be invoked from another working directory and retain
+the current-directory and exit-code semantics.
 
 The environment variables remain supported for CI and direct `dotnet test`
 invocations. A run records both resolved values and their sources in

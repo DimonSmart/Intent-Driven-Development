@@ -31,6 +31,7 @@ src/adapters/codex/               Codex adapter configuration
 tools/generate/                   canonical model to native marketplace generator
 tests/Idd.Generation.Tests/       generated marketplace and generator contracts
 scripts/Check.ps1                 Fast / Live / Release validation entry point
+scripts/evals/                   Factory live-evaluation launchers
 ```
 
 `artifacts/marketplace/` is local generated output and is ignored by Git. The main branch contains canonical source, not generated marketplace artifacts.
@@ -181,10 +182,21 @@ pwsh ./scripts/Check.ps1 -Mode Live
 ```
 
 Live builds `Idd.Factory.LiveTests`, enables `IDD_RUN_LIVE_FACTORY_EVALS=1`,
-and runs only `Category=LiveFactoryEval`. The category currently selects the
-single Factory end-to-end evaluation. Ordinary `[Fact]` tests in the LiveTests
-project are not selected by Live mode. `run-live-factory-evals.bat` is a
-convenience wrapper for the same entry point.
+and runs the explicit `Category=LiveFactoryEval` scenarios, including normal
+implementation, unavailable worker-model handling, and recovery after failed
+final verification. Ordinary `[Fact]` tests in the LiveTests project are not
+selected by Live mode. The convenience launchers live in `scripts/evals/`:
+
+```powershell
+scripts\evals\run-live-factory-evals.bat --model MODEL_NAME --reasoning medium
+```
+
+```zsh
+./scripts/evals/run-live-factory-evals.zsh --model MODEL_NAME --reasoning medium
+```
+
+Intent Live Evals are independent of Factory Live Evals and must be opted into
+separately; neither is part of Fast or Release validation.
 
 Release validation extends Fast with release-only contracts:
 
@@ -192,9 +204,11 @@ Release validation extends Fast with release-only contracts:
 pwsh ./scripts/Check.ps1 -Mode Release -Version 1.2.3
 ```
 
-Release additionally validates release scripts, performs final generation and
-`--check` for the exact release version, validates the publish layout, and runs
-Claude native plugin validation when the Claude CLI is available.
+Release additionally validates release scripts and Marketplace README links,
+performs final generation and `--check` for the exact release version,
+validates the publish layout, and runs Claude native plugin validation when
+the Claude CLI is available. Fast also checks documentation links and safe
+launcher argument branches without invoking Codex.
 
 All modes verify that validation itself does not change the repository working
 tree relative to its starting state. Release validation additionally requires a
@@ -233,13 +247,14 @@ evaluation. If tag push fails, the temporary local tag is removed.
 Tag publication runs `.github/workflows/publish-marketplace.yml`. That workflow
 is the deterministic RELEASE gate for the exact tagged revision: it calls
 `scripts/Check.ps1 -Mode Release -Version <tag version>`, builds the publish
-root, publishes the `marketplace` branch, and creates the GitHub release only
-after release validation succeeds.
+root, generates a Marketplace README whose documentation/image links point to
+the matching release tag, publishes the `marketplace` branch, and creates the
+GitHub release only after release validation succeeds.
 
 Real-model behavior is evaluated separately and never gates publication:
 
 ```bat
-run-live-factory-evals.bat
+scripts\evals\run-live-factory-evals.bat
 ```
 
 The live eval consumes Codex usage and checks installed-plugin execution,
@@ -250,14 +265,17 @@ final product behavior, and protected-input preservation. See
 The publish workflow is:
 
 ```text
-Checkout
+Checkout tag commit
+Setup .NET
+Extract version from tag
 Run Release Validation
 Build Publish Root
+Generate marketplace README
 Publish Marketplace Branch
 Create GitHub Release
 ```
 
-The `marketplace` branch contains only ready-to-consume marketplace output and the public README. It must not contain canonical source, generator source, or maintainer documentation.
+The `marketplace` branch contains only ready-to-consume marketplace output and the generated public README; it does not contain `docs/`. It must not contain canonical source, generator source, or maintainer documentation.
 
 ## Rules
 

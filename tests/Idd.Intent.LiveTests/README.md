@@ -18,8 +18,30 @@ It exercises six scenarios:
 - conflict with an existing current Rule;
 - explicit replacement of an existing Rule while preserving its stable ID.
 
-Run explicitly with `run-live-intent-evals.bat` or set
-`IDD_RUN_LIVE_INTENT_EVALS=1` and run this test project directly.
+Run explicitly from the repository root (requires installed and authenticated
+Codex; these evaluations consume tokens and must never run in normal CI).
+
+Windows PowerShell:
+
+```powershell
+$env:IDD_RUN_LIVE_INTENT_EVALS = "1"
+dotnet test tests/Idd.Intent.LiveTests/Idd.Intent.LiveTests.csproj --filter "Category=LiveIntentEval"
+```
+
+When finished, optionally run `Remove-Item Env:IDD_RUN_LIVE_INTENT_EVALS`.
+
+macOS/Linux:
+
+```bash
+IDD_RUN_LIVE_INTENT_EVALS=1 dotnet test \
+  tests/Idd.Intent.LiveTests/Idd.Intent.LiveTests.csproj \
+  --filter 'Category=LiveIntentEval'
+```
+
+The opt-in variable applies to the current process/session only. Existing
+`IDD_INTENT_EVAL_TIMEOUT_MINUTES` and other `IDD_INTENT_EVAL_*` overrides
+continue to work; the default timeout is 20 minutes. Intent Live Evals
+are separate from Factory Live Evals.
 
 ## Opt-in mechanical lint check/fix evaluation
 

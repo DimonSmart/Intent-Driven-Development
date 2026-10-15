@@ -145,10 +145,12 @@ Release-specific migration instructions are maintained on the dedicated [Updates
 - [New Project Guide](docs/new-project.md)
 - [Methodology](docs/methodology.md)
 - [Interactive IDD Overview](docs/diagram/README.md)
-- [Factory Workflow](docs/factory-workflow.md)
 - [Factory Skills Reference](docs/factory-skills.md)
-- [Factory Token Efficiency](docs/factory-token-efficiency.md)
-- [Factory Benchmarking](docs/factory-benchmarking.md)
+- [Factory Token Efficiency & Benchmarking](docs/factory-token-efficiency.md)
+
+### For contributors and maintainers
+
+- [Project Maintenance](docs/project-maintenance.md)
 
 ## License
 

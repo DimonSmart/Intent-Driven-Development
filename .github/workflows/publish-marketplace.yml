@@ -42,7 +42,10 @@ jobs:
           rm -rf /tmp/idd-marketplace
           mkdir -p /tmp/idd-marketplace
           cp -R artifacts/marketplace/. /tmp/idd-marketplace/
-          cp README.md /tmp/idd-marketplace/README.md
+
+      - name: Generate marketplace README
+        shell: pwsh
+        run: pwsh ./scripts/Build-MarketplaceReadme.ps1 -SourceReadme ./README.md -OutputReadme /tmp/idd-marketplace/README.md -Version "${{ steps.version.outputs.VERSION }}"
 
       - name: Publish marketplace branch
         shell: bash
