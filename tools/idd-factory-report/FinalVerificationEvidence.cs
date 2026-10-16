@@ -84,7 +84,7 @@ internal sealed class FinalVerificationEvidence
             }
             var selectedChecks = selected.Select(id => all[id]).ToArray();
             var commands = selectedChecks.Where(check => check.Command is not null)
-                .Select(check => NormalizeCommand(check.Command)).ToArray();
+                .Select(check => NormalizeCommand(check.Command, allowConfiguredRun: true)).ToArray();
             if (commands.Any(command => command is null) || commands.Distinct().Count() != commands.Length)
                 throw new FormatException("Final commands are ambiguous or use unsupported shell syntax.");
             return new(true, selectedChecks, workingDirectory: workingDirectory);
@@ -122,7 +122,7 @@ internal sealed class FinalVerificationEvidence
                     item.ToolName.Contains("local_shell", StringComparison.OrdinalIgnoreCase))) continue;
             if (item.CommandWorkingDirectory is not null && workingDirectory is not null &&
                 NormalizeDirectory(item.CommandWorkingDirectory) != NormalizeDirectory(workingDirectory)) continue;
-            var command = NormalizeCommand(item.ToolArguments);
+            var command = NormalizeCommand(item.ToolArguments, allowConfiguredRun: configured);
             if (command is null) continue;
             var check = configured
                 ? checks.SingleOrDefault(check => check.Command is not null && NormalizeCommand(check.Command) == command)
@@ -161,7 +161,7 @@ internal sealed class FinalVerificationEvidence
             ? uri.LocalPath : path);
 
     // Compare argv, never shell substrings: a quoted echo or a compound command isn't evidence.
-    internal static string? NormalizeCommand(string? input, bool allowPowerShell = true)
+    internal static string? NormalizeCommand(string? input, bool allowPowerShell = true, bool allowConfiguredRun = false)
     {
         if (string.IsNullOrWhiteSpace(input)) return null;
         try
@@ -178,35 +178,36 @@ internal sealed class FinalVerificationEvidence
                 var values = node.EnumerateArray().ToArray();
                 if (values.Any(arg => arg.ValueKind != JsonValueKind.String)) return null;
                 var args = values.Select(arg => arg.GetString()!).ToArray();
-                return NormalizeArgs(args, allowPowerShell);
+                return NormalizeArgs(args, allowPowerShell, allowConfiguredRun);
             }
             if (node.ValueKind != JsonValueKind.String) return null;
             input = node.GetString();
         }
         catch (JsonException) { }
         var tokens = Tokenize(input!);
-        return tokens is null ? null : NormalizeArgs(tokens, allowPowerShell);
+        return tokens is null ? null : NormalizeArgs(tokens, allowPowerShell, allowConfiguredRun);
     }
 
-    private static string? NormalizeArgs(IReadOnlyList<string> args, bool allowPowerShell)
+    private static string? NormalizeArgs(IReadOnlyList<string> args, bool allowPowerShell, bool allowConfiguredRun)
     {
         if (args.Count == 0 || string.IsNullOrWhiteSpace(args[0]) || args.Any(arg => arg.Contains('\0'))) return null;
         var executable = args[0].Replace('\\', '/').Split('/').Last();
         if (args.Count == 3 && executable is "sh" or "bash" or "zsh" && args[1] is "-c" or "-lc")
-            return NormalizeCommand(args[2], allowPowerShell: false);
+            return NormalizeCommand(args[2], allowPowerShell: false, allowConfiguredRun: allowConfiguredRun);
         if (IsPowerShell(executable))
         {
             if (!allowPowerShell || args.Count != 3 ||
                 !string.Equals(args[1], "-Command", StringComparison.OrdinalIgnoreCase)) return null;
-            // Only transparent, single-command dotnet build/test calls are evidence.
+            // Only literal dotnet commands count; 'run' requires an explicit verification policy.
             // Reject PowerShell operators and expansion syntax, even inside quoted arguments.
             if (args[2].IndexOfAny([';', '&', '|', '<', '>', '$', '`', '{', '}', '@', '(', ')', '*', '?', '#']) >= 0)
                 return null;
             var inner = Tokenize(args[2]);
             if (inner is null || inner.Count < 2 || inner[0] is not ("dotnet" or "dotnet.exe") ||
-                inner[1] is not ("build" or "test") || inner.Contains("--%", StringComparer.Ordinal))
+                (inner[1] is not ("build" or "test") && !(allowConfiguredRun && inner[1] == "run")) ||
+                inner.Contains("--%", StringComparer.Ordinal))
                 return null;
-            return NormalizeArgs(inner, allowPowerShell: false);
+            return NormalizeArgs(inner, allowPowerShell: false, allowConfiguredRun: allowConfiguredRun);
         }
         // Reject wrappers/options whose semantics have not been interpreted.
         if (executable is "sh" or "bash" or "zsh" or "cmd.exe") return null;
