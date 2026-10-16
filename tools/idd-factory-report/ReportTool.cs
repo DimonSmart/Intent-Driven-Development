@@ -2161,7 +2161,8 @@ public sealed class FactoryReportEngine
 
     private static bool HasFactoryMarker(string? text, string marker) =>
         !string.IsNullOrWhiteSpace(text) &&
-        text.Contains(marker, StringComparison.OrdinalIgnoreCase);
+        Regex.IsMatch(text, @"(?im)^\s*(?:use|invoke|run|follow)\s+" +
+            Regex.Escape(marker) + @"(?:\s|[.,;:]|$)");
 
     private static bool IsNativeSpawn(CodexEvent e) =>
         e.ToolName?.Contains("spawn_agent", StringComparison.OrdinalIgnoreCase) == true;
