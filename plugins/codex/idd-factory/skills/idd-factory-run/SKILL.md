@@ -270,6 +270,28 @@ while true:
 This is conceptual behavior, not a requirement to implement a new programmatic
 state machine.
 
+### Codex MultiAgentV2 spawn identity
+
+On Codex MultiAgentV2, **every Factory-owned native `spawn_agent` call**
+(planner and worker) MUST include a unique explicit `task_name` argument:
+`idd_factory_planner_01`, `idd_factory_planner_02`, ... for planners,
+or `idd_factory_worker_01`, `idd_factory_worker_02`, ... for workers.
+Only names matching `^idd_factory_(planner|worker)_[0-9]+$` are valid.
+Use a fresh name for **each attempt**, including a spawn rejected by the host.
+Keep names unique within the root-session/Factory invocation and any shared
+host namespace; inspect visible native calls before selecting the next suffix.
+Do not persist counters or create another Factory runtime/state machine.
+
+Pass `task_name` in native spawn arguments, **not** in child instructions or
+worker assignments. This is a trace-visible role marker, not evidence that a
+child was accepted, completed or used its requested model. Also explicitly set
+`fork_turns: "none"` for **planner and worker** spawns; a fresh context must
+not inherit the parent or an earlier child's transcript. Apply exact model and
+reasoning overrides when execution policy requires them; if the host cannot
+express a required argument or honor an override, block with a host-compatibility
+diagnostic rather than changing model or backend. Other platform adapters are
+unchanged when they lack `task_name`.
+
 ### Fresh planner
 
 Before every planner spawn, read `references/factory-planner.md`. Create a
@@ -536,7 +558,21 @@ Use native Codex child-agent delegation for Factory semantic work.
   that reason.
 - Use the native `spawn_agent` operation (or its current native
   equivalent) and a blocking/event-driven `wait_agent` operation.
-  Prefer one long wait on the critical path. Do not build a
+- Before **every** Factory-owned planner or worker spawn attempt,
+  choose an unused structured `task_name`: `idd_factory_planner_01`,
+  `idd_factory_planner_02`, ... for planners, or
+  `idd_factory_worker_01`, `idd_factory_worker_02`, ... for workers
+  (format `^idd_factory_(planner|worker)_[0-9]+$`).
+  Names must be unique within this Factory invocation and the
+  visible shared host namespace. Reserve the name even if the host
+  rejects the attempt; use a new suffix for any retry.
+- Pass `task_name` in native `spawn_agent` arguments, never only
+  inside `message`, and pass `fork_turns: "none"` for **both**
+  planners and workers. Example without optional model overrides:
+  `{"task_name":"idd_factory_worker_01","fork_turns":"none","message":"<complete-worker-instructions>"}`.
+  Include `model` and `reasoning_effort` only when required by the
+  validated execution profile mapping; never substitute models.
+- Prefer one long wait on the critical path. Do not build a
   short-wait/status-polling loop that consumes parent model turns.
 - If a wait fails or the host times out, do not start a replacement
   worker while the previous child may still write to the workspace.

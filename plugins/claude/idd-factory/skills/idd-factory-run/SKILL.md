@@ -272,6 +272,28 @@ while true:
 This is conceptual behavior, not a requirement to implement a new programmatic
 state machine.
 
+### Codex MultiAgentV2 spawn identity
+
+On Codex MultiAgentV2, **every Factory-owned native `spawn_agent` call**
+(planner and worker) MUST include a unique explicit `task_name` argument:
+`idd_factory_planner_01`, `idd_factory_planner_02`, ... for planners,
+or `idd_factory_worker_01`, `idd_factory_worker_02`, ... for workers.
+Only names matching `^idd_factory_(planner|worker)_[0-9]+$` are valid.
+Use a fresh name for **each attempt**, including a spawn rejected by the host.
+Keep names unique within the root-session/Factory invocation and any shared
+host namespace; inspect visible native calls before selecting the next suffix.
+Do not persist counters or create another Factory runtime/state machine.
+
+Pass `task_name` in native spawn arguments, **not** in child instructions or
+worker assignments. This is a trace-visible role marker, not evidence that a
+child was accepted, completed or used its requested model. Also explicitly set
+`fork_turns: "none"` for **planner and worker** spawns; a fresh context must
+not inherit the parent or an earlier child's transcript. Apply exact model and
+reasoning overrides when execution policy requires them; if the host cannot
+express a required argument or honor an override, block with a host-compatibility
+diagnostic rather than changing model or backend. Other platform adapters are
+unchanged when they lack `task_name`.
+
 ### Fresh planner
 
 Before every planner spawn, read `references/factory-planner.md`. Create a
