@@ -420,6 +420,9 @@ public sealed class CodexRolloutReader
 
                 if (toolName == "spawn_agent")
                 {
+                    if (toolOutput is null && eventObject.ValueKind == JsonValueKind.Object &&
+                        eventObject.TryGetProperty("error", out _))
+                        toolOutput = eventObject.GetRawText();
                     // Native structured items can put task_name beside an opaque
                     // message instead of inside the serialized arguments field.
                     if (eventObject.ValueKind == JsonValueKind.Object &&
@@ -621,6 +624,12 @@ public sealed class CodexRolloutReader
                 code = error.ValueKind == JsonValueKind.Object ? FindString(error, "code", "type") : null;
                 message = error.ValueKind == JsonValueKind.Object
                     ? FindString(error, "message", "detail") : error.ValueKind == JsonValueKind.String ? error.GetString() : null;
+            }
+            if (root.ValueKind == JsonValueKind.Object &&
+                FindString(root, "status", "outcome") is "rejected" or "failed" or "error")
+            {
+                code ??= FindString(root, "code", "error_code");
+                message ??= FindString(root, "message", "reason", "detail") ?? "Host explicitly rejected the spawn.";
             }
         }
         catch (JsonException)
