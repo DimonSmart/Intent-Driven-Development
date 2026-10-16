@@ -21,7 +21,7 @@ public sealed class MarketplaceGenerationTests(GenerationFixture fixture)
         AssertString(renames, "idd-core", "idd-intent");
 
         var plugins = root.GetProperty("plugins").EnumerateArray().ToArray();
-        Assert.Equal(["idd-intent", "idd-factory"], plugins.Select(plugin => plugin.GetProperty("name").GetString()).ToArray());
+        Assert.Equal(["idd-intent", "idd-factory"], plugins.Select(plugin => plugin.GetProperty("name").GetString()!).ToArray());
         foreach (var plugin in plugins)
         {
             AssertString(plugin, "version", fixture.Version);
@@ -41,7 +41,7 @@ public sealed class MarketplaceGenerationTests(GenerationFixture fixture)
         AssertString(root.GetProperty("interface"), "displayName", "Intent-Driven Development");
 
         var plugins = root.GetProperty("plugins").EnumerateArray().ToArray();
-        Assert.Equal(["idd-intent", "idd-factory"], plugins.Select(plugin => plugin.GetProperty("name").GetString()).ToArray());
+        Assert.Equal(["idd-intent", "idd-factory"], plugins.Select(plugin => plugin.GetProperty("name").GetString()!).ToArray());
         foreach (var plugin in plugins)
         {
             var source = plugin.GetProperty("source");

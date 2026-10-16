@@ -999,7 +999,7 @@ public sealed partial class FactoryReportTests : IDisposable
             Assistant("2026-09-23T10:00:50Z", "Implemented."));
 
         var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
-        var worker = Assert.Single(report.Agents.Where(x => x.Role == "worker"));
+        var worker = Assert.Single(report.Agents, x => x.Role == "worker");
         Assert.Equal(1, report.Metrics.WorkerInvocations);
         Assert.Equal("Implement Catalog refresh.", worker.TaskTitle);
         Assert.Equal("Implement Catalog refresh.\n\nPreserve the existing public behavior.\nThis task quotes: You are the Factory planner.", worker.Task);
@@ -1036,7 +1036,7 @@ public sealed partial class FactoryReportTests : IDisposable
                 Assistant("2026-09-23T10:00:30Z", "No task."));
 
             var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
-            var worker = Assert.Single(report.Agents.Where(x => x.Role == "worker"));
+            var worker = Assert.Single(report.Agents, x => x.Role == "worker");
             Assert.Null(worker.Task);
             Assert.Null(worker.TaskTitle);
         }
@@ -1128,7 +1128,7 @@ public sealed partial class FactoryReportTests : IDisposable
         ]);
 
         var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
-        Assert.Equal(expectedRole, Assert.Single(report.Agents.Where(x => x.Role != "root")).Role);
+        Assert.Equal(expectedRole, Assert.Single(report.Agents, x => x.Role != "root").Role);
         Assert.Equal(0, report.Metrics.WorkerInvocations);
         Assert.Contains(report.Diagnostics, diagnostic => diagnostic.Code == "agent_role_conflict");
     }

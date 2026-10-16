@@ -14,11 +14,11 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
         }
 
         var knownSkills = Directory.GetFiles(layout.SkillsRoot, "*.md")
-            .Select(Path.GetFileNameWithoutExtension)
+            .Select(path => Path.GetFileNameWithoutExtension(path)!)
             .ToHashSet(StringComparer.Ordinal);
         var knownRoles = Directory.Exists(layout.FactoryRolesRoot)
             ? Directory.GetFiles(layout.FactoryRolesRoot, "*.md")
-                .Select(Path.GetFileNameWithoutExtension)
+                .Select(path => Path.GetFileNameWithoutExtension(path)!)
                 .ToHashSet(StringComparer.Ordinal)
             : new HashSet<string>(StringComparer.Ordinal);
 
