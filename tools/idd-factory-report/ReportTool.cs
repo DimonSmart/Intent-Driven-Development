@@ -579,7 +579,7 @@ public sealed class CodexRolloutReader
                 }
 
                 var fallbackId = e.ChildThreadId;
-                if (record.ChildThreadIds.Count == 0 && string.IsNullOrWhiteSpace(fallbackId))
+                if (record.SpawnOutcome != "rejected" && record.ChildThreadIds.Count == 0 && string.IsNullOrWhiteSpace(fallbackId))
                     fallbackId = ExtractThreadId(e.ToolOutput);
                 if (!string.IsNullOrWhiteSpace(fallbackId) &&
                     !record.ChildThreadIds.Contains(fallbackId, StringComparer.Ordinal))
@@ -1535,6 +1535,20 @@ public sealed class FactoryReportEngine
         foreach (var spawn in root.SpawnRecords.Values.Where(x =>
                      x.Timestamp >= start.Timestamp && (end is null || x.Timestamp <= end)))
         {
+            if (spawn.SpawnOutcome == "rejected")
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "info", Category = "host-trace", Code = "native_spawn_rejected",
+                    Message = $"Spawn {spawn.CallId} task_name={spawn.RequestedTaskName ?? "unavailable"} requested " +
+                        $"{FormatExecutionSettings(spawn.RequestedModel, spawn.RequestedReasoningEffort)} " +
+                        $"rejected: {spawn.RejectionCode ?? "host"} {spawn.RejectionMessage ?? "no message"}."
+                });
+            if (spawn.SpawnOutcome == "unknown" && !spawn.Children.Any())
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "info", Category = "host-trace", Code = "spawn_child_unresolved",
+                    Message = $"Spawn {spawn.CallId} has no confirmed child or explicit host rejection."
+                });
             if (spawn.ChildThreadId is not null && !byId.ContainsKey(spawn.ChildThreadId))
             {
                 diagnostics.Add(new Diagnostic
@@ -1860,8 +1874,10 @@ public sealed class FactoryReportEngine
         {
             foreach (var spawn in spawningRollout.SpawnRecords.Values)
             {
+                if (spawn.CorrelationConflict)
+                    continue;
                 foreach (var childId in spawn.Children)
-                    parentMap[childId] = spawn.SenderThreadId ?? spawningRollout.ThreadId;
+                    parentMap.TryAdd(childId, spawn.SenderThreadId ?? spawningRollout.ThreadId);
             }
         }
 
@@ -1918,8 +1934,17 @@ public sealed class FactoryReportEngine
 
         foreach (var child in descendants.OrderBy(ActivityStartedAt).ThenBy(x => x.ThreadId, StringComparer.Ordinal))
         {
+            var related = spawningRollouts.SelectMany(rollout => rollout.SpawnRecords.Values)
+                .Where(record => record.Children.Contains(child.ThreadId, StringComparer.Ordinal)).ToArray();
             var spawn = FindSpawnRecord(spawningRollouts, child.ThreadId);
-            var role = ClassifyRole(root, child, spawn, diagnostics);
+            var uncertain = related.Length > 1 || related.Any(record => record.CorrelationConflict);
+            var role = uncertain ? "unknown" : ClassifyRole(root, child, spawn, diagnostics);
+            if (uncertain)
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "factory", Code = "agent_role_conflict",
+                    Message = $"Child {child.ThreadId} has conflicting or non-unique native spawn identity."
+                });
             var task = role == "worker" ? ExtractFactoryTask(spawn?.Task) : null;
             var (outcome, outcomeAt) = role == "planner" ? PlannerOutcome(child) : (null, null);
             var actualSettings = ChildExecutionSettings(child, spawn, role == "worker" ? diagnostics : null);
