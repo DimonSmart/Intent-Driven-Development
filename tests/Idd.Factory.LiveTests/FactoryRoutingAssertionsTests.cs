@@ -174,6 +174,12 @@ public sealed class FactoryRoutingAssertionsTests
         Tasks = new[] { "standard", "strong", "economy" }.Select((profile, index) => new TaskReport
         {
             AgentThreadId = $"worker-{index}",
+            Text = profile switch
+            {
+                "standard" => "Implement ProductCode",
+                "strong" => "Update Catalog",
+                _ => "Run ProductCode and Catalog verification tests"
+            },
             ExecutionProfile = profile,
             Status = "completed",
             RequestedModel = Mappings[profile].Model,
