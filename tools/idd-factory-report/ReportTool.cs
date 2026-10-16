@@ -1211,6 +1211,18 @@ public sealed class FactoryReportEngine
             foreach (var spawn in spawns)
             {
                 var parent = spawn.SenderThreadId ?? spawningRollout.ThreadId;
+                if (FactoryTaskNameRole(spawn.RequestedTaskName) is not null &&
+                    spawn.ChildAgentPath?.StartsWith('/') == true &&
+                    spawn.ChildAgentPath.Split('/').Last() != spawn.RequestedTaskName)
+                {
+                    spawn.CorrelationConflict = true;
+                    spawningRollout.Diagnostics.Add(new Diagnostic
+                    {
+                        Severity = "warning", Category = "host-trace", Code = "spawn_child_identity_conflict",
+                        Message = $"Spawn {spawn.CallId} requested {spawn.RequestedTaskName} but host returned {spawn.ChildAgentPath}."
+                    });
+                }
+
                 if (!spawn.Children.Any() && spawn.SpawnOutcome != "rejected")
                 {
                     var candidates = all.Where(child => child.ParentThreadId == parent &&
