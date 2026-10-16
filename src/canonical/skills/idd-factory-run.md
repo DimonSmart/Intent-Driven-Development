@@ -265,6 +265,295 @@ while true:
 This is conceptual behavior, not a requirement to implement a new programmatic
 state machine.
 
+### Codex MultiAgentV2 spawn identity
+
+On Codex MultiAgentV2, **every Factory-owned native `spawn_agent` call**
+(planner and worker) MUST include a unique explicit `task_name` argument:
+`idd_factory_planner_01`, `idd_factory_planner_02`, ... for planners,
+or `idd_factory_worker_01`, `idd_factory_worker_02`, ... for workers.
+Only names matching `^idd_factory_(planner|worker)_[0-9]+# IDD Factory Run
+
+Use Factory for an implementation request that benefits from temporary
+multi-task orchestration. Factory is a thin semantic orchestration skill over
+native child-agent capabilities. It is not a workflow engine, process runtime,
+MCP transport, retry engine, or durable implementation database.
+
+## Required references
+
+Read `references/intent-preflight.md` before starting or replacing a Factory
+run. Read `references/factory-planner.md` before spawning any planner. Read
+`references/factory-worker.md` before every worker spawn. Read
+`references/engineering-guardrails.md` before using an optional
+`.idd/engineering/` layer. Read `references/project-verification.md` before
+project verification. Read `references/factory-execution-policy.md` before
+interpreting `ExecutionProfile` or `.idd/execution.yaml`.
+
+## Required host capabilities
+
+Factory requires the platform adapter to provide all of these properties:
+
+- spawn a child agent in a fresh isolated semantic context;
+- explicitly avoid inheriting the parent transcript;
+- give the child access to the current repository;
+- wait for a terminal child result without model-driven polling;
+- receive the final child result;
+- stop or close a child when necessary.
+
+Use a read-only planner and workspace-writing workers when the platform can
+express those sandboxes natively. If the host cannot provide the required
+properties, Factory is unsupported on that host. Do not recreate the removed
+C# runtime, MCP transport, shell process supervisor, status protocol, or polling
+loop to compensate.
+
+A new thread is not sufficient if it automatically receives the parent history.
+
+## Factory Preflight
+
+For a new run, first resolve one complete self-contained logical request. Preserve
+the user request text and materialize pasted text, explicitly supplied textual
+content, and request-local textual documents that the user identifies as part of
+the task. Host-local paths and attachment identifiers are transport metadata, not
+durable semantics. The materialized request is authoritative for both preflight
+and the later Factory run; do not replace it with a route summary, generated
+summary, implementation plan, Engineering summary, or Intent diff.
+
+Resolve the requested scope before durable work:
+
+- `route-only`: report routing/diagnostics only; perform no durable mutation and
+  do not start Factory;
+- `intent-only`: durable Product Intent preparation and Engineering management
+  are allowed when required, but implementation and Factory orchestration do not
+  start;
+- `implementation-only`: neither `.idd/intent/*` nor
+  `.idd/engineering/*` may be mutated. If the request requires either durable
+  change, stop with the required durable-workflow diagnostic;
+- `end-to-end`: durable preparation may be followed by implementation and
+  verification.
+
+Run the existing Product Intent classification from Intent Preflight before any
+durable write:
+
+```text
+AlreadyCovered
+ExplicitIntentChange
+MissingIntentDecision
+ImplementationOnly
+```
+
+For `ExplicitIntentChange`, determine the safe Intent handoff/owner, but defer
+the actual Product Intent mutation until Engineering management has completed
+successfully or as a no-op. Product Intent mutations remain owned by
+`idd-intent-change`, including its internal document-creation workflow.
+Factory planners and workers cannot create or modify Product Intent.
+
+Separately classify only whether Engineering management is a durable concern:
+
+```text
+NoEngineeringManagementNeeded
+EngineeringManagementRequired
+EngineeringDecisionMissing
+```
+
+`EngineeringManagementRequired` means that the complete request explicitly
+contains one or more durable implementation-only project decisions. It does not
+authorize Factory to determine `new`, semantic equivalence, owning ENG ID,
+add/modify/remove/no-op actions, allocator changes, or INDEX edits. Those remain
+exclusively owned by `idd-engineering-change`.
+
+Do not promote task-local implementation details into Engineering policy. A
+technology name, class/file name, DI wiring step, implementation order, test
+step, temporary migration instruction, or local library-use instruction is not
+by itself a durable project-wide Engineering decision.
+
+Before any durable write, detect every request-level blocker that can be decided
+without invoking a mutation owner, including `MissingIntentDecision`,
+`EngineeringDecisionMissing`, conflicting requirements inside the request,
+requested-scope violations, inability to materialize the complete request, and
+an Engineering-changing replacement while an active Factory request exists. A
+request-level blocker means no Product mutation, no Engineering mutation, and no
+new Factory state.
+
+For a new `end-to-end` run, the required order is:
+
+```text
+1. materialize complete logical request
+2. resolve requested scope
+3. non-mutating Product Intent analysis
+4. Factory-level Engineering disposition
+5. detect request-level blockers
+
+6. if EngineeringManagementRequired:
+       invoke idd-engineering-change with the complete logical request
+
+7. handle Engineering result:
+       success   -> continue
+       no-op     -> continue
+       ambiguous -> stop before Factory state creation
+       blocked   -> stop before Factory state creation
+
+8. apply required Product Intent mutation through existing intent workflows
+9. validate durable coverage against the complete logical request
+10. create .idd/factory/current/request.md
+11. start a fresh Factory planner
+```
+
+The Engineering step deliberately precedes the Product Intent write because
+`idd-engineering-change` owns authoritative Engineering ownership/ambiguity
+planning and has no separate dry-run protocol. This ordering avoids changing
+Product Intent first and discovering an Engineering ownership ambiguity only
+afterward. It is not a transaction: if Engineering succeeds and a later Intent
+workflow fails mechanically, report the blocker and do not create Factory state;
+do not add rollback machinery.
+
+Coverage validation is against the complete logical request, not a generated
+summary. Confirm that required Product behavior is represented, every explicit
+Engineering concern was handled by `idd-engineering-change` with `success` or
+`no-op`, material safety/compatibility constraints and explicit non-goals were
+not lost, implementation-only details did not leak into Product Intent,
+task-local details did not leak into Engineering, the two durable layers do not
+contradict one another, and no required durable decision remains unresolved.
+When `.idd/engineering/` exists, its structure must also be valid. Absence of
+the Engineering layer is valid and produces no warning.
+
+Only after successful durable preparation and coverage validation may a new run
+create `.idd/factory/current/request.md`. Persist the complete self-contained
+logical request itself, not a preflight report or rewrite.
+
+Continuation of an existing simplified run does not repeat initial preflight.
+
+For an explicit replacement request, resolve the complete replacement request
+while leaving the current Factory state untouched. Replacement that needs no
+Engineering mutation keeps the existing replacement Product Intent semantics:
+run replacement preflight/coverage first and replace temporary state only after
+success. If the active replacement request is
+`EngineeringManagementRequired`, stop before any durable write. Do not bypass
+the `idd-engineering-change` active-run guard, auto-cancel/restart the current
+run, archive/unarchive it as a trick, or create a suspended/pending lifecycle.
+Report that the current run must be completed or cancelled and the complete
+replacement request then started as a new Factory run.
+
+## Minimal temporary state
+
+Use only the temporary files needed for continuation:
+
+```text
+.idd/factory/current/
+    request.md
+    plan.md
+    completed.md
+    answers.md
+    question.md                # only while waiting for the user
+    verification-failure.md    # only when relevant
+```
+
+`request.md` is the complete self-contained logical request that passed Factory
+Preflight. `plan.md` contains only the remaining implementation/research tasks in
+the current batch. `completed.md` contains short semantic summaries useful to
+later planners. `answers.md` contains exact user answers.
+
+The repository is the authoritative implementation reality. These files are
+best-effort scheduling and semantic context, not proof that a change exists.
+
+`.idd/execution.yaml`, when present, is deliberately outside
+`.idd/factory/current/`. It is project-owned execution policy that survives
+Factory runs, not temporary Factory state or workflow/runtime configuration.
+
+Do not persist attempt IDs, process IDs, retry counters, workflow states,
+transition history, changed-path snapshots, runtime ownership, verification
+graphs, or schema versions for a Factory state machine.
+
+If a legacy `.idd/factory/current/state.json` exists, do not deserialize,
+migrate, or continue its old state machine. Preserve product changes. An
+explicit restart may reuse a valid self-contained legacy `request.md` as the
+replacement request and may archive the old directory for diagnostics.
+
+## User-level operations
+
+New:
+- materialize the complete self-contained logical request;
+- run Factory Preflight, including required Product Intent and Engineering
+  preparation;
+- validate durable coverage;
+- only then create the minimal current state;
+- enter the orchestration loop.
+
+Continue:
+- read `request.md` and the minimal current state;
+- continue from repository reality;
+- do not repeat initial preflight.
+
+Cancel:
+- archive or remove the temporary Factory state;
+- never roll back repository or durable-knowledge changes automatically.
+
+Restart / explicit replacement:
+- resolve one complete replacement request while preserving the active state;
+- run replacement preflight;
+- if the replacement requires Engineering management, return the active-run
+  blocker without changing Product Intent, Engineering, or Factory state;
+- otherwise replace temporary state only after successful replacement preflight
+  and coverage validation.
+
+These are skill-level operations. There are no `factory_run`,
+`factory_continue`, `factory_restart`, `factory_retry`, `factory_cancel`,
+or `factory_status` transport operations.
+
+## Orchestration loop
+
+Conceptually:
+
+```text
+while true:
+    if waiting for user:
+        stop
+
+    if plan.md has no remaining task:
+        run a fresh planner
+
+        Question -> persist question.md and stop
+        Done     -> run project verification
+        Tasks    -> require one canonical ExecutionProfile per new task, then persist in plan.md
+
+    take the first remaining task
+    read its ExecutionProfile; missing metadata in existing plan.md means standard
+    reject empty, repeated, or unknown explicit profiles
+    if .idd/execution.yaml is absent, inherit host settings
+    otherwise re-read and structurally validate .idd/execution.yaml
+    mechanically resolve the active-platform profile mapping
+    if that profile/platform mapping is absent, inherit host settings
+    deterministically re-read the current Engineering INDEX
+    enumerate all current Always ENG IDs
+    read complete factory-worker.md and prepare the isolated worker assignment
+    spawn a fresh native worker with the resolved native model override
+    wait natively for its terminal result
+
+    if no trusted completed result:
+        leave the task first in plan.md
+        stop
+
+    append a short result to completed.md
+    remove the completed task from plan.md
+```
+
+This is conceptual behavior, not a requirement to implement a new programmatic
+state machine.
+
+ are valid.
+Use a fresh name for **each attempt**, including a spawn rejected by the host.
+Keep names unique within the root-session/Factory invocation and any shared
+host namespace; inspect visible native calls before selecting the next suffix.
+Do not persist counters or create another Factory runtime/state machine.
+
+Pass `task_name` in native spawn arguments, **not** in child instructions or
+worker assignments. This is a trace-visible role marker, not evidence that a
+child was accepted, completed or used its requested model. Also explicitly set
+`fork_turns: "none"` for **planner and worker** spawns; a fresh context must
+not inherit the parent or an earlier child's transcript. Apply exact model and
+reasoning overrides when execution policy requires them; if the host cannot
+express a required argument or honor an override, block with a host-compatibility
+diagnostic rather than changing model or backend. Other platform adapters are
+unchanged when they lack `task_name`.
+
 ### Fresh planner
 
 Before every planner spawn, read `references/factory-planner.md`. Create a
