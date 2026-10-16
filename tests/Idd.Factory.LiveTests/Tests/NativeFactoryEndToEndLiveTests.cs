@@ -185,8 +185,7 @@ public sealed class NativeFactoryEndToEndLiveTests
                 File.Copy(lastMessage, Path.Combine(artifactRoot, "last-message.json"), overwrite: true);
 
             var traceItems = ParseTraceItems(result.Stdout);
-            var rootRollout = FindRootRollout(codexHome);
-            AssertMultiAgentV2(rootRollout);
+            var rootRollout = FindRootRollout(codexHome, requireSpawn: false);
             Assert.DoesNotContain(traceItems, item => IsToolCall(item, "mcp_tool_call", "factory_run"));
             Assert.DoesNotContain(traceItems, item => IsToolCall(item, "mcp_tool_call", "factory_status"));
             Assert.DoesNotContain(traceItems, IsLegacyFactoryRuntimeCommand);
@@ -195,6 +194,17 @@ public sealed class NativeFactoryEndToEndLiveTests
             var factoryReport = Assert.Single(new FactoryReportEngine().FindRuns(workspace, codexHome));
             ReportWriters.WriteMarkdown(factoryReport, Path.Combine(artifactRoot, "factory-report.md"), verbose: false);
             ReportWriters.WriteJson(factoryReport, Path.Combine(artifactRoot, "factory-report.json"));
+
+            var declaredStatus = finalJson.RootElement.TryGetProperty("status", out var statusProperty) &&
+                statusProperty.ValueKind == JsonValueKind.String ? statusProperty.GetString() : null;
+            var requiredStatus = unavailableWorkerModel ? "BLOCKED" : "COMPLETED";
+            Assert.True(string.Equals(requiredStatus, declaredStatus, StringComparison.Ordinal),
+                $"Factory returned {declaredStatus ?? "missing/malformed"} (expected {requiredStatus}). " +
+                $"Report result={factoryReport.Run.Result}, declared={factoryReport.Completion.DeclaredResult}, " +
+                $"reason={factoryReport.Run.Reason ?? "unavailable"}. " +
+                $"Evidence: {artifactRoot}/factory-report.json, factory-report.md, codex-trace.jsonl, " +
+                $"last-message.json, exception.txt, summary.json.");
+            AssertMultiAgentV2(rootRollout);
             RunResult? verification = null;
             if (!unavailableWorkerModel)
             {
@@ -207,44 +217,21 @@ public sealed class NativeFactoryEndToEndLiveTests
             }
             if (unavailableWorkerModel)
             {
-                Assert.Equal("BLOCKED", finalJson.RootElement.GetProperty("status").GetString());
-                FactoryRoutingAssertions.VerifyUnavailableModel(factoryReport, rootRollout, unavailableModel);
+                var pendingPlanPath = Path.Combine(workspace, ".idd", "factory", "current", "plan.md");
+                Assert.True(File.Exists(pendingPlanPath), "BLOCKED must preserve the pending Factory plan.");
+                var pendingPlan = await File.ReadAllTextAsync(pendingPlanPath);
+                FactoryRoutingAssertions.VerifyUnavailableModel(factoryReport, rootRollout,
+                    unavailableModel, settings.ExecutionProfiles["standard"].ReasoningEffort, pendingPlan);
                 Assert.Equal(initialPolicy, await File.ReadAllTextAsync(Path.Combine(workspace, ".idd", "execution.yaml")));
                 Assert.Equal(initialCatalog, await File.ReadAllTextAsync(Path.Combine(workspace, "src", "MiniCatalog", "Catalog.cs")));
                 Assert.False(File.Exists(Path.Combine(workspace, "src", "MiniCatalog", "ProductCode.cs")));
                 Assert.Contains(factoryReport.Agents, agent => agent.Role == "planner");
                 Assert.True(factoryReport.FactoryProjectState.CurrentRequestPresent);
                 Assert.True(factoryReport.FactoryProjectState.CurrentPlanPresent);
-                var plan = await File.ReadAllTextAsync(Path.Combine(workspace, ".idd", "factory", "current", "plan.md"));
-                Assert.Contains("# Task", plan);
-                Assert.Contains("# ExecutionProfile", plan);
-                Assert.Contains("standard", plan);
                 return;
             }
 
-            Assert.True(
-                rootRollout.SpawnRecords.Count >= 4,
-                "Expected a planner and at least three workers in the native Codex session rollout.");
-            Assert.Equal("COMPLETED", finalJson.RootElement.GetProperty("status").GetString());
-            Assert.NotEmpty(factoryReport.Tasks);
-            FactoryRoutingAssertions.Verify(factoryReport, settings.ExecutionProfiles);
-            var childPaths = Directory.EnumerateFiles(Path.Combine(codexHome, "sessions"), "*.jsonl", SearchOption.AllDirectories)
-                .Select(path => new CodexRolloutReader().Read(path))
-                .ToDictionary(rollout => rollout.ThreadId, rollout => rollout.AgentPath, StringComparer.Ordinal);
-            foreach (var worker in factoryReport.Agents.Where(agent => agent.Role == "worker"))
-            {
-                var spawn = Assert.Single(rootRollout.SpawnRecords.Values, spawn =>
-                    spawn.Children.Contains(worker.ThreadId, StringComparer.Ordinal) ||
-                    spawn.ChildAgentPath is not null && spawn.ChildAgentPath == childPaths[worker.ThreadId]);
-                var expected = settings.ExecutionProfiles[worker.ExecutionProfile!];
-                Assert.Equal(expected.Model, spawn.RequestedModel);
-                Assert.Equal(expected.ReasoningEffort, spawn.RequestedReasoningEffort);
-                Assert.Contains(rootRollout.Events, item =>
-                    item.ToolName == "spawn_agent" && item.ToolId == spawn.CallId &&
-                    HasExplicitNoHistoryFork(item.ToolArguments));
-            }
-            Assert.Equal(new[] { "standard", "strong", "economy" },
-                factoryReport.Tasks.Take(3).Select(task => task.ExecutionProfile).ToArray());
+            FactoryRoutingAssertions.VerifyNativeSpawns(factoryReport, rootRollout, settings.ExecutionProfiles);
             Assert.Equal("completed", factoryReport.Run.Result);
             Assert.Equal("passed", factoryReport.Completion.ProjectVerification);
             Assert.Equal("ok", factoryReport.Completion.ProtocolValidation);
