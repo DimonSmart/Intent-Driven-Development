@@ -161,7 +161,7 @@ internal sealed class FinalVerificationEvidence
             ? uri.LocalPath : path);
 
     // Compare argv, never shell substrings: a quoted echo or a compound command isn't evidence.
-    internal static string? NormalizeCommand(string? input)
+    internal static string? NormalizeCommand(string? input, bool allowPowerShell = true)
     {
         if (string.IsNullOrWhiteSpace(input)) return null;
         try
@@ -178,29 +178,49 @@ internal sealed class FinalVerificationEvidence
                 var values = node.EnumerateArray().ToArray();
                 if (values.Any(arg => arg.ValueKind != JsonValueKind.String)) return null;
                 var args = values.Select(arg => arg.GetString()!).ToArray();
-                return NormalizeArgs(args);
+                return NormalizeArgs(args, allowPowerShell);
             }
             if (node.ValueKind != JsonValueKind.String) return null;
             input = node.GetString();
         }
         catch (JsonException) { }
         var tokens = Tokenize(input!);
-        return tokens is null ? null : NormalizeArgs(tokens);
+        return tokens is null ? null : NormalizeArgs(tokens, allowPowerShell);
     }
 
-    private static string? NormalizeArgs(IReadOnlyList<string> args)
+    private static string? NormalizeArgs(IReadOnlyList<string> args, bool allowPowerShell)
     {
         if (args.Count == 0 || string.IsNullOrWhiteSpace(args[0]) || args.Any(arg => arg.Contains('\0'))) return null;
         var executable = args[0].Replace('\\', '/').Split('/').Last();
         if (args.Count == 3 && executable is "sh" or "bash" or "zsh" && args[1] is "-c" or "-lc")
-            return NormalizeCommand(args[2]);
+            return NormalizeCommand(args[2], allowPowerShell: false);
+        if (IsPowerShell(executable))
+        {
+            if (!allowPowerShell || args.Count != 3 ||
+                !string.Equals(args[1], "-Command", StringComparison.OrdinalIgnoreCase)) return null;
+            // Only transparent, single-command dotnet build/test calls are evidence.
+            // Reject PowerShell operators and expansion syntax, even inside quoted arguments.
+            if (args[2].IndexOfAny([';', '&', '|', '<', '>', '$', '`', '{', '}', '@', '(', ')', '*', '?', '#']) >= 0)
+                return null;
+            var inner = Tokenize(args[2]);
+            if (inner is null || inner.Count < 2 || inner[0] is not ("dotnet" or "dotnet.exe") ||
+                inner[1] is not ("build" or "test") || inner.Contains("--%", StringComparer.Ordinal))
+                return null;
+            return NormalizeArgs(inner, allowPowerShell: false);
+        }
         // Reject wrappers/options whose semantics have not been interpreted.
-        if (executable is "sh" or "bash" or "zsh" or "cmd.exe" or "pwsh" or "powershell") return null;
+        if (executable is "sh" or "bash" or "zsh" or "cmd.exe") return null;
         // Preserve explicit executable paths; only standard dotnet host paths are equivalent here.
         var normalized = args.ToArray();
         if (executable is "dotnet" or "dotnet.exe") normalized[0] = "dotnet";
         return string.Join('\0', normalized);
     }
+
+    private static bool IsPowerShell(string executable) =>
+        executable.Equals("pwsh", StringComparison.OrdinalIgnoreCase) ||
+        executable.Equals("pwsh.exe", StringComparison.OrdinalIgnoreCase) ||
+        executable.Equals("powershell", StringComparison.OrdinalIgnoreCase) ||
+        executable.Equals("powershell.exe", StringComparison.OrdinalIgnoreCase);
 
     private static List<string>? Tokenize(string input)
     {
