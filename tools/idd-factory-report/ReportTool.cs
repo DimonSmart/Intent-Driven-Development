@@ -1390,7 +1390,25 @@ public sealed class FactoryReportEngine
 
         var diagnostics = new List<Diagnostic>();
         var agents = BuildAgents(root, segmentRootEvents, descendants, state, verbose, diagnostics);
-        PopulateMissingWorkerTasks(agents, byId);
+        var rootCallIds = segmentRootEvents.Where(e => e.ToolName == "spawn_agent" && e.ToolId is not null)
+            .Select(e => e.ToolId!).ToHashSet(StringComparer.Ordinal);
+        var runSpawns = root.SpawnRecords.Values.Where(spawn => rootCallIds.Contains(spawn.CallId)).ToArray();
+        var ambiguousTaskRouting = runSpawns.Any(spawn =>
+            spawn.CorrelationConflict ||
+            spawn.SpawnOutcome != "accepted" &&
+                (FactoryTaskNameRole(spawn.RequestedTaskName) == "worker" ||
+                 ExplicitFactoryRole(spawn.Task) == "worker" ||
+                 LegacyFactoryRole(spawn.Task) == "worker" ||
+                 spawn.RequestedTaskName is null && spawn.Task is null));
+        if (ambiguousTaskRouting)
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "warning", Category = "host-trace", Code = "worker_task_correlation_unavailable",
+                Message = "Factory worker spawn identity or outcome is ambiguous; planner task order alone " +
+                    "cannot establish worker task/profile routing."
+            });
+        else
+            PopulateMissingWorkerTasks(agents, byId);
         var plannerAgents = agents.Where(x => x.Role == "planner").OrderBy(x => x.StartedAt).ToArray();
         var workerAgents = agents.Where(x => x.Role == "worker").OrderBy(x => x.StartedAt).ToArray();
         var latestPlanner = plannerAgents.LastOrDefault();
