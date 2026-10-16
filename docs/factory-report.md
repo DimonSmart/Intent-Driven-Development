@@ -28,6 +28,30 @@ Known lifecycle/item aliases are normalized deterministically. Legacy `item.star
 
 Structured `sender_thread_id -> receiver_thread_ids[]` is the preferred parent/child evidence. Textual UUID extraction is retained only as a legacy fallback.
 
+For Codex MultiAgentV2, Factory explicitly sets a unique native `task_name`
+(`idd_factory_planner_01`, `idd_factory_worker_01`, etc.) for **each**
+planner/worker spawn attempt, including rejected attempts, and
+`fork_turns: "none"` for both roles. The **requested** `task_name` in
+spawn arguments is recorded separately from the **canonical** child agent path
+returned by the host. The requested name is a role marker, not evidence that
+the host created a child or honored the model/effort overrides.
+
+Spawn calls and their started/completed/response outputs are deduplicated by
+native call ID. Correlation prefers explicit child-thread IDs, then a canonical
+output path matching child `session_meta.agent_path` **under the confirmed
+parent**, then a unique requested short name matching the final child-path
+segment within that parent namespace. A matching basename in another parent
+tree is never sufficient. Conflicting native role, task name and path evidence
+or duplicate names produce diagnostics and a fail-closed `unknown` role; the
+`agent_path` field is not an `agent_role` field.
+
+Native host errors (code/message or unambiguous rejection output) are retained
+on the attempted spawn as `rejected`, even when no child rollout exists.
+Missing child evidence *without* rejection is `unknown`, never assumed to be
+rejected. Rejected attempts do not fabricate AgentReport or TaskReport entries;
+`Tasks` may be empty on a genuinely blocked first-worker spawn.
+
+
 ## Factory run versus Codex thread
 
 A root Codex thread may contain ordinary work before and after Factory. Root Factory tokens therefore represent the Factory segment, not the whole root thread.
