@@ -31,7 +31,7 @@ src/adapters/codex/               Codex adapter configuration
 tools/generate/                   canonical model to native marketplace generator
 tests/Idd.Generation.Tests/       generated marketplace and generator contracts
 scripts/Check.ps1                 Fast / Live / Release validation entry point
-scripts/evals/                   Factory live-evaluation launchers
+scripts/Run-Live.local.ps1.example  Local Factory Live evaluation preset example
 ```
 
 `artifacts/marketplace/` is local generated output and is ignored by Git. The main branch contains canonical source, not generated marketplace artifacts.
@@ -182,18 +182,24 @@ pwsh ./scripts/Check.ps1 -Mode Live
 ```
 
 Live builds `Idd.Factory.LiveTests`, enables `IDD_RUN_LIVE_FACTORY_EVALS=1`,
-and runs the explicit `Category=LiveFactoryEval` scenarios, including normal
-implementation, unavailable worker-model handling, and recovery after failed
-final verification. Ordinary `[Fact]` tests in the LiveTests project are not
-selected by Live mode. The convenience launchers live in `scripts/evals/`:
+and runs the `Category=LiveFactoryEval` scenarios, including normal
+implementation, unavailable worker models and final verification recovery.
+Ordinary `[Fact]` tests in LiveTests are excluded. The single
+cross-platform entry point owns the complete Factory Live workflow:
 
 ```powershell
-scripts\evals\run-live-factory-evals.bat --model MODEL_NAME --reasoning medium
+pwsh ./scripts/Check.ps1 -Mode Live -Model "gpt-6-luna" -Reasoning medium
 ```
 
-```zsh
-./scripts/evals/run-live-factory-evals.zsh --model MODEL_NAME --reasoning medium
-```
+The CLI parameters override root-model environment settings and are valid only
+with `-Mode Live`. The command prepares per-run artifacts and temporary
+workspaces, handles platform-specific testhost locks, runs the Factory tests
+and produces TRX plus JSON/Markdown Factory Reports. The working directory
+may be anywhere. User-owned temporary roots are not removed.
+
+Copy `scripts/Run-Live.local.ps1.example` to
+`scripts/Run-Live.local.ps1` for a personal, Git-ignored preset. The example
+only forwards parameters to the same `Check.ps1` entry point.
 
 Intent Live Evals are independent of Factory Live Evals and must be opted into
 separately; neither is part of Fast or Release validation.
@@ -208,7 +214,7 @@ Release additionally validates release scripts and Marketplace README links,
 performs final generation and `--check` for the exact release version,
 validates the publish layout, and runs Claude native plugin validation when
 the Claude CLI is available. Fast also checks documentation links and safe
-launcher argument branches without invoking Codex.
+single-entry Live smoke tests using a stubbed dotnet (without Codex).
 
 All modes verify that validation itself does not change the repository working
 tree relative to its starting state. Release validation additionally requires a
@@ -253,8 +259,8 @@ GitHub release only after release validation succeeds.
 
 Real-model behavior is evaluated separately and never gates publication:
 
-```bat
-scripts\evals\run-live-factory-evals.bat
+```powershell
+pwsh ./scripts/Check.ps1 -Mode Live
 ```
 
 The live eval consumes Codex usage and checks installed-plugin execution,

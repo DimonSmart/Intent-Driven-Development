@@ -27,3 +27,6 @@ Thumbs.db
 #IDD
 .idd/factory
 .idd/tmp/
+
+# Developer-specific, token-consuming Live eval preset
+/scripts/Run-Live.local.ps1

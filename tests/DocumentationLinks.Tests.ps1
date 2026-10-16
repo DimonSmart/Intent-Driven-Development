@@ -96,13 +96,15 @@ foreach ($document in $documents) {
     }
 }
 
-$zsh = Join-Path $repositoryRoot "scripts/evals/run-live-factory-evals.zsh"
-$bat = Join-Path $repositoryRoot "scripts/evals/run-live-factory-evals.bat"
-foreach ($file in @($zsh, $bat)) {
-    if (-not [IO.File]::Exists($file)) { throw "Missing Factory launcher: $file" }
+foreach ($required in @("scripts/Check.ps1", "scripts/Run-Live.local.ps1.example")) {
+    if (-not [IO.File]::Exists((Join-Path $repositoryRoot $required))) {
+        throw "Missing Live validation entry point or preset: $required"
+    }
 }
 foreach ($removed in @("run-live-factory-evals.zsh", "run-live-factory-evals.bat",
-                       "run-live-intent-evals.bat", "docs/factory-benchmarking.md")) {
+                       "run-live-intent-evals.bat", "docs/factory-benchmarking.md",
+                       "scripts/evals/run-live-factory-evals.zsh",
+                       "scripts/evals/run-live-factory-evals.bat")) {
     if ([IO.File]::Exists((Join-Path $repositoryRoot $removed))) {
         throw "Obsolete tracked path is still present: $removed"
     }

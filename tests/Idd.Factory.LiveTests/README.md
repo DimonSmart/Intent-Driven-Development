@@ -40,25 +40,24 @@ The tracked [`live-eval.json`](live-eval.json) selects the root Codex model
 and reasoning effort, plus the three worker mappings. Its initial root default
 is `gpt-6-luna` with `medium` reasoning. Worker mappings are
 `economy → gpt-6-luna`, `standard → gpt-5.6-terra`, and
-`strong → gpt-6.1-sol`, all with `medium` reasoning. Both convenience
-launchers accept one-run overrides,
-which take precedence over `IDD_FACTORY_EVAL_MODEL` and
-`IDD_FACTORY_EVAL_REASONING_EFFORT` environment overrides:
+`strong → gpt-6.1-sol`, all with `medium` reasoning. `Check.ps1`
+accepts one-run overrides, taking precedence over
+`IDD_FACTORY_EVAL_MODEL` and `IDD_FACTORY_EVAL_REASONING_EFFORT`:
 
-```zsh
-./scripts/evals/run-live-factory-evals.zsh --model gpt-6-luna --reasoning medium
+```powershell
+pwsh ./scripts/Check.ps1 -Mode Live -Model "gpt-6-luna" -Reasoning medium
 ```
 
-On Windows CMD, use `scripts\evals\run-live-factory-evals.bat --model MODEL_NAME --reasoning medium` from the repository root.
-Both launchers can also be invoked from another working directory and retain
-the current-directory and exit-code semantics.
+The same command works on Windows, macOS and Linux, from any working directory.
+For a local preset copy `scripts/Run-Live.local.ps1.example` to
+`scripts/Run-Live.local.ps1` (Git-ignored) and edit its values.
+The environment overrides remain supported for direct `dotnet test` runs.
 
-The environment variables remain supported for CI and direct `dotnet test`
-invocations. A run records both resolved values and their sources in
-`summary.json`, including resolved worker mappings. Both convenience launchers
-print the complete human-readable
-Factory report after the test run and save it as `factory-report.md` beside the
-TRX results.
+The entry point creates unique artifacts, captures TRX, handles locked test
+assemblies, generates JSON/Markdown Factory Reports, prints the human-readable
+report and preserves failed-test exit codes. It cleans up only temporary
+directories it created, not caller-owned locations. `summary.json`
+records resolved model/effort settings, their sources and worker mappings.
 
 The host trace is authoritative for requested spawn arguments. Actual settings
 are read from each worker's own `turn_context.model` / `turn_context.effort` or
@@ -66,7 +65,7 @@ explicit resolved/actual fields. If those values cannot be read, the report
 records `unknown` with a diagnostic and the routing evaluation fails rather
 than treating the requested settings as confirmation.
 
-`--model`, `--reasoning`, and their environment equivalents override only the
+`-Model`, `-Reasoning`, and their environment equivalents override only the
 root session. Worker profiles require explicit models in `live-eval.json`.
 Override individual mappings with
 `IDD_FACTORY_EVAL_ECONOMY_MODEL`, `IDD_FACTORY_EVAL_STANDARD_MODEL`, or
@@ -108,7 +107,7 @@ Rejection before creating a child is valid, but a mere `BLOCKED` response
 without an attempted spawn is not evidence of model unavailability. Requested
 settings never prove successful execution.
 
-When launchers supply shared artifact/temp directories, this case uses their
+When Check.ps1 supplies shared artifact/temp directories, this case uses their
 `model-unavailable/` subdirectories. Its Markdown/JSON reports and source traces
 are saved there independently of the successful catalog evaluation.
 Run just this case with `IDD_RUN_LIVE_FACTORY_EVALS=1 dotnet test

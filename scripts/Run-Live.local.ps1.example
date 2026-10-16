@@ -1,0 +1,4 @@
+$ErrorActionPreference = "Stop"
+
+& pwsh (Join-Path $PSScriptRoot "Check.ps1") -Mode Live -Model "gpt-6-luna" -Reasoning "medium"
+exit $LASTEXITCODE
