@@ -2494,6 +2494,16 @@ public sealed class FactoryReportEngine
                Same(usage.RootTurnId, terminal.RootTurnId);
     }
 
+    private static bool HasAmbiguousTerminalUsage(
+        IReadOnlyList<CodexEvent> events, string threadId, CodexEvent? terminal) =>
+        terminal is not null && events.Any(x =>
+            x.Ordinal > terminal.Ordinal &&
+            x.UsageScope == "thread" && x.Usage is not null &&
+            (x.ThreadId is null || x.ThreadId == threadId) &&
+            !Correlates(x, terminal, threadId) &&
+            (terminal.TurnIdentityConflict || x.TurnIdentityConflict ||
+             terminal.TurnId is null || x.TurnId is null));
+
     private static bool AtTerminalBoundary(CodexEvent usage, DateTimeOffset end, CodexEvent? terminal, string threadId)
     {
         if (!BelongsToThread(usage, threadId))
@@ -2536,6 +2546,12 @@ public sealed class FactoryReportEngine
             if (!HasCompleteTokens(baseline))
             {
                 unavailableReason = "root_start_baseline_unavailable";
+                return new TokenMetrics();
+            }
+
+            if (HasAmbiguousTerminalUsage(events, threadId, terminalEvent))
+            {
+                unavailableReason = "root_terminal_usage_correlation_unavailable";
                 return new TokenMetrics();
             }
 
@@ -2589,7 +2605,7 @@ public sealed class FactoryReportEngine
         DateTimeOffset? end,
         CodexEvent? terminalEvent)
     {
-        if (end is null)
+        if (end is null || HasAmbiguousTerminalUsage(events, threadId, terminalEvent))
             return new TokenMetrics();
         var eligible = events.Where(x => x.Usage is not null &&
             AtTerminalBoundary(x, end.Value, terminalEvent, threadId)).ToArray();
