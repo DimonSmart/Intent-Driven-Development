@@ -243,7 +243,7 @@ public sealed class TokenAccountingTests : IDisposable
     }
 
     private static void Write(string dir, string name, IEnumerable<object> events) =>
-        File.WriteAllLines(Path.Combine(dir, name), events.Select(JsonSerializer.Serialize), Encoding.UTF8);
+        File.WriteAllLines(Path.Combine(dir, name), events.Select(e => JsonSerializer.Serialize(e)), Encoding.UTF8);
 
     private static string JsonEscaped(string value) => value.Replace("\\", "\\\\").Replace("\"", "\\\"");
     private static string Time(string seconds) => "2026-10-16T15:00:" + seconds + ".000Z";
