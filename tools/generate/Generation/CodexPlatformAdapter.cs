@@ -78,7 +78,99 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                       that reason.
                     - Use the native `spawn_agent` operation (or its current native
                       equivalent) and a blocking/event-driven `wait_agent` operation.
-                      Prefer one long wait on the critical path. Do not build a
+                    - Before **every** Factory-owned planner or worker spawn attempt,
+                      choose an unused structured `task_name`: `idd_factory_planner_01`,
+                      `idd_factory_planner_02`, ... for planners, or
+                      `idd_factory_worker_01`, `idd_factory_worker_02`, ... for workers
+                      (format `^idd_factory_(planner|worker)_[0-9]+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
+{
+    public override string Platform => "codex";
+    protected override string ManifestDirectory => ".codex-plugin";
+    protected override string ManifestFileName => "plugin.json";
+
+    public override GeneratedFile BuildMarketplaceFile(PluginManifest manifest, string version) =>
+        CodexMarketplaceBuilder.Build(manifest);
+
+    protected override string BuildPluginManifest(
+        AdapterConfig adapter,
+        string pluginName,
+        PluginDefinition plugin,
+        string version)
+    {
+        var displayName = pluginName switch
+        {
+            "idd-intent" => "IDD Intent",
+            "idd-factory" => "IDD Factory",
+            _ => DisplayName(pluginName)
+        };
+
+        var pluginJson = new JsonObject
+        {
+            ["name"] = pluginName,
+            ["version"] = version,
+            ["description"] = plugin.Description,
+            ["skills"] = "./skills/",
+            ["author"] = new JsonObject { ["name"] = AuthorName },
+            ["repository"] = RepositoryUrl,
+            ["license"] = "MIT",
+            ["interface"] = new JsonObject
+            {
+                ["displayName"] = displayName,
+                ["shortDescription"] = plugin.Description
+            }
+        };
+
+        return pluginJson.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n";
+    }
+
+    protected override IReadOnlyList<GeneratedFile> BuildSkillFiles(
+        AdapterConfig adapter,
+        PluginDefinition plugin,
+        IReadOnlyDictionary<string, RoleDefinition> roleDefinitions,
+        string skillName,
+        IReadOnlyDictionary<string, SkillDescription> skillDescriptions)
+    {
+        var files = base.BuildSkillFiles(adapter, plugin, roleDefinitions, skillName, skillDescriptions).ToList();
+
+        if (StringComparer.Ordinal.Equals(skillName, "idd-factory-run"))
+        {
+            var skill = files.Single(file => StringComparer.Ordinal.Equals(
+                file.RelativePath,
+                Path.Combine("skills", skillName, "SKILL.md")));
+            files[files.IndexOf(skill)] = skill with
+            {
+                Content = ContentNormalizer.NormalizeContent(ContentNormalizer.JoinBlocks(
+                    skill.Content!,
+                    """
+                    ## Codex native-agent orchestration
+
+                    Use native Codex child-agent delegation for Factory semantic work.
+
+                    - Spawn every planner and worker in a fresh semantic context with
+                      parent-history inheritance explicitly disabled. Pass
+                      `fork_turns: "none"` (or the host-equivalent setting); never
+                      rely on an inheritance default.
+                    - Prefer a read-only planner and a workspace-writing worker when the
+                      host exposes those sandbox choices.
+                    - Sandbox selection is an optional hardening feature, not a Factory
+                      capability requirement. When Codex exposes no per-child sandbox
+                      choice, continue with fresh no-parent-history children that share
+                      repository access; do not report Factory as unsupported solely for
+                      that reason.
+).
+                      Names must be unique within this Factory invocation and the
+                      visible shared host namespace. Reserve the name even if the host
+                      rejects the attempt; use a new suffix for any retry.
+                    - Pass `task_name` in native `spawn_agent` arguments, never only
+                      inside `message`, and pass `fork_turns: "none"` for **both**
+                      planners and workers. Example without optional model overrides:
+                      `{"task_name":"idd_factory_worker_01","fork_turns":"none","message":"<complete-worker-instructions>"}`.
+                      Include `model` and `reasoning_effort` only when required by the
+                      validated execution profile mapping; never substitute models.
+                    - Prefer one long wait on the critical path. Do not build a
                       short-wait/status-polling loop that consumes parent model turns.
                     - If a wait fails or the host times out, do not start a replacement
                       worker while the previous child may still write to the workspace.

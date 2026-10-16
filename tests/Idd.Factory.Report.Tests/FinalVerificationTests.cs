@@ -217,6 +217,42 @@ public sealed partial class FactoryReportTests
     }
 
     [Theory]
+    [InlineData("pwsh-windows-argv", "passed")]
+    [InlineData("powershell-argv", "passed")]
+    [InlineData("pwsh-text", "passed")]
+    [InlineData("echo", "unavailable")]
+    [InlineData("compound", "unavailable")]
+    [InlineData("unsupported-option", "unavailable")]
+    [InlineData("nested-shell", "unavailable")]
+    public void Report_RecognizesOnlyTransparentPowerShellFinalChecks(string scenario, string expected)
+    {
+        const string buildCommand = "dotnet build MiniCatalog.sln --no-restore";
+        const string testCommand = "dotnet test MiniCatalog.sln --no-restore";
+        var build = JsonSerializer.Serialize(new
+        {
+            command = new[] { @"C:\Users\Test\AppData\Local\Microsoft\WindowsApps\pwsh.EXE", "-Command", buildCommand }
+        });
+        var test = scenario switch
+        {
+            "pwsh-windows-argv" => JsonSerializer.Serialize(new
+                { command = new[] { @"C:\Users\Test\AppData\Local\Microsoft\WindowsApps\pwsh.EXE", "-Command", testCommand } }),
+            "powershell-argv" => JsonSerializer.Serialize(new[]
+                { @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe", "-Command", testCommand }),
+            "pwsh-text" => @"pwsh -Command ""dotnet test MiniCatalog.sln --no-restore""",
+            "echo" => JsonSerializer.Serialize(new[] { "pwsh.exe", "-Command", "echo '" + testCommand + "'" }),
+            "compound" => JsonSerializer.Serialize(new[] { "pwsh.exe", "-Command", testCommand + "; exit 0" }),
+            "unsupported-option" => JsonSerializer.Serialize(new[] { "pwsh.exe", "-NoProfile", "-Command", testCommand }),
+            "nested-shell" => JsonSerializer.Serialize(new[] { "/bin/sh", "-lc", "pwsh -Command '" + testCommand + "'" }),
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario))
+        };
+        var report = ReportWithPolicyAndCommands(VerificationPolicy, true,
+            VerificationCommand("2026-09-23T10:03:00Z", "build", build, 0, "Build succeeded."),
+            VerificationCommand("2026-09-23T10:03:05Z", "test", test, 0, TestSummary));
+        Assert.Equal(expected, report.Completion.ProjectVerification);
+        Assert.Equal(expected == "passed" ? "ok" : "warning", report.Completion.ProtocolValidation);
+    }
+
+    [Theory]
     [InlineData("[\"dotnet\", null]")]
     [InlineData("[\"dotnet\", 42]")]
     [InlineData("[null, \"test\"]")]

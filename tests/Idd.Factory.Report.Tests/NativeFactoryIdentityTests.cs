@@ -56,14 +56,20 @@ public sealed partial class FactoryReportTests
     }
 
     [Theory]
-    [InlineData(true, "rejected")]
-    [InlineData(false, "unknown")]
-    public void NativeIdentity_DistinguishesRejectedSpawnFromMissingChild(bool rejection, string expected)
+    [InlineData("structured")]
+    [InlineData("text")]
+    [InlineData("missing")]
+    public void NativeIdentity_DistinguishesRejectedSpawnFromMissingChild(string scenario)
     {
-        var (repo, home, sessions) = NativeIdentityWorkspace("outcome-" + expected);
-        var output = rejection
-            ? JsonSerializer.Serialize(new { error = new { code = "model_not_found", message = "Model removed-model unavailable" } })
-            : "{}";
+        var rejected = scenario != "missing";
+        var expected = rejected ? "rejected" : "unknown";
+        var (repo, home, sessions) = NativeIdentityWorkspace("outcome-" + scenario);
+        var output = scenario switch
+        {
+            "structured" => JsonSerializer.Serialize(new { error = new { code = "model_not_found", message = "Model removed-model unavailable" } }),
+            "text" => "Unknown model `removed-model` for spawn_agent.\nAvailable models: model-a",
+            _ => "{}"
+        };
         Write(Path.Combine(sessions, "root.jsonl"),
         [
             Session(TestRootId, repo),
@@ -73,14 +79,21 @@ public sealed partial class FactoryReportTests
             Assistant("2026-10-16T10:00:03Z", "Factory blocked.")
         ]);
         var root = new CodexRolloutReader().Read(Path.Combine(sessions, "root.jsonl"));
-        Assert.Equal(expected, root.SpawnRecords["w1"].SpawnOutcome);
-        Assert.Empty(root.SpawnRecords["w1"].Children);
-        Assert.Equal(rejection ? "model_not_found" : null, root.SpawnRecords["w1"].RejectionCode);
+        var spawn = root.SpawnRecords["w1"];
+        Assert.Equal(expected, spawn.SpawnOutcome);
+        Assert.Empty(spawn.Children);
+        Assert.Equal(rejected ? "model_not_found" : null, spawn.RejectionCode);
+        Assert.Equal("removed-model", spawn.RequestedModel);
+        Assert.Equal("medium", spawn.RequestedReasoningEffort);
+        Assert.Null(spawn.ActualModel);
+        Assert.Null(spawn.ActualReasoningEffort);
+        Assert.Equal(scenario == "text" ? output : scenario == "structured" ? "Model removed-model unavailable" : null,
+            spawn.RejectionMessage);
         var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, home));
         Assert.Empty(report.Tasks);
         Assert.DoesNotContain(report.Agents, a => a.Role == "worker");
         Assert.Contains(report.Diagnostics, d => d.Code ==
-            (rejection ? "native_spawn_rejected" : "spawn_child_unresolved"));
+            (rejected ? "native_spawn_rejected" : "spawn_child_unresolved"));
     }
 
     [Theory]

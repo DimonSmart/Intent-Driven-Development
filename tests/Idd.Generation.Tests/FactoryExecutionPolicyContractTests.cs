@@ -325,6 +325,11 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("codex.reasoningEffort", codexRun);
         Assert.Contains("reasoning_effort", codexRun);
         Assert.Contains("fork_turns: \"none\"", codexRun);
+        Assert.Contains("`task_name` in native `spawn_agent` arguments", codexRun);
+        Assert.Contains("idd_factory_planner_01", codexRun);
+        Assert.Contains("idd_factory_worker_01", codexRun);
+        Assert.Contains("^idd_factory_(planner|worker)_[0-9]+$", codexRun);
+        Assert.Contains("rejects the attempt", codexRun);
 
         var claudeRun = fixture.ReadText(Path.Combine(
             fixture.MarketplaceRoot, "plugins", "claude", "idd-factory", "skills", "idd-factory-run", "SKILL.md"));
