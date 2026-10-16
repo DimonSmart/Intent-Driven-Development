@@ -59,7 +59,16 @@ report and preserves failed-test exit codes. It cleans up only temporary
 directories it created, not caller-owned locations. `summary.json`
 records resolved model/effort settings, their sources and worker mappings.
 
-The host trace is authoritative for requested spawn arguments. Actual settings
+The host trace is authoritative for requested spawn arguments.
+The canonical Factory skill requires per-attempt native `task_name` values
+matching `idd_factory_planner_[0-9]+` or `idd_factory_worker_[0-9]+`.
+An encrypted `message` is not decoded; independently structured
+`task_name`, `model`, `reasoning_effort` and `fork_turns` are still
+required. A requested name is distinct from the canonical child `agent_path`.
+Role and child association require consistent, parent-aware native evidence.
+The host's explicit rejection must be correlated to the attempted call;
+a missing child alone does not establish rejection.
+ Actual settings
 are read from each worker's own `turn_context.model` / `turn_context.effort` or
 explicit resolved/actual fields. If those values cannot be read, the report
 records `unknown` with a diagnostic and the routing evaluation fails rather
