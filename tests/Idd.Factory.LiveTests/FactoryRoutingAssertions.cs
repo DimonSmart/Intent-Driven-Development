@@ -79,6 +79,11 @@ internal static class FactoryRoutingAssertions
             report.Tasks.Take(3).Select(task => task.ExecutionProfile));
         Assert.Equal(3, report.Tasks.Take(3).Select(task => task.AgentThreadId)
             .Distinct(StringComparer.Ordinal).Count());
+        Assert.Contains("ProductCode", report.Tasks[0].Text ?? "", StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Catalog", report.Tasks[1].Text ?? "", StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("ProductCode", report.Tasks[2].Text ?? "", StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Catalog", report.Tasks[2].Text ?? "", StringComparison.OrdinalIgnoreCase);
+        Assert.Matches("(?i)test|verif", report.Tasks[2].Text ?? "");
         Assert.DoesNotContain(report.Tasks.Take(3), task =>
             string.IsNullOrWhiteSpace(task.AgentThreadId) || task.Status != "completed");
 
