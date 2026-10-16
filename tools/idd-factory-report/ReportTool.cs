@@ -634,7 +634,12 @@ public sealed class CodexRolloutReader
         }
         catch (JsonException)
         {
-            if (Regex.IsMatch(output, @"(?i)\b(error|rejected|unavailable|not found|unsupported|denied)\b"))
+            if (Regex.IsMatch(output, @"\A\s*Unknown model (?<quote>[`'""])[^`'""\r\n]+\k<quote> for spawn_agent\.(?:\r?\n[\s\S]*)?\z"))
+            {
+                code = "model_not_found";
+                message = output;
+            }
+            else if (Regex.IsMatch(output, @"(?i)\b(error|rejected|unavailable|not found|unsupported|denied)\b"))
                 message = output;
         }
         if (!string.IsNullOrWhiteSpace(code) || !string.IsNullOrWhiteSpace(message))

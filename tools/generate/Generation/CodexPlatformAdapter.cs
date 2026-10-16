@@ -78,7 +78,21 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                       that reason.
                     - Use the native `spawn_agent` operation (or its current native
                       equivalent) and a blocking/event-driven `wait_agent` operation.
-                      Prefer one long wait on the critical path. Do not build a
+                    - Before **every** Factory-owned planner or worker spawn attempt,
+                      choose an unused structured `task_name`: `idd_factory_planner_01`,
+                      `idd_factory_planner_02`, ... for planners, or
+                      `idd_factory_worker_01`, `idd_factory_worker_02`, ... for workers
+                      (format `^idd_factory_(planner|worker)_[0-9]+$`).
+                      Names must be unique within this Factory invocation and the
+                      visible shared host namespace. Reserve the name even if the host
+                      rejects the attempt; use a new suffix for any retry.
+                    - Pass `task_name` in native `spawn_agent` arguments, never only
+                      inside `message`, and pass `fork_turns: "none"` for **both**
+                      planners and workers. Example without optional model overrides:
+                      `{"task_name":"idd_factory_worker_01","fork_turns":"none","message":"<complete-worker-instructions>"}`.
+                      Include `model` and `reasoning_effort` only when required by the
+                      validated execution profile mapping; never substitute models.
+                    - Prefer one long wait on the critical path. Do not build a
                       short-wait/status-polling loop that consumes parent model turns.
                     - If a wait fails or the host times out, do not start a replacement
                       worker while the previous child may still write to the workspace.
