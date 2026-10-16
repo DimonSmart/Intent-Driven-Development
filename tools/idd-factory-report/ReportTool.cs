@@ -2283,7 +2283,7 @@ public sealed class FactoryReportEngine
     private static string? ExtractPlannerExecutionProfile(string text)
     {
         var headings = Regex.Matches(text,
-            @"(?ims)^\s*#\s*ExecutionProfile\s*$\s*(?<value>.*?)(?=^\s*#|\z)");
+            @"(?im)^[ \t]*#[ \t]*ExecutionProfile[ \t]*\r?$[ \t\r\n]*(?<value>[^\r\n]*)");
         var inline = Regex.Matches(text,
             @"(?im)^ExecutionProfile:\s*(?<value>[^\r\n]*)$");
         // Legacy output with no section is standard. Any explicit malformed
