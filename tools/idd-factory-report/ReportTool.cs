@@ -2096,7 +2096,7 @@ public sealed class FactoryReportEngine
 
     private static AgentReport BuildRootAgent(
         CodexRollout root,
-        DateTimeOffset? start,
+        CodexEvent start,
         DateTimeOffset? end,
         CodexEvent? terminalEvent,
         IReadOnlyList<CodexEvent> segmentEvents,
@@ -2123,13 +2123,13 @@ public sealed class FactoryReportEngine
         {
             ThreadId = root.ThreadId,
             Role = "root",
-            StartedAt = start,
+            StartedAt = start.Timestamp,
             FinishedAt = end,
             Tokens = tokens,
             TokensAuthoritative = authoritativeTokens,
             Tools = AnalyzeTools(
                 segmentEvents.Where(x =>
-                    (start is null || x.Timestamp is null || x.Timestamp >= start) &&
+                    (start.Timestamp is null || x.Timestamp is null || x.Timestamp >= start.Timestamp) &&
                     (end is null || x.Timestamp is null || x.Timestamp <= end || Correlates(x, terminalEvent))),
                 "Factory root"),
             RolloutPath = verbose ? root.Path : null
