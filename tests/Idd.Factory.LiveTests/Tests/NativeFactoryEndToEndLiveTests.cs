@@ -205,7 +205,7 @@ public sealed class NativeFactoryEndToEndLiveTests
                 $"Evidence: {artifactRoot}/factory-report.json, factory-report.md, codex-trace.jsonl, " +
                 $"last-message.json, exception.txt, summary.json.");
             AssertMultiAgentV2(rootRollout);
-            CorrelateNativeSpawnsForAssertions(rootRollout, codexHome);
+            CorrelateNativeSpawnsForAssertions(rootRollout, codexHome, factoryReport);
             RunResult? verification = null;
             if (!unavailableWorkerModel)
             {
@@ -291,7 +291,7 @@ public sealed class NativeFactoryEndToEndLiveTests
         }
     }
 
-    private static void CorrelateNativeSpawnsForAssertions(CodexRollout root, string codexHome)
+    private static void CorrelateNativeSpawnsForAssertions(CodexRollout root, string codexHome, FactoryRunReport report)
     {
         // FindRuns performs parent-aware correlation internally, but this separately
         // read root rollout is used to check the original native call arguments.
@@ -318,7 +318,9 @@ public sealed class NativeFactoryEndToEndLiveTests
 
             var parent = spawn.SenderThreadId ?? root.ThreadId;
             var candidates = children.Where(child =>
-                child.ParentThreadId == parent &&
+                (child.ParentThreadId == parent ||
+                 report.Agents.Any(agent => agent.ThreadId == child.ThreadId &&
+                     agent.ParentThreadId == parent)) &&
                 (spawn.Children.Contains(child.ThreadId, StringComparer.Ordinal) ||
                  spawn.ChildAgentPath?.StartsWith('/') == true &&
                  child.AgentPath == spawn.ChildAgentPath ||
