@@ -286,6 +286,12 @@ public sealed class SpawnRecord
     public string? ChildThreadId { get; set; }
     public List<string> ChildThreadIds { get; } = [];
     public string? ChildAgentPath { get; set; }
+    public string? RequestedTaskName { get; set; }
+    public string SpawnOutcome { get; set; } = "unknown";
+    public string? RejectionCode { get; set; }
+    public string? RejectionMessage { get; set; }
+    [JsonIgnore]
+    public bool CorrelationConflict { get; set; }
     public string? Task { get; set; }
     public string? ExecutionProfile { get; set; }
     public string? RequestedModel { get; set; }
@@ -348,7 +354,7 @@ public sealed class CodexRolloutReader
                     rollout.ThreadId = String(payload, "id") ?? String(root, "id") ?? rollout.ThreadId;
                     rollout.Cwd = String(payload, "cwd") ?? rollout.Cwd;
                     rollout.ParentThreadId = FindString(payload, "parent_thread_id", "parentThreadId", "parent_id") ?? rollout.ParentThreadId;
-                    rollout.AgentRoleHint = FindString(payload, "agent_role", "agentRole", "agent_path", "agentPath") ?? rollout.AgentRoleHint;
+                    rollout.AgentRoleHint = FindString(payload, "agent_role", "agentRole") ?? rollout.AgentRoleHint;
                     rollout.AgentPath = FindString(payload, "agent_path", "agentPath") ?? rollout.AgentPath;
                 }
 
@@ -414,6 +420,13 @@ public sealed class CodexRolloutReader
 
                 if (toolName == "spawn_agent")
                 {
+                    // Native structured items can put task_name beside an opaque
+                    // message instead of inside the serialized arguments field.
+                    if (eventObject.ValueKind == JsonValueKind.Object &&
+                        (eventObject.TryGetProperty("task_name", out _) ||
+                         eventObject.TryGetProperty("fork_turns", out _) ||
+                         eventObject.TryGetProperty("model", out _)))
+                        toolArguments = eventObject.GetRawText();
                     spawnTask = ExtractSpawnTask(toolArguments);
                     if (IsOpaqueSpawnTask(spawnTask))
                     {
@@ -534,6 +547,7 @@ public sealed class CodexRolloutReader
                         SenderThreadId = e.SenderThreadId ?? rollout.ThreadId,
                         Task = e.SpawnTask,
                         ChildAgentPath = ExtractSpawnArgument(e.ToolOutput, "task_name"),
+                        RequestedTaskName = ExtractSpawnArgument(e.ToolArguments, "task_name"),
                         ExecutionProfile = ExtractExecutionProfile(e.SpawnTask),
                         RequestedModel = ExtractSpawnArgument(e.ToolArguments, "model"),
                         RequestedReasoningEffort = ExtractSpawnArgument(e.ToolArguments, "reasoning_effort", "reasoningEffort"),
@@ -550,6 +564,7 @@ public sealed class CodexRolloutReader
                     if (record.Task is null && e.SpawnTask is not null)
                         record.Task = e.SpawnTask;
                     record.ChildAgentPath ??= ExtractSpawnArgument(e.ToolOutput, "task_name");
+                    record.RequestedTaskName ??= ExtractSpawnArgument(e.ToolArguments, "task_name");
                     record.ExecutionProfile ??= ExtractExecutionProfile(e.SpawnTask);
                     record.RequestedModel ??= ExtractSpawnArgument(e.ToolArguments, "model");
                     record.RequestedReasoningEffort ??= ExtractSpawnArgument(e.ToolArguments, "reasoning_effort", "reasoningEffort");
@@ -570,6 +585,7 @@ public sealed class CodexRolloutReader
                     !record.ChildThreadIds.Contains(fallbackId, StringComparer.Ordinal))
                     record.ChildThreadIds.Add(fallbackId);
 
+                ApplySpawnOutcome(record, e.ToolOutput);
                 record.ChildThreadId = record.ChildThreadIds.FirstOrDefault();
                 e.ChildThreadId = record.ChildThreadId;
             }
@@ -578,13 +594,45 @@ public sealed class CodexRolloutReader
                 record.ChildAgentPath ??= ExtractSpawnArgument(e.ToolOutput, "task_name");
                 record.ActualModel ??= e.ActualModel ?? ExtractSpawnArgument(e.ToolOutput, "actual_model", "actualModel", "model_used", "modelUsed", "resolved_model", "resolvedModel");
                 record.ActualReasoningEffort ??= e.ActualReasoningEffort ?? ExtractSpawnArgument(e.ToolOutput, "actual_reasoning_effort", "actualReasoningEffort", "reasoning_effort_used", "reasoningEffortUsed", "resolved_reasoning_effort", "resolvedReasoningEffort");
-                var id = e.ChildThreadId ?? ExtractThreadId(e.ToolOutput);
+                ApplySpawnOutcome(record, e.ToolOutput);
+                var id = record.SpawnOutcome == "rejected" ? null : e.ChildThreadId ?? ExtractThreadId(e.ToolOutput);
                 if (!string.IsNullOrWhiteSpace(id) &&
                     !record.ChildThreadIds.Contains(id, StringComparer.Ordinal))
                     record.ChildThreadIds.Add(id);
                 record.ChildThreadId = record.ChildThreadIds.FirstOrDefault();
                 e.ChildThreadId = record.ChildThreadId;
             }
+        }
+        // Native started/completed and response_item wrappers share one call ID.
+        // Rejections without a child are retained, never synthesized as workers.
+    }
+
+    private static void ApplySpawnOutcome(SpawnRecord record, string? output)
+    {
+        if (string.IsNullOrWhiteSpace(output))
+            return;
+        string? code = null, message = null;
+        try
+        {
+            using var parsed = JsonDocument.Parse(output);
+            var root = parsed.RootElement;
+            if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("error", out var error))
+            {
+                code = error.ValueKind == JsonValueKind.Object ? FindString(error, "code", "type") : null;
+                message = error.ValueKind == JsonValueKind.Object
+                    ? FindString(error, "message", "detail") : error.ValueKind == JsonValueKind.String ? error.GetString() : null;
+            }
+        }
+        catch (JsonException)
+        {
+            if (Regex.IsMatch(output, @"(?i)\b(error|rejected|unavailable|not found|unsupported|denied)\b"))
+                message = output;
+        }
+        if (!string.IsNullOrWhiteSpace(code) || !string.IsNullOrWhiteSpace(message))
+        {
+            record.SpawnOutcome = "rejected";
+            record.RejectionCode = code;
+            record.RejectionMessage = message;
         }
     }
 
@@ -1146,26 +1194,72 @@ public sealed class FactoryReportEngine
 
         foreach (var spawningRollout in all)
         {
-            foreach (var spawn in spawningRollout.SpawnRecords.Values)
+            var spawns = spawningRollout.SpawnRecords.Values.ToArray();
+            foreach (var duplicate in spawns.Where(x => x.RequestedTaskName is not null)
+                         .GroupBy(x => (x.SenderThreadId ?? spawningRollout.ThreadId, x.RequestedTaskName))
+                         .Where(x => x.Count() > 1))
             {
-                if (!spawn.Children.Any() && spawn.ChildAgentPath?.StartsWith('/') == true)
+                foreach (var spawn in duplicate)
+                    spawn.CorrelationConflict = true;
+                spawningRollout.Diagnostics.Add(new Diagnostic
                 {
-                    // Current native spawn results may identify the child by canonical
-                    // agent path instead of UUID. Resolve only within the known parent.
-                    var matches = all.Where(child => child.AgentPath == spawn.ChildAgentPath &&
-                        child.ParentThreadId == (spawn.SenderThreadId ?? spawningRollout.ThreadId)).ToArray();
-                    if (matches.Length == 1)
+                    Severity = "warning", Category = "host-trace", Code = "duplicate_spawn_task_name",
+                    Message = $"Duplicate native task_name {duplicate.Key.RequestedTaskName} under parent {duplicate.Key.Item1}."
+                });
+            }
+
+            foreach (var spawn in spawns)
+            {
+                var parent = spawn.SenderThreadId ?? spawningRollout.ThreadId;
+                if (!spawn.Children.Any() && spawn.SpawnOutcome != "rejected")
+                {
+                    var candidates = all.Where(child => child.ParentThreadId == parent &&
+                        !string.IsNullOrWhiteSpace(child.AgentPath)).ToArray();
+                    CodexRollout[] matches = [];
+                    if (spawn.ChildAgentPath?.StartsWith('/') == true)
+                        matches = candidates.Where(child => child.AgentPath == spawn.ChildAgentPath).ToArray();
+                    else if (FactoryTaskNameRole(spawn.RequestedTaskName) is not null)
+                        matches = candidates.Where(child => child.AgentPath is not null &&
+                            child.AgentPath.Split('/').Last() == spawn.RequestedTaskName).ToArray();
+
+                    if (matches.Length == 1 && !spawn.CorrelationConflict)
                     {
                         spawn.ChildThreadId = matches[0].ThreadId;
                         spawn.ChildThreadIds.Add(matches[0].ThreadId);
                     }
+                    else if (matches.Length > 1)
+                    {
+                        spawn.CorrelationConflict = true;
+                        spawningRollout.Diagnostics.Add(new Diagnostic
+                        {
+                            Severity = "warning", Category = "host-trace", Code = "ambiguous_spawn_child",
+                            Message = $"Spawn {spawn.CallId} has {matches.Length} matching children under {parent}."
+                        });
+                    }
                 }
+
                 foreach (var childId in spawn.Children)
                 {
                     if (!byId.TryGetValue(childId, out var child))
                         continue;
 
-                    child.ParentThreadId ??= spawn.SenderThreadId ?? spawningRollout.ThreadId;
+                    if (child.ParentThreadId is not null && child.ParentThreadId != parent ||
+                        spawn.RequestedTaskName is not null && FactoryTaskNameRole(spawn.RequestedTaskName) is not null &&
+                        child.AgentPath is not null && child.AgentPath.Split('/').Last() != spawn.RequestedTaskName ||
+                        spawn.ChildAgentPath?.StartsWith('/') == true &&
+                        child.AgentPath is not null && child.AgentPath != spawn.ChildAgentPath)
+                    {
+                        spawn.CorrelationConflict = true;
+                        spawningRollout.Diagnostics.Add(new Diagnostic
+                        {
+                            Severity = "warning", Category = "host-trace", Code = "spawn_child_identity_conflict",
+                            Message = $"Spawn {spawn.CallId} child {childId} conflicts with parent/name/path evidence."
+                        });
+                        continue;
+                    }
+                    child.ParentThreadId ??= parent;
+                    if (!spawn.CorrelationConflict)
+                        spawn.SpawnOutcome = "accepted";
                 }
             }
         }
@@ -1825,7 +1919,7 @@ public sealed class FactoryReportEngine
         foreach (var child in descendants.OrderBy(ActivityStartedAt).ThenBy(x => x.ThreadId, StringComparer.Ordinal))
         {
             var spawn = FindSpawnRecord(spawningRollouts, child.ThreadId);
-            var role = ClassifyRole(root, child, spawn);
+            var role = ClassifyRole(root, child, spawn, diagnostics);
             var task = role == "worker" ? ExtractFactoryTask(spawn?.Task) : null;
             var (outcome, outcomeAt) = role == "planner" ? PlannerOutcome(child) : (null, null);
             var actualSettings = ChildExecutionSettings(child, spawn, role == "worker" ? diagnostics : null);
@@ -1920,46 +2014,62 @@ public sealed class FactoryReportEngine
         };
     }
 
-    private static string ClassifyRole(CodexRollout root, CodexRollout child, SpawnRecord? spawn)
+    private static string ClassifyRole(CodexRollout root, CodexRollout child,
+        SpawnRecord? spawn, List<Diagnostic> diagnostics)
     {
-        // Only explicit native Factory role values are trusted, not arbitrary
-        // agent_path text containing "worker" or "planner".
         var nativeRole = TrustedFactoryRole(child.AgentRoleHint);
-        if (nativeRole is not null)
-            return nativeRole;
-
+        var namedRole = FactoryTaskNameRole(spawn?.RequestedTaskName);
         var initialInstructions = child.Events
             .Where(x => string.Equals(x.Role, "user", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(x.Role, "system", StringComparison.OrdinalIgnoreCase))
             .Select(x => x.Text)
             .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
 
-        var spawnRole = ExplicitFactoryRole(spawn?.Task);
-        if (spawnRole == "ambiguous")
-            return FallbackRole(root, child);
-        if (spawnRole is not null)
-            return spawnRole;
+        var roleSources = new[]
+        {
+            nativeRole, namedRole,
+            ExplicitFactoryRole(spawn?.Task), ExplicitFactoryRole(initialInstructions),
+            LegacyFactoryRole(spawn?.Task), LegacyFactoryRole(initialInstructions)
+        }.Where(x => x is not null).Distinct(StringComparer.Ordinal).ToArray();
 
-        var initialRole = ExplicitFactoryRole(initialInstructions);
-        if (initialRole == "ambiguous")
-            return FallbackRole(root, child);
-        if (initialRole is not null)
-            return initialRole;
+        var invalidPath = spawn is not null && (
+            spawn.CorrelationConflict ||
+            namedRole is not null && child.AgentPath is not null &&
+                child.AgentPath.Split('/').Last() != spawn.RequestedTaskName ||
+            spawn.ChildAgentPath?.StartsWith('/') == true &&
+                child.AgentPath is not null && spawn.ChildAgentPath != child.AgentPath);
 
-        var legacySpawn = LegacyFactoryRole(spawn?.Task);
-        if (legacySpawn == "ambiguous")
-            return FallbackRole(root, child);
-        if (legacySpawn is not null)
-            return legacySpawn;
+        if (invalidPath || roleSources.Length > 1 || roleSources.Contains("ambiguous"))
+        {
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "warning", Category = "factory", Code = "agent_role_conflict",
+                Message = $"Child {child.ThreadId} has incompatible role or identity evidence: " +
+                    $"agent_role={child.AgentRoleHint ?? "unavailable"}, " +
+                    $"requested task_name={spawn?.RequestedTaskName ?? "unavailable"}, " +
+                    $"child agent_path={child.AgentPath ?? "unavailable"}, " +
+                    $"spawn output path={spawn?.ChildAgentPath ?? "unavailable"}, " +
+                    $"roles={string.Join(",", roleSources)}."
+            });
+            return "unknown";
+        }
 
-        var legacyInitial = LegacyFactoryRole(initialInstructions);
-        return legacyInitial is null or "ambiguous"
-            ? FallbackRole(root, child) : legacyInitial;
+        return roleSources.SingleOrDefault() ?? FallbackRole(root, child);
     }
 
     private static string FallbackRole(CodexRollout root, CodexRollout child) =>
         child.ParentThreadId is not null && child.ParentThreadId != root.ThreadId
             ? "subagent" : "unknown";
+
+    private static string? FactoryTaskNameRole(string? name)
+    {
+        if (name is null)
+            return null;
+        if (Regex.IsMatch(name, @"\Aidd_factory_planner_[0-9]+\z", RegexOptions.CultureInvariant))
+            return "planner";
+        return Regex.IsMatch(name, @"\Aidd_factory_worker_[0-9]+\z", RegexOptions.CultureInvariant)
+            ? "worker" : null;
+    }
 
     private static string? TrustedFactoryRole(string? hint) =>
         hint?.Trim().ToLowerInvariant() switch
@@ -1971,14 +2081,9 @@ public sealed class FactoryReportEngine
 
     private static SpawnRecord? FindSpawnRecord(IEnumerable<CodexRollout> rollouts, string childId)
     {
-        foreach (var rollout in rollouts)
-        {
-            var record = rollout.SpawnRecords.Values.FirstOrDefault(
-                x => x.Children.Contains(childId, StringComparer.Ordinal));
-            if (record is not null)
-                return record;
-        }
-        return null;
+        var matches = rollouts.SelectMany(rollout => rollout.SpawnRecords.Values)
+            .Where(record => record.Children.Contains(childId, StringComparer.Ordinal)).ToArray();
+        return matches.Length == 1 && !matches[0].CorrelationConflict ? matches[0] : null;
     }
 
     private static string? ExplicitFactoryRole(string? instructions)
