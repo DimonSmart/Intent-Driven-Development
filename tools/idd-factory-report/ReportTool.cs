@@ -578,14 +578,14 @@ public sealed class CodexRolloutReader
                         record.ChildThreadIds.Add(id);
                 }
 
-                var fallbackId = e.ChildThreadId;
+                ApplySpawnOutcome(record, e.ToolOutput);
+                var fallbackId = record.SpawnOutcome == "rejected" ? null : e.ChildThreadId;
                 if (record.SpawnOutcome != "rejected" && record.ChildThreadIds.Count == 0 && string.IsNullOrWhiteSpace(fallbackId))
                     fallbackId = ExtractThreadId(e.ToolOutput);
                 if (!string.IsNullOrWhiteSpace(fallbackId) &&
                     !record.ChildThreadIds.Contains(fallbackId, StringComparer.Ordinal))
                     record.ChildThreadIds.Add(fallbackId);
 
-                ApplySpawnOutcome(record, e.ToolOutput);
                 record.ChildThreadId = record.ChildThreadIds.FirstOrDefault();
                 e.ChildThreadId = record.ChildThreadId;
             }
