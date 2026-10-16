@@ -254,6 +254,8 @@ public sealed class CodexEvent
     public string? Status { get; init; }
     public TokenMetrics? Usage { get; init; }
     public bool UsageIsCumulative { get; init; }
+    public bool IsInitialization { get; init; }
+    public bool TurnIdentityConflict { get; init; }
     public string? ChildThreadId { get; set; }
     public string? SpawnTask { get; init; }
     public string? ActualModel { get; init; }
@@ -378,7 +380,40 @@ public sealed class CodexRolloutReader
                     text = ExtractText(payload);
 
                 var threadId = FindStringAcross([eventObject, payload, root], "thread_id", "threadId");
-                var turnId = FindStringAcross([eventObject, payload, root], "turn_id", "turnId");
+                // Native response_item messages carry their turn in metadata, whereas
+                // usage records carry it directly on the payload. Reject contradictions.
+                var identifiers = new[] { eventObject, payload, root };
+                var turnIds = identifiers.SelectMany(element => new[]
+                    {
+                        String(element, "turn_id"),
+                        String(element, "turnId"),
+                        String(Object(element, "internal_chat_message_metadata_passthrough") ?? default, "turn_id"),
+                        String(Object(element, "internal_chat_message_metadata_passthrough") ?? default, "turnId")
+                    })
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray();
+                var turnConflict = turnIds.Length > 1;
+                var turnId = turnConflict ? null : turnIds.FirstOrDefault();
+                if (turnConflict)
+                    rollout.Diagnostics.Add(new Diagnostic
+                    {
+                        Severity = "warning", Category = "host-trace", Code = "conflicting_turn_ids",
+                        Message = $"Conflicting native turn identifiers in {Path.GetFileName(path)} at line {ordinal}; the event cannot establish turn correlation."
+                    });
+
+                var metadata = Object(eventObject, "internal_chat_message_metadata_passthrough")
+                    ?? Object(payload, "internal_chat_message_metadata_passthrough");
+                var environmentContext = metadata is { } m &&
+                    m.TryGetProperty("content_item_kinds", out var kinds) &&
+                    kinds.ValueKind == JsonValueKind.Array &&
+                    kinds.EnumerateArray().Any(kind =>
+                        kind.ValueKind == JsonValueKind.String &&
+                        kind.GetString() == "environments.environment_context");
+                var initialization = topType is "session_meta" or "world_state" or "turn_context" ||
+                    type is "task_started" or "thread_settings_applied" ||
+                    topType == "response_item" && rawItemType == "message" &&
+                    (role is "developer" or "system" || role == "user" && environmentContext);
                 var rootTurnId = FindStringAcross([eventObject, payload, root], "root_turn_id", "rootTurnId");
                 var responseId = FindStringAcross([eventObject, payload, root], "response_id", "responseId");
                 var senderThreadId = FindStringAcross([eventObject, payload, root], "sender_thread_id", "senderThreadId");
@@ -488,6 +523,8 @@ public sealed class CodexRolloutReader
                     Status = FindString(eventObject, "status", "outcome"),
                     Usage = usage,
                     UsageIsCumulative = cumulative,
+                    IsInitialization = initialization,
+                    TurnIdentityConflict = turnConflict,
                     ChildThreadId = childThreadId,
                     SpawnTask = spawnTask,
                     ActualModel = actualModel,
@@ -1639,7 +1676,7 @@ public sealed class FactoryReportEngine
             });
         }
 
-        var rootAgent = BuildRootAgent(root, start.Timestamp, end, terminalEvent, segmentRootEvents, verbose);
+        var rootAgent = BuildRootAgent(root, start, end, terminalEvent, segmentRootEvents, verbose, diagnostics);
         agents.Insert(0, rootAgent);
 
         AssignSequences(agents);
@@ -1725,7 +1762,7 @@ public sealed class FactoryReportEngine
             });
         }
 
-        var rootReportedTokens = ComputeRootReportedTokens(root.Events, end, terminalEvent);
+        var rootReportedTokens = ComputeRootReportedTokens(root.Events, root.ThreadId, end, terminalEvent);
         var tokenMetrics = AggregateTokens(agents, out var tokenMethod, out var tokenComplete);
 
         var tokenStatus = tokenMethod == "overlap-unknown"
@@ -2063,9 +2100,25 @@ public sealed class FactoryReportEngine
         DateTimeOffset? end,
         CodexEvent? terminalEvent,
         IReadOnlyList<CodexEvent> segmentEvents,
-        bool verbose)
+        bool verbose,
+        List<Diagnostic> diagnostics)
     {
-        var tokens = ComputeSegmentTokens(root.Events, start, end, terminalEvent, out var authoritativeTokens);
+        var tokens = ComputeSegmentTokens(root.Events, root.ThreadId, start, end, terminalEvent,
+            out var authoritativeTokens, out var unavailableReason);
+        if (unavailableReason is not null)
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "info", Category = "reporter",
+                Code = unavailableReason,
+                Message = $"Could not establish root Factory Run token usage for {root.ThreadId}: " +
+                    unavailableReason switch
+                    {
+                        "root_start_baseline_unavailable" => "no reliable cumulative baseline before Factory.",
+                        "root_terminal_usage_unavailable" => "no reliable cumulative counter at the Factory terminal boundary.",
+                        "root_terminal_usage_correlation_unavailable" => "a later usage record cannot be proven to belong to the terminal turn.",
+                        _ => "the native counters are incomplete or inconsistent."
+                    }
+            });
         return new AgentReport
         {
             ThreadId = root.ThreadId,
@@ -2355,124 +2408,195 @@ public sealed class FactoryReportEngine
             .ToArray();
     }
 
+
+    private static bool HasCompleteTokens(TokenMetrics? usage) =>
+        usage?.InputTokens is >= 0 &&
+        usage.CachedInputTokens is >= 0 &&
+        usage.OutputTokens is >= 0 &&
+        usage.CachedInputTokens <= usage.InputTokens &&
+        usage.NewInputTokens == usage.InputTokens - usage.CachedInputTokens;
+
+    private static bool BelongsToThread(CodexEvent e, string threadId) =>
+        !e.TurnIdentityConflict && (e.ThreadId is null || e.ThreadId == threadId);
+
     private static TokenMetrics ComputeWholeThreadTokens(CodexRollout rollout, out bool authoritative)
     {
         authoritative = false;
-        var threadUsage = rollout.Events
-            .Where(x => x.Usage is not null && x.UsageScope == "thread")
-            .LastOrDefault();
+        var threadUsage = rollout.Events.LastOrDefault(x =>
+            x.Usage is not null && x.UsageScope == "thread" &&
+            BelongsToThread(x, rollout.ThreadId));
         if (threadUsage?.Usage is not null)
         {
-            authoritative = true;
+            authoritative = HasCompleteTokens(threadUsage.Usage);
             return threadUsage.Usage;
         }
 
-        var usageEvents = rollout.Events.Where(x => x.Usage is not null).ToArray();
-        var cumulative = usageEvents.Where(x => x.UsageIsCumulative).LastOrDefault();
+        var usageEvents = rollout.Events.Where(x => x.Usage is not null &&
+            BelongsToThread(x, rollout.ThreadId)).ToArray();
+        var cumulative = usageEvents.LastOrDefault(x => x.UsageIsCumulative);
         if (cumulative?.Usage is not null)
             return cumulative.Usage;
 
+        // Legacy turn counters are not authoritative independent thread totals.
         var perTurn = usageEvents.Where(x => !x.UsageIsCumulative).Select(x => x.Usage!).ToArray();
         return perTurn.Length == 0 ? new TokenMetrics() : TokenMetrics.Sum(perTurn);
     }
 
+    private static bool HasFreshSessionPrelude(
+        IReadOnlyList<CodexEvent> events, CodexEvent start)
+    {
+        // Only a complete, recognized session prelude proves zero prior model usage.
+        // Unknown events, earlier user turns and truncated sessions fail closed.
+        if (events.Count == 0 || events[0].Type != "session_meta" ||
+            events[0].Ordinal >= start.Ordinal || start.TurnIdentityConflict)
+            return false;
+
+        foreach (var e in events.Where(x => x.Ordinal < start.Ordinal))
+        {
+            if (!e.IsInitialization || e.Usage is not null || e.TurnIdentityConflict)
+                return false;
+            if (e.TurnId is not null &&
+                (start.TurnId is null || e.TurnId != start.TurnId))
+                return false;
+        }
+        return true;
+    }
+
+    private static bool Correlates(CodexEvent usage, CodexEvent? terminal, string? threadId = null)
+    {
+        if (terminal is null || usage.Usage is null ||
+            usage.TurnIdentityConflict || terminal.TurnIdentityConflict)
+            return false;
+
+        if (threadId is not null &&
+            (usage.ThreadId is not null && usage.ThreadId != threadId ||
+             terminal.ThreadId is not null && terminal.ThreadId != threadId))
+            return false;
+        if (usage.ThreadId is not null && terminal.ThreadId is not null &&
+            usage.ThreadId != terminal.ThreadId)
+            return false;
+
+        static bool Same(string? a, string? b) =>
+            !string.IsNullOrWhiteSpace(a) &&
+            string.Equals(a, b, StringComparison.Ordinal);
+
+        // Shared root_turn_id does not identify a child turn when both native
+        // turn_ids are present and different.
+        if (usage.TurnId is not null && terminal.TurnId is not null)
+            return Same(usage.TurnId, terminal.TurnId);
+
+        if (Same(usage.ResponseId, terminal.ResponseId))
+            return true;
+        // Root-turn fallback is safe only when neither event supplies a
+        // competing turn identity.
+        return usage.TurnId is null && terminal.TurnId is null &&
+               Same(usage.RootTurnId, terminal.RootTurnId);
+    }
+
+    private static bool AtTerminalBoundary(CodexEvent usage, DateTimeOffset end, CodexEvent? terminal, string threadId)
+    {
+        if (!BelongsToThread(usage, threadId))
+            return false;
+        if (terminal is not null && usage.Ordinal > terminal.Ordinal)
+            return Correlates(usage, terminal, threadId);
+        return usage.Timestamp <= end;
+    }
+
     private static TokenMetrics ComputeSegmentTokens(
         IReadOnlyList<CodexEvent> events,
-        DateTimeOffset? start,
+        string threadId,
+        CodexEvent start,
         DateTimeOffset? end,
         CodexEvent? terminalEvent,
-        out bool authoritative)
+        out bool authoritative,
+        out string? unavailableReason)
     {
         authoritative = false;
-        if (start is null || end is null)
+        unavailableReason = null;
+        if (start.Timestamp is null || end is null)
+        {
+            unavailableReason = "root_terminal_usage_unavailable";
             return new TokenMetrics();
+        }
 
-        var native = events.Where(x => x.UsageScope == "thread" && x.Usage is not null).ToArray();
+        var native = events.Where(x => x.UsageScope == "thread" &&
+            x.Usage is not null && BelongsToThread(x, threadId)).ToArray();
         if (native.Length > 0)
         {
-            var before = native.LastOrDefault(x => x.Timestamp < start);
+            var before = native.LastOrDefault(x => x.Ordinal < start.Ordinal &&
+                x.Timestamp < start.Timestamp);
             TokenMetrics? baseline = before?.Usage;
-            if (baseline is null)
-            {
-                var priorExecution = events.Any(x =>
-                    x.Timestamp < start &&
-                    x.Type != "session_meta" &&
-                    x.Usage is null);
-                if (!priorExecution)
+            if (baseline is null && HasFreshSessionPrelude(events, start))
+                baseline = new TokenMetrics
                 {
-                    baseline = new TokenMetrics
-                    {
-                        InputTokens = 0,
-                        CachedInputTokens = 0,
-                        NewInputTokens = 0,
-                        OutputTokens = 0
-                    };
-                }
+                    InputTokens = 0, CachedInputTokens = 0, NewInputTokens = 0, OutputTokens = 0
+                };
+
+            if (!HasCompleteTokens(baseline))
+            {
+                unavailableReason = "root_start_baseline_unavailable";
+                return new TokenMetrics();
             }
 
-            var finish = native.LastOrDefault(x =>
-                x.Timestamp <= end || Correlates(x, terminalEvent));
-            if (baseline is not null && finish?.Usage is not null)
+            var finish = native.LastOrDefault(x => AtTerminalBoundary(x, end.Value, terminalEvent, threadId));
+            if (finish?.Usage is null)
             {
-                authoritative = true;
-                return TokenMetrics.Subtract(finish.Usage, baseline);
+                unavailableReason = native.Any(x => x.Ordinal > (terminalEvent?.Ordinal ?? long.MaxValue))
+                    ? "root_terminal_usage_correlation_unavailable" : "root_terminal_usage_unavailable";
+                return new TokenMetrics();
             }
-            return new TokenMetrics();
+
+            var delta = TokenMetrics.Subtract(finish.Usage, baseline!);
+            if (!HasCompleteTokens(delta))
+            {
+                unavailableReason = "root_token_counters_inconsistent";
+                return delta;
+            }
+            authoritative = true;
+            return delta;
         }
 
-        var cumulative = events.Where(x => x.UsageIsCumulative && x.Usage is not null).ToArray();
+        // Legacy cumulative counters may still yield a segment value, but
+        // without native per-thread identity they cannot establish aggregation.
+        var cumulative = events.Where(x => x.UsageIsCumulative &&
+            x.Usage is not null && BelongsToThread(x, threadId)).ToArray();
         if (cumulative.Length > 0)
         {
-            var before = cumulative.LastOrDefault(x => x.Timestamp < start);
-            var finish = cumulative.LastOrDefault(x => x.Timestamp <= end);
+            var before = cumulative.LastOrDefault(x => x.Timestamp < start.Timestamp);
+            var finish = cumulative.LastOrDefault(x =>
+                AtTerminalBoundary(x, end.Value, terminalEvent, threadId));
             if (before?.Usage is not null && finish?.Usage is not null)
                 return TokenMetrics.Subtract(finish.Usage, before.Usage);
+            unavailableReason = before?.Usage is null
+                ? "root_start_baseline_unavailable" : "root_terminal_usage_unavailable";
             return new TokenMetrics();
         }
 
-        var perTurn = events.Where(x =>
-                !x.UsageIsCumulative && x.Usage is not null &&
-                x.Timestamp >= start && (x.Timestamp <= end || Correlates(x, terminalEvent)))
+        var perTurn = events.Where(x => !x.UsageIsCumulative && x.Usage is not null &&
+                x.Timestamp >= start.Timestamp &&
+                AtTerminalBoundary(x, end.Value, terminalEvent, threadId))
             .Select(x => x.Usage!)
             .ToArray();
+        if (perTurn.Length == 0)
+            unavailableReason = "root_terminal_usage_unavailable";
         return perTurn.Length == 0 ? new TokenMetrics() : TokenMetrics.Sum(perTurn);
     }
 
     private static TokenMetrics ComputeRootReportedTokens(
         IReadOnlyList<CodexEvent> events,
+        string threadId,
         DateTimeOffset? end,
         CodexEvent? terminalEvent)
     {
-        var eligible = events
-            .Where(x => x.Usage is not null &&
-                        (end is null || x.Timestamp is null || x.Timestamp <= end || Correlates(x, terminalEvent)))
-            .ToArray();
-
-        var thread = eligible.LastOrDefault(x => x.UsageScope == "thread");
-        if (thread?.Usage is not null)
-            return thread.Usage;
-
-        var cumulative = eligible.LastOrDefault(x => x.UsageIsCumulative);
-        if (cumulative?.Usage is not null)
-            return cumulative.Usage;
-
-        var perTurn = eligible.Where(x => !x.UsageIsCumulative).Select(x => x.Usage!).ToArray();
-        return perTurn.Length == 0 ? new TokenMetrics() : TokenMetrics.Sum(perTurn);
-    }
-
-    private static bool Correlates(CodexEvent usage, CodexEvent? terminal)
-    {
-        if (terminal is null || usage.Usage is null)
-            return false;
-
-        static bool Same(string? a, string? b) =>
-            !string.IsNullOrWhiteSpace(a) &&
-            !string.IsNullOrWhiteSpace(b) &&
-            string.Equals(a, b, StringComparison.Ordinal);
-
-        return Same(usage.ResponseId, terminal.ResponseId) ||
-               Same(usage.TurnId, terminal.TurnId) ||
-               Same(usage.RootTurnId, terminal.RootTurnId);
+        if (end is null)
+            return new TokenMetrics();
+        var eligible = events.Where(x => x.Usage is not null &&
+            AtTerminalBoundary(x, end.Value, terminalEvent, threadId)).ToArray();
+        // A cumulative root-reported metric must never be synthesized from
+        // independent turn counters or multiple representations of one record.
+        return eligible.LastOrDefault(x => x.UsageScope == "thread")?.Usage ??
+               eligible.LastOrDefault(x => x.UsageIsCumulative)?.Usage ??
+               new TokenMetrics();
     }
 
     private static ToolMetrics AnalyzeTools(IEnumerable<CodexEvent> source, string agent)
@@ -2770,7 +2894,8 @@ public sealed class FactoryReportEngine
             return new TokenMetrics();
         }
 
-        if (distinct.Any(x => !x.TokensAuthoritative || !x.Tokens.Available))
+        if (agents.GroupBy(x => x.ThreadId, StringComparer.Ordinal).Any(x => x.Count() != 1) ||
+            distinct.Any(x => !x.TokensAuthoritative || !HasCompleteTokens(x.Tokens)))
         {
             complete = false;
             method = distinct.Any(x => x.Tokens.Available) ? "overlap-unknown" : "unavailable";
