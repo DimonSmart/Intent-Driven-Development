@@ -112,6 +112,7 @@ public sealed class FactoryRoutingAssertionsTests
         {
             AgentThreadId = fault == "reused-thread" ? report.Tasks[1].AgentThreadId : first.AgentThreadId,
             Status = fault == "unfinished" ? "interrupted" : first.Status,
+            Text = first.Text,
             ExecutionProfile = fault == "wrong-profile" ? "economy" : first.ExecutionProfile,
             RequestedModel = fault switch
             {
