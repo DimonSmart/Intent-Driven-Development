@@ -134,7 +134,9 @@ public sealed class TokenAccountingTests : IDisposable
             message,
             Usage("03", RunTurn, 90, 30, 8));
         Assert.Contains(report.Diagnostics, x => x.Code == "conflicting_turn_ids");
-        Assert.Equal(40, report.Metrics.RootReportedTokens.InputTokens);
+        Assert.Contains(report.Diagnostics, x => x.Code == "root_terminal_usage_correlation_unavailable");
+        Assert.Null(report.Metrics.RootReportedTokens.InputTokens);
+        Assert.Null(Assert.Single(report.Agents).Tokens.InputTokens);
     }
 
     [Fact]
