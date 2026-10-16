@@ -58,6 +58,7 @@ public sealed partial class FactoryReportTests
     [Theory]
     [InlineData("structured")]
     [InlineData("text")]
+    [InlineData("same-line")]
     [InlineData("missing")]
     public void NativeIdentity_DistinguishesRejectedSpawnFromMissingChild(string scenario)
     {
@@ -68,6 +69,7 @@ public sealed partial class FactoryReportTests
         {
             "structured" => JsonSerializer.Serialize(new { error = new { code = "model_not_found", message = "Model removed-model unavailable" } }),
             "text" => "Unknown model `removed-model` for spawn_agent.\nAvailable models: model-a",
+            "same-line" => "Unknown model `removed-model` for spawn_agent. Available models: model-a",
             _ => "{}"
         };
         Write(Path.Combine(sessions, "root.jsonl"),
@@ -87,13 +89,54 @@ public sealed partial class FactoryReportTests
         Assert.Equal("medium", spawn.RequestedReasoningEffort);
         Assert.Null(spawn.ActualModel);
         Assert.Null(spawn.ActualReasoningEffort);
-        Assert.Equal(scenario == "text" ? output : scenario == "structured" ? "Model removed-model unavailable" : null,
+        Assert.Equal(scenario is "text" or "same-line" ? output : scenario == "structured" ? "Model removed-model unavailable" : null,
             spawn.RejectionMessage);
         var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, home));
         Assert.Empty(report.Tasks);
         Assert.DoesNotContain(report.Agents, a => a.Role == "worker");
         Assert.Contains(report.Diagnostics, d => d.Code ==
             (rejected ? "native_spawn_rejected" : "spawn_child_unresolved"));
+    }
+
+    [Theory]
+    [InlineData("canonical", "standard")]
+    [InlineData("inline", "strong")]
+    [InlineData("mixed", "economy")]
+    [InlineData("duplicate", null)]
+    public void NativeIdentity_RecoversOnlyExplicitPlannerTaskProfiles(string format, string? expected)
+    {
+        var (repo, home, sessions) = NativeIdentityWorkspace("planner-formats-" + format);
+        var plannerOutput = format switch
+        {
+            "canonical" => "# Task\nImplement ProductCode.\n# ExecutionProfile\nstandard",
+            "inline" => "## Task 1: Implement ProductCode.\nImplement ProductCode.\nExecutionProfile: strong  \nTaskRelatedIntent: IDD-0001",
+            "mixed" => "## Task 3: Verify ProductCode.\nVerify ProductCode.\n# ExecutionProfile\neconomy\nIntent: IDD-0001",
+            _ => "## Task 1: Implement ProductCode.\nExecutionProfile: standard\nExecutionProfile: strong"
+        };
+        Write(Path.Combine(sessions, "root.jsonl"),
+        [
+            Session(TestRootId, repo),
+            User("2026-10-16T10:00:00Z", "Use idd-factory-run."),
+            NamedSpawn("2026-10-16T10:00:01Z", "p1", "idd_factory_planner_01"),
+            NamedOutput("2026-10-16T10:00:02Z", "p1", "/root/idd_factory_planner_01"),
+            NamedSpawn("2026-10-16T10:00:03Z", "w1", "idd_factory_worker_01", "model-a", "medium"),
+            NamedOutput("2026-10-16T10:00:04Z", "w1", "/root/idd_factory_worker_01")
+        ]);
+        Write(Path.Combine(sessions, "planner.jsonl"),
+        [
+            Session(TestPlannerId, repo, TestRootId, "/root/idd_factory_planner_01"),
+            Assistant("2026-10-16T10:00:02Z", plannerOutput)
+        ]);
+        Write(Path.Combine(sessions, "worker.jsonl"),
+        [
+            Session(TestWorkerId, repo, TestRootId, "/root/idd_factory_worker_01"),
+            Assistant("2026-10-16T10:00:30Z", "Done.")
+        ]);
+        var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, home));
+        var task = Assert.Single(report.Tasks);
+        Assert.Equal(expected, task.ExecutionProfile);
+        Assert.Contains("ProductCode", task.Text);
+        Assert.Equal("model-a", task.RequestedModel);
     }
 
     [Theory]

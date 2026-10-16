@@ -253,6 +253,29 @@ public sealed partial class FactoryReportTests
     }
 
     [Theory]
+    [InlineData("simple", "passed")]
+    [InlineData("compound", "unavailable")]
+    [InlineData("script", "unavailable")]
+    public void Report_ConfiguredRecoveryGateAcceptsOnlyLiteralPowerShellRun(string scenario, string expected)
+    {
+        const string gate = "dotnet run --project tools/RecoveryGate/RecoveryGate.csproj --no-restore -- .idd/factory/current/verification-failure.md";
+        const string policy = "version: 1\nchecks:\n  gate:\n    run: " + gate + "\ndefault: {use: [gate]}";
+        var command = scenario switch
+        {
+            "simple" => gate,
+            "compound" => gate + "; exit 0",
+            _ => "Write-Output '" + gate + "'"
+        };
+        var wrapped = JsonSerializer.Serialize(new
+        {
+            command = new[] { @"C:\WindowsApps\pwsh.exe", "-Command", command }
+        });
+        var report = ReportWithPolicyAndCommands(policy, true,
+            VerificationCommand("2026-09-23T10:03:00Z", "gate", wrapped, 0, "Recovery gate passed."));
+        Assert.Equal(expected, report.Completion.ProjectVerification);
+    }
+
+    [Theory]
     [InlineData("[\"dotnet\", null]")]
     [InlineData("[\"dotnet\", 42]")]
     [InlineData("[null, \"test\"]")]

@@ -634,7 +634,7 @@ public sealed class CodexRolloutReader
         }
         catch (JsonException)
         {
-            if (Regex.IsMatch(output, @"\A\s*Unknown model (?<quote>[`'""])[^`'""\r\n]+\k<quote> for spawn_agent\.(?:\r?\n[\s\S]*)?\z"))
+            if (Regex.IsMatch(output, @"\A\s*Unknown model (?<quote>[`'""])[^`'""\r\n]+\k<quote> for spawn_agent\.(?:[ \t]+[^\r\n]*)?(?:\r?\n[\s\S]*)?\z"))
             {
                 code = "model_not_found";
                 message = output;
@@ -2209,7 +2209,7 @@ public sealed class FactoryReportEngine
                 return ("Question", e.Timestamp);
             if (Regex.IsMatch(e.Text!, @"(?m)^#\s*Done\s*$", RegexOptions.IgnoreCase))
                 return ("Done", e.Timestamp);
-            if (Regex.IsMatch(e.Text!, @"(?m)^#\s*Task\s*$", RegexOptions.IgnoreCase))
+            if (Regex.IsMatch(e.Text!, @"(?m)^(?:#\s*Task\s*$|##\s*Task\s+\d+:)", RegexOptions.IgnoreCase))
                 return ("Tasks", e.Timestamp);
         }
         return ("Unknown", null);
@@ -2282,15 +2282,17 @@ public sealed class FactoryReportEngine
 
     private static string? ExtractPlannerExecutionProfile(string text)
     {
-        var matches = Regex.Matches(text,
+        var headings = Regex.Matches(text,
             @"(?ims)^\s*#\s*ExecutionProfile\s*$\s*(?<value>.*?)(?=^\s*#|\z)");
-        // Readable legacy tasks omitted the section and used standard. An
-        // explicitly malformed section must never be treated as absence.
-        if (matches.Count == 0)
+        var inline = Regex.Matches(text,
+            @"(?im)^ExecutionProfile:\s*(?<value>[^\r\n]*)$");
+        // Legacy output with no section is standard. Any explicit malformed
+        // or repeated profile remains unknown instead of being inferred.
+        if (headings.Count + inline.Count == 0)
             return "standard";
-        if (matches.Count != 1)
+        if (headings.Count + inline.Count != 1)
             return null;
-        var value = matches[0].Groups["value"].Value.Trim();
+        var value = (headings.Count == 1 ? headings[0] : inline[0]).Groups["value"].Value.Trim();
         return value is "economy" or "standard" or "strong" ? value : null;
     }
 
@@ -2327,20 +2329,25 @@ public sealed class FactoryReportEngine
         var text = rollout.Events
             .Where(x => string.Equals(x.Role, "assistant", StringComparison.OrdinalIgnoreCase) &&
                         !string.IsNullOrWhiteSpace(x.Text) &&
-                        Regex.IsMatch(x.Text!, @"(?m)^\s*#\s*Task\s*$", RegexOptions.IgnoreCase))
+                        Regex.IsMatch(x.Text!, @"(?m)^(?:\s*#\s*Task\s*$|##\s*Task\s+\d+:)", RegexOptions.IgnoreCase))
             .Select(x => x.Text!)
             .LastOrDefault();
         if (text is null)
             return [];
 
-        return Regex.Matches(text,
-                @"(?ms)^\s*#\s*Task\s*$\s*(?<section>.*?)(?=^\s*#\s*Task\s*$|\z)",
+        // Accept the two bounded, explicit planner layouts observed in native
+        // traces, without guessing profiles from models or root commentary.
+        var canonical = Regex.IsMatch(text, @"(?m)^#\s*Task\s*$", RegexOptions.IgnoreCase);
+        var sections = canonical
+            ? Regex.Matches(text, @"(?ms)^#\s*Task\s*$\s*(?<section>.*?)(?=^#\s*Task\s*$|\z)",
                 RegexOptions.IgnoreCase)
-            .Select(match =>
+            : Regex.Matches(text, @"(?ms)^##\s*Task\s+\d+:\s*(?<section>.*?)(?=^##\s*Task\s+\d+:|\z)",
+                RegexOptions.IgnoreCase);
+        return sections.Select(match =>
             {
                 var section = match.Groups["section"].Value;
                 var task = Regex.Split(section,
-                        @"(?m)^\s*#\s*(?:ExecutionProfile|TaskRelatedIntent|TaskRelatedEngineering)\s*$",
+                        @"(?m)^(?:\s*#\s*(?:ExecutionProfile|TaskRelatedIntent|TaskRelatedEngineering)\s*$|(?:ExecutionProfile|TaskRelatedIntent):)",
                         RegexOptions.IgnoreCase)[0];
                 return new PlannedTask(Bound(task.Trim(), 1000), ExtractPlannerExecutionProfile(section));
             })
