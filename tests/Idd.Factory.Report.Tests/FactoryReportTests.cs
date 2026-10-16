@@ -1095,8 +1095,8 @@ public sealed partial class FactoryReportTests : IDisposable
     [Theory]
     [InlineData(null, "unknown")]
     [InlineData("path/to/generic-worker.md", "unknown")]
-    [InlineData("factory-worker", "worker")]
-    [InlineData("factory-planner", "planner")]
+    [InlineData("factory-worker", "unknown")]
+    [InlineData("factory-planner", "unknown")]
     public void ConflictingRoleMarkers_OnlyTrustedNativeHintsResolveRole(string? roleHint, string expectedRole)
     {
         var repo = Path.Combine(_root, "repo-conflict-" + (roleHint ?? "none").Replace('/', '_'));
@@ -1129,7 +1129,8 @@ public sealed partial class FactoryReportTests : IDisposable
 
         var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
         Assert.Equal(expectedRole, Assert.Single(report.Agents.Where(x => x.Role != "root")).Role);
-        Assert.Equal(expectedRole == "worker" ? 1 : 0, report.Metrics.WorkerInvocations);
+        Assert.Equal(0, report.Metrics.WorkerInvocations);
+        Assert.Contains(report.Diagnostics, diagnostic => diagnostic.Code == "agent_role_conflict");
     }
 
     private static object SpawnCall(string timestamp, string callId, string task, string? model = null, string? reasoningEffort = null) => new
