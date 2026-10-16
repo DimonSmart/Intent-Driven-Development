@@ -82,7 +82,27 @@ Override individual mappings with
 variables. The configuration is rejected before live execution unless all
 three resolved models are distinct, even if reasoning settings differ.
 Host rejection of an unsupported setting
-fails the evaluation without choosing a fallback.
+fails the evaluation without choosing a fallback. Before a Live run, confirm
+on the **same Codex host and authorization** that root uses MultiAgentV2 and
+that all three worker models can actually spawn with the requested per-child
+model/effort overrides and `fork_turns: "none"`. Version numbers and a model
+list alone do not establish compatibility. The checked-in `strong` preset is
+not changed merely because it was unavailable on one host. After independently
+confirming a compatible distinct model, override it locally, for example:
+
+```powershell
+$env:IDD_FACTORY_EVAL_STRONG_MODEL = "<confirmed-available-model>"
+pwsh ./scripts/Check.ps1 -Mode Live
+```
+
+When the host hides or rejects required overrides, report a host/environment
+blocker, not a passed LiveTest. The positive test checks declared `BLOCKED`
+first and reports the model/reason and preserved artifact paths rather than
+misreporting missing worker counts. `COMPLETED` is not sufficient: the test
+requires three distinct completed worker threads in planner order
+`standard → strong → economy`, plus trusted accepted spawns, isolated
+planner/worker histories, actual child settings and independent project TRX.
+
 
 The fixture specifies planner profiles `standard`, `strong`, then `economy`
 to isolate routing from classification variability. Assertions compare each
