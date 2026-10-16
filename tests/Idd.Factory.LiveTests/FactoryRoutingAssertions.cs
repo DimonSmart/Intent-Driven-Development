@@ -21,8 +21,8 @@ internal static class FactoryRoutingAssertions
         Assert.Contains("# Task", pendingPlan, StringComparison.Ordinal);
         Assert.Matches(@"(?s)#\s*ExecutionProfile\s*\r?\n\s*standard\b", pendingPlan);
         Assert.NotEqual("passed", report.Completion.ProjectVerification);
-        Assert.NotEmpty(report.Agents.Where(agent => agent.Role == "planner" &&
-            agent.PlannerOutcome == "Tasks"));
+        Assert.Contains(report.Agents, agent => agent.Role == "planner" &&
+            agent.PlannerOutcome == "Tasks");
 
         var spawns = InRun(root, report).ToArray();
         var workerSpawns = spawns.Where(IsFactoryWorkerSpawn).ToArray();
@@ -49,6 +49,10 @@ internal static class FactoryRoutingAssertions
         Assert.Empty(report.Tasks);
         Assert.DoesNotContain(report.Agents, agent => agent.Role == "worker");
         Assert.DoesNotContain(spawns, spawn => spawn.CorrelationConflict);
+        foreach (var spawn in spawns.Where(spawn =>
+            !IsFactoryWorkerSpawn(spawn) && !IsFactorySpawnForRole(spawn, "planner")))
+            Assert.True(IsProvenUnrelated(spawn.Task),
+                $"insufficient native evidence: spawn {spawn.CallId} may be a substitute worker.");
 
         // Unrelated nested agents are allowed, but a root child of uncertain
         // provenance cannot be silently excluded as a substitute worker.
@@ -131,6 +135,10 @@ internal static class FactoryRoutingAssertions
             Assert.Equal(expected.Model, spawn.RequestedModel);
             Assert.Equal(expected.ReasoningEffort, spawn.RequestedReasoningEffort);
         }
+
+        foreach (var spawn in spawns.Where(spawn => !used.Contains(spawn.CallId)))
+            Assert.True(IsProvenUnrelated(spawn.Task),
+                $"insufficient native evidence: unaccounted spawn {spawn.CallId} in the Factory invocation.");
 
         Assert.DoesNotContain(spawns, spawn => spawn.CorrelationConflict ||
             IsFactoryWorkerSpawn(spawn) && spawn.SpawnOutcome != "accepted");
