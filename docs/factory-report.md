@@ -56,9 +56,17 @@ rejected. Rejected attempts do not fabricate AgentReport or TaskReport entries;
 
 A root Codex thread may contain ordinary work before and after Factory. Root Factory tokens therefore represent the Factory segment, not the whole root thread.
 
-For current native Codex, `thread_token_usage` is treated as an authoritative cumulative counter for its thread. Root Factory usage is `terminal - pre-run baseline` when both boundaries are trustworthy. A terminal token record written after the terminal assistant response is included only when structural correlation (`turn_id`, `root_turn_id`, or `response_id`) ties it to that turn; it never moves `Run.FinishedAt`.
+For current native Codex, `thread_token_usage` is the preferred, authoritative **cumulative counter for its own thread**; `turn_token_usage` on the same record is a different representation and is never added to it. Repeated cumulative snapshots replace earlier snapshots, rather than being summed.
 
-Factory-owned child threads use their final authoritative `thread_token_usage`. Aggregate Total is emitted only when every distinct thread is authoritative and counted exactly once. Legacy formats whose overlap semantics are not proven remain unavailable / `overlap-unknown`.
+The root agent's **Factory Run usage** is `EndCumulativeUsage - StartCumulativeUsage`. The baseline is the last reliable per-thread cumulative snapshot before Factory starts. It may be zero **only if the rollout starts with a session metadata record and a complete, recognized initialization prelude** without prior model work. Known session-start events include developer/system instructions, the host's structured environment context, `task_started`, `world_state`, `turn_context`, and `thread_settings_applied`. These events alone are not evidence that the model already ran. A prior user turn or model activity without a trustworthy cumulative snapshot, an unknown prelude event, or a truncated beginning does **not** justify a zero baseline: the root segment remains unavailable. If Factory is invoked again in the same thread, its baseline is the latest cumulative snapshot before **that** invocation, so earlier Factory Runs and intermediate work are excluded.
+
+The root agent's **Root reported usage** is a separate metric: the cumulative Codex counter at the run's established terminal boundary. This can equal the root Factory Run usage in a fresh session, but it will usually be larger in a reused root thread. Console and Markdown show both; JSON preserves `metrics.rootReportedTokens` for cumulative usage, while the root entry in `agents[].tokens` records the Factory segment.
+
+A `token_usage_record` written **after** the terminal assistant message is included in both calculations only when native identifiers correlate it to the terminal response, and its `thread_id` matches the owning root thread. The parser recognizes `payload.internal_chat_message_metadata_passthrough.turn_id` on response messages and `payload.turn_id` on usage records. Conflicting turn IDs fail correlation with a `conflicting_turn_ids` diagnostic. A matching `root_turn_id` alone cannot override two different `turn_id` values; timestamps and arbitrary UUIDs in message text cannot establish identity. Post-terminal counters never extend `Run.FinishedAt` or the Factory duration.
+
+Factory-owned child threads use their own final authoritative `thread_token_usage`. Aggregate `Total` is available only when the root Factory segment and **every** distinct planner/worker thread have complete, independent, non-overlapping, trustworthy per-thread counters. Each thread is counted once; missing or inconsistent counters and ambiguous identity yield `unavailable` or `overlap-unknown`, not made-up zeros. Legacy `turn_token_usage` and other supported trace shapes continue to be parsed, but without established independent cumulative thread accounting they cannot justify an exact aggregate.
+
+**What InputTokens means:** these are the actual input tokens **reported by Codex**, potentially including system/developer instructions, registered tools, skills, plugins, and other context supplied by the host. This is not the incremental cost attributable solely to Factory. `CachedInputTokens` are already **part of** `InputTokens`; they must not be added again. `NewInputTokens = InputTokens - CachedInputTokens`, and output tokens are reported separately.
 
 ## Agent topology and tasks
 
@@ -166,7 +174,7 @@ trace evidence; they do not execute checks or create Factory lifecycle state.
 
 ## JSON schema
 
-Schema version is `3`. `toolBatches`, actual worker settings, and other
+Schema version remains `3` (no metric fields were added or renamed). `toolBatches`, actual worker settings, and other
 unavailable metrics use nullable representation so a real zero is distinct from
 unavailable evidence.
 
@@ -187,4 +195,4 @@ Unknown unrelated Codex events are tolerated. Missing Factory-relevant evidence 
 
 ## Regression fixture
 
-The test suite contains a sanitized current-native JSONL fixture preserving `event_msg/item_completed`, `CollabAgentToolCall`, `CommandExecution`, `FileChange`, and `token_usage_record` structures. Synthetic helpers remain appropriate for isolated legacy/parser unit tests.
+The test suite includes sanitized native root JSONL fixtures from the three October 16 Live Eval token-counter shapes, with the final usage record following the structured Factory reply, plus a sanitized current-native JSONL fixture preserving `event_msg/item_completed`, `CollabAgentToolCall`, `CommandExecution`, `FileChange`, and `token_usage_record` structures. Synthetic helpers remain appropriate for isolated legacy/parser unit tests.
