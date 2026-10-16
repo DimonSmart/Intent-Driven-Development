@@ -2111,13 +2111,13 @@ public sealed class FactoryReportEngine
                 Severity = "info", Category = "reporter",
                 Code = unavailableReason,
                 Message = $"Could not establish root Factory Run token usage for {root.ThreadId}: " +
-                    unavailableReason switch
+                    (unavailableReason switch
                     {
                         "root_start_baseline_unavailable" => "no reliable cumulative baseline before Factory.",
                         "root_terminal_usage_unavailable" => "no reliable cumulative counter at the Factory terminal boundary.",
                         "root_terminal_usage_correlation_unavailable" => "a later usage record cannot be proven to belong to the terminal turn.",
                         _ => "the native counters are incomplete or inconsistent."
-                    }
+                    })
             });
         return new AgentReport
         {
@@ -2410,7 +2410,8 @@ public sealed class FactoryReportEngine
 
 
     private static bool HasCompleteTokens(TokenMetrics? usage) =>
-        usage?.InputTokens is >= 0 &&
+        usage is not null &&
+        usage.InputTokens is >= 0 &&
         usage.CachedInputTokens is >= 0 &&
         usage.OutputTokens is >= 0 &&
         usage.CachedInputTokens <= usage.InputTokens &&
