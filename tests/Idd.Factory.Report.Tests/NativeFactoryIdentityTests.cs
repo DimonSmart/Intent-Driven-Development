@@ -179,6 +179,41 @@ public sealed partial class FactoryReportTests
         Assert.Equal("unknown", Assert.Single(report.Agents, a => a.ThreadId == TestWorkerId).Role);
     }
 
+    [Fact]
+    public void NativeIdentity_ExtraRejectedWorkerPreventsGuessingPlannerTaskOrder()
+    {
+        var (repo, home, sessions) = NativeIdentityWorkspace("ambiguous-profile");
+        Write(Path.Combine(sessions, "root.jsonl"),
+        [
+            Session(TestRootId, repo),
+            User("2026-10-16T10:00:00Z", "idd-factory-run"),
+            NamedSpawn("2026-10-16T10:00:01Z", "p1", "idd_factory_planner_01"),
+            NamedOutput("2026-10-16T10:00:02Z", "p1", "/root/idd_factory_planner_01"),
+            NamedSpawn("2026-10-16T10:00:03Z", "rejected", "idd_factory_worker_01", "removed-model", "medium"),
+            NamedOutput("2026-10-16T10:00:04Z", "rejected", null,
+                JsonSerializer.Serialize(new { error = new { code = "model_not_found", message = "Model rejected" } })),
+            NamedSpawn("2026-10-16T10:00:05Z", "w2", "idd_factory_worker_02", "model-b", "medium"),
+            NamedOutput("2026-10-16T10:00:06Z", "w2", "/root/idd_factory_worker_02"),
+            Assistant("2026-10-16T10:01:00Z", "Factory completed.")
+        ]);
+        Write(Path.Combine(sessions, "planner.jsonl"),
+        [
+            Session(TestPlannerId, repo, TestRootId, "/root/idd_factory_planner_01"),
+            Assistant("2026-10-16T10:00:02Z",
+                "# Task\nProductCode task\n# ExecutionProfile\nstandard\n# Task\nCatalog task\n# ExecutionProfile\nstrong")
+        ]);
+        Write(Path.Combine(sessions, "worker.jsonl"),
+        [
+            Session(TestWorkerId, repo, TestRootId, "/root/idd_factory_worker_02"),
+            Assistant("2026-10-16T10:00:30Z", "Completed.")
+        ]);
+
+        var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, home));
+        var task = Assert.Single(report.Tasks);
+        Assert.Null(task.ExecutionProfile);
+        Assert.Contains(report.Diagnostics, diagnostic => diagnostic.Code == "worker_task_correlation_unavailable");
+    }
+
     private (string Repo, string Home, string Sessions) NativeIdentityWorkspace(string name)
     {
         var repo = Path.Combine(_root, name, "repo");
