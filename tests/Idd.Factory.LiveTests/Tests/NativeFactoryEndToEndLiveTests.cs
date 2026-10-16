@@ -205,6 +205,7 @@ public sealed class NativeFactoryEndToEndLiveTests
                 $"Evidence: {artifactRoot}/factory-report.json, factory-report.md, codex-trace.jsonl, " +
                 $"last-message.json, exception.txt, summary.json.");
             AssertMultiAgentV2(rootRollout);
+            CorrelateNativeSpawnsForAssertions(rootRollout, codexHome);
             RunResult? verification = null;
             if (!unavailableWorkerModel)
             {
@@ -287,6 +288,66 @@ public sealed class NativeFactoryEndToEndLiveTests
             {
                 try { Directory.Delete(tempRoot, recursive: true); } catch { }
             }
+        }
+    }
+
+    private static void CorrelateNativeSpawnsForAssertions(CodexRollout root, string codexHome)
+    {
+        // FindRuns performs parent-aware correlation internally, but this separately
+        // read root rollout is used to check the original native call arguments.
+        // Reconcile it independently against the same host session metadata.
+        var reader = new CodexRolloutReader();
+        var sessions = Path.Combine(codexHome, "sessions");
+        var children = Directory.EnumerateFiles(sessions, "*.jsonl", SearchOption.AllDirectories)
+            .Select(path => reader.Read(path))
+            .Where(child => child.ThreadId != root.ThreadId &&
+                !string.IsNullOrWhiteSpace(child.ThreadId))
+            .ToArray();
+
+        foreach (var duplicate in root.SpawnRecords.Values.Where(spawn =>
+                     !string.IsNullOrWhiteSpace(spawn.RequestedTaskName))
+                     .GroupBy(spawn => (spawn.SenderThreadId ?? root.ThreadId, spawn.RequestedTaskName))
+                     .Where(group => group.Count() > 1))
+            foreach (var spawn in duplicate)
+                spawn.CorrelationConflict = true;
+
+        foreach (var spawn in root.SpawnRecords.Values)
+        {
+            if (spawn.SpawnOutcome == "rejected" || spawn.CorrelationConflict)
+                continue;
+
+            var parent = spawn.SenderThreadId ?? root.ThreadId;
+            var candidates = children.Where(child =>
+                child.ParentThreadId == parent &&
+                (spawn.Children.Contains(child.ThreadId, StringComparer.Ordinal) ||
+                 spawn.ChildAgentPath?.StartsWith('/') == true &&
+                 child.AgentPath == spawn.ChildAgentPath ||
+                 spawn.ChildAgentPath?.StartsWith('/') != true &&
+                 !string.IsNullOrWhiteSpace(spawn.RequestedTaskName) &&
+                 child.AgentPath?.Split('/').Last() == spawn.RequestedTaskName)).ToArray();
+            if (candidates.Length > 1)
+            {
+                spawn.CorrelationConflict = true;
+                continue;
+            }
+
+            if (candidates.Length != 1)
+                continue;
+
+            var child = candidates[0];
+            if (spawn.RequestedTaskName is not null && child.AgentPath is not null &&
+                child.AgentPath.Split('/').Last() != spawn.RequestedTaskName ||
+                spawn.ChildAgentPath?.StartsWith('/') == true && child.AgentPath is not null &&
+                child.AgentPath != spawn.ChildAgentPath)
+            {
+                spawn.CorrelationConflict = true;
+                continue;
+            }
+
+            if (!spawn.ChildThreadIds.Contains(child.ThreadId, StringComparer.Ordinal))
+                spawn.ChildThreadIds.Add(child.ThreadId);
+            spawn.ChildThreadId ??= child.ThreadId;
+            spawn.SpawnOutcome = "accepted";
         }
     }
 
