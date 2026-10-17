@@ -291,7 +291,7 @@ the rule that active Factory state is created only afterward.
 
 When a `product-change` request includes visual references but the user has
 not confirmed which visual properties should be preserved, keep the same
-`product-change` classification and recommend `idd-visual-intent-brainstorm`.
+`product-change` classification and recommend `idd-intent-visual-brainstorm`.
 Do not invent `visual-intent` as a top-level classification.
 Do not use this gate for bug-report screenshots, already-confirmed design
 requirements, or explicit faithful-reproduction tasks that need no discovery.
@@ -308,7 +308,7 @@ model-policy route above is selected before the table:
 | `verification-configuration` | `idd-verification-configure` |
 | `intent-bootstrap` | `idd-intent-bootstrap` |
 | `intent-import` | `idd-intent-import` |
-| `product-change` | `idd-visual-intent-brainstorm` for unclear visual reference preferences; otherwise `idd-intent-change` |
+| `product-change` | `idd-intent-visual-brainstorm` for unclear visual reference preferences; otherwise `idd-intent-change` |
 | `engineering-change` | `idd-engineering-change` |
 | `implementation-change` | `idd-code-implement` or Factory |
 | `intent-normalization` | `idd-intent-normalize-current` |
