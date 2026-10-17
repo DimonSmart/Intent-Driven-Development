@@ -61,6 +61,9 @@ Discovery is read-only. After the user confirms which visual qualities are
 Essential, Preferred, Free or Avoid, `idd-intent-change` can add the durable
 meaning to the current owning specification.
 
+Branch development and local validation are documented in
+[Testing plugins locally](docs/local-plugin-development.md).
+
 ## Quick Start
 
 Install the core `idd-intent` plugin. For complex, multi-step implementation tasks, you can also install the optional `idd-factory` plugin.
