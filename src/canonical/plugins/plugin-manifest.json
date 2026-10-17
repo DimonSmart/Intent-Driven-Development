@@ -159,7 +159,14 @@
       ],
       "metadata": {
         "entryPoint": true
-      }
+      },
+      "skillAssets": [
+        {
+          "skill": "idd-intent-visual-brainstorm",
+          "source": "src/canonical/visual-intent-library",
+          "destination": "visual-intent"
+        }
+      ]
     },
     "idd-factory": {
       "description": "Temporary implementation organization for Intent-Driven Development.",
