@@ -93,29 +93,30 @@ may require client restart to refresh installed plugin files. The
 `codex plugin marketplace upgrade` command primarily refreshes Git sources;
 do not assume it refreshes a copied local plugin automatically.
 
-## 5. Project-supplied comparison-card library
+## 5. Bundled comparison-card library
 
-An example location is outside the plugin repository:
+Copy your approved local library into canonical source so the plugin ships it:
 
-```text
-E:\Private\VisualIntent\
-  VISUAL_INTENT_CATALOG.md
-  Images\
-    V01-...png
-    V02-...png
-    ...
+```powershell
+$source = 'E:\Private\VisualIntent'
+$dest = '.\src\canonical\visual-intent-library'
+Copy-Item "$source\VISUAL_INTENT_CATALOG.md" $dest -Force
+Copy-Item "$source\Images" $dest -Recurse -Force
+
+# Regenerate and verify packaged assets
+dotnet run --project tools/generate/Generate.csproj -- --version 0.0.0
 ```
 
-The catalog's actual image mapping or whole ID tokens in filenames are used
-to find cards. No particular image filename extension, grid layout, or
-number of examples is required. The skill does not package these personal
-assets, does not assume an E: drive, and needs filesystem permissions to
-read the files. To test, explicitly provide the library root in the prompt.
+The generator packages all canonical library files in both platform plugins
+at `skills/idd-intent-visual-brainstorm/assets/visual-intent/`. Keep the real
+catalog's ID/filename mapping, and commit only images you are allowed to
+redistribute. An optional external library can override packaged cards,
+but the installed plugin no longer depends on your `E:` drive.
 
 Example conversation:
 
-> Use Visual Intent discovery. My card library is in
-> `E:\Private\VisualIntent\`. I attached a UI screenshot.
+> Use Visual Intent discovery with your bundled comparison cards.
+> I attached a UI screenshot.
 > Help me understand which parts of its visual style I want to preserve.
 > Use visual comparison cards when useful, but do not update intent yet.
 
