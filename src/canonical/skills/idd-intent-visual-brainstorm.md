@@ -10,7 +10,7 @@ properties should become durable Product Intent.
 
 Read `references/visual-intent-method.md` for the interview method. When visual
 comparisons would help, read `references/visual-card-library.md` for locating
-the user's catalog and existing card images. If a required reference is absent,
+the bundled catalog/card images or an explicitly supplied override. If a required reference is absent,
 report incomplete plugin packaging; do not invent its instructions.
 
 ## Ownership and boundaries
@@ -48,7 +48,7 @@ do not average references or inherit unrelated content accidentally.
    rather than exhaustively describing every pixel.
 5. Ask 3–5 contrastive questions per round, in plain language. Explain the
    professional term using the user's own screenshot.
-6. Where helpful, use actual comparison images from the user-provided
+6. Where helpful, use actual comparison images from the bundled or project-provided
    Visual Intent Reference Library to clarify alternatives. A card is an
    educational aid, not a mandatory questionnaire or design system.
 7. Accept a mixed response, 'none', 'not important', 'depends on component',
