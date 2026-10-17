@@ -36,6 +36,16 @@ public sealed class VisualIntentSkillContractTests(GenerationFixture fixture)
             fixture.AssertFile(Path.Combine(skill, "SKILL.md"));
             fixture.AssertFile(Path.Combine(skill, "references", "visual-intent-method.md"));
             fixture.AssertFile(Path.Combine(skill, "references", "visual-card-library.md"));
+            var sourceAssets = Path.Combine(root, "visual-intent-library");
+            var generatedAssets = Path.Combine(skill, "assets", "visual-intent");
+            fixture.AssertFile(Path.Combine(generatedAssets, "README.md"));
+            foreach (var sourceFile in Directory.GetFiles(sourceAssets, "*", SearchOption.AllDirectories))
+            {
+                var relative = Path.GetRelativePath(sourceAssets, sourceFile);
+                var generatedFile = Path.Combine(generatedAssets, relative);
+                fixture.AssertFile(generatedFile);
+                Assert.Equal(File.ReadAllBytes(sourceFile), File.ReadAllBytes(generatedFile));
+            }
         }
     }
 }
