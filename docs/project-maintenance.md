@@ -112,15 +112,15 @@ the caller must pass the actual request and relevant constraints.
 `mode: check` is behaviorally read-only, not sandbox-isolated: the skill
 must enforce its no-write contract, including via Bash.
 
-The 19 skills contain seven user commands (five in Intent and two in Factory)
-and twelve automatic workflows. Five commands have manual-only invocation and
-fourteen skills allow automatic invocation. `idd-route` is an automatic
+The 20 skills contain seven user commands (five in Intent and two in Factory)
+and thirteen automatic workflows. Five commands have manual-only invocation and
+fifteen skills allow automatic invocation. `idd-route` is an automatic
 workflow with no `interface` metadata; Claude emits `user-invocable: false`
 and `disable-model-invocation: false` for it.
 
 Codex generates `skills/<skill>/agents/openai.yaml` for seven commands:
 five manual-only commands declare `allow_implicit_invocation: false`,
-and the two automatic Factory commands declare `true`. All twelve workflows,
+and the two automatic Factory commands declare `true`. All thirteen workflows,
 including `idd-route`, remain published as `SKILL.md` without
 `agents/openai.yaml`. Codex does not guarantee this hides them from every
 host's user-visible skill list, and local disabling would also remove
@@ -156,6 +156,12 @@ plugins/codex/idd-factory
 ```
 
 Claude marketplace rename metadata maps the legacy `idd-core` and unified `idd` names to `idd-intent`. `idd-factory` keeps its existing public name.
+
+## Local plugin development
+
+See [Test an unpublished IDD plugin branch locally](local-plugin-development.md)
+for Claude Code `--plugin-dir`, a local Codex marketplace, and the separate
+Visual Intent comparison-card library. No PR or publication is needed.
 
 ## Validation
 
