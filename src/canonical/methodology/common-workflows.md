@@ -374,7 +374,7 @@ the workflow still returns the discovery summary as temporary output.
 
 Use `Classification: product-change`, not a new classification, when a visual
 reference indicates desired product appearance but its normative properties
-remain unclear. Select `idd-visual-intent-brainstorm` as a **read-only**
+remain unclear. Select `idd-intent-visual-brainstorm` as a **read-only**
 discovery gate before `idd-intent-change`:
 
 ```text
