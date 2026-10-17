@@ -370,6 +370,27 @@ Bootstrap completes only when:
 If the user cancels before approval, no current numbered intent is created and
 the workflow still returns the discovery summary as temporary output.
 
+## Workflow Family: Visual Intent Clarification
+
+Use `Classification: product-change`, not a new classification, when a visual
+reference indicates desired product appearance but its normative properties
+remain unclear. Select `idd-visual-intent-brainstorm` as a **read-only**
+discovery gate before `idd-intent-change`:
+
+```text
+visual reference + optional project-supplied comparison cards
+-> professional observations and hypotheses
+-> user confirmation of Essential / Preferred / Free / Avoid
+-> idd-intent-change (separate, only after confirmation)
+-> current owning spec + acceptance criteria / verification
+```
+
+Comparison cards explain design concepts; they are not normative requirements.
+Do not infer user preference from screenshot contents. The Visual Intent
+catalog and Images folder are external supporting inputs, not a new intent
+storage root. Screenshot bug reports, and already-explicit fidelity targets,
+do not require this clarification gate.
+
 ## Workflow Family: Intent Import
 
 Use this workflow when existing supplied material already expresses durable
