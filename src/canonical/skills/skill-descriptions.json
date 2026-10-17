@@ -191,5 +191,9 @@
       "displayName": "IDD Factory Run",
       "shortDescription": "Execute an IDD Factory workflow"
     }
+  },
+  "idd-visual-intent-brainstorm": {
+    "description": "Clarify user-confirmed Visual Intent from screenshots or mockups using professional design interpretation and optional locally supplied comparison-card images, without changing specs or code.",
+    "exposure": "workflow"
   }
 }
