@@ -160,8 +160,8 @@ Claude marketplace rename metadata maps the legacy `idd-core` and unified `idd` 
 ## Local plugin development
 
 See [Test an unpublished IDD plugin branch locally](local-plugin-development.md)
-for Claude Code `--plugin-dir`, a local Codex marketplace, and the separate
-Visual Intent comparison-card library. No PR or publication is needed.
+for Claude Code `--plugin-dir`, a local Codex marketplace, and packaging
+Visual Intent comparison cards into the skill. No PR or publication is needed.
 
 ## Validation
 
