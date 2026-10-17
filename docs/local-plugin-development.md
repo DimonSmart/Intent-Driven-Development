@@ -5,6 +5,50 @@ and Codex plugin packages into the Git-ignored `artifacts/marketplace/`
 directory. A Git branch is **not** itself a packaged plugin marketplace.
 These steps work without a PR or a marketplace-branch publication.
 
+## Quick switch: published vs local in Codex (Windows)
+
+From this checkout, run the BAT file interactively:
+
+```bat
+scripts\Switch-Idd-Codex.bat
+```
+
+Or select a source without prompts:
+
+```powershell
+.\scripts\Switch-Idd-Codex.bat published
+.\scripts\Switch-Idd-Codex.bat local
+
+# PowerShell equivalent (including optional Factory installation):
+pwsh ./scripts/Switch-Idd-Codex.ps1 -Source Published
+pwsh ./scripts/Switch-Idd-Codex.ps1 -Source Local
+pwsh ./scripts/Switch-Idd-Codex.ps1 -Source Local -WithFactory
+```
+
+The switcher uses `codex plugin list --json` to find active IDD plugins and
+removes any previously installed copies from its two managed marketplaces
+before installing `idd-intent` from the selected source. If `idd-factory`
+was installed, it also switches Factory to the same source. `-WithFactory`
+installs it when missing. Other unrelated Codex plugins are untouched.
+
+**Published** uses `DimonSmart/Intent-Driven-Development` pinned to
+the `marketplace` branch, refreshing its Git-backed marketplace.
+
+**Local** runs the generator from the current checkout, then copies the
+generated marketplace into `artifacts/marketplace-local-test/` with the
+isolated catalog name `idd-local-test`. The generated canonical output
+remains unchanged. The local install is refreshed by uninstall/reinstall
+rather than relying on Codex cache refresh.
+
+Both modes leave the two marketplace *registrations* intact where possible,
+but only one set of IDD plugins installed. Close open Codex sessions and
+start a new one after switching. The script never publishes to GitHub.
+
+Requires PowerShell 7, Codex CLI, and (only for `local`) .NET 10 SDK.
+Do not run the switcher concurrently with another instance or with
+plugin installation in a running Codex session. If installation fails,
+inspect `codex plugin list --json` and rerun the appropriate mode.
+
 ## 1. Checkout and verify the branch
 
 Use PowerShell from an IDD source clone:
@@ -122,7 +166,8 @@ Example conversation:
 
 ## 6. CI behavior without a PR
 
-`idd-check.yml` currently runs on pushes to `main` and `pull_request`
-events. Pushing only to a feature branch does **not** trigger it.
-Run `pwsh ./scripts/Check.ps1 -Mode Fast -Version 0.0.0` locally for
-branch validation. Do not create a PR merely to test a local skill change.
+`idd-check.yml` runs on pushes to `main` and `pull_request` events.
+This feature branch additionally has a temporary push trigger for CI while
+we develop without a PR. Independently run
+`pwsh ./scripts/Check.ps1 -Mode Fast -Version 0.0.0` locally.
+Do not create a PR merely to test a local skill change.
