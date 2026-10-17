@@ -138,6 +138,22 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
                 ContentNormalizer.NormalizeContent(referenceContent)));
         }
 
+        foreach (var asset in plugin.SkillAssetsOrEmpty
+            .Where(asset => StringComparer.Ordinal.Equals(asset.Skill, skillName)))
+        {
+            var source = asset.Source.Replace('/', Path.DirectorySeparatorChar);
+            var destination = SkillReferencePathValidator.NormalizeDestination(asset.Destination)
+                .Replace('/', Path.DirectorySeparatorChar);
+            foreach (var sourceFile in Directory.GetFiles(source, "*", SearchOption.AllDirectories)
+                .OrderBy(path => path, StringComparer.Ordinal))
+            {
+                var relative = Path.GetRelativePath(source, sourceFile);
+                files.Add(GeneratedFile.Binary(
+                    Path.Combine("skills", skillName, "assets", destination, relative),
+                    sourceFile));
+            }
+        }
+
         var skillBootstrapDestination = skillName switch
         {
             "idd-project-init" => ".idd/intent",
