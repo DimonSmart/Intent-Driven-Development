@@ -46,6 +46,21 @@ Factory is actively developed with a strong focus on token efficiency. Its prima
 
 The direction is maximum economy: native child agents, no model-driven polling, compact temporary state, minimal handoffs, and only as much orchestration as the task actually needs. Install Factory when that additional structure is useful; keep using `idd-intent` alone when a direct workflow is enough.
 
+## Visual Intent discovery
+
+`idd-visual-intent-brainstorm` helps turn screenshots, visual inspiration and
+UI mockups into user-confirmed visual requirements. It explains professional
+design vocabulary in ordinary language and, when available, shows comparison
+cards from a **user-provided** Visual Intent Reference Library.
+
+For example, specify a directory containing `VISUAL_INTENT_CATALOG.md` and
+an adjacent `Images/` folder. The installed plugin does not bundle
+project-specific images or assume a Windows drive location.
+
+Discovery is read-only. After the user confirms which visual qualities are
+Essential, Preferred, Free or Avoid, `idd-intent-change` can add the durable
+meaning to the current owning specification.
+
 ## Quick Start
 
 Install the core `idd-intent` plugin. For complex, multi-step implementation tasks, you can also install the optional `idd-factory` plugin.
