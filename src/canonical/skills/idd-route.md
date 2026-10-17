@@ -308,7 +308,7 @@ model-policy route above is selected before the table:
 | `verification-configuration` | `idd-verification-configure` |
 | `intent-bootstrap` | `idd-intent-bootstrap` |
 | `intent-import` | `idd-intent-import` |
-| `product-change` | `idd-intent-visual-brainstorm` for unclear visual reference preferences; otherwise `idd-intent-change` |
+| `product-change` | `idd-intent-change` |
 | `engineering-change` | `idd-engineering-change` |
 | `implementation-change` | `idd-code-implement` or Factory |
 | `intent-normalization` | `idd-intent-normalize-current` |
