@@ -3,6 +3,28 @@
 The Visual Intent Reference Library teaches design vocabulary to people
 without formal design training. It is optional, not normative.
 
+## Preferred: packaged library
+
+The plugin can ship a canonical library alongside this skill:
+
+```text
+skills/idd-intent-visual-brainstorm/
+  assets/visual-intent/
+    VISUAL_INTENT_CATALOG.md
+    Images/
+      V01-...png
+      ...
+```
+
+First check whether `assets/visual-intent/VISUAL_INTENT_CATALOG.md`
+and its `Images/` folder are present and usable. These are bundled
+educational resources, not normative specifications.
+
+Developers maintain them in `src/canonical/visual-intent-library/` and the
+plugin generator copies them into both Claude and Codex packages.
+
+An explicitly supplied user/project library overrides the bundled library.
+
 ## Typical project-supplied layout
 
 ```text
@@ -18,9 +40,10 @@ Example Windows location (NOT a built-in default):
 ## Locate and inspect
 
 1. Prefer a catalog/image location explicitly supplied by the user.
-2. Otherwise, use an already-configured workspace library, or an unambiguous
+2. Otherwise, prefer the packaged `assets/visual-intent/` library if present.
+3. Otherwise, use an already-configured workspace library, or an unambiguous
    `VISUAL_INTENT_CATALOG.md` with adjacent `Images/` in the current project.
-3. Do not browse unrelated drives, repositories or private folders looking
+4. Do not browse unrelated drives, repositories or private folders looking
    for an assumed library. Do not assume every user's library has 50 assets.
 4. Read the requested catalog entry, its designer term, contrast variants,
    suggested question and comparison focus. Treat variant descriptions as
