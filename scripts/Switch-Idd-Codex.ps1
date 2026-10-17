@@ -52,7 +52,7 @@ function Read-CodexJson {
 }
 
 function Get-InstalledIdd {
-    $data = Read-CodexJson @('plugin', 'list', '--json')
+    $data = Read-CodexJson -Arguments @('plugin', 'list', '--json')
     if ($null -eq $data.installed) {
         throw "Unexpected Codex plugin list JSON: missing 'installed'."
     }
@@ -69,7 +69,7 @@ function Get-InstalledIdd {
 
 function Get-Marketplace {
     param([string] $Name)
-    $list = Read-CodexJson @('plugin', 'marketplace', 'list', '--json')
+    $list = Read-CodexJson -Arguments @('plugin', 'marketplace', 'list', '--json')
     if ($null -eq $list.marketplaces) {
         throw "Unexpected Codex marketplace JSON: missing 'marketplaces'."
     }
@@ -79,7 +79,7 @@ function Get-Marketplace {
 function Prepare-Published {
     $existing = @(Get-Marketplace $publishedMarketplace)
     if ($existing.Count -eq 0) {
-        Invoke-Codex @('plugin', 'marketplace', 'add', $publishedRepository, '--ref', 'marketplace')
+        Invoke-Codex -Arguments @('plugin', 'marketplace', 'add', $publishedRepository, '--ref', 'marketplace')
         return
     }
 
@@ -87,7 +87,7 @@ function Prepare-Published {
     if ($null -ne $market.marketplaceSource -and $market.marketplaceSource.source -eq 'local') {
         throw "Marketplace '$publishedMarketplace' points to a local folder; refusing to silently overwrite it."
     }
-    Invoke-Codex @('plugin', 'marketplace', 'upgrade', $publishedMarketplace)
+    Invoke-Codex -Arguments @('plugin', 'marketplace', 'upgrade', $publishedMarketplace)
 }
 
 function Prepare-Local {
@@ -156,7 +156,7 @@ function Prepare-Local {
     Move-Item -LiteralPath $stage -Destination $target
 
     if ($existing.Count -eq 0) {
-        Invoke-Codex @('plugin', 'marketplace', 'add', $target)
+        Invoke-Codex -Arguments @('plugin', 'marketplace', 'add', $target)
     }
 }
 
@@ -200,13 +200,13 @@ try {
     # source, even if already selected, to refresh the Codex plugin cache.
     foreach ($name in @('idd-factory', 'idd-intent')) {
         foreach ($entry in @($previous | Where-Object { $_.name -eq $name })) {
-            Invoke-Codex @('plugin', 'remove', $entry.pluginId)
+            Invoke-Codex -Arguments @('plugin', 'remove', $entry.pluginId)
         }
     }
 
-    Invoke-Codex @('plugin', 'add', "idd-intent@$destination")
+    Invoke-Codex -Arguments @('plugin', 'add', "idd-intent@$destination")
     if ($needFactory) {
-        Invoke-Codex @('plugin', 'add', "idd-factory@$destination")
+        Invoke-Codex -Arguments @('plugin', 'add', "idd-factory@$destination")
     }
 
     $current = @(Get-InstalledIdd)
@@ -226,7 +226,7 @@ try {
     exit 0
 }
 catch {
-    Write-Error $_.Exception.Message
+    [Console]::Error.WriteLine($_.Exception.Message)
     Write-Host 'Check the active installation with: codex plugin list --json'
     exit 1
 }
