@@ -48,7 +48,7 @@ The direction is maximum economy: native child agents, no model-driven polling, 
 
 ## Visual Intent discovery
 
-`idd-visual-intent-brainstorm` helps turn screenshots, visual inspiration and
+`idd-intent-visual-brainstorm` helps turn screenshots, visual inspiration and
 UI mockups into user-confirmed visual requirements. It explains professional
 design vocabulary in ordinary language and, when available, shows comparison
 cards from a **user-provided** Visual Intent Reference Library.
