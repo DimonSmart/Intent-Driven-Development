@@ -64,6 +64,8 @@ meaning to the current owning specification.
 
 Branch development and local validation are documented in
 [Testing plugins locally](docs/local-plugin-development.md).
+Windows Codex users can switch between published and local IDD using
+`scripts/Switch-Idd-Codex.bat published` or `scripts/Switch-Idd-Codex.bat local`.
 
 ## Quick Start
 
