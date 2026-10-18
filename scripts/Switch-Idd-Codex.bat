@@ -6,7 +6,7 @@ rem The PowerShell script and this BAT must remain in the same folder.
 
 where pwsh >nul 2>nul
 if errorlevel 1 (
-  echo PowerShell 7 (pwsh) was not found. Install PowerShell 7 and retry.
+  echo PowerShell 7 - pwsh - was not found. Install PowerShell 7 and retry.
   exit /b 1
 )
 
