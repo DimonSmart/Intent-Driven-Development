@@ -8,10 +8,11 @@ properties should become durable Product Intent.
 
 ## Required references
 
-Read `references/visual-intent-method.md` for the interview method. When visual
-comparisons would help, read `references/visual-card-library.md` for locating
-the bundled catalog/card images or an explicitly supplied override. If a required reference is absent,
-report incomplete plugin packaging; do not invent its instructions.
+Read `references/visual-intent-method.md` for the interview method and
+`references/visual-card-library.md` for locating and **displaying** actual
+comparison images. This visual-first behavior applies automatically; the user
+should not need to ask for pictures or explicitly name this skill. If a
+required reference is absent, report incomplete packaging.
 
 ## Ownership and boundaries
 
@@ -23,7 +24,10 @@ report incomplete plugin packaging; do not invent its instructions.
   design critique, one selected comparison variant, or model confidence as
   automatically normative.
 - This skill never edits `.idd/intent/`, implementation files, design tokens,
-  or image assets. It does not write requirements or implement UI.
+  or image assets. It does not write requirements or implement UI. A temporary,
+  read-only-image HTML viewer under the OS temp directory is allowed solely
+  to help the user see existing references; never write preview output to
+  tracked project directories.
 - Durable visual constraints belong in the current owning `.idd/intent/` spec,
   not a separate `.idd/visual-intent/` tree.
 - After user confirmation, recommend `idd-intent-change` for persistence;
@@ -46,11 +50,15 @@ do not average references or inherit unrelated content accidentally.
    observable fact, confidence, interpretation/hypothesis, and unknowns.
 4. Select 3–7 high-impact visual hypotheses, using professional lenses
    rather than exhaustively describing every pixel.
-5. Ask 3–5 contrastive questions per round, in plain language. Explain the
-   professional term using the user's own screenshot.
-6. Where helpful, use actual comparison images from the bundled or project-provided
-   Visual Intent Reference Library to clarify alternatives. A card is an
-   educational aid, not a mandatory questionnaire or design system.
+5. Pick a few relevant comparison cards for the highest-value visual
+   hypotheses. **Resolve and show each real image before asking its related
+   question**, following the display/fallback procedure in
+   `references/visual-card-library.md`. Never say you showed a card if you
+   only read its catalog entry, or if the preview did not render/open.
+6. Ask 3–5 contrastive questions per round, in plain language. Pair each
+   question about a visual property with its relevant **visible** image(s).
+   A card is a teaching aid, not a required fixed set of answers. If a
+   genuinely non-visual question needs no image, explain it in text.
 7. Accept a mixed response, 'none', 'not important', 'depends on component',
    or user-specified change to a shown example.
 8. Capture user-confirmed preferences as Essential / Preferred / Free / Avoid
@@ -82,9 +90,14 @@ a confirmed more precise description is available.
 
 ## Output during discovery
 
-Give a concise professional reading of the user reference, distinguish
-observations from hypotheses, mention relevant card IDs only when actually
-used, ask up to five focused questions, and list material unobservable facts.
+Give a concise professional reading of the user reference and distinguish
+observations from hypotheses. For a normal visual interview, accompany
+visual questions with **actual visible comparison cards**, not just IDs or
+variant names. Keep the image and related question adjacent; when inline
+rendering is unavailable, offer/open the generated gallery containing cards
+and questions together. Ask up to five focused questions and list material
+unobservable facts. If card viewing is blocked, state what failed rather
+than quietly falling back to text-only comparisons.
 
 ## Specification-ready output
 
