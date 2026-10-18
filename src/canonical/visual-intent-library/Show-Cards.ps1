@@ -39,7 +39,7 @@ function Encode-Html([string] $Value) {
 
 $blocks = [System.Collections.Generic.List[string]]::new()
 $seen = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-foreach ($inputId in $Cards) {
+foreach ($inputId in @($Cards | ForEach-Object { $_ -split ',' })) {
     $cardId = $inputId.Trim().ToUpperInvariant()
     if ($cardId -notmatch '^V?(\d{1,2})$') {
         throw "Invalid card ID '$inputId'. Examples: V09 or 09."
