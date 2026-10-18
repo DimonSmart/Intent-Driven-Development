@@ -9,9 +9,11 @@ Copy your verified library here:
 src/canonical/visual-intent-library/
   VISUAL_INTENT_CATALOG.md
   Images/
-    V01-<descriptive-name>.png
-    V02-<descriptive-name>.png
+    01.png
+    02.png
     ...
+    50.png
+  Show-Cards.ps1
 ```
 
 Use the existing `E:\Private\VisualIntent\VISUAL_INTENT_CATALOG.md`
@@ -29,3 +31,19 @@ use externally supplied libraries as overrides or fallbacks.
 
 Keep images reasonably sized and ensure that they may be redistributed before
 committing them to this public repository.
+
+## Showing cards during an interview
+
+Visual comparison questions should normally include the actual image.
+Do not assume a Codex terminal or Codex desktop host can render local PNG
+references inline. This folder includes an offline HTML gallery fallback:
+
+```powershell
+pwsh ./Show-Cards.ps1 -Cards V09,V15,V30
+```
+
+By default it opens a browser window with real images and corresponding
+catalog questions, and prints the temporary gallery file path.
+Use `-NoOpen` to generate without launching a browser, for example in CI.
+The gallery is stored in the OS temp folder; the skill never changes app
+source, `.idd/intent/`, or the image library when showing cards.
