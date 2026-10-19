@@ -46,6 +46,13 @@ Factory is actively developed with a strong focus on token efficiency. Its prima
 
 The direction is maximum economy: native child agents, no model-driven polling, compact temporary state, minimal handoffs, and only as much orchestration as the task actually needs. Install Factory when that additional structure is useful; keep using `idd-intent` alone when a direct workflow is enough.
 
+<details>
+<summary><strong>Why is Factory a separate plugin?</strong></summary>
+
+`idd-intent` is complete on its own. Factory adds orchestration for complex, multi-step work, so you only install it when you need it.
+
+</details>
+
 ## Quick Start
 
 Install the core `idd-intent` plugin. For complex, multi-step implementation tasks, you can also install the optional `idd-factory` plugin.
