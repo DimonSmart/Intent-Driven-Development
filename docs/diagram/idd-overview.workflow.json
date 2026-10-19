@@ -104,11 +104,10 @@
     },
     {
       "dot": "violet",
-      "title": "Factory is optional orchestration",
+      "title": "Why is Factory a separate plugin?",
       "items": [
-        "Durable preparation and coverage complete before active orchestration",
-        "Fresh planners and workers use repository reality, not inherited transcripts",
-        "Tasks, plans, and state are temporary; Git preserves revision history"
+        "idd-intent is complete on its own for everyday development",
+        "Factory adds fresh-context orchestration for complex work; install only when needed"
       ]
     },
     {
