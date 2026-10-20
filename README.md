@@ -1,7 +1,7 @@
 # Intent-Driven Development
 
 <p align="center">
-  <img src="docs/assets/idd-hero.png" alt="Intent-Driven Development thought experiment: delete the implementation, keep only the intent, and rebuild the product" />
+  <img src="docs/assets/idd-thought-experiment.png" alt="Intent-Driven Development thought experiment: delete the implementation, keep only the intent, and rebuild the product" />
 </p>
 
 <p align="center">
@@ -46,6 +46,13 @@ Factory is actively developed with a strong focus on token efficiency. Its prima
 
 The direction is maximum economy: native child agents, no model-driven polling, compact temporary state, minimal handoffs, and only as much orchestration as the task actually needs. Install Factory when that additional structure is useful; keep using `idd-intent` alone when a direct workflow is enough.
 
+<details>
+<summary><strong>Why is Factory a separate plugin?</strong></summary>
+
+`idd-intent` is complete on its own. Factory adds orchestration for complex, multi-step work, so you only install it when you need it.
+
+</details>
+
 ## Visual Intent discovery
 
 `idd-intent-visual-brainstorm` helps turn screenshots, visual inspiration and
@@ -59,8 +66,10 @@ The installed plugin uses those bundled cards by default; an explicitly
 provided local library may override them. No Windows drive is assumed.
 
 Discovery is read-only. After the user confirms which visual qualities are
-Essential, Preferred, Free or Avoid, `idd-intent-change` can add the durable
-meaning to the current owning specification.
+Essential, Preferred, Free or Avoid, `idd-intent-change` can persist and later
+modify/remove the scoped durable meaning in its existing owning specification.
+The brainstorm alone does not write Product Intent; confirmed handoffs can be
+saved separately without restarting discovery.
 
 Branch development and local validation are documented in
 [Testing plugins locally](docs/local-plugin-development.md).

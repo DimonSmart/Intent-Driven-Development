@@ -98,7 +98,7 @@ try {
     if ($realRun.Code -ne 0) { throw "Real README generation failed: $($realRun.Message)" }
     $realResult = [IO.File]::ReadAllText($realOutput)
     Assert-Contains $realResult "blob/v1.2.3/docs/using-idd.md"
-    Assert-Contains $realResult "raw.githubusercontent.com/DimonSmart/Intent-Driven-Development/v1.2.3/docs/assets/idd-hero.png"
+    Assert-Contains $realResult "raw.githubusercontent.com/DimonSmart/Intent-Driven-Development/v1.2.3/docs/assets/idd-thought-experiment.png"
 
     $buildIndex = $workflow.IndexOf("name: Build publish root", [StringComparison]::Ordinal)
     $generateIndex = $workflow.IndexOf("name: Generate marketplace README", [StringComparison]::Ordinal)
