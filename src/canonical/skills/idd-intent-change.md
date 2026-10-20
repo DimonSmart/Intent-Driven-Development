@@ -258,6 +258,7 @@ For `operation: remove`:
     internal creation workflow inside this same execution. Recheck ownership;
     if the owner already exists, return to step 9, not a recursive invocation.
     Preserve ordinary IDs, templates, `INDEX.md`, and lint invariants.
+    Use the already confirmed Product Intent, without a child agent or additional confirmation solely for document creation.
 11. Reconcile old requirements, scope exceptions, related specs, applicable
     Acceptance Criteria and Verification. Do not harden `Preferred`/`Free`
     into unconditional acceptance tests; do not leave obsolete checks after
