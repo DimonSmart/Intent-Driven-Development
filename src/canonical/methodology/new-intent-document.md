@@ -26,9 +26,10 @@ only if it fits the current IDD document semantics. If it conflicts with those
 semantics, explain the mismatch and use the appropriate type; block if the
 choice requires a missing durable decision.
 
-- `spec`: durable observable product behavior, domain contracts, acceptance
-  criteria, verification properties, shared behavior, and product-significant
-  constraints.
+- `spec`: durable observable product behavior **or confirmed visual product
+  properties** (including appearance without a functional behavior change),
+  domain contracts, acceptance criteria, verification properties, shared
+  behavior, and product-significant constraints.
 - `adr`: durable architectural decision, its rationale, alternatives, and
   tradeoffs. Preserve the ADR decision lifecycle; accepted ADRs are not
   semantically rewritten. A changed decision gets a new ADR and supersedes the
@@ -36,8 +37,9 @@ choice requires a missing durable decision.
 - `spike`: active research, experiment, or hypothesis check before a product
   or architecture decision. A spike does not silently establish the outcome.
 
-Never create a spec for a local task, dependency update, ordinary refactor, or
-a small change owned by an existing spec. Do not create a replacement spec
+Never create a spec for a local task, dependency update, ordinary refactor,
+local styling within current Product Intent, or a small behavioral **or
+visual** change owned by an existing spec. A visual label is not an owner. Do not create a replacement spec
 merely to preserve old wording.
 
 ## Ownership Check (Mandatory)
@@ -47,7 +49,8 @@ merely to preserve old wording.
 3. Read the relevant current `IDD-NNNN` documents directly under
    `.idd/intent/` (not just their index rows).
 4. Recheck the owning product area and any shared or adjacent owner against the
-   proposed durable change.
+   proposed durable behavioral or visual change; do not select ownership by
+   a document's name or whether it already has a `## Visual Intent` section.
 5. For `new-spec-required`, if a current spec already owns the area, **do
    not create a new spec**. Return control to the current
    `idd-intent-change` execution to update the existing owner. Do not
@@ -93,7 +96,10 @@ conflicting number.
    plans, temporary task notes, progress logs, chat history, or private
    implementation shape.
 3. For a spec, preserve the canonical Behavior, Acceptance Criteria,
-   Verification, related-document and ownership semantics. Verification
+   Verification, related-document and ownership semantics. Add an optional
+   `## Visual Intent` section only when it improves the owning spec; it is
+   not a required template section. Preserve confirmed visual scope,
+   obligation strength, allowed alternatives and exceptions. Verification
    describes important user scenarios, critical invariants, meaningful
    boundary cases, and justified manual checks, not test-method names,
    private classes, or a test per sentence.

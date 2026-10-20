@@ -31,7 +31,8 @@ required reference is absent, report incomplete packaging.
 - Durable visual constraints belong in the current owning `.idd/intent/` spec,
   not a separate `.idd/visual-intent/` tree.
 - After user confirmation, recommend `idd-intent-change` for persistence;
-  do not invoke it automatically.
+  do not invoke it automatically or write without a separate request. Explicitly
+  confirmed meaning and scope can be handed off without another interview.
 
 ## Reference roles
 
@@ -62,14 +63,17 @@ do not average references or inherit unrelated content accidentally.
 7. Accept a mixed response, 'none', 'not important', 'depends on component',
    or user-specified change to a shown example.
 8. Capture user-confirmed preferences as Essential / Preferred / Free / Avoid
-   with scope (global, screen, component, state), and map to their references.
+   with scope (global, screen, component, state, theme), agreed exceptions,
+   obligation strength, permitted alternatives and rejected traits, and map
+   each to the specific aspect of the relevant reference.
 9. Prefer perceptual relations over CSS values. Record exact colors, fonts,
    distances or radii only when exact identity is product-significant.
 10. Identify unknown dynamic properties, conflicts and gaps; do not infer
     responsive behavior, hover, focus, loading, motion, accessibility or
     localization from a single static screenshot.
-11. Produce a specification-ready Visual Intent proposal and ask the user
-    to confirm or correct it. Stop before changing any project files.
+11. Produce a specification-ready Visual Intent proposal with candidate
+    perceptual checks and separate uncertainties; ask the user to confirm its
+    meaning and scope or correct it. Stop before changing any project files.
 
 ## Contrastive interviewing
 
@@ -128,11 +132,18 @@ than quietly falling back to text-only comparisons.
 
 ## Handoff to idd-intent-change
 - Current owning product area / candidate spec:
-- Confirmed visual relationships and scopes:
-- Supporting reference locations:
-- Conflicts and open questions:
+- Confirmed properties, obligation strength, scoped exceptions, permitted alternatives:
+- Rejected traits and their strictness:
+- Supporting durable reference (if available), role and relevant aspect:
+- Candidate observable checks / meaningful verification:
+- Confirmation decision (approved meaning and scope; do not infer from a card):
+- Unconfirmed observations, conflicts and open questions (not normative):
 ```
 
 Normative text should survive loss of a screenshot, asset path, image reader,
 or UI framework. The reference image is supporting evidence except when
-explicitly confirmed as a scoped fidelity target.
+explicitly confirmed as a scoped fidelity target. For exact image-dependent
+fidelity, flag a missing durable resolvable reference as a blocker for the
+unverifiable portion only; do not persist temp gallery paths as lasting links.
+A subsequent explicit request to save an approved handoff belongs to
+`idd-intent-change`, without another brainstorm round.

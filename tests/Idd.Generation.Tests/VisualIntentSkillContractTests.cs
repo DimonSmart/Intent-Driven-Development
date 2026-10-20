@@ -19,6 +19,10 @@ public sealed class VisualIntentSkillContractTests(GenerationFixture fixture)
         Assert.Contains("Essential", body);
         Assert.Contains("Avoid", body);
         Assert.Contains("idd-intent-change", body);
+        Assert.Contains("Scope", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Candidate observable checks", body);
+        Assert.Contains("Unconfirmed observations", body);
+        Assert.Contains("separate request", body);
 
         using var manifest = JsonDocument.Parse(fixture.ReadText(
             Path.Combine(root, "plugins", "plugin-manifest.json")));
@@ -47,5 +51,52 @@ public sealed class VisualIntentSkillContractTests(GenerationFixture fixture)
                 Assert.Equal(File.ReadAllBytes(sourceFile), File.ReadAllBytes(generatedFile));
             }
         }
+
+    }
+
+    [Fact]
+    public void VisualProductChange_PreservesExistingOperationsAndOwnership()
+    {
+        var root = Path.Combine(fixture.RepoRoot, "src", "canonical");
+        var change = fixture.ReadText(Path.Combine(root, "skills", "idd-intent-change.md"));
+        var method = fixture.ReadText(Path.Combine(root, "methodology", "visual-intent-method.md"));
+        var newDocument = fixture.ReadText(Path.Combine(root, "methodology", "new-intent-document.md"));
+        var router = fixture.ReadText(Path.Combine(root, "skills", "idd-route.md"));
+        var workflows = fixture.ReadText(Path.Combine(root, "methodology", "common-workflows.md"));
+        var selfIntent = fixture.ReadText(Path.Combine(fixture.RepoRoot, ".idd", "intent",
+            "IDD-0003.spec-core-intent-and-generation.md"));
+
+        foreach (var operation in new[] { "add", "modify", "remove", "not-applicable" })
+            Assert.Contains(operation, change);
+
+        foreach (var level in new[] { "Essential", "Preferred", "Free", "Avoid" })
+        {
+            Assert.Contains(level, change);
+            Assert.Contains(level, method);
+        }
+
+        Assert.Contains("existing-spec-update", change);
+        Assert.Contains("new-spec-required", change);
+        Assert.Contains("references/new-intent-document.md", change);
+        Assert.Contains("confirmed visual", newDocument, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("optional", newDocument, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("approved handoff", router, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("implementation-change", workflows);
+        Assert.Contains("confirmed visual", selfIntent, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("## Visual Intent", fixture.ReadText(
+            Path.Combine(root, "project-files", "intent", "_templates", "spec.md")));
+    }
+
+    [Theory]
+    [InlineData("a comparison-card choice", "card")]
+    [InlineData("an ephemeral fidelity reference", "temp")]
+    [InlineData("a scope-specific modification", "exceptions")]
+    [InlineData("softening Essential to Preferred", "hard")]
+    public void VisualIntentMaintenance_ExplicitlyGuardsAgainstLossOfMeaning(string scenario, string requiredTerm)
+    {
+        var root = Path.Combine(fixture.RepoRoot, "src", "canonical");
+        var change = fixture.ReadText(Path.Combine(root, "skills", "idd-intent-change.md"));
+        var method = fixture.ReadText(Path.Combine(root, "methodology", "visual-intent-method.md"));
+        Assert.Contains(requiredTerm, change + method, StringComparison.OrdinalIgnoreCase);
     }
 }
