@@ -53,6 +53,29 @@ The direction is maximum economy: native child agents, no model-driven polling, 
 
 </details>
 
+## Visual Intent discovery
+
+`idd-intent-visual-brainstorm` helps turn screenshots, visual inspiration and
+UI mockups into user-confirmed visual requirements. It explains professional
+design vocabulary in ordinary language and, when available, shows comparison
+cards from a bundled Visual Intent Reference Library (or an explicitly supplied project override).
+
+Maintain distributable cards under `src/canonical/visual-intent-library/`:
+place `VISUAL_INTENT_CATALOG.md` next to `Images/` and regenerate the plugin.
+The installed plugin uses those bundled cards by default; an explicitly
+provided local library may override them. No Windows drive is assumed.
+
+Discovery is read-only. After the user confirms which visual qualities are
+Essential, Preferred, Free or Avoid, `idd-intent-change` can persist and later
+modify/remove the scoped durable meaning in its existing owning specification.
+The brainstorm alone does not write Product Intent; confirmed handoffs can be
+saved separately without restarting discovery.
+
+Branch development and local validation are documented in
+[Testing plugins locally](docs/local-plugin-development.md).
+Windows Codex users can switch between published and local IDD using
+`scripts/Switch-Idd-Codex.bat published` or `scripts/Switch-Idd-Codex.bat local`.
+
 ## Quick Start
 
 Install the core `idd-intent` plugin. For complex, multi-step implementation tasks, you can also install the optional `idd-factory` plugin.

@@ -68,8 +68,8 @@ public sealed class IntentDocumentCreationContractTests(GenerationFixture fixtur
         Assert.Contains("Ordinary existing-spec updates do not", parent);
         Assert.Contains("inside this same execution", parent);
         Assert.Contains("without a child agent or additional confirmation", parent);
-        Assert.Contains("return to step 8 without recursively invoking this skill", parent);
-        Assert.Contains("For `existing-spec-update`, update the owning current spec", parent);
+        Assert.Contains("return to step 9, not a recursive invocation", parent);
+        Assert.Contains("For `existing-spec-update`, update the existing owner", parent);
         Assert.DoesNotContain("idd-intent-new-document", parent);
     }
 

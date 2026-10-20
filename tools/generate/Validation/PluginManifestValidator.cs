@@ -81,6 +81,28 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
 
             ValidateSkillReferences(pluginName, plugin);
 
+            foreach (var asset in plugin.SkillAssetsOrEmpty)
+            {
+                if (!plugin.Skills.Contains(asset.Skill, StringComparer.Ordinal))
+                    throw new InvalidOperationException(
+                        $"Plugin '{pluginName}' has assets for unowned skill '{asset.Skill}'.");
+
+                var source = ResolveRepositoryPath(asset.Source);
+                if (!Directory.Exists(source))
+                    throw new InvalidOperationException(
+                        $"Plugin '{pluginName}' skill '{asset.Skill}' asset directory is missing: '{asset.Source}'.");
+
+                try
+                {
+                    _ = SkillReferencePathValidator.NormalizeDestination(asset.Destination);
+                }
+                catch (ArgumentException ex)
+                {
+                    throw new InvalidOperationException(
+                        $"Plugin '{pluginName}' has invalid skill asset destination '{asset.Destination}'.", ex);
+                }
+            }
+
             foreach (var asset in plugin.Assets)
             {
                 var source = Path.Combine(layout.RepoRoot, asset.Source.Replace('/', Path.DirectorySeparatorChar));

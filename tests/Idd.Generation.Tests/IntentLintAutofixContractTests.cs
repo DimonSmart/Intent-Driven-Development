@@ -108,11 +108,11 @@ public sealed class IntentLintAutofixContractTests(GenerationFixture fixture)
     }
 
     [Fact]
-    public void NoNewSkillAndLintRemainsAutomaticWorkflow()
+    public void LintRemainsAutomaticWorkflow()
     {
         using var desc = JsonDocument.Parse(fixture.ReadText(Path.Combine(
             fixture.RepoRoot, "src", "canonical", "skills", "skill-descriptions.json")));
-        Assert.Equal(19, desc.RootElement.EnumerateObject().Count());
+        Assert.Equal(20, desc.RootElement.EnumerateObject().Count());
         var lint = desc.RootElement.GetProperty("idd-intent-lint");
         Assert.Equal("workflow", lint.GetProperty("exposure").GetString());
         Assert.False(lint.TryGetProperty("invocation", out _));

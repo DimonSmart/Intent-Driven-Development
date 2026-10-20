@@ -13,6 +13,7 @@
         "idd-skip",
         "idd-intent-structure-audit",
         "idd-intent-brainstorm",
+        "idd-intent-visual-brainstorm",
         "idd-intent-change",
         "idd-engineering-change",
         "idd-intent-import",
@@ -134,6 +135,16 @@
           "skill": "idd-intent-change",
           "source": "src/canonical/methodology/new-intent-document.md",
           "destination": "new-intent-document.md"
+        },
+        {
+          "skill": "idd-intent-visual-brainstorm",
+          "source": "src/canonical/methodology/visual-intent-method.md",
+          "destination": "visual-intent-method.md"
+        },
+        {
+          "skill": "idd-intent-visual-brainstorm",
+          "source": "src/canonical/methodology/visual-card-library.md",
+          "destination": "visual-card-library.md"
         }
       ],
       "assets": [
@@ -148,7 +159,14 @@
       ],
       "metadata": {
         "entryPoint": true
-      }
+      },
+      "skillAssets": [
+        {
+          "skill": "idd-intent-visual-brainstorm",
+          "source": "src/canonical/visual-intent-library",
+          "destination": "visual-intent"
+        }
+      ]
     },
     "idd-factory": {
       "description": "Temporary implementation organization for Intent-Driven Development.",

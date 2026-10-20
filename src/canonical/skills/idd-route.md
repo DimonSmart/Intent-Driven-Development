@@ -287,6 +287,25 @@ for a new run; bypassing this router must not bypass Product Intent analysis,
 explicit Engineering preparation when required, durable coverage validation, or
 the rule that active Factory state is created only afterward.
 
+## Visual Reference Clarity Gate
+
+When a `product-change` request includes visual references but the user has
+not confirmed which visual properties, scope, or strictness should be preserved,
+keep `product-change` and recommend the read-only
+`idd-intent-visual-brainstorm` discovery gate. Do not invent a top-level
+`visual-change` or `visual-intent` classification.
+
+Already confirmed visual Product Intent, including a clear approved handoff
+that the user now asks to save, routes **directly** to `idd-intent-change`;
+a second brainstorm or approval is unnecessary. A screenshot reporting a bug,
+an explicit actionable visual result, or a local styling request preserving
+current Intent does not trigger visual discovery. Local styling is an ordinary
+`implementation-change` unless it changes durable product truth; when it
+might violate an Essential visual invariant, stop for the smallest product
+decision rather than silently changing implementation or Intent.
+Respect `intent-only` / `implementation-only` / `end-to-end` scope and
+never automatically run a separately requested intent write after brainstorm.
+
 ## First Skill
 
 For ordinary classified routes, use the required reference to select the first
