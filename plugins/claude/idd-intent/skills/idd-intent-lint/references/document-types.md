@@ -21,6 +21,13 @@ directory means that it is current. Do not mark a spec as `Current`,
 place when its product area remains current; migrate remaining current intent
 and delete it when obsolete. Git history is the only history of spec revisions.
 
+When appearance or interaction cues are product-significant, the current
+owning specification may include an **optional** `## Visual Intent` section.
+Record user-confirmed properties, relative visual relationships, scope,
+implementation freedom, and deliberate things to avoid. Reference images
+are supporting evidence by default, not a replacement for normative text.
+Do not introduce this section where visual appearance is irrelevant.
+
 Shared specification is a normal `spec`. Common rendering, input, validation,
 or dialog behavior should be a separate specification when multiple product
 areas depend on it.

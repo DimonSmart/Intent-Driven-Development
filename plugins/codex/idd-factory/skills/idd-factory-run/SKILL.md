@@ -125,8 +125,11 @@ For a new `end-to-end` run, the required order is:
 
 8. apply required Product Intent mutation through existing intent workflows
 9. validate durable coverage against the complete logical request
-10. create .idd/factory/current/request.md
-11. start a fresh Factory planner
+10. persist the full request in .idd/factory/preparation/request.md
+11. run a fresh initial Factory planner while current/request.md is absent
+12. validate the first Task batch, or handle Question/Done in preparation
+13. prepare current/plan.md and exact answers; create current/request.md LAST
+14. only then start sequential workers
 ```
 
 The Engineering step deliberately precedes the Product Intent write because
@@ -147,9 +150,12 @@ contradict one another, and no required durable decision remains unresolved.
 When `.idd/engineering/` exists, its structure must also be valid. Absence of
 the Engineering layer is valid and produces no warning.
 
-Only after successful durable preparation and coverage validation may a new run
-create `.idd/factory/current/request.md`. Persist the complete self-contained
-logical request itself, not a preflight report or rewrite.
+Successful durable coverage authorizes the initial planner, NOT activation. Persist
+the complete base request in `.idd/factory/preparation/request.md` before its
+first spawn. `.idd/factory/current/request.md` is created only after the initial
+planner returns a fully validated executable Task batch, with active `plan.md`
+and any required answers prepared first. Preserve the base request exactly; never
+replace it with a generated summary, plan, or answers.
 
 Continuation of an existing simplified run does not repeat initial preflight.
 
@@ -166,25 +172,31 @@ replacement request then started as a new Factory run.
 
 ## Minimal temporary state
 
-Use only the temporary files needed for continuation:
+The presence of `.idd/factory/current/` alone is not active state.
+Only `.idd/factory/current/request.md` is the authoritative active-run
+marker. One pending preparation per working tree is sufficient:
 
 ```text
+.idd/factory/preparation/
+    request.md               # full materialized base request
+    answers.md               # chronological exact question/answer pairs, optional
+    question.md              # outstanding exact question, optional
+    verification-failure.md  # bounded final-check diagnostic, optional
+
 .idd/factory/current/
-    request.md
-    plan.md
-    completed.md
-    answers.md
-    question.md                # only while waiting for the user
-    verification-failure.md    # only when relevant
+    plan.md                  # validated remaining Task batch
+    answers.md               # exact answers transferred from preparation, optional
+    request.md               # active marker, written LAST
+    completed.md             # active-run summaries, as needed
+    question.md              # active-run question, optional
+    verification-failure.md  # active-run failure, optional
 ```
 
-`request.md` is the complete self-contained logical request that passed Factory
-Preflight. `plan.md` contains only the remaining implementation/research tasks in
-the current batch. `completed.md` contains short semantic summaries useful to
-later planners. `answers.md` contains exact user answers.
-
-The repository is the authoritative implementation reality. These files are
-best-effort scheduling and semantic context, not proof that a change exists.
+The repository is the authoritative implementation reality. `plan.md`
+contains only the remaining implementation/research tasks. `completed.md`
+contains bounded semantic summaries, not proof of completed code. Exact Q/A
+are kept separately from the unchanged base request. The preparation directory
+is ignored by Git through the existing `.idd/factory` rule.
 
 `.idd/execution.yaml`, when present, is deliberately outside
 `.idd/factory/current/`. It is project-owned execution policy that survives
@@ -202,33 +214,105 @@ replacement request and may archive the old directory for diagnostics.
 ## User-level operations
 
 New:
-- materialize the complete self-contained logical request;
-- run Factory Preflight, including required Product Intent and Engineering
-  preparation;
-- validate durable coverage;
-- only then create the minimal current state;
-- enter the orchestration loop.
+- materialize the full logical base request and resolve requested scope;
+- execute existing durable preflight and coverage validation;
+- persist preparation, run the fresh initial planner and handle its result;
+- activate only on a validated Task batch, then enter the worker loop.
 
 Continue:
-- read `request.md` and the minimal current state;
-- continue from repository reality;
-- do not repeat initial preflight.
+- if `current/request.md` exists, use ordinary active-run continuation
+  without repeating entry preflight or initial planning;
+- otherwise if `preparation/request.md` exists, restore the full base request,
+  exact Q/A and pending question without depending on parent transcript;
+- treat a precise reply as the answer to the saved `question.md`; when a new
+  independent request appears, ask whether to continue or explicitly replace
+  the pending preparation instead of silently combining two requests;
+- incomplete preparation blocks automatic execution. Explain which source is
+  missing rather than reconstructing it from memory.
 
 Cancel:
-- archive or remove the temporary Factory state;
+- remove pending preparation, or archive/remove the active state as appropriate;
 - never roll back repository or durable-knowledge changes automatically.
 
 Restart / explicit replacement:
-- resolve one complete replacement request while preserving the active state;
-- run replacement preflight;
-- if the replacement requires Engineering management, return the active-run
-  blocker without changing Product Intent, Engineering, or Factory state;
-- otherwise replace temporary state only after successful replacement preflight
-  and coverage validation.
+- preserve existing active replacement semantics and guard;
+- an independent new request cannot silently overwrite pending preparation;
+- on explicit replacement of preparation, discard only that temporary directory
+  and perform new preflight. Existing active runs retain their own rules.
 
-These are skill-level operations. There are no `factory_run`,
-`factory_continue`, `factory_restart`, `factory_retry`, `factory_cancel`,
-or `factory_status` transport operations.
+These are skill-level operations, not new transport operations or state schemas.
+
+## Preparation planner and activation
+
+This path applies to new implementation-capable runs only; `route-only` and
+`intent-only` never spawn an initial planner. Requested scope remains binding
+through all follow-up questions. A reply does not implicitly promote
+`implementation-only` to `end-to-end`.
+
+1. Following successful initial durable preflight, persist complete
+   `preparation/request.md`. Read the ordinary canonical planner protocol and
+   invoke the SAME fresh native planner used for active runs. Give it the full
+   base request, chronological exact Q/A (if any), current repository/Intent,
+   optional Engineering Guardrails and bounded preparation verification failure.
+   No `completed.md` exists before any Worker. No active marker exists yet.
+2. `# Question`: require exactly one concrete question. Save the exact text
+   to `preparation/question.md` before asking the user and stop this turn.
+   Do NOT write `current/request.md` or `current/plan.md`, or spawn a Worker.
+3. On the next exact answer, append the original question AND answer verbatim
+   and in order to `preparation/answers.md` before removing the pending question.
+   Reclassify the complete base request plus all applicable clarifications,
+   against the current repository and original requested scope. Detect
+   request-level blockers BEFORE any further durable write. An unclear,
+   conflicting, or forbidden decision blocks or elicits one concrete question.
+4. When clarification requires authorized durable Engineering changes, pass
+   the FULL base request, accumulated exact clarifications, and latest exact
+   Planner question/answer to normal `idd-engineering-change`. Product Intent
+   changes use the normal `idd-intent-change` workflow. If both are needed,
+   complete Engineering before Product Intent. Factory never owns semantic
+   ENG mapping or directly edits either durable layer. Treat owner `ambiguous`
+   or `blocked` as stop conditions and retain preparation; `success` or
+   `no-op` can continue after renewed coverage validation. No automatic
+   rollback of an already completed owner's writes.
+5. Launch a NEW isolated planner after each successful clarification and
+   validation. Never resume the earlier child or inherit its transcript.
+   Do not repeatedly ask an unchanged question without new user input or
+   material repository change; stop with the question or diagnostic instead.
+6. `# Task`: require one or more complete self-contained Task contracts,
+   exactly one explicit `# ExecutionProfile` per new Task from
+   `economy | standard | strong`, and no mixed Question/Done output.
+   Verify each `TaskRelatedIntent` has an existing unique `IDD-NNNN`
+   owner and each `TaskRelatedEngineering` is an existing unique Conditional
+   `ENG-NNNN` (never Always). Validate the existing Engineering layer
+   structurally when present. Recheck requested scope, durable coverage and
+   repository/knowledge freshness; any material changes invalidate the batch
+   and require renewed validation and fresh planning.
+7. Recheck `current/request.md` is absent. Prepare a valid
+   `current/plan.md` containing THAT exact Task batch and transfer exact
+   `answers.md` if present; remove or verify orphaned inactive files before
+   reuse. Write complete `current/request.md` LAST, preferably by an atomic
+   same-directory rename of a fully written temporary file. Only after BOTH
+   marker and valid plan are present may the existing sequential Worker loop
+   start. After confirmed activation remove preparation. Never overwrite a
+   competing active marker or claim multi-file atomicity/exactly-once execution.
+8. `# Done` before activation: use existing project verification in the
+   `final` context, honoring the existing absent-policy completion fallback.
+   On success, clean preparation and finish WITHOUT active marker or empty plan.
+   On failure, persist only check/command, exit result and bounded diagnostic in
+   `preparation/verification-failure.md`, then invoke a fresh planner.
+   `Not verified` or required human confirmation cannot be reported as success.
+   If the same failure persists after another Done without intervening change,
+   stop with diagnostic rather than looping or fixing checks in the root.
+9. Empty/mixed/malformed Planner output, unresolved IDs, invalid profile,
+   infrastructure/owner blockers or interrupted activation are NOT success,
+   Question or executable Tasks. Preserve preparation and report the exact
+   reason; do not launch workers or invent automatic retry machinery.
+
+Before the active marker exists, stray `current/plan.md` or legacy
+`current/state.json` does not signal an active run. Safe resume verifies
+preparation provenance and the entire pending batch before replacing any
+orphaned files. After the marker exists, use existing active-run behavior and
+at-least-once Worker convergence. Never move/delete an active marker to get
+around the Engineering guard.
 
 ## Orchestration loop
 
@@ -302,11 +386,11 @@ reporting can identify the planner without relying on a public skill name.
 
 Give the planner only:
 
-- the self-contained Factory request;
+- the complete unchanged base Factory request (from preparation/request.md or current/request.md);
 - current repository access;
-- exact prior user answers;
-- bounded completed summaries;
-- the latest bounded project-verification failure, when present;
+- chronological exact question AND answer pairs (preparation/answers.md or current/answers.md);
+- bounded completed summaries (active runs only);
+- the latest bounded project-verification failure from the same phase, when present;
 - the complete canonical Engineering Guardrails contract from
   `references/engineering-guardrails.md` when `.idd/engineering/` exists.
 
@@ -324,10 +408,11 @@ references, or inherited root transcript. Do not forward the parent transcript
 or automatically load the complete intent or Engineering trees.
 
 The planner creates only implementation/research tasks. It must not execute
-implementation and must not create tasks to update Product Intent,
-create/modify Engineering Rules, run `idd-engineering-change`, import the
-request, or otherwise perform durable preparation. Factory Preflight finishes
-that work before active state exists.
+implementation or create tasks to update Product Intent, create/modify
+Engineering Rules, run `idd-engineering-change`, import the request, or
+perform durable preparation. Before activation, Planner questions may expose
+new durable decisions; only Factory entry orchestration and normal durable
+owners can resolve those decisions while the marker is absent.
 
 ### Worker execution profile
 
@@ -460,6 +545,10 @@ reverting correct existing changes merely because an interrupted execution may
 have produced them.
 
 ## Planner outcomes
+
+The following forms apply to BOTH preparation and active-run planning. The
+pre-activation Question/Task/Done handling is defined above; do not apply
+active-run Engineering restrictions while no active marker exists.
 
 The planner returns exactly one of:
 

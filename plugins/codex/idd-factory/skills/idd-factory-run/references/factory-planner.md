@@ -15,15 +15,22 @@ Do not assume parent-skill references or inherited parent context are available.
 
 Use only:
 
-- the persisted self-contained `request.md`;
+- the complete, self-contained, unchanged base request: either persisted
+  `.idd/factory/preparation/request.md` before activation or
+  `.idd/factory/current/request.md` in an active run. Before first persistence
+  an explicitly supplied verbatim host packet is equivalent; a summary is not;
 - current repository reality;
 - current durable intent discovered from `.idd/intent/README.md` and
   `.idd/intent/INDEX.md`;
 - optional validated Engineering discovery metadata from
   `.idd/engineering/README.md` and `.idd/engineering/INDEX.md`;
-- exact prior user answers from `answers.md`;
-- short semantic summaries from `completed.md`;
-- the latest bounded `verification-failure.md`, when present.
+- chronological exact question-and-answer pairs, separate from the base request,
+  from the corresponding `preparation/answers.md` or `current/answers.md`
+  (or a verbatim host packet before persistence);
+- bounded `current/completed.md` summaries only in an active run (no Worker
+  has run during preparation);
+- the latest bounded `preparation/verification-failure.md` or
+  `current/verification-failure.md`, as applicable.
 
 Do not read `.idd/execution.yaml`. Model policy, model availability, model cost,
 and vendor-specific reasoning settings are outside planner inputs.
@@ -61,10 +68,15 @@ content is needed to form a correct task contract, but never decide whether an
 Always rule applies.
 
 Do not create or modify durable Product Intent or Engineering Rules. Factory
-Preflight must finish durable preparation before active state exists. Never emit
+entry orchestration and the authorized durable owners complete required
+preparation before activating on valid Tasks. A pre-activation question may
+expose an additional decision for the entry orchestration to resolve. Never emit
 a task whose purpose is to update `.idd/intent/*`, create/modify/remove an
 `ENG-NNNN`, run `idd-engineering-change`, or import durable knowledge. If the
 current product decision is missing, use `# Question` rather than inventing it.
+You may return that question BEFORE `.idd/factory/current/request.md` exists;
+a question never authorizes you to write durable knowledge or create a Worker
+task to do so.
 
 ## Output protocol
 

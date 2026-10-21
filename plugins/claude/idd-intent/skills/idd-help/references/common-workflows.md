@@ -15,8 +15,9 @@ route itself durable product intent.
 Identify the requested concern before applying ordinary workflow classification.
 Standalone Factory model-policy requests select their skill directly:
 
-- `product truth`: desired product behavior, constraint, acceptance rule,
-  public contract, or durable architecture changes.
+- `product truth`: desired product behavior, confirmed normative visual
+  appearance, constraint, acceptance rule, public contract, or durable
+  architecture changes.
 - `engineering policy`: an explicit project decision adds, modifies, or removes
   a durable implementation-only Engineering Rule.
 - `implementation only`: code structure changes while current product intent
@@ -67,7 +68,7 @@ For `engineering-change`, use the same operation names independently and target 
 
 Product operations and Engineering operations do not share semantic ownership. A product constraint must not become Engineering merely because it mentions implementation, and an implementation-only durable convention must not be forced into Intent.
 
-Adding product behavior can still update an existing spec. Removing product behavior can still leave the owning spec in place when it contains other current intent. Engineering add may become a no-op or an explicit modify when an existing Rule already owns the durable constraint.
+Adding a behavioral or visual product rule can still update an existing spec. Removing one product rule can still leave the owning spec in place when it contains other current intent. Engineering add may become a no-op or an explicit modify when an existing Rule already owns the durable constraint.
 
 Bootstrap establishes current product truth; it is not an `add` operation.
 Import migrates supplied durable knowledge; it is not an ordinary product or
@@ -370,6 +371,44 @@ Bootstrap completes only when:
 If the user cancels before approval, no current numbered intent is created and
 the workflow still returns the discovery summary as temporary output.
 
+## Workflow Family: Visual Intent Clarification and Maintenance
+
+Use `Classification: product-change`, **not** a new visual classification,
+when appearance itself is a durable product requirement. If a visual reference
+leaves meaning, obligation or scope uncertain, select
+`idd-intent-visual-brainstorm` as a **read-only** discovery gate:
+
+```text
+unclear visual reference -> observations / hypotheses
+-> user-confirmed Essential / Preferred / Free / Avoid, scope, exceptions
+-> stop; separate user request to idd-intent-change
+-> current owning spec, synchronized acceptance criteria / verification
+```
+
+The complete discovery-to-maintenance lifecycle is not permission to run the
+next stage in the current request. Already confirmed visual requirements
+(including approved handoff plus 'save it') go straight to
+`idd-intent-change` without repeating discovery or approval. A screenshot
+reporting a defect, a clear product requirement, an explicit reproducible
+fidelity target, and a purely local implementation change do **not**
+automatically require visual brainstorming.
+
+Comparison cards and screenshots support discovery but are not normative by
+themselves; do not infer all visual traits or dynamic states from an image.
+Preserve the source role and its relevant aspect only. The Visual Intent
+catalog and Images folder are supporting inputs, never a new intent storage
+root or mandatory handoff file.
+
+A saved visual requirement has one product-area owner, regardless of a
+`## Visual Intent` heading. `add`, `modify`, and `remove` use ordinary
+`idd-intent-change` with the same ownership/INDEX/new-spec gates as behavior.
+Scope changes, weaker preferences or removal must also reconcile old
+Acceptance Criteria, Verification, exceptions and cross-references without
+altering adjacent contracts. If the user requests local styling within
+existing intent, use `implementation-change` and current implementation
+workflow; a possible conflict with an Essential invariant requires clarification
+before implementation, never a silent rewrite of Product Intent.
+
 ## Workflow Family: Intent Import
 
 Use this workflow when existing supplied material already expresses durable
@@ -402,7 +441,7 @@ Product changes use `idd-intent-change` first. The ownership outcome is decided
 there: existing spec update, new spec required, ADR required, spike required,
 delete owning spec, or unclear product intent.
 
-### Add Behavior
+### Add Product Requirement
 
 ```text
 brainstorm if the request is unclear
@@ -412,7 +451,7 @@ brainstorm if the request is unclear
 -> idd-intent-drift-audit
 ```
 
-### Modify Behavior
+### Modify Product Requirement
 
 ```text
 find current owner
@@ -422,7 +461,7 @@ find current owner
 -> idd-intent-drift-audit
 ```
 
-### Remove Behavior
+### Remove Product Requirement
 
 ```text
 find owner and dependent scenarios
@@ -441,7 +480,10 @@ requirements, remaining intent in the owning document, and whether a durable
 non-goal is needed.
 
 For `intent-only`, stop after the intent-side stage and report the remaining
-complete lifecycle without starting implementation. For `route-only`, do not
+complete lifecycle without starting implementation. This also applies to a
+request solely to persist approved Visual Intent; do not start UI work or
+Factory. For a visual change without a functional behavior change, retain
+product-change routing and existing operation names. For `route-only`, do not
 start the product-change workflow at all.
 
 ## Workflow Family: Engineering Management
@@ -478,7 +520,10 @@ implementation, `idd-factory-run` may coordinate those existing durable owners
 during entry preflight. It passes the complete logical request to
 `idd-engineering-change`, performs any required Product Intent mutation through
 normal Intent workflows, validates durable coverage, and creates active Factory
-state only afterward. Factory does not duplicate Engineering ownership,
+state only after a fresh initial Planner yields a validated executable Task batch.
+Before activation its questions may lead to further authorized durable-owner
+work and renewed coverage validation; a `# Done` with successful final
+verification needs no active run. Factory does not duplicate Engineering ownership,
 equivalence, allocator, or mutation logic.
 
 The Engineering mutation happens before active Factory state is created. An

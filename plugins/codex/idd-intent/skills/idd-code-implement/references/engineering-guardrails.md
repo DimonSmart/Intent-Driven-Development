@@ -170,11 +170,13 @@ The workflow performs semantic planning for the complete request before mutation
 
 The Engineering layer is created lazily only after semantic planning confirms at least one new Rule and `.idd/engineering/` is completely absent, using packaged canonical bootstrap assets. `idd-project-init` does not create it. Planning, ambiguity detection, allocator-capacity checks, and all other pre-mutation gates happen before bootstrap. An existing malformed or partial layer blocks mutation and is never overwritten by bootstrap.
 
-Before any mutation, `.idd/factory/current/request.md` is the canonical active simplified Factory marker. If it exists, block Engineering mutation and return `blocked`. The management workflow does not patch `plan.md`, rewrite `TaskRelatedEngineering`, restart Factory, re-plan automatically, or accept a hidden bypass. A stale `.idd/factory/current/` directory without `request.md`, or legacy `state.json` alone, is not an active-run marker.
+Before any mutation, `.idd/factory/current/request.md` is the canonical active simplified Factory marker. If it exists, block Engineering mutation and return `blocked`. The management workflow does not patch `plan.md`, rewrite `TaskRelatedEngineering`, restart Factory, re-plan automatically, or accept a hidden bypass. A stale `.idd/factory/current/` directory without `request.md`, a pending `.idd/factory/preparation/` directory, orphaned `plan.md`, or legacy `state.json` alone is not an active-run marker.
 
-A new Factory entry is a valid coordinator only before that marker exists. It
+A new Factory entry is a valid coordinator only before that marker exists,
+including while an initial Planner question is persisted in preparation. It
 may identify `EngineeringManagementRequired` and invoke normal
-`idd-engineering-change` with the complete logical request. Factory itself does
+`idd-engineering-change` with the complete original logical request plus all
+relevant verbatim clarifications and the latest exact question/answer. Factory itself does
 not map decisions to ENG owners, decide semantic equivalence, allocate IDs, edit
 INDEX, or write Rules. `success` and `no-op` allow entry preflight to continue;
 `ambiguous` and `blocked` stop before active Factory state.

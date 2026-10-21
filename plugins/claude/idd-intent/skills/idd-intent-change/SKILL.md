@@ -7,9 +7,10 @@ disable-model-invocation: false
 
 # idd-intent-change
 
-Use this skill when the user describes a desired product behavior change, new
-capability, changed interaction rule, changed acceptance behavior, changed
-default, or changed product constraint.
+Use this skill when the user describes a desired change to durable Product
+Intent: behavior, capabilities, interactions, acceptance behavior, defaults,
+product constraints, or user-confirmed visual appearance. A visual requirement
+may change product truth without changing functional behavior.
 
 This skill updates `.idd/intent/` before implementation.
 
@@ -26,15 +27,16 @@ idd-intent-change =
 ## Rules
 
 - Treat the user request as proposed product intent.
-- First find whether the behavior belongs to an existing current spec.
+- First find whether the product requirement belongs to an existing current spec,
+  including visual requirements owned by an otherwise behavioral spec.
 - Prefer updating an existing current spec when the product area already exists.
 - Create a new document only through the internal on-demand
   `references/new-intent-document.md` workflow when ownership classification
   requires a new spec, ADR, or spike. Ordinary existing-spec updates do not
   load that reference.
 - Do not create a new spec for a local implementation task.
-- Do not create a new spec for a small behavior change inside an existing
-  feature area.
+- Do not create a new spec for a small behavioral or visual change inside an
+  existing product area; appearance alone is not a new ownership boundary.
 - Do not put implementation steps, temporary notes, generated plans, or chat
   history into specs.
 - Do not add build or test commands, implementation plans, private classes or
@@ -51,7 +53,8 @@ idd-intent-change =
   as authoritative input. Do not replace it with a route summary or generated
   implementation plan.
 - Do not archive old specs.
-- If behavior changes inside the same product area, edit the existing spec.
+- If behavior or a normative visual property changes inside the same product
+  area, edit the existing spec.
 - If product area identity changes, use the internal document-creation
   reference after confirming that a distinct new owner is required; do not
   duplicate document-creation instructions in this skill.
@@ -60,15 +63,19 @@ idd-intent-change =
 - For `operation: remove`, delete an owning spec only when no current product
   intent remains in that document.
 - Git history preserves previous versions.
-- Update Behavior, Acceptance Criteria and Verification together when the change
-  affects them.
-- If the request contradicts current specs and the user clearly asks for the new
-  behavior, update the spec to the new intent and mention the superseded
-  behavior in the report.
+- Update the affected Behavior, optional Visual Intent, product constraints,
+  Acceptance Criteria and Verification together when the change affects them.
+  Do not delete unrelated functional, UX, accessibility, compatibility or
+  other visual requirements.
+- If the request clearly changes existing Product Intent, update the owning
+  spec to the new current truth and mention the superseded requirement in the
+  report. When a proposed implementation-only style change might violate an
+  Essential visual invariant, ask whether the user intends a product change;
+  never silently override the invariant.
 - If the request is ambiguous, report the ambiguity and ask for the smallest
   product decision needed.
-- Keep the change normative: describe observable product behavior, not patch
-  mechanics.
+- Keep the change normative: describe observable product behavior or
+  user-confirmed perceptual properties, not patch mechanics.
 - Do not treat current implementation as product intent by itself.
 - Before editing, identify what changes, what must be preserved, affected
   public contracts, compatibility constraints, and adjacent areas that remain
@@ -88,9 +95,10 @@ remove
 not-applicable
 ```
 
-This operation is separate from document ownership. Adding behavior can update
-an existing spec. Removing behavior can update part of a spec or delete the
-whole owning spec only when that document has no remaining current intent.
+This operation is separate from document ownership. Adding behavior or a
+visual property can update an existing spec. Removing one visual invariant does
+not remove other requirements or the owning spec; delete it only if no current
+intent remains.
 
 Use `not-applicable` only when the ownership outcome is
 `task-only-no-idd-intent-change`. Do not assign a fake `add`, `modify`, or
@@ -114,9 +122,11 @@ unclear-product-intent
 Use `existing-spec-update` when an existing current spec already owns the product
 area.
 
-Use `new-spec-required` only when no existing current spec owns the product area
-and the change describes durable product behavior. Create the new owning spec
+Use `new-spec-required` only when no existing current spec owns the product
+area and the change describes durable product truth, including a confirmed
+visual invariant without a functional behavior change. Create the owning spec
 through the internal document-creation workflow only after its ownership check.
+Do not create a separate visual spec merely because its requirement is visual.
 
 Use `adr-required` when the change is primarily a durable architecture decision;
 create its decision record through the internal document-creation workflow.
@@ -128,8 +138,8 @@ Use `delete-owning-spec` for `operation: remove` only when the removed document
 does not own any remaining current product intent.
 
 Use `task-only-no-idd-intent-change` when the request is only a local refactor,
-cleanup, dependency update, or implementation detail that does not change
-durable product intent.
+cleanup, dependency update, or styling/implementation choice within current
+Product Intent that does not change any durable product requirement.
 
 For `task-only-no-idd-intent-change`:
 
@@ -140,6 +150,81 @@ For `task-only-no-idd-intent-change`:
 4. Recommend Factory for orchestrated work.
 5. Do not force the request into `add`, `modify`, or `remove`.
 
+## Visual Product Intent: Confirmation and Persistence
+
+Visual Intent is one aspect of Product Intent, not a new storage layer, status
+system or mandatory Factory stage. A confirmed visual property can be normative
+without a functional behavior change. Use the existing four operations and
+ownership outcomes; never create a `visual-change` operation or classification.
+
+When receiving a `Specification-Ready Visual Intent` handoff from
+`idd-intent-visual-brainstorm`, use its human-readable decisions, not a new
+JSON/YAML contract. For **each** candidate, establish as applicable:
+
+- the exact user-confirmed property and its significance;
+- whether it is `Essential`, `Preferred`, `Free`, or `Avoid`;
+- product/screen/surface/component/state/theme scope and agreed exceptions;
+- the level of obligation, permissible alternatives, and implementation freedom;
+- specifically rejected traits, plus any source role (`inspiration`,
+  `fidelity-target`, `anti-reference`, `current-state`) and the precise
+  source aspect that matters;
+- a meaningful perceptual acceptance observation or verification method;
+- open questions and contradictions, **separate** from approved requirements.
+
+A screenshot, comparison-card choice, unqualified 'I like this', or design
+hypothesis does not approve every feature of the reference. Ask only the
+smallest question required for a material missing meaning, scope, strictness,
+or blocking conflict. Conversely, if the user approved the proposal or
+unambiguously asks to save previously confirmed handoff, persist it without a
+repeat discovery/approval round. A new session needs the handoff or an
+accessible approved current requirement; do not reconstruct confirmation from
+the image.
+
+Interpret category strength in the **written current specification**:
+
+- `Essential`: mandatory within its scope; violations fail conformity.
+- `Preferred`: preferred direction with expressly allowed justified
+  alternatives, **not** an unconditional hard acceptance gate.
+- `Free`: implementation freedom, normally not stored unless it clarifies
+  another constraint and prevents over-specification.
+- `Avoid`: preserve the agreed degree of prohibition or reluctance; use
+  `Non-Goals` only for genuinely excluded product outcomes/approaches.
+
+The text must stand on its own for a Coding Agent with only the repository:
+describe scope, relative emphasis, exceptions, alternatives and strength
+without requiring card IDs, screenshots, chat history or a UI framework.
+Exact colors, shapes or numbers are legitimate *when their exact identity is
+explicitly product-significant*; otherwise avoid invented CSS/XAML values,
+tokens, private classes and presentation files. Keep independent engineering
+conventions in `.idd/engineering/` and retain existing ADR/spike boundaries;
+do not migrate old constraints automatically.
+
+References support meaning, never replace it. Do not record OS temp paths,
+temporary HTML galleries or expiring URLs. For `fidelity-target`, identify
+the specific reproducible aspect, scope, permissible deviations and a durable
+resolvable reference (for example a versioned tracked asset). If a precise
+image-dependent requirement cannot be independently expressed or checked
+without a missing durable reference, **block that precise part** and request
+the reference; other confirmed self-contained properties can be saved.
+
+Find the owner by **product area and applicability**, not by a 'Visual'
+filename or heading. Reuse the current owning spec; for genuinely ownerless
+durable visual truth use the existing `new-spec-required` internal reference.
+For cross-area rules, establish one primary owner and align dependent specs
+without cloning normative text. Put perceptual constraints in an optional
+`## Visual Intent` section or existing appropriate section; interactive
+visual states may belong to `## Behavior`. Never require or retrofit a
+`## Visual Intent` heading in every spec. Observable mandatory results
+belong in Acceptance Criteria and justified checks in Verification.
+
+For `modify` or `remove`, locate and reconcile the previous rule, scoped
+exceptions, linked acceptance/verification checks and dependent references.
+Replace obsolete current truth, rather than appending a contradictory version.
+If Essential becomes Preferred, remove hard pass/fail checks for that property
+while retaining meaningful evaluation of the preference. Preserve untouched
+behavior, UX, accessibility, compatibility, and visual rules. Git, not the
+specification, holds the revision history.
+
 ## Removal Rules
 
 For `operation: remove`:
@@ -148,7 +233,8 @@ For `operation: remove`:
 2. Find dependent specifications and cross-references.
 3. Determine whether the product needs immediate removal, deprecation,
    compatibility transition, or replacement.
-4. Remove obsolete behavior from current intent.
+4. Remove obsolete behavior or visual constraints from current intent and
+   reconcile scope-specific exceptions and related acceptance/verification.
 5. Preserve remaining compatibility requirements.
 6. Preserve a durable non-goal only when the removed behavior defines an
    intentional product boundary.
@@ -162,48 +248,54 @@ For `operation: remove`:
 1. Read `.idd/intent/README.md`.
 2. Read `.idd/intent/INDEX.md`.
 3. Identify the product area and candidate current specs.
-4. Read only relevant current `IDD-NNNN` specs.
-5. Classify the operation.
-6. Classify the ownership outcome.
-7. If the ownership outcome is `task-only-no-idd-intent-change`, stop without
-   editing `.idd/intent` and report the implementation-work recommendation.
-8. For `existing-spec-update`, update the owning current spec instead of
-   creating a duplicate. For `adr-required` or `spike-required`, retain any
-   existing behavior-owning spec and evaluate the distinct decision or
-   investigation in the internal workflow.
-9. If `new-spec-required`, `adr-required`, or `spike-required`, read
-   `references/new-intent-document.md` and follow its complete internal
-   document creation workflow inside this same execution. Use the already
-   confirmed Product Intent, without a child agent or additional confirmation
-   merely for this step. If its ownership check finds an existing spec owner,
-   return to step 8 without recursively invoking this skill. Block on a
-   genuinely unresolved durable decision as before.
-10. If the change affects behavior, update acceptance criteria.
-11. If the change affects testable behavior, update verification.
-12. When invoked by Factory Intent Preflight, validate the resulting current
-    intent against the unchanged original request. Confirm requested behavior,
-    material non-goals, safety/durability constraints, and compatibility
-    boundaries are covered without copying private implementation shape. Stop
-    on a genuinely unresolved durable decision.
-13. Report:
+4. Read only relevant current `IDD-NNNN` specs and related references.
+5. Identify the requested current-truth change, its scope and confirmation;
+   for visual handoff apply the Visual Product Intent gate above.
+6. Classify the operation (`add`, `modify`, `remove`, `not-applicable`).
+7. Classify the ownership outcome by product area and applicability.
+8. If `task-only-no-idd-intent-change`, stop without editing
+   `.idd/intent` and report the implementation recommendation. Do not
+   mistake local styling that preserves the current visual contract for a
+   Product Intent change.
+9. For `existing-spec-update`, update the existing owner. For
+   `adr-required` or `spike-required`, retain any existing product-spec
+   owner and evaluate the distinct decision/investigation separately.
+10. If `new-spec-required`, `adr-required`, or `spike-required`, read
+    `references/new-intent-document.md` lazily and follow its complete
+    internal creation workflow inside this same execution. Recheck ownership;
+    if the owner already exists, return to step 9, not a recursive invocation.
+    Preserve ordinary IDs, templates, `INDEX.md`, and lint invariants.
+    Use the already confirmed Product Intent, without a child agent or additional confirmation solely for document creation.
+11. Reconcile old requirements, scope exceptions, related specs, applicable
+    Acceptance Criteria and Verification. Do not harden `Preferred`/`Free`
+    into unconditional acceptance tests; do not leave obsolete checks after
+    `modify` or `remove`.
+12. Check the normative wording independently of any visual gallery, chat
+    history, framework or reference-specific shorthand. Only make a durable
+    image-dependent fidelity claim when the source remains resolvable.
+13. When invoked by Factory Intent Preflight, validate the resulting current
+    intent against the unchanged original request: requested behavior or
+    visual requirements, material non-goals, safety/durability and compatibility
+    boundaries. Stop for a genuinely missing durable decision.
+14. Report:
 
     - operation;
     - ownership outcome;
-    - primary owner;
-    - affected specifications;
-    - changed behavior;
-    - preservation boundary;
-    - document changes;
-    - recommended implementation depth;
-    - recommended next skill.
-    - preflight coverage as `Covered` or `MissingIntentDecision` when the
-      caller requested Factory Intent Preflight.
+    - primary owner and affected specifications;
+    - changed behavioral/visual product truth, strength, scope and exceptions;
+    - preservation boundary (including untouched adjacent contracts);
+    - document changes and synchronized Acceptance Criteria/Verification;
+    - blocked/unknown requirements, if any;
+    - recommended implementation depth and next skill;
+    - preflight coverage as `Covered` or `MissingIntentDecision` when
+      Factory Intent Preflight was requested.
 
 `existing-spec-update` means this skill updates the current owning document.
 The three new-document classifications use the lazy internal reference
 `references/new-intent-document.md`, which repeats the ownership check before
-writing. `idd-intent-change` owns the complete final result and consistency
-validation for both existing and newly created documents.
+writing. `idd-intent-change` owns final semantic consistency for both
+existing and newly created documents. A request to save intent only stops
+here after validation, without implementation or Factory.
 
 ## Example
 
