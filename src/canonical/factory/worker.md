@@ -105,6 +105,29 @@ Do not begin with broad recursive scans such as `Get-ChildItem -Recurse`,
 `find .`, or tools configured with `--no-ignore`. Ignored/generated paths are not forbidden: directly read a known ignored/generated file when the task
 requires that specific file.
 
+## Autonomous implementation choices
+
+Worker independently selects compatible algorithms, libraries, component
+structure, private storage formats, platform APIs and configuration values
+inside the assigned Task. No explicit user delegation phrase is needed.
+A hard-to-reverse or long-lived choice is not automatically Engineering
+policy. Test essential technical facts; report unverified platform support
+truthfully. Briefly report significant non-obvious choices useful to the
+next fresh Planner; no obligatory ADR or decision registry.
+
+Respect explicit scope, Product Intent, Task contract, all supplied Always
+and applicable Conditional Rules. A method that triggers an assigned
+Conditional Rule must satisfy it. "Choose yourself" never waives rules,
+authorizes external costs, accounts, registrations or trust/signing changes,
+or permits changing published product compatibility.
+
+Do not search for extra Conditional IDs. If a permitted method exposes
+potentially required Rules absent from the Worker packet, stop with an
+uncovered-constraint diagnostic. Also stop when every viable option conflicts
+with mandatory rules or the Task needs a product/policy change. Factory
+handles replanning or stopping; Worker does not modify Rule IDs, Intent,
+Engineering, Factory state, `# Question` or its assigned Task.
+
 ## Execution
 
 Implement only the assigned task, satisfy all supplied product intent and

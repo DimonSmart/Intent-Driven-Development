@@ -47,6 +47,67 @@ Do not automatically migrate existing intent between layers.
 
 ADRs may remain in `.idd/intent/` and explain why an Engineering Rule exists. The ADR owns rationale and decision history; the Engineering Rule owns the current normative implementation constraint.
 
+## Authority for technical decisions
+
+Classify decisions semantically, not by their longevity, complexity, cross-file
+impact, or the number of implementation alternatives. This is not a protocol
+field, a new document kind, or a deterministic selection algorithm.
+
+1. **Existing Mandatory Constraint** — enforce current Product Intent,
+   validated Always and semantically applicable Conditional Engineering Rules,
+   and the explicit request scope. Independently verified platform constraints
+   bound feasibility, not normative project policy. Code patterns and library
+   recommendations alone do not establish obligations.
+2. **Autonomous Technical Decision** — choose a compatible algorithm, library,
+   private component structure, internal storage format, platform API, or
+   new-application configuration value. No "choose yourself" phrase is needed.
+   A decision can last years, affect many files, or matter architecturally
+   without creating a future-facing Engineering Rule.
+3. **New or Changed Durable Decision** — establish or change a mandatory
+   implementation-only project policy, or a product contract. Require explicit
+   authority and the established owner workflow. Planner and Worker cannot
+   create, modify or remove Engineering Rules or Product Intent.
+
+Ask whether the chosen approach **must constrain future implementations
+independently of this task**. "Use SQLite for this feature" describes one
+implementation; "all new components must use SQLite" proposes normative
+Engineering policy. An ADR describing rationale does not automatically create
+a Rule, but an existing authoritative ADR cannot be silently overridden.
+Never promote a successful spike, selected package, repeated code pattern,
+or local implementation into policy by inference.
+
+Technical autonomy is bounded by safety, privacy, security, licensing,
+compatibility, maintainability, verifiability and current authority. Missing
+testable platform facts can justify bounded research, not a question asking
+the user to choose a technical fact. A genuine missing product decision,
+incompatible mandatory constraints, policy lacking authorization or required
+external obligation warrants a concrete question/blocker. Explicit
+delegation confirms ordinary technical freedom but never waives constraints
+or authorizes purchases, accepting terms, account access, external identity
+registration, irreversible acts, or new signing/trust policy.
+
+For example a new macOS app may select its `CFBundleIdentifier` consistently
+with project configuration without a Rule or explicit delegation. Changing a
+published identity, pre-existing permissions, or external ownership instead
+requires the relevant authority. Ad-hoc signing, Developer ID and notarization
+are not necessarily equivalent private settings.
+
+### Conditional rule coverage before Worker
+
+Planner selects Conditional `TaskRelatedEngineering` IDs *before* Worker
+starts. For a choice left to Worker, semantically consider every realistic
+alternative and pass rules relevant to any of them; their applicability
+remains conditional. If the set cannot be reliably determined, Planner must
+narrow the permitted approach or contract bounded research and rely on a
+fresh Planner after evidence is available. Do not infer rule relevance
+mechanically from filenames, packages, paths, keywords, embeddings or code.
+
+Worker must obey every supplied Always and applicable Conditional Rule. It
+may not discover additional Conditional IDs or change its packet. When the
+packet cannot safely cover the selected approach, Worker reports the precise
+blocker to Factory for stopping or fresh planning, not a bypass or an
+Engineering mutation. Active `current/request.md` still prohibits Rule edits.
+
 ## Optional project layout
 
 Absence of `.idd/engineering/` is valid and produces no warning.
