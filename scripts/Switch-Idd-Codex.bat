@@ -13,7 +13,7 @@ if errorlevel 1 (
 if "%~1"=="" (
   pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0Switch-Idd-Codex.ps1"
 ) else (
-  pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0Switch-Idd-Codex.ps1" -Source "%~1"
+  pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0Switch-Idd-Codex.ps1" %*
 )
 
 set "RESULT=%ERRORLEVEL%"
