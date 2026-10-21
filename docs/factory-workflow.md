@@ -5,43 +5,42 @@ benefits from decomposition and fresh contexts. Its entry workflow may coordinat
 required durable preparation before orchestration starts; its planner and
 workers remain implementation-only.
 
-## Entry preflight
+## Entry preflight and initial planning
 
-For a new run:
+For a new implementation-capable Factory run:
 
 ```text
-Complete logical request
+Complete materialized logical request
 -> Factory Preflight
-   -> Product Intent analysis
-   -> explicit Engineering concern detection
+   -> non-mutating Product Intent analysis and blocker checks
    -> idd-engineering-change when required
-   -> existing Product Intent workflows when required
+   -> normal Product Intent mutation when required
    -> durable coverage validation
--> create .idd/factory/current/request.md
--> fresh planner
--> current batch
--> fresh sequential workers
--> fresh planner
--> Question | Done
+-> preparation/request.md -> fresh initial Planner [INACTIVE]
+     Question -> persist exact question, ask user and STOP
+               -> exact answer, owner workflow(s), renewed coverage
+               -> NEW fresh Planner [still INACTIVE]
+     Done     -> final verification -> complete without activation
+     Tasks    -> validate all contracts and durable references
+               -> current/plan.md + exact answers
+               -> current/request.md LAST [ACTIVE]
+-> sequential native Workers -> fresh Planner -> Question | Done
 ```
 
-The request is materialized once and stays authoritative. A referenced local
-Markdown specification is read into the logical request so continuation does not
-depend on a temporary attachment/path.
+Preflight uses the complete materialized request, not summaries, plans or host
+attachment paths. Product Intent changes are owned by normal Intent workflows;
+Engineering decisions are owned by `idd-engineering-change`, which also owns
+ENG mapping, semantic equivalence and allocator edits. When both are needed,
+Engineering changes precede Product changes. Known request-level blockers stop
+before durable mutations; failed owners do not trigger rollback of earlier
+completed owner writes.
 
-Product Intent mutations remain owned by normal Intent workflows. Engineering
-mutations remain owned by `idd-engineering-change`; Factory does not decide ENG
-ownership, semantic equivalence, allocator changes, or add/modify/remove/no-op
-actions itself.
+`route-only` has no Planner or writes, `intent-only` stops after authorized
+durable preparation, and `implementation-only` forbids changes to both
+`.idd/intent/*` and `.idd/engineering/*`, even after a Planner question.
+No response silently expands requested scope. A missing Engineering layer is
+normal and is not bootstrapped merely by entering Factory.
 
-When Engineering management is required, it runs before Product Intent mutation
-and before active Factory state exists. `success` and `no-op` continue;
-`ambiguous` and `blocked` stop. Durable coverage is validated against the
-complete request before `request.md` is created.
-
-`implementation-only` permits no mutation of either `.idd/intent/*` or
-`.idd/engineering/*`. Projects without an Engineering layer remain valid and do
-not receive one merely because Factory starts.
 
 ## Replacement and active-run safety
 
@@ -110,23 +109,27 @@ Engineering documents but never edit either durable layer.
 ## Temporary state
 
 ```text
+.idd/factory/preparation/
+    request.md               # unchanged full base request
+    answers.md               # exact chronological Q/A, optional
+    question.md              # one pending question, optional
+    verification-failure.md  # bounded final check, optional
+
 .idd/factory/current/
-    request.md
-    plan.md
-    completed.md
-    answers.md
-    question.md                # optional
-    verification-failure.md    # optional
+    plan.md                  # validated Task batch / remaining tasks
+    answers.md               # transferred exact Q/A, optional
+    request.md               # ONLY active marker, written LAST
+    completed.md             # later worker summaries
+    question.md              # optional active-run question
+    verification-failure.md  # optional active final-check result
 ```
 
-`request.md` is the complete self-contained logical request that passed
-preflight. The repository is authoritative implementation reality. `plan.md`
-contains only remaining implementation/research work in the current batch.
-`completed.md` contains short semantic summaries useful to the next planner.
+Only `current/request.md` means Factory is active. An orphaned directory,
+plan or legacy `state.json` without the marker is NOT an active run.
+Preliminary request and exact answers survive across sessions without relying
+on old agent transcripts. The repository remains the implementation truth.
+A valid first Task batch is not planned a second time merely on activation.
 
-There is no authoritative `state.json`, work-item lifecycle graph, attempt
-history, process ownership, retry budget, transaction log, or exact continuation
-protocol.
 
 ## Interruption
 
@@ -139,35 +142,52 @@ finishes from that reality.
 Do not start a replacement writer while the previous child may still be active.
 Use native stop/close when possible and end the invocation.
 
-## Questions
+## Questions, preparation resume, and activation
 
-When the planner returns one `# Question`, Factory persists the question and
-stops.
+Before activation the initial Planner may ask one concrete question. Factory
+saves `preparation/question.md` before asking and starts no Worker. On a reply,
+it stores the original question and verbatim answer in `preparation/answers.md`
+in order, then reclassifies the entire base request plus all clarifications
+under the original requested scope. Implementation-local answers produce no
+Engineering Rule. Authorized durable Engineering answers go to
+`idd-engineering-change` with the full base request and relevant exact Q/A;
+Product answers go through existing Intent workflows. When both apply,
+Engineering comes first. After renewed coverage validation the next Planner
+must be FRESH, without inherited transcript.
 
-A Product-Intent answer uses the normal outer Intent workflow when allowed. An
-ordinary implementation decision changes no durable knowledge. If the answer
-introduces a new durable Engineering decision, Rules cannot be mutated while the
-active `request.md` exists: keep Factory paused and require the current run to
-be completed/cancelled before starting a new complete request that includes the
-decision.
+When preparation exists but `current/request.md` does not, a later invocation
+may resume using `preparation/request.md` and the exact saved question/answers.
+A new independent request cannot silently merge with it: request an explicit
+decision to continue or discard preparation. Cancellation removes only
+temporary preparation and does not undo durable changes. A malformed Planner
+output, missing/ambiguous references, blocked owner or scope conflict retains
+preparation, never activates or runs Workers.
 
-The exact answer is stored before a fresh planner starts. The old planner thread
-is never resumed.
+On initial Tasks, require nonempty self-contained contracts, exactly one
+explicit valid `# ExecutionProfile` per new Task, unique resolved Intent IDs
+and Conditional-only Engineering IDs. Recheck current repository and durable
+knowledge for freshness. Prepare `current/plan.md` and exact answers BEFORE
+`current/request.md`, which is written last, preferably via an atomic
+same-directory rename. Only both valid active files permit Workers. A partial
+write without marker is inactive; verify provenance before reusing its files.
+There is no multi-file transaction or exactly-once execution promise.
+
+After activation, later Engineering decisions remain blocked by the unchanged
+active-run guard even if no Worker has finished. Explicit active replacement
+with Engineering changes also remains blocked.
 
 ## Done and verification
 
-When a fresh planner returns `# Done`, run configured project verification.
+`# Done` even before the first Worker uses the existing final project
+verification configuration and the existing absent-policy fallback. Successful
+pre-activation Done ends without creating an active run or empty plan. On
+failure retain bounded check/command, exit result and diagnostic in
+`preparation/verification-failure.md` and invoke a fresh Planner. Confirmation
+needed and `Not verified` are not success. Identical repeated Done/failure
+without intervening change stops with diagnosis, not an infinite loop. After
+activation use the same ordinary final verification protocol and active
+diagnostic file; root orchestration never repairs checks directly.
 
-- success: complete Factory and remove/archive temporary state;
-- failure: persist a bounded diagnostic and invoke a fresh planner;
-- no configured verification: ordinary worker checks plus `# Done` are enough.
-
-Factory does not own a separate verification engine.
-
-Infrastructure failures follow the same diagnostic and fresh-planner handoff as
-other final-check failures. After a new planner `# Done`, repeat all configured
-final checks. A successful command exit without actual test execution is not
-successful test verification.
 
 ## Native host requirement
 

@@ -270,12 +270,24 @@ Use idd-factory-run to implement the task described in ./ui-audit.md.
 For a new end-to-end run, Factory first performs durable preflight: it may
 coordinate Product Intent preparation through the normal Intent workflows and
 explicit durable Engineering preparation through `idd-engineering-change`, then
-validates coverage before active Factory state is created. The planner and
-workers themselves remain implementation-only and never mutate
-`.idd/intent/*` or `.idd/engineering/*`. Factory is not used for bootstrap or
-glossary maintenance.
+validates coverage before the first fresh Planner. That Planner may ask for
+clarification while Factory is inactive. Factory saves the unchanged base
+request, exact question and answers in `.idd/factory/preparation/` and, if
+authorized under the original requested scope, uses the normal durable owner
+before renewed validation and a fresh Planner. Only the first validated
+executable Task batch permits activation: `current/plan.md` and answers are
+prepared before `current/request.md`, written LAST. Planner and Workers remain
+implementation-only and never mutate `.idd/intent/*` or
+`.idd/engineering/*`. Factory is not used for bootstrap or glossary
+maintenance.
 
-A normal run continues automatically. Only after an unexpected interruption use:
+A normal run continues automatically. An interrupted preparation can resume
+between sessions using its saved base request and verbatim Q/A without
+inherited transcripts. New independent requests must not be silently mixed
+with pending preparation. After activation, Engineering mutation remains
+blocked until the run is completed or cancelled.
+
+Only after an unexpected interruption use:
 
 ```text
 Continue the current IDD Factory work.

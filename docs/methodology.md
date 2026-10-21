@@ -217,25 +217,34 @@ complete logical request
    -> Product Intent preparation through normal Intent workflows when required
    -> explicit Engineering preparation through idd-engineering-change when required
    -> durable coverage validation
--> create active Factory state
--> fresh planner
+-> persist preparation -> fresh initial planner (inactive)
+   -> Question: exact answer -> authorized owners -> fresh planner
+   -> Done: final verification without activation
+   -> Tasks: validate first batch -> create active Factory state LAST
 -> current batch
 -> fresh sequential workers
 -> fresh planner
 -> Question | Done
 ```
 
-The entry workflow coordinates existing durable owners before active state;
-Factory planners and workers never mutate Product Intent or Engineering.
+The entry workflow coordinates existing durable owners before active state.
+An initial Planner can ask while `current/request.md` is absent; exact Q/A
+are saved in preparation for continuation between sessions, and authorized
+durable owners run before renewed coverage and a fresh Planner. The first
+valid Task batch, not preflight alone, allows writing `current/request.md`
+LAST after its plan and answers. Factory planners and workers never mutate
+Product Intent or Engineering.
 
 Factory does not package or run a .NET workflow runtime. It has no Factory MCP
 transport, process supervisor, retry state machine, authoritative attempt
 history, or exact continuation protocol.
 
 The repository is authoritative implementation reality. Temporary continuation
-state contains only the original request, remaining current batch, short
-completed summaries, exact answers, and optional question/verification failure
-artifacts.
+state contains the original request and exact Q/A in
+`.idd/factory/preparation/` before activation and the original request,
+remaining batch, short completed summaries and exact answers in `current/`
+after activation. Only `current/request.md` denotes an active run.
+Pending preparation can be cancelled without undoing durable writes.
 
 Every planner and worker receives a fresh semantic context. Workers share the
 repository but do not inherit the root or sibling transcripts. Platforms are
@@ -251,15 +260,18 @@ Future tasks are self-contained.
 Factory deliberately uses at-least-once execution. An interrupted task may run
 again against current repository reality.
 
-Planner `# Question` stops orchestration for one user decision. Product-Intent
-answers use the normal outer Intent workflow. Ordinary implementation answers do
-not alter durable knowledge. A new durable Engineering decision cannot be
-applied while the Factory active marker exists; the run stays paused until it is
-completed/cancelled and the decision is included in a new complete request.
+Planner `# Question` stops orchestration for one user decision. Before
+activation, answers are classified against the complete base request and the
+original scope. A local choice creates no Engineering Rule; authorized
+Engineering changes use `idd-engineering-change`, with Product Intent
+updates afterward when both are required. After activation, a new durable
+Engineering decision cannot be applied while the active marker exists;
+the run stays paused until completed/cancelled and restarted with the decision.
 
-Planner `# Done` triggers existing project verification when configured.
-Failure is bounded input to a fresh planner; success completes the temporary
-run.
+Planner `# Done` uses existing final project verification when configured,
+even before the first Worker. Pre-activation success completes without an
+active run; failures provide bounded diagnostics to a fresh Planner, and
+repeated unchanged failure or `Not verified` is not a success.
 
 ## Routing Model
 
