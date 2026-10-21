@@ -61,20 +61,27 @@ if ($IsWindows) {
         $env:PATH = "$temp;$originalPath"
         $env:IDD_SWITCH_TEST_ARGS = Join-Path $temp 'args.txt'
         foreach ($source in @('local', 'published')) {
-            if (Test-Path -LiteralPath $env:IDD_SWITCH_TEST_ARGS) {
-                Remove-Item -LiteralPath $env:IDD_SWITCH_TEST_ARGS
-            }
-            & $env:ComSpec /D /C ('"' + $batch + '" ' + $source) | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                throw "BAT launcher failed for '$source' (exit $LASTEXITCODE)."
-            }
-            if (-not (Test-Path -LiteralPath $env:IDD_SWITCH_TEST_ARGS)) {
-                throw "BAT launcher did not invoke fake pwsh for '$source'."
-            }
-            $arguments = Get-Content -LiteralPath $env:IDD_SWITCH_TEST_ARGS -Raw
-            $expected = '-Source "' + $source + '"'
-            if (-not $arguments.Contains($expected)) {
-                throw "BAT launcher forwarded wrong arguments for '$source': $arguments"
+            foreach ($suffix in @('', ' -WithFactory')) {
+                if (Test-Path -LiteralPath $env:IDD_SWITCH_TEST_ARGS) {
+                    Remove-Item -LiteralPath $env:IDD_SWITCH_TEST_ARGS
+                }
+                & $env:ComSpec /D /C ('"' + $batch + '" ' + $source + $suffix) | Out-Null
+                if ($LASTEXITCODE -ne 0) {
+                    throw "BAT launcher failed for '$source$suffix' (exit $LASTEXITCODE)."
+                }
+                if (-not (Test-Path -LiteralPath $env:IDD_SWITCH_TEST_ARGS)) {
+                    throw "BAT launcher did not invoke fake pwsh for '$source$suffix'."
+                }
+                $arguments = Get-Content -LiteralPath $env:IDD_SWITCH_TEST_ARGS -Raw
+                $explicitSource = '-Source "' + $source + '"'
+                $positionalSource = '(?i)(?:^|\s)' + [regex]::Escape($source) + '(?:\s|$)'
+                if (-not $arguments.Contains($explicitSource) -and
+                    $arguments -notmatch $positionalSource) {
+                    throw "BAT launcher forwarded wrong source for '$source$suffix': $arguments"
+                }
+                if ($suffix -and -not $arguments.Contains('-WithFactory')) {
+                    throw "BAT launcher dropped -WithFactory for '$source': $arguments"
+                }
             }
         }
     }
