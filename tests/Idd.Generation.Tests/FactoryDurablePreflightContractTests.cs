@@ -168,9 +168,9 @@ public sealed class FactoryDurablePreflightContractTests(GenerationFixture fixtu
         var methodology = Repo("docs", "methodology.md");
 
         Assert.Contains("Factory Preflight", workflow);
-        Assert.Contains("planner and", usingIdd);
-        Assert.Contains("workers themselves remain implementation-only", usingIdd);
-        Assert.Contains("Factory planners and workers never mutate Product Intent or Engineering", methodology);
+        Assert.Contains("Planner and Workers remain implementation-only", usingIdd);
+        Assert.Contains("Planner and Workers remain implementation-only", usingIdd);
+        Assert.Contains("Factory planners and workers never mutate", methodology);
         Assert.DoesNotContain("Factory must not create or change product intent", usingIdd);
     }
 
@@ -280,10 +280,10 @@ public sealed class FactoryDurablePreflightContractTests(GenerationFixture fixtu
         var engineering = Canonical("methodology", "engineering-guardrails.md");
         var intent = Repo(".idd", "intent", "IDD-0001.spec-factory-orchestration.md");
 
-        Assert.Contains("Absence of the Engineering layer is valid", run);
+        Assert.Contains("Absence of the Engineering layer is valid and produces no warning", Canonical("methodology", "intent-preflight.md"));
         Assert.Contains("pending", engineering);
         Assert.Contains("preparation/", intent);
-        Assert.Contains("after the first valid executable plan", intent);
+        Assert.Contains("AFTER the first valid executable plan", intent);
         Assert.Contains("at-least-once", intent);
     }
 
