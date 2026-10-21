@@ -520,7 +520,10 @@ implementation, `idd-factory-run` may coordinate those existing durable owners
 during entry preflight. It passes the complete logical request to
 `idd-engineering-change`, performs any required Product Intent mutation through
 normal Intent workflows, validates durable coverage, and creates active Factory
-state only afterward. Factory does not duplicate Engineering ownership,
+state only after a fresh initial Planner yields a validated executable Task batch.
+Before activation its questions may lead to further authorized durable-owner
+work and renewed coverage validation; a `# Done` with successful final
+verification needs no active run. Factory does not duplicate Engineering ownership,
 equivalence, allocator, or mutation logic.
 
 The Engineering mutation happens before active Factory state is created. An

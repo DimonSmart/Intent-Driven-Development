@@ -31,8 +31,8 @@ handoff, durable coverage validation, and eventual
 New:
 - no active simplified Factory run is being continued;
 - run durable preflight on the materialized current request;
-- create Factory temporary state only after durable preparation and coverage
-  validation succeed.
+- create persistent preparation after durable preparation and coverage
+  validation succeed; activate only after a valid initial Planner Task batch.
 
 Replacement:
 - resolve one complete self-contained replacement request first;
@@ -43,7 +43,10 @@ Replacement:
   temporary state only after successful preflight and coverage validation.
 
 Continue:
-- do not repeat initial preflight.
+- active `current/request.md`: do not repeat initial preflight;
+- absent marker with valid `preparation/request.md`: resume preparation from
+  exact saved context and outstanding question, without inherited transcript.
+  Never silently merge a different new request into that preparation.
 
 A legacy `.idd/factory/current/state.json` is not an active state-machine
 contract. Do not interpret or migrate it. The active simplified-run marker is
@@ -210,8 +213,12 @@ For a new run, execute durable preflight in this order:
 
 8. perform required Product Intent mutation through existing Intent workflows
 9. validate durable coverage against the complete logical request
-10. only then create .idd/factory/current/request.md
-11. start a fresh planner
+10. persist .idd/factory/preparation/request.md (complete base request)
+11. start the fresh initial planner while current/request.md is ABSENT
+12. on Question: save exact Q/A, reclassify, use authorized owners, revalidate,
+    then start a NEW fresh planner; on Done: run final verification without activation
+13. on validated Task batch: prepare current/plan.md and exact answers
+14. create current/request.md LAST; only then start workers
 ```
 
 Engineering management precedes the Product Intent write because
@@ -248,12 +255,46 @@ semantic equivalence.
 
 ## Request identity
 
-Only after successful durable preflight may a new Factory run write
-`.idd/factory/current/request.md`.
+Only after successful durable preflight may a new Factory run begin
+`.idd/factory/preparation/request.md` and start the initial Planner.
+Only after a validated executable Task batch may it write
+`.idd/factory/current/request.md`, LAST, after preparing `current/plan.md`
+and necessary exact Q/A. The active marker contains the original complete
+self-contained implementation base request, not its answers, a route result,
+a plan, a preflight report or a rewrite.
 
-Its contents are the complete self-contained logical implementation request that
-was analyzed, not the updated Intent documents, Engineering summary, route
-result, plan, preflight report, or short rewrite.
+## Preparation questions and renewed coverage
+
+The initial Planner is the ordinary read-only Factory Planner with the normal
+`# Task`, `# Question`, and `# Done` outcomes. A valid single Question
+before activation remains in `preparation/question.md`; record exact
+chronological Q/A in `preparation/answers.md`. Classify the whole base request
+plus every applicable clarification, not the last answer alone. Before any new
+durable mutation, repeat request-level blocker checks, including conflicts and
+the original requested scope. Answers do not implicitly relax `implementation-only`
+or other explicit restrictions.
+
+An implementation-local answer does not create a Rule. Authorized Engineering
+answers go to `idd-engineering-change` with the full original request, all
+relevant exact Q/A and the latest exact question. Authorized product changes
+go to normal Intent owners. Both types may apply to the same answer; Engineering
+must complete before Product Intent mutation. Handle `success`/`no-op` by
+renewed coverage validation; `ambiguous`/`blocked` stop and preserve
+preparation, without activation. Completed durable writes are not rolled back.
+
+Coverage considers the original base request, applicable exact clarifications,
+current durable knowledge, safety, non-goals, structural Engineering validity
+and requested scope. A materially changed repository or durable layer after
+planning invalidates stale Tasks and requires fresh planning. Invalid Planner
+output is a protocol diagnostic, not an executable batch. Questions may repeat
+only after meaningful new user input or repository change; no blind retries.
+
+`# Done` before activation uses existing `final` project verification.
+Success cleans preparation without creating a marker. Failure records a bounded
+`preparation/verification-failure.md` for a fresh Planner; unresolved
+confirmation, `Not verified`, or an unchanged repeated failure cannot be
+declared success. Preserve preparation for resumable blockers; explicitly
+cancelled preparation may be removed without undoing durable writes.
 
 ## Replacement semantics
 
