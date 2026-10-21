@@ -15,10 +15,15 @@ This is the orchestration entry point.
 For a new run it performs Factory Preflight: materialize the complete logical
 request, analyze Product Intent, hand explicit durable Engineering decisions to
 `idd-engineering-change` when required, apply required Product Intent through
-normal Intent workflows, validate durable coverage, and only then create active
-Factory state. It then maintains minimal temporary continuation state, invokes a
-fresh planner and sequential fresh workers, handles one planner question, and
-runs configured project verification after planner `# Done`.
+normal Intent workflows, and validate durable coverage. It then saves the full
+base request in `.idd/factory/preparation/request.md` and invokes a fresh
+initial Planner WHILE FACTORY IS INACTIVE. Initial `# Question` saves exact
+Q/A, reclassifies the full context under the requested scope, invokes only
+authorized durable owners and starts a new fresh Planner. Initial `# Done`
+runs existing final verification without creating an active run. Initial valid
+Tasks are saved to `current/plan.md`; only then is
+`current/request.md` written LAST, enabling sequential Workers. Active
+Planner questions and Engineering guardrails keep their existing restrictions.
 
 Immediately before each worker spawn it mechanically maps the task's
 `ExecutionProfile` through optional `.idd/execution.yaml`. New planner output
@@ -73,9 +78,14 @@ The planner is not a user-invokable skill. `idd-factory-run` creates a fresh
 planner child and supplies the complete packaged
 `references/factory-planner.md` protocol.
 
-A fresh planner inspects the original request, repository, relevant current
-intent, exact user answers, bounded completed summaries, and the latest bounded
-verification failure. It does not read `.idd/execution.yaml`.
+The same fresh Planner protocol accepts either
+`preparation/request.md` and `preparation/answers.md` before activation, or
+`current/request.md` and `current/answers.md` afterward. These carry the
+unchanged original request and chronological exact Q/A as separate inputs.
+The Planner inspects the repository and relevant current Intent and Engineering,
+with bounded completed summaries only after Workers have started and the
+phase-appropriate verification failure when present. It does not read
+`.idd/execution.yaml`.
 
 A task may contain:
 
