@@ -11,6 +11,15 @@ The host is started with MultiAgentV2 explicitly enabled; a model-selected
 runtime that does not report V2 fails the evaluation instead of silently
 testing a different spawn protocol.
 
+The new preparation-before-activation contract additionally requires explicit
+native-host scenarios: initial `# Question` with no active marker/Worker,
+authorized Engineering owner handoff from exact saved Q/A, fresh Planner,
+validated initial Task batch, marker-last activation and first Worker; plus
+pre-activation `# Done` with successful/failing final verification, and
+recovery from interrupted preparation. These live traces are not simulated by
+static contract tests and must not be marked passed unless a compatible host
+actually executes them.
+
 The evaluation checks observable properties:
 
 - the generated plugin contains no Factory runtime directory or `.mcp.json`;

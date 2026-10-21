@@ -24,10 +24,12 @@ public sealed class FactoryDurablePreflightContractTests(GenerationFixture fixtu
 
         var engineering = run.IndexOf("invoke idd-engineering-change with the complete logical request", StringComparison.Ordinal);
         var intent = run.IndexOf("apply required Product Intent mutation through existing intent workflows", StringComparison.Ordinal);
-        var state = run.IndexOf("create .idd/factory/current/request.md", StringComparison.Ordinal);
+        var initialPlanner = run.IndexOf("run a fresh initial Factory planner while current/request.md is absent", StringComparison.Ordinal);
+        var activation = run.IndexOf("create current/request.md LAST", StringComparison.Ordinal);
 
         Assert.True(engineering >= 0 && engineering < intent);
-        Assert.True(intent < state);
+        Assert.True(intent < initialPlanner);
+        Assert.True(initialPlanner < activation);
     }
 
     [Fact]
@@ -52,6 +54,8 @@ public sealed class FactoryDurablePreflightContractTests(GenerationFixture fixtu
         Assert.Contains("complete self-contained logical request", preflight);
         Assert.Contains("Do not substitute a route summary", preflight);
         Assert.Contains("Only after successful durable preflight", preflight);
+        Assert.Contains("preparation/request.md", preflight);
+        Assert.Contains("unchanged base request", Canonical("factory", "planner.md"));
     }
 
     [Fact]
@@ -169,4 +173,148 @@ public sealed class FactoryDurablePreflightContractTests(GenerationFixture fixtu
         Assert.Contains("Factory planners and workers never mutate Product Intent or Engineering", methodology);
         Assert.DoesNotContain("Factory must not create or change product intent", usingIdd);
     }
+
+    [Fact]
+    public void InitialPlanner_ReceivesPreparationAndActiveInputsThroughSameProtocol()
+    {
+        var planner = Canonical("factory", "planner.md");
+        var run = Canonical("skills", "idd-factory-run.md");
+
+        Assert.Contains("preparation/request.md", planner);
+        Assert.Contains("current/request.md", planner);
+        Assert.Contains("preparation/answers.md", planner);
+        Assert.Contains("current/answers.md", planner);
+        Assert.Contains("No `completed.md` exists before any Worker", run);
+        Assert.Contains("read-only Factory Planner", Canonical("methodology", "intent-preflight.md"));
+        Assert.Contains("fork_turns: \"none\"", run);
+        Assert.Contains("idd_factory_planner_01", run);
+    }
+
+    [Fact]
+    public void InitialQuestion_LeavesRunInactiveAndPersistsExactQuestionAnswer()
+    {
+        var run = Canonical("skills", "idd-factory-run.md");
+        var planner = Canonical("factory", "planner.md");
+
+        Assert.Contains("Do NOT write `current/request.md` or `current/plan.md`", run);
+        Assert.Contains("preparation/question.md", run);
+        Assert.Contains("question AND answer verbatim", run);
+        Assert.Contains("chronological exact question-and-answer pairs", planner);
+        Assert.Contains("NEW isolated planner", run);
+    }
+
+    [Fact]
+    public void PreparationAnswers_UseAuthorizedOwnersBeforeFreshPlanning()
+    {
+        var run = Canonical("skills", "idd-factory-run.md");
+        var preflight = Canonical("methodology", "intent-preflight.md");
+
+        Assert.Contains("does not implicitly promote", run);
+        Assert.Contains("Engineering before Product Intent", run);
+        Assert.Contains("ambiguous", run);
+        Assert.Contains("blocked", run);
+        Assert.Contains("request-level blocker checks", preflight);
+        Assert.Contains("original requested scope", preflight);
+        Assert.Contains("preparation/answers.md", preflight);
+    }
+
+    [Fact]
+    public void ValidFirstBatch_ActivatesOnceAndWorkersRequireBothFiles()
+    {
+        var run = Canonical("skills", "idd-factory-run.md");
+
+        Assert.Contains("THAT exact Task batch", run);
+        Assert.Contains("exactly one explicit `# ExecutionProfile`", run);
+        Assert.Contains("existing unique Conditional", run);
+        Assert.Contains("Only after BOTH", run);
+        Assert.Contains("current/request.md` LAST", run);
+        Assert.Contains("legacy", run);
+        Assert.Contains("without `# ExecutionProfile` remain valid", run);
+    }
+
+    [Fact]
+    public void BeforeActivationDone_IsVerifiedWithoutEmptyActiveRun()
+    {
+        var run = Canonical("skills", "idd-factory-run.md");
+        var preflight = Canonical("methodology", "intent-preflight.md");
+
+        Assert.Contains("`# Done` before activation", run);
+        Assert.Contains("`final` context", run);
+        Assert.Contains("WITHOUT active marker or empty plan", run);
+        Assert.Contains("preparation/verification-failure.md", run);
+        Assert.Contains("Not verified", run);
+        Assert.Contains("unchanged repeated failure", preflight);
+    }
+
+    [Fact]
+    public void MalformedPlannerAndBrokenOwner_DoNotActivate()
+    {
+        var run = Canonical("skills", "idd-factory-run.md");
+
+        Assert.Contains("Empty/mixed/malformed Planner output", run);
+        Assert.Contains("unresolved IDs", run);
+        Assert.Contains("Preserve preparation", run);
+        Assert.Contains("material changes invalidate", run);
+        Assert.Contains("same failure persists", run);
+    }
+
+    [Fact]
+    public void PreparationResumeAndCancellation_DoNotChangeActiveGuard()
+    {
+        var run = Canonical("skills", "idd-factory-run.md");
+        var preflight = Canonical("methodology", "intent-preflight.md");
+        var change = Canonical("skills", "idd-engineering-change.md");
+
+        Assert.Contains("restore the full base request", run);
+        Assert.Contains("ask whether to continue", run);
+        Assert.Contains("never roll back", run);
+        Assert.Contains("orphaned inactive files", run);
+        Assert.Contains("resume preparation from", preflight);
+        Assert.Contains("If it exists, return `blocked` and mutate nothing", change);
+    }
+
+    [Fact]
+    public void OptionalEngineeringAndDualScopeStayCompatible()
+    {
+        var run = Canonical("skills", "idd-factory-run.md");
+        var engineering = Canonical("methodology", "engineering-guardrails.md");
+        var intent = Repo(".idd", "intent", "IDD-0001.spec-factory-orchestration.md");
+
+        Assert.Contains("Absence of the Engineering layer is valid", run);
+        Assert.Contains("pending", engineering);
+        Assert.Contains("preparation/", intent);
+        Assert.Contains("after the first valid executable plan", intent);
+        Assert.Contains("at-least-once", intent);
+    }
+
+    [Fact]
+    public void CanonicalPluginReferences_AreDeclaredForBothPlatforms()
+    {
+        var manifest = Canonical("plugins", "plugin-manifest.json");
+        var planner = Canonical("factory", "planner.md");
+        var preflight = Canonical("methodology", "intent-preflight.md");
+
+        Assert.Contains("src/canonical/factory/planner.md", manifest);
+        Assert.Contains("src/canonical/methodology/intent-preflight.md", manifest);
+        Assert.Contains("src/canonical/methodology/engineering-guardrails.md", manifest);
+        Assert.Contains("before activation", planner);
+        Assert.Contains("fresh initial planner", preflight);
+    }
+
+    [Fact]
+    public void UserFacingFactoryDocs_DescribeMarkerLastActivation()
+    {
+        var workflow = Repo("docs", "factory-workflow.md");
+        var usingIdd = Repo("docs", "using-idd.md");
+        var methodology = Repo("docs", "methodology.md");
+        var engineering = Repo("docs", "engineering-guardrails.md");
+
+        Assert.Contains("fresh initial Planner [INACTIVE]", workflow);
+        Assert.Contains("current/request.md LAST", workflow);
+        Assert.Contains("preparation/question.md", workflow);
+        Assert.Contains("Only `current/request.md`", methodology);
+        Assert.Contains("preparation/", usingIdd);
+        Assert.Contains("Engineering mutation is blocked", engineering);
+    }
+
 }
