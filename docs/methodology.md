@@ -91,6 +91,25 @@ commands tied only to the current toolchain
 implementation-only durable conventions that belong in Engineering
 ```
 
+## Technical autonomy versus durable policy
+
+IDD distinguishes what the product must do (Intent), which implementation
+constraints must bind *future* work (Engineering), and which technical
+means are locally chosen for the current Task. Factory may choose a
+compatible library, algorithm, internal structure or new application's
+configuration value without special permission, even when that choice
+lasts for years. Ordinary implementation choices do not become Rules
+automatically.
+
+By contrast, requiring the chosen library across all future tasks,
+changing a shipped identity or altering distribution/trust policy needs
+appropriate authority and the existing durable owner workflow. All
+existing Rules remain mandatory. A Planner leaving implementation
+alternatives to Worker must semantically include relevant Conditional
+Rules, or narrow/research the approach before execution. Worker cannot
+discover additional Conditional rules. Technical facts are established
+through research, not by asking users to guess them.
+
 ## Optional Engineering Guardrails
 
 A project may optionally keep durable implementation constraints in

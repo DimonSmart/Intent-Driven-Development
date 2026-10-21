@@ -36,6 +36,33 @@ All dialogs obtain keyboard behavior from the shared Dialog component.
 
 ADRs may remain in `.idd/intent/` and explain why an Engineering Rule exists.
 
+## Implementation choice is not automatically Engineering policy
+
+Factory may independently choose a compatible internal algorithm, library,
+component layout or new-app configuration value, even when the decision
+will last years. It needs no explicit "choose yourself" instruction and
+does not add an Engineering Rule merely because the implementation works.
+An obligation that *all future components* use the same technology
+requires an explicit authoritative policy and `idd-engineering-change`.
+A technical ADR may explain rationale but does not create policy by itself.
+
+For a new macOS app, Factory can select a consistent `CFBundleIdentifier`
+without creating a Rule. Changing a distributed identity or established
+permissions, registering an external identifier, accepting license terms,
+or choosing a new Developer ID/notarization trust policy may instead
+need specific product/policy authority. Delegation cannot waive existing
+Intent or Engineering Rules or authorize external commitments.
+
+For example, a Conditional Rule might require special protection of
+secrets **when a local database is used**. If Planner leaves database
+and non-database approaches open to Worker, it must include the relevant
+Conditional Rule ID in `TaskRelatedEngineering` before Worker execution
+(or choose/research a narrower approach). A Conditional Rule in the
+assignment applies only when its condition holds. Worker may not
+discover or edit additional Rule IDs; insufficient coverage is a
+blocker returned to Factory for fresh planning, not permission to ignore
+the Rule.
+
 ## Managing Engineering Rules
 
 Use `idd-engineering-change` for ordinary explicit durable Rule add, modify,

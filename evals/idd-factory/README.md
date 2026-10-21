@@ -41,6 +41,13 @@ The trace should contain native child-agent dispatch and no
 
 Do not emulate the removed deterministic state machine in the eval harness.
 
+## Additional autonomous-choice evaluations
+
+Use [E01–E10 autonomous-decision live protocol](autonomous-technical-decisions.md)
+for technical choice without delegation, bounded user questions, active-run
+policy protection and Conditional Rule selection. These require actual
+native Planner/Worker traces; static contract tests do not replace them.
+
 ## Artifacts
 
 Every Live run creates a dedicated directory under:

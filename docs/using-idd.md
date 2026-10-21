@@ -259,6 +259,24 @@ Normalize the documents for topic X without changing product meaning. Propose th
 
 Audit and lint may inspect an existing glossary, but they do not build or maintain it. Use `idd-glossary-build` explicitly for glossary changes.
 
+## Let Factory select implementation details
+
+Factory normally chooses compatible algorithms, libraries, private
+structures and new-app configuration values without asking you to pick
+among equally valid technical options. A selected technique is not
+automatically a future-facing Engineering standard. "Choose yourself"
+confirms this limited autonomy; it cannot waive Product Intent, Engineering
+Rules, explicit scope, account/expense permissions, or a product contract.
+
+If one delegated storage method triggers a Conditional Rule requiring
+secret protection, Planner must supply that Rule's ID *before* Worker
+chooses, or narrow the implementation. Worker cannot expand the packet
+and must report insufficient rule coverage. Missing product/policy
+requirements at request preflight stop before `preparation/` exists.
+A genuine question from a later initial Planner instead uses
+`preparation/question.md` and does not activate Factory. Uncertain
+platform API facts can be investigated through a bounded research Task.
+
 ## Use Factory for Larger Work
 
 Install optional `idd-factory`, then provide the complete task once:

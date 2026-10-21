@@ -42,6 +42,27 @@ No response silently expands requested scope. A missing Engineering layer is
 normal and is not bootstrapped merely by entering Factory.
 
 
+## Autonomous choices and genuine questions
+
+Request-level `MissingIntentDecision` or `EngineeringDecisionMissing`
+blocks **before durable writes and `preparation/`**. An initial Planner
+can separately return `# Question` *after* successful preflight; this
+uses `preparation/question.md` and `preparation/answers.md`, but
+neither situation creates an active marker.
+
+An unchosen library, internal algorithm or new-app identifier normally
+needs only a compatible technical choice, not a project-wide Engineering
+policy or an approval phrase. Unverified platform facts may warrant a
+bounded research Task followed by a fresh Planner. Missing product
+behavior, incompatible mandatory rules and externally binding identity,
+signing or commercial decisions still require actual authority.
+
+If Worker is free to choose storage technology and a Conditional Rule
+applies to local-database secrets, Planner must send that ID before
+delegation or narrow the approach first. Worker must stop and report
+missing Rule coverage rather than silently ignoring it; it never
+updates Engineering during the active run.
+
 ## Replacement and active-run safety
 
 Continuation of the current run does not repeat preflight.
