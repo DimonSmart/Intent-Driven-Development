@@ -220,4 +220,31 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
         }
     }
 
+
+    [Fact]
+    public void LocalTechnicalChoice_DoesNotPromoteToEngineeringPolicy()
+    {
+        var guardrails = Canonical("methodology", "engineering-guardrails.md");
+        var change = Canonical("skills", "idd-engineering-change.md");
+        Assert.Contains("## Authority for technical decisions", guardrails);
+        Assert.Contains("Autonomous Technical Decision", guardrails);
+        Assert.Contains("New or Changed Durable Decision", guardrails);
+        Assert.Contains("A decision can last years", guardrails);
+        Assert.Contains("Never promote a successful spike", guardrails);
+        Assert.Contains("explicit durable implementation-only project decisions", change);
+    }
+
+    [Fact]
+    public void ConditionalSelection_RemainsSemanticAndPlannerOwned()
+    {
+        var guardrails = Canonical("methodology", "engineering-guardrails.md");
+        var planner = Canonical("factory", "planner.md");
+        var worker = Canonical("factory", "worker.md");
+        Assert.Contains("Planner selects Conditional", guardrails);
+        Assert.Contains("every realistic", guardrails);
+        Assert.Contains("Do not discover extra Conditional rules by filename", planner);
+        Assert.Contains("Do not search for extra Conditional IDs", worker);
+        Assert.Contains("uncovered-constraint diagnostic", worker);
+    }
+
 }

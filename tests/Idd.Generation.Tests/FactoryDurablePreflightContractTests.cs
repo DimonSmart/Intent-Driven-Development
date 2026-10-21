@@ -317,4 +317,116 @@ public sealed class FactoryDurablePreflightContractTests(GenerationFixture fixtu
         Assert.Contains("Engineering mutation is blocked", engineering);
     }
 
+
+    [Fact]
+    public void TechnicalDecisions_AreNotNewDurablePolicyByDefault()
+    {
+        var preflight = Canonical("methodology", "intent-preflight.md");
+        var guardrails = Canonical("methodology", "engineering-guardrails.md");
+        var noPolicy = preflight.IndexOf("### NoEngineeringManagementNeeded", StringComparison.Ordinal);
+        var newPolicy = preflight.IndexOf("### EngineeringManagementRequired", StringComparison.Ordinal);
+        var missingPolicy = preflight.IndexOf("### EngineeringDecisionMissing", StringComparison.Ordinal);
+        Assert.True(noPolicy >= 0 && noPolicy < newPolicy && newPolicy < missingPolicy);
+        Assert.Contains("even without \"choose yourself\"", preflight);
+        Assert.Contains("EngineeringDecisionMissing does not mean", preflight);
+        Assert.Contains("## Authority for technical decisions", guardrails);
+        Assert.Contains("must constrain future implementations", guardrails);
+        Assert.Contains("Never promote a successful spike", guardrails);
+    }
+
+    [Fact]
+    public void RealPreflightBlocker_PrecedesPreparationAndFirstPlanner()
+    {
+        var run = Canonical("skills", "idd-factory-run.md");
+        var preflight = Canonical("methodology", "intent-preflight.md");
+        var workflow = Canonical("methodology", "common-workflows.md");
+        Assert.Contains("NOT an initial Planner `# Question`", preflight);
+        Assert.Contains("before durable writes, `preparation/`, and", run);
+        var preparation = workflow.LastIndexOf("-> persist .idd/factory/preparation/request.md", StringComparison.Ordinal);
+        var planner = workflow.IndexOf("-> fresh initial Planner [INACTIVE]", preparation, StringComparison.Ordinal);
+        var marker = workflow.IndexOf("-> create .idd/factory/current/request.md LAST [ACTIVE]", planner, StringComparison.Ordinal);
+        Assert.True(preparation >= 0 && preparation < planner && planner < marker);
+    }
+
+    [Fact]
+    public void PlannerSuppliesRulesForWorkerDelegatedAlternatives()
+    {
+        var planner = Canonical("factory", "planner.md");
+        var worker = Canonical("factory", "worker.md");
+        var run = Canonical("skills", "idd-factory-run.md");
+        var intent = Repo(".idd", "intent", "IDD-0001.spec-factory-orchestration.md");
+        Assert.Contains("*before* delegating the", planner);
+        Assert.Contains("The Rules remain Conditional", planner);
+        Assert.Contains("Do not rely on Worker to discover", planner);
+        Assert.Contains("extra Conditional IDs", worker);
+        Assert.Contains("uncovered-constraint diagnostic", worker);
+        Assert.Contains("*before* Worker spawn", run);
+        Assert.Contains("reports missing coverage as", intent);
+    }
+
+    [Fact]
+    public void WorkerAutonomy_DoesNotBypassActiveRunPolicyProtection()
+    {
+        var worker = Canonical("factory", "worker.md");
+        var run = Canonical("skills", "idd-factory-run.md");
+        var guardrails = Canonical("methodology", "engineering-guardrails.md");
+        Assert.Contains("No explicit user delegation phrase is needed", worker);
+        Assert.Contains("Respect explicit scope, Product Intent", worker);
+        Assert.Contains("does not modify Rule IDs", worker);
+        Assert.Contains("A new Engineering policy remains forbidden during an active run", run);
+        Assert.Contains("Active `current/request.md` still prohibits Rule edits", guardrails);
+        Assert.Contains("external identity", guardrails);
+    }
+
+    [Fact]
+    public void PlannerOutputProtocol_DoesNotIntroduceDecisionSection()
+    {
+        var planner = Canonical("factory", "planner.md");
+        Assert.Contains("# ExecutionProfile", planner);
+        Assert.Contains("# TaskRelatedIntent", planner);
+        Assert.Contains("# TaskRelatedEngineering", planner);
+        Assert.Contains("# Question", planner);
+        Assert.Contains("# Done", planner);
+        Assert.DoesNotContain("# Decision", planner);
+        Assert.Contains("existing pending plans", planner);
+    }
+
+    [Fact]
+    public void LiveCases_RequireRealTracesAndSeparateNotRunStatus()
+    {
+        var live = Repo("evals", "idd-factory", "autonomous-technical-decisions.md");
+        for (var id = 1; id <= 10; id++)
+            Assert.Contains($"E{id:00}", live);
+        Assert.Contains("codex-trace.jsonl", live);
+        Assert.Contains("preparation/", live);
+        Assert.Contains("current/", live);
+        Assert.Contains("not run", live);
+        Assert.Contains("never counted as passed", live);
+    }
+
+    [Theory]
+    [InlineData("T01 T03 T17", "src/canonical/methodology/intent-preflight.md", "even without \"choose yourself\"")]
+    [InlineData("T02 T07", "src/canonical/methodology/engineering-guardrails.md", "Existing Mandatory Constraint")]
+    [InlineData("T04", "src/canonical/methodology/intent-preflight.md", "### MissingIntentDecision")]
+    [InlineData("T05", "src/canonical/methodology/intent-preflight.md", "### EngineeringDecisionMissing")]
+    [InlineData("T06", "src/canonical/factory/planner.md", "without requiring the user to say")]
+    [InlineData("T08", "src/canonical/factory/planner.md", "bounded research Task")]
+    [InlineData("T09 T10", "src/canonical/methodology/engineering-guardrails.md", "published identity")]
+    [InlineData("T11", "src/canonical/methodology/engineering-guardrails.md", "incompatible mandatory constraints")]
+    [InlineData("T12", "src/canonical/methodology/intent-preflight.md", "If the layer is absent")]
+    [InlineData("T13", "src/canonical/methodology/intent-preflight.md", "idd-engineering-change")]
+    [InlineData("T14", "src/canonical/skills/idd-factory-run.md", "active run")]
+    [InlineData("T15", "src/canonical/factory/planner.md", "# ExecutionProfile")]
+    [InlineData("T16", "src/canonical/factory/planner.md", "Multiple technical choices alone")]
+    [InlineData("T18", "src/canonical/factory/planner.md", "Conditional")]
+    [InlineData("T19", "src/canonical/factory/worker.md", "uncovered-constraint diagnostic")]
+    [InlineData("T20", "src/canonical/methodology/intent-preflight.md", "NOT an initial Planner")]
+    [InlineData("T21", "src/canonical/methodology/common-workflows.md", "create .idd/factory/current/request.md LAST")]
+    [InlineData("T22", "src/canonical/methodology/engineering-guardrails.md", "purchases")]
+    public void AutonomousDecisionCases_ReferenceRequiredContracts(string caseLabel, string path, string clause)
+    {
+        Assert.False(string.IsNullOrWhiteSpace(caseLabel));
+        Assert.Contains(clause, Repo(path.Split('/')));
+    }
+
 }
