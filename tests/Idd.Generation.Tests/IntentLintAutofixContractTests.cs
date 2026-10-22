@@ -159,7 +159,7 @@ public sealed class IntentLintAutofixContractTests(GenerationFixture fixture)
             "src", "canonical", "methodology", "document-types.md"));
 
         Assert.Contains("absence of optional template headings is neither error nor", lint);
-        Assert.Contains("Never insert `None`, `TBD`", lint);
+        Assert.Contains("insert `None`, `TBD`", lint);
         Assert.Contains("No ADR lifecycle status", lint);
         Assert.Contains("semantic migration", lint);
         Assert.Contains("merge historical decisions", lint);

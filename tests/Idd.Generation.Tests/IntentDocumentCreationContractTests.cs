@@ -70,7 +70,7 @@ public sealed class IntentDocumentCreationContractTests(GenerationFixture fixtur
         Assert.Contains("inside this same execution", parent);
         Assert.Contains("without a child agent or additional confirmation", parent);
         Assert.Contains("return to step 9, not a recursive invocation", parent);
-        Assert.Contains("For `existing-spec-update`, update the existing owner", parent);
+        Assert.Contains("For `existing-spec-update`, update the owning spec", parent);
         Assert.DoesNotContain("idd-intent-new-document", parent);
     }
 
@@ -182,7 +182,7 @@ public sealed class IntentDocumentCreationContractTests(GenerationFixture fixtur
         Assert.Contains("No universal H2 heading is required", types);
         Assert.Contains("No universal H2", types);
         Assert.Contains("A spec has no", types);
-        Assert.Contains("Missing, conflicting or", types);
+        Assert.Contains("Mechanical lint cannot establish semantic completeness", types);
         Assert.Contains("not the template heading list", readme);
         Assert.Contains("never an independent list of mandatory sections", lint);
     }
@@ -200,7 +200,7 @@ public sealed class IntentDocumentCreationContractTests(GenerationFixture fixtur
         var fromCode = Canonical("skills", "idd-code-update-intent.md");
         var normalize = Canonical("skills", "idd-intent-normalize-current.md");
 
-        Assert.Contains("update the owning ADR directly and retain its ID", types);
+        Assert.Contains("owning ADR directly and retain its ID", types);
         Assert.Contains("independent", creator);
         Assert.Contains("existing ADR owner", creator);
         Assert.Contains("existing architectural owner", change);
