@@ -187,4 +187,23 @@ public sealed class IntentDocumentCreationContractTests(GenerationFixture fixtur
     }
 
 
+    [Theory]
+    [InlineData("claude")]
+    [InlineData("codex")]
+    public void SemanticDocumentTypeReference_IsPackagedForCreationImportAndBootstrap(string platform)
+    {
+        var typeContract = GenerationFixture.NormalizeText(
+            Canonical("methodology", "document-types.md"));
+
+        foreach (var skill in new[]
+            { "idd-intent-change", "idd-intent-import", "idd-intent-bootstrap", "idd-intent-lint" })
+        {
+            var path = Path.Combine(fixture.MarketplaceRoot, "plugins", platform,
+                "idd-intent", "skills", skill, "references", "document-types.md");
+            Assert.Equal(typeContract,
+                GenerationFixture.NormalizeText(fixture.ReadText(path)));
+        }
+    }
+
+
 }

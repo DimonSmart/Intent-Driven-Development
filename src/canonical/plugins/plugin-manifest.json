@@ -107,6 +107,21 @@
           "destination": "glossary-integration.md"
         },
         {
+          "skill": "idd-intent-bootstrap",
+          "source": "src/canonical/methodology/document-types.md",
+          "destination": "document-types.md"
+        },
+        {
+          "skill": "idd-intent-import",
+          "source": "src/canonical/methodology/document-types.md",
+          "destination": "document-types.md"
+        },
+        {
+          "skill": "idd-intent-change",
+          "source": "src/canonical/methodology/document-types.md",
+          "destination": "document-types.md"
+        },
+        {
           "skill": "idd-intent-lint",
           "source": "src/canonical/methodology/document-types.md",
           "destination": "document-types.md"
