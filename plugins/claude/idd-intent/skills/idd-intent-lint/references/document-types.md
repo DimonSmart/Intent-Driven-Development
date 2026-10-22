@@ -61,38 +61,43 @@ areas depend on it.
 
 ## adr
 
-`adr` describes a durable architectural decision, including decisions that later
-turned out to be wrong.
+`adr` is a **living record of the currently accepted architectural decision**
+for a stable architectural area. It is not an immutable event or a versioned
+decision history. Its presence among current `.idd/intent/` documents means
+that its decision is normative; no lifecycle status is used.
 
-An ADR answers why a decision seemed correct, which alternatives were
-considered, and which consequences were accepted.
+**Semantic contract:** explain the current architectural choice, its context,
+rationale, significant alternatives, relevant findings from experiments, and
+consequences or tradeoffs. The ADR must be self-contained without requiring
+deleted documents or Git history. Preserve former experimental findings only
+when they explain the current decision or prevent known errors; do not retain
+a chronology of implementation iterations. Do not invent reasons or results.
 
-**Semantic contract:** record an architectural decision and enough available
-context, alternatives, rationale and consequences to understand it. `Decision`,
-`Context`, `Alternatives Considered`, `Consequences` and `Supersedes` are
-not universally mandatory H2 headings. Known relevant information must still
-be preserved; do not invent reasons or alternatives.
+**Mechanical contract:** the common stable ID, filename, first H1, unique INDEX
+entry and valid normative references. No universal H2 heading is required.
+`Context`, `Decision`, `Alternatives Considered`, `Experiments and Findings`,
+and `Consequences` are example headings only. Do not require lifecycle
+`Status`, `Supersedes`, `Superseded By`, or history-oriented `Replaces`.
 
-**Mechanical contract:** in addition to common identity and normative
-relations, every ADR needs one unambiguous machine-recognizable status with
-a single allowed value. `## Status` is canonical; preserve existing
-supported unambiguous status representations. Missing, conflicting or
-placeholder multi-value statuses are errors. The status enables ADR lifecycle
-processing, not template matching.
+When the decision changes within the same architectural responsibility, update
+the owning ADR directly and retain its ID, even if the technical approach
+changes. Create a new ADR only for a genuinely independent architectural
+decision without an existing owner. Ordinary implementation-local decisions
+need no ADR. An unresolved choice belongs in a spike or the existing decision
+workflow, not a `Proposed` ADR; rejected alternatives can be included in the
+current ADR's rationale but not as separate `Rejected` ADRs.
 
-Accepted ADRs must not be rewritten semantically. If the decision changes,
-mark the old ADR as `Superseded` and create a new ADR that replaces it.
+When an architectural area disappears, loses durable relevance or duplicates
+another ADR, use an authorized semantic workflow to transfer useful knowledge
+to the appropriate current owner, reconcile current normative references and
+INDEX, and delete obsolete records. Retain the ID of the best architectural
+owner, not necessarily the newest number. Deleted IDs are not reused; Git
+preserves revisions. Do not create archives or tombstones.
 
-ADR status values are:
-
-```text
-Proposed | Accepted | Superseded | Rejected
-```
-
-ADR status is part of the decision record lifecycle and does not apply to specs.
-
-ADRs are decision records, not current behavior specs. Do not archive ADRs. The
-replacing ADR should reference the superseded ADR.
+An ADR explains architecture but does not replace product specs, Engineering
+Rules, or implementation reality. An accepted target decision may differ from
+current code: establish whether to change the implementation or the decision
+before editing the ADR.
 
 ## spike
 

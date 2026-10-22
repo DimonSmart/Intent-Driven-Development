@@ -5,13 +5,13 @@ description: Perform focused structural normalization of existing `.idd/intent/`
 
 # idd-intent-normalize-current
 
-Use this skill to perform focused structural normalization over accepted current
-specs without changing product meaning.
+Use this skill to perform focused structural normalization over current
+specs and living ADRs without changing accepted architectural or product meaning.
 
 Formula:
 
 ```text
-idd-intent-normalize-current = focused structural normalization over accepted current specs
+idd-intent-normalize-current = focused structural normalization over current Intent owners
 ```
 
 This skill works on an already accepted `.idd/intent` structure, so it is more
@@ -205,10 +205,11 @@ Support these scenarios:
 - Git history is the only history mechanism.
 - Remove process-only import reports from `.idd/intent`; if a persistent report is
   explicitly needed, move it outside `.idd/intent`.
-- `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar relations must
-  use `IDD-NNNN` identifiers and point to existing current documents.
-- Remove historical-only relations or rewrite them when the current target is
-  obvious from the existing document set.
+- `Related`, `Depends on` and other current normative relations must use
+  `IDD-NNNN` identifiers and resolve to current documents.
+- Remove historical ADR supersession fields only as part of an authorized
+  semantic migration; never infer current architecture from status, dates
+  or document numbering.
 - Maintain `INDEX.md` as required by a deliberate semantic document operation;
   retain all existing user metadata, columns, comments and notes. Do not
   regenerate it merely because a cell/row is mechanically malformed;
@@ -224,7 +225,7 @@ Support these scenarios:
 2. If no concrete focus is present, stop and direct broad requests to
    `idd-intent-structure-audit`.
 3. Read `.idd/intent/README.md`, `.idd/intent/INDEX.md`, and only relevant current
-   numbered specs.
+   numbered specs and ADRs.
 4. Find current fragments related to the focus.
 5. Classify fragments as:
    - common behavior to move;
@@ -232,7 +233,9 @@ Support these scenarios:
    - duplicate wording to replace with references;
    - misplaced behavior;
    - task-like/process material;
-   - ADR-worthy decisions;
+   - ADR-worthy decisions and their current owners;
+   - overlapping ADRs for the same area;
+   - historical-only ADRs with useful architectural findings;
    - spike-worthy unresolved research;
    - possible conflicts;
    - unrelated mentions.
@@ -240,7 +243,12 @@ Support these scenarios:
 7. In `propose` mode, report the proposed split/merge/extract/delete plan and
    stop before edits.
 8. In `apply` mode, move only existing intent that preserves meaning.
-9. Replace moved fragments in source specs with short references.
+9. When ADRs overlap, establish the current architectural owner, preserve
+   its stable ID, merge useful rationale and experimental findings, then
+   remove redundant historical-only ADRs after reviewing their content.
+   Reconcile INDEX and current normative links, without archives, tombstones
+   or replacement chains. Do not select a winner by ID or date alone.
+10. Replace moved fragments in source specs with short references.
 10. Preserve local exceptions and feature-specific behavior.
 11. Keep conflicts visible and unresolved.
 12. Update `INDEX.md` when the document set or document roles change.

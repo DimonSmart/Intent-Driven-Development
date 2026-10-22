@@ -126,8 +126,11 @@ visual invariant without a functional behavior change. Create the owning spec
 through the internal document-creation workflow only after its ownership check.
 Do not create a separate visual spec merely because its requirement is visual.
 
-Use `adr-required` when the change is primarily a durable architecture decision;
-create its decision record through the internal document-creation workflow.
+Use `adr-required` for a confirmed durable architecture decision. Check the
+architectural owner first. Update the owning ADR in place with its stable ID
+when it covers the decision; create an ADR only for an independent ownerless
+decision. Unresolved architecture uses the existing spike/decision workflow.
+Ordinary implementation-local choices do not automatically require an ADR.
 
 Use `spike-required` when the right product or architecture decision requires
 research; create its investigation record through the internal workflow.
@@ -245,8 +248,8 @@ For `operation: remove`:
 
 1. Read `.idd/intent/README.md`.
 2. Read `.idd/intent/INDEX.md`.
-3. Identify the product area and candidate current specs.
-4. Read only relevant current `IDD-NNNN` specs and related references.
+3. Identify the product or architectural area and candidate current owners.
+4. Read relevant current specs, ADRs and related references.
 5. Identify the requested current-truth change, its scope and confirmation;
    for visual handoff apply the Visual Product Intent gate above.
 6. Classify the operation (`add`, `modify`, `remove`, `not-applicable`).
@@ -255,11 +258,14 @@ For `operation: remove`:
    `.idd/intent` and report the implementation recommendation. Do not
    mistake local styling that preserves the current visual contract for a
    Product Intent change.
-9. For `existing-spec-update`, update the existing owner. For
-   `adr-required` or `spike-required`, retain any existing product-spec
-   owner and evaluate the distinct decision/investigation separately.
-10. If `new-spec-required`, `adr-required`, or `spike-required`, read
-    `references/new-intent-document.md` lazily and follow its complete
+9. For `existing-spec-update`, update the owning spec. For `adr-required`,
+   update an existing architectural owner directly, keeping its ID, or create
+   a new ADR only for an independent ownerless decision. Preserve useful
+   findings and remove obsolete normative claims. Never infer acceptance from
+   a code/ADR discrepancy. For `spike-required`, investigate the question
+   without creating a speculative ADR.
+10. If `new-spec-required`, `spike-required`, or independent ownerless
+    `adr-required`, read `references/new-intent-document.md` lazily and follow its complete
     internal creation workflow inside this same execution. Recheck ownership;
     if the owner already exists, return to step 9, not a recursive invocation.
     Preserve ordinary IDs, templates, `INDEX.md`, and lint invariants.

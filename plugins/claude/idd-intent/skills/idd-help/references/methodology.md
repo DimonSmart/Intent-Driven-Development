@@ -335,9 +335,12 @@ delete the old spec and create a new owning spec.
 When a document is obsolete, duplicated, task-like, process-only, incorrect, or
 no longer useful as current product intent, delete it.
 
-ADRs are decision records. They are not archived when superseded. If a durable
-decision changes, keep the old ADR in place, mark it as `Superseded`, and
-create a new ADR that replaces or supersedes it.
+ADRs describe current accepted architecture. When a decision changes within
+the same area, update the owning ADR in place without allocating a new ID.
+Create an ADR only for an independent decision. Preserve significant findings
+from previous experiments, not revision history. For obsolete or overlapping
+ADRs, first transfer useful knowledge to current owners, then delete the old
+records and reconcile INDEX and normative references.
 
 Spikes are research records. When a spike is resolved, either convert its
 outcome into a spec or ADR and delete the spike, or keep the spike only if it
@@ -359,5 +362,6 @@ When a spec becomes obsolete or is absorbed by another document, migrate any
 remaining current intent and delete the obsolete spec. Git history is the only
 history of spec revisions.
 
-ADR status is part of the decision record lifecycle and does not apply to specs.
-A spike remains only while the question is active.
+ADRs have no lifecycle status or replacement-chain metadata. Their presence
+in current Intent signifies an accepted decision. A spike remains only while
+its question is active.

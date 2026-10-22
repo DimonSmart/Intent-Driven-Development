@@ -94,7 +94,13 @@ dictionary, code symbol catalog, or translation table for ordinary terminology.
    - obsolete documents that should be deleted;
    - process-only documents that should be deleted;
    - duplicated specs that should be merged or deleted;
-   - ADRs incorrectly moved out of the current document set;
+   - ADRs with overlapping architectural responsibilities;
+   - conflicting current ADR decisions within one architectural area;
+   - historical-only ADRs with no current decision;
+   - unjustified ADR fragmentation by experiment stage;
+   - missing essential architectural rationale, alternatives or consequences;
+   - excessive experiment chronology without useful findings;
+   - obsolete normative links to removed ADR owners;
    - spikes that are resolved but still kept as current research;
    - specs that should be ADR;
    - specs that should be spike;
@@ -113,8 +119,11 @@ dictionary, code symbol catalog, or translation table for ordinary terminology.
    - glossary entries for private identifiers or task-local language;
    - glossary aliases that merge distinct concepts;
    - a glossary listed incorrectly as a numbered current document.
-8. Do not edit files.
-9. Produce a report with recommendations.
+8. Recommend update, merge or deletion of overlapping ADRs only after
+   establishing the current architectural owner and transferring useful
+   knowledge. Do not invent lifecycle statuses or versions.
+9. Do not edit files.
+10. Produce a report with recommendations.
 
 ## Structural Diagnostics
 
@@ -150,7 +159,7 @@ Short list of the most important structural problems.
 
 ### Finding: <short title>
 
-- Type: oversized | undersized | mixed-scope | duplicate | scattered-model | conflict | task-like-spec | stale-reference | missing-shared-spec | adr-candidate | spike-candidate | archive-concept | delete-candidate | obsolete-current-doc | resolved-spike | superseded-adr-status-missing | implementation-leakage | verification-command | migration-history | private-code-contract | over-specified-architecture | glossary-bloat | glossary-behavior-leakage | glossary-alias-conflict
+- Type: oversized | undersized | mixed-scope | duplicate | scattered-model | conflict | task-like-spec | stale-reference | missing-shared-spec | adr-candidate | spike-candidate | archive-concept | delete-candidate | obsolete-current-doc | resolved-spike | duplicate-adr-owner | conflicting-adrs | history-only-adr | fragmented-adr | missing-adr-rationale | excess-experiment-history | stale-adr-reference | implementation-leakage | verification-command | migration-history | private-code-contract | over-specified-architecture | glossary-bloat | glossary-behavior-leakage | glossary-alias-conflict
 - Specs:
 - Problem:
 - Recommended action:

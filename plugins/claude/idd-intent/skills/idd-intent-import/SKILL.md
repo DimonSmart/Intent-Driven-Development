@@ -528,9 +528,21 @@ Avoid:
 - specs named after temporary work items;
 - specs that describe how the migration was performed.
 
-Create current spec documents only for durable current product intent. Create
-adr documents only for durable decision records. Create spike documents only for
-active unresolved research.
+Create current specs only for durable current Product Intent. Create living
+ADRs only for confirmed current architectural decisions, updating an existing
+architectural owner when its responsibility covers the decision. Group legacy
+ADR variants by architecture area rather than source file, status, number or
+date. Create spikes only for unresolved research.
+
+Legacy ADRs may contain `Proposed`, `Accepted`, `Superseded`, `Rejected`,
+`Supersedes`, `Superseded By` and `Replaces`. These are *source-methodology*
+metadata, not IDD lifecycle fields or proof that a decision is still current.
+Identify the actual current accepted architecture from authoritative context,
+transfer significant experiment findings and constraints to the current owner,
+and omit obsolete normative choices. Do not select the newest date or number
+as a winner or reconstruct entire legacy chains. If there are competing
+plausible current decisions, diagnose the conflict and obtain the missing
+decision through existing workflows before writing a normative ADR.
 
 For example, this source mixes operational commands with a concrete
 implementation constraint:
@@ -627,10 +639,6 @@ Expanded illustrative template for `adr` documents (not mandatory H2 headings):
 ```md
 # IDD-NNNN.adr-short-title
 
-## Status
-
-Proposed
-
 ## Context
 
 Describe the decision context.
@@ -647,9 +655,9 @@ List alternatives and why they were not chosen.
 
 Describe accepted tradeoffs and follow-up constraints.
 
-## Supersedes
+## Experiments and Findings
 
-Reference the superseded ADR when this ADR replaces an earlier decision.
+Optionally preserve findings that explain the current decision.
 ```
 
 Expanded illustrative template for `spike` documents (not mandatory H2 headings):
@@ -683,8 +691,8 @@ State the proposed follow-up.
 ```
 
 The sample sections above illustrate content only. An imported spec need not
-carry every H2, an ADR needs one recognized allowed status and a semantic
-decision (not necessarily `## Decision`), and an unresolved spike needs
+carry every H2, an ADR needs a confirmed current semantic decision (not
+necessarily a `## Decision` heading), and an unresolved spike needs
 no `Result` or `Recommendation`. Do not fill these with invented material
 just to follow the example.
 
@@ -747,11 +755,11 @@ Minimum structure:
 ```md
 # IDD Intent Index
 
-| Document | Role | Area | Notes | Replaces |
-| --- | --- | --- | --- | --- |
-| IDD-0001 | Spec | Product overview | ... | — |
-| IDD-0002 | ADR | Rendering | ... | — |
-| IDD-0003 | Spike | Input layer | ... | — |
+| Document | Role | Area | Notes |
+| --- | --- | --- | --- |
+| IDD-0001 | Spec | Product overview | ... |
+| IDD-0002 | ADR | Rendering | ... |
+| IDD-0003 | Spike | Input layer | ... |
 ```
 
 Rules:
@@ -809,7 +817,9 @@ Before finishing:
    `.idd/engineering/`.
 3. Regenerate `.idd/intent/INDEX.md` from current Intent documents.
 4. Validate and rewrite Intent relations through the source-to-target map.
-5. Normalize current specs, ADRs, and spikes to current section shapes.
+5. Normalize current specs, living ADRs and active spikes to their semantic
+   contracts without imposing status, supersession history or optional
+   headings. Legacy ADR consolidation is a semantic operation, not lint fix.
 6. Reclassify resolved spikes.
 7. Remove or merge task-like/process-only/duplicate/historical-only Intent docs.
 8. Ensure Engineering additions/updates use the canonical Rule format and INDEX

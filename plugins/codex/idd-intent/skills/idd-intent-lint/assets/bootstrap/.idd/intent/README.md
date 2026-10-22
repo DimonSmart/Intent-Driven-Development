@@ -19,8 +19,7 @@ schemas. Their optional headings may be omitted, reordered or replaced by
 other readable structures without lint errors or warnings. Mechanical checks
 follow the type contract in the canonical `document-types.md` reference,
 not the template heading list. Creation must still supply canonical identity,
-INDEX entries, valid relations and one recognized ADR status even if a custom
-template omits these. Do not create placeholder sections to mirror templates.
+INDEX entries and valid current relations. ADRs have no lifecycle status. Do not create placeholder sections to mirror templates.
 
 `GLOSSARY.md` is an optional unnumbered project vocabulary support file. It is
 created only through explicit `idd-glossary-build` work. Its absence is valid,
@@ -35,8 +34,10 @@ versions are available through Git history.
 A spec document has no lifecycle status: its presence here means it is current.
 Do not mark specs as Current, Completed, Deprecated, Retired, or Superseded.
 Edit an owning spec in place or migrate its remaining current intent and delete
-it. ADR status remains part of ADR decision records; a spike remains only while
-its question is active.
+it. ADRs are living current decisions; edit the architectural owner in place,
+preserve useful experiment findings, and delete obsolete historical-only ADRs
+after transferring knowledge. Do not use ADR status or replacement chains.
+A spike remains only while its question is active.
 
 ## Intent and Engineering boundary
 

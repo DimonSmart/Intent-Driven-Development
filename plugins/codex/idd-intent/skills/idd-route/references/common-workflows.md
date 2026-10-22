@@ -439,7 +439,10 @@ route to bootstrap rather than import.
 
 Product changes use `idd-intent-change` first. The ownership outcome is decided
 there: existing spec update, new spec required, ADR required, spike required,
-delete owning spec, or unclear product intent.
+delete owning spec, or unclear product intent. An ADR-required decision reuses
+an existing architectural owner in place when available. Creation is reserved
+for a confirmed independent decision; unresolved choices use the existing
+spike/decision workflow.
 
 ### Add Product Requirement
 
