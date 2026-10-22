@@ -142,7 +142,7 @@ Canonical filenames match:
 
 The first heading must equal the filename stem.
 
-Canonical rule structure:
+Expanded recommended rule structure (illustrative, not a validation schema):
 
 ```markdown
 # ENG-0001.rule-ui-composition
@@ -178,7 +178,47 @@ Do not put build or test commands here.
 - `Always`
 - `Conditional`
 
-A Conditional rule requires a non-empty `## Applies when` section. For Always, `## Applies when` is optional and never changes applicability.
+A Conditional rule requires exactly one non-empty `## Applies when` section.
+For Always, `## Applies when` is optional and never changes applicability.
+Every Rule requires exactly one non-empty `## Rule` and one unambiguous
+`## Applicability` containing `Always` or `Conditional`. The `## Rationale`,
+`## Guidance` and `## Verification` sections are optional. Their absence
+does not weaken the normative Rule or remove the obligation to verify it.
+
+Minimal valid Always Rule (assuming valid filename, H1 and INDEX):
+
+```markdown
+# ENG-0001.rule-no-global-state
+
+## Rule
+
+Do not introduce mutable global state.
+
+## Applicability
+
+Always
+```
+
+Minimal valid Conditional Rule (assuming valid filename, H1 and INDEX):
+
+```markdown
+# ENG-0002.rule-shared-dialogs
+
+## Rule
+
+Use the shared dialog component for user-visible dialogs.
+
+## Applicability
+
+Conditional
+
+## Applies when
+
+Creating or modifying a user-visible dialog.
+```
+
+Additional explanatory sections may be used when they add useful information.
+Templates and examples do not independently establish structural requirements.
 
 Rules describe current target state, not migration history or implementation progress.
 
@@ -307,9 +347,9 @@ Validate:
 5. A stable ID is derived from the canonical Rule filename. Every current `ENG-NNNN` resolves to exactly one Rule document; arbitrary mentions of an ID inside prose do not count as extra documents.
 6. Every INDEX `Rule` cell is exactly a plain `ENG-NNNN` matching `^ENG-\d{4}$`, appears exactly once, and resolves to exactly one current Rule document. Every current Rule document is represented exactly once in INDEX.
 7. The first Markdown heading is exactly `# <filename stem>`.
-8. Each Rule contains exactly one unambiguous structural section for `## Rule`, `## Applicability`, `## Rationale`, `## Guidance`, and `## Verification`.
-9. Document Applicability is exactly `Always` or `Conditional`, and INDEX Applicability matches it.
-10. Every Conditional Rule has a non-empty `## Applies when` section. For Always, that section is optional.
+8. Each Rule contains exactly one unambiguous, non-empty structural `## Rule` and exactly one unambiguous `## Applicability` section. `## Rationale`, `## Guidance` and `## Verification` are optional. If present as structural sections, each must occur at most once; ambiguous duplicates are errors. Missing optional sections are neither errors nor warnings. A structural `## Applies when` section must not be ambiguously duplicated.
+9. Document Applicability contains exactly one value, `Always` or `Conditional`, and INDEX Applicability matches it.
+10. Every Conditional Rule has exactly one non-empty `## Applies when` section. For Always, that section is optional and does not change Always applicability.
 11. Explicit lifecycle sections such as `## Task`, `## Tasks`, `## Progress`, `## Implementation progress`, and `## Migration status`, plus implementation checklists in normative Engineering content, are rejected. Do not try to infer from ordinary prose whether it merely resembles a task.
 12. Normative Engineering sections do not contain fenced shell/build/test command blocks. Operational commands belong in `.idd/verification.yaml`; `## Verification` describes required properties or evidence.
 13. Allocator metadata may be absent only in a valid legacy read-only layer. If present, exactly one line matches `^Next ID: ENG-\d{4}$` and its ID is strictly greater than every current Rule ID.
@@ -433,7 +473,7 @@ The worker does not search for additional Conditional rules and does not edit En
 
 ## Verification separation
 
-Engineering Rule `## Verification` states the property or evidence required for conformance. It does not contain repository commands.
+If an Engineering Rule has a `## Verification` section, it states properties or evidence for conformance, not repository commands. A missing `## Verification` does not exempt the Rule from conformance checks.
 
 Operational commands remain in:
 

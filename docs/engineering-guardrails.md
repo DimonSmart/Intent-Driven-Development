@@ -108,7 +108,7 @@ Rules use stable `ENG-NNNN` identifiers and canonical filenames such as:
 ENG-0001.rule-ui-composition.md
 ```
 
-A rule contains:
+A full recommended example (not a required list of sections):
 
 ```markdown
 # ENG-0001.rule-ui-composition
@@ -138,6 +138,13 @@ Implementation guidance and allowed approaches.
 Properties or evidence that demonstrate conformance.
 ```
 
+The minimal valid Always Rule contains a non-empty `## Rule` and one
+`## Applicability` with value `Always`, along with its file/H1/INDEX
+identity. A Conditional Rule additionally needs a non-empty `## Applies when`.
+`## Rationale`, `## Guidance` and `## Verification` are optional, and may
+not be ambiguously duplicated. Missing optional sections are neither errors
+nor warnings; their absence does not waive Rule conformance.
+
 `Applicability` is only `Always` or `Conditional`.
 
 An Always rule applies to every implementation task. A Conditional rule is selected semantically from its human-readable `Applies when` description.
@@ -158,7 +165,10 @@ Next ID: ENG-0003
 
 Read INDEX first. Do not load the complete Engineering tree by default.
 
-If the Engineering layer exists, its filenames, stable IDs, headings, INDEX mapping, Applicability metadata, and required sections must be mechanically valid before implementation proceeds. Missing or ambiguous rules are blocking diagnostics rather than permission to ignore guardrails.
+If the Engineering layer exists, its filenames, stable IDs, H1, INDEX mapping,
+Applicability metadata and *minimal* required structural sections must be
+mechanically valid before implementation proceeds. A missing optional section
+from the expanded example does not block implementation. Missing or ambiguous rules are blocking diagnostics rather than permission to ignore guardrails.
 
 ## Direct implementation
 
@@ -220,7 +230,9 @@ Engineering support does not add a Factory runtime, MCP transport, workflow stat
 
 Engineering Rules may describe evidence that cannot be fully automated. Where a property can be checked reliably, prefer deterministic verification such as architecture tests or analyzers.
 
-The rule states what evidence matters. `.idd/verification.yaml` states how project commands obtain that evidence.
+A Rule may state what evidence matters, including in an optional
+`## Verification` section. `.idd/verification.yaml` states how project commands
+obtain that evidence; absence of the optional section does not waive conformance.
 
 ## History and lifecycle
 
