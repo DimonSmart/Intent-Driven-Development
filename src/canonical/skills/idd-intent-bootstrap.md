@@ -426,8 +426,9 @@ After approval:
 3. Create the minimum required specs, ADRs, and active spikes using current
    project templates as starting points and `IDD-NNNN` numbering rules.
    Follow `references/document-types.md` for semantic and minimal structural
-   contracts; do not copy every heading or invent `TBD` content. Supply one
-   recognized ADR status even if the template omits it.
+   contracts; do not copy every heading or invent `TBD` content. Create ADRs only
+   for confirmed architectural decisions grouped by semantic ownership,
+   without lifecycle status or supersession metadata.
 4. Express observable behavior and durable contracts without private type,
    method, source-file, or dependency-wiring names.
 5. Include technologies and libraries only when confirmed as a product contract,
@@ -446,8 +447,8 @@ Use:
 
 - `spec` for durable behavior, actors, scenarios, domain contracts, public
   contracts, compatibility constraints, acceptance criteria, and verification;
-- `adr` for a confirmed durable architecture decision whose rationale,
-  alternatives, and consequences matter;
+- `adr` for a confirmed current architecture decision whose independent
+  responsibility, rationale, alternatives and consequences matter;
 - `spike` for an active unresolved question requiring research before a product
   or architecture decision.
 

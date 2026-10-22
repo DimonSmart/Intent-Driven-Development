@@ -47,8 +47,11 @@ implementation.
 - Change only the smallest set of current documents needed to represent
   confirmed intent.
 - Preserve stable document numbers and references.
-- Do not rewrite accepted ADRs semantically. If the decision changed, create a
-  replacing ADR.
+- When a confirmed architectural decision changes within an existing ADR's
+  responsibility, edit that ADR in place and preserve its ID. Code divergence
+  alone does not establish a new accepted decision: clarify whether to correct
+  implementation or deliberately change the architecture. Create a new ADR
+  only for a genuinely independent area.
 - Do not archive old specs when implementation changes confirmed product
   intent.
 - Update current owning specs directly.
