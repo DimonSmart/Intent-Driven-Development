@@ -84,37 +84,46 @@ conflicting number.
 
 ## Create And Normalize
 
-1. Use the matching canonical template installed in
+1. Use the matching project template installed in
    `.idd/intent/_templates/spec.md`, `.idd/intent/_templates/adr.md`, or
-   `.idd/intent/_templates/spike.md`. Those
-   templates originate from
-   `src/canonical/project-files/intent/_templates/`; do not invent a
-   parallel template or a new document schema.
-2. Create exactly the justified document under `.idd/intent/`, replace the
-   template identifier/title consistently in its filename and first heading,
-   and populate only current normative content. Never write implementation
-   plans, temporary task notes, progress logs, chat history, or private
-   implementation shape.
-3. For a spec, preserve the canonical Behavior, Acceptance Criteria,
-   Verification, related-document and ownership semantics. Add an optional
-   `## Visual Intent` section only when it improves the owning spec; it is
-   not a required template section. Preserve confirmed visual scope,
-   obligation strength, allowed alternatives and exceptions. Verification
-   describes important user scenarios, critical invariants, meaningful
-   boundary cases, and justified manual checks, not test-method names,
-   private classes, or a test per sentence.
-4. For an ADR, record context, decision status, alternatives, consequences and
-   `Supersedes` relations where relevant. For a spike, retain the question,
-   constraints, method, result and recommendation structure; do not fabricate
-   research results.
+   `.idd/intent/_templates/spike.md` **as a starting point**. These are
+   initially installed from `src/canonical/project-files/intent/_templates/`.
+   Project-owned edits may omit or rearrange optional sections. Neither
+   canonical nor custom templates are validation schemas. Do not invent a
+   parallel schema or reject a usable project template merely because it
+   omits a field required in the final document.
+2. Create exactly the justified document under `.idd/intent/`, set the
+   canonical identifier/type in its filename and first heading, and populate
+   only current normative content. Use semantically relevant sections or
+   another readable structure; neither copy every template heading nor pad
+   missing sections with `None`, `TBD` or invented facts. Never write
+   implementation plans, temporary task notes, progress logs, chat history,
+   or private implementation shape.
+3. For a spec, express relevant Behavior, Acceptance Criteria,
+   Verification, related-document and ownership semantics wherever readable;
+   none requires a same-named H2. Add optional `## Visual Intent` only where
+   relevant. Preserve confirmed visual scope, obligation strength, allowed
+   alternatives and exceptions. Verification describes important user scenarios,
+   critical invariants, meaningful boundary cases and justified manual checks,
+   not test-method names, private classes or a test per sentence.
+4. For an ADR, record the decision and available relevant context, alternatives,
+   consequences and `Supersedes` relations without requiring matching
+   headings. Supply exactly one recognized valid ADR status from confirmed
+   decision context; never leave `Proposed | Accepted | Superseded | Rejected`
+   as a placeholder or guess the status. If status cannot be established, block
+   and ask the parent for the missing decision. For an active spike, preserve
+   the question and known constraints/method, and include results and
+   recommendations only when known. Do not fabricate research outcomes.
 5. Update `.idd/intent/INDEX.md` in the same change. Its `Document` column
    contains the stable plain-text `IDD-NNNN` identifier, not a path,
    filename or Markdown link. Keep its role, area, notes and replacements
    consistent with the new document, and use full `IDD-NNNN` references in
    normative relations. Update affected cross-references only when necessary.
-6. Check the result against the established `idd-intent-lint` mechanical
-   consistency requirements. Do not relax ownership, numbering, formatting or
-   normative relation rules to make the document pass.
+6. Check the result as a document against `idd-intent-lint` and the
+   `references/document-types.md` type contract, never for heading-by-heading
+   template equality. Ensure mandatory structural identity, INDEX, relations
+   and ADR status even if a custom template omitted them. Do not relax any
+   invariant to make the document pass. Review semantic completeness separately.
 
 ## Return To Parent
 

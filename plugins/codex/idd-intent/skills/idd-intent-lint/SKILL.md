@@ -103,58 +103,8 @@ corresponding repair.
 ### Stable IDs and filenames
 
 - Current documents directly under `.idd/intent/` use
-  `^IDD-\\d{4}\\.(spec|adr|spike)-[a-z0-9][a-z0-9-]*\\.md# idd-intent-lint
+  `^IDD-\d{4}\.(spec|adr|spike)-[a-z0-9][a-z0-9-]*\.md$`.
 
-Use this skill to check mechanical consistency of project-owned `.idd/intent/` and, only when explicitly authorized, conservatively repair unambiguous technical defects. Always perform the existing read-only Mechanical Engineering Validation when `.idd/engineering/` is present.
-
-Formula:
-
-```text
-idd-intent-lint = mechanical IDD check | conservative, authorized mechanical fix
-```
-
-Use `mode: check` by default; `mode: fix` only for explicit permission to
-modify technical Intent documents. Accept an optional document/scope argument.
-In a forked Claude context, the caller must forward the **complete original
-request**, including mode, scope, exclusions, and prohibitions. Never derive
-write consent from the availability of Edit/Write/Bash tools. An explicit
-read-only restriction always wins.
-
-Read `references/numbering.md`, `references/document-types.md` and
-`references/glossary-integration.md` for normative constraints. Read
-`references/engineering-guardrails.md` before validating Engineering.
-Use packaged `assets/bootstrap/.idd/intent/` only when restoring missing
-standard files in fix mode; do not borrow another skill's assets or read plugin
-cache paths.
-
-## Rules
-
-- In `check`, perform no writes, moves, deletes, initialization, temporary
-  repository files, shell redirection to files, or script/report generation.
-  `Bash` remains read-only in this mode even when the host permits writes.
-- In `fix`, make only the minimal, independently verifiable repairs specified
-  below. Do not rewrite whole documents as a formatter.
-- Do not reorganize specs.
-- Do not perform broad semantic review.
-- Do not resolve product conflicts.
-- Treat `GLOSSARY.md` as optional. Its absence is valid and produces no warning.
-- Do not create or update the glossary from lint.
-- Always report errors and warnings; in `check` suggest fixes only.
-  In `fix` report actual fixes, skipped fixes, changed paths, and the
-  final result of mandatory revalidation.
-- Absence of `.idd/engineering/` is valid and produces no warning.
-- Do not use lint to decide semantic applicability of Conditional Engineering
-  Rules.
-- Ordinary project lint is limited to project-owned `.idd/intent/`, optional
-  `.idd/intent/GLOSSARY.md`, and optional `.idd/engineering/` state. Do not scan
-  an installed plugin cache, canonical IDD repository, skill source tree, or IDD
-  documentation tree unless the user explicitly asks to validate the IDD
-  distribution itself.
-- Do not generate a general-purpose validator program solely to perform IDD lint.
-  Use bounded repository inspection operations: Read, Glob, Grep/Search, and
-  simple bounded host/shell commands when useful.
-
-.
   Recognize legacy `0001.spec-editor.md` -> `IDD-0001.spec-editor.md`
   only when existing ID/type/slug are unambiguous, including heading and
   INDEX evidence. Change only the missing technical namespace prefix.
@@ -212,15 +162,19 @@ cache paths.
   and surrounding formatting. A regular Markdown link stays a link, not a
   plain relation ID. Do not change external URLs, absolute paths outside
   scope, fenced/inline code, quoted history, or arbitrary prose identifiers.
-- Validate templates and required spec/ADR/spike sections against
-  `references/document-types.md` and packaged canonical templates,
-  allowing existing supported structure variations. In fix mode only an
-  unmistakable typo of a **unique mandatory section heading**, standard
-  heading syntax, or separator/space in managed metadata may be fixed.
-  Never invent missing Intent, Behavior, Non-Goals, Acceptance Criteria,
-  Verification, Decision, Status, Question, Result, Recommendation, or
-  other substantive content or empty sections just to produce pass.
-  Never infer ADR status or rewrite accepted decisions.
+- Validate specs/ADRs/spikes against the **minimal structural contract**
+  defined in `references/document-types.md` and the common identity, INDEX
+  and relation rules. The headings of packaged or user-owned templates
+  are examples, never an independent list of mandatory sections. Accept
+  supported equivalent presentation, regardless of heading order or number.
+  Validate a single recognized allowed ADR status; do not require a same-named
+  `## Decision` or `## Question` heading. In fix mode repair only
+  unmistakable mechanical syntax/metadata defects with a unique result.
+  Never infer or invent ADR status, architectural decision, research question,
+  acceptance criterion, research result, or missing optional section.
+  Never insert `None`, `TBD` or empty headings to achieve pass.
+  Semantic completeness belongs to the owning workflow, not mechanical lint;
+  accepted ADRs must not be semantically rewritten.
 - No blanket Markdown formatter, paragraph reflow, section sorting,
   code-block rewriting, archive cleaning, progress-checklist deletion or
   stylistic rephrasing. Diagnostic findings about task/status leakage,
@@ -240,8 +194,11 @@ Only when `.idd/intent/` already exists in an initialized project:
 3. If INDEX is missing, copy the canonical scaffold and add minimal rows
    for existing unique documents; preserve its explanatory material.
 4. Existing user templates, README and INDEX must never be overwritten
-   just because their text differs from canonical. Check mandatory
-   template sections and syntax, not byte-for-byte equality.
+   just because their text differs from canonical. Check a project template
+   for usability as a starting point and instructions explicitly violating
+   the type contract; do not require canonical optional headings, order,
+   field coverage or byte-for-byte equality. A final-document field missing
+   from a template may be supplied by the owning creation workflow.
 5. An optional missing Glossary or Engineering layer is valid and
    must not be created. Existing Glossary and Engineering are never
    modified by lint, including ID allocator metadata.
@@ -319,7 +276,9 @@ Check that:
 - obsolete/task-like/process-only docs are reported as delete candidates, not
   preservation candidates;
 - templates and support files are not listed as current specs;
-- required sections exist, or missing sections are reported;
+- only genuinely mandatory structural fields of the document type exist and
+  are unambiguous; absence of optional template headings is neither error nor
+  warning;
 - `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar normative
   relations use `IDD-NNNN` identifiers and point to existing current documents;
 - normative relations do not use bare four-digit document numbers;
@@ -331,9 +290,13 @@ Check that:
 - specs do not contain generated chat transcripts;
 - specs do not contain obvious contradiction markers such as "supported" in
   Scope and "not implemented" in Non-goals for the same feature;
-- ADR files use ADR-like structure;
-- spike files are marked as non-normative research or unresolved
-  investigation;
+- ADR files have a single recognized status value from `Proposed`,
+  `Accepted`, `Superseded`, `Rejected` without conflicts or unselected
+  template choices; the decision itself is assessed by the owning semantic
+  workflow, not inferred from a `## Decision` heading;
+- spikes represent active non-normative research or unresolved
+  investigation; missing `## Question`, `## Result` or
+  `## Recommendation` headings are not themselves mechanical defects;
 - normative spec sections do not contain fenced build/test shell commands,
   explicit task/progress sections, implementation checklists, migration status,
   or a spec lifecycle status.
@@ -366,6 +329,8 @@ When `.idd/intent/GLOSSARY.md` exists, also check that:
 - a current intent filename uses the legacy bare numeric format;
 - a document heading uses a missing, malformed, or filename-mismatched
   `IDD-NNNN` identifier;
+- an ADR has no recognized single allowed status, has conflicting status
+  values, or retains a template choice list instead of one selected status;
 - an archive directory exists under `.idd/intent`;
 - `.idd/intent/import-report.md` exists;
 - generated, import, task, progress, or process reports exist under `.idd/intent`;
@@ -409,8 +374,10 @@ Do not apply implementation-leakage checks to clearly non-normative sections
 named `Source history`, `Migration source`, `Provenance`, `Imported from`, or
 `Historical note`; those sections must not state current requirements.
 
-Mechanical lint may flag suspicious wording. It must not claim to have completed
-semantic review. Glossary inclusion quality is primarily reviewed by
+Mechanical lint may flag suspicious wording with existing safe heuristics.
+It must not warn merely because a template heading is absent, or claim to have
+completed semantic review. A mechanical pass says nothing about whether a spec
+expresses Product Intent, an ADR records a decision, or a spike has a question. Glossary inclusion quality is primarily reviewed by
 `idd-glossary-build`; lint only catches cheap structural problems and obvious
 scope leakage.
 
@@ -478,7 +445,8 @@ Expected behavior:
 
 - use `idd-intent-lint`;
 - check `INDEX.md` ID-only document entries, filenames, document headings, links,
-  required sections, relation identifiers, stale `.worklog` references, and the
+  required structural fields (not template headings), relation identifiers,
+  stale `.worklog` references, and the
   optional glossary when present;
 - report pass/fail and warnings;
 - do not edit files.

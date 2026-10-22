@@ -41,7 +41,7 @@ Canonical filenames match:
 
 The first heading must equal the filename stem.
 
-Canonical structure:
+Expanded recommended example (only Rule and Applicability are always-required headings):
 
 ```markdown
 # ENG-0001.rule-ui-composition
@@ -73,6 +73,13 @@ Do not put build or test commands here.
 ```
 
 For `Always`, `## Applies when` is optional and does not alter applicability.
+Every Rule requires one non-empty `## Rule`, one `## Applicability` containing
+exactly `Always` or `Conditional`, and, for Conditional only, one non-empty
+`## Applies when`. `## Rationale`, `## Guidance` and `## Verification` are
+optional. None is required just because it appears in a template; duplicates
+of recognized structural sections are errors. A minimal Always Rule needs
+only Rule and Applicability plus valid file/H1/INDEX identity.
+Missing optional sections never excuse noncompliance with a Rule.
 
 Rule documents are normative. `INDEX.md` is only a compact metadata projection for discovery. INDEX Applicability must match the document.
 

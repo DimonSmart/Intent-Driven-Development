@@ -432,7 +432,10 @@ After approval:
 2. Use existing owners when bootstrapping uncovered areas in a partially
    documented project.
 3. Create the minimum required specs, ADRs, and active spikes using current
-   templates and `IDD-NNNN` numbering rules.
+   project templates as starting points and `IDD-NNNN` numbering rules.
+   Follow `references/document-types.md` for semantic and minimal structural
+   contracts; do not copy every heading or invent `TBD` content. Supply one
+   recognized ADR status even if the template omits it.
 4. Express observable behavior and durable contracts without private type,
    method, source-file, or dependency-wiring names.
 5. Include technologies and libraries only when confirmed as a product contract,

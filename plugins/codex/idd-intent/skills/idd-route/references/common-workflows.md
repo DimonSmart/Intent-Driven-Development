@@ -673,9 +673,21 @@ complete logical request
 -> idd-engineering-change when required
 -> Product Intent workflow when required
 -> durable coverage validation
--> create .idd/factory/current/request.md
--> native-agent Factory orchestration
+-> persist .idd/factory/preparation/request.md
+-> fresh initial Planner [INACTIVE]
+   -> Question: preparation/question.md + exact answers -> renewed coverage -> fresh Planner
+   -> Done: final verification without activation
+   -> Tasks: validate executable batch -> current/plan.md + exact answers
+-> create .idd/factory/current/request.md LAST [ACTIVE]
+-> sequential native Workers -> fresh Planner
 ```
+
+Request-level MissingIntentDecision and EngineeringDecisionMissing block BEFORE
+durable mutations and `preparation/`. Initial Planner `# Question` can occur
+only AFTER successful preflight. An unchosen internal technique is an
+autonomous implementation choice, not a missing Engineering Rule. Planner
+must consider applicable Conditional Rules for realistic alternatives left
+to Worker, or narrow/research the Task before execution.
 
 The Product Intent sub-analysis retains
 `AlreadyCovered | ExplicitIntentChange | MissingIntentDecision | ImplementationOnly`.

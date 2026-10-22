@@ -113,7 +113,10 @@ management is a separate durable concern.
 ### NoEngineeringManagementNeeded
 
 The request contains no explicit new/changed/removed durable
-implementation-only project decision.
+implementation-only project decision. A yet-unchosen technical approach
+does not require Engineering management, even when complex, long-lived,
+cross-file, or requiring research, and even without "choose yourself".
+Always and relevant Conditional Engineering Rules still apply.
 
 Ordinary implementation details, task-local technical suggestions, temporary
 migration instructions, class/file names, package suggestions, methods, DI
@@ -122,8 +125,11 @@ themselves create Engineering Rules.
 
 ### EngineeringManagementRequired
 
-The request explicitly contains one or more durable implementation-only project
-decisions.
+The request explicitly contains one or more authoritative durable
+implementation-only project policy decisions. Picking a library for this
+Task or suggesting a plausible standard is not authority to create that
+standard. Delegating ordinary implementation choice does not authorize
+unbounded future-facing policy changes.
 
 Invoke normal `idd-engineering-change` with the complete logical request, not
 a lossy Engineering-only summary. That workflow alone owns semantic grouping,
@@ -145,9 +151,18 @@ returning `no-op`.
 
 ### EngineeringDecisionMissing
 
-Correct continuation requires a durable Engineering decision, but the complete
-request does not actually make that decision. Stop before durable writes and ask
-the minimum question. Factory must not silently choose a project-wide policy.
+Correct continuation actually requires a missing normative implementation-only
+project decision not determined by the authoritative request or existing
+Rules and not within Factory authority. First rule out compliant autonomous
+implementation choices and uncertainty resolvable by research.
+EngineeringDecisionMissing does not mean "an implementation approach is
+still unchosen", regardless of how long it would last.
+
+This genuine request-level blocker stops before all durable writes including
+`.idd/factory/preparation/`; ask a minimum substantive policy question or
+return a precise blocker. This is NOT an initial Planner `# Question`,
+which can arise only after successful request-level preflight. Do not create
+a new preflight question storage mechanism.
 
 ## Engineering boundary and discovery
 
@@ -249,6 +264,11 @@ Check at least:
 - Product Intent and Engineering do not contradict one another;
 - no durable decision required before implementation remains unresolved;
 - an existing Engineering layer remains structurally valid.
+
+Coverage is not incomplete simply because an implementation detail, private
+algorithm, compatible new-app identifier or library remains to be chosen.
+Validate the original full logical request against authoritative contracts;
+never hide an absent normative decision inside Task/configuration instead.
 
 Engineering coverage validation does not repeat Engineering owner mapping or
 semantic equivalence.

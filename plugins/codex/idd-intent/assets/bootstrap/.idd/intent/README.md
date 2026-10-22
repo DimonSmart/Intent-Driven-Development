@@ -14,6 +14,14 @@ valid.
 
 Current numbered documents may be specs, ADRs, or active spikes.
 
+Project templates under `_templates/` are starting points, not validation
+schemas. Their optional headings may be omitted, reordered or replaced by
+other readable structures without lint errors or warnings. Mechanical checks
+follow the type contract in the canonical `document-types.md` reference,
+not the template heading list. Creation must still supply canonical identity,
+INDEX entries, valid relations and one recognized ADR status even if a custom
+template omits these. Do not create placeholder sections to mirror templates.
+
 `GLOSSARY.md` is an optional unnumbered project vocabulary support file. It is
 created only through explicit `idd-glossary-build` work. Its absence is valid,
 it is not listed in `INDEX.md`, and it does not own product behavior.

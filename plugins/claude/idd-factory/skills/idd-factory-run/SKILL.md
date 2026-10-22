@@ -99,6 +99,20 @@ technology name, class/file name, DI wiring step, implementation order, test
 step, temporary migration instruction, or local library-use instruction is not
 by itself a durable project-wide Engineering decision.
 
+Distinguish existing mandatory contracts, autonomous implementation choices
+and new durable project policies. An unchosen library, algorithm, private
+architecture, new-app identifier or researchable API fact is not by itself
+EngineeringDecisionMissing. Normal technical choices need no user delegation;
+"choose yourself" cannot waive existing Rules, change product behavior,
+authorize external purchases/registration or choose a new trust policy.
+Policy changes still use the owner workflow and lifecycle guard.
+
+Request-level MissingIntentDecision and genuine EngineeringDecisionMissing
+return a question/diagnostic before durable writes, `preparation/`, and
+the initial Planner. Only after successful preflight may the initial Planner
+create `preparation/question.md`. Do not ask users to decide verifiable
+platform facts.
+
 Before any durable write, detect every request-level blocker that can be decided
 without invoking a mutation owner, including `MissingIntentDecision`,
 `EngineeringDecisionMissing`, conflicting requirements inside the request,
@@ -545,6 +559,28 @@ Factory deliberately uses at-least-once execution. A later fresh worker must
 inspect current repository reality, finish partially completed work, and avoid
 reverting correct existing changes merely because an interrupted execution may
 have produced them.
+
+## Technical autonomy during execution
+
+Planner can select a suitable compliant implementation direction, delegate
+bounded technical choices to Worker, or contract focused research with
+observable evidence. A fresh Planner consumes research results from the
+repository before dependent Tasks are contracted. Multiple viable techniques
+alone do not justify `# Question`; ask only for a genuine user-owned
+product, normative, trust, compatibility or external-obligation decision.
+
+When realistic alternatives left to Worker activate different Conditional
+Rules, Planner semantically supplies the relevant `TaskRelatedEngineering`
+IDs *before* Worker spawn, or first narrows the Task/researches the decision.
+Conditions remain conditional. The root only resolves IDs and enumerates
+Always Rules; no heuristic Conditional rule selection is introduced.
+
+Worker chooses local implementation methods inside the Task and supplied
+Rules. If rules are insufficient for the selected approach or required
+constraints conflict, Worker reports a precise blocker and cannot widen
+the packet, write `# Question`, alter Task, edit durable knowledge or
+remove/rename the active marker. Factory handles further planning/stopping.
+A new Engineering policy remains forbidden during an active run.
 
 ## Planner outcomes
 

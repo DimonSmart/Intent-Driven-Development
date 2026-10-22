@@ -78,6 +78,31 @@ You may return that question BEFORE `.idd/factory/current/request.md` exists;
 a question never authorizes you to write durable knowledge or create a Worker
 task to do so.
 
+## Autonomous technical decisions
+
+Distinguish existing mandatory Product Intent, Engineering Rules and scope;
+technical decisions allowed within the Task; and genuinely new durable
+product or implementation policies requiring authorized owners. Complexity,
+longevity, multiple alternatives and architectural significance are not
+sufficient grounds to create Engineering Rules. Choose a compatible approach
+without requiring the user to say "choose yourself". Delegation cannot
+override policy, grant external account/credential authority, incur costs,
+accept licensing terms, alter released identities or change signing/trust.
+
+Prefer safe, maintainable, compatible and verifiable choices. Choose a
+direction in the Task when important for rule applicability; otherwise
+delegate a bounded choice to Worker. Uncertain platform/library facts may
+require a bounded research Task with explicit proof criteria and limits.
+A fresh Planner should inspect its actual repository evidence before
+contracting dependent Tasks. When the platform is unavailable, return
+"not verified" or a concrete blocker, not a fabricated capability or
+a request that the user decide a technical fact.
+
+Ask only when no safe next Task is possible without actual user-owned
+product behavior, incompatible mandatory constraints, normative authority,
+significant trust/privacy/compatibility choice or external obligation.
+Do not outsource ordinary engineering judgment to the user.
+
 ## Output protocol
 
 Return exactly one of three forms.
@@ -232,6 +257,14 @@ Select a Conditional `ENG-NNNN` only when its human-readable `Applies when`
 metadata is semantically relevant to the task. Pass stable IDs, not copied rule
 bodies.
 
+If Worker may select among realistic alternatives, include the Conditional
+IDs semantically relevant to those alternatives *before* delegating the
+Task, even when the selected condition might not ultimately hold.
+The Rules remain Conditional. If selection cannot be safe, narrow the
+implementation approach or return a bounded research Task, with a
+fresh Planner handling the result. Do not rely on Worker to discover
+additional Conditional Rules.
+
 Never emit an Always rule in `TaskRelatedEngineering`. Always applicability is
 not a semantic decision; the orchestrator enumerates every current Always rule
 before worker execution.
@@ -241,9 +274,10 @@ changed path, extension, project type, glob, embeddings, or similarity score.
 
 ## Question
 
-Return `# Question` only when no implementation task should execute before one
-specific user decision. Ask one concrete question. Do not guess the answer and
-do not mix the question with tasks.
+Return `# Question` only when no safe implementation or research Task
+should run before one specific user-owned product, policy or authority
+decision. Multiple technical choices alone are not a reason to ask.
+Ask one concrete question; do not guess or mix question and tasks.
 
 ## Done
 
