@@ -247,4 +247,31 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
         Assert.Contains("uncovered-constraint diagnostic", worker);
     }
 
+    [Fact]
+    public void MinimalRuleExamples_DoNotRequireOptionalExplanationSections()
+    {
+        var guardrails = Canonical("methodology", "engineering-guardrails.md");
+        var always = guardrails.Split("Minimal valid Always Rule")[1]
+            .Split("Minimal valid Conditional Rule")[0];
+        var conditional = guardrails.Split("Minimal valid Conditional Rule")[1]
+            .Split("Additional explanatory sections")[0];
+
+        foreach (var example in new[] { always, conditional })
+        {
+            Assert.Contains("## Rule", example);
+            Assert.Contains("## Applicability", example);
+            Assert.DoesNotContain("## Rationale", example);
+            Assert.DoesNotContain("## Guidance", example);
+            Assert.DoesNotContain("## Verification", example);
+        }
+
+        Assert.Contains("Always", always);
+        Assert.Contains("Conditional", conditional);
+        Assert.Contains("## Applies when", conditional);
+        Assert.DoesNotContain("## Applies when", always);
+        Assert.Contains("Missing optional sections are neither errors nor warnings", guardrails);
+        Assert.Contains("exactly one non-empty `## Applies when`", guardrails);
+    }
+
+
 }

@@ -167,4 +167,24 @@ public sealed class IntentDocumentCreationContractTests(GenerationFixture fixtur
         Assert.DoesNotContain("idd-intent-new-document", router);
         Assert.DoesNotContain("idd-intent-new-document", docs);
     }
+    [Fact]
+    public void DocumentCreation_UsesSemanticContractInsteadOfTemplateHeadingEquality()
+    {
+        var types = Canonical("methodology", "document-types.md");
+        var lint = Canonical("skills", "idd-intent-lint.md");
+        var readme = Canonical("project-files", "intent", "README.md");
+
+        Assert.Contains("as a starting point", Workflow);
+        Assert.Contains("templates are validation schemas", Workflow);
+        Assert.Contains("recognized valid ADR status", Workflow);
+        Assert.Contains("never for heading-by-heading", Workflow);
+        Assert.Contains("No universal H2 heading is required", types);
+        Assert.Contains("No universal H2", types);
+        Assert.Contains("A spec has no", types);
+        Assert.Contains("Missing, conflicting or", types);
+        Assert.Contains("not the template heading list", readme);
+        Assert.Contains("never an independent list of mandatory sections", lint);
+    }
+
+
 }

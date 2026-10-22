@@ -123,4 +123,29 @@ public sealed class IntentLintAutofixContractTests(GenerationFixture fixture)
         Assert.Equal("Read Glob Grep Edit Write Bash", claude.GetProperty("allowed-tools").GetString());
         Assert.Equal("[scope] [mode: check|fix]", claude.GetProperty("argument-hint").GetString());
     }
+    [Fact]
+    public void FilenameRegex_IsIntactAndDuplicateSkillPreambleIsGone()
+    {
+        var lint = Canonical("idd-intent-lint.md");
+        Assert.Equal(1, lint.Split("# idd-intent-lint").Length - 1);
+        Assert.Contains(@"^IDD-\d{4}\.(spec|adr|spike)-[a-z0-9][a-z0-9-]*\.md$", lint);
+        Assert.DoesNotContain(".md# idd-intent-lint", lint);
+    }
+
+    [Fact]
+    public void OptionalTemplateHeadings_DoNotTriggerErrorsOrAutofix()
+    {
+        var lint = Canonical("idd-intent-lint.md");
+        var types = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "methodology", "document-types.md"));
+
+        Assert.Contains("absence of optional template headings is neither error nor", lint);
+        Assert.Contains("Never insert `None`, `TBD`", lint);
+        Assert.Contains("single recognized status value", lint);
+        Assert.Contains("Mechanical lint cannot establish semantic completeness", types);
+        Assert.Contains("existing safe heuristics", lint);
+        Assert.Contains("do not require canonical optional headings", lint);
+    }
+
+
 }

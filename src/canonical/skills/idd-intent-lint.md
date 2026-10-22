@@ -97,8 +97,107 @@ corresponding repair.
 
 ### Stable IDs and filenames
 
-- Current documents directly under \`.idd/intent/\` use
-  \`^IDD-\d{4}\.(spec|adr|spike)-[a-z0-9][a-z0-9-]*\.md$\`.
+- Current documents directly under `.idd/intent/` use
+  `^IDD-\d{4}\.(spec|adr|spike)-[a-z0-9][a-z0-9-]*\.md# idd-intent-lint
+
+Use this skill to check mechanical consistency of project-owned `.idd/intent/` and, only when explicitly authorized, conservatively repair unambiguous technical defects. Always perform the existing read-only Mechanical Engineering Validation when `.idd/engineering/` is present.
+
+Formula:
+
+```text
+idd-intent-lint = mechanical IDD check | conservative, authorized mechanical fix
+```
+
+Use `mode: check` by default; `mode: fix` only for explicit permission to
+modify technical Intent documents. Accept an optional document/scope argument.
+In a forked Claude context, the caller must forward the **complete original
+request**, including mode, scope, exclusions, and prohibitions. Never derive
+write consent from the availability of Edit/Write/Bash tools. An explicit
+read-only restriction always wins.
+
+Read `references/numbering.md`, `references/document-types.md` and
+`references/glossary-integration.md` for normative constraints. Read
+`references/engineering-guardrails.md` before validating Engineering.
+Use packaged `assets/bootstrap/.idd/intent/` only when restoring missing
+standard files in fix mode; do not borrow another skill's assets or read plugin
+cache paths.
+
+## Rules
+
+- In `check`, perform no writes, moves, deletes, initialization, temporary
+  repository files, shell redirection to files, or script/report generation.
+  `Bash` remains read-only in this mode even when the host permits writes.
+- In `fix`, make only the minimal, independently verifiable repairs specified
+  below. Do not rewrite whole documents as a formatter.
+- Do not reorganize specs.
+- Do not perform broad semantic review.
+- Do not resolve product conflicts.
+- Treat `GLOSSARY.md` as optional. Its absence is valid and produces no warning.
+- Do not create or update the glossary from lint.
+- Always report errors and warnings; in `check` suggest fixes only.
+  In `fix` report actual fixes, skipped fixes, changed paths, and the
+  final result of mandatory revalidation.
+- Absence of `.idd/engineering/` is valid and produces no warning.
+- Do not use lint to decide semantic applicability of Conditional Engineering
+  Rules.
+- Ordinary project lint is limited to project-owned `.idd/intent/`, optional
+  `.idd/intent/GLOSSARY.md`, and optional `.idd/engineering/` state. Do not scan
+  an installed plugin cache, canonical IDD repository, skill source tree, or IDD
+  documentation tree unless the user explicitly asks to validate the IDD
+  distribution itself.
+- Do not generate a general-purpose validator program solely to perform IDD lint.
+  Use bounded repository inspection operations: Read, Glob, Grep/Search, and
+  simple bounded host/shell commands when useful.
+
+
+## Modes, scope and ownership
+
+- `check` is the default for "check", "run lint", "find errors", and
+  "check and explain how to fix". It may identify fixable findings but must not
+  change any file. It must not create missing bootstrap files.
+- `fix` requires "check and fix", "repair mechanical errors", or explicit
+  `mode: fix`. Apply eligible changes without repeatedly seeking permission
+  for each. "Fix the lint skill" refers to implementation work, **not** a
+  project-documents autofix.
+- No `dry-run`, snapshot/rollback system, automatic Git commits or
+  force/reset/restore/clean operations. Git diff/status are inspection tools
+  only. Record new untracked files separately because `git diff` misses them.
+- Default scope: project-owned `.idd/intent/`, its direct current numbered
+  documents, `README.md`, `INDEX.md`, `_templates/`, and optional
+  read-only `GLOSSARY.md`; and read-only `.idd/engineering/` if it exists.
+  Do not recursively lint source code, plugin cache, generated marketplace,
+  methodology sources or the entire repository. A separately requested
+  IDD-distribution audit is a distinct scope, never automatic autofix of
+  `src/canonical/`.
+- A scoped check includes required INDEX, identity collision, and affected
+  relation dependencies. Its `pass` covers only the reported scope.
+- If the entire `.idd/intent/` folder is absent, report the need for
+  `idd-project-init` without creating it, even in fix mode.
+- Never write outside `.idd/intent/`. During a prospective file rename,
+  do a bounded *exact* search for old path references elsewhere in the
+  project; if such dependencies cannot be safely handled without changing
+  outside files, skip the complete rename group.
+- `idd-intent-structure-audit` owns semantic structure and conflicts;
+  `idd-intent-normalize-current` owns substantive move/split/merge/delete,
+  including archives and process-only documents; `idd-intent-change` owns
+  product truth; `idd-glossary-build` exclusively owns Glossary writes;
+  `idd-engineering-change` owns Engineering writes and allocation;
+  `idd-project-init` owns full initialization and agent instructions.
+  Findings in these categories remain visible but **diagnostic-only** here.
+
+## Conservative fix policy
+
+Before changing anything, classify every finding as `safe-fix`,
+`diagnostic-only`, or `ambiguous`. A safe fix requires an existing canonical
+rule, one uniquely determined target state, a purely technical edit, all
+dependencies resolvable, and preservation of all user-owned data. Otherwise
+report the diagnostic and do not edit. These permissions apply **only** in
+`mode: fix`. Continue performing every check below even when there is no
+corresponding repair.
+
+### Stable IDs and filenames
+
+.
 
   Recognize legacy `0001.spec-editor.md` -> `IDD-0001.spec-editor.md`
   only when existing ID/type/slug are unambiguous, including heading and

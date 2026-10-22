@@ -101,30 +101,15 @@ public sealed class IntentLintEndToEndLiveTests
             File.WriteAllText(dependent, """
                 # IDD-0002.spec-integration
 
-                ## Intent
+                Integration uses the timer and displays its results.
 
-                Integration uses the timer.
-
-                ## Related Specifications
-
-                [Timer](0001.spec-timer.md#behavior)
-
-                ## Behavior
-
-                Timer results are displayed.
-
-                ## Non-Goals
-
-                No scheduling.
-
-                ## Acceptance Criteria
-
-                The timer is visible.
-
-                ## Verification
-
-                Verify the timer is visible.
+                Related: [Timer](0001.spec-timer.md#behavior)
                 """);
+
+            // A customized project template does not need canonical optional headings.
+            var userSpecTemplate = Path.Combine(intent, "_templates", "spec.md");
+            File.WriteAllText(userSpecTemplate,
+                "# IDD-NNNN.spec-short-title\n\nDescribe current Product Intent.\n");
 
             var glossary = Path.Combine(intent, "GLOSSARY.md");
             File.WriteAllText(glossary, "# Incorrect user glossary heading\n\n## Timer\nExplanation.\n");
@@ -146,6 +131,10 @@ public sealed class IntentLintEndToEndLiveTests
             Assert.Contains("# IDD-0001.spec-timer", File.ReadAllText(renamed));
             Assert.Contains("IDD-0001 | Spec | Clock | Author note | —", File.ReadAllText(idx));
             Assert.Contains("[Timer](IDD-0001.spec-timer.md#behavior)", File.ReadAllText(dependent));
+            Assert.DoesNotContain("## Acceptance Criteria", File.ReadAllText(dependent));
+            Assert.DoesNotContain("## Verification", File.ReadAllText(dependent));
+            Assert.Equal("# IDD-NNNN.spec-short-title\n\nDescribe current Product Intent.\n",
+                File.ReadAllText(userSpecTemplate));
             Assert.True(File.Exists(Path.Combine(intent, "README.md")));
             Assert.Equal("# Incorrect user glossary heading\n\n## Timer\nExplanation.\n",
                 File.ReadAllText(glossary));
