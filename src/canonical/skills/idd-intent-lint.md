@@ -29,7 +29,8 @@ cache paths.
   `Bash` remains read-only in this mode even when the host permits writes.
 - In `fix`, make only the minimal, independently verifiable repairs specified
   below. Do not rewrite whole documents as a formatter.
-- Do not reorganize specs.
+- Do not reorganize specs or ADRs, merge historical decisions, or delete
+  documents based on lifecycle metadata.
 - Do not perform broad semantic review.
 - Do not resolve product conflicts.
 - Treat `GLOSSARY.md` as optional. Its absence is valid and produces no warning.
@@ -120,8 +121,10 @@ corresponding repair.
 
 ### INDEX.md: surgical table edits
 
-- Preserve the canonical `Document | Role | Area | Notes | Replaces` schema
-  and any extra user columns. The key `Document` contains only plain
+- Preserve the canonical `Document | Role | Area | Notes` discovery
+  columns and any extra user columns. A legacy `Replaces` column is not
+  required; a historical replacement chain in it is a semantic migration
+  diagnostic, not permission to remove the column automatically. The key `Document` contains only plain
   `IDD-NNNN`; the column is **Role**, not Type. Do not regenerate INDEX
   from scratch or reorder existing rows.
 - Convert a `Document` cell containing an unambiguous legacy number, current
@@ -130,7 +133,8 @@ corresponding repair.
 - When a unique existing current document lacks a row, insert one minimally:
   derive Document and Role (`Spec`, `ADR`, `Spike`) from the filename;
   use the established empty/`—` placeholders for other columns. Note
-  missing discovery metadata; **never invent** Area, Notes, or Replaces.
+  missing discovery metadata; **never invent** Area, Notes, or
+   historical replacement relations.
 - Remove exact duplicate rows only when this loses no associated comments
   or notes. Conflicting duplicate-ID rows remain unchanged with an error.
   A missing document referenced from INDEX is not sufficient grounds for
@@ -140,15 +144,17 @@ corresponding repair.
   "No current `IDD-NNNN` documents have been created yet." only when
   real current documents exist. Do not strip other explanations.
 - A provably wrong Role can be adjusted from the unique file's type, but an
-  uncertain role or substantive state requires diagnosis. Historical
-  "Superseded" prose in Notes alone is not a spec lifecycle marker.
-  `Replaces` is a normative ID relation: repair only exact, unambiguous
-  ID representation.
+  uncertain role or substantive state requires diagnosis. Legacy historical
+  `Replaces` columns and explicit ADR `Superseded` status are diagnosed
+  without automatic removal. Ordinary prose discussing experiments, including
+  the word "superseded", is not lifecycle metadata.
 
 ### Formal relations, local links, and sections
 
-- In recognized normative fields such as `Related`, `Replaces`,
-  `Supersedes`, and `Depends on`, use a unique current `IDD-NNNN`.
+- In recognized **current normative** relations such as `Related` and
+  `Depends on`, require a unique current `IDD-NNNN`. ADR history fields
+  `Replaces` and `Supersedes` are legacy diagnostics, not current normative
+  relation types.
   Convert a bare `0007` only *inside* a recognized relation when it maps
   unambiguously to `IDD-0007`. Check missing or multiply-resolved
   targets; do not choose candidates by topic or modify ordinary numbers.
@@ -162,14 +168,17 @@ corresponding repair.
   and relation rules. The headings of packaged or user-owned templates
   are examples, never an independent list of mandatory sections. Accept
   supported equivalent presentation, regardless of heading order or number.
-  Validate a single recognized allowed ADR status; do not require a same-named
-  `## Decision` or `## Question` heading. In fix mode repair only
-  unmistakable mechanical syntax/metadata defects with a unique result.
-  Never infer or invent ADR status, architectural decision, research question,
-  acceptance criterion, research result, or missing optional section.
-  Never insert `None`, `TBD` or empty headings to achieve pass.
-  Semantic completeness belongs to the owning workflow, not mechanical lint;
-  accepted ADRs must not be semantically rewritten.
+  No ADR lifecycle status or same-named `## Decision` or `## Question`
+  heading is required. Diagnose obvious legacy ADR lifecycle metadata such as
+  an ADR `## Status` field with `Accepted` / `Superseded` / `Rejected` /
+  `Proposed`, or an ADR `## Supersedes` or `## Superseded By` section.
+  Do not flag the same words in normal architecture prose, quoted examples,
+  code, or descriptions of experiments. In fix mode repair only unmistakable
+  mechanical syntax/identity defects with uniquely established results.
+  Never infer or invent an architectural decision, research question,
+  acceptance criterion, experimental result, or optional section. Never
+  insert `None`, `TBD` or empty headings. The semantic owner, not lint,
+  decides which current ADR to retain or what knowledge to transfer.
 - No blanket Markdown formatter, paragraph reflow, section sorting,
   code-block rewriting, archive cleaning, progress-checklist deletion or
   stylistic rephrasing. Diagnostic findings about task/status leakage,
@@ -274,8 +283,11 @@ Check that:
 - only genuinely mandatory structural fields of the document type exist and
   are unambiguous; absence of optional template headings is neither error nor
   warning;
-- `Related`, `Replaces`, `Supersedes`, `Depends on`, and similar normative
-  relations use `IDD-NNNN` identifiers and point to existing current documents;
+- `Related`, `Depends on` and other current normative relations use
+  `IDD-NNNN` identifiers and point to existing current documents;
+- explicit legacy ADR lifecycle status, supersession fields, and INDEX history
+  columns are diagnostic migration candidates, never automatically merged,
+  deleted, or converted into normative dependencies;
 - normative relations do not use bare four-digit document numbers;
 - Related Specifications links point to existing files or valid external
   references;
@@ -285,10 +297,8 @@ Check that:
 - specs do not contain generated chat transcripts;
 - specs do not contain obvious contradiction markers such as "supported" in
   Scope and "not implemented" in Non-goals for the same feature;
-- ADR files have a single recognized status value from `Proposed`,
-  `Accepted`, `Superseded`, `Rejected` without conflicts or unselected
-  template choices; the decision itself is assessed by the owning semantic
-  workflow, not inferred from a `## Decision` heading;
+- ADRs require no lifecycle status, supersession links or fixed H2 sections;
+  semantic completeness is assessed by the owning workflow, not H2 counting;
 - spikes represent active non-normative research or unresolved
   investigation; missing `## Question`, `## Result` or
   `## Recommendation` headings are not themselves mechanical defects;
@@ -324,17 +334,14 @@ When `.idd/intent/GLOSSARY.md` exists, also check that:
 - a current intent filename uses the legacy bare numeric format;
 - a document heading uses a missing, malformed, or filename-mismatched
   `IDD-NNNN` identifier;
-- an ADR has no recognized single allowed status, has conflicting status
-  values, or retains a template choice list instead of one selected status;
 - an archive directory exists under `.idd/intent`;
 - `.idd/intent/import-report.md` exists;
 - generated, import, task, progress, or process reports exist under `.idd/intent`;
 - `INDEX.md` contains an `Archived` section;
 - `INDEX.md` links to deleted document storage;
 - any file under `.idd/intent` references `.idd/intent/archive/...`;
-- any `Related`, `Replaces`, `Supersedes`, `Depends on`, or similar normative
-  relation uses a bare four-digit document number or points to a missing current
-  document;
+- any current normative `Related`, `Depends on`, or similar relation uses
+  a bare four-digit ID or points to a missing current document;
 - an ordinary spec contains `Status: Current`, `Status: Superseded`,
   `Superseded by`, or another explicit lifecycle status;
 - `INDEX.md` models ordinary specs as `Current`, `Completed`, `Superseded`, or
