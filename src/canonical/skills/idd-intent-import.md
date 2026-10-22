@@ -548,14 +548,17 @@ If the same source also states a product-visible requirement such as consistent
 dialog and overlay redraw behavior across viewport changes, import that product
 requirement and its durable verification property into Intent.
 
-Imported current documents must use current IDD document shapes. Do not preserve
-legacy section layout when the document becomes current normative intent.
+Imported current documents must satisfy the semantic and minimal structural
+contracts in `references/document-types.md`. Reorganize legacy layouts only
+where necessary for understandable current intent, not to copy every template
+heading. Preserve supported alternatives and omit optional sections that add
+no meaning. Never synthesize placeholders or evidence.
 
 Every target document must use the canonical `IDD-NNNN.type-short-title.md`
 filename and the same `IDD-NNNN` identifier in its heading. Bare `NNNN`
 filenames and normative references are invalid.
 
-Minimum shape for `spec` documents:
+Expanded illustrative template for `spec` documents (not mandatory H2 headings):
 
 ```md
 # IDD-NNNN.spec-short-title
@@ -611,14 +614,14 @@ sentence. Prefer important user scenarios, critical invariants, meaningful
 boundary cases, and justified manual checks.
 ```
 
-Minimum shape for `adr` documents:
+Expanded illustrative template for `adr` documents (not mandatory H2 headings):
 
 ```md
 # IDD-NNNN.adr-short-title
 
 ## Status
 
-Proposed | Accepted | Superseded | Rejected
+Proposed
 
 ## Context
 
@@ -641,7 +644,7 @@ Describe accepted tradeoffs and follow-up constraints.
 Reference the superseded ADR when this ADR replaces an earlier decision.
 ```
 
-Minimum shape for `spike` documents:
+Expanded illustrative template for `spike` documents (not mandatory H2 headings):
 
 ```md
 # IDD-NNNN.spike-short-title
@@ -670,6 +673,12 @@ Record what was learned.
 
 State the proposed follow-up.
 ```
+
+The sample sections above illustrate content only. An imported spec need not
+carry every H2, an ADR needs one recognized allowed status and a semantic
+decision (not necessarily `## Decision`), and an unresolved spike needs
+no `Result` or `Recommendation`. Do not fill these with invented material
+just to follow the example.
 
 If a spike already has `Result` or `Recommendation` and is no longer active
 research, import must choose one of these outcomes:
