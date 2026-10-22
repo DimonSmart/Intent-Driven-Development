@@ -63,7 +63,8 @@ public sealed class IntentDocumentCreationContractTests(GenerationFixture fixtur
     public void ParentWorkflow_LoadsCreationOnlyForThreeClassifications()
     {
         var parent = Canonical("skills", "idd-intent-change.md");
-        Assert.Contains("If `new-spec-required`, `adr-required`, or `spike-required`, read", parent);
+        Assert.Contains("or independent ownerless", parent);
+        Assert.Contains("`adr-required`", parent);
         Assert.Contains("`references/new-intent-document.md`", parent);
         Assert.Contains("Ordinary existing-spec updates do not", parent);
         Assert.Contains("inside this same execution", parent);
@@ -176,7 +177,7 @@ public sealed class IntentDocumentCreationContractTests(GenerationFixture fixtur
 
         Assert.Contains("as a starting point", Workflow);
         Assert.Contains("templates are validation schemas", Workflow);
-        Assert.Contains("recognized valid ADR status", Workflow);
+        Assert.Contains("Do not write status or supersession metadata", Workflow);
         Assert.Contains("never for heading-by-heading", Workflow);
         Assert.Contains("No universal H2 heading is required", types);
         Assert.Contains("No universal H2", types);
@@ -184,6 +185,53 @@ public sealed class IntentDocumentCreationContractTests(GenerationFixture fixtur
         Assert.Contains("Missing, conflicting or", types);
         Assert.Contains("not the template heading list", readme);
         Assert.Contains("never an independent list of mandatory sections", lint);
+    }
+
+
+    [Fact]
+    public void LivingAdr_PreservesOwnerAndDoesNotIntroduceStatusOrSupersession()
+    {
+        var types = Canonical("methodology", "document-types.md");
+        var template = Canonical("project-files", "intent", "_templates", "adr.md");
+        var creator = Workflow;
+        var change = Canonical("skills", "idd-intent-change.md");
+        var importer = Canonical("skills", "idd-intent-import.md");
+        var bootstrap = Canonical("skills", "idd-intent-bootstrap.md");
+        var fromCode = Canonical("skills", "idd-code-update-intent.md");
+        var normalize = Canonical("skills", "idd-intent-normalize-current.md");
+
+        Assert.Contains("update the owning ADR directly and retain its ID", types);
+        Assert.Contains("independent", creator);
+        Assert.Contains("existing ADR owner", creator);
+        Assert.Contains("existing architectural owner", change);
+        Assert.Contains("confirmed", bootstrap);
+        Assert.Contains("Legacy ADRs may contain", importer);
+        Assert.Contains("Never select the newest date or number", importer);
+        Assert.Contains("merge", normalize, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("update", fromCode, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("## Status", template);
+        Assert.DoesNotContain("## Supersedes", template);
+        Assert.Contains("## Experiments and Findings", template);
+        Assert.Contains("no lifecycle status", types);
+    }
+
+    [Fact]
+    public void LivingAdr_SelfHostingKeepsOnlyCurrentArchitecturalOwner()
+    {
+        var root = Path.Combine(fixture.RepoRoot, ".idd", "intent");
+        var adr = fixture.ReadText(Path.Combine(root,
+            "IDD-0006.adr-native-agent-factory-orchestration.md"));
+        var index = fixture.ReadText(Path.Combine(root, "INDEX.md"));
+        Assert.Contains("at-least-once", adr);
+        Assert.Contains("polling", adr);
+        Assert.Contains("Experiments and Findings", adr);
+        Assert.DoesNotContain("## Status", adr);
+        Assert.DoesNotContain("## Supersedes", adr);
+        Assert.DoesNotContain("| Replaces |", index);
+        Assert.Contains("| IDD-0006 | ADR |", index);
+
+        foreach (var id in new[] { "IDD-0002.", "IDD-0004.", "IDD-0005.", "IDD-0007." })
+            Assert.Empty(Directory.GetFiles(root, id + "*.md"));
     }
 
 

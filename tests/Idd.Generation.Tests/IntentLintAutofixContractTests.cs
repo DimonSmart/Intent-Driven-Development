@@ -124,6 +124,25 @@ public sealed class IntentLintAutofixContractTests(GenerationFixture fixture)
         Assert.Equal("[scope] [mode: check|fix]", claude.GetProperty("argument-hint").GetString());
     }
     [Fact]
+    public void LivingAdr_LintIsMechanicalAndNeverMigratesArchitecturalHistory()
+    {
+        var lint = Canonical("idd-intent-lint.md");
+        var types = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "methodology", "document-types.md"));
+        var index = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "project-files", "intent", "INDEX.md"));
+
+        Assert.Contains("Do not reorganize specs or ADRs", lint);
+        Assert.Contains("## Status", lint);
+        Assert.Contains("diagnostic", lint, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Validate a single recognized allowed ADR status", lint);
+        Assert.Contains("No universal H2", types);
+        Assert.Contains("| Document | Role | Area | Notes |", index);
+        Assert.DoesNotContain("| Replaces |", index);
+    }
+
+
+    [Fact]
     public void FilenameRegex_IsIntactAndDuplicateSkillPreambleIsGone()
     {
         var lint = Canonical("idd-intent-lint.md");
@@ -141,7 +160,9 @@ public sealed class IntentLintAutofixContractTests(GenerationFixture fixture)
 
         Assert.Contains("absence of optional template headings is neither error nor", lint);
         Assert.Contains("Never insert `None`, `TBD`", lint);
-        Assert.Contains("single recognized status value", lint);
+        Assert.Contains("No ADR lifecycle status", lint);
+        Assert.Contains("semantic migration", lint);
+        Assert.Contains("merge historical decisions", lint);
         Assert.Contains("Mechanical lint cannot establish semantic completeness", types);
         Assert.Contains("existing safe heuristics", lint);
         Assert.Contains("do not require canonical optional headings", lint);
