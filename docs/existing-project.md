@@ -82,7 +82,12 @@ explicit accepted durable Engineering decisions already stated in ./docs.
 Import treats source material as evidence, not unquestionable truth. Historical
 plans, stale requirements, accidental implementation details, and obsolete
 documentation should not become current product intent merely because they
-exist.
+exist. Classical imported ADRs with Proposed, Accepted, Superseded or Rejected
+statuses are source evidence, not lifecycle states to preserve. Consolidate
+them by architectural responsibility into current living ADRs after verifying
+the accepted decision, keeping only significant findings and constraints.
+Do not assume the latest dated or highest-numbered ADR is authoritative; if
+sources disagree, report the conflict for a decision before importing.
 
 ### Implementation exists but reliable product documentation does not
 

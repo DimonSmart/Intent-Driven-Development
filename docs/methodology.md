@@ -209,7 +209,14 @@ When behavior evolves inside an existing product area, update the current owning
 
 Git owns history. The intent tree should not reproduce Git through status fields, changelogs inside specifications, or retained obsolete documents.
 
-ADRs are the exception because they record durable decisions. When a decision changes, mark the old ADR as superseded and create the replacing ADR.
+ADRs are also current knowledge, not an exception to Git-owned history. A
+living ADR describes the currently accepted architectural decision for its
+area, its rationale, relevant experimental findings and consequences. Update
+its owning ADR in place when the approach changes while the architectural
+responsibility remains the same; keep the ID. Create a new ADR only for a
+genuinely independent decision. Remove obsolete, historical-only ADRs after
+transferring useful knowledge and updating INDEX and current references.
+Do not use ADR lifecycle statuses or supersession chains.
 
 Resolved spikes should be removed after their durable outcome is captured in a specification or ADR, unless the research itself remains active.
 

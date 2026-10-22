@@ -202,7 +202,24 @@ Users must be able to compare two local folders without modifying either side. U
 The workflow updates the current owning intent document. When required, it also
 creates a new owning spec, ADR, or spike through an internal document-creation
 workflow, without a separate public skill. A new spec is created only when no
-existing spec owns that product area.
+existing spec owns that product area. Likewise, an ADR is created only when a
+confirmed architectural decision has no existing architectural owner. Changes
+within the same area update the owning living ADR in place with its stable ID.
+
+## Update an Architectural Decision
+
+ADRs are living descriptions of **accepted current architecture**. When a
+technical approach changes, find the ADR that already owns the architectural
+area, update its decision, rationale, alternatives and consequences, and retain
+its `IDD-NNNN` identifier. Relevant findings from earlier experiments may
+explain why the new choice is justified; a chronology of old decisions belongs
+in Git. Do not write `Status`, `Supersedes`, or `Superseded By` metadata.
+
+Create a separate ADR only for an independently owned architectural decision.
+If the choice remains unresolved, investigate through a spike or obtain the
+missing decision before recording accepted architecture. Code divergence
+alone does not establish that the ADR has changed. The ADR documents the
+accepted target, which may precede its implementation.
 
 ## Implement from Current Intent
 

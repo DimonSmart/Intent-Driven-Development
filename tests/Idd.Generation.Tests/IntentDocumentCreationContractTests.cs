@@ -206,7 +206,7 @@ public sealed class IntentDocumentCreationContractTests(GenerationFixture fixtur
         Assert.Contains("existing architectural owner", change);
         Assert.Contains("confirmed", bootstrap);
         Assert.Contains("Legacy ADRs may contain", importer);
-        Assert.Contains("Never select the newest date or number", importer);
+        Assert.Contains("Do not select the newest date or number", importer);
         Assert.Contains("merge", normalize, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("update", fromCode, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("## Status", template);
