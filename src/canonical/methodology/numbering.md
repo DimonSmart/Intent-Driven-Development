@@ -51,9 +51,9 @@ stable identifier as plain text.
 For example:
 
 ```md
-| Document | Role | Area | Notes | Replaces |
-| --- | --- | --- | --- | --- |
-| IDD-0001 | Spec | Agentic chat | ... | — |
+| Document | Role | Area | Notes |
+| --- | --- | --- | --- |
+| IDD-0001 | Spec | Agentic chat | ... |
 ```
 
 Do not put the canonical filename, a file path, or a Markdown link in the

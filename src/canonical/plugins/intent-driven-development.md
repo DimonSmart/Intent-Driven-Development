@@ -51,8 +51,11 @@ spec directly.
 When a product area is replaced by a substantially different product area,
 delete the old spec and create a new owning spec.
 
-ADRs are decision records. Do not archive superseded ADRs. Mark them as
-`Superseded` and create a new ADR for the replacing decision.
+ADRs are living records of accepted architecture. Update an existing owner
+in place when a decision changes; create a new ADR only for an independent
+architectural area. Preserve useful experiment findings and remove obsolete
+historical-only ADRs after transferring knowledge. Git holds document history;
+ADR status and replacement chains are not used.
 
 Resolved spikes should be deleted after their outcome is captured in a spec or
 ADR, unless they remain useful as active research.

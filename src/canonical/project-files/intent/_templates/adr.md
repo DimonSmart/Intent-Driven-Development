@@ -1,27 +1,25 @@
 # IDD-NNNN.adr-short-title
 
-## Status
-
-Proposed | Accepted | Superseded | Rejected
-
 ## Context
 
-Describe the decision context. Include known future intent only when it
-materially affects this decision.
+Describe the architectural problem and relevant constraints.
 
 ## Decision
 
-Describe the chosen decision.
+Describe the current accepted architecture and its rationale.
 
 ## Alternatives Considered
 
-List alternatives and why they were not chosen.
+Describe significant alternatives and reasons for not choosing them, if known.
+
+## Experiments and Findings
+
+Optional: record results that explain the current choice or prevent known
+architectural mistakes, not the chronological implementation history.
 
 ## Consequences
 
-Describe accepted tradeoffs, follow-up constraints, and important future options
-that this decision keeps open or closes.
+Describe tradeoffs and enduring architectural constraints.
 
-## Supersedes
-
-Reference the superseded ADR by its `IDD-NNNN` identifier when this ADR replaces an earlier decision.
+All headings are illustrative and may be omitted, merged or renamed. The
+semantic decision must remain clear and self-contained.

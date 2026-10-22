@@ -30,10 +30,9 @@ choice requires a missing durable decision.
   properties** (including appearance without a functional behavior change),
   domain contracts, acceptance criteria, verification properties, shared
   behavior, and product-significant constraints.
-- `adr`: durable architectural decision, its rationale, alternatives, and
-  tradeoffs. Preserve the ADR decision lifecycle; accepted ADRs are not
-  semantically rewritten. A changed decision gets a new ADR and supersedes the
-  old one.
+- `adr`: a confirmed current architectural decision, its rationale,
+  alternatives and tradeoffs. When an ADR already owns this architectural area,
+  update it directly instead of entering the creation workflow.
 - `spike`: active research, experiment, or hypothesis check before a product
   or architecture decision. A spike does not silently establish the outcome.
 
@@ -55,8 +54,9 @@ merely to preserve old wording.
    not create a new spec**. Return control to the current
    `idd-intent-change` execution to update the existing owner. Do not
    invoke it recursively or emit another skill handoff.
-6. For `adr-required`, verify that a distinct architectural decision or
-   supersession warrants a new decision record. For `spike-required`, verify
+6. For `adr-required`, verify that a confirmed independent architectural
+   decision has no existing ADR owner. If an ADR owns the area, return to the
+   parent to edit it in place with the same ID. A revision is not a new owner. For `spike-required`, verify
    that a genuine unresolved research question warrants a spike, rather than
    duplicating an existing active investigation. An existing behavior-owning
    spec alone does not prohibit a justified ADR or spike.
@@ -106,23 +106,22 @@ conflicting number.
    alternatives and exceptions. Verification describes important user scenarios,
    critical invariants, meaningful boundary cases and justified manual checks,
    not test-method names, private classes or a test per sentence.
-4. For an ADR, record the decision and available relevant context, alternatives,
-   consequences and `Supersedes` relations without requiring matching
-   headings. Supply exactly one recognized valid ADR status from confirmed
-   decision context; never leave `Proposed | Accepted | Superseded | Rejected`
-   as a placeholder or guess the status. If status cannot be established, block
-   and ask the parent for the missing decision. For an active spike, preserve
+4. For an ADR, record the confirmed current decision, context, rationale,
+   alternatives, consequences and useful experimental findings where known.
+   Do not write status or supersession metadata and do not require specific
+   H2 headings. If the architecture is unresolved, return the missing decision
+   to the parent. For an active spike, preserve
    the question and known constraints/method, and include results and
    recommendations only when known. Do not fabricate research outcomes.
 5. Update `.idd/intent/INDEX.md` in the same change. Its `Document` column
    contains the stable plain-text `IDD-NNNN` identifier, not a path,
-   filename or Markdown link. Keep its role, area, notes and replacements
-   consistent with the new document, and use full `IDD-NNNN` references in
+   filename or Markdown link. Keep its role, area and notes consistent
+   with the new document while preserving unrelated custom columns, and use full `IDD-NNNN` references in
    normative relations. Update affected cross-references only when necessary.
 6. Check the result as a document against `idd-intent-lint` and the
    `references/document-types.md` type contract, never for heading-by-heading
-   template equality. Ensure mandatory structural identity, INDEX, relations
-   and ADR status even if a custom template omitted them. Do not relax any
+   template equality. Ensure mandatory structural identity, INDEX and current normative relations
+   without inventing status, supersession links or optional headings. Do not relax any
    invariant to make the document pass. Review semantic completeness separately.
 
 ## Return To Parent

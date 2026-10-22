@@ -28,5 +28,5 @@ filenames, file paths, or Markdown links in this column. Resolve an identifier t
 the unique current `.idd/intent/IDD-NNNN.*.md` file when the document must be
 opened.
 
-| Document | Role | Area | Notes | Replaces |
-| --- | --- | --- | --- | --- |
+| Document | Role | Area | Notes |
+| --- | --- | --- | --- |
