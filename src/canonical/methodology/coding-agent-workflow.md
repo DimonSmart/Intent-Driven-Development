@@ -87,10 +87,10 @@ mutation through normal Intent workflows, validates durable coverage, and only
 then creates active `request.md`. Engineering `ambiguous` or `blocked` results
 stop before active state.
 
-Temporary state contains only `request.md`, remaining `plan.md`, short
-`completed.md`, `answers.md`, and optional question or verification-failure
-files. Factory planners are read-only and Factory Workers only refine existing Intent monotonically; neither may modify
-`.idd/intent/*` or `.idd/engineering/*`.
+Temporary state preserves the request, immutable Git baseline, bounded
+provenance, remaining Tasks, brief summaries and exact Q/A. Planner is read-only;
+Factory Worker alone may refine existing Intent owners without changing
+approved Product decisions; neither edits Engineering Rules.
 
 An Engineering-changing explicit replacement is blocked while an active
 `.idd/factory/current/request.md` exists; do not bypass the Engineering guard or

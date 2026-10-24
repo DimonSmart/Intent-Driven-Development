@@ -3,7 +3,7 @@
 Factory is lightweight native-agent orchestration for implementation work that
 benefits from decomposition and fresh contexts. Its entry workflow may coordinate
 required durable preparation before orchestration starts; its planner and
-workers remain implementation-only.
+workers preserve the approved product contract; only Factory Worker may add monotonic Intent refinements.
 
 ## Entry preflight and initial planning
 
@@ -36,11 +36,29 @@ before durable mutations; failed owners do not trigger rollback of earlier
 completed owner writes.
 
 `route-only` has no Planner or writes, `intent-only` stops after authorized
-durable preparation, and `implementation-only` forbids changes to both
-`.idd/intent/*` and `.idd/engineering/*`, even after a Planner question.
+durable preparation, and `intent-preserving` forbids new approved Product decisions and Engineering
+mutations. Factory Workers may only refine existing Intent monotonically absent
+explicit user prohibition.
 No response silently expands requested scope. A missing Engineering layer is
 normal and is not bootstrapped merely by entering Factory.
 
+
+## Immutable baseline and review
+
+New independent Factory runs require clean managed IDD files, not clean code.
+Before mutating preflight they save the original full Git HEAD, verbatim
+request, and bounded owner provenance. Interrupted preparation or active runs
+continue without a clean-tree gate or a new baseline; partially applied owner
+actions are reconciled, not replayed blindly. The original SHA never changes.
+
+Factory Workers may enrich existing Intent owners with confirmed semantic-
+preserving knowledge. Final review separates authorized owner decisions,
+Worker refinements and changes of unknown provenance. User approval,
+selective rejection, correction or deferral uses ordinary Git tools without
+blindly reverting entire files. Deferred evidence under ignored
+`.idd/factory/results/` is worktree-local, and never leaves Factory active.
+Third-party originals are allowed unchanged under `doc/` or `docs/` with
+original names when possible; no parallel normative specs.
 
 ## Autonomous choices and genuine questions
 

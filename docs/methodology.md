@@ -258,8 +258,10 @@ An initial Planner can ask while `current/request.md` is absent; exact Q/A
 are saved in preparation for continuation between sessions, and authorized
 durable owners run before renewed coverage and a fresh Planner. The first
 valid Task batch, not preflight alone, allows writing `current/request.md`
-LAST after its plan and answers. Factory planners and workers never mutate
-Product Intent or Engineering.
+LAST after its plan, immutable baseline, provenance and answers. Factory
+Planner remains read-only. Only Factory Worker may refine existing Intent
+monotonically; neither independently changes approved Product decisions or
+Engineering Rules.
 
 Factory does not package or run a .NET workflow runtime. It has no Factory MCP
 transport, process supervisor, retry state machine, authoritative attempt

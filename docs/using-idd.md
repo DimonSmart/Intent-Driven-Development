@@ -311,9 +311,10 @@ request, exact question and answers in `.idd/factory/preparation/` and, if
 authorized under the original requested scope, uses the normal durable owner
 before renewed validation and a fresh Planner. Only the first validated
 executable Task batch permits activation: `current/plan.md` and answers are
-prepared before `current/request.md`, written LAST. Planner and Workers remain
-implementation-only and never mutate `.idd/intent/*` or
-`.idd/engineering/*`. Factory is not used for bootstrap or glossary
+prepared before `current/request.md`, written LAST. The original request,
+Git baseline and bounded provenance are saved before preflight owner writes.
+Planner remains read-only; Factory Worker alone may monotonically refine
+existing Intent owners without revising approved Product decisions or Engineering. Factory is not used for bootstrap or glossary
 maintenance.
 
 A normal run continues automatically. An interrupted preparation can resume

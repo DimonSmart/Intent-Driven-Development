@@ -672,10 +672,11 @@ complete logical request
 -> requested scope
 -> Product Intent analysis
 -> explicit Engineering concern detection
--> idd-engineering-change when required
--> Product Intent workflow when required
+-> check clean managed IDD and valid original HEAD on new runs
+-> persist .idd/factory/preparation/request.md, baseline.md, provenance.md
+-> checkpoint Engineering owner when required
+-> checkpoint Product Intent owner when required
 -> durable coverage validation
--> persist .idd/factory/preparation/request.md
 -> fresh initial Planner [INACTIVE]
    -> Question: preparation/question.md + exact answers -> renewed coverage -> fresh Planner
    -> Done: final verification without activation
@@ -728,9 +729,9 @@ mappings are valid. Malformed existing mappings block execution and never trigge
 silent inheritance. The root applies exact configured native model/settings
 without substituting another model or reclassifying the task.
 
-Temporary continuation state is limited to the original request, remaining
-current batch, short completed summaries, exact user answers, and optional
-question/verification-failure artifacts. There is no Factory-owned workflow
+Temporary continuation state includes original request, immutable baseline,
+bounded owner/Worker provenance, remaining batch, short results, exact Q/A,
+and optional question/verification-failure artifacts. There is no Factory-owned workflow
 state machine, process supervisor, MCP transport, retry budget, or exact
 continuation protocol.
 
@@ -747,8 +748,8 @@ inside the active run; keep Factory paused and require a later new complete run
 after the current one is completed or cancelled.
 
 Do not start or resume implementation when requested scope is `route-only` or
-`intent-only`. With `intent-preserving`, Factory can run only when no Product
-Intent or Engineering mutation is required.
+`intent-only`. With `intent-preserving`, Factory runs without changing approved Product
+decisions or Engineering; Workers may refine existing Intent monotonically.
 
 ## Preservation And Discovery Boundaries
 
@@ -787,8 +788,8 @@ and direct standalone Factory model-policy selection:
 For `route-only`, the current handoff is none. The standalone Factory
 model-policy route has no classification fields; its `end-to-end` review-only
 case remains read-only. For ordinary classified workflows, `intent-only`
-stops before implementation. For `intent-preserving`, do not modify Product Intent or
-Engineering. For `end-to-end`, continue through the complete workflow unless
+stops before implementation. For `intent-preserving`, do not change approved Product decisions or
+Engineering; Factory Workers may refine existing Intent monotonically. For `end-to-end`, continue through the complete workflow unless
 ambiguity, required research, a missing durable decision, verification failure,
 or another safety gate blocks progress.
 
