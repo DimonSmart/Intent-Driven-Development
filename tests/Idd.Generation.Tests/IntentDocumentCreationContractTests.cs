@@ -134,7 +134,9 @@ public sealed class IntentDocumentCreationContractTests(GenerationFixture fixtur
         Assert.Contains("`idd-intent-change`", brainstorm);
         Assert.DoesNotContain("idd-intent-new-document", brainstorm);
         Assert.Contains("defer", factory);
-        Assert.Contains("Factory planners and workers cannot create or modify Product Intent", factory);
+        Assert.Contains("only authorized Intent owner workflows may", factory);
+        Assert.Contains("Factory Workers may add monotonic", factory);
+        Assert.Contains("Existing Intent", factory, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Engineering management has completed", preflight);
         Assert.Contains("MissingIntentDecision", preflight);
         Assert.DoesNotContain("idd-intent-new-document", preflight);
