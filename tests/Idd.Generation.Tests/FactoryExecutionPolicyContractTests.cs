@@ -283,7 +283,8 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("fresh semantic context", worker);
         Assert.Contains("Do not read `.idd/execution.yaml`", worker);
         Assert.Contains("choose a model", worker);
-        Assert.Contains("Do not modify `.idd/intent`, `.idd/engineering`", worker);
+        Assert.Contains("Do not modify `.idd/engineering`", worker);
+        Assert.Contains("Monotonic Intent Refinement", worker);
         Assert.Contains("`.idd/factory/current`", worker);
         Assert.Contains("Do not search for additional Conditional Engineering Rules", worker);
         Assert.Contains("git ls-files --cached --others --exclude-standard", worker);

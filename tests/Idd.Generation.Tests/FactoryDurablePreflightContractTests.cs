@@ -13,23 +13,20 @@ public sealed class FactoryDurablePreflightContractTests(GenerationFixture fixtu
         fixture.ReadText(Path.Combine([fixture.RepoRoot, .. parts]));
 
     [Fact]
-    public void FactoryRun_PreparesBothDurableLayersBeforeActiveState()
+    public void FactoryRun_PersistsOriginalBaselineBeforeOwnerMutations()
     {
         var run = Canonical("skills", "idd-factory-run.md");
 
-        Assert.Contains("EngineeringManagementRequired", run);
-        Assert.Contains("invoke idd-engineering-change with the complete logical request", run);
-        Assert.Contains("apply required Product Intent mutation through existing intent workflows", run);
-        Assert.Contains("validate durable coverage against the complete logical request", run);
+        var saved = run.IndexOf("save preparation/request.md, baseline.md, provenance.md BEFORE owner mutations", StringComparison.Ordinal);
+        var engineering = run.IndexOf("invoke Engineering owner if required", saved, StringComparison.Ordinal);
+        var product = run.IndexOf("invoke authorized Product Intent owner workflows", engineering, StringComparison.Ordinal);
+        var planner = run.IndexOf("run a fresh initial Factory planner while current/request.md is absent", product, StringComparison.Ordinal);
+        var marker = run.IndexOf("create current/request.md LAST", planner, StringComparison.Ordinal);
 
-        var engineering = run.IndexOf("invoke idd-engineering-change with the complete logical request", StringComparison.Ordinal);
-        var intent = run.IndexOf("apply required Product Intent mutation through existing intent workflows", StringComparison.Ordinal);
-        var initialPlanner = run.IndexOf("run a fresh initial Factory planner while current/request.md is absent", StringComparison.Ordinal);
-        var activation = run.IndexOf("create current/request.md LAST", StringComparison.Ordinal);
-
-        Assert.True(engineering >= 0 && engineering < intent);
-        Assert.True(intent < initialPlanner);
-        Assert.True(initialPlanner < activation);
+        Assert.True(saved >= 0 && saved < engineering);
+        Assert.True(engineering < product && product < planner && planner < marker);
+        Assert.Contains("Git status --porcelain", run, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("HEAD^{commit}", run);
     }
 
     [Fact]
@@ -53,32 +50,25 @@ public sealed class FactoryDurablePreflightContractTests(GenerationFixture fixtu
         Assert.Contains("materialized request is authoritative", run);
         Assert.Contains("complete self-contained logical request", preflight);
         Assert.Contains("Do not substitute a route summary", preflight);
-        Assert.Contains("Only after successful durable preflight", preflight);
+        Assert.Contains("before any mutating preflight", preflight);
         Assert.Contains("preparation/request.md", preflight);
         Assert.Contains("unchanged base request", Canonical("factory", "planner.md"));
     }
 
     [Fact]
-    public void ImplementationOnly_ProtectsIntentAndEngineering()
+    public void IntentPreserving_AllowsOnlyFactoryMonotonicRefinement()
     {
         var preflight = Canonical("methodology", "intent-preflight.md");
         var route = Canonical("skills", "idd-route.md");
-
-        Assert.Contains("never mutate `.idd/intent/*`", preflight);
-        Assert.Contains("`.idd/engineering/*`", preflight);
-        Assert.Contains("Do not change `.idd/intent/*`", route);
-        Assert.Contains("`.idd/engineering/*`", route);
-    }
-
-    [Fact]
-    public void PlannerAndWorker_CannotMutateDurableKnowledge()
-    {
-        var planner = Canonical("factory", "planner.md");
         var worker = Canonical("factory", "worker.md");
-
+        var planner = Canonical("factory", "planner.md");
+        Assert.Contains("`intent-preserving`", preflight);
+        Assert.Contains("`intent-preserving`", route);
+        Assert.Contains("No mutating Product/Engineering preflight", preflight, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Monotonic Intent Refinement (Factory Worker only)", worker);
+        Assert.Contains("Do not modify `.idd/engineering`", worker);
         Assert.Contains("Do not create or modify durable Product Intent or Engineering Rules", planner);
-        Assert.Contains("run `idd-engineering-change`", planner);
-        Assert.Contains("Do not modify `.idd/intent`, `.idd/engineering`", worker);
+        Assert.DoesNotContain("Do not modify `.idd/intent`, `.idd/engineering`", worker);
     }
 
     [Fact]
@@ -168,9 +158,9 @@ public sealed class FactoryDurablePreflightContractTests(GenerationFixture fixtu
         var methodology = Repo("docs", "methodology.md");
 
         Assert.Contains("Factory Preflight", workflow);
-        Assert.Contains("Planner and Workers remain", usingIdd);
-        Assert.Contains("Planner and Workers remain", usingIdd);
-        Assert.Contains("Factory planners and workers never mutate", methodology);
+        Assert.Contains("Planner is read-only", usingIdd);
+        Assert.Contains("Factory Worker", usingIdd);
+        Assert.Contains("Planner is", methodology);
         Assert.DoesNotContain("Factory must not create or change product intent", usingIdd);
     }
 
