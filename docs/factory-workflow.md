@@ -18,7 +18,7 @@ Complete materialized logical request
    -> checkpoint idd-engineering-change when required
    -> normal Product Intent mutation when required
    -> durable coverage validation
--> preparation/request.md -> fresh initial Planner [INACTIVE]
+-> fresh initial Planner [INACTIVE]
      Question -> persist exact question, ask user and STOP
                -> exact answer, owner workflow(s), renewed coverage
                -> NEW fresh Planner [still INACTIVE]

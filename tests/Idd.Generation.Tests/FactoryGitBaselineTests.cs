@@ -55,8 +55,24 @@ public sealed class FactoryGitBaselineTests
 
         public void Dispose()
         {
-            if (Directory.Exists(Root))
-                Directory.Delete(Root, recursive: true);
+            if (!Directory.Exists(Root))
+                return;
+
+            // Windows Git marks object files read-only. Normalize attributes
+            // before recursively deleting this isolated test-only repository.
+            foreach (var file in Directory.EnumerateFiles(
+                         Root, "*", SearchOption.AllDirectories))
+                File.SetAttributes(file, FileAttributes.Normal);
+
+            foreach (var directory in Directory.EnumerateDirectories(
+                         Root, "*", SearchOption.AllDirectories))
+            {
+                var attributes = File.GetAttributes(directory);
+                if ((attributes & FileAttributes.ReadOnly) != 0)
+                    File.SetAttributes(directory, attributes & ~FileAttributes.ReadOnly);
+            }
+
+            Directory.Delete(Root, recursive: true);
         }
     }
 
