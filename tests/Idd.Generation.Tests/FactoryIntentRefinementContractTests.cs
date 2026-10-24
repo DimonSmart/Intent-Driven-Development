@@ -23,7 +23,6 @@ public sealed class FactoryIntentRefinementContractTests(GenerationFixture fixtu
         Assert.Contains("dirty code/tests", run);
         Assert.Contains("Continuation never requires cleanliness", run);
         Assert.Contains("preparation/baseline.md", preflight);
-        Assert.Contains("preparation/baseline.md", preflight);
         Assert.Contains("external-unknown", preflight);
     }
 

@@ -98,7 +98,7 @@ For each proposed edit verify (1) the existing `IDD-NNNN` owner, (2) logical
 entailment from approved requirements or reproducible technical evidence and
 its conditions/limits, (3) preservation of normative behavior, guarantees,
 scope, accepted architecture, exceptions, non-goals and Acceptance Criteria,
-and (4) durable value for a future Worker. No contradiction alone is not proof.
+and (4) durable value for a future Worker. Lack of contradiction alone is not proof.
 Add confirmed experiments, relevant rationale and semantic-preserving technical
 clarifications to existing specs, Living ADRs or active spikes. A verified fact
 does not create a new product promise or Engineering policy. Do not independently

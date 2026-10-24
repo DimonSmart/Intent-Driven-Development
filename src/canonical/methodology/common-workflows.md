@@ -133,9 +133,10 @@ scope:
   that do not execute implementation.
 
 A broad repository scan does not make bootstrap `orchestrated`. Factory
-planner/worker orchestration is for implementation work and never mutates
-Product Intent or Engineering. A new Factory entry may coordinate the normal
-durable owners during preflight before active Factory state exists.
+planner/worker orchestration preserves approved Product decisions and all
+Engineering Rules. A new entry may coordinate normal authorized owners in
+preflight; only Factory Workers may enrich existing Intent owners with
+verified monotonic findings during implementation.
 
 Diff size alone is not enough to choose Factory. Execution depth may describe a
 later implementation stage even when the current requested scope stops at

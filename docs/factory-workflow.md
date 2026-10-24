@@ -13,7 +13,9 @@ For a new implementation-capable Factory run:
 Complete materialized logical request
 -> Factory Preflight
    -> non-mutating Product Intent analysis and blocker checks
-   -> idd-engineering-change when required
+   -> verify managed IDD clean and original Git HEAD (new run only)
+   -> persist preparation/request.md, baseline.md and provenance.md BEFORE writes
+   -> checkpoint idd-engineering-change when required
    -> normal Product Intent mutation when required
    -> durable coverage validation
 -> preparation/request.md -> fresh initial Planner [INACTIVE]
