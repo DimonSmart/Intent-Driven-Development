@@ -99,8 +99,7 @@ Classify how much of the workflow the user authorizes in the current request:
 - `intent-only`: perform only durable IDD knowledge-side work, including
   product Intent or Engineering management. Do not implement product code or
   start Factory execution.
-- `implementation-only`: implement or check against current durable knowledge
-  without changing `.idd/intent/*` or `.idd/engineering/*`.
+- `intent-preserving`: implement/check against the approved Product Intent without changing normative product decisions or `.idd/engineering/*`. Factory Workers alone may add verified monotonic refinements in existing Intent owners; ordinary `idd-code-implement` retains its local restrictions.
 - `end-to-end`: continue through all requested workflow stages.
 
 Requested scope is independent from what changes and from execution depth. Use
@@ -268,7 +267,7 @@ review, use `end-to-end` and hand the complete request to
 configure skill's confirmation and exact-edit rules. Carry exact platform,
 profile, model ID, reasoning, inheritance, cost/latency/quality, prohibition,
 and confirmation context without summarizing away constraints. Explicit
-`intent-only` or `implementation-only` restrictions are not automatically
+`intent-only` or `intent-preserving` restrictions are not automatically
 mapped to this route; preserve them or diagnose incompatible scope.
 
 The router neither reads/writes model policy nor researches model alternatives,
@@ -550,7 +549,7 @@ read relevant intent
 
 If implementation work reveals that product behavior must change, stop the
 implementation workflow and route to `idd-intent-change`. Do not silently
-expand an `implementation-only` request into an intent change.
+expand an `intent-preserving` request into an intent change.
 
 If adequate current intent is missing for the affected product area, stop and
 route to bootstrap, import, or the applicable intent workflow. Do not infer a
@@ -748,7 +747,7 @@ inside the active run; keep Factory paused and require a later new complete run
 after the current one is completed or cancelled.
 
 Do not start or resume implementation when requested scope is `route-only` or
-`intent-only`. With `implementation-only`, Factory can run only when no Product
+`intent-only`. With `intent-preserving`, Factory can run only when no Product
 Intent or Engineering mutation is required.
 
 ## Preservation And Discovery Boundaries
@@ -788,7 +787,7 @@ and direct standalone Factory model-policy selection:
 For `route-only`, the current handoff is none. The standalone Factory
 model-policy route has no classification fields; its `end-to-end` review-only
 case remains read-only. For ordinary classified workflows, `intent-only`
-stops before implementation. For `implementation-only`, do not modify Product Intent or
+stops before implementation. For `intent-preserving`, do not modify Product Intent or
 Engineering. For `end-to-end`, continue through the complete workflow unless
 ambiguity, required research, a missing durable decision, verification failure,
 or another safety gate blocks progress.

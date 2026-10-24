@@ -341,6 +341,19 @@ For GitHub Spec Kit / Spec Driven Development-like sources:
   acceptance behavior.
 - Checklists may contain acceptance or verification rules, but not task status.
 
+## External originals and generated sources
+
+Separate original external/user-provided reference documents, extracted
+durable decisions, agent-generated material and temporary analysis. Original
+external materials under `doc/` or `docs/` are legitimate read-only references:
+keep content, names, extensions and directory hierarchy unchanged where
+possible. Do not silently modify, remove, normalize or replace the original.
+Link to originals from IDD instead of copying large/binary references into
+Intent. An accepted requirement must be owned by an IDD document; original
+source text alone is not normative. An explicitly authorized newer official
+edition is a replacement, not preservation of the earlier original. Avoid
+parallel normative files and default import reports under `docs/`.
+
 ## Import Inventory
 
 Create an import inventory before writing target documents.
@@ -831,11 +844,9 @@ Do not create `.idd/intent/import-report.md`.
 Import reports are process output, not product intent. They must not be stored
 inside `.idd/intent`.
 
-Prefer returning the import report in the assistant response. If a persistent
-report is explicitly needed, write it outside `.idd/intent`, for example:
-
-- `.intent-driven-development/import-report.md`;
-- `docs/import-report.md`.
+Return the import report in the assistant response by default. An expressly
+requested persistent report is non-normative and must not create a default
+`docs/import-report.md`.
 
 The report must not recommend creating `.idd/intent/archive` or link to
 `.idd/intent/archive/...`.

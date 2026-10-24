@@ -139,7 +139,7 @@ constraints where useful. Do **not** invent or return `Classification`,
   `idd-factory-configure` in the same user request, without a second routing
   confirmation. `end-to-end` is not permission to write. Preserve explicit
   `review-only`/`do not write` and all other authorization limits.
-- Do not mechanically map `intent-only` or `implementation-only` to a
+- Do not mechanically map `intent-only` or `intent-preserving` to a
   standalone Factory model-policy request. Carry explicit restrictions as
   constraints, or diagnose incompatible scope without expanding permission.
 - Preserve all exact selected platforms, profiles, model IDs, reasoning
@@ -246,7 +246,7 @@ Set `Requested scope` to one of:
 ```text
 route-only
 intent-only
-implementation-only
+intent-preserving
 end-to-end
 ```
 
@@ -261,10 +261,7 @@ with the classification.
   initialization, product Intent workflows, Engineering management, audit, lint,
   or normalization as applicable. Do not implement product code or start Factory
   execution.
-- `implementation-only`: perform implementation or implementation checking from
-  current durable knowledge. Do not change `.idd/intent/*` or
-  `.idd/engineering/*`. If the request requires either durable mutation, stop
-  and report the required durable workflow instead of expanding scope.
+- `intent-preserving`: implement/check against approved product decisions. No normative Product or Engineering mutation. Only Factory Workers may add verified monotonic refinements to existing Intent owners unless explicitly forbidden; ordinary `idd-code-implement` retains its local modes. Stop rather than silently escalate to `end-to-end` when required durable changes exceed this scope.
 - `end-to-end`: continue through all requested workflow stages, subject to
   clarity gates and execution-depth selection.
 
@@ -273,7 +270,7 @@ normally `intent-only` unless it also explicitly asks for implementation
 changes after bootstrap.
 
 A structure audit is normally `intent-only` because it reads the Intent knowledge
-model. A drift audit is normally `implementation-only` because it reads Product
+model. A drift audit is normally `intent-preserving` because it reads Product
 Intent plus implementation evidence without mutating either layer. Use
 `route-only` when the user asks only for classification.
 
@@ -303,7 +300,7 @@ current Intent does not trigger visual discovery. Local styling is an ordinary
 `implementation-change` unless it changes durable product truth; when it
 might violate an Essential visual invariant, stop for the smallest product
 decision rather than silently changing implementation or Intent.
-Respect `intent-only` / `implementation-only` / `end-to-end` scope and
+Respect `intent-only` / `intent-preserving` / `end-to-end` scope and
 never automatically run a separately requested intent write after brainstorm.
 
 ## First Skill
@@ -351,8 +348,7 @@ Apply these rules:
   route.
 - For `intent-only`, hand off only to the applicable intent-side skill and stop
   before implementation or Factory execution.
-- For `implementation-only`, hand off only to the applicable code or check skill
-  and do not modify Product Intent or Engineering.
+- For `intent-preserving`, hand off to the applicable code/check skill or Factory. No independent normative Product or Engineering decisions; Factory-only monotonic refinements remain subject to user restrictions.
 - For `end-to-end`, the caller continues with the recommended skill in the
   same user request when scope and clarity gates permit. Do not require a
   second user message only to confirm the route. This classifier returns

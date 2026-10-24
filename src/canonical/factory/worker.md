@@ -74,9 +74,44 @@ documents before implementation.
 Do not search for additional Conditional Engineering Rules. Semantic
 applicability selection belongs to the planner.
 
-Do not modify `.idd/intent`, `.idd/engineering`, `.idd/execution.yaml`,
-`.idd/factory/current`, or the project verification policy. Durable intent
-and Engineering Rules are prepared outside worker execution.
+Do not modify `.idd/engineering`, `.idd/execution.yaml`,
+`.idd/factory/current`, or the project verification policy. Existing Intent
+owners may receive only Factory-specific Monotonic Intent Refinement as below;
+Product decision and Engineering owner workflows remain separate.
+
+## Monotonic Intent Refinement (Factory Worker only)
+
+Factory Workers may edit **existing** owners under `.idd/intent/` during
+their assigned implementation/research task, if the edit preserves the effective
+approved product contract, has enduring value, and the user has not forbidden
+it. No other skill (including ordinary `idd-code-implement`) gains this right.
+Never edit `.idd/engineering/`, create new normative IDD owners, or introduce
+parallel normative specifications under `doc/` or `docs/`.
+
+Discover owners through README -> INDEX -> relevant `TaskRelatedIntent` IDs;
+selectively read additional owners only when necessary, without extending Task
+scope or reselecting Conditional Engineering Rules. Read the bounded Factory
+baseline and preflight/Worker provenance or the explicitly supplied verified
+contract boundary. Unattributed edits do not establish new approved obligations.
+
+For each proposed edit verify (1) the existing `IDD-NNNN` owner, (2) logical
+entailment from approved requirements or reproducible technical evidence and
+its conditions/limits, (3) preservation of normative behavior, guarantees,
+scope, accepted architecture, exceptions, non-goals and Acceptance Criteria,
+and (4) durable value for a future Worker. No contradiction alone is not proof.
+Add confirmed experiments, relevant rationale and semantic-preserving technical
+clarifications to existing specs, Living ADRs or active spikes. A verified fact
+does not create a new product promise or Engineering policy. Do not independently
+edit `GLOSSARY.md`, invent an ADR, normalize all Intent, or replace an approved
+requirement merely to match implementation. Mechanical INDEX/link updates
+accompany only an already-authorized edit.
+
+If evidence, owner, provenance, authority or monotonicity is ambiguous, leave
+the disputed normative text untouched; report the finding or a blocking
+diagnostic for the owner workflow. Re-running an interrupted task must not
+duplicate knowledge. Check semantic equivalence, structural validity, links
+and duplication after any edit. External original references in `doc/` and
+`docs/` remain unchanged and retain source names when possible.
 
 ## Work from current reality
 
@@ -125,7 +160,7 @@ Do not search for extra Conditional IDs. If a permitted method exposes
 potentially required Rules absent from the Worker packet, stop with an
 uncovered-constraint diagnostic. Also stop when every viable option conflicts
 with mandatory rules or the Task needs a product/policy change. Factory
-handles replanning or stopping; Worker does not modify Rule IDs, Intent,
+handles replanning or stopping; Worker does not modify Rule IDs, approved product decisions,
 Engineering, Factory state, `# Question` or its assigned Task.
 
 ## Execution
@@ -161,6 +196,8 @@ Relevant focused tests pass.
 Concern: none.
 ```
 
+Report refined IDD owners, confirmed findings/experiment limits, and proposed
+out-of-scope changes when relevant. Never add empty mandatory report sections.
 Do not return full diffs, large command logs, complete test output, tool
 history, internal reasoning, or a list of every file inspected unless a concise
 specific detail is necessary to explain a concern.

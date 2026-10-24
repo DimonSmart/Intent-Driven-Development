@@ -30,7 +30,8 @@ Use only:
 - bounded `current/completed.md` summaries only in an active run (no Worker
   has run during preparation);
 - the latest bounded `preparation/verification-failure.md` or
-  `current/verification-failure.md`, as applicable.
+  `current/verification-failure.md`, as applicable;
+- bounded `baseline.md` and provenance for the corresponding Factory phase.
 
 Do not read `.idd/execution.yaml`. Model policy, model availability, model cost,
 and vendor-specific reasoning settings are outside planner inputs.
@@ -77,6 +78,23 @@ current product decision is missing, use `# Question` rather than inventing it.
 You may return that question BEFORE `.idd/factory/current/request.md` exists;
 a question never authorizes you to write durable knowledge or create a Worker
 task to do so.
+
+## Effective approved contract and refinements
+
+Read bounded Factory `baseline.md` and provenance (preparation/current) with
+the exact user-authorized owner changes; do not load full historical snapshots.
+Distinguish original obligations, authorized preflight or later owner changes,
+verified Worker refinements and unattributed/external differences. A new
+normative line in current Intent is not automatically a new approved contract.
+Unresolved material ambiguity leads to one `# Question` or a precise stop;
+never give Worker a Task that independently authorizes new product behavior.
+
+Previous Workers may add confirmed evidence to current spec/ADR/spike owners.
+Use it in subsequent implementation Tasks without making routine documentation
+a standalone Task. Preserve selective INDEX discovery and Engineering
+applicability. If obligations, ownership, answers or applicable Rules change
+materially after a Task batch is planned, demand a fresh Planner and revalidate
+the batch before Worker spawn.
 
 ## Autonomous technical decisions
 

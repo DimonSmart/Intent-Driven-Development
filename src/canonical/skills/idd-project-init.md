@@ -97,6 +97,10 @@ current product truth. When `.idd/engineering/` exists, treat it as the current
 durable engineering guardrails. When `.idd/verification.yaml` exists, follow it
 as the project-owned verification policy. Use the installed IDD skills when
 changing intent, implementing behavior, or verifying implementation.
+Only Factory Workers may add confirmed monotonic refinements to existing Intent
+owners, never independently revise product requirements; user prohibitions win.
+No competing normative documents in `doc/` or `docs/`. Preserve unmodified
+external originals and their names there when possible; IDD may link to them.
 <!-- idd:project:end -->
 ```
 

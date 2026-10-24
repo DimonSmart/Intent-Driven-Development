@@ -89,7 +89,7 @@ stop before active state.
 
 Temporary state contains only `request.md`, remaining `plan.md`, short
 `completed.md`, `answers.md`, and optional question or verification-failure
-files. Factory planners and workers are implementation-only and never modify
+files. Factory planners are read-only and Factory Workers only refine existing Intent monotonically; neither may modify
 `.idd/intent/*` or `.idd/engineering/*`.
 
 An Engineering-changing explicit replacement is blocked while an active
