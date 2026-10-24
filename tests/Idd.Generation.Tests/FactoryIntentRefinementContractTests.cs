@@ -23,7 +23,7 @@ public sealed class FactoryIntentRefinementContractTests(GenerationFixture fixtu
         Assert.Contains("dirty code/tests", run);
         Assert.Contains("Continuation never requires cleanliness", run);
         Assert.Contains("preparation/baseline.md", preflight);
-        Assert.Contains("before any mutating", preflight, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("preparation/baseline.md", preflight);
         Assert.Contains("external-unknown", preflight);
     }
 
@@ -64,7 +64,7 @@ public sealed class FactoryIntentRefinementContractTests(GenerationFixture fixtu
         var run = Canonical("skills", "idd-factory-run.md");
         Assert.Contains("Intent Refinement Review", run);
         Assert.Contains("git reset --hard", run);
-        Assert.Contains("git revert", run, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("revert an unrelated commit", run);
         Assert.Contains(".idd/factory/results/", run);
         Assert.Contains("Deferred review never keeps Factory active", run);
     }

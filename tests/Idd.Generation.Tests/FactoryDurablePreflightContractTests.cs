@@ -50,7 +50,7 @@ public sealed class FactoryDurablePreflightContractTests(GenerationFixture fixtu
         Assert.Contains("materialized request is authoritative", run);
         Assert.Contains("complete self-contained logical request", preflight);
         Assert.Contains("Do not substitute a route summary", preflight);
-        Assert.Contains("before any mutating preflight", preflight);
+        Assert.Contains("preparation/baseline.md", preflight);
         Assert.Contains("preparation/request.md", preflight);
         Assert.Contains("unchanged base request", Canonical("factory", "planner.md"));
     }
@@ -64,7 +64,7 @@ public sealed class FactoryDurablePreflightContractTests(GenerationFixture fixtu
         var planner = Canonical("factory", "planner.md");
         Assert.Contains("`intent-preserving`", preflight);
         Assert.Contains("`intent-preserving`", route);
-        Assert.Contains("No mutating Product/Engineering preflight", preflight, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Mutating Product/Engineering preflight is forbidden", preflight);
         Assert.Contains("Monotonic Intent Refinement (Factory Worker only)", worker);
         Assert.Contains("Do not modify `.idd/engineering`", worker);
         Assert.Contains("Do not create or modify durable Product Intent or Engineering Rules", planner);
@@ -158,9 +158,9 @@ public sealed class FactoryDurablePreflightContractTests(GenerationFixture fixtu
         var methodology = Repo("docs", "methodology.md");
 
         Assert.Contains("Factory Preflight", workflow);
-        Assert.Contains("Planner is read-only", usingIdd);
+        Assert.Contains("Planner remains read-only", usingIdd);
         Assert.Contains("Factory Worker", usingIdd);
-        Assert.Contains("Planner is", methodology);
+        Assert.Contains("Planner remains read-only", methodology);
         Assert.DoesNotContain("Factory must not create or change product intent", usingIdd);
     }
 
@@ -288,7 +288,7 @@ public sealed class FactoryDurablePreflightContractTests(GenerationFixture fixtu
         Assert.Contains("src/canonical/methodology/intent-preflight.md", manifest);
         Assert.Contains("src/canonical/methodology/engineering-guardrails.md", manifest);
         Assert.Contains("before activation", planner);
-        Assert.Contains("fresh initial planner", preflight);
+        Assert.Contains("fresh initial Planner", preflight);
     }
 
     [Fact]

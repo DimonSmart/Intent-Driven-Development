@@ -178,8 +178,9 @@ routing or intent work.
 - Factory entry preflight may coordinate required Product Intent preparation
   through normal Intent workflows and explicit Engineering preparation through
   `idd-engineering-change` before active Factory state exists. Factory planners
-  and workers then remain implementation-only: they do not mutate Product
-  Intent or Engineering. When Engineering exists, planners select only
+  and Workers preserve approved normative Product decisions; Planner is
+  read-only and only Factory Workers may monotonically refine existing Intent
+  owners. Neither may modify Engineering Rules. When Engineering exists, planners select only
   Conditional `TaskRelatedEngineering` IDs, the orchestrator mechanically
   enumerates the current Always set before each worker, and workers do not edit
   Engineering Rules.

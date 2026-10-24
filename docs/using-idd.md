@@ -314,8 +314,8 @@ executable Task batch permits activation: `current/plan.md` and answers are
 prepared before `current/request.md`, written LAST. The original request,
 Git baseline and bounded provenance are saved before preflight owner writes.
 Planner remains read-only; Factory Worker alone may monotonically refine
-existing Intent owners without revising approved Product decisions or Engineering. Factory is not used for bootstrap or glossary
-maintenance.
+existing Intent owners without revising approved Product decisions or
+Engineering. Factory is not used for bootstrap or glossary maintenance.
 
 A normal run continues automatically. An interrupted preparation can resume
 between sessions using its saved base request and verbatim Q/A without

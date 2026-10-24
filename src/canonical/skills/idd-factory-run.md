@@ -140,8 +140,8 @@ For a new `end-to-end` run, the required order is:
 
 The Engineering step deliberately precedes the Product Intent write because
 `idd-engineering-change` owns authoritative Engineering ownership/ambiguity
-planning and has no separate dry-run protocol. This ordering avoids writing Product Intent before Engineering ownership is
-resolved. It is not a transaction: owner failure after preparation is saved
+planning and has no separate dry-run protocol. This ordering avoids writing
+Product Intent before Engineering ownership is resolved. It is not a transaction: owner failure after preparation is saved
 preserves earlier writes and recovery context, not a new active Factory state.
 Never automatically rollback or infer authorization from an interrupted write.
 
