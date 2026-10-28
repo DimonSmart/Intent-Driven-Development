@@ -31,8 +31,8 @@ handoff, durable coverage validation, and eventual
 New:
 - no active simplified Factory run is being continued;
 - run durable preflight on the materialized current request;
-- create persistent preparation after durable preparation and coverage
-  validation succeed; activate only after a valid initial Planner Task batch.
+- save recoverable preparation BEFORE mutating preflight; activate only
+  after verified coverage and a valid initial Planner Task batch.
 
 Replacement:
 - resolve one complete self-contained replacement request first;
@@ -59,9 +59,10 @@ contract. Do not interpret or migrate it. The active simplified-run marker is
 - `intent-only`: perform only durable knowledge-side work. Product Intent
   preparation and Engineering management are both allowed when the request
   requires them; implementation and Factory orchestration do not start.
-- `implementation-only`: never mutate `.idd/intent/*` or
-  `.idd/engineering/*`. Proceed only when the request needs no durable change.
-  If either durable layer must change, stop and report the required workflow.
+- `intent-preserving`: never change approved Product decisions or Engineering
+  Rules. Mutating Product/Engineering preflight is forbidden. Only Factory
+  Workers may add proven monotonic refinements to existing Intent owners,
+  unless the user explicitly forbids such edits. Do not silently expand scope.
 - `end-to-end`: prepare required durable knowledge, validate it, then start
   implementation/Factory when no blocker remains.
 
@@ -211,40 +212,73 @@ no new Factory state
 
 ## New-run ordering
 
-For a new run, execute durable preflight in this order:
-
 ```text
 1. materialize complete logical request
-2. resolve requested scope
-3. non-mutating Product Intent analysis
-4. Factory-level Engineering disposition
-5. detect request-level blockers
-
-6. when EngineeringManagementRequired:
-       idd-engineering-change(complete logical request)
-
-7. require Engineering result success | no-op
-   ambiguous | blocked -> stop
-
-8. perform required Product Intent mutation through existing Intent workflows
-9. validate durable coverage against the complete logical request
-10. persist .idd/factory/preparation/request.md (complete base request)
-11. start the fresh initial planner while current/request.md is ABSENT
-12. on Question: save exact Q/A, reclassify, use authorized owners, revalidate,
-    then start a NEW fresh planner; on Done: run final verification without activation
-13. on validated Task batch: prepare current/plan.md and exact answers
-14. create current/request.md LAST; only then start workers
+2. resolve scope and non-mutating Product / Engineering classifications
+3. detect request-level blockers before any write or preparation
+4. for a new independent run: require clean managed IDD and valid Git HEAD
+5. persist complete preparation/request.md, baseline.md, provenance.md
+6. checkpoint BEFORE mutating Engineering owner workflow; execute if required
+7. success/no-op: record result; blocked/ambiguous/crashed: preserve preparation
+8. checkpoint and execute authorized Product Intent owner workflows
+9. validate durable coverage of full request and exact saved Q/A
+10. record verified effective preflight contract boundary
+11. invoke fresh initial Planner while current/request.md is absent
+12. Question -> save exact Q/A and checkpoint newly authorized owner changes
+    Done -> final verification with no activation
+    Tasks -> verify full batch and transfer plan, answers, baseline, provenance
+13. create current/request.md LAST; then sequential Workers
 ```
 
-Engineering management precedes the Product Intent write because
-`idd-engineering-change` contains authoritative Engineering ownership and
-ambiguity planning but exposes no separate durable dry-run contract. Product
-semantics are still analyzed first so the Engineering handoff sees a correctly
-classified complete request.
+Engineering still precedes Product because Engineering ownership is decided by
+its existing owner. This is not a transaction: a failed or partially applied
+owner after preparation exists retains recovery context and prior writes but
+does not activate Factory. Before the first write, request-level blockers
+must leave no preparation or durable mutations.
 
-This ordering is not a transaction. If Engineering mutates successfully and a
-later Intent workflow fails mechanically, report the blocker and do not create
-Factory state. Do not add rollback infrastructure.
+## Original Git baseline and preflight provenance
+
+The cleanliness gate applies **only to a new independent run**, not to
+continuation, saved preparation recovery or valid active-run replacement.
+From the repository root check
+`git status --porcelain=v1 -z --untracked-files=all -- .idd/intent/ .idd/engineering/`
+including staged/unstaged/untracked, deleted and renamed paths. Parse NUL
+delimiters, including rename pairs, never split by whitespace. The optional
+Engineering directory may be absent. Dirty code/tests outside the managed
+paths do not block a new run. Refuse a dirty managed tree with affected paths;
+never auto-commit. Resolve a real full `HEAD^{commit}` SHA and check
+again immediately before mutating if managed state could have changed.
+
+Save the original complete request and `preparation/baseline.md` (immutable
+full HEAD SHA, sanitized Git repository identity, managed-document cleanliness
+checkpoint, no secrets/one-off path as sole identity), and bounded
+`preparation/provenance.md` **before any mutating owner**. Checkpoint each
+preflight/Worker action with pending before-state then after-state,
+owner/phase, affected IDD paths, original/current SHA, needed hashes/hunks,
+result and exact user request/Q/A authorizing normative owner decisions.
+An interrupted mutation without trustworthy after-evidence is
+`external-unknown`, not automatically authorized. Owner name, passing
+tests or a commit alone do not confer normative permission. A completed
+owner action is not blindly replayed on recovery.
+
+The effective contract consists of original obligations plus exactly
+authorized owner workflow changes. Monotonic Worker refinements must
+preserve this contract; later authorized owner changes supersede only the
+explicitly changed obligation. Original baseline is not a clean snapshot
+of all code and must never move forward on reentry, commits or replacement.
+Unattributed/external edits are preserved, not attributed to Factory.
+
+On active/preparation continuation, recover saved request, Q/A, baseline,
+provenance and actual repository, without demanding clean Git or a new
+commit. Inspect pending actions semantically to avoid duplicate writes; if
+a possibly completed owner cannot be safely reconciled, stop the unsafe
+action with concrete diagnosis. Never auto-rollback. Legacy pre-baseline
+runs may continue conservatively without newly granted Worker Intent edits;
+missing baseline for a known-new run is corruption. If original Git objects
+are unavailable, report and block autonomous refinements rather than
+fabricating a replacement SHA. Validate orphaned partial activation plan,
+baseline, provenance and answers before writing the sole active marker
+`current/request.md` last. A timeout does not imply a child writer ended.
 
 ## Durable coverage validation
 
@@ -275,8 +309,9 @@ semantic equivalence.
 
 ## Request identity
 
-Only after successful durable preflight may a new Factory run begin
-`.idd/factory/preparation/request.md` and start the initial Planner.
+The preparation request, original Git baseline and bounded provenance must
+exist **before** any mutating preflight. Only after successful coverage may
+the first Planner start.
 Only after a validated executable Task batch may it write
 `.idd/factory/current/request.md`, LAST, after preparing `current/plan.md`
 and necessary exact Q/A. The active marker contains the original complete
@@ -291,7 +326,7 @@ before activation remains in `preparation/question.md`; record exact
 chronological Q/A in `preparation/answers.md`. Classify the whole base request
 plus every applicable clarification, not the last answer alone. Before any new
 durable mutation, repeat request-level blocker checks, including conflicts and
-the original requested scope. Answers do not implicitly relax `implementation-only`
+the original requested scope. Answers do not implicitly relax `intent-preserving`
 or other explicit restrictions.
 
 An implementation-local answer does not create a Rule. Authorized Engineering
@@ -320,8 +355,11 @@ cancelled preparation may be removed without undoing durable writes.
 
 A normal continuation does not repeat preflight.
 
-For an explicit complete replacement that needs no Engineering mutation, keep
-the existing replacement Product Intent flow:
+For a valid active-run replacement without Engineering mutation, retain the
+original baseline and account for inherited dirty/unknown changes; no new-run
+cleanliness gate or reattribution applies. If provenance cannot safely restore
+the effective contract, preserve the old active run and stop. A missing active
+marker is not replacement. Keep the existing replacement Product Intent flow:
 
 ```text
 complete replacement request
@@ -369,9 +407,9 @@ Factory state exists.
 Product Intent workflows own Product Intent mutations.
 `idd-engineering-change` owns ordinary Engineering Rule mutations.
 
-Factory planners and workers own implementation/research against prepared
-durable knowledge. They never mutate `.idd/intent/*` or
-`.idd/engineering/*`.
+Factory Planner is read-only; Factory Worker may only add verified monotonic
+refinements to existing Intent owners. Neither Planner nor Worker edits
+Engineering Rules or independently authorizes new Product decisions.
 
 Nothing in this contract creates a new Factory runtime, state machine,
 transaction/rollback subsystem, deterministic semantic classifier, JSON schema,

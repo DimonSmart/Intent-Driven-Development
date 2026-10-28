@@ -19,8 +19,7 @@ sequencing, or coordinated execution across bounded tasks. Factory may be
 selected automatically for those conditions. For a new end-to-end run its entry
 preflight may coordinate required Product Intent preparation through normal
 Intent workflows and explicit durable Engineering preparation through
-`idd-engineering-change` before active Factory state exists. Planner and worker
-execution never mutates either durable layer.
+`idd-engineering-change` before active Factory state exists. Planner is read-only. Only Factory Workers may monotonically refine existing Product Intent owners without revising approved decisions; Engineering remains protected.
 
 For Factory terminology, a Request is the original self-contained user
 instruction. A fresh planner repeatedly contracts the current bounded batch.
@@ -99,6 +98,30 @@ Implementation-only durable constraints are not automatically product intent.
 When they exist to preserve architecture, consistency, maintainability, or
 engineering conventions while another implementation could preserve the same
 product contract, store them in the optional Engineering layer instead.
+
+## Monotonic Intent Refinement
+
+During Factory implementation, only the Factory Worker may record grounded,
+long-lived information directly in existing Product Intent specs, Living ADRs
+and active spikes. This preserves the effective approved contract, including
+exact authorized changes through Intent owner workflows. Noncontradiction alone
+is insufficient; no new product obligation, independent guarantee, normative
+Acceptance Criterion, architectural reversal, Engineering Rule or Non-Goal
+change is permitted. Record verified experiment conditions and limitations.
+Unknown provenance cannot authorize an expanded product contract.
+
+New routing uses `intent-preserving` rather than the legacy Requested scope
+`implementation-only`; ordinary `idd-code-implement` still uses
+`satisfy-current-intent` and `preserve-current-intent` and does not gain
+Factory Worker write privileges. Legacy unfinished runs remain restricted until
+explicit authorization. Explicit user constraints (including "only code" and
+"do not edit .idd/") always take precedence.
+
+Do not create competing normative documentation in `doc/` or `docs/`.
+User guidance, reference documentation and unchanged external originals may
+stay in these directories; preserve source names when possible and reference
+them from the owning IDD document. External sources do not automatically become
+new Product Intent. Transient investigations belong in temporary Factory state.
 
 ## Engineering Guardrails
 

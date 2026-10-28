@@ -99,6 +99,14 @@ Rules, or implementation reality. An accepted target decision may differ from
 current code: establish whether to change the implementation or the decision
 before editing the ADR.
 
+Confirmed experiments with enduring architectural relevance may enrich the
+existing owning Living ADR; include conditions, reproduction method, result
+and limitations. Semantic-preserving clarifications may update current specs.
+A local algorithm or passing experiment does not by itself create a Product
+Intent guarantee, acceptance threshold, normative Engineering Rule or new ADR.
+Factory Workers refine existing owners rather than create documentation just
+to mark a task complete.
+
 ## spike
 
 `spike` describes an experiment, research task, or hypothesis check before a
