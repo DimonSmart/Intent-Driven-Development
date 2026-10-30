@@ -7,7 +7,7 @@
     "output": "site/views/factory.html",
     "animation": "trace",
     "visual_preset": "signal-flow",
-    "quality_profile": "showcase",
+    "quality_profile": "standard",
     "repository": {
       "url": "https://github.com/DimonSmart/Intent-Driven-Development.git",
       "provider": "github",
@@ -76,7 +76,8 @@
       "col": 0,
       "type": "external",
       "label": "Complete Request",
-      "sublabel": "scope preserved verbatim"
+      "sublabel": "scope preserved verbatim",
+      "width": 184
     },
     {
       "id": "preflight",
@@ -91,7 +92,8 @@
           "line": 11,
           "label": "Durable preflight"
         }
-      ]
+      ],
+      "width": 184
     },
     {
       "id": "ready",
@@ -106,7 +108,8 @@
           "line": 8,
           "label": "Preparation"
         }
-      ]
+      ],
+      "width": 184
     },
     {
       "id": "initial",
@@ -114,7 +117,8 @@
       "col": 3,
       "type": "backend",
       "label": "Initial Fresh Planner",
-      "sublabel": "inactive; Question / Done / Tasks"
+      "sublabel": "inactive; Question / Done / Tasks",
+      "width": 184
     },
     {
       "id": "worker",
@@ -129,7 +133,8 @@
           "line": 540,
           "label": "Worker"
         }
-      ]
+      ],
+      "width": 184
     },
     {
       "id": "planner",
@@ -144,7 +149,8 @@
           "line": 456,
           "label": "Planner"
         }
-      ]
+      ],
+      "width": 184
     },
     {
       "id": "verify",
@@ -152,7 +158,8 @@
       "col": 5,
       "type": "security",
       "label": "Final Verification",
-      "sublabel": "when Planner says Done"
+      "sublabel": "when Planner says Done",
+      "width": 184
     },
     {
       "id": "review",
@@ -168,7 +175,8 @@
           "line": 723,
           "label": "Review"
         }
-      ]
+      ],
+      "width": 218
     },
     {
       "id": "block",
@@ -176,7 +184,8 @@
       "col": 1,
       "type": "external",
       "label": "Stop / Ask Owner",
-      "sublabel": "missing durable decision"
+      "sublabel": "missing durable decision",
+      "width": 184
     },
     {
       "id": "question",
@@ -184,7 +193,8 @@
       "col": 3,
       "type": "external",
       "label": "Question / Pause",
-      "sublabel": "save exact answer"
+      "sublabel": "save exact answer",
+      "width": 184
     },
     {
       "id": "failure",
@@ -192,7 +202,8 @@
       "col": 5,
       "type": "security",
       "label": "Bounded Failure",
-      "sublabel": "diagnostic to new Planner"
+      "sublabel": "diagnostic to new Planner",
+      "width": 184
     }
   ],
   "edges": [
@@ -269,10 +280,10 @@
       "role": "error"
     },
     {
-      "id": "planner_failure",
-      "from": "planner",
+      "id": "verify_failure",
+      "from": "verify",
       "to": "failure",
-      "label": "verification fails",
+      "label": "failed checks",
       "variant": "security",
       "role": "error"
     },

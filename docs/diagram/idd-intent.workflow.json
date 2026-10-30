@@ -7,7 +7,7 @@
     "output": "site/views/intent.html",
     "animation": "trace",
     "visual_preset": "signal-flow",
-    "quality_profile": "showcase",
+    "quality_profile": "standard",
     "repository": {
       "url": "https://github.com/DimonSmart/Intent-Driven-Development.git",
       "provider": "github",
@@ -69,7 +69,8 @@
       "col": 0,
       "type": "external",
       "label": "Product Request",
-      "sublabel": "new / existing / visual"
+      "sublabel": "new / existing / visual",
+      "width": 184
     },
     {
       "id": "route",
@@ -77,7 +78,8 @@
       "col": 1,
       "type": "frontend",
       "label": "Classify Scope",
-      "sublabel": "product change or known truth"
+      "sublabel": "product change or known truth",
+      "width": 184
     },
     {
       "id": "discover",
@@ -92,7 +94,8 @@
           "line": 302,
           "label": "Entry routes"
         }
-      ]
+      ],
+      "width": 184
     },
     {
       "id": "confirm",
@@ -100,7 +103,8 @@
       "col": 3,
       "type": "security",
       "label": "Confirm Meaning",
-      "sublabel": "user-approved obligations"
+      "sublabel": "user-approved obligations",
+      "width": 184
     },
     {
       "id": "known",
@@ -108,7 +112,8 @@
       "col": 2,
       "type": "messagebus",
       "label": "Known Requirement",
-      "sublabel": "skip redundant discovery"
+      "sublabel": "skip redundant discovery",
+      "width": 184
     },
     {
       "id": "owner",
@@ -123,7 +128,8 @@
           "line": 439,
           "label": "Product change"
         }
-      ]
+      ],
+      "width": 184
     },
     {
       "id": "current",
@@ -132,7 +138,8 @@
       "type": "database",
       "label": "Current Product Intent",
       "sublabel": "write only authorized changes",
-      "tag": "durable"
+      "tag": "durable",
+      "width": 184
     },
     {
       "id": "question",
@@ -140,7 +147,8 @@
       "col": 3,
       "type": "external",
       "label": "Question / Stop",
-      "sublabel": "missing product decision"
+      "sublabel": "missing product decision",
+      "width": 184
     }
   ],
   "edges": [

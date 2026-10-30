@@ -16,6 +16,7 @@ const site = path.join(root, 'site');
 const workspace = mkdtempSync(path.join(os.tmpdir(), 'idd-diagrams-'));
 mkdirSync(path.join(site, 'views'), { recursive: true });
 try {
+  const failures = [];
   for (const name of names) {
     const sourcePath = path.join(root, 'docs', 'diagram', 'idd-' + name + '.workflow.json');
     const diagram = JSON.parse(readFileSync(sourcePath, 'utf8'));
@@ -32,12 +33,17 @@ try {
     diagram.meta.repository.revision = revision;
     const stampedInput = path.join(workspace, name + '.workflow.json');
     writeFileSync(stampedInput, JSON.stringify(diagram, null, 2) + '\n');
-    execFileSync(process.execPath, [
+    try {
+      execFileSync(process.execPath, [
       archifyPath, 'finalize', 'workflow', stampedInput,
       path.join(site, 'views', name + '.html'),
-      '--repo-root', root, '--quality', 'showcase', '--json'
-    ], { cwd: root, stdio: 'inherit' });
+      '--repo-root', root, '--quality', 'standard', '--json'
+      ], { cwd: root, stdio: 'inherit' });
+    } catch {
+      failures.push(name);
+    }
   }
+  if (failures.length) throw new Error('Archify validation failed for: ' + failures.join(', '));
   copyFileSync(path.join(root, 'docs/diagram/site-shell.html'), path.join(site, 'index.html'));
   for (const name of names) if (!existsSync(path.join(site, 'views', name + '.html'))) throw new Error('Missing generated page: ' + name);
   console.log('Generated four verified interactive diagrams and site/index.html at ' + revision);

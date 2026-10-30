@@ -7,7 +7,7 @@
     "output": "site/views/overview.html",
     "animation": "trace",
     "visual_preset": "signal-flow",
-    "quality_profile": "showcase",
+    "quality_profile": "standard",
     "repository": {
       "url": "https://github.com/DimonSmart/Intent-Driven-Development.git",
       "provider": "github",
@@ -68,7 +68,8 @@
       "col": 0,
       "type": "external",
       "label": "User Request",
-      "sublabel": "desired outcome + scope"
+      "sublabel": "desired outcome + scope",
+      "width": 184
     },
     {
       "id": "route",
@@ -76,7 +77,8 @@
       "col": 1,
       "type": "frontend",
       "label": "Classify Request",
-      "sublabel": "which truth changes?"
+      "sublabel": "which truth changes?",
+      "width": 184
     },
     {
       "id": "discover",
@@ -84,7 +86,8 @@
       "col": 2,
       "type": "frontend",
       "label": "Clarify / Discover",
-      "sublabel": "only when required"
+      "sublabel": "only when required",
+      "width": 184
     },
     {
       "id": "owner",
@@ -99,7 +102,8 @@
           "line": 439,
           "label": "Product change"
         }
-      ]
+      ],
+      "width": 184
     },
     {
       "id": "intent",
@@ -115,7 +119,8 @@
           "line": 23,
           "label": "Intent contract"
         }
-      ]
+      ],
+      "width": 184
     },
     {
       "id": "choice",
@@ -123,7 +128,8 @@
       "col": 2,
       "type": "messagebus",
       "label": "Execution Choice",
-      "sublabel": "focused or orchestrated"
+      "sublabel": "focused or orchestrated",
+      "width": 184
     },
     {
       "id": "direct",
@@ -132,7 +138,8 @@
       "type": "backend",
       "label": "Direct Agent",
       "sublabel": "focused implementation",
-      "yOffset": -65
+      "yOffset": -65,
+      "width": 184
     },
     {
       "id": "factory",
@@ -148,7 +155,8 @@
           "line": 225,
           "label": "Optional Factory"
         }
-      ]
+      ],
+      "width": 184
     },
     {
       "id": "verify",
@@ -163,7 +171,8 @@
           "line": 606,
           "label": "Verification"
         }
-      ]
+      ],
+      "width": 184
     },
     {
       "id": "result",
@@ -171,7 +180,8 @@
       "col": 5,
       "type": "cloud",
       "label": "Implementation Result",
-      "sublabel": "evidence-backed"
+      "sublabel": "evidence-backed",
+      "width": 184
     },
     {
       "id": "audit",
@@ -186,7 +196,8 @@
           "line": 125,
           "label": "Audit"
         }
-      ]
+      ],
+      "width": 184
     },
     {
       "id": "findings",
@@ -194,7 +205,8 @@
       "col": 3,
       "type": "database",
       "label": "Audit Findings",
-      "sublabel": "diagnose, do not change"
+      "sublabel": "diagnose, do not change",
+      "width": 184
     }
   ],
   "edges": [

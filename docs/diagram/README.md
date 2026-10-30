@@ -19,7 +19,7 @@ Install or check out the [pinned Archify revision](../../.github/workflows/deplo
 node scripts/Build-Idd-Diagram-Site.mjs --archify .archify/archify/bin/archify.mjs
 ```
 
-The builder checks graph references and isolated nodes. Archify `finalize --quality showcase` checks schema, readable layout and delivery. It stamps each temporary diagram input with the actual Git commit SHA for accurate source links; **the checked-in source files are not rewritten**.
+The builder checks graph references and isolated nodes. Archify `finalize --quality standard` checks schema, readable layout and delivery. It stamps each temporary diagram input with the actual Git commit SHA for accurate source links; **the checked-in source files are not rewritten**.
 
 GitHub Actions publishes `site/index.html` and the four generated views on edits to `docs/diagram/**`, the builder or the deployment workflow.
 

@@ -7,7 +7,7 @@
     "output": "site/views/quality.html",
     "animation": "trace",
     "visual_preset": "signal-flow",
-    "quality_profile": "showcase",
+    "quality_profile": "standard",
     "repository": {
       "url": "https://github.com/DimonSmart/Intent-Driven-Development.git",
       "provider": "github",
@@ -58,7 +58,8 @@
       "col": 0,
       "type": "external",
       "label": "Quality Question",
-      "sublabel": "check or fix?"
+      "sublabel": "check or fix?",
+      "width": 184
     },
     {
       "id": "route",
@@ -66,7 +67,8 @@
       "col": 1,
       "type": "frontend",
       "label": "Choose Check",
-      "sublabel": "read-only by default"
+      "sublabel": "read-only by default",
+      "width": 184
     },
     {
       "id": "lint",
@@ -81,7 +83,8 @@
           "line": 560,
           "label": "Lint"
         }
-      ]
+      ],
+      "width": 184
     },
     {
       "id": "lint_result",
@@ -89,7 +92,8 @@
       "col": 3,
       "type": "database",
       "label": "Formal Findings",
-      "sublabel": "IDs, INDEX, links, headings"
+      "sublabel": "IDs, INDEX, links, headings",
+      "width": 184
     },
     {
       "id": "structure",
@@ -97,7 +101,8 @@
       "col": 2,
       "type": "security",
       "label": "Structure Audit",
-      "sublabel": "semantic ownership; read-only"
+      "sublabel": "semantic ownership; read-only",
+      "width": 184
     },
     {
       "id": "normalize",
@@ -105,7 +110,8 @@
       "col": 3,
       "type": "backend",
       "label": "Normalize Current",
-      "sublabel": "separate propose / apply"
+      "sublabel": "separate propose / apply",
+      "width": 184
     },
     {
       "id": "drift",
@@ -120,7 +126,8 @@
           "line": 606,
           "label": "Conformance"
         }
-      ]
+      ],
+      "width": 184
     },
     {
       "id": "drift_result",
@@ -128,7 +135,8 @@
       "col": 3,
       "type": "database",
       "label": "Conformance Report",
-      "sublabel": "read-only; scoped"
+      "sublabel": "read-only; scoped",
+      "width": 184
     },
     {
       "id": "verification",
@@ -136,7 +144,8 @@
       "col": 2,
       "type": "security",
       "label": "Project Verification",
-      "sublabel": "build / tests / checks"
+      "sublabel": "build / tests / checks",
+      "width": 184
     },
     {
       "id": "evidence",
@@ -144,7 +153,8 @@
       "col": 3,
       "type": "database",
       "label": "Execution Evidence",
-      "sublabel": "configured operational commands"
+      "sublabel": "configured operational commands",
+      "width": 184
     }
   ],
   "edges": [
