@@ -20,26 +20,18 @@
       "label": "Choose the question"
     },
     {
-      "id": "lint",
-      "label": "Mechanical Intent validity"
+      "id": "checks",
+      "label": "Independent verification paths"
     },
     {
-      "id": "structure",
-      "label": "Intent organization"
-    },
-    {
-      "id": "drift",
-      "label": "Product conformance"
-    },
-    {
-      "id": "project",
-      "label": "Technical project evidence"
+      "id": "outcomes",
+      "label": "Findings & authorized handoffs"
     }
   ],
   "phases": [
     {
       "id": "select",
-      "label": "Choose responsibility",
+      "label": "Route",
       "fromCol": 0,
       "toCol": 1
     },
@@ -47,7 +39,7 @@
       "id": "check",
       "label": "Independent checks",
       "fromCol": 2,
-      "toCol": 3,
+      "toCol": 5,
       "variant": "emphasis"
     }
   ],
@@ -72,7 +64,7 @@
     },
     {
       "id": "lint",
-      "lane": "lint",
+      "lane": "checks",
       "col": 2,
       "type": "security",
       "label": "Intent Lint",
@@ -88,7 +80,7 @@
     },
     {
       "id": "lint_result",
-      "lane": "lint",
+      "lane": "outcomes",
       "col": 3,
       "type": "database",
       "label": "Formal Findings",
@@ -97,7 +89,7 @@
     },
     {
       "id": "structure",
-      "lane": "structure",
+      "lane": "checks",
       "col": 2,
       "type": "security",
       "label": "Structure Audit",
@@ -106,7 +98,7 @@
     },
     {
       "id": "normalize",
-      "lane": "structure",
+      "lane": "outcomes",
       "col": 3,
       "type": "backend",
       "label": "Normalize Current",
@@ -115,7 +107,7 @@
     },
     {
       "id": "drift",
-      "lane": "drift",
+      "lane": "checks",
       "col": 2,
       "type": "security",
       "label": "Drift Audit",
@@ -131,7 +123,7 @@
     },
     {
       "id": "drift_result",
-      "lane": "drift",
+      "lane": "outcomes",
       "col": 3,
       "type": "database",
       "label": "Conformance Report",
@@ -140,7 +132,7 @@
     },
     {
       "id": "verification",
-      "lane": "project",
+      "lane": "checks",
       "col": 2,
       "type": "security",
       "label": "Project Verification",
@@ -149,7 +141,7 @@
     },
     {
       "id": "evidence",
-      "lane": "project",
+      "lane": "outcomes",
       "col": 3,
       "type": "database",
       "label": "Execution Evidence",

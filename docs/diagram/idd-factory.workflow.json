@@ -16,25 +16,16 @@
   },
   "lanes": [
     {
-      "id": "entry",
-      "label": "Entry & preflight"
-    },
-    {
       "id": "preparation",
-      "label": "Durable preparation / planning"
+      "label": "Entry & durable preflight"
     },
     {
       "id": "execution",
-      "label": "Optional native-agent execution"
+      "label": "Fresh agent execution"
     },
     {
-      "id": "verification",
-      "label": "Project verification & review"
-    },
-    {
-      "id": "exceptions",
-      "label": "Stops and bounded feedback",
-      "variant": "exception"
+      "id": "outcomes",
+      "label": "Questions, checks & final review"
     }
   ],
   "mainPath": [
@@ -49,21 +40,21 @@
   ],
   "phases": [
     {
-      "id": "gates",
-      "label": "Preflight",
+      "id": "entry",
+      "label": "Prepare before activation",
       "fromCol": 0,
       "toCol": 2,
       "variant": "emphasis"
     },
     {
       "id": "work",
-      "label": "Fresh agents",
+      "label": "Tasks → fresh contexts",
       "fromCol": 3,
       "toCol": 4
     },
     {
-      "id": "finish",
-      "label": "Verify and review",
+      "id": "check",
+      "label": "Verify, review or replan",
       "fromCol": 5,
       "toCol": 5,
       "variant": "emphasis"
@@ -72,7 +63,7 @@
   "nodes": [
     {
       "id": "request",
-      "lane": "entry",
+      "lane": "preparation",
       "col": 0,
       "type": "external",
       "label": "Complete Request",
@@ -81,7 +72,7 @@
     },
     {
       "id": "preflight",
-      "lane": "entry",
+      "lane": "preparation",
       "col": 1,
       "type": "security",
       "label": "Factory Preflight",
@@ -154,21 +145,22 @@
     },
     {
       "id": "verify",
-      "lane": "verification",
+      "lane": "outcomes",
       "col": 5,
       "type": "security",
       "label": "Final Verification",
       "sublabel": "when Planner says Done",
-      "width": 184
+      "width": 184,
+      "yOffset": -80
     },
     {
       "id": "review",
-      "lane": "verification",
+      "lane": "outcomes",
       "col": 5,
       "type": "database",
       "label": "Intent Refinement Review",
       "sublabel": "after passed checks",
-      "yOffset": 90,
+      "yOffset": 80,
       "sources": [
         {
           "path": "src/canonical/skills/idd-factory-run.md",
@@ -180,7 +172,7 @@
     },
     {
       "id": "block",
-      "lane": "exceptions",
+      "lane": "outcomes",
       "col": 1,
       "type": "external",
       "label": "Stop / Ask Owner",
@@ -189,20 +181,11 @@
     },
     {
       "id": "question",
-      "lane": "exceptions",
+      "lane": "outcomes",
       "col": 3,
       "type": "external",
       "label": "Question / Pause",
       "sublabel": "save exact answer",
-      "width": 184
-    },
-    {
-      "id": "failure",
-      "lane": "exceptions",
-      "col": 5,
-      "type": "security",
-      "label": "Bounded Failure",
-      "sublabel": "diagnostic to new Planner",
       "width": 184
     }
   ],
@@ -280,29 +263,22 @@
       "role": "error"
     },
     {
-      "id": "verify_failure",
-      "from": "verify",
-      "to": "failure",
-      "label": "failed checks",
-      "variant": "security",
-      "role": "error"
-    },
-    {
-      "id": "failure_planner",
-      "from": "failure",
-      "to": "planner",
-      "label": "retry planning",
-      "variant": "security",
-      "role": "return"
-    },
-    {
       "id": "planner_worker",
       "from": "planner",
       "to": "worker",
       "label": "next tasks",
       "variant": "dashed",
       "role": "return",
-      "route": "return-left"
+      "route": "bottom-channel"
+    },
+    {
+      "id": "verify_planner",
+      "from": "verify",
+      "to": "planner",
+      "label": "failure: bounded evidence",
+      "variant": "security",
+      "role": "return",
+      "route": "outside-right"
     }
   ],
   "cards": [
