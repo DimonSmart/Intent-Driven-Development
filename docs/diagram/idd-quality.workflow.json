@@ -81,7 +81,7 @@
     {
       "id": "lint_result",
       "lane": "outcomes",
-      "col": 3,
+      "col": 2,
       "type": "database",
       "label": "Formal Findings",
       "sublabel": "IDs, INDEX, links, headings",
@@ -90,7 +90,7 @@
     {
       "id": "structure",
       "lane": "checks",
-      "col": 2,
+      "col": 3,
       "type": "security",
       "label": "Structure Audit",
       "sublabel": "semantic ownership; read-only",
@@ -108,7 +108,7 @@
     {
       "id": "drift",
       "lane": "checks",
-      "col": 2,
+      "col": 4,
       "type": "security",
       "label": "Drift Audit",
       "sublabel": "intent vs implementation",
@@ -124,7 +124,7 @@
     {
       "id": "drift_result",
       "lane": "outcomes",
-      "col": 3,
+      "col": 4,
       "type": "database",
       "label": "Conformance Report",
       "sublabel": "read-only; scoped",
@@ -133,7 +133,7 @@
     {
       "id": "verification",
       "lane": "checks",
-      "col": 2,
+      "col": 5,
       "type": "security",
       "label": "Project Verification",
       "sublabel": "build / tests / checks",
@@ -142,7 +142,7 @@
     {
       "id": "evidence",
       "lane": "outcomes",
-      "col": 3,
+      "col": 5,
       "type": "database",
       "label": "Execution Evidence",
       "sublabel": "configured operational commands",

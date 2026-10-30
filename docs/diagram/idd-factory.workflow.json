@@ -269,7 +269,7 @@
       "label": "next tasks",
       "variant": "dashed",
       "role": "return",
-      "route": "bottom-channel"
+      "route": "straight"
     },
     {
       "id": "verify_planner",
