@@ -277,8 +277,7 @@
       "to": "planner",
       "label": "failure: bounded evidence",
       "variant": "security",
-      "role": "return",
-      "route": "outside-right"
+      "role": "return"
     }
   ],
   "cards": [
