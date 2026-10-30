@@ -1,0 +1,242 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Quality & Conformance",
+    "subtitle": "Four different checks. Different authority to change files.",
+    "output": "site/views/quality.html",
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/DimonSmart/Intent-Driven-Development.git",
+      "provider": "github",
+      "revision": "b8db839829be2a2a04827618d2cc7c4d977e2bac"
+    }
+  },
+  "lanes": [
+    {
+      "id": "request",
+      "label": "Choose the question"
+    },
+    {
+      "id": "lint",
+      "label": "Mechanical Intent validity"
+    },
+    {
+      "id": "structure",
+      "label": "Intent organization"
+    },
+    {
+      "id": "drift",
+      "label": "Product conformance"
+    },
+    {
+      "id": "project",
+      "label": "Technical project evidence"
+    }
+  ],
+  "phases": [
+    {
+      "id": "select",
+      "label": "Choose responsibility",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "check",
+      "label": "Independent checks",
+      "fromCol": 2,
+      "toCol": 3,
+      "variant": "emphasis"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "request",
+      "lane": "request",
+      "col": 0,
+      "type": "external",
+      "label": "Quality Question",
+      "sublabel": "check or fix?"
+    },
+    {
+      "id": "route",
+      "lane": "request",
+      "col": 1,
+      "type": "frontend",
+      "label": "Choose Check",
+      "sublabel": "read-only by default"
+    },
+    {
+      "id": "lint",
+      "lane": "lint",
+      "col": 2,
+      "type": "security",
+      "label": "Intent Lint",
+      "sublabel": "check; safe fix if authorized",
+      "sources": [
+        {
+          "path": "src/canonical/methodology/common-workflows.md",
+          "line": 560,
+          "label": "Lint"
+        }
+      ]
+    },
+    {
+      "id": "lint_result",
+      "lane": "lint",
+      "col": 3,
+      "type": "database",
+      "label": "Formal Findings",
+      "sublabel": "IDs, INDEX, links, headings"
+    },
+    {
+      "id": "structure",
+      "lane": "structure",
+      "col": 2,
+      "type": "security",
+      "label": "Structure Audit",
+      "sublabel": "semantic ownership; read-only"
+    },
+    {
+      "id": "normalize",
+      "lane": "structure",
+      "col": 3,
+      "type": "backend",
+      "label": "Normalize Current",
+      "sublabel": "separate propose / apply"
+    },
+    {
+      "id": "drift",
+      "lane": "drift",
+      "col": 2,
+      "type": "security",
+      "label": "Drift Audit",
+      "sublabel": "intent vs implementation",
+      "sources": [
+        {
+          "path": "src/canonical/methodology/common-workflows.md",
+          "line": 606,
+          "label": "Conformance"
+        }
+      ]
+    },
+    {
+      "id": "drift_result",
+      "lane": "drift",
+      "col": 3,
+      "type": "database",
+      "label": "Conformance Report",
+      "sublabel": "read-only; scoped"
+    },
+    {
+      "id": "verification",
+      "lane": "project",
+      "col": 2,
+      "type": "security",
+      "label": "Project Verification",
+      "sublabel": "build / tests / checks"
+    },
+    {
+      "id": "evidence",
+      "lane": "project",
+      "col": 3,
+      "type": "database",
+      "label": "Execution Evidence",
+      "sublabel": "configured operational commands"
+    }
+  ],
+  "edges": [
+    {
+      "id": "request_route",
+      "from": "request",
+      "to": "route",
+      "label": "select",
+      "variant": "emphasis"
+    },
+    {
+      "id": "route_lint",
+      "from": "route",
+      "to": "lint",
+      "label": "mechanics",
+      "variant": "emphasis",
+      "role": "branch"
+    },
+    {
+      "id": "lint_lint_result",
+      "from": "lint",
+      "to": "lint_result",
+      "label": "diagnose",
+      "variant": "emphasis"
+    },
+    {
+      "id": "route_structure",
+      "from": "route",
+      "to": "structure",
+      "label": "ownership",
+      "role": "branch"
+    },
+    {
+      "id": "structure_normalize",
+      "from": "structure",
+      "to": "normalize",
+      "label": "optional handoff",
+      "variant": "dashed"
+    },
+    {
+      "id": "route_drift",
+      "from": "route",
+      "to": "drift",
+      "label": "conformance",
+      "role": "branch"
+    },
+    {
+      "id": "drift_drift_result",
+      "from": "drift",
+      "to": "drift_result",
+      "label": "findings",
+      "variant": "dashed"
+    },
+    {
+      "id": "route_verification",
+      "from": "route",
+      "to": "verification",
+      "label": "execution checks",
+      "role": "branch"
+    },
+    {
+      "id": "verification_evidence",
+      "from": "verification",
+      "to": "evidence",
+      "label": "results",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Not interchangeable",
+      "items": [
+        "Lint validates mechanical document consistency; structure audit checks semantic organization.",
+        "Drift audit is read-only and measures implementation against Intent, not general code quality."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Writing requires authority",
+      "items": [
+        "Only explicitly requested safe lint fixes can edit mechanically.",
+        "Normalization is a separate propose/apply workflow; audit findings never silently trigger writes."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Project verification is operational",
+      "items": [
+        "Commands live in .idd/verification.yaml when configured, not in Product Intent.",
+        "Direct Agent or Factory consumes verification evidence; Factory does not own another verification engine."
+      ]
+    }
+  ]
+}

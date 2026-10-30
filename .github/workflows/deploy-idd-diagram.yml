@@ -1,4 +1,4 @@
-name: Deploy IDD diagram
+name: Deploy IDD diagrams
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - docs/diagram/**
+      - scripts/Build-Idd-Diagram-Site.mjs
       - .github/workflows/deploy-idd-diagram.yml
   workflow_dispatch:
 
@@ -41,12 +42,10 @@ jobs:
           ref: 7f483b61e8f68d0d5c3219d2c943c5381c8db0b1
           path: .archify
 
-      - name: Generate standalone diagram
-        shell: pwsh
-        run: |
-          node .archify/archify/bin/archify.mjs finalize workflow docs/diagram/idd-overview.workflow.json site/index.html --repo-root $env:GITHUB_WORKSPACE --quality showcase --json
+      - name: Generate and validate all diagrams
+        run: node scripts/Build-Idd-Diagram-Site.mjs --archify .archify/archify/bin/archify.mjs
 
-      - name: Upload generated diagram
+      - name: Upload generated site
         uses: actions/upload-pages-artifact@v4
         with:
           path: site

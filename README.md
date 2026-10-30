@@ -8,6 +8,8 @@
   <strong>Durable product intent for disposable implementations.</strong>
 </p>
 
+[**Explore the interactive IDD diagrams**](https://dimonsmart.github.io/Intent-Driven-Development/) — Overview, Intent Lifecycle, Factory Execution, and Quality & Conformance.
+
 ## What Is Intent-Driven Development?
 
 Intent-Driven Development (IDD) is a lightweight methodology and plugin toolkit for AI-assisted software development.

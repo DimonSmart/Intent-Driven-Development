@@ -1,0 +1,243 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Intent Lifecycle",
+    "subtitle": "Discover, confirm, and maintain current product truth.",
+    "output": "site/views/intent.html",
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/DimonSmart/Intent-Driven-Development.git",
+      "provider": "github",
+      "revision": "b8db839829be2a2a04827618d2cc7c4d977e2bac"
+    }
+  },
+  "lanes": [
+    {
+      "id": "entry",
+      "label": "Request & routing"
+    },
+    {
+      "id": "discovery",
+      "label": "Discovery when needed"
+    },
+    {
+      "id": "owners",
+      "label": "Durable ownership"
+    },
+    {
+      "id": "exceptions",
+      "label": "Questions / ambiguity",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "request",
+    "route",
+    "discover",
+    "confirm",
+    "owner",
+    "current"
+  ],
+  "phases": [
+    {
+      "id": "understand",
+      "label": "Understand",
+      "fromCol": 0,
+      "toCol": 2
+    },
+    {
+      "id": "authorize",
+      "label": "Confirm and own",
+      "fromCol": 3,
+      "toCol": 4,
+      "variant": "emphasis"
+    },
+    {
+      "id": "save",
+      "label": "Current truth",
+      "fromCol": 5,
+      "toCol": 5
+    }
+  ],
+  "nodes": [
+    {
+      "id": "request",
+      "lane": "entry",
+      "col": 0,
+      "type": "external",
+      "label": "Product Request",
+      "sublabel": "new / existing / visual"
+    },
+    {
+      "id": "route",
+      "lane": "entry",
+      "col": 1,
+      "type": "frontend",
+      "label": "Classify Scope",
+      "sublabel": "product change or known truth"
+    },
+    {
+      "id": "discover",
+      "lane": "discovery",
+      "col": 2,
+      "type": "frontend",
+      "label": "Discover / Clarify",
+      "sublabel": "brainstorm, bootstrap, import",
+      "sources": [
+        {
+          "path": "src/canonical/methodology/common-workflows.md",
+          "line": 302,
+          "label": "Entry routes"
+        }
+      ]
+    },
+    {
+      "id": "confirm",
+      "lane": "discovery",
+      "col": 3,
+      "type": "security",
+      "label": "Confirm Meaning",
+      "sublabel": "user-approved obligations"
+    },
+    {
+      "id": "known",
+      "lane": "owners",
+      "col": 2,
+      "type": "messagebus",
+      "label": "Known Requirement",
+      "sublabel": "skip redundant discovery"
+    },
+    {
+      "id": "owner",
+      "lane": "owners",
+      "col": 4,
+      "type": "backend",
+      "label": "Choose Owner",
+      "sublabel": "existing spec, ADR, spike",
+      "sources": [
+        {
+          "path": "src/canonical/methodology/common-workflows.md",
+          "line": 439,
+          "label": "Product change"
+        }
+      ]
+    },
+    {
+      "id": "current",
+      "lane": "owners",
+      "col": 5,
+      "type": "database",
+      "label": "Current Product Intent",
+      "sublabel": "write only authorized changes",
+      "tag": "durable"
+    },
+    {
+      "id": "question",
+      "lane": "exceptions",
+      "col": 3,
+      "type": "external",
+      "label": "Question / Stop",
+      "sublabel": "missing product decision"
+    }
+  ],
+  "edges": [
+    {
+      "id": "request_route",
+      "from": "request",
+      "to": "route",
+      "label": "classify",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "route_discover",
+      "from": "route",
+      "to": "discover",
+      "label": "unclear / source",
+      "role": "main"
+    },
+    {
+      "id": "discover_confirm",
+      "from": "discover",
+      "to": "confirm",
+      "label": "proposal",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "confirm_owner",
+      "from": "confirm",
+      "to": "owner",
+      "label": "approved",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "route_known",
+      "from": "route",
+      "to": "known",
+      "label": "already clear",
+      "role": "branch"
+    },
+    {
+      "id": "known_owner",
+      "from": "known",
+      "to": "owner",
+      "label": "direct change",
+      "role": "branch"
+    },
+    {
+      "id": "owner_current",
+      "from": "owner",
+      "to": "current",
+      "label": "add / modify / remove",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "discover_question",
+      "from": "discover",
+      "to": "question",
+      "label": "ambiguous",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "question_confirm",
+      "from": "question",
+      "to": "confirm",
+      "label": "explicit answer",
+      "variant": "security",
+      "role": "return"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Bootstrap versus import",
+      "items": [
+        "Bootstrap reconstructs a proposal from an undocumented product and requires approval.",
+        "Import migrates established external knowledge without treating code as the source of product truth."
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Visual intent is product intent",
+      "items": [
+        "Visual discovery is read-only; confirmed Essential / Preferred / Free / Avoid requirements go through the ordinary Intent owner.",
+        "Clear requirements skip redundant brainstorming."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Knowledge stays current",
+      "items": [
+        "Edit the smallest existing owner, create only when needed, remove obsolete specs rather than archiving them.",
+        "Mechanical lint, normalization and drift audit are shown in Quality & Conformance."
+      ]
+    }
+  ]
+}

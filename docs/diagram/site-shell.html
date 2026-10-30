@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interactive maps of Intent-Driven Development: core workflow, product intent, optional Factory and conformance.">
+  <title>Intent-Driven Development · Interactive Maps</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #090f1b; color: #e6edf7; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #090f1b; }
+    a { color: inherit; }
+    .masthead { padding: 23px clamp(20px,3vw,52px) 17px; border-bottom: 1px solid #253449; background: linear-gradient(110deg,#101e32,#0b1424); }
+    .topline { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+    .eyebrow { color:#7cdbc8; font-size: 11px; font-weight: 750; letter-spacing: .16em; text-transform: uppercase; margin: 0 0 8px; }
+    h1 { margin: 0; font-size: clamp(21px,2.3vw,29px); line-height: 1.15; letter-spacing: -.03em; }
+    .subtitle { max-width: 840px; color: #b2bed0; margin: 9px 0 0; font-size: 13px; line-height: 1.5; }
+    .repo { display: inline-flex; align-items: center; white-space: nowrap; text-decoration: none; color: #b4c5df; border: 1px solid #34475f; border-radius: 8px; padding: 8px 12px; font-size: 12px; }
+    .repo:hover, .repo:focus-visible { color: #fff; border-color: #7cdbc8; }
+    nav { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 20px; }
+    nav a { display: inline-flex; align-items: center; gap: 9px; padding: 10px 14px; text-decoration: none; border: 1px solid #2b3d54; border-radius: 9px; color: #b3c2d7; background: #101d30; font-size: 13px; font-weight: 550; transition: border-color .15s,background .15s; }
+    nav a:hover, nav a:focus-visible { color: white; border-color: #6b94ab; }
+    nav a[aria-current="page"] { background:#173c43; color:#d6fff2; border-color: #4fb9ac; }
+    nav .num { font-size: 10px; color: #86adbf; }
+    nav a[aria-current="page"] .num { color:#81dfc9; }
+    .description { padding: 11px clamp(20px,3vw,52px); display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 18px; row-gap: 5px; border-bottom:1px solid #253449; background:#0c1626; }
+    .description strong { font-size: 13px; font-weight: 700; }
+    .description span { color: #98a9c0; font-size: 12px; }
+    .description a { color:#83d6d1; margin-left:auto; text-decoration: none; font-size: 12px; }
+    .description a:hover { text-decoration: underline; }
+    .diagram { display:block; width:100%; height:calc(100dvh - 205px); min-height:580px; border:0; background:#0b1220; }
+    .footer { padding: 10px clamp(20px,3vw,52px) 15px; color:#7f91ac; border-top:1px solid #253449; font-size:12px; }
+    @media(max-width:700px) {
+      .masthead {padding:17px 14px 13px;}
+      .topline { flex-direction:column; gap: 10px; }
+      .subtitle {font-size:12px;}
+      nav {margin-top:14px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;}
+      nav a {padding:11px 8px;font-size:12px;}
+      .description {padding:11px 14px;}
+      .description a {margin-left:0;}
+      .diagram {height:calc(100dvh - 260px);min-height:480px;}
+      .footer {padding:10px 14px;}
+    }
+    @media(prefers-reduced-motion:reduce){*{transition:none!important;}}
+  </style>
+</head>
+<body>
+  <header class="masthead">
+    <div class="topline">
+      <div>
+        <p class="eyebrow">IDD / Interactive workflow maps</p>
+        <h1>Intent-Driven Development</h1>
+        <p class="subtitle">Durable product intent. Disposable implementation workflows. Explore the methodology, its optional Factory, and the independent verification paths.</p>
+      </div>
+      <a class="repo" href="https://github.com/DimonSmart/Intent-Driven-Development">GitHub repository ↗</a>
+    </div>
+    <nav aria-label="Diagram sections">
+      <a href="./views/overview.html" target="idd-diagram" data-view="overview" aria-current="page"><span class="num">01</span> Overview</a>
+      <a href="./views/intent.html" target="idd-diagram" data-view="intent"><span class="num">02</span> Intent Lifecycle</a>
+      <a href="./views/factory.html" target="idd-diagram" data-view="factory"><span class="num">03</span> Factory Execution</a>
+      <a href="./views/quality.html" target="idd-diagram" data-view="quality"><span class="num">04</span> Quality &amp; Conformance</a>
+    </nav>
+  </header>
+  <section class="description" aria-live="polite">
+    <strong id="section-title">Overview</strong>
+    <span id="section-description">See how requests are routed through current product truth, optional execution and independent audits.</span>
+    <a id="standalone" href="./views/overview.html" target="_blank" rel="noopener noreferrer">Open diagram on its own ↗</a>
+  </section>
+  <main>
+    <iframe class="diagram" id="diagram" name="idd-diagram" src="./views/overview.html" title="Overview interactive workflow diagram" loading="eager"></iframe>
+  </main>
+  <footer class="footer">Select a node or connection in a diagram to explore its relationships and source references. Product Intent is the durable contract; implementation work and Factory state are temporary.</footer>
+  <script>
+    (() => {
+      const views = {
+        overview: {title: "Overview", description: "See how requests are routed through current product truth, optional execution and independent audits."},
+        intent: {title: "Intent Lifecycle", description: "Understand discovery, confirmation, ownership and the living product contract."},
+        factory: {title: "Factory Execution", description: "Follow preflight, original Git baseline, fresh Planner and Worker contexts, verification and review."},
+        quality: {title: "Quality & Conformance", description: "Distinguish mechanical lint, semantic organization, implementation drift and project verification."}
+      };
+      const frame = document.getElementById("diagram");
+      const standalone = document.getElementById("standalone");
+      const links = Array.from(document.querySelectorAll("nav [data-view]"));
+      const select = () => {
+        const requested = location.hash.slice(1).toLowerCase();
+        const id = Object.hasOwn(views, requested) ? requested : "overview";
+        const url = "./views/" + id + ".html";
+        links.forEach(link => {
+          if (link.dataset.view === id) link.setAttribute("aria-current", "page");
+          else link.removeAttribute("aria-current");
+        });
+        if (frame.dataset.view !== id) { frame.src = url; frame.dataset.view = id; }
+        frame.title = views[id].title + " interactive workflow diagram";
+        standalone.href = url;
+        document.getElementById("section-title").textContent = views[id].title;
+        document.getElementById("section-description").textContent = views[id].description;
+        document.title = views[id].title + " · Intent-Driven Development";
+      };
+      links.forEach(link => link.addEventListener("click", event => {
+        event.preventDefault();
+        const id = link.dataset.view;
+        if (location.hash !== "#" + id) location.hash = id;
+        else select();
+      }));
+      window.addEventListener("hashchange", select);
+      select();
+    })();
+  </script>
+</body>
+</html>

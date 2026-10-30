@@ -1,0 +1,324 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Factory Execution",
+    "subtitle": "Durable preflight first. Fresh contexts only for bounded implementation.",
+    "output": "site/views/factory.html",
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/DimonSmart/Intent-Driven-Development.git",
+      "provider": "github",
+      "revision": "b8db839829be2a2a04827618d2cc7c4d977e2bac"
+    }
+  },
+  "lanes": [
+    {
+      "id": "entry",
+      "label": "Entry & preflight"
+    },
+    {
+      "id": "preparation",
+      "label": "Durable preparation / planning"
+    },
+    {
+      "id": "execution",
+      "label": "Optional native-agent execution"
+    },
+    {
+      "id": "verification",
+      "label": "Project verification & review"
+    },
+    {
+      "id": "exceptions",
+      "label": "Stops and bounded feedback",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "request",
+    "preflight",
+    "ready",
+    "initial",
+    "worker",
+    "planner",
+    "verify",
+    "review"
+  ],
+  "phases": [
+    {
+      "id": "gates",
+      "label": "Preflight",
+      "fromCol": 0,
+      "toCol": 2,
+      "variant": "emphasis"
+    },
+    {
+      "id": "work",
+      "label": "Fresh agents",
+      "fromCol": 3,
+      "toCol": 4
+    },
+    {
+      "id": "finish",
+      "label": "Verify and review",
+      "fromCol": 5,
+      "toCol": 5,
+      "variant": "emphasis"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "request",
+      "lane": "entry",
+      "col": 0,
+      "type": "external",
+      "label": "Complete Request",
+      "sublabel": "scope preserved verbatim"
+    },
+    {
+      "id": "preflight",
+      "lane": "entry",
+      "col": 1,
+      "type": "security",
+      "label": "Factory Preflight",
+      "sublabel": "decision & scope gates",
+      "sources": [
+        {
+          "path": "src/canonical/methodology/intent-preflight.md",
+          "line": 11,
+          "label": "Durable preflight"
+        }
+      ]
+    },
+    {
+      "id": "ready",
+      "lane": "preparation",
+      "col": 2,
+      "type": "database",
+      "label": "Baseline + Coverage",
+      "sublabel": "save SHA, owner changes, validate",
+      "sources": [
+        {
+          "path": "docs/factory-workflow.md",
+          "line": 8,
+          "label": "Preparation"
+        }
+      ]
+    },
+    {
+      "id": "initial",
+      "lane": "preparation",
+      "col": 3,
+      "type": "backend",
+      "label": "Initial Fresh Planner",
+      "sublabel": "inactive; Question / Done / Tasks"
+    },
+    {
+      "id": "worker",
+      "lane": "execution",
+      "col": 4,
+      "type": "backend",
+      "label": "Fresh Worker",
+      "sublabel": "tasks activate run; shared repo",
+      "sources": [
+        {
+          "path": "src/canonical/skills/idd-factory-run.md",
+          "line": 540,
+          "label": "Worker"
+        }
+      ]
+    },
+    {
+      "id": "planner",
+      "lane": "execution",
+      "col": 5,
+      "type": "backend",
+      "label": "Fresh Planner",
+      "sublabel": "re-read repository reality",
+      "sources": [
+        {
+          "path": "src/canonical/skills/idd-factory-run.md",
+          "line": 456,
+          "label": "Planner"
+        }
+      ]
+    },
+    {
+      "id": "verify",
+      "lane": "verification",
+      "col": 5,
+      "type": "security",
+      "label": "Final Verification",
+      "sublabel": "when Planner says Done"
+    },
+    {
+      "id": "review",
+      "lane": "verification",
+      "col": 5,
+      "type": "database",
+      "label": "Intent Refinement Review",
+      "sublabel": "after passed checks",
+      "yOffset": 90,
+      "sources": [
+        {
+          "path": "src/canonical/skills/idd-factory-run.md",
+          "line": 723,
+          "label": "Review"
+        }
+      ]
+    },
+    {
+      "id": "block",
+      "lane": "exceptions",
+      "col": 1,
+      "type": "external",
+      "label": "Stop / Ask Owner",
+      "sublabel": "missing durable decision"
+    },
+    {
+      "id": "question",
+      "lane": "exceptions",
+      "col": 3,
+      "type": "external",
+      "label": "Question / Pause",
+      "sublabel": "save exact answer"
+    },
+    {
+      "id": "failure",
+      "lane": "exceptions",
+      "col": 5,
+      "type": "security",
+      "label": "Bounded Failure",
+      "sublabel": "diagnostic to new Planner"
+    }
+  ],
+  "edges": [
+    {
+      "id": "request_preflight",
+      "from": "request",
+      "to": "preflight",
+      "label": "begin",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "preflight_ready",
+      "from": "preflight",
+      "to": "ready",
+      "label": "allowed",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "ready_initial",
+      "from": "ready",
+      "to": "initial",
+      "label": "coverage valid",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "initial_worker",
+      "from": "initial",
+      "to": "worker",
+      "label": "Tasks: activate",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "worker_planner",
+      "from": "worker",
+      "to": "planner",
+      "label": "work result",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "planner_verify",
+      "from": "planner",
+      "to": "verify",
+      "label": "Done",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "verify_review",
+      "from": "verify",
+      "to": "review",
+      "label": "success",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "preflight_block",
+      "from": "preflight",
+      "to": "block",
+      "label": "missing decision",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "initial_question",
+      "from": "initial",
+      "to": "question",
+      "label": "Question",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "planner_failure",
+      "from": "planner",
+      "to": "failure",
+      "label": "verification fails",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "failure_planner",
+      "from": "failure",
+      "to": "planner",
+      "label": "retry planning",
+      "variant": "security",
+      "role": "return"
+    },
+    {
+      "id": "planner_worker",
+      "from": "planner",
+      "to": "worker",
+      "label": "next tasks",
+      "variant": "dashed",
+      "role": "return",
+      "route": "return-left"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Preflight owns the gate",
+      "items": [
+        "Persist the original Git baseline and provenance before authorized durable writes.",
+        "Engineering owner changes precede Product Intent owner changes; validate coverage before activation."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Fresh contexts, not a workflow engine",
+      "items": [
+        "Planner is read-only and issues bounded Tasks, one Question, or Done.",
+        "Each Worker uses fresh context; only Workers may add proven monotonic refinements to existing Intent owners."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Stops are real boundaries",
+      "items": [
+        "Known missing decisions block before mutations; Question pauses until an exact answer.",
+        "Verification failure returns bounded evidence to a new Planner, not an automatic root-level repair.",
+        "After success, review Intent refinements independently of the implementation result."
+      ]
+    }
+  ]
+}
