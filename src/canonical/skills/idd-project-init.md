@@ -92,15 +92,15 @@ The root Coding Agent instruction file must contain exactly one managed IDD bloc
 ```markdown
 <!-- idd:project:start -->
 ## Intent-Driven Development
-This project uses Intent-Driven Development (IDD). Treat `.idd/intent/` as the
-current product truth. When `.idd/engineering/` exists, treat it as the current
-durable engineering guardrails. When `.idd/verification.yaml` exists, follow it
-as the project-owned verification policy. Use the installed IDD skills when
-changing intent, implementing behavior, or verifying implementation.
+This project uses IDD. Product truth: `.idd/intent/`; optional engineering
+guardrails: `.idd/engineering/`; verification policy: `.idd/verification.yaml`.
+Use installed IDD skills for intent, implementation, and verification.
+Plugin: `idd-intent` (optional `idd-factory`).
+Install: https://github.com/DimonSmart/Intent-Driven-Development#quick-start
+If IDD skills are unavailable, share the installation link; do not simulate them.
 Only Factory Workers may add confirmed monotonic refinements to existing Intent
-owners, never independently revise product requirements; user prohibitions win.
-No competing normative documents in `doc/` or `docs/`. Preserve unmodified
-external originals and their names there when possible; IDD may link to them.
+owners; never independently revise requirements. User prohibitions win.
+No competing normative docs in `doc/` or `docs/`. Preserve external originals.
 <!-- idd:project:end -->
 ```
 
@@ -280,7 +280,6 @@ product truth during the handoff.
 
 - Copy bootstrap files from `assets/bootstrap/.idd/intent/` without semantic rewriting.
 - Never replace an existing project file wholesale. Initialization authorizes only adding missing bootstrap files and creating or updating the single managed IDD block in the active Coding Agent instruction file.
-- Treat a pre-existing `.idd/plugins.json` as an unused legacy file: do not read it, modify it, delete it, or use its contents for feature detection.
 - Do not create agent-specific skill directories in the user project.
 - Do not copy plugin skills into the user project.
 - Do not create generated plugin delivery artifacts. The root `AGENTS.md` or `CLAUDE.md` instruction file is project-owned and is intentionally maintained by the agent.
@@ -304,10 +303,6 @@ product truth during the handoff.
 When `.idd/intent` already exists, preserve existing documents. Add only missing bootstrap files.
 
 Always inspect and normalize the active Coding Agent instruction file so that it contains exactly one minimal managed IDD block while preserving unrelated instructions.
-
-Treat a pre-existing `.idd/plugins.json` as unused legacy state. Do not read it,
-normalize it, modify it, delete it, or use it to infer enabled features. Its
-presence or contents have no effect on initialization.
 
 For existing projects, Factory-specific behavior may be selected when the current
 request explicitly asks for Factory or when existing project state such as

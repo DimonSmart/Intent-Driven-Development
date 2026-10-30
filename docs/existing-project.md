@@ -41,10 +41,6 @@ This creates the minimal project-owned IDD structure:
   intent/
 ```
 
-Older projects may still contain `.idd/plugins.json`. Current IDD treats it as
-an unused legacy file: initialization does not read, modify, delete, or use it
-to decide which features are enabled.
-
 It also adds one small managed IDD section to `AGENTS.md` for Codex or
 `CLAUDE.md` for Claude Code while preserving unrelated project instructions.
 

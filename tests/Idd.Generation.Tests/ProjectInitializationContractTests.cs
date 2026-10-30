@@ -13,17 +13,16 @@ public sealed class ProjectInitializationContractTests(GenerationFixture fixture
         value.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     [Fact]
-    public void ProjectInit_CreatesIntentStateWithoutProjectPluginManifest()
+    public void ProjectInit_CreatesIntentStateAndLinksToPluginInstallWithoutManifest()
     {
         var init = NormalizeLineEndings(Repo("src", "canonical", "skills", "idd-project-init.md"));
 
         Assert.Contains("Create only the project-owned IDD state:", init);
         Assert.Contains(".idd/intent/", init);
-        Assert.DoesNotContain("\n.idd/plugins.json\n", init);
-        Assert.DoesNotContain("\"plugins\":", init);
-        Assert.DoesNotContain("idd-core", init);
-        Assert.Contains("unused legacy file", init);
-        Assert.Contains("do not read it, modify it, delete it", init);
+        Assert.Contains("Plugin: `idd-intent` (optional `idd-factory`).", init);
+        Assert.Contains("Install: https://github.com/DimonSmart/Intent-Driven-Development#quick-start", init);
+        Assert.Contains("If IDD skills are unavailable", init);
+        Assert.Contains("Do not create a project-level plugin declaration", init);
         Assert.Contains("Do not create a replacement project manifest", init);
     }
 
@@ -41,14 +40,12 @@ public sealed class ProjectInitializationContractTests(GenerationFixture fixture
     }
 
     [Fact]
-    public void ExistingProjectDocs_ShowIntentOnlyMinimalStructureAndLegacyCompatibility()
+    public void ExistingProjectDocs_ShowIntentOnlyMinimalStructure()
     {
         var docs = NormalizeLineEndings(Repo("docs", "existing-project.md"));
 
         Assert.Contains(".idd/\n  intent/\n", docs);
-        Assert.DoesNotContain("  plugins.json", docs);
-        Assert.Contains("unused legacy file", docs);
-        Assert.Contains("does not read, modify, delete", docs);
+        Assert.Contains("It also adds one small managed IDD section", docs);
     }
 
     [Fact]
