@@ -107,8 +107,8 @@
       "lane": "preparation",
       "col": 3,
       "type": "backend",
-      "label": "Initial Fresh Planner",
-      "sublabel": "inactive; Question / Done / Tasks",
+      "label": "Fresh Planner",
+      "sublabel": "before activation",
       "width": 184
     },
     {
@@ -133,7 +133,7 @@
       "col": 5,
       "type": "backend",
       "label": "Fresh Planner",
-      "sublabel": "re-read repository reality",
+      "sublabel": "after tasks / feedback",
       "sources": [
         {
           "path": "src/canonical/skills/idd-factory-run.md",
