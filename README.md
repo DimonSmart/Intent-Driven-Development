@@ -30,6 +30,12 @@ IDD organizes product knowledge so the answer can move closer to **yes**.
 - **Replaceable implementations.** Product knowledge survives refactoring, tool changes, agent changes, and rewrites.
 - **Git owns history.** Specifications stay current; Git records how they and the implementation changed.
 
+## Real-world IDD Showcase
+
+IDD is used in substantial public projects, not only small examples. **[CSharpFar](https://github.com/DimonSmart/CSharpFar)** includes a custom terminal window and UI subsystem, dual-panel file management, remote providers, and extensive behavior specifications. **[CSharpGit](https://github.com/DimonSmart/CSharpGit)** applies durable Intent to a cross-platform Git desktop client with history editing, repository-state coordination, and platform-specific presentation concerns.
+
+[Explore the Real-world IDD Showcase](docs/real-world-showcase.md) for real demos, measured source-code scope, and direct links to the projects' current Intent documents.
+
 ## Core Intent Plugin and Optional Factory
 
 ### `idd-intent` — durable product memory
@@ -166,6 +172,7 @@ Release-specific migration instructions are maintained on the dedicated [Updates
 
 ## Documentation
 
+- [Real-world IDD Showcase](docs/real-world-showcase.md)
 - [IDD Use Cases](docs/using-idd.md)
 - [Engineering Guardrails](docs/engineering-guardrails.md)
 - [Verify Installation](docs/verify-installation.md)
