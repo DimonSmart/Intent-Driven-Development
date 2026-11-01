@@ -1,6 +1,6 @@
 internal sealed class Generator(RepositoryLayout layout)
 {
-    public IReadOnlyList<string> Run(bool checkOnly, string manifestVersion, string? outputDirectory = null)
+    public IReadOnlyList<string> Run(bool checkOnly, string manifestVersion, string? outputDirectory = null, bool internalAgentExperiment = false)
     {
         if (Environment.ExitCode != 0)
         {
@@ -34,6 +34,9 @@ internal sealed class Generator(RepositoryLayout layout)
                 skillDescriptions,
                 manifestVersion));
         }
+
+        if (internalAgentExperiment)
+            InternalAgentExperiment.Apply(expectedFiles);
 
         if (checkOnly)
         {

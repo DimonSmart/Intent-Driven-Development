@@ -3,12 +3,18 @@ internal static class GeneratorOptionsParser
     public static GeneratorOptions Parse(string[] args)
     {
         var checkOnly = false;
+        var internalAgentExperiment = false;
         string? manifestVersion = null;
         string? outputDirectory = null;
 
         for (var index = 0; index < args.Length; index++)
         {
             var arg = args[index];
+            if (arg == "--internal-agent-experiment")
+            {
+                internalAgentExperiment = true;
+                continue;
+            }
             if (StringComparer.Ordinal.Equals(arg, "--check"))
             {
                 checkOnly = true;
@@ -53,6 +59,6 @@ internal static class GeneratorOptionsParser
             return new GeneratorOptions(checkOnly, "", null);
         }
 
-        return new GeneratorOptions(checkOnly, manifestVersion, outputDirectory);
+        return new GeneratorOptions(checkOnly, manifestVersion, outputDirectory, internalAgentExperiment);
     }
 }

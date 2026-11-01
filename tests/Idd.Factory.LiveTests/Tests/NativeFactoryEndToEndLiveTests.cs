@@ -116,9 +116,15 @@ public sealed class NativeFactoryEndToEndLiveTests
                 "06-generator-build");
 
             var generator = Path.Combine(repo, "tools", "generate", "bin", "Debug", "net10.0", "Generate.dll");
+            var generationArguments = new List<string>
+            {
+                "exec", generator, "--version", "0.0.0-live", "--output", marketplace
+            };
+            if (Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_INTERNAL_SKILLS") == "1")
+                generationArguments.Add("--internal-agent-experiment");
             await RunAsync(
                 "dotnet",
-                ["exec", generator, "--version", "0.0.0-live", "--output", marketplace],
+                generationArguments,
                 repo,
                 null,
                 null,
