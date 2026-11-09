@@ -60,7 +60,7 @@ public sealed class FactoryRoutingAssertionsTests
                 Run = new RunInfo
                 {
                     RootThreadId = "root", Result = fault == "completed" ? "completed" : "blocked",
-                    Reason = fault == "no-reason" ? "Something failed" : report.Run.Reason,
+                    Reason = fault == "no-reason" ? null : report.Run.Reason,
                     StartedAt = report.Run.StartedAt
                 },
                 Completion = report.Completion, FactoryProjectState = report.FactoryProjectState,
