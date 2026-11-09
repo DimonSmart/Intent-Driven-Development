@@ -4,9 +4,19 @@ This project contains explicit token-consuming end-to-end evaluations of the
 native-agent Factory architecture. They are skipped unless
 `IDD_RUN_LIVE_FACTORY_EVALS=1`.
 
-The primary scenario builds the current generator, generates and installs the Codex
-`idd-factory` plugin, copies the `TwoStepCatalog` workspace, and invokes a real
-Codex host with `$idd-factory-run`.
+The primary scenario builds the current generator and Codex `idd-factory`
+plugin, creates a disposable `TwoStepCatalog` workspace, and invokes a real
+Codex host with `$idd-factory-run`. It copies the **generated** Planner and
+Worker TOML definitions to that workspace's `.codex/agents/` directory, then
+force-adds only those two otherwise ignored definitions to its initial Git
+commit. Before starting Codex, the harness independently verifies the exact
+`HEAD^{commit}` object, Git root, and both tracked agent files; it stores
+`git-baseline.txt` and `agent-registration.json` as evidence.
+No global user or host agent configuration is changed.
+
+This makes the main scenario a Factory orchestration/routing evaluation;
+it is **not evidence** that the Marketplace plugin independently registers
+its native roles. That question is tested separately below.
 The host is started with MultiAgentV2 explicitly enabled; a model-selected
 runtime that does not report V2 fails the evaluation instead of silently
 testing a different spawn protocol.
