@@ -24,25 +24,31 @@ public sealed partial class NativeFactoryEndToEndLiveTests
     {
         PrepareCodexHome(probeHome);
         var env = new Dictionary<string, string?> { ["CODEX_HOME"] = probeHome };
-        var result = await RunAsync(codex,
-            [
-                "exec", "--json", "--ignore-rules",
-                "--enable", "multi_agent", "--enable", "multi_agent_v2",
-                "-c", "agents.max_depth=2",
-                "-c", "agents.max_threads=4",
-                "-c", "approval_policy=never",
-                "-c", $"model_reasoning_effort={reasoning}",
-                "--model", model,
-                "--sandbox", "read-only",
-                "--cd", workspace, "-"
-            ],
-            workspace, env, NativeRoleProbePrompt, artifacts, "09-project-agent-probe",
-            timeout: TimeSpan.FromMinutes(Math.Min(timeoutMinutes, 4)));
+        try
+        {
+            var result = await RunAsync(codex,
+                [
+                    "exec", "--json", "--ignore-rules",
+                    "--enable", "multi_agent", "--enable", "multi_agent_v2",
+                    "-c", "agents.max_depth=2",
+                    "-c", "agents.max_threads=4",
+                    "-c", "approval_policy=never",
+                    "-c", $"model_reasoning_effort={reasoning}",
+                    "--model", model,
+                    "--sandbox", "read-only",
+                    "--cd", workspace, "-"
+                ],
+                workspace, env, NativeRoleProbePrompt, artifacts, "09-project-agent-probe",
+                timeout: TimeSpan.FromMinutes(Math.Min(timeoutMinutes, 4)));
 
-        await File.WriteAllTextAsync(Path.Combine(artifacts, "project-agent-probe-trace.jsonl"), result.Stdout);
-        var root = FindRootRollout(probeHome, requireSpawn: false);
-        VerifyRegisteredNativeRoleSpawns(root, artifacts, "project-local");
-        await TrySaveReportSourceAsync(probeHome, Path.Combine(artifacts, "project-agent-probe"));
+            await File.WriteAllTextAsync(Path.Combine(artifacts, "project-agent-probe-trace.jsonl"), result.Stdout);
+            var root = FindRootRollout(probeHome, requireSpawn: false);
+            VerifyRegisteredNativeRoleSpawns(root, artifacts, "project-local");
+        }
+        finally
+        {
+            await TrySaveReportSourceAsync(probeHome, Path.Combine(artifacts, "project-agent-probe"));
+        }
     }
 
     private static void VerifyRegisteredNativeRoleSpawns(
