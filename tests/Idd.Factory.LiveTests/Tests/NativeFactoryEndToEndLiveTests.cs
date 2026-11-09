@@ -476,7 +476,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         File.WriteAllText(Path.Combine(idd, "execution.yaml"), yaml.ToString().ReplaceLineEndings("\n"));
     }
 
-    private static async Task VerifyGitBaselineAsync(string workspace, string artifactRoot)
+    private static async Task VerifyGitBaselineAsync(string workspace, string artifactRoot, bool requireProjectAgents = true)
     {
         // ArgumentList passes the revision verbatim, including braces. This check
         // distinguishes a missing Git baseline from a later agent/shell failure.
@@ -497,13 +497,16 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             workspace, null, null, artifactRoot, "05-git-baseline-object");
         Assert.Equal("commit", kind.Stdout.Trim());
 
-        var tracked = await RunAsync("git", ["ls-files", "--", ".codex/agents"],
-            workspace, null, null, artifactRoot, "05-git-agents-tracked");
-        var actual = tracked.Stdout.Split('\n', StringSplitOptions.TrimEntries |
-                                                   StringSplitOptions.RemoveEmptyEntries);
-        var expected = FactoryEvalAgentRegistration.RequiredRoles
-            .Select(name => ".codex/agents/" + name + ".toml").ToArray();
-        Assert.Equal(expected.Order(StringComparer.Ordinal), actual.Order(StringComparer.Ordinal));
+        if (requireProjectAgents)
+        {
+            var tracked = await RunAsync("git", ["ls-files", "--", ".codex/agents"],
+                workspace, null, null, artifactRoot, "05-git-agents-tracked");
+            var actual = tracked.Stdout.Split('\n', StringSplitOptions.TrimEntries |
+                                                       StringSplitOptions.RemoveEmptyEntries);
+            var expected = FactoryEvalAgentRegistration.RequiredRoles
+                .Select(name => ".codex/agents/" + name + ".toml").ToArray();
+            Assert.Equal(expected.Order(StringComparer.Ordinal), actual.Order(StringComparer.Ordinal));
+        }
 
         await File.WriteAllTextAsync(Path.Combine(artifactRoot, "git-baseline.txt"), hash + "\n");
     }
