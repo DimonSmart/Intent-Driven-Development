@@ -34,34 +34,30 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
         }
     }
 
-    [Fact]
-    public void FactoryPlanner_ReceivesEngineeringGuardrailsThroughRunOwner()
+    [Theory]
+    [InlineData("claude")]
+    [InlineData("codex")]
+    public void FactoryNativeAgents_LoadEngineeringContractWithoutRootRelay(string platform)
     {
         var run = Canonical("skills", "idd-factory-run.md");
-        var planner = Canonical("factory", "planner.md");
-
-        Assert.Contains("complete canonical Engineering Guardrails contract", run);
+        var engineering = GenerationFixture.NormalizeText(Canonical("methodology", "engineering-guardrails.md")).Trim();
         Assert.Contains("references/engineering-guardrails.md", run);
-        Assert.Contains("Engineering Guardrails contract explicitly supplied by `idd-factory-run`", planner);
-        Assert.Contains("Do not assume parent-skill references", planner);
-    }
-
-    [Fact]
-    public void FactoryWorker_ReceivesExplicitEngineeringContractWithoutLocalReferences()
-    {
-        var run = Canonical("skills", "idd-factory-run.md");
-        var worker = Canonical("factory", "worker.md");
-
-        Assert.Contains("references/factory-worker.md", run);
-        Assert.Contains("complete", run);
-        Assert.Contains("references/engineering-guardrails.md", run);
-        Assert.Contains("Every", worker, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("references/factory-worker.md", run);
         Assert.Contains("TaskRelatedEngineering", run);
         Assert.Contains("AlwaysEngineering", run);
-        Assert.Contains("Absence is normal", run);
-        Assert.Contains("blocks execution", run);
-        Assert.DoesNotContain("Read `references/engineering-guardrails.md`", worker);
-        Assert.Contains("explicitly supplied by `idd-factory-run`", worker);
+        foreach (var role in new[] { "planner", "worker" })
+        {
+            var root = Path.Combine(fixture.MarketplaceRoot, "plugins", platform, "idd-factory", "agents");
+            var generated = fixture.ReadText(Path.Combine(root,
+                "idd-internal-factory-" + role + (platform == "codex" ? ".toml" : ".md")));
+            var instructions = platform == "codex"
+                ? JsonSerializer.Deserialize<string>(generated.Split('\\n')
+                    .Single(line => line.StartsWith("developer_instructions = ", StringComparison.Ordinal))
+                    ["developer_instructions = ".Length..])!
+                : generated;
+            Assert.Contains(engineering, instructions);
+            Assert.Contains("return BLOCKED", instructions, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     [Fact]

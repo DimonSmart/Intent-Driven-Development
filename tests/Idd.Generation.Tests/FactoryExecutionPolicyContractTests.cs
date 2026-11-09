@@ -37,10 +37,7 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
     [Fact]
     public void PlannerTaskExamples_DeclareOneCanonicalProfileForEveryTask()
     {
-        var planners = new[] { Canonical("factory", "planner.md") }
-            .Concat(new[] { "codex", "claude" }.Select(platform => fixture.ReadText(Path.Combine(
-                fixture.MarketplaceRoot, "plugins", platform, "idd-factory", "skills",
-                "idd-factory-run", "references", "factory-planner.md"))));
+        var planners = new[] { Canonical("factory", "planner.md") };
         foreach (var planner in planners)
         {
             var example = Regex.Match(planner, @"(?s)Tasks:\s*```text\s*(?<tasks>.*?)```");
