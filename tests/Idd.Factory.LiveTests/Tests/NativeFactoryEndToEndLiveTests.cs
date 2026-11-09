@@ -98,12 +98,6 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             }
             var initialPolicy = await File.ReadAllTextAsync(Path.Combine(workspace, ".idd", "execution.yaml"));
             var initialCatalog = await File.ReadAllTextAsync(Path.Combine(workspace, "src", "MiniCatalog", "Catalog.cs"));
-            await InitializeGitRepositoryAsync(workspace, artifactRoot);
-            await RunAsync("dotnet", ["restore", "MiniCatalog.sln", "--nologo"],
-                workspace, null, null, artifactRoot, "05-workspace-restore");
-            if (verificationRecovery)
-                await RunAsync("dotnet", ["restore", "tools/RecoveryGate/RecoveryGate.csproj", "--nologo"],
-                    workspace, null, null, artifactRoot, "05-recovery-gate-restore");
             PrepareCodexHome(codexHome);
 
             await RunAsync(
@@ -134,6 +128,18 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             var generatedFactory = Path.Combine(marketplace, "plugins", "codex", "idd-factory");
             Assert.False(Directory.Exists(Path.Combine(generatedFactory, "runtime")));
             Assert.False(File.Exists(Path.Combine(generatedFactory, ".mcp.json")));
+
+            // This eval exercises Factory itself, not Marketplace-only agent discovery.
+            // Register the exact generated TOML definitions only inside its disposable
+            // project; the separate Marketplace discovery test deliberately omits this.
+            FactoryEvalAgentRegistration.StageProjectAgents(generatedFactory, workspace, artifactRoot);
+            await InitializeGitRepositoryAsync(workspace, artifactRoot);
+            await VerifyGitBaselineAsync(workspace, artifactRoot);
+            await RunAsync("dotnet", ["restore", "MiniCatalog.sln", "--nologo"],
+                workspace, null, null, artifactRoot, "05-workspace-restore");
+            if (verificationRecovery)
+                await RunAsync("dotnet", ["restore", "tools/RecoveryGate/RecoveryGate.csproj", "--nologo"],
+                    workspace, null, null, artifactRoot, "05-recovery-gate-restore");
 
             var env = new Dictionary<string, string?> { ["CODEX_HOME"] = codexHome };
             var codex = Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_CODEX") ?? "codex";
@@ -468,6 +474,38 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             yaml.AppendLine($"        reasoningEffort: '{reasoningScalar}'");
         }
         File.WriteAllText(Path.Combine(idd, "execution.yaml"), yaml.ToString().ReplaceLineEndings("\n"));
+    }
+
+    private static async Task VerifyGitBaselineAsync(string workspace, string artifactRoot)
+    {
+        // ArgumentList passes the revision verbatim, including braces. This check
+        // distinguishes a missing Git baseline from a later agent/shell failure.
+        var root = await RunAsync("git", ["rev-parse", "--show-toplevel"],
+            workspace, null, null, artifactRoot, "05-git-root");
+        Assert.Equal(Path.TrimEndingDirectorySeparator(Path.GetFullPath(workspace)),
+            Path.TrimEndingDirectorySeparator(Path.GetFullPath(root.Stdout.Trim())),
+            ignoreCase: OperatingSystem.IsWindows());
+
+        var revision = await RunAsync("git", ["rev-parse", "--verify", "HEAD^{commit}"],
+            workspace, null, null, artifactRoot, "05-git-baseline-verify");
+        var hash = revision.Stdout.Trim();
+        Assert.True((hash.Length == 40 || hash.Length == 64) &&
+                    hash.All(Uri.IsHexDigit),
+            $"Git baseline is not a complete commit hash: {hash}");
+
+        var kind = await RunAsync("git", ["cat-file", "-t", hash],
+            workspace, null, null, artifactRoot, "05-git-baseline-object");
+        Assert.Equal("commit", kind.Stdout.Trim());
+
+        var tracked = await RunAsync("git", ["ls-files", "--", ".codex/agents"],
+            workspace, null, null, artifactRoot, "05-git-agents-tracked");
+        var actual = tracked.Stdout.Split('\n', StringSplitOptions.TrimEntries |
+                                                   StringSplitOptions.RemoveEmptyEntries);
+        var expected = FactoryEvalAgentRegistration.RequiredRoles
+            .Select(name => ".codex/agents/" + name + ".toml").ToArray();
+        Assert.Equal(expected.Order(StringComparer.Ordinal), actual.Order(StringComparer.Ordinal));
+
+        await File.WriteAllTextAsync(Path.Combine(artifactRoot, "git-baseline.txt"), hash + "\n");
     }
 
     private static void PrepareCodexHome(string target)
