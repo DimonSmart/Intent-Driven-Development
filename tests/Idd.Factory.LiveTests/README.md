@@ -139,6 +139,35 @@ own mappings in `.idd/execution.yaml`, managed by `idd-factory-configure` and
 tracked in Git. Factory re-reads that project file before each worker spawn;
 planner output contains only the execution profile.
 
+## Native agent discovery through Marketplace (separate opt-in test)
+
+`Factory_MarketplaceAloneDiscoversNativeAgents` uses a fresh Git repository,
+a separate `CODEX_HOME`, and a normal generated Marketplace plugin
+installation. It **does not** create `.codex/agents/` or copy role definitions.
+The root attempts one native `spawn_agent` for each of the two required agent
+types with an intentionally invalid, no-write Factory assignment. The child
+role guard is expected to block work; the test succeeds only with host trace
+evidence that each **named native role was actually accepted and spawned**.
+No generic-agent fallback counts as discovery. The test is separate because
+some Codex versions may install the plugin but not register its `agents/`.
+
+To run only this token-consuming capability test:
+
+```powershell
+$env:IDD_RUN_LIVE_FACTORY_MARKETPLACE_EVALS = "1"
+try {
+    dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj `
+        --filter "FullyQualifiedName~Factory_MarketplaceAloneDiscoversNativeAgents"
+}
+finally {
+    Remove-Item Env:IDD_RUN_LIVE_FACTORY_MARKETPLACE_EVALS -ErrorAction SilentlyContinue
+}
+```
+
+It is excluded from the normal `Check.ps1 -Mode Live` selection.
+Native traces, Git verification and failure diagnostics are retained under
+`artifacts/factory-evals/marketplace-agents-*/`.
+
 ## Effort configuration (opt-in live test)
 
 `FactoryConfigure_UpdatesAndClearsEffortWithoutLosingOtherMappings` runs the
