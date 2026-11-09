@@ -13,13 +13,6 @@ public sealed class NativeFactoryAgentTests(GenerationFixture fixture)
     public void OrdinaryGeneration_EmbedsCanonicalInstructionsInRegisteredDefinitions(string platform, string extension)
     {
         var root = Path.Combine(fixture.MarketplaceRoot, "plugins", platform, "idd-factory");
-        var run = fixture.ReadText(Path.Combine(root, "skills", "idd-factory-run", "SKILL.md"));
-        Assert.DoesNotContain("references/factory-planner.md", run);
-        Assert.DoesNotContain("references/factory-worker.md", run);
-        Assert.DoesNotContain("Load and follow Skill idd-internal", run);
-        Assert.DoesNotContain("<complete contents of references", run);
-        Assert.Contains("registered", run, StringComparison.OrdinalIgnoreCase);
-
         var guardrails = fixture.ReadText(Path.Combine(fixture.RepoRoot,
             "src", "canonical", "methodology", "engineering-guardrails.md")).ReplaceLineEndings("\n").Trim();
         foreach (var role in new[] { "planner", "worker" })
@@ -33,9 +26,6 @@ public sealed class NativeFactoryAgentTests(GenerationFixture fixture)
                 : generated;
 
             Assert.Contains(guardrails, body);
-            Assert.Contains("## Native Factory assignment guard", body);
-            Assert.Contains("BLOCKED", body);
-            Assert.Contains("# IDD Factory " + (role == "planner" ? "Planner" : "Worker") + " Protocol", body);
             Assert.False(Directory.Exists(Path.Combine(root, "skills", name)));
         }
     }

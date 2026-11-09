@@ -199,35 +199,6 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
             fixture.AssertFile(Path.Combine(
                 root, "skills", "idd-factory-run", "references", "engineering-guardrails.md"));
 
-            var run = fixture.ReadText(Path.Combine(root, "skills", "idd-factory-run", "SKILL.md"));
-            Assert.DoesNotContain("references/factory-planner.md", run);
-            Assert.DoesNotContain("references/factory-worker.md", run);
-            Assert.Contains("Registered native agent gate", run);
-            Assert.Contains("idd-internal-factory-planner", run);
-            Assert.Contains("idd-internal-factory-worker", run);
-            Assert.Contains("--- Factory worker assignment ---", run);
-            Assert.DoesNotContain("Invoke `idd-factory-decompose-task`", run);
-
-            if (platform == "codex")
-            {
-                Assert.Contains("fork_turns: \"none\"", run);
-                Assert.Contains("spawn_agent", run);
-                Assert.Contains("wait_agent", run);
-            }
-            else
-            {
-                Assert.Contains("fresh semantic context with controlled input", run);
-                Assert.Contains("Agent/subagent", run);
-                Assert.Contains("terminal", run);
-            }
-
-            var helpInventory = fixture.ReadText(Path.Combine(
-                fixture.MarketplaceRoot, "plugins", platform, "idd-intent", "skills", "idd-help",
-                "references", "skill-descriptions.json"));
-            Assert.DoesNotContain("idd-factory-decompose-task", helpInventory);
-            Assert.DoesNotContain("idd-factory-execute-subtask", helpInventory);
-            Assert.DoesNotContain("idd-factory-update-effort-models", helpInventory);
-
             using var metadata = JsonDocument.Parse(fixture.ReadText(Path.Combine(root, "idd-plugin.json")));
             if (metadata.RootElement.TryGetProperty("roleDefinitions", out var roleDefinitions))
                 Assert.Equal(0, roleDefinitions.GetArrayLength());

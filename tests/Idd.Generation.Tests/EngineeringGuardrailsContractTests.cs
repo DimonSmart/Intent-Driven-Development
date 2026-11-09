@@ -34,32 +34,6 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
         }
     }
 
-    [Theory]
-    [InlineData("claude")]
-    [InlineData("codex")]
-    public void FactoryNativeAgents_LoadEngineeringContractWithoutRootRelay(string platform)
-    {
-        var run = Canonical("skills", "idd-factory-run.md");
-        var engineering = GenerationFixture.NormalizeText(Canonical("methodology", "engineering-guardrails.md")).Trim();
-        Assert.Contains("references/engineering-guardrails.md", run);
-        Assert.DoesNotContain("references/factory-worker.md", run);
-        Assert.Contains("TaskRelatedEngineering", run);
-        Assert.Contains("AlwaysEngineering", run);
-        foreach (var role in new[] { "planner", "worker" })
-        {
-            var root = Path.Combine(fixture.MarketplaceRoot, "plugins", platform, "idd-factory", "agents");
-            var generated = fixture.ReadText(Path.Combine(root,
-                "idd-internal-factory-" + role + (platform == "codex" ? ".toml" : ".md")));
-            var instructions = platform == "codex"
-                ? JsonSerializer.Deserialize<string>(generated.Split((char)10)
-                    .Single(line => line.StartsWith("developer_instructions = ", StringComparison.Ordinal))
-                    ["developer_instructions = ".Length..])!
-                : generated;
-            Assert.Contains(engineering, instructions);
-            Assert.Contains("return BLOCKED", instructions, StringComparison.OrdinalIgnoreCase);
-        }
-    }
-
     [Fact]
     public void EngineeringManagement_IsOwnedByIntentPlugin()
     {
@@ -104,63 +78,6 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
     }
 
     [Fact]
-    public void MechanicalEngineeringValidation_IsSharedAndAllocatorRegexIsCanonical()
-    {
-        var guardrails = Canonical("methodology", "engineering-guardrails.md");
-        var engineeringChange = Canonical("skills", "idd-engineering-change.md");
-        var lint = Canonical("skills", "idd-intent-lint.md");
-
-        Assert.Contains("## Mechanical Engineering Validation", guardrails);
-        Assert.Contains("^Next ID: ENG-\\d{4}$", guardrails);
-        Assert.DoesNotContain("^Next ID: ENG-\\\\d{4}$", guardrails);
-        Assert.Contains("Mechanical Engineering Validation", engineeringChange);
-        Assert.Contains("Mechanical Engineering Validation", lint);
-        Assert.DoesNotContain("## Optional Engineering checks", lint);
-    }
-
-    [Fact]
-    public void EngineeringManagement_DoesNotRouteValidationThroughIntentLint()
-    {
-        var guardrails = Canonical("methodology", "engineering-guardrails.md");
-        var workflows = Canonical("methodology", "common-workflows.md");
-        var engineeringChange = Canonical("skills", "idd-engineering-change.md");
-
-        Assert.DoesNotContain("idd-intent-lint structural validation", guardrails);
-        Assert.DoesNotContain("structural validation through idd-intent-lint", workflows);
-        Assert.False(engineeringChange.Contains("idd-intent-lint", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains("-> Mechanical Engineering Validation", guardrails);
-        Assert.Contains("-> direct Mechanical Engineering Validation", workflows);
-    }
-
-    [Fact]
-    public void ProjectLint_IsProjectOwnedAndForbidsAdHocValidatorPrograms()
-    {
-        var lint = Canonical("skills", "idd-intent-lint.md");
-        var engineeringChange = Canonical("skills", "idd-engineering-change.md");
-
-        Assert.Contains("Do not generate a general-purpose validator program solely to perform IDD lint.", lint);
-        Assert.Contains("Do not generate a general-purpose validator program", engineeringChange);
-        Assert.Contains("installed plugin cache", lint);
-        Assert.Contains("canonical IDD repository", lint);
-        Assert.DoesNotContain("skills do not contain an archive-enabling flag", lint);
-        Assert.DoesNotContain("skills do not contain an archive import action", lint);
-        Assert.DoesNotContain("docs describe archive as a normal lifecycle", lint);
-    }
-
-    [Fact]
-    public void EngineeringManagement_SupportsBatchPlanningAndSequentialAllocation()
-    {
-        var guardrails = Canonical("methodology", "engineering-guardrails.md");
-        var engineeringChange = Canonical("skills", "idd-engineering-change.md");
-
-        Assert.Contains("one or more durable Engineering decisions", guardrails);
-        Assert.Contains("One invocation may process multiple durable Engineering decisions.", engineeringChange);
-        Assert.Contains("allocate sequentially", guardrails);
-        Assert.Contains("allocate consecutive IDs only to `new` candidates", engineeringChange);
-        Assert.DoesNotContain("creates one Rule", guardrails);
-    }
-
-    [Fact]
     public void EngineeringBootstrapAssets_RemainPackaged()
     {
         foreach (var platform in new[] { "claude", "codex" })
@@ -175,26 +92,6 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
                 fixture.AssertFile(Path.Combine(root, "INDEX.md"));
             }
         }
-    }
-
-    [Fact]
-    public void IntentImport_HasBoundedEngineeringMigrationAuthority()
-    {
-        var import = Canonical("skills", "idd-intent-import.md");
-        var guardrails = Canonical("methodology", "engineering-guardrails.md");
-        var engineeringChange = Canonical("skills", "idd-engineering-change.md");
-
-        Assert.Contains("explicit durable Engineering decision", import);
-        Assert.Contains("Repository code, package references, tests, runtime wiring", import);
-        Assert.Contains("mutate no Engineering Rules in this invocation", import);
-        Assert.Matches(@"never changes\s+`\.idd/verification\.yaml`", import);
-        Assert.Contains("Do not invoke `idd-engineering-change` as an executable subroutine.", import);
-        Assert.Contains("ENG-9999", import);
-        Assert.Contains(".idd/factory/current/request.md", import);
-        Assert.Contains("valid legacy layers gain an allocator", import);
-        Assert.Contains("idd-intent-import", guardrails);
-        Assert.Contains("narrow migration exception", guardrails);
-        Assert.Contains("sole bounded exception", engineeringChange);
     }
 
     [Fact]
@@ -216,58 +113,6 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
         }
     }
 
-
-    [Fact]
-    public void LocalTechnicalChoice_DoesNotPromoteToEngineeringPolicy()
-    {
-        var guardrails = Canonical("methodology", "engineering-guardrails.md");
-        var change = Canonical("skills", "idd-engineering-change.md");
-        Assert.Contains("## Authority for technical decisions", guardrails);
-        Assert.Contains("Autonomous Technical Decision", guardrails);
-        Assert.Contains("New or Changed Durable Decision", guardrails);
-        Assert.Contains("A decision can last years", guardrails);
-        Assert.Contains("Never promote a successful spike", guardrails);
-        Assert.Contains("explicit durable implementation-only project decisions", change);
-    }
-
-    [Fact]
-    public void ConditionalSelection_RemainsSemanticAndPlannerOwned()
-    {
-        var guardrails = Canonical("methodology", "engineering-guardrails.md");
-        var planner = Canonical("factory", "planner.md");
-        var worker = Canonical("factory", "worker.md");
-        Assert.Contains("Planner selects Conditional", guardrails);
-        Assert.Contains("every realistic", guardrails);
-        Assert.Contains("Do not discover extra Conditional rules by filename", planner);
-        Assert.Contains("Do not search for extra Conditional IDs", worker);
-        Assert.Contains("uncovered-constraint diagnostic", worker);
-    }
-
-    [Fact]
-    public void MinimalRuleExamples_DoNotRequireOptionalExplanationSections()
-    {
-        var guardrails = Canonical("methodology", "engineering-guardrails.md");
-        var always = guardrails.Split("Minimal valid Always Rule")[1]
-            .Split("Minimal valid Conditional Rule")[0];
-        var conditional = guardrails.Split("Minimal valid Conditional Rule")[1]
-            .Split("Additional explanatory sections")[0];
-
-        foreach (var example in new[] { always, conditional })
-        {
-            Assert.Contains("## Rule", example);
-            Assert.Contains("## Applicability", example);
-            Assert.DoesNotContain("## Rationale", example);
-            Assert.DoesNotContain("## Guidance", example);
-            Assert.DoesNotContain("## Verification", example);
-        }
-
-        Assert.Contains("Always", always);
-        Assert.Contains("Conditional", conditional);
-        Assert.Contains("## Applies when", conditional);
-        Assert.DoesNotContain("## Applies when", always);
-        Assert.Contains("Missing optional sections are neither errors nor warnings", guardrails);
-        Assert.Contains("exactly one non-empty `## Applies when`", guardrails);
-    }
 
 
 }

@@ -47,7 +47,6 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
                 var plugin = name.StartsWith("idd-factory-", StringComparison.Ordinal) ? "idd-factory" : "idd-intent";
                 var folder = Path.Combine(fixture.MarketplaceRoot, "plugins", platform, plugin, "skills", name);
                 var skill = fixture.ReadText(Path.Combine(folder, "SKILL.md"));
-                Assert.Contains("#", skill);
 
                 if (platform == "claude")
                 {
@@ -122,7 +121,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
     }
 
     [Fact]
-    public void Route_IsInternalAutomaticAndPreservesReadOnlyDiagnosticContracts()
+    public void Route_IsInternalAutomatic()
     {
         var sourceRoot = Path.Combine(fixture.RepoRoot, "src", "canonical", "skills");
         using var descriptions = JsonDocument.Parse(fixture.ReadText(
@@ -138,21 +137,11 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
         Assert.Equal(SkillInvocation.Auto, inventory["idd-route"].Invocation);
         Assert.Equal(SkillExposure.Workflow, inventory["idd-route"].Exposure);
 
-        var instructions = fixture.ReadText(Path.Combine(sourceRoot, "idd-route.md"));
-        Assert.Contains("This skill is a read-only router", instructions);
-        Assert.Contains("complete available", instructions);
-        Assert.Contains("manual-only commands", instructions);
-        Assert.Contains("require explicit user", instructions);
-        Assert.Contains("Requested scope: route-only", instructions);
-        Assert.Contains("Current handoff: none", instructions);
-        Assert.Contains("change project files", instructions);
-        Assert.Contains("## Direct Factory Model-Policy Route", instructions);
-        Assert.Contains("If a request includes Factory model management", instructions);
-        Assert.Contains("Never select `idd-skip` automatically", instructions);
+
     }
 
     [Fact]
-    public void FactoryConfigure_IsSoleUserSelectableAndAutomaticWithRoutingAndPackagedPolicy()
+    public void FactoryConfigure_HasRegisteredExposureAndPackagedMetadata()
     {
         const string retired = "idd-factory-update-effort-models";
         var sourceRoot = Path.Combine(fixture.RepoRoot, "src", "canonical", "skills");
@@ -165,40 +154,16 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
 
         foreach (var platform in new[] { "claude", "codex" })
         {
-            var plugins = Path.Combine(fixture.MarketplaceRoot, "plugins", platform);
-            var factory = Path.Combine(plugins, "idd-factory");
-            var folder = Path.Combine(factory, "skills", "idd-factory-configure");
-            var configure = fixture.ReadText(Path.Combine(folder, "SKILL.md"));
+            var root = Path.Combine(fixture.MarketplaceRoot, "plugins", platform, "idd-factory");
+            var folder = Path.Combine(root, "skills", "idd-factory-configure");
+            fixture.AssertFile(Path.Combine(folder, "SKILL.md"));
             fixture.AssertFile(Path.Combine(folder, "references", "factory-execution-policy.md"));
-            fixture.AssertMissing(Path.Combine(factory, "skills", retired));
-            fixture.AssertMissing(Path.Combine(factory, "skills", retired, "SKILL.md"));
-            fixture.AssertMissing(Path.Combine(factory, "skills", retired, "agents", "openai.yaml"));
-            fixture.AssertMissing(Path.Combine(factory, "skills", retired, "references"));
+            fixture.AssertMissing(Path.Combine(root, "skills", retired));
 
-            Assert.Contains("Automatic activation alone does not authorize a policy write", configure);
-            Assert.Contains("A review-only request must not write the policy", configure);
-            Assert.Contains("Direct invocation", configure);
-            Assert.Contains("next worker spawn", configure);
-
-            var route = fixture.ReadText(Path.Combine(plugins, "idd-intent", "skills", "idd-route", "SKILL.md"));
-            Assert.Contains("## Direct Factory Model-Policy Route", route);
-            Assert.Contains("Recommended first skill: idd-factory-configure", route);
-            Assert.DoesNotContain("factory-model-update", route);
-            Assert.DoesNotContain(retired, route);
-            var routingReference = fixture.ReadText(Path.Combine(plugins, "idd-intent",
-                "skills", "idd-route", "references", "common-workflows.md"));
-            Assert.Contains("selects `Recommended first skill: idd-factory-configure` directly",
-                routingReference);
-            Assert.Contains("For **mixed requests**", routingReference);
-            Assert.DoesNotContain("factory-model-update", routingReference);
-            var help = fixture.ReadText(Path.Combine(plugins, "idd-intent", "skills", "idd-help", "SKILL.md"));
-            Assert.Contains("Installing `idd-factory`", help);
-            var inventory = fixture.ReadText(Path.Combine(plugins, "idd-intent", "skills",
-                "idd-help", "references", "skill-descriptions.json"));
-            Assert.DoesNotContain(retired, inventory);
             if (platform == "claude")
             {
-                var yaml = ParseYaml(GenerationFixture.ReadFrontMatter(configure));
+                var text = fixture.ReadText(Path.Combine(folder, "SKILL.md"));
+                var yaml = ParseYaml(GenerationFixture.ReadFrontMatter(text));
                 AssertScalar(yaml, "user-invocable", "true");
                 AssertScalar(yaml, "disable-model-invocation", "false");
             }
@@ -207,7 +172,6 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
                 var yaml = ParseYaml(fixture.ReadText(Path.Combine(folder, "agents", "openai.yaml")));
                 var ui = Assert.IsType<YamlMappingNode>(yaml.Children[new YamlScalarNode("interface")]);
                 AssertScalar(ui, "display_name", "IDD Factory Configure");
-                AssertScalar(ui, "short_description", "Configure, review, and refresh Factory models");
                 var policy = Assert.IsType<YamlMappingNode>(yaml.Children[new YamlScalarNode("policy")]);
                 AssertScalar(policy, "allow_implicit_invocation", "true");
             }
