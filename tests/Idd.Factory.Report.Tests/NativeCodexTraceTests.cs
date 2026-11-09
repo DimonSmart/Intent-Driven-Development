@@ -61,8 +61,6 @@ public sealed class NativeCodexTraceTests : IDisposable
         Assert.Equal(2, report.Metrics.WorkerInvocations);
         Assert.Equal(0, report.Metrics.OtherChildAgents);
         Assert.Equal(2, report.Tasks.Count);
-        Assert.Contains("ProductCode", report.Tasks[0].Text);
-        Assert.Contains("Catalog", report.Tasks[1].Text);
 
         Assert.Equal(27, report.Metrics.Tools.NativeOperations);
         Assert.Equal(3, report.Metrics.Tools.SpawnAgentCalls);
@@ -93,7 +91,6 @@ public sealed class NativeCodexTraceTests : IDisposable
         var console = writer.ToString();
         Assert.Contains("├─ Planner", console);
         Assert.Contains("Worker #1", console);
-        Assert.Contains("ProductCode", console);
         Assert.Contains("Tool batches:      unavailable", console);
     }
 

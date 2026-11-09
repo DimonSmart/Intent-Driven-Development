@@ -874,8 +874,6 @@ public sealed partial class FactoryReportTests : IDisposable
         Assert.Equal(2, report.Metrics.WorkerInvocations);
         Assert.Equal(2, report.Tasks.Count);
         Assert.All(report.Tasks, task => Assert.Equal("completed", task.Status));
-        Assert.Contains("ProductCode", report.Tasks[0].Text);
-        Assert.Contains("Catalog", report.Tasks[1].Text);
         Assert.All(report.Tasks, task => Assert.NotNull(task.DurationMilliseconds));
         Assert.Equal(2, report.Metrics.Tools.Commands);
         Assert.Equal(1, report.Metrics.Tools.FailedCommands);

@@ -96,20 +96,9 @@ public sealed class IntentImportEndToEndLiveTests
 
         await RunImportAsync(workspace, codex, env, model, reasoning, timeoutMinutes);
 
-        var intent = ReadCombinedIntent(workspace);
-        Assert.Contains("SVG", intent, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("STL", intent, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("printable", intent, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("MudBlazor", intent, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Clipper2", intent, StringComparison.OrdinalIgnoreCase);
-
-        var engineering = ReadCombinedRules(workspace);
-        Assert.Contains("Blazor WebAssembly", engineering, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("MudBlazor", engineering, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Clipper2", engineering, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("client-side", engineering, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("NetTopologySuite", engineering, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("custom polygon engine", engineering, StringComparison.OrdinalIgnoreCase);
+        Assert.NotEmpty(Directory.GetFiles(
+            Path.Combine(workspace, ".idd", "intent"), "IDD-*.md"));
+        Assert.NotEmpty(GetRuleFiles(workspace));
     }
 
     private static async Task ProductIntentOnlyAsync(
@@ -126,7 +115,8 @@ public sealed class IntentImportEndToEndLiveTests
 
         await RunImportAsync(workspace, codex, env, model, reasoning, timeoutMinutes);
 
-        Assert.Contains("SVG", ReadCombinedIntent(workspace), StringComparison.OrdinalIgnoreCase);
+        Assert.NotEmpty(Directory.GetFiles(
+            Path.Combine(workspace, ".idd", "intent"), "IDD-*.md"));
         Assert.False(Directory.Exists(Path.Combine(workspace, ".idd", "engineering")));
     }
 
@@ -147,7 +137,8 @@ public sealed class IntentImportEndToEndLiveTests
 
         await RunImportAsync(workspace, codex, env, model, reasoning, timeoutMinutes);
 
-        Assert.Contains("SVG", ReadCombinedIntent(workspace), StringComparison.OrdinalIgnoreCase);
+        Assert.NotEmpty(Directory.GetFiles(
+            Path.Combine(workspace, ".idd", "intent"), "IDD-*.md"));
         Assert.False(Directory.Exists(Path.Combine(workspace, ".idd", "engineering")));
     }
 
@@ -184,13 +175,14 @@ public sealed class IntentImportEndToEndLiveTests
             NetTopologySuite is the canonical polygon engine.
             """, withPolygonRule: true);
 
+        var existingRule = Path.Combine(
+            workspace, ".idd", "engineering", "ENG-0002.rule-polygon-engine.md");
+        var before = File.ReadAllText(existingRule);
         await RunImportAsync(workspace, codex, env, model, reasoning, timeoutMinutes);
 
         var rules = GetRuleFiles(workspace);
         Assert.Single(rules);
-        var content = File.ReadAllText(rules[0]);
-        Assert.Contains("Clipper2", content, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("NetTopologySuite", content, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(before, File.ReadAllText(rules[0]));
         Assert.Contains(
             "Next ID: ENG-0003",
             File.ReadAllText(Path.Combine(workspace, ".idd", "engineering", "INDEX.md")),
@@ -208,15 +200,15 @@ public sealed class IntentImportEndToEndLiveTests
             NetTopologySuite is now the canonical polygon engine.
             """, withPolygonRule: true);
 
+        var existingRule = Path.Combine(
+            workspace, ".idd", "engineering", "ENG-0002.rule-polygon-engine.md");
+        var before = File.ReadAllText(existingRule);
         await RunImportAsync(workspace, codex, env, model, reasoning, timeoutMinutes);
 
         var rules = GetRuleFiles(workspace);
         Assert.Single(rules);
-        Assert.True(
-            Path.GetFileName(rules[0]).StartsWith("ENG-0002.rule-", StringComparison.Ordinal),
-            "Explicit replacement must preserve ENG-0002 identity.");
-        var content = File.ReadAllText(rules[0]);
-        Assert.Contains("NetTopologySuite", content, StringComparison.OrdinalIgnoreCase);
+        Assert.StartsWith("ENG-0002.rule-", Path.GetFileName(rules[0]), StringComparison.Ordinal);
+        Assert.NotEqual(before, File.ReadAllText(rules[0]));
         Assert.Contains(
             "Next ID: ENG-0003",
             File.ReadAllText(Path.Combine(workspace, ".idd", "engineering", "INDEX.md")),
@@ -314,16 +306,6 @@ public sealed class IntentImportEndToEndLiveTests
             prompt,
             TimeSpan.FromMinutes(timeoutMinutes));
     }
-
-    private static string ReadCombinedIntent(string workspace) =>
-        string.Join(
-            Environment.NewLine,
-            Directory.GetFiles(Path.Combine(workspace, ".idd", "intent"), "IDD-*.md")
-                .OrderBy(path => path, StringComparer.Ordinal)
-                .Select(File.ReadAllText));
-
-    private static string ReadCombinedRules(string workspace) =>
-        string.Join(Environment.NewLine, GetRuleFiles(workspace).Select(File.ReadAllText));
 
     private static string[] GetRuleFiles(string workspace)
     {

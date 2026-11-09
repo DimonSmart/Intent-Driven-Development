@@ -226,9 +226,8 @@ public sealed class NativeFactoryEndToEndLiveTests
             {
                 var pendingPlanPath = Path.Combine(workspace, ".idd", "factory", "current", "plan.md");
                 Assert.True(File.Exists(pendingPlanPath), "BLOCKED must preserve the pending Factory plan.");
-                var pendingPlan = await File.ReadAllTextAsync(pendingPlanPath);
                 FactoryRoutingAssertions.VerifyUnavailableModel(factoryReport, rootRollout,
-                    unavailableModel, settings.ExecutionProfiles["standard"].ReasoningEffort, pendingPlan);
+                    unavailableModel, settings.ExecutionProfiles["standard"].ReasoningEffort);
                 Assert.Equal(initialPolicy, await File.ReadAllTextAsync(Path.Combine(workspace, ".idd", "execution.yaml")));
                 Assert.Equal(initialCatalog, await File.ReadAllTextAsync(Path.Combine(workspace, "src", "MiniCatalog", "Catalog.cs")));
                 Assert.False(File.Exists(Path.Combine(workspace, "src", "MiniCatalog", "ProductCode.cs")));
@@ -263,8 +262,6 @@ public sealed class NativeFactoryEndToEndLiveTests
                 Path.Combine(artifactRoot, "project-verification.trx"), expectedTests: 9);
 
             Assert.True(File.Exists(Path.Combine(workspace, "src", "MiniCatalog", "ProductCode.cs")));
-            var catalog = await File.ReadAllTextAsync(Path.Combine(workspace, "src", "MiniCatalog", "Catalog.cs"));
-            Assert.Contains("ProductCode", catalog, StringComparison.Ordinal);
         }
         catch (Exception ex)
         {

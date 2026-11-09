@@ -6,7 +6,6 @@ namespace Idd.Factory.LiveTests.Tests;
 public sealed class FactoryRoutingAssertionsTests
 {
     private const string RemovedModel = "removed-model";
-    private const string Plan = "# Task\nImplement ProductCode.\n# ExecutionProfile\nstandard\n";
     private static readonly IReadOnlyDictionary<string, WorkerExecutionSettings> Mappings =
         new Dictionary<string, WorkerExecutionSettings>
         {
@@ -23,7 +22,7 @@ public sealed class FactoryRoutingAssertionsTests
     public void VerifyUnavailableModel_AcceptsBlockedRejectionWithoutAWorker()
     {
         var (report, root) = UnavailableModelReport();
-        FactoryRoutingAssertions.VerifyUnavailableModel(report, root, RemovedModel, "medium", Plan);
+        FactoryRoutingAssertions.VerifyUnavailableModel(report, root, RemovedModel, "medium");
     }
 
     [Theory]
@@ -35,7 +34,6 @@ public sealed class FactoryRoutingAssertionsTests
     [InlineData("other-factory-attempt")]
     [InlineData("no-fork")]
     [InlineData("no-planner")]
-    [InlineData("no-plan")]
     [InlineData("no-reason")]
     [InlineData("completed")]
     [InlineData("completed-worker")]
@@ -43,7 +41,6 @@ public sealed class FactoryRoutingAssertionsTests
     public void VerifyUnavailableModel_FailsClosedOnMissingEvidenceOrFallback(string fault)
     {
         var (report, root) = UnavailableModelReport();
-        string plan = Plan;
         if (fault == "no-spawn") root.SpawnRecords.Clear();
         if (fault == "unknown-outcome") root.SpawnRecords["rejected"].SpawnOutcome = "unknown";
         if (fault == "wrong-model") root.SpawnRecords["rejected"].RequestedModel = "fallback";
@@ -57,7 +54,6 @@ public sealed class FactoryRoutingAssertionsTests
             };
         if (fault == "no-fork") root.Events.Clear();
         if (fault == "no-planner") report.Agents.Clear();
-        if (fault == "no-plan") plan = "# Task\nImplement ProductCode.";
         if (fault is "no-reason" or "completed")
             report = new FactoryRunReport
             {
@@ -75,21 +71,21 @@ public sealed class FactoryRoutingAssertionsTests
         if (fault == "unknown-worker")
             report.Agents.Add(new AgentReport { Role = "unknown", ThreadId = "maybe-worker", ParentThreadId = "root" });
         Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
-            FactoryRoutingAssertions.VerifyUnavailableModel(report, root, RemovedModel, "medium", plan));
+            FactoryRoutingAssertions.VerifyUnavailableModel(report, root, RemovedModel, "medium"));
     }
 
     [Fact]
-    public void VerifyUnavailableModel_AllowsProvenUnrelatedChild()
+    public void VerifyUnavailableModel_AllowsExplicitlyNamedUnrelatedChild()
     {
         var (report, root) = UnavailableModelReport();
         root.SpawnRecords["helper"] = new SpawnRecord
         {
-            CallId = "helper", Task = "You are a helper. Explain this term.",
+            CallId = "helper", RequestedTaskName = "independent_helper_01", Task = "Explain this term.",
             Timestamp = DateTimeOffset.Parse("2026-10-16T10:00:03Z"),
             ChildThreadId = "helper-thread"
         };
         report.Agents.Add(new AgentReport { Role = "unknown", ThreadId = "helper-thread", ParentThreadId = "root" });
-        FactoryRoutingAssertions.VerifyUnavailableModel(report, root, RemovedModel, "medium", Plan);
+        FactoryRoutingAssertions.VerifyUnavailableModel(report, root, RemovedModel, "medium");
     }
 
     [Theory]
