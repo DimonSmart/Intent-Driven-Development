@@ -142,7 +142,7 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
         try
         {
             var value = File.ReadAllText(path, StrictUtf8);
-            if (string.IsNullOrWhiteSpace(value) || value.Contains('\\0'))
+            if (string.IsNullOrWhiteSpace(value) || value.Contains('\0'))
                 throw new InvalidOperationException($"Empty or invalid native-agent source: {agent.Source}");
         }
         catch (DecoderFallbackException exception)
