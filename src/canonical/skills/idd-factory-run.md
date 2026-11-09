@@ -307,7 +307,10 @@ Engineering is valid; dirty code/tests elsewhere are not blocking. Recheck
 before the first owner write if another process may have changed managed docs.
 On any managed dirty path, stop before creating preparation, show the paths,
 and never auto-commit. Require an actual full commit SHA from
-`git rev-parse --verify HEAD^{commit}`; never invent a baseline.
+`git rev-parse --verify "HEAD^{commit}"`; pass the revision as one literal
+argument (quote it in PowerShell or other shells), and never invent a baseline.
+If a check fails, verify the working directory and command invocation before
+concluding that the repository has no commits.
 
 After request-level blockers are ruled out and BEFORE any possibly mutating
 owner workflow, durably write the full request, `preparation/baseline.md`
@@ -782,7 +785,10 @@ Engineering is valid; dirty code/tests elsewhere are not blocking. Recheck
 before the first owner write if another process may have changed managed docs.
 On any managed dirty path, stop before creating preparation, show the paths,
 and never auto-commit. Require an actual full commit SHA from
-`git rev-parse --verify HEAD^{commit}`; never invent a baseline.
+`git rev-parse --verify "HEAD^{commit}"`; pass the revision as one literal
+argument (quote it in PowerShell or other shells), and never invent a baseline.
+If a check fails, verify the working directory and command invocation before
+concluding that the repository has no commits.
 
 After request-level blockers are ruled out and BEFORE any possibly mutating
 owner workflow, durably write the full request, `preparation/baseline.md`
