@@ -133,7 +133,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             // Register the exact generated TOML definitions only inside its disposable
             // project; the separate Marketplace discovery test deliberately omits this.
             FactoryEvalAgentRegistration.StageProjectAgents(generatedFactory, workspace, artifactRoot);
-            await InitializeGitRepositoryAsync(workspace, artifactRoot);
+            await InitializeGitRepositoryAsync(workspace, artifactRoot, includeProjectAgents: true);
             await VerifyGitBaselineAsync(workspace, artifactRoot);
             await RunAsync("dotnet", ["restore", "MiniCatalog.sln", "--nologo"],
                 workspace, null, null, artifactRoot, "05-workspace-restore");
@@ -447,12 +447,23 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             && command.GetString()?.Contains("idd-factory.dll", StringComparison.OrdinalIgnoreCase) == true;
     }
 
-    private static async Task InitializeGitRepositoryAsync(string workspace, string artifactRoot)
+    private static async Task InitializeGitRepositoryAsync(
+        string workspace, string artifactRoot, bool includeProjectAgents = false)
     {
         await RunAsync("git", ["init"], workspace, null, null, artifactRoot, "01-git-init");
         await RunAsync("git", ["config", "user.name", "IDD Factory Eval"], workspace, null, null, artifactRoot, "02-git-config-name");
         await RunAsync("git", ["config", "user.email", "idd-factory-eval@localhost"], workspace, null, null, artifactRoot, "03-git-config-email");
         await RunAsync("git", ["add", "--all"], workspace, null, null, artifactRoot, "04-git-add");
+        if (includeProjectAgents)
+        {
+            // The fixture deliberately ignores .codex/ as a local-agent directory.
+            // Track only these generated role definitions in the disposable
+            // baseline; never force-add unrelated ignored files.
+            var files = FactoryEvalAgentRegistration.RequiredRoles
+                .Select(name => ".codex/agents/" + name + ".toml").ToArray();
+            await RunAsync("git", ["add", "-f", "--", ..files],
+                workspace, null, null, artifactRoot, "04-git-add-factory-agents");
+        }
         await RunAsync("git", ["commit", "-m", "Initial eval workspace"], workspace, null, null, artifactRoot, "05-git-commit");
     }
 
@@ -482,9 +493,11 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         // distinguishes a missing Git baseline from a later agent/shell failure.
         var root = await RunAsync("git", ["rev-parse", "--show-toplevel"],
             workspace, null, null, artifactRoot, "05-git-root");
-        Assert.Equal(Path.TrimEndingDirectorySeparator(Path.GetFullPath(workspace)),
-            Path.TrimEndingDirectorySeparator(Path.GetFullPath(root.Stdout.Trim())),
-            ignoreCase: OperatingSystem.IsWindows());
+        var expectedRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(workspace));
+        var actualRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root.Stdout.Trim()));
+        Assert.True(string.Equals(expectedRoot, actualRoot,
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal),
+            $"Git resolved a different repository: {actualRoot} (expected {expectedRoot})");
 
         var revision = await RunAsync("git", ["rev-parse", "--verify", "HEAD^{commit}"],
             workspace, null, null, artifactRoot, "05-git-baseline-verify");
