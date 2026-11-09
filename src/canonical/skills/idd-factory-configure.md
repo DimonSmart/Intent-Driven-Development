@@ -102,9 +102,11 @@ refresh, consider the **model/effort pair** for each requested platform/profile:
   `strong` are not hardwired to `low`, `medium`, or `high`; the same model can
   be proposed for several profiles with different effort settings.
 - If support or allowed values are unknown, disclose that uncertainty. Offer
-  `host default (omitted)` rather than inventing a value. If explicitly
-  unsupported, omit the effort override. Never discard a previously configured
-  effort silently to make a new model fit.
+  `host default (omitted)` rather than inventing a value. On a new mapping
+  for a model known not to support explicit effort, propose omission. If an
+  existing effort is incompatible with a proposed replacement model, block the
+  change until the user separately authorizes a compatible effort or removal;
+  never silently discard that setting to make a new model fit.
 - Show the resulting platform/profile, model, and effort (or omission) before
   seeking the usual single Apply/Edit/Reject decision for interpreted proposals.
   Do not run a separate mandatory effort questionnaire. An exact, unambiguous
