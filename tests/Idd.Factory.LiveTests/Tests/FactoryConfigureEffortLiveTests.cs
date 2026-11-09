@@ -24,18 +24,18 @@ public sealed partial class NativeFactoryEndToEndLiveTests
               executionProfiles:
                 economy:
                   codex:
-                    model: model-a
+                    model: shared-model
                     reasoningEffort: low
                 standard:
                   codex:
-                    model: model-b
+                    model: shared-model
                     reasoningEffort: medium
                   claude:
                     model: claude-model
                     effort: high
                 strong:
                   codex:
-                    model: model-c
+                    model: shared-model
             """;
         await File.WriteAllTextAsync(policyPath, initialPolicy);
         var modelSettings = LiveEvalSettings.Resolve(
