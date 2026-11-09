@@ -252,7 +252,7 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("New planner output must include exactly one canonical profile", run);
         Assert.Contains("idd-factory-configure", run);
         Assert.Contains("same canonical Factory", run);
-        Assert.Contains("references/factory-worker.md", run);
+        Assert.DoesNotContain("references/factory-worker.md", run);
     }
 
     [Fact]
@@ -275,9 +275,9 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
 
         Assert.StartsWith("# IDD Factory Worker Protocol", worker);
         Assert.Contains("You are the Factory worker.", worker);
-        Assert.Contains("internal protocol owned by `idd-factory-run`", worker);
-        Assert.Contains("exactly one Factory task", worker);
-        Assert.Contains("fresh semantic context", worker);
+        Assert.Contains("host-loaded native internal role owned by `idd-factory-run`", worker);
+        Assert.Contains("exactly one Factory Task", worker);
+        Assert.Contains("fresh context", worker);
         Assert.Contains("Do not read `.idd/execution.yaml`", worker);
         Assert.Contains("choose a model", worker);
         Assert.Contains("Do not modify `.idd/engineering`", worker);
@@ -290,11 +290,11 @@ public sealed class FactoryExecutionPolicyContractTests(GenerationFixture fixtur
         Assert.Contains("focused checks", worker);
         Assert.Contains("short semantic result", worker);
         Assert.Contains("perform Factory finalization", worker);
-        Assert.Contains("Do not assume inherited parent-skill references", worker);
+        Assert.Contains("Do not assume inherited parent transcript", worker);
 
-        Assert.Contains("Before **every** worker spawn", run);
-        Assert.Contains("If that reference is missing, empty, or", run);
-        Assert.Contains("complete worker", run);
+        Assert.Contains("Before **every** Worker spawn", run);
+        Assert.Contains("If missing, corrupt, ambiguous or unreadable", run);
+        Assert.Contains("registered native Worker", run);
         Assert.Contains("--- Factory worker assignment ---", run);
         Assert.Contains("--- End Factory worker assignment ---", run);
         Assert.Contains("trusted terminal result", run);
