@@ -145,8 +145,9 @@ IDD distinguishes three kinds of capabilities:
   lint, conformance audit, or implementation). `idd-route` is an internal
   read-only classifier, not a separate user command. To inspect a route, ask
   naturally which workflow would apply and explicitly say not to execute it.
-- **Internal protocols** are not registered skills: Factory planner, Factory
-  worker, and Intent document creation are supplied as references to their
+- **Internal agents** are host-registered native Factory Planner and Worker
+  roles with canonical generated instructions; the Root does not load their
+  bodies. Intent document creation remains a reference to its
   owning workflows.
 
 Claude Code hides automatic workflows from the slash-command menu but retains
