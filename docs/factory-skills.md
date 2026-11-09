@@ -150,3 +150,6 @@ parent transcript. The adapter must explicitly deliver a fresh semantic context.
 Codex and Claude generated guidance describe how to apply an already-authorized
 active-platform model override through native child-agent controls. Platform
 adapters do not contain profile-to-concrete-model recommendations.
+
+Native role installation and host limitations are documented in
+[Factory native-agent installation](factory-native-agent-installation.md).
