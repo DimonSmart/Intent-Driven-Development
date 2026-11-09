@@ -6,7 +6,7 @@ namespace Idd.Factory.LiveTests.Tests;
 public sealed partial class NativeFactoryEndToEndLiveTests
 {
     [LiveFactoryEvalFact]
-    [Trait("Category", "LiveFactoryEval")]
+    [Trait("Category", "LiveFactoryConfigure")]
     public async Task FactoryConfigure_UpdatesAndClearsEffortWithoutLosingOtherMappings()
     {
         var repo = FindRepositoryRoot();
