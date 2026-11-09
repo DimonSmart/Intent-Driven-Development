@@ -51,7 +51,7 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
             var generated = fixture.ReadText(Path.Combine(root,
                 "idd-internal-factory-" + role + (platform == "codex" ? ".toml" : ".md")));
             var instructions = platform == "codex"
-                ? JsonSerializer.Deserialize<string>(generated.Split('\\n')
+                ? JsonSerializer.Deserialize<string>(generated.Split((char)10)
                     .Single(line => line.StartsWith("developer_instructions = ", StringComparison.Ordinal))
                     ["developer_instructions = ".Length..])!
                 : generated;

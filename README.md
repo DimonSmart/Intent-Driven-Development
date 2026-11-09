@@ -131,7 +131,7 @@ Help me clarify a feature that lets users compare two local folders without modi
 
 For complex implementation tasks, use `idd-factory-run` after installing the optional Factory plugin above.
 
-## Commands, automatic workflows, and internal protocols
+## Commands, automatic workflows, and internal agents
 
 IDD distinguishes three kinds of capabilities:
 

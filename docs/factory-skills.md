@@ -127,8 +127,8 @@ Rules.
 The Worker is not a public skill. Before every spawn, `idd-factory-run`
 resolves the registered `idd-internal-factory-worker` type; the host loads its
 canonical protocol plus Engineering Guardrails directly. Root sends a single-task
-assignment. When the optional Engineering layer exists, it also supplies the
-complete `references/engineering-guardrails.md` contract.
+assignment. The optional Engineering contract is already included in the
+host-loaded Worker definition; Root does not forward it.
 
 Every task runs in a fresh isolated context against the shared current
 repository. The root agent has already selected the model/context before the

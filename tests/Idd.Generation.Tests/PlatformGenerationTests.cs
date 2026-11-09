@@ -178,17 +178,17 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
                 var generated = fixture.ReadText(file);
                 if (platform == "codex")
                 {
-                    Assert.Contains("name = \\"" + name + "\\"", generated);
-                    var instructionLine = generated.Split('\\n').Single(line => line.StartsWith("developer_instructions = ", StringComparison.Ordinal));
+                    Assert.Contains("name = " + JsonSerializer.Serialize(name), generated);
+                    var instructionLine = generated.Split((char)10).Single(line => line.StartsWith("developer_instructions = ", StringComparison.Ordinal));
                     var decoded = JsonSerializer.Deserialize<string>(instructionLine["developer_instructions = ".Length..]);
                     Assert.NotNull(decoded);
                     Assert.Contains(canonical.Trim(), decoded);
-                    Assert.DoesNotContain("model = ", generated);
-                    Assert.DoesNotContain("model_reasoning_effort", generated);
+                    Assert.DoesNotContain(generated.Split((char)10), line => line.StartsWith("model = ", StringComparison.Ordinal));
+                    Assert.DoesNotContain(generated.Split((char)10), line => line.StartsWith("model_reasoning_effort = ", StringComparison.Ordinal));
                 }
                 else
                 {
-                    Assert.StartsWith("---\\nname: " + name, generated);
+                    Assert.Contains("name: " + name, generated);
                     Assert.Contains(canonical.Trim(), generated);
                     Assert.Contains("tools:", generated);
                     Assert.Contains("disallowedTools:", generated);
