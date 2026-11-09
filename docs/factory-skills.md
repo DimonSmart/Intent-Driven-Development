@@ -45,8 +45,10 @@ It owns validation and authorized persistence of optional `.idd/execution.yaml`.
 No other Factory model-update command or persistence entry point is published.
 
 - **Initial setup:** choose once between `default (inherit)` and
-  `configure` for explicit partial platform/profile mappings. An absent
-  policy already means inheritance; review-only requests do not create one.
+  `configure` for explicit partial platform/profile mappings. For selected
+  mappings, propose model and optional effort together, with an explicit
+  `host default (omitted)` option. An absent policy already means
+  inheritance; review-only requests do not create one.
 - **Exact changes:** user-specified model IDs are applied without autonomous
   substitution or duplicate confirmation. Only requested mappings/settings
   change, including independent Codex and Claude assignments. Returning one
@@ -60,9 +62,13 @@ No other Factory model-update command or persistence entry point is published.
   interpreted mappings require explicit Apply/Edit/Reject confirmation.
 
 Unselected profiles/platforms inherit host settings. The same model may be used
-for multiple profiles. Optional `reasoningEffort` (Codex) and `effort` (Claude)
-are preserved, including absence; a reasoning-only override without a model is
-invalid. Known incompatibility with a preserved setting blocks the proposal
+for multiple profiles with different effort values. Optional `reasoningEffort`
+(Codex) and `effort` (Claude) are preserved, including absence; a reasoning-only
+override without a model is invalid. For an explicit model, omitted effort means
+the child host/model default, not necessarily the parent session's effort.
+Guided proposals must check model/effort support, avoid hardwired
+profile-to-effort rules, and show effort alongside the model. Clearing an effort
+removes only its field. Known incompatibility with a preserved setting blocks the proposal
 until separately resolved. Unknown availability or compatibility is reported
 honestly instead of prompting silent fallback.
 
