@@ -129,6 +129,33 @@ own mappings in `.idd/execution.yaml`, managed by `idd-factory-configure` and
 tracked in Git. Factory re-reads that project file before each worker spawn;
 planner output contains only the execution profile.
 
+## Effort configuration (opt-in live test)
+
+`FactoryConfigure_UpdatesAndClearsEffortWithoutLosingOtherMappings` runs the
+installed Codex `idd-factory-configure` skill against a disposable project.
+It verifies the parsed YAML structure, not instruction-text keywords: an
+exact effort-only edit preserves all other Codex/Claude mappings; an exact
+model-and-effort edit changes only its two fields; clearing effort preserves
+the concrete model; and an unrelated malformed blank effort blocks further
+edits without silently repairing or replacing policy. This test requires a
+working Codex plugin host and is never run by ordinary unit-test commands.
+
+Run only this case directly:
+
+```powershell
+$env:IDD_RUN_LIVE_FACTORY_EVALS = "1"
+dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj --filter FullyQualifiedName~FactoryConfigure_UpdatesAndClearsEffortWithoutLosingOtherMappings
+Remove-Item Env:IDD_RUN_LIVE_FACTORY_EVALS
+```
+
+This is not a deterministic simulation of a model provider's capability
+catalog. Known model/effort incompatibilities must still be verified against
+the active native host: a rejected explicit pair must block without dropping
+the effort or choosing a substitute. Existing native Factory routing Live tests
+assert both requested `reasoning_effort` spawn arguments and actual worker
+`turn_context.effort` evidence; the standard unit tests also check that
+distinct profile effort values cannot be swapped or silently changed.
+
 ## Unavailable worker model
 
 `Factory_BlocksWhenConfiguredWorkerModelIsUnavailable` keeps the configured root
