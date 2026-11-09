@@ -53,7 +53,14 @@ plugin's definitions into those locations or alter global configuration
 silently.** Whether the specific installed Codex version discovers plugin
 `agents/` directly must be checked with the real Marketplace installation.
 If a version requires a user-approved project/user registration step, state
-that prerequisite and perform it only with the user's permission. Missing,
+that prerequisite and perform it only with the user's permission. The isolated
+`Factory_UsesNativeAgentsAndCompletesTwoStepCatalog` evaluation deliberately
+copies **generated** agent definitions into its disposable workspace's
+`.codex/agents/` before committing the test baseline. This is an
+**eval-only** registration mechanism, not proof that a normal Marketplace
+install discovers plugin-supplied agents and not an instruction to modify
+real projects. `Factory_MarketplaceAloneDiscoversNativeAgents` is a
+separate explicit opt-in Live probe without this copy. Missing,
 conflicting or shadowed definitions block Factory; there is no generic-agent
 fallback. Codex Planner is read-only **by role behavior**, not by a separate
 sandbox: native custom agents may inherit the parent's sandbox/approvals.
