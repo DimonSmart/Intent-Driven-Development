@@ -9,9 +9,9 @@ public sealed class FactoryRoutingAssertionsTests
     private static readonly IReadOnlyDictionary<string, WorkerExecutionSettings> Mappings =
         new Dictionary<string, WorkerExecutionSettings>
         {
-            ["economy"] = new("model-a", "medium"),
+            ["economy"] = new("model-a", "low"),
             ["standard"] = new("model-b", "medium"),
-            ["strong"] = new("model-c", "medium")
+            ["strong"] = new("model-c", "high")
         };
 
     [Fact]
@@ -93,10 +93,12 @@ public sealed class FactoryRoutingAssertionsTests
     [InlineData("swapped-mappings")]
     [InlineData("root-default")]
     [InlineData("missing-spawn-settings")]
+    [InlineData("swapped-efforts")]
     [InlineData("missing-profile")]
     [InlineData("wrong-actual")]
     [InlineData("missing-actual-model")]
     [InlineData("missing-actual-reasoning")]
+    [InlineData("wrong-actual-reasoning")]
     [InlineData("reused-thread")]
     [InlineData("unfinished")]
     [InlineData("diagnostic-conflict")]
@@ -117,14 +119,24 @@ public sealed class FactoryRoutingAssertionsTests
                 "root-default" => "model-a",
                 _ => first.RequestedModel
             },
-            RequestedReasoningEffort = fault == "missing-spawn-settings" ? null : first.RequestedReasoningEffort,
+            RequestedReasoningEffort = fault switch
+            {
+                "missing-spawn-settings" => null,
+                "swapped-efforts" => "low",
+                _ => first.RequestedReasoningEffort
+            },
             ActualModel = fault switch
             {
                 "wrong-actual" => "unexpected-model",
                 "missing-actual-model" => null,
                 _ => first.ActualModel
             },
-            ActualReasoningEffort = fault == "missing-actual-reasoning" ? null : first.ActualReasoningEffort
+            ActualReasoningEffort = fault switch
+            {
+                "missing-actual-reasoning" => null,
+                "wrong-actual-reasoning" => "low",
+                _ => first.ActualReasoningEffort
+            }
         };
         if (fault == "missing-profile")
             report.Tasks.RemoveAt(2);
