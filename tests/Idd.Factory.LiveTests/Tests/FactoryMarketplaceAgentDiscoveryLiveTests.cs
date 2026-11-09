@@ -1,5 +1,3 @@
-using System.Text.Json;
-using Idd.Factory.Report;
 using Xunit;
 
 namespace Idd.Factory.LiveTests.Tests;
@@ -69,17 +67,6 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             Assert.False(Directory.Exists(Path.Combine(workspace, ".codex", "agents")),
                 "Marketplace-only test must not register project-local custom agents.");
 
-            var prompt = """
-                This is an isolated host-native agent discovery probe, not a Factory run.
-                Probe exactly these two registered native agent types, one after the other:
-                idd-internal-factory-planner and idd-internal-factory-worker.
-                Use native spawn_agent with the exact agent_type, a unique task_name,
-                fork_turns "none", and a short message saying there is NO valid Factory
-                assignment and the child must return BLOCKED without modifying files.
-                Wait for each child to finish. Do not use generic agents, construct role
-                prompts, or edit any project files. If a type is missing, report the
-                native rejection without substituting a different type.
-                """;
             var result = await RunAsync(codex,
                 [
                     "exec", "--json", "--ignore-rules",
@@ -93,27 +80,12 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                     "--sandbox", "read-only",
                     "--cd", workspace, "-"
                 ],
-                workspace, env, prompt, artifacts, "10-marketplace-agent-probe",
+                workspace, env, NativeRoleProbePrompt, artifacts, "10-marketplace-agent-probe",
                 timeout: TimeSpan.FromMinutes(timeoutMinutes));
 
             await File.WriteAllTextAsync(Path.Combine(artifacts, "codex-trace.jsonl"), result.Stdout);
             var root = FindRootRollout(codexHome, requireSpawn: false);
-            var nativeCalls = root.Events.Where(e => e.ToolName == "spawn_agent").ToArray();
-            foreach (var role in FactoryEvalAgentRegistration.RequiredRoles)
-            {
-                var calls = nativeCalls.Where(e => GetRequestedAgentType(e.ToolArguments) == role).ToArray();
-                Assert.True(calls.Length == 1,
-                    $"Marketplace did not produce exactly one native spawn_agent attempt for {role}; " +
-                    $"found {calls.Length}. Evidence: {artifacts}/codex-trace.jsonl");
-
-                var call = calls[0];
-                Assert.True(root.SpawnRecords.TryGetValue(call.ToolId ?? "", out var spawn),
-                    $"No native spawn result for {role}: {call.ToolId}");
-                Assert.True(spawn.SpawnOutcome == "accepted" && spawn.Children.Any(),
-                    $"Marketplace did not register a callable {role}: " +
-                    $"outcome={spawn.SpawnOutcome}, code={spawn.RejectionCode}, " +
-                    $"reason={spawn.RejectionMessage}. Evidence: {artifacts}/codex-trace.jsonl");
-            }
+            VerifyRegisteredNativeRoleSpawns(root, artifacts, "marketplace-only");
 
             var status = await RunAsync("git", ["status", "--porcelain=v1"],
                 workspace, null, null, artifacts, "11-marketplace-workspace-status");
@@ -134,21 +106,4 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         }
     }
 
-    private static string? GetRequestedAgentType(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            return null;
-        try
-        {
-            using var document = JsonDocument.Parse(json);
-            return document.RootElement.TryGetProperty("agent_type", out var type) &&
-                   type.ValueKind == JsonValueKind.String
-                ? type.GetString()
-                : null;
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
 }
