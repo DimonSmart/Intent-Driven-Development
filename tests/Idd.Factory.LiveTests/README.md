@@ -12,6 +12,12 @@ force-adds only those two otherwise ignored definitions to its initial Git
 commit. Before starting Codex, the harness independently verifies the exact
 `HEAD^{commit}` object, Git root, and both tracked agent files; it stores
 `git-baseline.txt` and `agent-registration.json` as evidence.
+It then runs a separate native `spawn_agent` preflight for both roles in a
+fresh isolated `CODEX_HOME` before starting Factory. A failure produces an
+explicit registration diagnostic and preserves
+`project-agent-probe-trace.jsonl`; preflight sessions do not contaminate
+the main Factory report. The direct probe intentionally carries no valid
+assignment, so children may return `BLOCKED` after successful spawn.
 No global user or host agent configuration is changed.
 
 This makes the main scenario a Factory orchestration/routing evaluation;
