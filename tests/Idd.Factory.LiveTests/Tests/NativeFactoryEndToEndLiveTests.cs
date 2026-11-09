@@ -161,6 +161,12 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 artifactRoot,
                 "09-codex-plugin-add");
 
+            // Preflight native role resolution in a separate isolated Codex home.
+            // Its sessions cannot contaminate the Factory run report or root trace.
+            await ProbeProjectAgentRegistrationAsync(
+                codex, workspace, Path.Combine(tempRoot, "codex-agent-probe-home"),
+                artifactRoot, model, reasoning, timeoutMinutes);
+
             var task = await File.ReadAllTextAsync(Path.Combine(caseRoot,
                 unavailableWorkerModel ? "task-model-unavailable.md" : "task.md"));
             if (verificationRecovery)
