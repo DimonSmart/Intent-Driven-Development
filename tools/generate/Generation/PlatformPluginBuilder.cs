@@ -32,6 +32,8 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
             files.AddRange(BuildSkillFiles(adapter, plugin, roleDefinitions, skillName, skillDescriptions));
         }
 
+        files.AddRange(BuildNativeAgentFiles(plugin));
+
         foreach (var asset in plugin.Assets)
         {
             files.AddRange(BuildAssetFiles(asset));
@@ -41,6 +43,8 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
 
         return files;
     }
+
+    protected virtual IReadOnlyList<GeneratedFile> BuildNativeAgentFiles(PluginDefinition plugin) => [];
 
     protected virtual IReadOnlyList<GeneratedFile> BuildAdditionalPluginFiles(string pluginName, string version)
     {
@@ -80,6 +84,10 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
             ["platform"] = adapter.CodingAgent,
             ["dependencies"] = JsonStringArray(plugin.Dependencies),
             ["roles"] = JsonStringArray(plugin.Roles),
+            ["nativeAgents"] = new JsonArray(plugin.NativeAgentsOrEmpty.Select(agent => (JsonNode?)new JsonObject
+            {
+                ["name"] = agent.Name, ["source"] = agent.Source
+            }).ToArray()),
             ["roleDefinitions"] = BuildRoleDefinitions(plugin, roleDefinitions),
             ["assets"] = BuildAssets(plugin),
             ["canonicalSource"] = "src/canonical"

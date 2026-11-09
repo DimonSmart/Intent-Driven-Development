@@ -10,6 +10,13 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
     public override GeneratedFile BuildMarketplaceFile(PluginManifest manifest, string version) =>
         ClaudeMarketplaceBuilder.Build(manifest, version);
 
+    protected override IReadOnlyList<GeneratedFile> BuildNativeAgentFiles(PluginDefinition plugin) =>
+        plugin.NativeAgentsOrEmpty.OrderBy(agent => agent.Name, StringComparer.Ordinal)
+            .Select(agent => new GeneratedFile(
+                Path.Combine("agents", agent.Name + ".md"),
+                NativeFactoryAgentRenderer.ClaudeMarkdown(agent)))
+            .ToArray();
+
     protected override IReadOnlyList<GeneratedFile> BuildSkillFiles(
         AdapterConfig adapter,
         PluginDefinition plugin,
@@ -29,6 +36,17 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
                 Content = ContentNormalizer.NormalizeContent(ContentNormalizer.JoinBlocks(
                     skill.Content!,
                     """
+                    ## Claude registered Factory agents
+
+                    Spawn only `idd-factory:idd-internal-factory-planner` and
+                    `idd-factory:idd-internal-factory-worker` via native
+                    `subagent_type` (or the host equivalent). Confirm both
+                    definitions before any durable preflight and again before
+                    each role spawn. Never substitute a generic subagent or
+                    ask a child to discover a Skill. Definitions are loaded
+                    into the child by the host; Root passes only the bounded
+                    assignment packet. Do not send the full protocol.
+
                     ## Claude native-agent capability
 
                     Use a native Claude fork/subagent mechanism only when the host can

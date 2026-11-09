@@ -1,1 +1,1 @@
-internal sealed record GeneratorOptions(bool CheckOnly, string ManifestVersion, string? OutputDirectory, bool InternalAgentExperiment = false);
+internal sealed record GeneratorOptions(bool CheckOnly, string ManifestVersion, string? OutputDirectory);

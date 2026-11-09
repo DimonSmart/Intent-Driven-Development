@@ -7,8 +7,10 @@ internal sealed record PluginDefinition(
     SkillReferenceDefinition[]? SkillReferences,
     AssetDefinition[] Assets,
     Dictionary<string, object>? Metadata,
-    SkillAssetDefinition[]? SkillAssets = null)
+    SkillAssetDefinition[]? SkillAssets = null,
+    NativeAgentDefinition[]? NativeAgents = null)
 {
     public IReadOnlyList<SkillReferenceDefinition> SkillReferencesOrEmpty => SkillReferences ?? [];
     public IReadOnlyList<SkillAssetDefinition> SkillAssetsOrEmpty => SkillAssets ?? [];
+    public IReadOnlyList<NativeAgentDefinition> NativeAgentsOrEmpty => NativeAgents ?? [];
 }

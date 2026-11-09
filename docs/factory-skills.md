@@ -3,7 +3,8 @@
 IDD Factory exposes two registered user commands: `idd-factory-run` and
 `idd-factory-configure`. Configure can also be selected automatically by the agent;
 selection alone never authorizes a write.
-Planner and worker are internal canonical protocols owned by `idd-factory-run`.
+Planner and Worker are internally registered native agent types owned by
+`idd-factory-run` (not additional public Skills).
 Automatic Intent workflows remain available to the agent and are hidden from
 the Claude Code slash menu. Codex currently has no equivalent documented
 visibility switch, so its automatic workflows may remain visible.
@@ -74,9 +75,10 @@ from model names.
 
 ## Internal planner protocol
 
-The planner is not a user-invokable skill. `idd-factory-run` creates a fresh
-planner child and supplies the complete packaged
-`references/factory-planner.md` protocol.
+The Planner is not a user-invokable skill. `idd-factory-run` resolves the
+registered `idd-internal-factory-planner` type (Claude plugin-scoped name when
+applicable), then sends a bounded request/phase/baseline/provenance packet.
+The host loads the complete canonical protocol directly into the child.
 
 The same fresh Planner protocol accepts either
 `preparation/request.md` and `preparation/answers.md` before activation, or
@@ -122,11 +124,11 @@ Rules.
 
 ## Internal worker protocol
 
-The worker is not a public skill. Before every spawn, `idd-factory-run` reads
-and explicitly supplies the complete packaged `references/factory-worker.md`
-protocol to a fresh native child agent, together with a separate, single-task
-assignment. When the optional Engineering layer exists, it also supplies the
-complete `references/engineering-guardrails.md` contract.
+The Worker is not a public skill. Before every spawn, `idd-factory-run`
+resolves the registered `idd-internal-factory-worker` type; the host loads its
+canonical protocol plus Engineering Guardrails directly. Root sends a single-task
+assignment. The optional Engineering contract is already included in the
+host-loaded Worker definition; Root does not forward it.
 
 Every task runs in a fresh isolated context against the shared current
 repository. The root agent has already selected the model/context before the
@@ -148,3 +150,6 @@ parent transcript. The adapter must explicitly deliver a fresh semantic context.
 Codex and Claude generated guidance describe how to apply an already-authorized
 active-platform model override through native child-agent controls. Platform
 adapters do not contain profile-to-concrete-model recommendations.
+
+Native role installation and host limitations are documented in
+[Factory native-agent installation](factory-native-agent-installation.md).

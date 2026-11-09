@@ -88,3 +88,14 @@ obvious. Verify product behavior independently before judging token savings.
 
 Record the host/model version alongside results. Token counts from different
 host releases are not directly comparable without that context.
+
+## Native registered role accounting
+
+Unlike the earlier Root-relayed protocol, registered Factory children load
+the Planner/Worker instructions from their host definitions. The Root sees
+only role metadata, bounded task packets and short results. Smaller spawn
+prompts alone do **not** prove lower total token cost. Benchmark Root,
+Planner, Worker and complete run separately, recording input, cached input,
+new input (input minus cached), output, total only with complete native
+usage, spawns, latency, and independent verification. The historical
+opt-in Skill-loading experiment is not evidence of native registration.

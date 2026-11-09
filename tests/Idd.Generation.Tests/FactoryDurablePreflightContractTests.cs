@@ -78,8 +78,8 @@ public sealed class FactoryDurablePreflightContractTests(GenerationFixture fixtu
         var route = Canonical("skills", "idd-route.md");
 
         Assert.Contains("Registered Factory skills are", intent);
-        Assert.Contains("Internal Factory protocols", intent);
-        Assert.Contains("worker                        owned by idd-factory-run", intent);
+        Assert.Contains("Internal Factory native agents", intent);
+        Assert.Contains("idd-internal-factory-worker", intent);
         Assert.Contains("owned by idd-factory-run", intent);
         Assert.DoesNotContain("idd-factory-decompose-task", intent);
         Assert.DoesNotContain("idd-factory-decompose-task", route);

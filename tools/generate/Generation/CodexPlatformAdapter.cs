@@ -29,6 +29,7 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
             ["version"] = version,
             ["description"] = plugin.Description,
             ["skills"] = "./skills/",
+            ["agents"] = "./agents/",
             ["author"] = new JsonObject { ["name"] = AuthorName },
             ["repository"] = RepositoryUrl,
             ["license"] = "MIT",
@@ -41,6 +42,13 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
 
         return pluginJson.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n";
     }
+
+    protected override IReadOnlyList<GeneratedFile> BuildNativeAgentFiles(PluginDefinition plugin) =>
+        plugin.NativeAgentsOrEmpty.OrderBy(agent => agent.Name, StringComparer.Ordinal)
+            .Select(agent => new GeneratedFile(
+                Path.Combine("agents", agent.Name + ".toml"),
+                NativeFactoryAgentRenderer.CodexToml(agent)))
+            .ToArray();
 
     protected override IReadOnlyList<GeneratedFile> BuildSkillFiles(
         AdapterConfig adapter,
@@ -69,6 +77,11 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                       parent-history inheritance explicitly disabled. Pass
                       `fork_turns: "none"` (or the host-equivalent setting); never
                       rely on an inheritance default.
+                    - Spawn only the verified registered native `agent_type` (never a
+                      generic agent or prompt-based Skill discovery). Verify both
+                      internal roles before durable preflight and the specific
+                      role again before each spawn. On missing/conflicting role,
+                      block without fallback.
                     - Prefer a read-only planner and a workspace-writing worker when the
                       host exposes those sandbox choices.
                     - Sandbox selection is an optional hardening feature, not a Factory
@@ -89,7 +102,9 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                     - Pass `task_name` in native `spawn_agent` arguments, never only
                       inside `message`, and pass `fork_turns: "none"` for **both**
                       planners and workers. Example without optional model overrides:
-                      `{"task_name":"idd_factory_worker_01","fork_turns":"none","message":"<complete-worker-instructions>"}`.
+                      `{"agent_type":"idd-internal-factory-worker","task_name":"idd_factory_worker_01","fork_turns":"none","message":"<bounded one-task Factory assignment>"}`.
+                      The `agent_type` selects the registered native role; `task_name`
+                      is only a trace identity, never an agent type.
                       Include `model` and `reasoning_effort` only when required by the
                       validated execution profile mapping; never substitute models.
                     - Prefer one long wait on the critical path. Do not build a
@@ -222,6 +237,10 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
             ["platform"] = adapter.CodingAgent,
             ["dependencies"] = JsonStringArray(plugin.Dependencies),
             ["roles"] = JsonStringArray(plugin.Roles),
+            ["nativeAgents"] = new JsonArray(plugin.NativeAgentsOrEmpty.Select(agent => (JsonNode?)new JsonObject
+            {
+                ["name"] = agent.Name, ["source"] = agent.Source
+            }).ToArray()),
             ["roleDefinitions"] = BuildRoleDefinitions(plugin, roleDefinitions),
             ["skillRoleBindings"] = BuildSkillRoleBindings(plugin),
             ["assets"] = BuildAssets(plugin),

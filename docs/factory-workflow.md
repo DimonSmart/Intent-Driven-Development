@@ -244,3 +244,24 @@ a packaged C# runtime, MCP transport, process supervisor, or polling protocol.
 For deterministic post-run diagnostics and statistics over the host-owned trace,
 see [`idd-factory-report`](factory-report.md). The reporter is a development
 utility and is not part of the Factory workflow or plugin runtime.
+
+## Registered child roles
+
+Factory requires host-registered `idd-internal-factory-planner` and
+`idd-internal-factory-worker`; Claude uses plugin-scoped identifiers prefixed
+`idd-factory:`. Before new-run owner writes Root validates both roles and
+native lifecycle capabilities; it revalidates each target before spawn.
+Registered role definitions load their own canonical protocol and Engineering
+contract in the child. Root passes only current request/phase, exact Q/A,
+bounded baseline/provenance, and for Workers one Task and selected
+`TaskRelatedIntent`, Conditional `TaskRelatedEngineering` and current
+`AlwaysEngineering` IDs. It never forwards child protocols or full
+Engineering/Intent trees. Direct use without a verified assignment returns
+`BLOCKED`. Missing/conflicting definitions or unsupported exact model/effort
+settings block without generic fallback or concurrent Writers.
+
+Codex definitions are generated as `agents/*.toml` in the Factory plugin;
+Claude uses `agents/*.md`. Planner is read-only by behavior on Codex
+(custom agents inherit the parent sandbox), and tool-restricted on Claude.
+The installed host's effective permissions and role registration must be
+verified separately; file generation alone does not prove discovery.

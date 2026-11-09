@@ -93,7 +93,7 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
     }
 
     [Fact]
-    public void FactoryMetadata_HasOnlyRegisteredSkillsAndInternalProtocols()
+    public void FactoryMetadata_HasOnlyUserSkillsAndRegisteredNativeAgents()
     {
         var manifestPath = Path.Combine(fixture.RepoRoot, "src", "canonical", "plugins", "plugin-manifest.json");
         using var manifest = JsonDocument.Parse(fixture.ReadText(manifestPath));
@@ -115,18 +115,15 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
         Assert.DoesNotContain(factory.GetProperty("skillReferences").EnumerateArray(),
             reference => reference.GetProperty("skill").GetString() == "idd-factory-update-effort-models");
 
-        var plannerReference = Assert.Single(
-            factory.GetProperty("skillReferences").EnumerateArray(),
-            reference => reference.GetProperty("destination").GetString() == "factory-planner.md");
-        AssertString(plannerReference, "skill", "idd-factory-run");
-        AssertString(plannerReference, "source", "src/canonical/factory/planner.md");
-        AssertString(plannerReference, "destination", "factory-planner.md");
-
-        var workerReference = Assert.Single(
-            factory.GetProperty("skillReferences").EnumerateArray(),
-            reference => reference.GetProperty("destination").GetString() == "factory-worker.md");
-        AssertString(workerReference, "skill", "idd-factory-run");
-        AssertString(workerReference, "source", "src/canonical/factory/worker.md");
+        Assert.DoesNotContain(factory.GetProperty("skillReferences").EnumerateArray(),
+            reference => reference.GetProperty("destination").GetString() is "factory-planner.md" or "factory-worker.md");
+        var nativeAgents = factory.GetProperty("nativeAgents").EnumerateArray().ToArray();
+        Assert.Equal(2, nativeAgents.Length);
+        foreach (var role in new[] { "planner", "worker" })
+        {
+            var agent = Assert.Single(nativeAgents, entry => entry.GetProperty("name").GetString() == "idd-internal-factory-" + role);
+            AssertString(agent, "source", "src/canonical/factory/" + role + ".md");
+        }
         Assert.DoesNotContain(factory.GetProperty("skillReferences").EnumerateArray(),
             reference => reference.GetProperty("skill").GetString() == "idd-factory-execute-subtask");
 
@@ -171,19 +168,43 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
             fixture.AssertMissing(Path.Combine(root, "skills", "idd-factory-execute-subtask"));
             fixture.AssertMissing(Path.Combine(root, "skills", "idd-factory-update-effort-models"));
 
-            var generatedPlanner = fixture.ReadText(Path.Combine(
-                root, "skills", "idd-factory-run", "references", "factory-planner.md"));
-            Assert.Equal(canonicalPlanner, GenerationFixture.NormalizeText(generatedPlanner));
-            var generatedWorker = fixture.ReadText(Path.Combine(
-                root, "skills", "idd-factory-run", "references", "factory-worker.md"));
-            Assert.Equal(canonicalWorker, GenerationFixture.NormalizeText(generatedWorker));
-            Assert.Contains("You are the Factory worker.", generatedWorker);
+            fixture.AssertMissing(Path.Combine(root, "skills", "idd-factory-run", "references", "factory-planner.md"));
+            fixture.AssertMissing(Path.Combine(root, "skills", "idd-factory-run", "references", "factory-worker.md"));
+            foreach (var role in new[] { "planner", "worker" })
+            {
+                var name = "idd-internal-factory-" + role;
+                var canonical = role == "planner" ? canonicalPlanner : canonicalWorker;
+                var file = Path.Combine(root, "agents", name + (platform == "codex" ? ".toml" : ".md"));
+                var generated = fixture.ReadText(file);
+                if (platform == "codex")
+                {
+                    Assert.Contains("name = " + JsonSerializer.Serialize(name), generated);
+                    var instructionLine = generated.Split((char)10).Single(line => line.StartsWith("developer_instructions = ", StringComparison.Ordinal));
+                    var decoded = JsonSerializer.Deserialize<string>(instructionLine["developer_instructions = ".Length..]);
+                    Assert.NotNull(decoded);
+                    Assert.Contains(canonical.Trim(), decoded);
+                    Assert.DoesNotContain(generated.Split((char)10), line => line.StartsWith("model = ", StringComparison.Ordinal));
+                    Assert.DoesNotContain(generated.Split((char)10), line => line.StartsWith("model_reasoning_effort = ", StringComparison.Ordinal));
+                }
+                else
+                {
+                    Assert.Contains("name: " + name, generated);
+                    Assert.Contains(canonical.Trim(), generated);
+                    Assert.Contains("tools:", generated);
+                    Assert.Contains("disallowedTools:", generated);
+                    Assert.DoesNotContain("permissionMode:", generated);
+                    Assert.DoesNotContain("mcpServers:", generated);
+                }
+            }
             fixture.AssertFile(Path.Combine(
                 root, "skills", "idd-factory-run", "references", "engineering-guardrails.md"));
 
             var run = fixture.ReadText(Path.Combine(root, "skills", "idd-factory-run", "SKILL.md"));
-            Assert.Contains("references/factory-planner.md", run);
-            Assert.Contains("references/factory-worker.md", run);
+            Assert.DoesNotContain("references/factory-planner.md", run);
+            Assert.DoesNotContain("references/factory-worker.md", run);
+            Assert.Contains("Registered native agent gate", run);
+            Assert.Contains("idd-internal-factory-planner", run);
+            Assert.Contains("idd-internal-factory-worker", run);
             Assert.Contains("--- Factory worker assignment ---", run);
             Assert.DoesNotContain("Invoke `idd-factory-decompose-task`", run);
 

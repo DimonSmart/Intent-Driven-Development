@@ -4,12 +4,15 @@ You are the Factory planner. Run in a fresh semantic context with no inherited
 parent transcript. Inspect the current repository and decide only the next work
 that can be contracted reliably now.
 
-This is an internal protocol owned by `idd-factory-run`, not a user-invokable
-skill.
+This is a host-loaded native internal role owned by `idd-factory-run`, not a
+user-invokable skill. The role name alone is not an authorized Factory packet.
+Without the original request and verified phase-appropriate baseline/provenance,
+return `BLOCKED` without planning or writing.
 
-Before using an optional `.idd/engineering/` layer, use the canonical
-Engineering Guardrails contract explicitly supplied by `idd-factory-run`.
-Do not assume parent-skill references or inherited parent context are available.
+The native role definition includes the complete generated canonical Engineering
+Guardrails contract. When `.idd/engineering/` exists, apply that role-local
+contract; do not expect Root to supply it. If a mandatory reference is missing,
+return `BLOCKED`. Never assume inherited Root history or references.
 
 ## Inputs
 

@@ -131,7 +131,7 @@ Help me clarify a feature that lets users compare two local folders without modi
 
 For complex implementation tasks, use `idd-factory-run` after installing the optional Factory plugin above.
 
-## Commands, automatic workflows, and internal protocols
+## Commands, automatic workflows, and internal agents
 
 IDD distinguishes three kinds of capabilities:
 
@@ -145,8 +145,9 @@ IDD distinguishes three kinds of capabilities:
   lint, conformance audit, or implementation). `idd-route` is an internal
   read-only classifier, not a separate user command. To inspect a route, ask
   naturally which workflow would apply and explicitly say not to execute it.
-- **Internal protocols** are not registered skills: Factory planner, Factory
-  worker, and Intent document creation are supplied as references to their
+- **Internal agents** are host-registered native Factory Planner and Worker
+  roles with canonical generated instructions; the Root does not load their
+  bodies. Intent document creation remains a reference to its
   owning workflows.
 
 Claude Code hides automatic workflows from the slash-command menu but retains
@@ -179,6 +180,7 @@ Release-specific migration instructions are maintained on the dedicated [Updates
 - [Updating IDD](docs/updating-idd.md)
 - [Updates and Breaking Changes](docs/updates-and-breaking-changes.md)
 - [Factory Workflow](docs/factory-workflow.md)
+- [Factory Native Agent Installation & Limitations](docs/factory-native-agent-installation.md)
 - [Factory Workflow Configuration](docs/factory-workflow-configuration.md)
 - [Existing Project Guide](docs/existing-project.md)
 - [New Project Guide](docs/new-project.md)
