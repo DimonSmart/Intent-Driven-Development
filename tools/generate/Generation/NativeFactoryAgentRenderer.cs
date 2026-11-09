@@ -33,7 +33,7 @@ internal static class NativeFactoryAgentRenderer
             An absent layer is valid. This copy is generated; edit only its
             source `src/canonical/methodology/engineering-guardrails.md`.
             """,
-            engineering));
+            engineering)).ReplaceLineEndings("\n");
     }
 
     public static string CodexToml(NativeAgentDefinition agent)
