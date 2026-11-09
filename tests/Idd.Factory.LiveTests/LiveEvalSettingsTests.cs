@@ -71,6 +71,28 @@ public sealed class LiveEvalSettingsTests
     }
 
     [Fact]
+    public void Resolve_KeepsDistinctReasoningEffortsForEachConfiguredProfile()
+    {
+        var root = CreateRepositoryConfig("root-model", "medium");
+        try
+        {
+            var path = Path.Combine(root, "tests", "Idd.Factory.LiveTests", "live-eval.json");
+            var config = JsonNode.Parse(File.ReadAllText(path))!;
+            config["executionProfiles"]!["economy"]!["reasoningEffort"] = "low";
+            config["executionProfiles"]!["strong"]!["reasoningEffort"] = "high";
+            File.WriteAllText(path, config.ToJsonString());
+
+            var settings = LiveEvalSettings.Resolve(root, null, null);
+
+            Assert.Equal("medium", settings.ReasoningEffort);
+            Assert.Equal(new WorkerExecutionSettings("model-a", "low"), settings.ExecutionProfiles["economy"]);
+            Assert.Equal(new WorkerExecutionSettings("model-b", "medium"), settings.ExecutionProfiles["standard"]);
+            Assert.Equal(new WorkerExecutionSettings("model-c", "high"), settings.ExecutionProfiles["strong"]);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
     public void Resolve_RejectsMissingWorkerModelInsteadOfInheritingRootModel()
     {
         var root = CreateRepositoryConfig("root-model", "medium");
