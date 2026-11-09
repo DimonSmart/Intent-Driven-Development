@@ -82,7 +82,39 @@ factory:
 For `configure`, create `executionProfiles` only for requested platform/profile
 mappings. All missing mappings inherit host behavior. Do not require a model
 for every profile, install-time defaults, or an automatic configuration merely
-because the policy is absent.
+because the policy is absent. For each selected mapping, present the concrete
+`model` **and** its optional reasoning choice as one configuration decision:
+`reasoningEffort` for Codex, `effort` for Claude, or `host default (omitted)`.
+Do not require an extra question when the user already specified the pair, or
+force an effort override for models that cannot support it.
+
+## Guided model and reasoning selection
+
+When helping the user choose models during initial `configure` or a later
+refresh, consider the **model/effort pair** for each requested platform/profile:
+
+- Prefer reliable active-host capabilities and current vendor information to
+  determine whether the concrete model accepts an explicit per-child effort
+  and which values are available. Do not infer support or valid values from a
+  model name, an execution profile, or another provider's naming convention.
+- If supported, propose a suitable effort alongside the model, balancing the
+  task's complexity with quality, latency, and cost. `economy`, `standard`, and
+  `strong` are not hardwired to `low`, `medium`, or `high`; the same model can
+  be proposed for several profiles with different effort settings.
+- If support or allowed values are unknown, disclose that uncertainty. Offer
+  `host default (omitted)` rather than inventing a value. If explicitly
+  unsupported, omit the effort override. Never discard a previously configured
+  effort silently to make a new model fit.
+- Show the resulting platform/profile, model, and effort (or omission) before
+  seeking the usual single Apply/Edit/Reject decision for interpreted proposals.
+  Do not run a separate mandatory effort questionnaire. An exact, unambiguous
+  user-specified model/effort edit is already authorized.
+
+Omitting an effort key for an **explicit model mapping** delegates reasoning
+behavior to the child host/model defaults; it does not pin the parent's effort.
+It is distinct from an absent platform/profile mapping, which inherits both
+host model selection and reasoning behavior. To clear an existing explicit
+effort, remove that field, not the entire model mapping or a null placeholder.
 
 ## Exact changes and minimality
 
@@ -95,7 +127,8 @@ including intentionally absent optional fields. Examples:
   every `claude` mapping, and every unselected profile.
 - Editing only `reasoningEffort` or Claude `effort` requires an existing model
   mapping. Never create a reasoning-only mapping: ask for a concrete model or
-  report the operation cannot be represented.
+  report the operation cannot be represented. An explicit request to clear an
+  effort removes only that optional field, retaining the model mapping.
 - Returning one mapping to inheritance **removes** the corresponding platform
   mapping and removes an empty profile section. Never persist `model: inherit`,
   `model: default`, null, or blank.
@@ -144,8 +177,8 @@ rejection at spawn is the authoritative error: do not silently switch models,
 drop reasoning, or revert to inherit in response.
 
 For review or proposals involving existing mappings, show a comparison with at
-least platform/profile, current model, proposed model, previous/proposed reasoning,
-and rationale. Identify targeted and unchanged scope, recommendation sources
+least platform/profile, current model, proposed model, previous/proposed reasoning
+(including `host default (omitted)`), and rationale. Identify targeted and unchanged scope, recommendation sources
 and freshness, unverified account availability, and confirmation required.
 For global inherit, a short resulting-strategy explanation is sufficient.
 
