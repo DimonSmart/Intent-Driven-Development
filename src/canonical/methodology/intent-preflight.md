@@ -246,8 +246,10 @@ including staged/unstaged/untracked, deleted and renamed paths. Parse NUL
 delimiters, including rename pairs, never split by whitespace. The optional
 Engineering directory may be absent. Dirty code/tests outside the managed
 paths do not block a new run. Refuse a dirty managed tree with affected paths;
-never auto-commit. Resolve a real full `HEAD^{commit}` SHA and check
-again immediately before mutating if managed state could have changed.
+never auto-commit. Resolve a real full `HEAD^{commit}` SHA (pass the revision as one literal,
+quoted argument in shells such as PowerShell) and check again immediately
+before mutating if managed state could have changed. An invocation/shell
+parsing failure is not evidence of an absent commit.
 
 Save the original complete request and `preparation/baseline.md` (immutable
 full HEAD SHA, sanitized Git repository identity, managed-document cleanliness
