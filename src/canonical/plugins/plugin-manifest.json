@@ -217,16 +217,6 @@
         },
         {
           "skill": "idd-factory-run",
-          "source": "src/canonical/factory/planner.md",
-          "destination": "factory-planner.md"
-        },
-        {
-          "skill": "idd-factory-run",
-          "source": "src/canonical/factory/worker.md",
-          "destination": "factory-worker.md"
-        },
-        {
-          "skill": "idd-factory-run",
           "source": "src/canonical/methodology/engineering-guardrails.md",
           "destination": "engineering-guardrails.md"
         }
@@ -240,7 +230,19 @@
       "metadata": {
         "entryPoint": false,
         "temporaryWorkspace": ".idd/factory"
-      }
+      },
+      "nativeAgents": [
+        {
+          "name": "idd-internal-factory-planner",
+          "source": "src/canonical/factory/planner.md",
+          "description": "Internal Factory planner; use only with verified Factory assignment."
+        },
+        {
+          "name": "idd-internal-factory-worker",
+          "source": "src/canonical/factory/worker.md",
+          "description": "Internal Factory worker; use only with one verified Factory task."
+        }
+      ]
     }
   }
 }

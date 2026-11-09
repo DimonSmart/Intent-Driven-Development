@@ -80,6 +80,7 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
             }
 
             ValidateSkillReferences(pluginName, plugin);
+            ValidateNativeAgents(pluginName, plugin);
 
             foreach (var asset in plugin.SkillAssetsOrEmpty)
             {
@@ -111,6 +112,42 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
                     throw new InvalidOperationException($"Plugin '{pluginName}' references missing asset source '{asset.Source}'.");
                 }
             }
+        }
+    }
+
+    private void ValidateNativeAgents(string pluginName, PluginDefinition plugin)
+    {
+        var definitions = plugin.NativeAgentsOrEmpty;
+        if (!StringComparer.Ordinal.Equals(pluginName, "idd-factory") && definitions.Count != 0)
+            throw new InvalidOperationException($"Only idd-factory may declare native agents: {pluginName}.");
+        if (!StringComparer.Ordinal.Equals(pluginName, "idd-factory")) return;
+
+        var expected = new[] { "planner", "worker" };
+        if (definitions.Count != expected.Length || definitions.Select(a => a.Name).Distinct(StringComparer.Ordinal).Count() != expected.Length)
+            throw new InvalidOperationException("Factory must declare exactly two distinct native agents.");
+        foreach (var role in expected)
+        {
+            var agent = definitions.SingleOrDefault(a => StringComparer.Ordinal.Equals(a.Name, $"idd-internal-factory-{role}"));
+            if (agent is null || !StringComparer.Ordinal.Equals(agent.Source, $"src/canonical/factory/{role}.md") ||
+                string.IsNullOrWhiteSpace(agent.Description))
+                throw new InvalidOperationException($"Missing or invalid native Factory {role} definition/source.");
+            var source = ResolveRepositoryPath(agent.Source);
+            if (!File.Exists(source)) throw new InvalidOperationException($"Missing canonical native-agent source: {agent.Source}");
+            ValidateUtf8NativeSource(agent, source);
+        }
+    }
+
+    private static void ValidateUtf8NativeSource(NativeAgentDefinition agent, string path)
+    {
+        try
+        {
+            var value = File.ReadAllText(path, StrictUtf8);
+            if (string.IsNullOrWhiteSpace(value) || value.Contains('\\0'))
+                throw new InvalidOperationException($"Empty or invalid native-agent source: {agent.Source}");
+        }
+        catch (DecoderFallbackException exception)
+        {
+            throw new InvalidOperationException($"Invalid UTF-8 native-agent source: {agent.Source}", exception);
         }
     }
 
