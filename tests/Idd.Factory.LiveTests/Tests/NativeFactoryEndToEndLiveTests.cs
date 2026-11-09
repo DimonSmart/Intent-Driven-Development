@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Idd.Factory.LiveTests.Tests;
 
-public sealed class NativeFactoryEndToEndLiveTests
+public sealed partial class NativeFactoryEndToEndLiveTests
 {
     [LiveFactoryEvalFact]
     [Trait("Category", "LiveFactoryEval")]
