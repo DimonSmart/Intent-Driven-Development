@@ -78,7 +78,10 @@ factory:
 
 A missing profile or missing active-platform mapping means inherit host
 model/reasoning settings. A project may assign the same model to multiple
-profiles, including with different reasoning settings. Global
+profiles, including with different reasoning settings. When a concrete model
+mapping omits `reasoningEffort` (Codex) or `effort` (Claude), the child
+host/model uses its default reasoning behavior; it need not equal the parent's
+current reasoning setting. Global
 `modelStrategy: inherit` cannot mix with explicit overrides.
 
 This partial policy overrides only Codex `strong`:
@@ -119,10 +122,16 @@ Known effort incompatibilities must be resolved explicitly. Before writing,
 revalidate the full policy and check for intervening edits; stop on unsafe
 conflicts. A no-op does not rewrite the file.
 
-For fine-grained configuration the active Coding Agent proposes overrides for
-the requested profiles from current host/platform information, states when
-account-specific availability cannot be verified, and waits for user
-confirmation before saving.
+For fine-grained configuration the active Coding Agent proposes **model and
+optional effort together** for each requested profile, based on verified
+host/platform capabilities and user goals (quality, cost, latency). It shows
+`host default (omitted)` when no compatible explicit effort is requested.
+There is no fixed `economy = low` / `standard = medium` / `strong = high` rule,
+and no obligation to fill every profile or effort field. It states when account
+availability or model/effort compatibility cannot be verified and waits for
+user confirmation only for interpreted recommendations. Exact model/effort
+edits need no extra approval. Clearing effort removes that optional key but
+keeps the model mapping.
 
 The initial question has two answers: `default`/`inherit` for the current
 session/host model at every level, or `configure` for selected overrides.
@@ -150,10 +159,9 @@ ExecutionProfile
 
 Absent configuration, explicit `modelStrategy: inherit`, or a missing selected
 mapping omits overrides. Malformed existing configuration blocks execution.
-If the host rejects a
-configured model/settings or cannot honor the override, Factory reports the
-problem and suggests reconfiguration; it never silently substitutes another
-model or profile.
+If the host rejects configured model/settings or cannot honor the override,
+Factory reports the problem and suggests reconfiguration; it never silently
+substitutes another model, drops the configured effort, or changes profiles.
 
 The same canonical Factory worker protocol is used for every profile. Execution profiles affect native child-agent model settings, not worker instructions.
 
