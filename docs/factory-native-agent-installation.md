@@ -31,8 +31,13 @@ role may be visible in user autocomplete; invisibility is not an access control.
 
 `claude.model` and `claude.effort` mappings are applied only when supported
 as exact native per-child settings; there is no ID-to-alias conversion.
-Unsupported explicit settings stop the affected Worker and suggest
-`idd-factory-configure`.
+The availability of an exact concrete model ID and a per-invocation effort
+control must be verified together on the installed Claude Code version; an
+effort-capable model by itself is not evidence that the required exact native
+child overrides are exposed. Unsupported explicit settings stop the affected
+Worker and suggest `idd-factory-configure`. Omitted effort on an explicit
+model mapping lets the child host choose its own default, while an absent
+mapping inherits model and reasoning behavior.
 
 ## Codex
 
