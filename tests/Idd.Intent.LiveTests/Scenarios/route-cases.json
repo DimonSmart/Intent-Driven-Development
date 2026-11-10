@@ -173,12 +173,12 @@
       "expected": {
         "classification": "intent-lint",
         "operation": null,
-        "requestedScope": "end-to-end",
+        "requestedScope": "intent-only",
         "firstSkill": "idd-intent-lint",
         "auditScope": null,
         "standaloneFactory": false
       },
-      "contract": "mode fix, no semantic edits",
+      "contract": "Only mechanical fixes to .idd/intent with recheck; no code implementation or broader workflow",
       "kind": "ordinary"
     },
     {

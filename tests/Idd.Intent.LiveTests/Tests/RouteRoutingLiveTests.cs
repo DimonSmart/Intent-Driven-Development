@@ -59,6 +59,66 @@ public sealed class RouteRoutingLiveTests
 
     public RouteRoutingLiveTests(ITestOutputHelper output) => this.output = output;
 
+    [Fact]
+    public void StructuralEvaluator_AllowsRouteOnlyWithNoHandoff()
+    {
+        var scenario = new RouteCase("manual-only-test",
+            "Which manual skill should I use? Advise only.",
+            new ExpectedRoute("intent-structure-audit", "not-applicable",
+                "route-only", "idd-glossary-build", "not-applicable",
+                false, "none", "clear", "not-applicable"),
+            "Manual recommendation, no execution", "ordinary");
+        var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Classification"] = "intent-structure-audit",
+            ["Operation"] = "not-applicable",
+            ["Clarity"] = "clear",
+            ["Execution depth"] = "not-applicable",
+            ["Requested scope"] = "route-only",
+            ["Audit scope"] = "not-applicable",
+            ["Recommended first skill"] = "idd-glossary-build",
+            ["Expected complete workflow"] = "idd-glossary-build, user-invoked only",
+            ["Current handoff"] = "none",
+            ["Stop after"] = "routing recommendation"
+        };
+
+        var (status, reason) = EvaluateStructuralResult(scenario, fields, 0, true,
+            "# IDD Route\n", new InstructionTrace(true, true, true, "test"),
+            null, []);
+
+        Assert.Equal("route correct", status);
+    }
+
+    [Fact]
+    public void StructuralEvaluator_RejectsRoutingStopWhenHandoffAuthorized()
+    {
+        var scenario = new RouteCase("engineering-handoff-test",
+            "Add an explicit Engineering Rule.",
+            new ExpectedRoute("engineering-change", "add", "intent-only",
+                "idd-engineering-change", "not-applicable",
+                false, "idd-engineering-change", "clear", "not-applicable"),
+            "Authorized Engineering management", "ordinary");
+        var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Classification"] = "engineering-change",
+            ["Operation"] = "add",
+            ["Clarity"] = "clear",
+            ["Execution depth"] = "not-applicable",
+            ["Requested scope"] = "intent-only",
+            ["Audit scope"] = "not-applicable",
+            ["Recommended first skill"] = "idd-engineering-change",
+            ["Expected complete workflow"] = "idd-engineering-change -> direct validation",
+            ["Current handoff"] = "idd-engineering-change",
+            ["Stop after"] = "routing recommendation"
+        };
+
+        var (status, reason) = EvaluateStructuralResult(scenario, fields, 0, true,
+            "# IDD Route\n", new InstructionTrace(true, true, true, "test"),
+            null, []);
+
+        Assert.Equal("route incorrect", status);
+    }
+
     [LiveRouteEvalFact]
     [Trait("Category", "LiveRouteEval")]
     public async Task GeneratedAutomaticRoute_RespectsNormativeFieldsAndScope()
@@ -311,7 +371,8 @@ public sealed class RouteRoutingLiveTests
         if (fields["Requested scope"] == "route-only" &&
             fields["Current handoff"] != "none")
             return ("route incorrect", "route-only must have no handoff.");
-        if (expected.CurrentHandoff is not null &&
+        if (!string.IsNullOrWhiteSpace(expected.CurrentHandoff) &&
+            !expected.CurrentHandoff.Equals("none", StringComparison.OrdinalIgnoreCase) &&
             fields["Stop after"].Equals("routing recommendation",
                 StringComparison.OrdinalIgnoreCase))
             return ("route incorrect",

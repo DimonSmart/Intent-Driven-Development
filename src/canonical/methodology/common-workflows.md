@@ -237,15 +237,27 @@ before implementation, never a silent rewrite of Product Intent.
 ## Workflow Family: Intent Import
 
 Use this workflow when existing supplied material already expresses durable
-knowledge:
+knowledge. Core owns the required-source handoff gate; this section describes
+the internal migration lifecycle once a source is available:
 
 ```text
-idd-project-init if needed
+check that supplied source content is accessible
+-> idd-project-init if needed
 -> idd-intent-import
--> classify Product Intent + explicit Engineering knowledge
--> normalize + direct mechanical validation
--> report conflicts, blocked changes, and review material
+   -> inventory and classify Product Intent + explicit Engineering decisions
+   -> resolve semantic owners and identify conflicts/blocked decisions
+      before any unsafe mutation
+   -> normalize and apply only safe Product/Engineering changes
+   -> direct Mechanical Intent Validation and, where applicable,
+      direct Mechanical Engineering Validation
+   -> report conflicts, blocked changes, validation and review material
 ```
+
+Conflict detection is a **pre-mutation semantic gate**; the report of any
+remaining conflicts is produced after validation. The importer itself performs
+Mechanical Intent Validation and applicable Mechanical Engineering Validation.
+Do not add a second executable `idd-intent-lint` handoff merely to validate
+the imported result; the import skill's own contract owns these checks.
 
 Typical sources include requirements, specifications, ADRs, public contracts,
 normative technical-design material, documented engineering conventions,

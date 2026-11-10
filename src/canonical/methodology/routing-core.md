@@ -106,6 +106,18 @@ An explicit request to discover and establish initial intent may be `clear`
 even though the discovered product model still requires interactive
 confirmation. The bootstrap workflow owns those semantic gates.
 
+For new product or Engineering decisions, distinguish a defined outcome from a
+mere feature/policy label. A request naming only a capability without stating
+what users can do or observe, or naming an Engineering concern without an
+enforceable constraint, lacks sufficient normative meaning. Do not supply missing
+defaults or acceptance decisions on the user's behalf. In a mixed Product +
+Engineering + implementation request, assess **both** durable owners: if either
+has an unresolved material decision, use `Clarity: ambiguous` and
+`idd-intent-brainstorm` before starting durable mutations. The complete
+workflow still retains both owners and implementation after confirmation.
+Conversely, an explicit observable contract such as "users can export the
+report as CSV" may be `clear` without prescribing implementation details.
+
 ### Requested Scope
 
 Classify how much of the workflow the user authorizes in the current request:
@@ -338,7 +350,7 @@ remain in the detailed workflow sections indexed below.
 | `project-initialization` | `idd-project-init`; optional `idd-intent-bootstrap` only with consent when implementation exists without current Intent; optionally Factory model setup only if Factory requested or project state shows earlier Factory use. Initialization-only ends after init. |
 | `verification-configuration` | `idd-verification-configure` review/edit/no-op; no test execution implied. |
 | `intent-bootstrap` | `idd-project-init` if needed -> `idd-intent-bootstrap` discovery -> explicit boundary and semantic approval -> write current Intent -> `idd-intent-lint`; optional later scoped drift audit. Block before unapproved writes. |
-| `intent-import` | `idd-project-init` if needed -> `idd-intent-import` migrate already-expressed Product / explicit Engineering knowledge -> validation and conflict review -> lint. No reverse-discovery by default. |
+| `intent-import` | After verifying supplied sources: `idd-project-init` if needed -> `idd-intent-import` inventories and classifies existing Product / explicit Engineering knowledge -> identifies conflict/owner gates before mutations -> applies only safe changes -> directly performs Mechanical Intent Validation and, when applicable, Mechanical Engineering Validation -> reports blocked decisions and validation. No reverse-discovery or separate mandatory `idd-intent-lint` invocation. |
 | `product-change` | Clarity/visual discovery if needed -> `idd-intent-change` (add/modify/remove) -> `idd-code-implement` or optional Factory when implementation authorized -> focused `idd-intent-drift-audit`. Stop before code for `intent-only`. |
 | `engineering-change` | `idd-engineering-change` -> direct Mechanical Engineering Validation; implementation/checks only if independently requested. Active Factory blocks Engineering mutation. |
 | `implementation-change` | `idd-code-implement` preserving current Intent, or optional `idd-factory-run` for orchestrated execution -> verification -> applicable scoped conformance. Stop at missing durable decision/approved preservation boundary. |
@@ -365,6 +377,15 @@ manual-only, availability and owner gates; use `none` for `route-only`,
 missing required input/reference/dependency, or a blocker. The caller may
 continue an already-authorized `end-to-end` lifecycle without *new routing*
 approval but must respect subsequent semantic approvals.
+
+In particular, `intent-import` requires actual source content in the original
+request or an accessible, resolvable supplied document. A reference to a
+"supplied", "attached" or previously discussed source that is not actually
+available is **not** an import input. Keep `Classification: intent-import`,
+`Requested scope: intent-only` when only IDD migration was requested, and
+the full future lifecycle; set `Current handoff: none` and `Stop after` to
+the missing-source blocker. Do not hand off to the import skill to discover
+or invent material that the user has not supplied.
 
 `Stop after` is the narrowest requested completion point or earliest blocker
 (uncertainty, permission, research, dependency, verification). An Engineering-
