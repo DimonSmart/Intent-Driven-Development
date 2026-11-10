@@ -68,8 +68,9 @@ read-only, and scoped reporting) require further isolated live evaluations.
 `scripts/Check.ps1 -Mode Live` (the latter runs Factory evaluations).
 
 The scenarios live in `Scenarios/route-cases.json` (39 cases). They check
-typed route fields and handoff constraints, read-only workspace snapshots and,
-by default, a separate LLM semantic judge for scope, ordering and gates.
+typed route fields, handoff constraints, and unchanged workspace snapshots.
+By default they also use a separate LLM semantic judge for scope, ordering and
+gates.
 The generated Codex plugin is installed into an isolated `CODEX_HOME`, and
 the route is triggered through a **natural-language automatic workflow**
 request rather than changing `idd-route` into a user-facing public command.
@@ -87,10 +88,13 @@ To run on the current checkout:
 $env:IDD_RUN_LIVE_ROUTE_EVALS = "1"
 $env:IDD_ROUTE_EVAL_MODEL = "gpt-6"
 $env:IDD_ROUTE_EVAL_REASONING = "medium"
+# Optional: read-only (default) or workspace-write
+$env:IDD_ROUTE_EVAL_SANDBOX = "read-only"
 dotnet test tests/Idd.Intent.LiveTests/Idd.Intent.LiveTests.csproj --filter "Category=LiveRouteEval"
 Remove-Item Env:IDD_RUN_LIVE_ROUTE_EVALS
 Remove-Item Env:IDD_ROUTE_EVAL_MODEL
 Remove-Item Env:IDD_ROUTE_EVAL_REASONING
+Remove-Item Env:IDD_ROUTE_EVAL_SANDBOX
 ```
 
 For comparative baseline evaluation, supply
@@ -103,12 +107,15 @@ model, reasoning and prompts.
 Useful overrides: `IDD_ROUTE_EVAL_CODEX`,
 `IDD_ROUTE_EVAL_TIMEOUT_MINUTES` (default 15 per host call),
 `IDD_ROUTE_EVAL_MAX_CASES`, `IDD_ROUTE_EVAL_OUTPUT_DIR`, and
-`IDD_ROUTE_EVAL_SKIP_JUDGE=1` for troubleshooting. The report
-(`route-report.json`) and raw responses/host events live in the output
-directory; preserve them when investigating discrepancies. Use the same
-host/provider, authenticated model, timeout and installed plugins when
-comparing revisions, and review changed decisions rather than only comparing
-prose.
+`IDD_ROUTE_EVAL_SANDBOX` (`read-only` by default; `workspace-write` is also
+supported), and `IDD_ROUTE_EVAL_SKIP_JUDGE=1` for troubleshooting. The report
+(`route-report.json`) records exit codes, process errors, `exec_command`
+failures, route failure reasons, the selected sandbox, and whether captured
+tool traces confirm reads of `idd-route/SKILL.md` and `routing-core.md`. Raw
+responses, JSONL events, and stderr live in the output directory; preserve them
+when investigating discrepancies. Use the same host/provider, authenticated
+model, timeout and installed plugins when comparing revisions, and review
+changed decisions rather than only comparing prose.
 
 **Context measurement:** the canonical source sizes provide only a
 Core-only *estimated upper bound* compared to the old unconditional

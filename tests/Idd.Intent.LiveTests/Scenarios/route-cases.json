@@ -4,12 +4,13 @@
   "scenarios": [
     {
       "id": "product-add",
-      "request": "Add a requirement: users can export the report as CSV.",
+      "request": "Add this requirement to the product intent only: users can export the report as CSV.",
       "expected": {
         "classification": "product-change",
         "operation": "add",
-        "requestedScope": "end-to-end",
+        "requestedScope": "intent-only",
         "firstSkill": "idd-intent-change",
+        "currentHandoff": "idd-intent-change",
         "auditScope": null,
         "standaloneFactory": false
       },

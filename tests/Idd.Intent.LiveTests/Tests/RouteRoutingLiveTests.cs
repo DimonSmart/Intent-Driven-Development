@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using Xunit.Abstractions;
 using Xunit;
 
 namespace Idd.Intent.LiveTests.Tests;
@@ -30,20 +32,30 @@ public sealed class RouteRoutingLiveTests
         string? RequestedScope,
         string? FirstSkill,
         string? AuditScope,
-        bool StandaloneFactory);
+        bool StandaloneFactory,
+        string? CurrentHandoff = null);
     private sealed record RouteCase(
         string Id, string Request, ExpectedRoute Expected, string Contract, string Kind);
     private sealed record RouteCases(int SchemaVersion, string BaselineCommit, RouteCase[] Scenarios);
-    private sealed record ProcessResult(int ExitCode, string Stdout, string Stderr);
+    private sealed record ProcessResult(
+        int? ExitCode, string Stdout, string Stderr, string? ExecutionError);
+    private sealed record InstructionTrace(
+        bool Available, bool RouteRead, bool CoreRead, string Summary);
     private sealed record CaseResult(
         string Scenario, string Revision, string Status, string Reason,
+        int? ExitCode, string? ExecutionError, string[] ExecCommandErrors,
+        string InstructionTrace,
         Dictionary<string, string> Fields, string? RawResponse,
         string? SemanticJudge, string? WorkspaceBefore, string? WorkspaceAfter);
     private sealed record EvalReport(
         string SourceCommit, string Model, string Reasoning, string Codex,
-        int TimeoutMinutes, string? BaselineSource,
+        string Sandbox, int TimeoutMinutes, string? BaselineSource,
         string? CandidateSource, string ContextMeasurement,
         CaseResult[] Results);
+
+    private readonly ITestOutputHelper output;
+
+    public RouteRoutingLiveTests(ITestOutputHelper output) => this.output = output;
 
     [LiveRouteEvalFact]
     [Trait("Category", "LiveRouteEval")]
@@ -59,6 +71,8 @@ public sealed class RouteRoutingLiveTests
 
         var model = Environment.GetEnvironmentVariable("IDD_ROUTE_EVAL_MODEL") ?? "gpt-6";
         var effort = Environment.GetEnvironmentVariable("IDD_ROUTE_EVAL_REASONING") ?? "medium";
+        var sandbox = ResolveSandbox(Environment.GetEnvironmentVariable(
+            "IDD_ROUTE_EVAL_SANDBOX"));
         var codex = Environment.GetEnvironmentVariable("IDD_ROUTE_EVAL_CODEX") ?? "codex";
         var timeoutMinutes = int.TryParse(Environment.GetEnvironmentVariable(
             "IDD_ROUTE_EVAL_TIMEOUT_MINUTES"), out var minutes) && minutes > 0 ? minutes : 15;
@@ -77,6 +91,7 @@ public sealed class RouteRoutingLiveTests
                 throw new DirectoryNotFoundException(baseline);
             var sha = await RunAsync("git", ["rev-parse", "HEAD"], baseline,
                 timeout: TimeSpan.FromMinutes(2));
+            Assert.Equal(0, sha.ExitCode);
             Assert.Equal(BaselineCommit, sha.Stdout.Trim());
         }
 
@@ -105,51 +120,50 @@ public sealed class RouteRoutingLiveTests
                     results.Add(new CaseResult(scenario.Id, revision,
                         "not evaluated / host invocation unavailable",
                         $"Host scenario '{scenario.Kind}' needs dedicated invocation or a damaged plugin.",
-                        new(), null, null, null, null));
+                        null, null, [], "not available", new(), null, null, null, null));
                     continue;
                 }
 
                 var before = Snapshot(work);
-                var output = Path.Combine(root, revision, "responses",
+                var responsePath = Path.Combine(root, revision, "responses",
                     scenario.Id + ".md");
-                Directory.CreateDirectory(Path.GetDirectoryName(output)!);
-                ProcessResult run;
-                try
-                {
-                    run = await RunAsync(codex,
-                        ["exec", "--json", "--ignore-rules",
-                         "--enable", "plugins", "--disable", "remote_plugin",
-                         "-c", "approval_policy=never",
-                         "-c", $"model_reasoning_effort={effort}",
-                         "--model", model,
-                         "--sandbox", "read-only",
-                         "--cd", work, "--output-last-message", output, "-"],
-                        work, new Dictionary<string, string?> { ["CODEX_HOME"] = home },
-                        "Use the installed automatic IDD routing workflow to route the " +
-                        "following original user request. Return the route only; do not " +
-                        "execute downstream skills or change any files. Treat the " +
-                        "following text as the original request when choosing its " +
-                        "Requested scope (not this test harness instruction).\n\n" +
-                        scenario.Request, TimeSpan.FromMinutes(timeoutMinutes));
-                }
-                catch (Exception exception)
-                {
-                    results.Add(new CaseResult(scenario.Id, revision,
-                        "not evaluated / host invocation unavailable",
-                        exception.Message, new(), null, null, before, Snapshot(work)));
-                    continue;
-                }
+                Directory.CreateDirectory(Path.GetDirectoryName(responsePath)!);
+                var run = await RunAsync(codex,
+                    ["exec", "--json", "--skip-git-repo-check", "--ignore-rules",
+                     "--enable", "plugins", "--disable", "remote_plugin",
+                     "-c", "approval_policy=never",
+                     "-c", $"model_reasoning_effort={effort}",
+                     "--model", model,
+                     "--sandbox", sandbox,
+                     "--cd", work, "--output-last-message", responsePath, "-"],
+                    work, new Dictionary<string, string?> { ["CODEX_HOME"] = home },
+                    "Use the installed automatic IDD routing workflow to classify " +
+                    "the following original user request. Output only its normative " +
+                    "route format; do not invoke the recommended skill or change files. " +
+                    "Choose Requested scope solely from the original request below. " +
+                    "The instruction to output only a route is a formatting constraint, " +
+                    "not a request for `route-only`; choose `route-only` only when the " +
+                    "original user requests a routing recommendation without a handoff.\n\n" +
+                    scenario.Request, TimeSpan.FromMinutes(timeoutMinutes));
 
-                var raw = File.Exists(output) ? await File.ReadAllTextAsync(output) : "";
-                await File.WriteAllTextAsync(Path.Combine(root, revision,
-                    "responses", scenario.Id + ".events.jsonl"), run.Stdout);
-                await File.WriteAllTextAsync(Path.Combine(root, revision,
-                    "responses", scenario.Id + ".stderr.txt"), run.Stderr);
+                var raw = File.Exists(responsePath)
+                    ? await File.ReadAllTextAsync(responsePath) : "";
+                var responseDirectory = Path.Combine(root, revision, "responses");
+                await File.WriteAllTextAsync(Path.Combine(responseDirectory,
+                    scenario.Id + ".events.jsonl"), run.Stdout);
+                await File.WriteAllTextAsync(Path.Combine(responseDirectory,
+                    scenario.Id + ".stderr.txt"), run.Stderr);
+                if (run.ExecutionError is not null)
+                    await File.WriteAllTextAsync(Path.Combine(responseDirectory,
+                        scenario.Id + ".execution-error.txt"), run.ExecutionError);
 
                 var after = Snapshot(work);
                 var fields = ParseFields(raw);
+                var trace = InspectInstructionTrace(run.Stdout, run.Stderr);
+                var execCommandErrors = ExtractExecCommandErrors(run.Stdout, run.Stderr);
                 var (status, reason) = EvaluateStructuralResult(scenario, fields,
-                    run.ExitCode, before == after);
+                    run.ExitCode, before == after, raw, trace, run.ExecutionError,
+                    execCommandErrors);
                 string? judge = null;
 
                 if (status == "route correct" && useJudge)
@@ -174,17 +188,22 @@ public sealed class RouteRoutingLiveTests
                 }
 
                 results.Add(new CaseResult(scenario.Id, revision, status, reason,
+                    run.ExitCode, run.ExecutionError, execCommandErrors, trace.Summary,
                     fields, raw, judge, before, after));
+                this.output.WriteLine(FormatCaseResult(results[^1]));
                 await SaveReportAsync(root, repo, baseline, model, effort, codex,
-                    timeoutMinutes, results);
+                    sandbox, timeoutMinutes, results);
             }
         }
 
         await SaveReportAsync(root, repo, baseline, model, effort, codex,
-            timeoutMinutes, results);
+            sandbox, timeoutMinutes, results);
         var candidate = results.Where(x => x.Revision == "candidate").ToArray();
         Assert.DoesNotContain(candidate, x => x.Status == "route incorrect");
-        Assert.Contains(candidate, x => x.Status == "route correct");
+        Assert.True(candidate.Any(x => x.Status == "route correct"),
+            "No complete normative route was obtained:\n" +
+            string.Join("\n", candidate.Select(FormatCaseResult)) +
+            $"\nReport: {Path.Combine(root, "route-report.json")}");
 
         // Baseline and candidate responses remain independent, and model
         // variability is visible in the report; no byte-for-byte text comparison.
@@ -193,14 +212,21 @@ public sealed class RouteRoutingLiveTests
 
     private static (string Status, string Reason) EvaluateStructuralResult(
         RouteCase scenario, Dictionary<string, string> fields,
-        int exitCode, bool readOnly)
+        int? exitCode, bool workspaceUnchanged, string raw,
+        InstructionTrace trace, string? executionError,
+        string[] execCommandErrors)
     {
-        if (exitCode != 0 || fields.Count == 0 ||
+        if (!workspaceUnchanged)
+            return ("route incorrect", "Routing altered files in the test workspace.");
+
+        if (exitCode != 0 || executionError is not null || fields.Count == 0 ||
             !fields.ContainsKey("Recommended first skill"))
             return ("not evaluated / host invocation unavailable",
-                "Host did not produce a recognizable IDD route.");
-        if (!readOnly)
-            return ("route incorrect", "Read-only routing altered the workspace.");
+                DescribeMissingRoute(exitCode, executionError, execCommandErrors, raw));
+
+        if (!Regex.IsMatch(raw, @"(?m)^\s*#\s+IDD Route\s*$"))
+            return ("not evaluated / host invocation unavailable",
+                "The response did not contain the required '# IDD Route' heading.");
 
         var expected = scenario.Expected;
         foreach (var (name, value) in new[]
@@ -209,7 +235,8 @@ public sealed class RouteRoutingLiveTests
             ("Operation", expected.Operation),
             ("Requested scope", expected.RequestedScope),
             ("Recommended first skill", expected.FirstSkill),
-            ("Audit scope", expected.AuditScope)
+            ("Audit scope", expected.AuditScope),
+            ("Current handoff", expected.CurrentHandoff)
         })
         {
             if (value is not null &&
@@ -241,8 +268,217 @@ public sealed class RouteRoutingLiveTests
         if (fields["Requested scope"] == "route-only" &&
             fields["Current handoff"] != "none")
             return ("route incorrect", "route-only must have no handoff.");
+        if (expected.CurrentHandoff is not null &&
+            fields["Stop after"].Equals("routing recommendation",
+                StringComparison.OrdinalIgnoreCase))
+            return ("route incorrect",
+                "An expected handoff cannot stop at the routing recommendation.");
 
-        return ("route correct", "Typed normative fields and read-only snapshot passed.");
+        if (trace.Available && (!trace.RouteRead || !trace.CoreRead))
+            return ("not evaluated / host invocation unavailable",
+                "The captured tool trace does not confirm successful reads of both " +
+                "installed idd-route/SKILL.md and references/routing-core.md: " +
+                trace.Summary);
+
+        return ("route correct", "Complete '# IDD Route' fields and unchanged workspace passed.");
+    }
+
+    private static string ResolveSandbox(string? configured)
+    {
+        if (string.IsNullOrWhiteSpace(configured)) return "read-only";
+        return configured.Trim().ToLowerInvariant() switch
+        {
+            "read-only" => "read-only",
+            "workspace-write" => "workspace-write",
+            _ => throw new InvalidOperationException(
+                "IDD_ROUTE_EVAL_SANDBOX must be 'read-only' or 'workspace-write'.")
+        };
+    }
+
+    private static string DescribeMissingRoute(int? exitCode,
+        string? executionError, string[] execCommandErrors, string raw)
+    {
+        var details = new List<string>();
+        details.Add(exitCode is null ? "exit code unavailable" : $"exit code {exitCode}");
+        if (!string.IsNullOrWhiteSpace(executionError))
+            details.Add("process error: " + executionError.Trim());
+        if (execCommandErrors.Length > 0)
+            details.Add("exec_command errors: " + string.Join(" | ", execCommandErrors));
+        if (raw.Length == 0)
+            details.Add("--output-last-message was missing or empty");
+        else if (ParseFields(raw).Count == 0)
+            details.Add("response contained no recognizable IDD route fields");
+        return "No complete IDD route was obtained (" + string.Join("; ", details) + ").";
+    }
+
+    private static InstructionTrace InspectInstructionTrace(string stdout, string stderr)
+    {
+        var traceEvents = new List<(string Text, bool Succeeded)>();
+        foreach (var line in stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(line);
+                CollectToolTrace(document.RootElement, traceEvents);
+            }
+            catch (JsonException)
+            {
+                // Non-JSON output is not a structured tool trace.
+            }
+        }
+
+        foreach (var line in stderr.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            if (line.Contains("exec_command", StringComparison.OrdinalIgnoreCase))
+                traceEvents.Add((line, false));
+
+        var traceAvailable = traceEvents.Count > 0;
+        var routeRead = traceEvents.Any(entry => MentionsRouteInstruction(entry.Text) &&
+            (entry.Succeeded || ContainsRouteInstructionContent(entry.Text)));
+        var coreRead = traceEvents.Any(entry => MentionsCoreInstruction(entry.Text) &&
+            (entry.Succeeded || ContainsCoreInstructionContent(entry.Text)));
+        var summary = traceAvailable
+            ? "available; idd-route/SKILL.md=" + (routeRead ? "read" : "not confirmed") +
+              ", routing-core.md=" + (coreRead ? "read" : "not confirmed")
+            : "not exposed by the Codex event stream";
+        return new InstructionTrace(traceAvailable, routeRead, coreRead, summary);
+    }
+
+    private static void CollectToolTrace(JsonElement element,
+        List<(string Text, bool Succeeded)> events)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            var values = element.EnumerateObject().ToArray();
+            var type = values.FirstOrDefault(property =>
+                property.Name.Equals("type", StringComparison.OrdinalIgnoreCase)).Value;
+            var name = values.FirstOrDefault(property =>
+                property.Name.Equals("name", StringComparison.OrdinalIgnoreCase) ||
+                property.Name.Equals("tool_name", StringComparison.OrdinalIgnoreCase)).Value;
+            var typeText = type.ValueKind == JsonValueKind.String ? type.GetString() : null;
+            var nameText = name.ValueKind == JsonValueKind.String ? name.GetString() : null;
+            var text = element.GetRawText();
+            var isToolTrace = IsToolTrace(typeText, nameText, text);
+            if (isToolTrace)
+                events.Add((text, IsSuccessfulToolTrace(element, text)));
+
+            foreach (var property in values)
+                CollectToolTrace(property.Value, events);
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var child in element.EnumerateArray())
+                CollectToolTrace(child, events);
+        }
+    }
+
+    private static bool IsToolTrace(string? type, string? name, string json)
+    {
+        static bool IsToolName(string? value) => value is not null &&
+            (value.Contains("command_execution", StringComparison.OrdinalIgnoreCase) ||
+             value.Contains("exec_command", StringComparison.OrdinalIgnoreCase) ||
+             value.Contains("file_read", StringComparison.OrdinalIgnoreCase) ||
+             value.Contains("read_file", StringComparison.OrdinalIgnoreCase));
+
+        return IsToolName(type) || IsToolName(name) ||
+            json.Contains("\"exec_command\"", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsSuccessfulToolTrace(JsonElement element, string text)
+    {
+        if (text.Contains("blocked by policy", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("Rejected(", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("\"isError\":true", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (TryGetNumber(element, "exit_code", out var exitCode) ||
+            TryGetNumber(element, "exitCode", out exitCode))
+            return exitCode == 0;
+        if (TryGetBoolean(element, "success", out var success)) return success;
+        return false;
+    }
+
+    private static bool TryGetNumber(JsonElement element, string name, out int value)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.Name.Equals(name, StringComparison.OrdinalIgnoreCase) &&
+                    property.Value.ValueKind == JsonValueKind.Number &&
+                    property.Value.TryGetInt32(out value)) return true;
+                if (TryGetNumber(property.Value, name, out value)) return true;
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var child in element.EnumerateArray())
+                if (TryGetNumber(child, name, out value)) return true;
+        }
+
+        value = default;
+        return false;
+    }
+
+    private static bool TryGetBoolean(JsonElement element, string name, out bool value)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.Name.Equals(name, StringComparison.OrdinalIgnoreCase) &&
+                    property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                {
+                    value = property.Value.GetBoolean();
+                    return true;
+                }
+                if (TryGetBoolean(property.Value, name, out value)) return true;
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var child in element.EnumerateArray())
+                if (TryGetBoolean(child, name, out value)) return true;
+        }
+
+        value = default;
+        return false;
+    }
+
+    private static bool MentionsRouteInstruction(string text) =>
+        text.Replace('\\', '/').Contains("idd-route/skill.md",
+            StringComparison.OrdinalIgnoreCase);
+
+    private static bool MentionsCoreInstruction(string text) =>
+        text.Replace('\\', '/').Contains("routing-core.md",
+            StringComparison.OrdinalIgnoreCase);
+
+    private static bool ContainsRouteInstructionContent(string text) =>
+        text.Contains("name: idd-route", StringComparison.OrdinalIgnoreCase) &&
+        text.Contains("Required references", StringComparison.OrdinalIgnoreCase) &&
+        text.Contains("Output Format", StringComparison.OrdinalIgnoreCase);
+
+    private static bool ContainsCoreInstructionContent(string text) =>
+        text.Contains("# IDD Routing Core", StringComparison.OrdinalIgnoreCase) &&
+        text.Contains("## Decision priority", StringComparison.OrdinalIgnoreCase) &&
+        text.Contains("## First Skill", StringComparison.OrdinalIgnoreCase);
+
+    private static string[] ExtractExecCommandErrors(string stdout, string stderr) =>
+        (stdout + "\n" + stderr).Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Where(line => line.Contains("exec_command", StringComparison.OrdinalIgnoreCase) &&
+                (line.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
+                 line.Contains("Rejected(", StringComparison.OrdinalIgnoreCase) ||
+                 line.Contains("blocked by policy", StringComparison.OrdinalIgnoreCase)))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+    private static string FormatCaseResult(CaseResult result)
+    {
+        var exitCode = result.ExitCode?.ToString() ?? "unavailable";
+        var errors = result.ExecCommandErrors.Length == 0
+            ? "none" : string.Join(" | ", result.ExecCommandErrors);
+        return $"{result.Scenario}/{result.Revision}: {result.Status}; exit code={exitCode}; " +
+            $"reason={result.Reason}; execution error={result.ExecutionError ?? "none"}; " +
+            $"exec_command errors={errors}; instruction trace={result.InstructionTrace}";
     }
 
     private static Dictionary<string, string> ParseFields(string raw)
@@ -352,12 +588,12 @@ public sealed class RouteRoutingLiveTests
 
     private static async Task SaveReportAsync(string root, string repo,
         string? baseline, string model, string effort, string codex,
-        int timeoutMinutes, List<CaseResult> results)
+        string sandbox, int timeoutMinutes, List<CaseResult> results)
     {
         var source = await RunAsync("git", ["rev-parse", "HEAD"], repo,
             timeout: TimeSpan.FromMinutes(2));
         var report = new EvalReport(source.Stdout.Trim(), model, effort, codex,
-            timeoutMinutes, baseline, repo,
+            sandbox, timeoutMinutes, baseline, repo,
             "Read traces/prompt-token counts are host-dependent and not inferred " +
             "from the presence of packaged files. See captured JSONL host events.",
             results.ToArray());
@@ -372,7 +608,8 @@ public sealed class RouteRoutingLiveTests
         var result = await RunAsync(executable, args, cwd, env,
             timeout: TimeSpan.FromMinutes(5));
         Assert.True(result.ExitCode == 0,
-            executable + " failed:\n" + result.Stderr + "\n" + result.Stdout);
+            executable + $" failed with exit code {result.ExitCode?.ToString() ?? "unavailable"}:\n" +
+            (result.ExecutionError ?? "") + "\n" + result.Stderr + "\n" + result.Stdout);
     }
 
     private static async Task<ProcessResult> RunAsync(string executable,
@@ -380,33 +617,56 @@ public sealed class RouteRoutingLiveTests
         IReadOnlyDictionary<string, string?>? env = null, string? input = null,
         TimeSpan? timeout = null)
     {
-        var info = new ProcessStartInfo(executable)
+        Process? process = null;
+        Task<string>? stdout = null;
+        Task<string>? stderr = null;
+        try
         {
-            WorkingDirectory = cwd, RedirectStandardInput = input is not null,
-            RedirectStandardOutput = true, RedirectStandardError = true,
-            UseShellExecute = false, CreateNoWindow = true
-        };
-        foreach (var arg in args) info.ArgumentList.Add(arg);
-        if (env is not null)
-            foreach (var (key, value) in env) info.Environment[key] = value;
-        using var process = Process.Start(info) ??
-            throw new InvalidOperationException("Unable to start " + executable);
-        if (input is not null)
-        {
-            await process.StandardInput.WriteAsync(input);
-            process.StandardInput.Close();
+            var info = new ProcessStartInfo(executable)
+            {
+                WorkingDirectory = cwd, RedirectStandardInput = input is not null,
+                RedirectStandardOutput = true, RedirectStandardError = true,
+                UseShellExecute = false, CreateNoWindow = true
+            };
+            foreach (var arg in args) info.ArgumentList.Add(arg);
+            if (env is not null)
+                foreach (var (key, value) in env) info.Environment[key] = value;
+            process = Process.Start(info) ??
+                throw new InvalidOperationException("Unable to start " + executable);
+            stdout = process.StandardOutput.ReadToEndAsync();
+            stderr = process.StandardError.ReadToEndAsync();
+            if (input is not null)
+            {
+                await process.StandardInput.WriteAsync(input);
+                process.StandardInput.Close();
+            }
+
+            using var cancellation = new CancellationTokenSource(
+                timeout ?? TimeSpan.FromMinutes(5));
+            await process.WaitForExitAsync(cancellation.Token);
+            return new ProcessResult(process.ExitCode, await stdout, await stderr, null);
         }
-        var stdout = process.StandardOutput.ReadToEndAsync();
-        var stderr = process.StandardError.ReadToEndAsync();
-        using var cancellation = new CancellationTokenSource(
-            timeout ?? TimeSpan.FromMinutes(5));
-        try { await process.WaitForExitAsync(cancellation.Token); }
-        catch (OperationCanceledException)
+        catch (Exception exception)
         {
-            try { process.Kill(entireProcessTree: true); } catch { }
-            throw new TimeoutException(executable + " timed out");
+            if (process is { HasExited: false })
+                try { process.Kill(entireProcessTree: true); } catch { }
+            return new ProcessResult(process is { HasExited: true }
+                    ? process.ExitCode : null,
+                await ReadCompletedStreamAsync(stdout),
+                await ReadCompletedStreamAsync(stderr),
+                exception.ToString());
         }
-        return new ProcessResult(process.ExitCode, await stdout, await stderr);
+        finally
+        {
+            process?.Dispose();
+        }
+    }
+
+    private static async Task<string> ReadCompletedStreamAsync(Task<string>? stream)
+    {
+        if (stream is null) return "";
+        try { return await stream; }
+        catch { return ""; }
     }
 
     private static string FindRoot()
