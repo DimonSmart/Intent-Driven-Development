@@ -241,7 +241,9 @@
         "requestedScope": "intent-only",
         "firstSkill": "idd-engineering-change",
         "auditScope": null,
-        "standaloneFactory": false
+        "standaloneFactory": false,
+        "clarity": "ambiguous",
+        "executionDepth": "not-applicable"
       },
       "contract": "No implementation implied",
       "kind": "ordinary"
@@ -346,7 +348,7 @@
     },
     {
       "id": "visual-uncertain",
-      "request": "Use this screenshot as inspiration for a new dashboard style; I haven't chosen which visual traits to preserve.",
+      "request": "Add a new dashboard page using this screenshot as visual inspiration; I haven't chosen which visual traits to preserve.",
       "expected": {
         "classification": "product-change",
         "operation": "add",
@@ -391,7 +393,7 @@
     },
     {
       "id": "no-spec-changes",
-      "request": "Refactor only the parser, do not touch any specs or Engineering Rules.",
+      "request": "Refactor only the parser without changing its behavior; do not touch any specs or Engineering Rules.",
       "expected": {
         "classification": "implementation-change",
         "operation": null,

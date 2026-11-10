@@ -118,6 +118,21 @@ workflow still retains both owners and implementation after confirmation.
 Conversely, an explicit observable contract such as "users can export the
 report as CSV" may be `clear` without prescribing implementation details.
 
+For an Engineering-only request with a named but underspecified constraint
+(e.g., "make logging stricter"), retain `Classification: engineering-change`
+and `Clarity: ambiguous`, but select its semantic owner `idd-engineering-change`.
+That skill must identify the missing enforceable decision and return `ambiguous`
+before any mutation; `idd-intent-brainstorm` clarifies *Product Intent*, not
+standalone Engineering policy. Do not silently invent an Engineering Rule.
+
+For mixed Product + Engineering + implementation work, when a new Product
+capability is identifiable, keep `Classification: product-change` even if its
+behavior or the separate Engineering decision is underspecified. In that
+case, `Clarity: ambiguous` and `Recommended first skill: idd-intent-brainstorm`
+establish the Product clarity gate; the complete workflow retains the
+Engineering owner and authorized implementation. Use `Classification: unclear`
+only when the primary concern itself cannot be identified.
+
 ### Requested Scope
 
 Classify how much of the workflow the user authorizes in the current request:
@@ -150,12 +165,24 @@ Distinguish three different instructions:
 For a request limited to creating, importing, changing or normalizing **IDD
 knowledge**, use `intent-only` unless code implementation is explicitly
 requested. This covers Product Intent, Engineering Rules, and
-`implementation-to-intent`. A user asking to "import into IDD" authorizes
+`implementation-to-intent`. A request to add, change or remove a **requirement
+or specification** is knowledge-side work, even when that requirement describes
+observable product behavior. Do not infer implementation authorization just
+because the user did not expressly forbid code changes. A user asking to "import into IDD" authorizes
 knowledge migration and its conflict/validation/lint stages, **not** code
 implementation. Keep an unavailable import source as an explicit handoff
 blocker without broadening the scope. For implementation-only work preserving
 approved Intent/Engineering use `intent-preserving` when requested;
 use `end-to-end` for authorized implementation plus its necessary checks.
+A refactor with no intended behavior change is `intent-preserving`, including
+when the user explicitly forbids modifying specs and Engineering Rules; the
+refactor and its verification still run. A prohibition on spec edits **alone**
+does not authorize changing product behavior or establish preservation intent.
+
+Project initialization is `end-to-end` when the user asks to carry out the
+complete IDD structure setup: completing the requested setup does not imply
+reverse-engineering Product Intent or implementing product code. Do not treat
+its lack of application implementation as a reason to select `intent-only`.
 
 Initial bootstrap is normally `intent-only`. It becomes `end-to-end` only when
 the user also explicitly requests later implementation work after the initial
@@ -187,6 +214,8 @@ scope:
 - `not-applicable`: routing, initialization, verification configuration,
   bootstrap, imports, audits, lint checks, brainstorms, and knowledge-only
   Engineering Rule management without separately requested implementation.
+  Adding or modifying one Engineering Rule is not a `focused` implementation
+  just because the policy targets source code.
   An actionable Product requirement may still describe the depth of a later
   implementation stage even when the present scope is `intent-only`.
 
@@ -261,6 +290,8 @@ for standalone Factory model-policy routing (no invented placeholders).
   consult installed invocation metadata/`skill-descriptions.json`.
   Direct skill invocation is user selection, not the result of this router.
   The router never executes an advised skill or any Factory preflight.
+  Engineering-only ambiguity stays with `idd-engineering-change`: its own
+  semantic planning gate asks for clarification before changing any Rules.
 - `idd-factory-run` owns mandatory preflight under the existing
   `intent-preflight.md`. The router must not inspect Factory state broadly,
   duplicate preflight, or change policy. Missing known Factory installation
@@ -310,9 +341,13 @@ request handoff; never substitute a summary.
 `idd-factory-configure` is in the separate `idd-factory` plugin.
 A recommendation does not establish installation. If known unavailable,
 keep the recommended skill but set `Current handoff: none` and stop with
-the dependency diagnostic. If unknown, state availability conditionally,
-not as a claimed installed capability. Never fabricate an availability API,
-substitute another skill or write policy from the router.
+the dependency diagnostic. If unknown, state availability conditionally in the free-text rationale or
+handoff instructions, not as a claimed installed capability. Keep
+`Current handoff` as a **single canonical skill ID** if conditionally allowed,
+or `none` if a required dependency is known to be missing; do not append
+"if available" or other explanatory text to this structured field.
+Never fabricate an availability API, substitute another skill or write policy
+from the router.
 
 ## First Skill
 
@@ -386,6 +421,11 @@ stages. Mixed Factory model-policy + code requests keep
 the separate `idd-factory-configure` stage and the implementation stages.
 Large new tasks may have Factory coordinate the authorized owners during its
 own preflight, but only those owners can mutate durable decisions.
+
+`Recommended first skill` and `Current handoff` are structured IDs: use exactly
+one registered `idd-*` skill name, or `none` for `Current handoff`. Put availability
+conditions, blockers and explanations in `Why`, `Stop after`, or `Handoff`,
+never inside an ID field.
 
 `Current handoff` is the next user-authorized action after scope, clarity,
 manual-only, availability and owner gates; use `none` for `route-only`,

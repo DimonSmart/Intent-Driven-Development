@@ -119,6 +119,56 @@ public sealed class RouteRoutingLiveTests
         Assert.Equal("route incorrect", status);
     }
 
+    [Fact]
+    public void StructuralEvaluator_RejectsDecoratedHandoffId()
+    {
+        var scenario = new RouteCase("factory-review-test",
+            "Review Factory model policy without editing it.",
+            new ExpectedRoute(null, null, "end-to-end",
+                "idd-factory-configure", null, true),
+            "Structured IDs remain canonical", "ordinary");
+        var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Recommended first skill"] = "idd-factory-configure",
+            ["Expected complete workflow"] = "idd-factory-configure",
+            ["Requested scope"] = "end-to-end",
+            ["Current handoff"] = "idd-factory-configure if available",
+            ["Stop after"] = "the review completes"
+        };
+
+        var (status, reason) = EvaluateStructuralResult(scenario, fields, 0, true,
+            "# IDD Route\n", new InstructionTrace(true, true, true, "test"),
+            null, []);
+
+        Assert.Equal("route incorrect", status);
+        Assert.Contains("Current handoff", reason);
+    }
+
+    [Fact]
+    public void StructuralEvaluator_RejectsInvalidScopeValue()
+    {
+        var scenario = new RouteCase("invalid-scope-test",
+            "Which Factory model-policy workflow should I use?",
+            new ExpectedRoute(null, null, null,
+                "idd-factory-configure", null, true),
+            "Scope is an enum", "ordinary");
+        var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Recommended first skill"] = "idd-factory-configure",
+            ["Expected complete workflow"] = "idd-factory-configure",
+            ["Requested scope"] = "route-only if desired",
+            ["Current handoff"] = "none",
+            ["Stop after"] = "routing recommendation"
+        };
+
+        var (status, reason) = EvaluateStructuralResult(scenario, fields, 0, true,
+            "# IDD Route\n", new InstructionTrace(true, true, true, "test"),
+            null, []);
+
+        Assert.Equal("route incorrect", status);
+        Assert.Contains("Requested scope", reason);
+    }
+
     [LiveRouteEvalFact]
     [Trait("Category", "LiveRouteEval")]
     public async Task GeneratedAutomaticRoute_RespectsNormativeFieldsAndScope()
@@ -199,6 +249,8 @@ public sealed class RouteRoutingLiveTests
                 if (scenario.Id is "product-modify" or "drift-focused" or
                     "implementation-simple" or "engineering-modify")
                     SeedMinimalIntent(work);
+                if (scenario.Id == "bootstrap")
+                    SeedBootstrapWorkspace(work);
                 if (scenario.Id == "import-present")
                     await File.WriteAllTextAsync(Path.Combine(work,
                         "approved-requirements.md"),
@@ -329,6 +381,10 @@ public sealed class RouteRoutingLiveTests
             return ("route incorrect",
                 "The response did not contain the required '# IDD Route' heading.");
 
+        var invalidField = FindInvalidStructuredField(fields);
+        if (invalidField is not null)
+            return ("route incorrect", invalidField);
+
         var expected = scenario.Expected;
         foreach (var (name, value) in new[]
         {
@@ -381,6 +437,49 @@ public sealed class RouteRoutingLiveTests
         return ("route correct", "Typed structural fields and unchanged workspace passed; " +
             "semantic workflow and free-text stop boundaries require judge or manual review.");
     }
+
+    private static string? FindInvalidStructuredField(
+        Dictionary<string, string> fields)
+    {
+        (string Name, string[] Allowed)[] controlled =
+        [
+            ("Classification", [
+                "project-initialization", "verification-configuration",
+                "intent-bootstrap", "intent-import", "product-change",
+                "engineering-change", "implementation-change",
+                "intent-normalization", "intent-structure-audit", "intent-lint",
+                "intent-drift-audit", "implementation-to-intent",
+                "explicit-skip", "unclear", "unknown"
+            ]),
+            ("Operation", ["add", "modify", "remove", "not-applicable"]),
+            ("Clarity", ["clear", "ambiguous", "research-required"]),
+            ("Execution depth", ["focused", "orchestrated", "not-applicable"]),
+            ("Requested scope", ["route-only", "intent-only", "intent-preserving", "end-to-end"]),
+            ("Audit scope", ["focused", "project-wide", "not-applicable"])
+        ];
+        foreach (var (name, allowed) in controlled)
+        {
+            if (fields.TryGetValue(name, out var value) &&
+                !allowed.Contains(value, StringComparer.OrdinalIgnoreCase))
+                return $"Invalid structured route field {name}={value}.";
+        }
+
+        foreach (var name in new[] { "Recommended first skill", "Current handoff" })
+        {
+            if (!fields.TryGetValue(name, out var value)) continue;
+            if (name == "Current handoff" &&
+                value.Equals("none", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!IsCanonicalSkillId(value))
+                return $"Invalid structured route skill ID {name}={value}.";
+        }
+        return null;
+    }
+
+    private static bool IsCanonicalSkillId(string value) =>
+        value.StartsWith("idd-", StringComparison.Ordinal) &&
+        value.Length > 4 && value[^1] != '-' &&
+        !value.Contains("--", StringComparison.Ordinal) &&
+        value.All(ch => ch is >= 'a' and <= 'z' or >= '0' and <= '9' or '-');
 
     private static string ResolveSandbox(string? configured)
     {
@@ -663,6 +762,26 @@ public sealed class RouteRoutingLiveTests
         await EnsureSuccess(codex, ["plugin", "add",
             "idd-intent@intent-driven-development", "--json"], repo, env);
         return home;
+    }
+
+    private static void SeedBootstrapWorkspace(string work)
+    {
+        // An existing application is required for a meaningful bootstrap handoff.
+        // The Intent scaffold exists, but contains no numbered specifications.
+        var intent = Path.Combine(work, ".idd", "intent");
+        Directory.CreateDirectory(intent);
+        File.WriteAllText(Path.Combine(intent, "README.md"),
+            "# Current Product Intent\n\nNo numbered specifications yet.\n");
+        File.WriteAllText(Path.Combine(intent, "INDEX.md"),
+            "# Product Intent Index\n\nNo current numbered specifications.\n");
+
+        var source = Path.Combine(work, "src", "ExampleApp");
+        Directory.CreateDirectory(source);
+        File.WriteAllText(Path.Combine(source, "ExampleApp.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings></PropertyGroup></Project>");
+        File.WriteAllText(Path.Combine(source, "Program.cs"),
+            "if (args.Contains(\"--status\", StringComparer.Ordinal)) Console.WriteLine(\"Ready\");\n" +
+            "else Console.WriteLine(\"Usage: --status\");\n");
     }
 
     private static void SeedMinimalIntent(string work)
