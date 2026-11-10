@@ -20,20 +20,8 @@ internal static class NativeFactoryAgentRenderer
     public static string Instructions(NativeAgentDefinition agent)
     {
         var role = RequiredFileReader.Read(agent.Source);
-        var engineering = RequiredFileReader.Read("src/canonical/methodology/engineering-guardrails.md");
-        return ContentNormalizer.NormalizeContent(ContentNormalizer.JoinBlocks(
-            Guard,
-            role,
-            """
-            ## Role-local canonical Engineering Guardrails
-
-            The following contract is generated from the canonical methodology,
-            loaded by the host into this child, and is NOT supplied by Root.
-            Apply it when the repository has an optional `.idd/engineering/` layer.
-            An absent layer is valid. This copy is generated; edit only its
-            source `src/canonical/methodology/engineering-guardrails.md`.
-            """,
-            engineering)).ReplaceLineEndings("\n");
+        return ContentNormalizer.NormalizeContent(
+            ContentNormalizer.JoinBlocks(Guard, role)).ReplaceLineEndings("\n");
     }
 
     public static string CodexToml(NativeAgentDefinition agent)

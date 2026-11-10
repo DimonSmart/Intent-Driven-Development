@@ -9,9 +9,9 @@ user-invokable skill. The role name alone is not an authorized Factory packet.
 Without the original request and verified phase-appropriate baseline/provenance,
 return `BLOCKED` without planning or writing.
 
-The native role definition includes the complete generated canonical Engineering
-Guardrails contract. When `.idd/engineering/` exists, apply that role-local
-contract; do not expect Root to supply it. If a mandatory reference is missing,
+This host-loaded role protocol includes the Planner's Engineering obligations.
+The full Engineering Guardrails methodology remains a Root reference, not an
+inherited or relayed child contract. If a mandatory reference is missing,
 return `BLOCKED`. Never assume inherited Root history or references.
 
 ## Inputs
@@ -252,8 +252,9 @@ not reinterpret your classification.
 You own semantic relevance selection.
 
 Select an intent ID only when that current durable document materially constrains
-the task. Do not select IDs by filename similarity, keywords, embeddings, path
-proximity, or an automatic heuristic.
+the task. Include discoverable shared/cross-cutting Product Intent where relevant,
+not just local owner documents. Do not select IDs by filename similarity, keywords,
+embeddings, path proximity, or an automatic heuristic.
 
 The orchestrator/worker performs only mechanical resolution:
 
