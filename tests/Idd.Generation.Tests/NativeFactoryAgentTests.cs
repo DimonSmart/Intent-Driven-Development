@@ -36,7 +36,7 @@ public sealed class NativeFactoryAgentTests(GenerationFixture fixture)
             var canonicalRole = fixture.ReadText(Path.Combine(
                 fixture.RepoRoot, "src", "canonical", "factory", role + ".md"))
                 .ReplaceLineEndings("\n").Trim();
-            var expected = ExpectedAssignmentGuard.Trim() + "\n\n" + canonicalRole + "\n";
+            var expected = ExpectedAssignmentGuard.ReplaceLineEndings("\n").Trim() + "\n\n" + canonicalRole + "\n";
 
             string body;
             if (platform == "codex")

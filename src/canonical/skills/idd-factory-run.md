@@ -606,9 +606,9 @@ semantically reselect Conditional rules.
 
 The host-loaded Worker protocol contains its Engineering obligations; pass
 the Worker verified baseline/provenance context or paths to the saved files,
-and carry explicit user document prohibitions and conservative legacy scope. Do not add another `# Task` section. The root resolves the execution
-profile and native model
-settings before spawn; the worker never selects a model or reads execution
+and carry explicit user document prohibitions and conservative legacy
+scope. Do not add another `# Task` section. The root resolves the execution
+profile and native model settings before spawn; the worker never selects a model or reads execution
 policy.
 
 Use this logical native spawn instruction structure, keeping role instructions
