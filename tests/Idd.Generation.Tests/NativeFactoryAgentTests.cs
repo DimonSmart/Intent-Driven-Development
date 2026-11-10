@@ -51,7 +51,7 @@ public sealed class NativeFactoryAgentTests(GenerationFixture fixture)
                 var frontMatter = GenerationFixture.ReadFrontMatter(generated);
                 Assert.NotEmpty(frontMatter);
                 var prefix = frontMatter + "\n\n";
-                Assert.True(generated.StartsWith(prefix, StringComparison.Ordinal));
+                Assert.StartsWith(prefix, generated);
                 body = generated[prefix.Length..];
             }
 
