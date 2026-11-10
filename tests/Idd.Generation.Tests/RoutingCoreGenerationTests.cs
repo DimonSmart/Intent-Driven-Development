@@ -28,6 +28,10 @@ public sealed class RoutingCoreGenerationTests(GenerationFixture fixture)
         Assert.Equal(references.Length, references
             .Select(r => (r.Skill, r.Destination)).Distinct().Count());
 
+        Assert.Single(references, r => r.Skill == "idd-route" &&
+            r.Source == "src/canonical/skills/skill-descriptions.json" &&
+            r.Destination == "skill-descriptions.json");
+
         foreach (var skill in new[] { "idd-route", "idd-help" })
         {
             Assert.Single(references, r => r.Skill == skill &&
@@ -73,6 +77,14 @@ public sealed class RoutingCoreGenerationTests(GenerationFixture fixture)
                 Assert.Equal(canonical, generated);
             }
         }
+
+        var metadataSource = GenerationFixture.NormalizeText(fixture.ReadText(
+            Path.Combine(fixture.RepoRoot, "src", "canonical", "skills",
+                "skill-descriptions.json")));
+        var routeMetadata = GenerationFixture.NormalizeText(fixture.ReadText(
+            Path.Combine(pluginRoot, "idd-route", "references",
+                "skill-descriptions.json")));
+        Assert.Equal(metadataSource, routeMetadata);
 
         fixture.AssertFile(Path.Combine(pluginRoot, "idd-engineering-change",
             "references", "common-workflows.md"));

@@ -16,7 +16,12 @@ project files, Intent, Engineering, Factory state or implementation.
    in `references/common-workflows.md`, read the chosen section completely
    (including child headings), and read explicit related dependencies.
    A Core-only request does **not** preload the detailed document.
-4. If precise partial reads are unsupported, load the entire detailed document
+4. If a recommendation may target a manual-only skill and current host
+   invocation metadata is insufficient, read
+   `references/skill-descriptions.json` to check actual `invocation`
+   and `exposure` before producing an automatic handoff. This machine-readable
+   reference is not a second set of routing-policy rules.
+5. If precise partial reads are unsupported, load the entire detailed document
    **only** when a detailed section is needed; never skip a required gate to
    save context. Missing mandatory Core or a required detailed section is a
    blocking incomplete-plugin diagnosis, never a memory-based fallback.

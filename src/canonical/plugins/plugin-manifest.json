@@ -57,6 +57,11 @@
           "destination": "routing-core.md"
         },
         {
+          "skill": "idd-route",
+          "source": "src/canonical/skills/skill-descriptions.json",
+          "destination": "skill-descriptions.json"
+        },
+        {
           "skill": "idd-project-init",
           "source": "src/canonical/methodology/glossary-integration.md",
           "destination": "glossary-integration.md"
