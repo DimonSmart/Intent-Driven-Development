@@ -24,19 +24,23 @@ to answer read-only; do not automatically invoke other workflows.
 
 ## Required References
 
-Before answering, read:
+Read only the references relevant to the actual question:
 
-- `references/common-workflows.md`
-- `references/methodology.md`
-- `references/skill-descriptions.json`
-- `references/project-verification.md`
+- For **routing decisions**, classification fields, operation, scope,
+  authorization, first skill, handoff or stop: `references/routing-core.md`
+  is the **single routing authority**.
+- For **detailed workflow procedures or completion**: the relevant
+  section(s) of `references/common-workflows.md`. If the question also
+  asks *which* route applies, read Core too.
+- For general principles: `references/methodology.md`; for current skill
+  inventory, invocation or availability metadata:
+  `references/skill-descriptions.json`; for policy-backed project checking:
+  `references/project-verification.md`. Keep all of these independent
+  contracts intact, reading each when needed.
 
-Treat `common-workflows.md` as the canonical source for current routing and
-workflow behavior, `methodology.md` as the explanation of IDD principles, and
-`skill-descriptions.json` as the current public skill inventory.
-
-If required references are unavailable, report that the installed plugin is
-incomplete rather than reconstructing current IDD rules from memory.
+If a reference required to answer the particular question is unavailable,
+report incomplete plugin installation rather than reconstructing authoritative
+rules from memory. This skill remains read-only and explanatory.
 
 ## What This Skill Explains
 

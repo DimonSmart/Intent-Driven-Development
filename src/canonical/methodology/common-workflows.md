@@ -2,145 +2,18 @@
 
 ## Purpose
 
-This document defines platform-independent IDD workflow routing. It describes
-how natural-language requests move through initialization, verification
-configuration, initial intent bootstrap, import, product intent, implementation,
-checking, normalization, and optional Factory orchestration without making the
-route itself durable product intent.
+Detailed platform-independent procedures, shared domain invariants and
+workflow-specific completion checks. The normative selection, classification,
+requested scope, first skill, current handoff and stop policy lives in
+`routing-core.md`, packaged for `idd-route` and `idd-help`.
+This document is consulted *selectively* when a specific workflow needs it;
+it does not independently redefine route selection.
 
-## Routing Dimensions
+## Routing Dimensions (owned by Routing Core)
 
-### What Changes
-
-Identify the requested concern before applying ordinary workflow classification.
-Standalone Factory model-policy requests select their skill directly:
-
-- `product truth`: desired product behavior, confirmed normative visual
-  appearance, constraint, acceptance rule, public contract, or durable
-  architecture changes.
-- `engineering policy`: an explicit project decision adds, modifies, or removes
-  a durable implementation-only Engineering Rule.
-- `implementation only`: code structure changes while current product intent
-  remains unchanged.
-- `intent structure`: current intent is moved, split, merged, renamed, or
-  cross-referenced without changing product meaning.
-- `implementation versus intent`: observed behavior may not match current
-  intent.
-- `initial product truth discovery`: an existing implementation lacks an
-  adequate current intent model and needs interactive discovery and owner
-  confirmation.
-- `raw imported knowledge`: external or existing product knowledge already
-  expressed in documents or other sources needs to be imported into IDD intent.
-- `project initialization`: the project needs an `.idd/intent/` structure.
-- `project verification configuration`: `.idd/verification.yaml` needs creation or
-  deliberate update.
-- `Factory model configuration and review`: project-owned Factory model
-  mappings or reasoning settings need initial setup, exact edits, inspection,
-  comparison, refresh, upgrade, downgrade, or inheritance changes. For this
-  standalone concern, select `idd-factory-configure` directly instead of
-  creating a classification.
-- `unknown`: the request does not provide enough information to choose safely.
-
-Initial product truth discovery and raw imported knowledge are different:
-
-```text
-existing implementation + uncertain product meaning
-    -> idd-intent-bootstrap
-
-existing source material that already expresses durable product meaning
-or explicit durable Engineering decisions
-    -> idd-intent-import
-```
-
-Raw imported knowledge remains an import route even when the same supplied
-source contains both Product Intent and already-decided Engineering policy.
-Ordinary new Engineering decisions still route as `engineering-change`.
-
-Code may be evidence during both workflows, but import must not become an
-implicit reverse-engineering workflow or derive Engineering policy from current
-implementation.
-
-### Product and Engineering Operation
-
-For `product-change`, classify `Operation` as `add`, `modify`, or `remove` and target current product truth under `.idd/intent/`.
-
-For `engineering-change`, use the same operation names independently and target current durable implementation policy under `.idd/engineering/`.
-
-Product operations and Engineering operations do not share semantic ownership. A product constraint must not become Engineering merely because it mentions implementation, and an implementation-only durable convention must not be forced into Intent.
-
-Adding a behavioral or visual product rule can still update an existing spec. Removing one product rule can still leave the owning spec in place when it contains other current intent. Engineering add may become a no-op or an explicit modify when an existing Rule already owns the durable constraint.
-
-Bootstrap establishes current product truth; it is not an `add` operation.
-Import migrates supplied durable knowledge; it is not an ordinary product or
-Engineering `add` operation. It may create/update Engineering Rules only for
-explicit decisions already present in supplied import sources.
-For classifications other than `product-change` and `engineering-change`, `Operation` is `not-applicable`.
-
-### Request Clarity
-
-Classify clarity as:
-
-- `clear`: the desired workflow or product or implementation outcome is
-  actionable.
-- `ambiguous`: a product decision is needed before writing intent or code.
-- `research-required`: the correct decision depends on investigation that
-  should be represented as a spike or focused check.
-
-An explicit request to discover and establish initial intent may be `clear`
-even though the discovered product model still requires interactive
-confirmation. The bootstrap workflow owns those semantic gates.
-
-### Requested Scope
-
-Classify how much of the workflow the user authorizes in the current request:
-
-- `route-only`: classify and describe the workflow without invoking another
-  skill or changing files.
-- `intent-only`: perform only durable IDD knowledge-side work, including
-  product Intent or Engineering management. Do not implement product code or
-  start Factory execution.
-- `intent-preserving`: implement/check against the approved Product Intent without changing normative product decisions or `.idd/engineering/*`. Factory Workers alone may add verified monotonic refinements in existing Intent owners; ordinary `idd-code-implement` retains its local restrictions.
-- `end-to-end`: continue through all requested workflow stages.
-
-Requested scope is independent from what changes and from execution depth. Use
-the narrowest scope that satisfies the explicit request. Explicit limits such
-as "only", "do not change files", "do not implement", and "do not change
-specs" take precedence over the normal complete lifecycle.
-
-Initial bootstrap is normally `intent-only`. It becomes `end-to-end` only when
-the user also explicitly requests later implementation work after the initial
-intent has been confirmed.
-
-The complete lifecycle describes what is eventually needed for safe delivery.
-It does not grant permission to execute stages outside the requested scope.
-
-Do not assign requested scope when an explicitly named skill or `idd-skip`
-bypasses routing.
-
-### Execution Depth
-
-Classify execution depth independently from the product operation and requested
-scope:
-
-- `focused`: one primary product owner, localized implementation, no complex
-  migration, no staged rollout, and no multiple review gates.
-- `orchestrated`: multiple subsystems, independent implementation tasks,
-  migration, compatibility transition, public contract change, high regression
-  risk, sequenced phases, multiple roles, review gates, or major capability
-  removal.
-- `not-applicable`: routing, initialization, verification configuration,
-  bootstrap, imports, audits, lint checks, brainstorms, and pure intent reads
-  that do not execute implementation.
-
-A broad repository scan does not make bootstrap `orchestrated`. Factory
-planner/worker orchestration preserves approved Product decisions and all
-Engineering Rules. A new entry may coordinate normal authorized owners in
-preflight; only Factory Workers may enrich existing Intent owners with
-verified monotonic findings during implementation.
-
-Diff size alone is not enough to choose Factory. Execution depth may describe a
-later implementation stage even when the current requested scope stops at
-routing or intent work.
+For the authoritative dimensions and selection priorities, consult
+`routing-core.md` through the routing skill's packaged reference.
+The following sections own workflow-specific procedures, not routing policy.
 
 ## Shared Invariants
 
@@ -249,44 +122,9 @@ idd-factory-configure
 -> re-check baseline, validate and persist or no-op
 ```
 
-Before ordinary classification, a **standalone** Factory model-policy request
-selects `Recommended first skill: idd-factory-configure` directly. Initial
-setup, exact edit (including reasoning-only changes or returning to host
-inheritance), review/compare without writes, and refresh/selection all use this
-one skill. `idd-factory-configure` is a skill name, not a `Classification`
-value. Do not introduce a replacement classification or alias.
-
-For this direct route, return `Recommended first skill`,
-`Expected complete workflow`, `Requested scope`, `Current handoff`, and
-`Stop after`; do not require `Classification`, `Operation`, `Clarity`,
-`Execution depth`, or `Audit scope` (including fake `not-applicable` values).
-`Expected complete workflow` is `idd-factory-configure`. Use `route-only`
-with `Current handoff: none` and stop after the routing recommendation when
-the user requests routing advice. For an authorized operation or read-only
-review, use `end-to-end` and hand the complete request to
-`idd-factory-configure` from the **caller**, not from the isolated router.
-`end-to-end` does not authorize writes: preserve review-only limits and the
-configure skill's confirmation and exact-edit rules. Carry exact platform,
-profile, model ID, reasoning, inheritance, cost/latency/quality, prohibition,
-and confirmation context without summarizing away constraints. Explicit
-`intent-only` or `intent-preserving` restrictions are not automatically
-mapped to this route; preserve them or diagnose incompatible scope.
-
-The router neither reads/writes model policy nor researches model alternatives,
-and it does not execute configure or Factory run. Direct user invocation of
-`idd-factory-configure` bypasses routing, and a request to **run Factory**
-belongs to `idd-factory-run`. Only `idd-intent` may be installed: the
-`idd-factory` plugin is required to execute the recommended skill. If its
-absence is known, use `Current handoff: none` and stop with a diagnostic;
-if availability is unknown, describe the dependency conditionally. Do not
-invent an installation API or treat recommendation as proof of availability.
-
-For **mixed requests** that also change Product Intent, Engineering, code,
-audits, or Factory execution, keep ordinary primary classification, scope,
-clarity gates, and every independent workflow stage. Include any authorized
-`idd-factory-configure` step without losing the other tasks or automatically
-running Factory. If the primary route is unresolved, apply the existing
-clarity gate, not an invented Factory classification.
+The standalone/mixed Factory policy routing, field format, plugin availability
+and scope gates are defined by `routing-core.md`. Actual policy inspection,
+confirmation and editing belong to `idd-factory-configure`, as follows.
 
 Only `.idd/execution.yaml` stores project-owned Factory model policy.
 Missing policy and absent mappings inherit host settings. A review request
@@ -374,25 +212,11 @@ the workflow still returns the discovery summary as temporary output.
 
 ## Workflow Family: Visual Intent Clarification and Maintenance
 
-Use `Classification: product-change`, **not** a new visual classification,
-when appearance itself is a durable product requirement. If a visual reference
-leaves meaning, obligation or scope uncertain, select
-`idd-intent-visual-brainstorm` as a **read-only** discovery gate:
-
-```text
-unclear visual reference -> observations / hypotheses
--> user-confirmed Essential / Preferred / Free / Avoid, scope, exceptions
--> stop; separate user request to idd-intent-change
--> current owning spec, synchronized acceptance criteria / verification
-```
-
-The complete discovery-to-maintenance lifecycle is not permission to run the
-next stage in the current request. Already confirmed visual requirements
-(including approved handoff plus 'save it') go straight to
-`idd-intent-change` without repeating discovery or approval. A screenshot
-reporting a defect, a clear product requirement, an explicit reproducible
-fidelity target, and a purely local implementation change do **not**
-automatically require visual brainstorming.
+The read-only visual discovery gate, direct route for confirmed visual intent,
+screenshot exception and handoff stop are defined by `routing-core.md`.
+Within the discovery workflow, observations and hypotheses lead to user-confirmed
+Essential / Preferred / Free / Avoid traits, scopes and exceptions.
+Only a separately authorized Intent owner can write those commitments.
 
 Comparison cards and screenshots support discovery but are not normative by
 themselves; do not infer all visual traits or dynamic states from an image.
@@ -764,26 +588,11 @@ constraints, verification, or non-goals of the owning current spec. Durable
 bootstrap findings belong in confirmed specs or ADRs only after proposal
 approval.
 
-## Complete Workflow and Current Handoff
+## Complete Workflow and Current Handoff (owned by Routing Core)
 
-Routing must distinguish these fields for both ordinary classified workflows
-and direct standalone Factory model-policy selection:
-
-- the `Expected complete workflow`, which describes the safe lifecycle;
-- the `Current handoff`, which is allowed in the current request;
-- the `Stop after` boundary, which follows requested scope and clarity gates.
-
-For `route-only`, the current handoff is none. The standalone Factory
-model-policy route has no classification fields; its `end-to-end` review-only
-case remains read-only. For ordinary classified workflows, `intent-only`
-stops before implementation. For `intent-preserving`, do not change approved Product decisions or
-Engineering; Factory Workers may refine existing Intent monotonically. For `end-to-end`, continue through the complete workflow unless
-ambiguity, required research, a missing durable decision, verification failure,
-or another safety gate blocks progress.
-
-A bootstrap handoff carries scope and temporary discovery context, but the
-bootstrap skill must still ask for product-boundary confirmation and semantic
-proposal approval.
+See `routing-core.md` for the authoritative expected lifecycle, permitted
+handoff, requested-scope and stop distinction. The following section documents
+workflow-specific completion checks.
 
 ## Workflow Completion Rules
 

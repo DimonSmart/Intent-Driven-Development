@@ -60,3 +60,59 @@ It is deliberately excluded from ordinary CI and may report nondeterministic
 host/model behavior. The broader lint acceptance scenarios (collision IDs,
 external references, dirty trees, failed writes, Engineering allocator
 read-only, and scoped reporting) require further isolated live evaluations.
+
+## Isolated IDD route LiveEval
+
+`RouteRoutingLiveTests` is a **separate opt-in** suite. It does not run with
+`IDD_RUN_LIVE_INTENT_EVALS=1`, ordinary `dotnet test`, or
+`scripts/Check.ps1 -Mode Live` (the latter runs Factory evaluations).
+
+The scenarios live in `Scenarios/route-cases.json` (39 cases). They check
+typed route fields and handoff constraints, read-only workspace snapshots and,
+by default, a separate LLM semantic judge for scope, ordering and gates.
+The generated Codex plugin is installed into an isolated `CODEX_HOME`, and
+the route is triggered through a **natural-language automatic workflow**
+request rather than changing `idd-route` into a user-facing public command.
+
+A host that does not trigger the automatic workflow, an unavailable model,
+an unsupported direct-invocation test or an intentionally damaged reference
+must be reported as `not evaluated / host invocation unavailable`, not a
+semantic regression. The directly invoked-skill and missing-reference
+scenarios are explicitly tracked but require their own host/incomplete-plugin
+integration harness and are **not** pretended to have run.
+
+To run on the current checkout:
+
+```powershell
+$env:IDD_RUN_LIVE_ROUTE_EVALS = "1"
+$env:IDD_ROUTE_EVAL_MODEL = "gpt-6"
+$env:IDD_ROUTE_EVAL_REASONING = "medium"
+dotnet test tests/Idd.Intent.LiveTests/Idd.Intent.LiveTests.csproj --filter "Category=LiveRouteEval"
+Remove-Item Env:IDD_RUN_LIVE_ROUTE_EVALS
+Remove-Item Env:IDD_ROUTE_EVAL_MODEL
+Remove-Item Env:IDD_ROUTE_EVAL_REASONING
+```
+
+For comparative baseline evaluation, supply
+`IDD_ROUTE_EVAL_BASELINE_DIR` pointing to a **separate clean checkout**
+at exact commit `b555ed4efee43e5bc21d127fe42890abb643c775`.
+The harness verifies `git rev-parse HEAD` before running. Each revision
+gets a distinct generated marketplace, home and workspace, with identical
+model, reasoning and prompts.
+
+Useful overrides: `IDD_ROUTE_EVAL_CODEX`,
+`IDD_ROUTE_EVAL_TIMEOUT_MINUTES` (default 15 per host call),
+`IDD_ROUTE_EVAL_MAX_CASES`, `IDD_ROUTE_EVAL_OUTPUT_DIR`, and
+`IDD_ROUTE_EVAL_SKIP_JUDGE=1` for troubleshooting. The report
+(`route-report.json`) and raw responses/host events live in the output
+directory; preserve them when investigating discrepancies. Use the same
+host/provider, authenticated model, timeout and installed plugins when
+comparing revisions, and review changed decisions rather than only comparing
+prose.
+
+**Context measurement:** the canonical source sizes provide only a
+Core-only *estimated upper bound* compared to the old unconditional
+route + full workflow read. The harness saves JSONL events, but it does not
+invent actual prompt-token counts or reference-read traces when the host does
+not expose them. Consult `docs/routing-core-migration.md` for the baseline
+ownership map and explicitly unverified cases.

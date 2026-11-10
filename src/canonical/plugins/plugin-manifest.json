@@ -33,6 +33,11 @@
         },
         {
           "skill": "idd-help",
+          "source": "src/canonical/methodology/routing-core.md",
+          "destination": "routing-core.md"
+        },
+        {
+          "skill": "idd-help",
           "source": "src/canonical/methodology/intent-driven-development.md",
           "destination": "methodology.md"
         },
@@ -45,6 +50,11 @@
           "skill": "idd-route",
           "source": "src/canonical/methodology/common-workflows.md",
           "destination": "common-workflows.md"
+        },
+        {
+          "skill": "idd-route",
+          "source": "src/canonical/methodology/routing-core.md",
+          "destination": "routing-core.md"
         },
         {
           "skill": "idd-project-init",

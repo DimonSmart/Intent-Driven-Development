@@ -1,0 +1,552 @@
+{
+  "schemaVersion": 1,
+  "baselineCommit": "b555ed4efee43e5bc21d127fe42890abb643c775",
+  "scenarios": [
+    {
+      "id": "product-add",
+      "request": "Add a requirement: users can export the report as CSV.",
+      "expected": {
+        "classification": "product-change",
+        "operation": "add",
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-change",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Product owner before implementation",
+      "kind": "ordinary"
+    },
+    {
+      "id": "product-modify",
+      "request": "Change the existing report requirement to include XML export.",
+      "expected": {
+        "classification": "product-change",
+        "operation": "modify",
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-change",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Preserve existing unrelated behavior",
+      "kind": "ordinary"
+    },
+    {
+      "id": "product-remove",
+      "request": "Remove the legacy guest checkout requirement and its implementation.",
+      "expected": {
+        "classification": "product-change",
+        "operation": "remove",
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-change",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Removal and dependent contracts",
+      "kind": "ordinary"
+    },
+    {
+      "id": "refactor-only",
+      "request": "Refactor the service class without changing public behavior or specs.",
+      "expected": {
+        "classification": "implementation-change",
+        "operation": null,
+        "requestedScope": "intent-preserving",
+        "firstSkill": "idd-code-implement",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "No normative Product decisions",
+      "kind": "ordinary"
+    },
+    {
+      "id": "focused-bug",
+      "request": "Fix the null reference when pressing Save; expected behavior is saving the current form.",
+      "expected": {
+        "classification": "implementation-change",
+        "operation": null,
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-code-implement",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Do not demand initial drift audit merely for bug",
+      "kind": "ordinary"
+    },
+    {
+      "id": "drift-focused",
+      "request": "Check whether the current login code matches IDD-0012; do not change files.",
+      "expected": {
+        "classification": "intent-drift-audit",
+        "operation": null,
+        "requestedScope": "route-only",
+        "firstSkill": "idd-intent-drift-audit",
+        "auditScope": "focused",
+        "standaloneFactory": false
+      },
+      "contract": "Focused audit requested as advice only",
+      "kind": "ordinary"
+    },
+    {
+      "id": "drift-project",
+      "request": "Audit all current Product Intent for implementation drift across the whole application.",
+      "expected": {
+        "classification": "intent-drift-audit",
+        "operation": null,
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-drift-audit",
+        "auditScope": "project-wide",
+        "standaloneFactory": false
+      },
+      "contract": "Explicit project-wide intent-driven conformance",
+      "kind": "ordinary"
+    },
+    {
+      "id": "normalization",
+      "request": "Merge two duplicate specification documents while preserving meaning.",
+      "expected": {
+        "classification": "intent-normalization",
+        "operation": null,
+        "requestedScope": "intent-only",
+        "firstSkill": "idd-intent-normalize-current",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Semantic movement not mechanical lint",
+      "kind": "ordinary"
+    },
+    {
+      "id": "structure",
+      "request": "Review current specs for duplicate semantic owners; do not edit files.",
+      "expected": {
+        "classification": "intent-structure-audit",
+        "operation": null,
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-structure-audit",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Read-only structure assessment",
+      "kind": "ordinary"
+    },
+    {
+      "id": "lint-check",
+      "request": "Check .idd/intent for broken references and numbering; no modifications.",
+      "expected": {
+        "classification": "intent-lint",
+        "operation": null,
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-lint",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "mode check, no writes",
+      "kind": "ordinary"
+    },
+    {
+      "id": "lint-fix",
+      "request": "Check and fix unambiguous mechanical numbering errors in .idd/intent.",
+      "expected": {
+        "classification": "intent-lint",
+        "operation": null,
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-lint",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "mode fix, no semantic edits",
+      "kind": "ordinary"
+    },
+    {
+      "id": "import",
+      "request": "Import these already-approved durable requirements from the supplied design document into IDD.",
+      "expected": {
+        "classification": "intent-import",
+        "operation": null,
+        "requestedScope": "intent-only",
+        "firstSkill": "idd-intent-import",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Source already expresses durable decisions",
+      "kind": "ordinary"
+    },
+    {
+      "id": "bootstrap",
+      "request": "The existing application has no current IDD specs; reconstruct and propose its existing product behavior for my approval.",
+      "expected": {
+        "classification": "intent-bootstrap",
+        "operation": null,
+        "requestedScope": "intent-only",
+        "firstSkill": "idd-intent-bootstrap",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Approval before writing, depth not-applicable",
+      "kind": "ordinary"
+    },
+    {
+      "id": "engineering-add",
+      "request": "Add a durable Engineering Rule: code must use nullable reference types.",
+      "expected": {
+        "classification": "engineering-change",
+        "operation": "add",
+        "requestedScope": "intent-only",
+        "firstSkill": "idd-engineering-change",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "No product behavior change",
+      "kind": "ordinary"
+    },
+    {
+      "id": "engineering-modify",
+      "request": "Modify ENG-0003 to require stricter logging; do not change code.",
+      "expected": {
+        "classification": "engineering-change",
+        "operation": "modify",
+        "requestedScope": "intent-only",
+        "firstSkill": "idd-engineering-change",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "No implementation implied",
+      "kind": "ordinary"
+    },
+    {
+      "id": "engineering-remove",
+      "request": "Remove the obsolete Engineering Rule ENG-0010, only update the policy.",
+      "expected": {
+        "classification": "engineering-change",
+        "operation": "remove",
+        "requestedScope": "intent-only",
+        "firstSkill": "idd-engineering-change",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Direct validation",
+      "kind": "ordinary"
+    },
+    {
+      "id": "implementation-simple",
+      "request": "Implement the already-approved IDD-0005 requirement, leaving other specs unchanged.",
+      "expected": {
+        "classification": "implementation-change",
+        "operation": null,
+        "requestedScope": "intent-preserving",
+        "firstSkill": "idd-code-implement",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Focused implementation and verify",
+      "kind": "ordinary"
+    },
+    {
+      "id": "implementation-many",
+      "request": "Implement the approved migration across five services, preserving compatibility and staging the rollout.",
+      "expected": {
+        "classification": "implementation-change",
+        "operation": null,
+        "requestedScope": "end-to-end",
+        "firstSkill": null,
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Orchestrated depth; Factory optional if installed",
+      "kind": "ordinary"
+    },
+    {
+      "id": "factory-policy-change",
+      "request": "Set the Codex strong Factory model to gpt-6 and reasoning effort high; do not change product behavior.",
+      "expected": {
+        "classification": null,
+        "operation": null,
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-factory-configure",
+        "auditScope": null,
+        "standaloneFactory": true
+      },
+      "contract": "Standalone shortcut omits ordinary fields",
+      "kind": "ordinary"
+    },
+    {
+      "id": "factory-policy-review",
+      "request": "Review the configured Factory economy, standard and strong model assignments, read-only; do not edit policy.",
+      "expected": {
+        "classification": null,
+        "operation": null,
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-factory-configure",
+        "auditScope": null,
+        "standaloneFactory": true
+      },
+      "contract": "Standalone read-only shortcut",
+      "kind": "ordinary"
+    },
+    {
+      "id": "factory-policy-route",
+      "request": "Which IDD skill should I use to change Factory model assignments? Do not execute it.",
+      "expected": {
+        "classification": null,
+        "operation": null,
+        "requestedScope": "route-only",
+        "firstSkill": "idd-factory-configure",
+        "auditScope": null,
+        "standaloneFactory": true
+      },
+      "contract": "No handoff",
+      "kind": "ordinary"
+    },
+    {
+      "id": "confirmed-visual",
+      "request": "The Essential visual design has been confirmed; save the approved requirements in the owning spec, no implementation.",
+      "expected": {
+        "classification": "product-change",
+        "operation": "modify",
+        "requestedScope": "intent-only",
+        "firstSkill": "idd-intent-change",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "No extra brainstorm",
+      "kind": "ordinary"
+    },
+    {
+      "id": "visual-uncertain",
+      "request": "Use this screenshot as inspiration for a new dashboard style; I haven't chosen which visual traits to preserve.",
+      "expected": {
+        "classification": "product-change",
+        "operation": null,
+        "requestedScope": "intent-only",
+        "firstSkill": "idd-intent-visual-brainstorm",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Read-only discovery gate",
+      "kind": "ordinary"
+    },
+    {
+      "id": "bug-screenshot",
+      "request": "Fix the displayed overflow visible in the screenshot; the panel should not clip text, and this is the expected behavior.",
+      "expected": {
+        "classification": "implementation-change",
+        "operation": null,
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-code-implement",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Screenshot bug not visual discovery",
+      "kind": "ordinary"
+    },
+    {
+      "id": "route-advice",
+      "request": "Which IDD workflow applies to changing an existing Product Requirement? Explain only, do not run anything.",
+      "expected": {
+        "classification": "product-change",
+        "operation": "modify",
+        "requestedScope": "route-only",
+        "firstSkill": "idd-intent-change",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "No execution and no current handoff",
+      "kind": "ordinary"
+    },
+    {
+      "id": "no-spec-changes",
+      "request": "Refactor only the parser, do not touch any specs or Engineering Rules.",
+      "expected": {
+        "classification": "implementation-change",
+        "operation": null,
+        "requestedScope": "intent-preserving",
+        "firstSkill": "idd-code-implement",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Preserve prohibition",
+      "kind": "ordinary"
+    },
+    {
+      "id": "mixed-product-engineering-code",
+      "request": "Add a new upload feature, define an explicit Engineering Rule for logging, and implement both end to end.",
+      "expected": {
+        "classification": "product-change",
+        "operation": "add",
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-change",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Both durable owners before implementation",
+      "kind": "ordinary"
+    },
+    {
+      "id": "mixed-policy-implementation",
+      "request": "Update the Factory standard model mapping and then implement the already-approved request.",
+      "expected": {
+        "classification": "implementation-change",
+        "operation": null,
+        "requestedScope": "end-to-end",
+        "firstSkill": null,
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Not a standalone configure shortcut; retain both stages",
+      "kind": "ordinary"
+    },
+    {
+      "id": "unclear-product",
+      "request": "Make the product nicer, but I do not know which behavior should change.",
+      "expected": {
+        "classification": "unclear",
+        "operation": null,
+        "requestedScope": null,
+        "firstSkill": "idd-intent-brainstorm",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "No unauthorized change",
+      "kind": "ordinary"
+    },
+    {
+      "id": "verification-policy",
+      "request": "Create project verification configuration in .idd/verification.yaml for the test suite.",
+      "expected": {
+        "classification": "verification-configuration",
+        "operation": null,
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-verification-configure",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Not running checks; manual-only skill",
+      "kind": "ordinary"
+    },
+    {
+      "id": "verification-checks",
+      "request": "Run the existing configured verification checks and fix a failing C# test; no verification policy edit.",
+      "expected": {
+        "classification": "implementation-change",
+        "operation": null,
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-code-implement",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Policy not edited",
+      "kind": "ordinary"
+    },
+    {
+      "id": "initialization",
+      "request": "Initialize the project's IDD structure, without reverse-engineering or implementing product behavior.",
+      "expected": {
+        "classification": "project-initialization",
+        "operation": null,
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-project-init",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Manual-only invocation gate",
+      "kind": "ordinary"
+    },
+    {
+      "id": "code-to-intent",
+      "request": "I approve the current implemented timeout behavior; record it as durable Product Intent.",
+      "expected": {
+        "classification": "implementation-to-intent",
+        "operation": null,
+        "requestedScope": "intent-only",
+        "firstSkill": "idd-code-update-intent",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Confirmed behavior rather than guessing from code",
+      "kind": "ordinary"
+    },
+    {
+      "id": "intent-preserving-factory",
+      "request": "Use Factory to refactor the approved implementation while preserving existing Product Intent and all Engineering Rules.",
+      "expected": {
+        "classification": "implementation-change",
+        "operation": null,
+        "requestedScope": "intent-preserving",
+        "firstSkill": null,
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Only Factory Workers have monotonic refinement exception",
+      "kind": "ordinary"
+    },
+    {
+      "id": "manual-command",
+      "request": "Which workflow would create an optional IDD glossary? Advise only; do not invoke it.",
+      "expected": {
+        "classification": null,
+        "operation": null,
+        "requestedScope": "route-only",
+        "firstSkill": "idd-glossary-build",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Manual-only prohibition",
+      "kind": "ordinary"
+    },
+    {
+      "id": "missing-meaning",
+      "request": "Use the stuff we discussed last month to update everything; the previous conversation is not supplied.",
+      "expected": {
+        "classification": null,
+        "operation": null,
+        "requestedScope": null,
+        "firstSkill": null,
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Missing isolated input must block, no invented history",
+      "kind": "ordinary"
+    },
+    {
+      "id": "missing-reference",
+      "request": "The required installed routing-core.md file is absent. Route my change anyway.",
+      "expected": {
+        "classification": null,
+        "operation": null,
+        "requestedScope": null,
+        "firstSkill": null,
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Missing mandatory Core should block without guessing",
+      "kind": "missing-reference"
+    },
+    {
+      "id": "direct-skill",
+      "request": "$idd-skip Implement the task without IDD.",
+      "expected": {
+        "classification": null,
+        "operation": null,
+        "requestedScope": null,
+        "firstSkill": null,
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Direct skill invocation bypasses router",
+      "kind": "host-bypass"
+    },
+    {
+      "id": "direct-factory",
+      "request": "$idd-factory-configure Review the Factory settings.",
+      "expected": {
+        "classification": null,
+        "operation": null,
+        "requestedScope": null,
+        "firstSkill": null,
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Direct named skill bypasses router",
+      "kind": "host-bypass"
+    }
+  ]
+}
