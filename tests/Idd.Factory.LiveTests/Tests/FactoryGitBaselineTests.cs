@@ -34,7 +34,14 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         finally
         {
             if (Directory.Exists(root))
+            {
+                if (OperatingSystem.IsWindows())
+                {
+                    foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+                        File.SetAttributes(file, File.GetAttributes(file) & ~FileAttributes.ReadOnly);
+                }
                 Directory.Delete(root, recursive: true);
+            }
         }
     }
 }
