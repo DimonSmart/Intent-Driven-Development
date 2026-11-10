@@ -52,10 +52,10 @@ Skill from a short prompt. Internal names are not authorization.
 
 Root must not read, reproduce, quote, or transmit the Planner/Worker protocol
 bodies. The host supplies the registered instructions to the selected child.
-Both child definitions include the canonical Engineering Guardrails contract
-as role-local generated content; Root may read its own
-`references/engineering-guardrails.md` for preflight, but never forward the
-complete contract in place of the child's instructions.
+Both child definitions contain their complete canonical role protocols,
+including role-specific Engineering obligations. Root reads
+`references/engineering-guardrails.md` when required by its workflow,
+but never forwards the full methodology to children.
 
 Every spawn carries only the bounded Factory assignment and accessible paths
 (or exact materialized request/answers where needed). Resolve paths against
@@ -366,7 +366,7 @@ plugin version does not imply permission.
    for active runs. Give it the unchanged base request or verified saved path,
    chronological exact Q/A (if any), repository access, Engineering discovery
    metadata and bounded preparation verification failure. The child's own
-   host-loaded instructions include the canonical Engineering contract.
+   host-loaded Planner protocol includes its Engineering obligations.
    No `completed.md` exists before any Worker. No active marker exists yet.
 2. `# Question`: require exactly one concrete question. Save the exact text
    to `preparation/question.md` before asking the user and stop this turn.
@@ -513,7 +513,8 @@ Give the planner only:
 - original immutable baseline and bounded verified preflight/Worker
   provenance, including any unknown changes or deferred contract issues;
 - whether the optional Engineering layer exists and the validated discovery
-  paths; the child already has its own generated canonical Engineering contract.
+  paths; the child's host-loaded Planner protocol contains its Engineering
+  obligations.
 
 The planner discovers current durable intent through the normal
 `.idd/intent/README.md` and `INDEX.md` flow and reads only relevant documents.
@@ -526,8 +527,8 @@ correct decomposition.
 
 Do not rely on child Skill discovery or inherited Root references. Do not
 forward the Root transcript, earlier child transcripts, full role protocols,
-or complete Intent/Engineering trees. Fail closed if host-loaded instructions
-or required role-local Engineering contents cannot be established.
+or complete Intent/Engineering trees. Fail closed if host-loaded role
+instructions or required repository references cannot be established.
 
 The planner creates only implementation/research tasks. It must not execute
 implementation or create tasks to update Product Intent, create/modify
@@ -603,10 +604,9 @@ IDs. A missing, duplicated, malformed, or metadata-inconsistent mandatory
 rule blocks execution without repairing the Engineering layer. Do not
 semantically reselect Conditional rules.
 
-The host-loaded Worker definition includes the canonical Engineering Guardrails
-contract; pass the Worker verified baseline/provenance context or paths to the saved
-files, and carry explicit user document prohibitions and conservative legacy
-scope. Do not add another `# Task` section. The root resolves the execution
+The host-loaded Worker protocol contains its Engineering obligations; pass
+the Worker verified baseline/provenance context or paths to the saved files,
+and carry explicit user document prohibitions and conservative legacy scope. Do not add another `# Task` section. The root resolves the execution
 profile and native model
 settings before spawn; the worker never selects a model or reads execution
 policy.
