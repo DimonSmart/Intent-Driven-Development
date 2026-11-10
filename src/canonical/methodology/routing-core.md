@@ -316,6 +316,21 @@ substitute another skill or write policy from the router.
 
 ## First Skill
 
+For an **advice-only** request asking which IDD workflow handles a specific
+operation, identify its actual capability owner before applying the ordinary
+classification-to-skill index. Consult registered skill metadata when the
+matching workflow is manual-only. A manual-only skill may be **recommended**
+without being invoked; do not substitute a generic Product Intent change just
+because the question uses verbs such as "create" or "update".
+
+In particular, questions about which workflow creates, reviews, or updates
+the optional project glossary must recommend `idd-glossary-build`, not
+`idd-intent-change`. For "which workflow?" / "advise only" requests set
+`Requested scope: route-only`, `Current handoff: none`, and stop after the
+recommendation. Do not invoke a manual-only command on the user's behalf.
+Keep the ordinary route output fields; this recommendation does not create
+a new classification or authorize glossary changes.
+
 For ordinary classified routes, use the following first-skill index; the standalone Factory
 model-policy route above is selected before the table:
 
