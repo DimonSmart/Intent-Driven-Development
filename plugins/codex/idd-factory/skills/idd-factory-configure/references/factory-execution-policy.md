@@ -75,7 +75,11 @@ Partial mappings are valid. A missing profile or missing active-platform mapping
 means inherit host model/reasoning settings for that task. A Codex-only mapping
 does not require a Claude mapping; Claude inherits when its mapping is absent.
 The same concrete model may be assigned to more than one profile, including
-with different reasoning settings.
+with different reasoning settings. An effort field is optional: when a model
+is explicit but its effort field is absent, the native host/model selects its
+default reasoning behavior for that child. That is not a request to inherit
+the parent session's exact effort. An absent profile/platform mapping instead
+inherits both the host model choice and its reasoning behavior.
 
 The two strategies do not mix. `modelStrategy: inherit` applies globally to all
 three profiles. `executionProfiles` may override only selected profiles and
@@ -126,7 +130,11 @@ no overrides. Never fill absent mappings with the current session model ID.
 For the current adapters, Codex mappings use `model` and optional
 `reasoningEffort`; Claude mappings use `model` and optional `effort`.
 Canonical IDD does not define concrete model IDs or enumerate allowed effort
-values.
+values. A guided model-selection proposal presents model and optional effort
+as one decision per selected platform/profile. Recommend an effort only when
+current host/vendor evidence supports its compatibility; otherwise disclose
+uncertainty and offer omission. Complexity profiles do not prescribe vendor
+effort values. Clearing effort removes only its optional key, not the model.
 
 Do not silently convert malformed explicit policy to `inherit`. Return a clear
 diagnostic and stop before spawning the affected worker.
@@ -170,8 +178,8 @@ update after this lookup does not alter the already-created worker; the next
 worker reads the current file (or observes its absence) without a new plan.
 
 If the host rejects the configured model/settings, or cannot honor an explicit
-per-child override, do not substitute another model and do not change the
-profile. Stop with a clear diagnostic and suggest rerunning
+per-child override, do not substitute another model, suppress the effort
+setting, or change the profile. Stop with a clear diagnostic and suggest rerunning
 `idd-factory-configure`.
 
 The same canonical Factory worker protocol is used for every execution profile.

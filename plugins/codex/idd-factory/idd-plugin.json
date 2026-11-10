@@ -1,10 +1,20 @@
 {
-  "version": "2.0.88",
+  "version": "2.0.89",
   "platform": "codex",
   "dependencies": [
     "idd-intent"
   ],
   "roles": [],
+  "nativeAgents": [
+    {
+      "name": "idd-internal-factory-planner",
+      "source": "src/canonical/factory/planner.md"
+    },
+    {
+      "name": "idd-internal-factory-worker",
+      "source": "src/canonical/factory/worker.md"
+    }
+  ],
   "roleDefinitions": [],
   "skillRoleBindings": [],
   "assets": [

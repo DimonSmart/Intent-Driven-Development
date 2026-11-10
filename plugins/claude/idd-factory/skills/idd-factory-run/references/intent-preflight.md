@@ -212,6 +212,12 @@ no new Factory state
 
 ## New-run ordering
 
+Before any durable owner or Factory write, the Factory Root also checks that the
+host supports isolated native children and that **both registered** Planner
+and Worker roles resolve unambiguously. The operational role-identity, spawn
+transport and readiness checks belong to `idd-factory-run.md`; they are
+prerequisites to (not substitutes for) the following normative phases.
+
 ```text
 1. materialize complete logical request
 2. resolve scope and non-mutating Product / Engineering classifications
@@ -246,8 +252,10 @@ including staged/unstaged/untracked, deleted and renamed paths. Parse NUL
 delimiters, including rename pairs, never split by whitespace. The optional
 Engineering directory may be absent. Dirty code/tests outside the managed
 paths do not block a new run. Refuse a dirty managed tree with affected paths;
-never auto-commit. Resolve a real full `HEAD^{commit}` SHA and check
-again immediately before mutating if managed state could have changed.
+never auto-commit. Resolve a real full `HEAD^{commit}` SHA (pass the revision as one literal,
+quoted argument in shells such as PowerShell) and check again immediately
+before mutating if managed state could have changed. An invocation/shell
+parsing failure is not evidence of an absent commit.
 
 Save the original complete request and `preparation/baseline.md` (immutable
 full HEAD SHA, sanitized Git repository identity, managed-document cleanliness

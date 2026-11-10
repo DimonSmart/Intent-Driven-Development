@@ -1,8 +1,9 @@
 {
-  "version": "2.0.88",
+  "version": "2.0.89",
   "platform": "claude",
   "dependencies": [],
   "roles": [],
+  "nativeAgents": [],
   "roleDefinitions": [],
   "assets": [
     {

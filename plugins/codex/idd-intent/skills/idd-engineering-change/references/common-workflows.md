@@ -658,100 +658,86 @@ A bug is not a separate top-level workflow family. Route through intent or
 conformance workflows only when they are needed to decide or protect durable
 product meaning; otherwise prefer the smallest focused implementation workflow.
 
+
 ## Focused and Orchestrated Execution
 
-Use focused execution when one implementation pass can safely satisfy current
-intent. Use optional `idd-factory-run` for coordinated multi-task
-implementation, sequencing, temporary planning, or high-risk preservation
-boundaries. Factory remains optional and must not become a dependency of
-`idd-intent`.
+Use focused implementation when one bounded pass can safely preserve
+current Product Intent. Use optional `idd-factory-run` when multiple
+tasks, sequencing, significant preservation risks or staged
+implementation call for native Planner/Worker orchestration.
+The intent plugin never requires Factory to be installed.
 
-The logical request is materialized once as complete self-contained input.
-Before a new run, apply Factory Preflight:
-
-```text
-complete logical request
--> requested scope
--> Product Intent analysis
--> explicit Engineering concern detection
--> check clean managed IDD and valid original HEAD on new runs
--> persist .idd/factory/preparation/request.md, baseline.md, provenance.md
--> checkpoint Engineering owner when required
--> checkpoint Product Intent owner when required
--> durable coverage validation
--> fresh initial Planner [INACTIVE]
-   -> Question: preparation/question.md + exact answers -> renewed coverage -> fresh Planner
-   -> Done: final verification without activation
-   -> Tasks: validate executable batch -> current/plan.md + exact answers
--> create .idd/factory/current/request.md LAST [ACTIVE]
--> sequential native Workers -> fresh Planner
-```
-
-Request-level MissingIntentDecision and EngineeringDecisionMissing block BEFORE
-durable mutations and `preparation/`. Initial Planner `# Question` can occur
-only AFTER successful preflight. An unchosen internal technique is an
-autonomous implementation choice, not a missing Engineering Rule. Planner
-must consider applicable Conditional Rules for realistic alternatives left
-to Worker, or narrow/research the Task before execution.
-
-The Product Intent sub-analysis retains
-`AlreadyCovered | ExplicitIntentChange | MissingIntentDecision | ImplementationOnly`.
-Factory-level Engineering disposition is only
-`NoEngineeringManagementNeeded | EngineeringManagementRequired |
-EngineeringDecisionMissing`; semantic equivalence and owner mapping stay inside
-`idd-engineering-change`.
-
-When both durable layers must change, analyze Product Intent first, perform
-Engineering management second, apply Product Intent mutation third, then validate
-coverage. `idd-engineering-change => ambiguous | blocked` stops before active
-Factory state. This ordering is not a rollback transaction.
-
-The Factory semantic loop is intentionally small:
+Factory entry uses a complete self-contained logical request and a
+**Preflight before active implementation**. For orientation:
 
 ```text
-fresh planner
--> current batch
--> fresh sequential worker per task
--> fresh planner
+complete original request + explicit scope
+  -> analyze Product Intent and explicit durable Engineering concerns
+  -> reject request-level blockers before writes
+  -> independent new-run Git baseline + preparation checkpoints
+  -> Engineering owner (when required), then Product Intent owner
+  -> validate coverage of both durable layers and full request
+  -> fresh isolated initial Planner while INACTIVE
+       Question -> save one question + exact Q/A, renew preflight as needed
+       Done     -> final verification, finish without activating
+       Tasks    -> validate batch, prepare plan/answers/baseline/provenance
+  -> write current/request.md LAST [ACTIVE]
+  -> sequential native Workers + fresh isolated Planner
+  -> final project verification + Intent Refinement Review
 ```
 
-Each planner and worker receives a fresh isolated semantic context rather than
-the root transcript. Workers share the repository but do not share transcripts.
-The repository is authoritative implementation reality.
+Factory's Product assessment distinguishes `AlreadyCovered`,
+`ExplicitIntentChange`, `MissingIntentDecision`, and
+`ImplementationOnly`. Its Engineering entry assessment distinguishes
+`NoEngineeringManagementNeeded`, `EngineeringManagementRequired`,
+and `EngineeringDecisionMissing`; Engineering Rule equivalence and
+changes belong to `idd-engineering-change`, not Factory. Ordinary
+unchosen implementation techniques do not create missing durable
+decisions. Root checks host support and both registered native roles
+before durable owner/Factory writes.
 
-New planner output must contain exactly one `ExecutionProfile` per task:
-`economy`, `standard`, or `strong`. Missing, empty, repeated, or unknown profiles
-invalidate new output before it is saved. Existing pending tasks in `plan.md`
-without the section remain valid and use `standard`; explicit empty, repeated,
-or unknown profiles still block execution. The planner never reads model policy.
-Immediately before each worker spawn, the root agent checks optional
-`.idd/execution.yaml`, re-reading and validating it when present. An absent
-policy or missing profile/platform mapping means inherit host settings. Partial
-mappings are valid. Malformed existing mappings block execution and never trigger
-silent inheritance. The root applies exact configured native model/settings
-without substituting another model or reclassifying the task.
+Missing durable Product/Engineering decisions, conflicts and unauthorized
+scope expansion block before `preparation/` and owner mutations.
+Analyze Product first, resolve an explicit Engineering owner second,
+mutate authorized Product Intent third, then validate complete durable
+coverage. An Engineering owner result of `blocked` or `ambiguous`
+cannot activate Factory. Already authorized owner writes are not
+automatically rolled back after interruption.
 
-Temporary continuation state includes original request, immutable baseline,
-bounded owner/Worker provenance, remaining batch, short results, exact Q/A,
-and optional question/verification-failure artifacts. There is no Factory-owned workflow
-state machine, process supervisor, MCP transport, retry budget, or exact
-continuation protocol.
+`current/request.md` alone marks an active run. Saved preparation is
+recoverable without assuming an earlier write failed; active continuation
+does not recreate the initial baseline. Explicit replacement must
+preserve existing active state until successful preflight and cannot
+change Engineering while that run is active. Partial activation,
+unknown provenance or an interrupted child writer calls for conservative
+recovery, not fabricated permission or automatic rollback. The
+detailed baseline, request identity, provenance, recovery and initial
+Planner protocol is defined in the canonical `intent-preflight.md`
+document, packaged as a reference for `idd-factory-run`, **not**
+for `idd-help` or `idd-route`. The diagram above provides
+independent orientation for Help.
 
-Factory uses at-least-once execution. An interrupted task may execute again; a
-fresh worker inspects current repository reality and converges from whatever
-correct partial work already exists.
+Each active cycle plans remaining work, runs one fresh registered Worker
+at a time and re-plans in an isolated child context; workers share
+repository state but not transcripts. Planner Tasks identify existing
+relevant Conditional Engineering Rules; Root supplies the current
+Always set before Workers. New Tasks require exactly one
+`ExecutionProfile` (`economy`, `standard`, `strong`). Legacy
+pending Tasks without a profile use `standard`; invalid explicit
+profiles fail closed. Optional `.idd/execution.yaml` maps profiles
+to native model settings; absent mappings inherit host settings,
+invalid mappings block. Planner never chooses the model.
 
-When the planner returns `# Done`, run configured project verification. A
-bounded verification failure becomes input to a new fresh planner. A successful
-verification completes Factory. Planner `# Question` persists one concrete
-question and stops until the user answers. Product-Intent answers use the normal
-outer Intent workflow. A new durable Engineering decision cannot be applied
-inside the active run; keep Factory paused and require a later new complete run
-after the current one is completed or cancelled.
-
-Do not start or resume implementation when requested scope is `route-only` or
-`intent-only`. With `intent-preserving`, Factory runs without changing approved Product
-decisions or Engineering; Workers may refine existing Intent monotonically.
+Factory is at-least-once: a recovering Worker inspects the actual
+repository and converges from partial progress. `# Done` after
+activation triggers final verification, and failures go back to a
+fresh Planner with bounded evidence. A question stops until answered;
+a new durable Engineering decision cannot be applied inside an
+active run. The orchestration is not a new runtime or transaction.
+Scope remains binding throughout: `route-only` and
+`intent-only` cannot start Factory; `intent-preserving`
+cannot mutate normative decisions, although authorized Factory
+Workers may monotonically refine existing Intent owners.
 
 ## Preservation And Discovery Boundaries
 
