@@ -212,6 +212,12 @@ no new Factory state
 
 ## New-run ordering
 
+Before any durable owner or Factory write, the Factory Root also checks that the
+host supports isolated native children and that **both registered** Planner
+and Worker roles resolve unambiguously. The operational role-identity, spawn
+transport and readiness checks belong to `idd-factory-run.md`; they are
+prerequisites to (not substitutes for) the following normative phases.
+
 ```text
 1. materialize complete logical request
 2. resolve scope and non-mutating Product / Engineering classifications
