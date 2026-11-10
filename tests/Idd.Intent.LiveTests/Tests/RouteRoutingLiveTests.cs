@@ -184,7 +184,7 @@ public sealed class RouteRoutingLiveTests
             timeoutMinutes, results);
         var candidate = results.Where(x => x.Revision == "candidate").ToArray();
         Assert.DoesNotContain(candidate, x => x.Status == "route incorrect");
-        Assert.NotEmpty(candidate.Where(x => x.Status == "route correct"));
+        Assert.Contains(candidate, x => x.Status == "route correct");
 
         // Baseline and candidate responses remain independent, and model
         // variability is visible in the report; no byte-for-byte text comparison.
