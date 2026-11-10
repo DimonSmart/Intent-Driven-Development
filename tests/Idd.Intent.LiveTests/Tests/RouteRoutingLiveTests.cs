@@ -33,7 +33,9 @@ public sealed class RouteRoutingLiveTests
         string? FirstSkill,
         string? AuditScope,
         bool StandaloneFactory,
-        string? CurrentHandoff = null);
+        string? CurrentHandoff = null,
+        string? Clarity = null,
+        string? ExecutionDepth = null);
     private sealed record RouteCase(
         string Id, string Request, ExpectedRoute Expected, string Contract, string Kind);
     private sealed record RouteCases(int SchemaVersion, string BaselineCommit, RouteCase[] Scenarios);
@@ -137,6 +139,10 @@ public sealed class RouteRoutingLiveTests
                 if (scenario.Id is "product-modify" or "drift-focused" or
                     "implementation-simple" or "engineering-modify")
                     SeedMinimalIntent(work);
+                if (scenario.Id == "import-present")
+                    await File.WriteAllTextAsync(Path.Combine(work,
+                        "approved-requirements.md"),
+                        "# Approved requirements\n\nThe report must be exportable as CSV.\n");
 
                 // These are separate host-integrations or an intentionally damaged
                 // plugin installation; do not simulate them with a normal route.
@@ -269,6 +275,8 @@ public sealed class RouteRoutingLiveTests
             ("Classification", expected.Classification),
             ("Operation", expected.Operation),
             ("Requested scope", expected.RequestedScope),
+            ("Clarity", expected.Clarity),
+            ("Execution depth", expected.ExecutionDepth),
             ("Recommended first skill", expected.FirstSkill),
             ("Audit scope", expected.AuditScope),
             ("Current handoff", expected.CurrentHandoff)
@@ -309,7 +317,8 @@ public sealed class RouteRoutingLiveTests
             return ("route incorrect",
                 "An expected handoff cannot stop at the routing recommendation.");
 
-        return ("route correct", "Complete '# IDD Route' fields and unchanged workspace passed.");
+        return ("route correct", "Typed structural fields and unchanged workspace passed; " +
+            "semantic workflow and free-text stop boundaries require judge or manual review.");
     }
 
     private static string ResolveSandbox(string? configured)

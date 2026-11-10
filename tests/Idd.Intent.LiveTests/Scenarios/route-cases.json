@@ -12,7 +12,9 @@
         "firstSkill": "idd-intent-change",
         "currentHandoff": "idd-intent-change",
         "auditScope": null,
-        "standaloneFactory": false
+        "standaloneFactory": false,
+        "clarity": "clear",
+        "executionDepth": "focused"
       },
       "contract": "Product owner before implementation",
       "kind": "ordinary"
@@ -27,7 +29,9 @@
         "firstSkill": "idd-intent-change",
         "auditScope": null,
         "standaloneFactory": false,
-        "currentHandoff": "idd-intent-change"
+        "currentHandoff": "idd-intent-change",
+        "clarity": "clear",
+        "executionDepth": "focused"
       },
       "contract": "Product owner before implementation; complete authorized lifecycle",
       "kind": "ordinary"
@@ -38,10 +42,11 @@
       "expected": {
         "classification": "product-change",
         "operation": "modify",
-        "requestedScope": "end-to-end",
+        "requestedScope": "intent-only",
         "firstSkill": "idd-intent-change",
         "auditScope": null,
-        "standaloneFactory": false
+        "standaloneFactory": false,
+        "clarity": "clear"
       },
       "contract": "Preserve existing unrelated behavior",
       "kind": "ordinary"
@@ -69,7 +74,9 @@
         "requestedScope": "intent-preserving",
         "firstSkill": "idd-code-implement",
         "auditScope": null,
-        "standaloneFactory": false
+        "standaloneFactory": false,
+        "clarity": "clear",
+        "executionDepth": "focused"
       },
       "contract": "No normative Product decisions",
       "kind": "ordinary"
@@ -94,7 +101,7 @@
       "expected": {
         "classification": "intent-drift-audit",
         "operation": null,
-        "requestedScope": "route-only",
+        "requestedScope": "end-to-end",
         "firstSkill": "idd-intent-drift-audit",
         "auditScope": "focused",
         "standaloneFactory": false
@@ -111,7 +118,9 @@
         "requestedScope": "end-to-end",
         "firstSkill": "idd-intent-drift-audit",
         "auditScope": "project-wide",
-        "standaloneFactory": false
+        "standaloneFactory": false,
+        "clarity": "clear",
+        "executionDepth": "not-applicable"
       },
       "contract": "Explicit project-wide intent-driven conformance",
       "kind": "ordinary"
@@ -181,9 +190,12 @@
         "requestedScope": "intent-only",
         "firstSkill": "idd-intent-import",
         "auditScope": null,
-        "standaloneFactory": false
+        "standaloneFactory": false,
+        "clarity": "clear",
+        "executionDepth": "not-applicable",
+        "currentHandoff": "none"
       },
-      "contract": "Source already expresses durable decisions",
+      "contract": "Already-decided IDD knowledge only; supplied design document is absent in the isolated workspace; stop on missing source, never invent content or broaden scope.",
       "kind": "ordinary"
     },
     {
@@ -195,7 +207,10 @@
         "requestedScope": "intent-only",
         "firstSkill": "idd-intent-bootstrap",
         "auditScope": null,
-        "standaloneFactory": false
+        "standaloneFactory": false,
+        "clarity": "clear",
+        "executionDepth": "not-applicable",
+        "currentHandoff": "idd-intent-bootstrap"
       },
       "contract": "Approval before writing, depth not-applicable",
       "kind": "ordinary"
@@ -209,7 +224,10 @@
         "requestedScope": "intent-only",
         "firstSkill": "idd-engineering-change",
         "auditScope": null,
-        "standaloneFactory": false
+        "standaloneFactory": false,
+        "clarity": "clear",
+        "executionDepth": "not-applicable",
+        "currentHandoff": "idd-engineering-change"
       },
       "contract": "No product behavior change",
       "kind": "ordinary"
@@ -331,11 +349,14 @@
       "request": "Use this screenshot as inspiration for a new dashboard style; I haven't chosen which visual traits to preserve.",
       "expected": {
         "classification": "product-change",
-        "operation": null,
+        "operation": "add",
         "requestedScope": "intent-only",
         "firstSkill": "idd-intent-visual-brainstorm",
         "auditScope": null,
-        "standaloneFactory": false
+        "standaloneFactory": false,
+        "clarity": "ambiguous",
+        "executionDepth": "not-applicable",
+        "currentHandoff": "idd-intent-visual-brainstorm"
       },
       "contract": "Read-only discovery gate",
       "kind": "ordinary"
@@ -389,11 +410,14 @@
         "classification": "product-change",
         "operation": "add",
         "requestedScope": "end-to-end",
-        "firstSkill": "idd-intent-change",
+        "firstSkill": "idd-intent-brainstorm",
         "auditScope": null,
-        "standaloneFactory": false
+        "standaloneFactory": false,
+        "clarity": "ambiguous",
+        "executionDepth": "orchestrated",
+        "currentHandoff": "idd-intent-brainstorm"
       },
-      "contract": "Both durable owners before implementation",
+      "contract": "Underspecified mixed request: clarity gate first; both durable owners before implementation, orchestrated depth.",
       "kind": "ordinary"
     },
     {
@@ -503,7 +527,10 @@
         "requestedScope": "route-only",
         "firstSkill": "idd-glossary-build",
         "auditScope": null,
-        "standaloneFactory": false
+        "standaloneFactory": false,
+        "clarity": "clear",
+        "executionDepth": "not-applicable",
+        "currentHandoff": "none"
       },
       "contract": "Manual-only prohibition",
       "kind": "ordinary"
@@ -563,6 +590,40 @@
       },
       "contract": "Direct named skill bypasses router",
       "kind": "host-bypass"
+    },
+    {
+      "id": "import-present",
+      "request": "Import the already-approved durable Product requirement from approved-requirements.md in this workspace into IDD, with no implementation work.",
+      "expected": {
+        "classification": "intent-import",
+        "operation": null,
+        "requestedScope": "intent-only",
+        "firstSkill": "idd-intent-import",
+        "auditScope": null,
+        "standaloneFactory": false,
+        "currentHandoff": "idd-intent-import",
+        "clarity": "clear",
+        "executionDepth": "not-applicable"
+      },
+      "contract": "Source document exists; IDD-only migration must include conflict review, validation and lint with an authorized import handoff.",
+      "kind": "ordinary"
+    },
+    {
+      "id": "mixed-product-engineering-code-clear",
+      "request": "Add a profile-picture upload accepting PNG or JPEG up to 5 MB, require a durable Engineering Rule that upload failures are logged with error codes and no file content, and implement and verify both requirements end to end.",
+      "expected": {
+        "classification": "product-change",
+        "operation": "add",
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-change",
+        "auditScope": null,
+        "standaloneFactory": false,
+        "currentHandoff": "idd-intent-change",
+        "clarity": "clear",
+        "executionDepth": "orchestrated"
+      },
+      "contract": "Actionable mixed Product and Engineering changes; distinct owners and gates must precede implementation.",
+      "kind": "ordinary"
     }
   ]
 }

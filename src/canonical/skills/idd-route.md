@@ -11,20 +11,39 @@ project files, Intent, Engineering, Factory state or implementation.
    lifecycle, handoff, stopping, special gates and the detailed-reference index.
 2. Apply the Core's standalone Factory model-policy shortcut before ordinary
    classification; for mixed requests retain all independent workflow stages.
-3. Decide from Core whether the supplied request is unambiguous and sufficient.
-   For each triggered/special case, search for the *exact section heading*
-   in `references/common-workflows.md`, read the chosen section completely
-   (including child headings), and read explicit related dependencies.
-   A Core-only request does **not** preload the detailed document.
-4. If a recommendation may target a manual-only skill and current host
-   invocation metadata is insufficient, read
-   `references/skill-descriptions.json` to check actual `invocation`
-   and `exposure` before producing an automatic handoff. This machine-readable
-   reference is not a second set of routing-policy rules.
-5. If precise partial reads are unsupported, load the entire detailed document
-   **only** when a detailed section is needed; never skip a required gate to
-   save context. Missing mandatory Core or a required detailed section is a
-   blocking incomplete-plugin diagnosis, never a memory-based fallback.
+3. Classify the **original user's request**, not the automatic caller's
+   "output only the route" or "do not invoke" formatting/safety instructions.
+   Such instructions apply to this read-only router, not to `Requested scope`.
+4. Make the complete decision from Core when possible. Consult
+   `references/common-workflows.md` only for an unresolved/special decision,
+   approval gate or lifecycle detail identified in Core's section index.
+   A clear ordinary route does **not** read details just for reassurance.
+5. Find each required **exact Markdown heading**, verify it exists, and read
+   only that section. For a `##` heading include its nested `###` headings
+   and stop **before the next `##`**. For a `###` heading stop before the
+   next `###` or `##`. No padded `sed` ranges or adjacent sections.
+   Read related sections only if the task depends on them.
+6. If a potential manual-only skill has ambiguous host invocation metadata,
+   read `references/skill-descriptions.json` for its actual `invocation`
+   and `exposure`; that reference is not a routing-policy duplicate.
+7. If exact partial reads are unsupported, load the whole detailed file **only
+   when required**. Missing mandatory Core or a needed detailed section is
+   an incomplete-plugin blocker; do not reconstruct it from memory.
+
+When a shell is available, a bounded `##` section can be extracted without
+line-number guesses (replace the heading with the exact indexed heading):
+
+```sh
+awk -v heading='## Workflow Family: Intent Import' '
+  $0 == heading {inside = 1}
+  inside && $0 != heading && /^## / {exit}
+  inside {print}
+' references/common-workflows.md
+```
+
+This prints the selected section and its child headings, not the next family.
+Other read tools may be used if they respect the same heading boundaries.
+Do not open downstream skill instructions just to decide which skill to use.
 
 ## Inputs
 

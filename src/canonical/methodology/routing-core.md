@@ -14,8 +14,10 @@ list of manual-only skills here.
 2. A standalone Factory model-policy request takes the direct configure
    shortcut **before** ordinary classification. If it is one task among
    independent Product/Engineering/code/audit tasks, use ordinary routing.
-3. For other requests apply the dimensions below, choose the smallest scope,
-   then apply approval, clarity, preservation and host availability gates.
+3. For other requests classify the **original user's requested work**, not
+   wrapper instructions governing the router's output or execution. Apply the
+   dimensions below, choose the smallest scope, then apply approval, clarity,
+   preservation and host availability gates.
 4. `Expected complete workflow` describes the full safe lifecycle, not
    permission to execute it. Only `Current handoff` authorizes the next
    caller-owned step; the router itself is read-only.
@@ -117,13 +119,39 @@ Classify how much of the workflow the user authorizes in the current request:
 - `end-to-end`: continue through all requested workflow stages.
 
 Requested scope is independent from what changes and from execution depth. Use
-the narrowest scope that satisfies the explicit request. Explicit limits such
-as "only", "do not change files", "do not implement", and "do not change
-specs" take precedence over the normal complete lifecycle.
+the narrowest scope that satisfies the **original user's** request; preserve
+explicit limits such as "only", "do not implement" and "do not change specs".
+
+Distinguish three different instructions:
+- A user asks **which workflow to use**, requests routing advice only, or
+  explicitly forbids subsequent handoff: `route-only`.
+- A caller, test harness or automatic-routing wrapper says **output only the
+  route**, **do not invoke the skill from inside the router**, or **do not
+  modify files while classifying**: these govern this read-only router's
+  behavior and output. They do **not** reduce the original task's requested
+  scope to `route-only` or suppress an otherwise authorized handoff.
+- A user requests **read-only work** (audit, lint check, review) rather than
+  route advice: route to the appropriate read-only skill; ordinarily
+  `end-to-end` means completing that read-only task, not writing files.
+  "Do not change files" alone is not "only tell me the route".
+
+For a request limited to creating, importing, changing or normalizing **IDD
+knowledge**, use `intent-only` unless code implementation is explicitly
+requested. This covers Product Intent, Engineering Rules, and
+`implementation-to-intent`. A user asking to "import into IDD" authorizes
+knowledge migration and its conflict/validation/lint stages, **not** code
+implementation. Keep an unavailable import source as an explicit handoff
+blocker without broadening the scope. For implementation-only work preserving
+approved Intent/Engineering use `intent-preserving` when requested;
+use `end-to-end` for authorized implementation plus its necessary checks.
 
 Initial bootstrap is normally `intent-only`. It becomes `end-to-end` only when
 the user also explicitly requests later implementation work after the initial
-intent has been confirmed.
+intent has been confirmed. Likewise, undecided visual inspiration requests
+authorize **read-only visual discovery only**: classify `intent-only` to
+express the knowledge-side boundary and stop after discovery. Do not infer
+permission to record normative visual Intent or implement a design from
+"try", "use this screenshot" or similar exploratory wording.
 
 The complete lifecycle describes what is eventually needed for safe delivery.
 It does not grant permission to execute stages outside the requested scope.
@@ -136,11 +164,13 @@ bypasses routing.
 Classify execution depth independently from the product operation and requested
 scope:
 
-- `focused`: one primary product owner, localized implementation, no complex
-  migration, no staged rollout, and no multiple review gates.
-- `orchestrated`: multiple subsystems, independent implementation tasks,
-  migration, compatibility transition, public contract change, high regression
-  risk, sequenced phases, multiple roles, review gates, or major capability
+- `focused`: one bounded owner/change and localized implementation, without
+  complex migration, staged rollout or multiple independent approval gates.
+  A single additive public feature does not automatically require orchestration.
+- `orchestrated`: multiple subsystems or independent tasks, migration,
+  compatibility transition or potentially breaking public contract changes,
+  high regression risk, sequenced phases, **multiple independent durable
+  Product/Engineering owners with separate review gates**, or major capability
   removal.
 - `not-applicable`: routing, initialization, verification configuration,
   bootstrap, imports, audits, lint checks, brainstorms, and pure intent reads
@@ -154,7 +184,9 @@ verified monotonic findings during implementation.
 
 Diff size alone is not enough to choose Factory. Execution depth may describe a
 later implementation stage even when the current requested scope stops at
-routing or intent work.
+routing or intent work. `orchestrated` does not itself invoke or require the
+optional Factory plugin. When an undecided visual discovery is the **only**
+authorized step, use `not-applicable` rather than an implementation depth.
 
 ## Audit scope, decisive distinctions and safety gates
 
@@ -196,8 +228,11 @@ for standalone Factory model-policy routing (no invented placeholders).
 - A `product-change` with visual references but unconfirmed visual meaning,
   scope or strictness must first use read-only
   `idd-intent-visual-brainstorm` to establish Essential/Preferred/Free/Avoid
-  traits and exceptions, then **stop**. Later Intent writing is separately
-  authorized. Already-confirmed visual Intent (including approved "save it"
+  traits and exceptions, then **stop**. Set `Requested scope: intent-only`
+  and `Execution depth: not-applicable` for this discovery-only task,
+  regardless of whether the request says "use" or "create" a visual style.
+  Do not claim `end-to-end` permission for later stages. Later Intent writing
+  is separately authorized. Already-confirmed visual Intent (including approved "save it"
   handoff) goes straight to `idd-intent-change`. Screenshots of bugs,
   actionable fidelity targets and local styling that preserves current
   Intent do not automatically require brainstorm. Stop for a Product
@@ -313,7 +348,11 @@ remain in the detailed workflow sections indexed below.
 | `unclear` | `idd-intent-brainstorm` or focused spike/research; stop at unresolved owner decision. |
 
 Mixed Product + Engineering + implementation requests keep *both* durable
-owners before implementation. Mixed Factory model-policy + code requests keep
+owners before implementation and normally have `Execution depth: orchestrated`
+because their distinct semantic owners and approval gates must be sequenced.
+If the decisions are underspecified, route first to `idd-intent-brainstorm`
+as a clarity gate, **without** discarding the Engineering owner or later code
+stages. Mixed Factory model-policy + code requests keep
 the separate `idd-factory-configure` stage and the implementation stages.
 Large new tasks may have Factory coordinate the authorized owners during its
 own preflight, but only those owners can mutate durable decisions.
@@ -365,6 +404,12 @@ relevant sections, preserving stage order.
 | `## Workflow Completion Rules` | Specialized completion/verification and mixed workflow stopping |
 
 When route and authority are clear, a standard request needs **only Core**.
+Do not read a detailed section solely to confirm a fully determined standard
+route (including a clear whole-project drift audit or a localized refactor).
+Do not inspect a downstream skill's complete SKILL.md merely to classify a
+route; the next skill owns its own implementation details. When a detailed
+section is needed, read only its exact heading-delimited bounds, not a rounded
+line range extending into an adjacent section.
 If the host cannot partially read a detailed section, it may load the
 whole `common-workflows.md` only when details are actually required;
 record that as full-read fallback. Never evade a gate to save tokens.

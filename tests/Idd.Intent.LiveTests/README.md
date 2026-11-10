@@ -67,13 +67,19 @@ read-only, and scoped reporting) require further isolated live evaluations.
 `IDD_RUN_LIVE_INTENT_EVALS=1`, ordinary `dotnet test`, or
 `scripts/Check.ps1 -Mode Live` (the latter runs Factory evaluations).
 
-The scenarios live in `Scenarios/route-cases.json` (39 cases). They check
-typed route fields, handoff constraints, and unchanged workspace snapshots.
+The scenarios live in `Scenarios/route-cases.json` (42 cases). They check
+typed classification, scope, clarity, execution depth and handoff fields plus
+unchanged workspace snapshots. The import suite has both a deliberately
+missing-source blocker and a scenario with an actual supplied source.
 By default they also use a separate LLM semantic judge for scope, ordering and
 gates.
 The generated Codex plugin is installed into an isolated `CODEX_HOME`, and
 the route is triggered through a **natural-language automatic workflow**
 request rather than changing `idd-route` into a user-facing public command.
+`IDD_ROUTE_EVAL_CASE_IDS` selects unique comma-separated scenario IDs.
+With `IDD_ROUTE_EVAL_SKIP_JUDGE=1`, only typed structural fields are checked
+automatically; lifecycle semantics, free-text stop boundaries and exact
+reference-read ranges require review of saved answers and JSONL traces.
 
 A host that does not trigger the automatic workflow, an unavailable model,
 an unsupported direct-invocation test or an intentionally damaged reference
