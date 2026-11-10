@@ -551,7 +551,10 @@ public sealed class RouteRoutingLiveTests
             "or execute any task. Compare the original request, the expected " +
             "normative routing contract, and the candidate route. Judge scope, " +
             "safe ordering, approval gates, direct/standalone exceptions, and " +
-            "stop conditions, not prose wording. Return ONLY a JSON object " +
+            "stop conditions. Explicitly check that the full expected workflow " +
+            "includes every required owner, conflict/validation/lint stage, " +
+            "and that the current handoff and stop boundary respect authorization. " +
+            "Evaluate meaning, not prose wording. Return ONLY a JSON object " +
             "with boolean 'correct' and string 'reason'.\n" +
             JsonSerializer.Serialize(new { scenario.Request, scenario.Expected,
                 scenario.Contract, ActualRoute = raw }, JsonOptions);

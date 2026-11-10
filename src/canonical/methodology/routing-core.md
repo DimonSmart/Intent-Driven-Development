@@ -173,8 +173,10 @@ scope:
   Product/Engineering owners with separate review gates**, or major capability
   removal.
 - `not-applicable`: routing, initialization, verification configuration,
-  bootstrap, imports, audits, lint checks, brainstorms, and pure intent reads
-  that do not execute implementation.
+  bootstrap, imports, audits, lint checks, brainstorms, and knowledge-only
+  Engineering Rule management without separately requested implementation.
+  An actionable Product requirement may still describe the depth of a later
+  implementation stage even when the present scope is `intent-only`.
 
 A broad repository scan does not make bootstrap `orchestrated`. Factory
 planner/worker orchestration preserves approved Product decisions and all
@@ -232,8 +234,9 @@ for standalone Factory model-policy routing (no invented placeholders).
   and `Execution depth: not-applicable` for this discovery-only task,
   regardless of whether the request says "use" or "create" a visual style.
   Do not claim `end-to-end` permission for later stages. Later Intent writing
-  is separately authorized. Already-confirmed visual Intent (including approved "save it"
-  handoff) goes straight to `idd-intent-change`. Screenshots of bugs,
+  is separately authorized. Already-confirmed visual Intent (including an
+  approved "save it" handoff) goes straight to `idd-intent-change`.
+  Screenshots of bugs,
   actionable fidelity targets and local styling that preserves current
   Intent do not automatically require brainstorm. Stop for a Product
   decision if local styling risks an Essential invariant.

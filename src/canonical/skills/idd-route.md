@@ -30,8 +30,11 @@ project files, Intent, Engineering, Factory state or implementation.
    when required**. Missing mandatory Core or a needed detailed section is
    an incomplete-plugin blocker; do not reconstruct it from memory.
 
-When a shell is available, a bounded `##` section can be extracted without
-line-number guesses (replace the heading with the exact indexed heading):
+When a POSIX shell is available, a bounded `##` section can be extracted
+without line-number guesses. Run from the installed `idd-route` skill directory
+(where `SKILL.md` lives), or substitute the **absolute installed reference
+path** for the final argument; do not assume the project workspace is the
+plugin directory. Replace the heading with the exact indexed heading:
 
 ```sh
 awk -v heading='## Workflow Family: Intent Import' '
