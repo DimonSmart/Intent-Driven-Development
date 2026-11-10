@@ -18,6 +18,21 @@
       "kind": "ordinary"
     },
     {
+      "id": "product-add-end-to-end",
+      "request": "Add this requirement to the product intent, then implement the corresponding behavior end to end: users can export the report as CSV.",
+      "expected": {
+        "classification": "product-change",
+        "operation": "add",
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-change",
+        "auditScope": null,
+        "standaloneFactory": false,
+        "currentHandoff": "idd-intent-change"
+      },
+      "contract": "Product owner before implementation; complete authorized lifecycle",
+      "kind": "ordinary"
+    },
+    {
       "id": "product-modify",
       "request": "Change the existing report requirement to include XML export.",
       "expected": {

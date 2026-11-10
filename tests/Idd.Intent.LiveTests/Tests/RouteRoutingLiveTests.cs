@@ -69,6 +69,28 @@ public sealed class RouteRoutingLiveTests
         Assert.Equal(BaselineCommit, config.BaselineCommit);
         Assert.True(config.Scenarios.Length >= 20);
 
+        var requestedIds = Environment.GetEnvironmentVariable(
+            "IDD_ROUTE_EVAL_CASE_IDS");
+        RouteCase[] selectedScenarios;
+        if (string.IsNullOrWhiteSpace(requestedIds))
+        {
+            selectedScenarios = config.Scenarios;
+        }
+        else
+        {
+            var ids = requestedIds.Split(',', StringSplitOptions.RemoveEmptyEntries |
+                StringSplitOptions.TrimEntries);
+            if (ids.Length == 0 || ids.Distinct(StringComparer.Ordinal).Count() != ids.Length)
+                throw new InvalidOperationException(
+                    "IDD_ROUTE_EVAL_CASE_IDS must contain unique comma-separated scenario IDs.");
+            var byId = config.Scenarios.ToDictionary(x => x.Id, StringComparer.Ordinal);
+            var unknownIds = ids.Where(id => !byId.ContainsKey(id)).ToArray();
+            if (unknownIds.Length > 0)
+                throw new InvalidOperationException("Unknown route scenario ID(s): " +
+                    string.Join(", ", unknownIds));
+            selectedScenarios = ids.Select(id => byId[id]).ToArray();
+        }
+
         var model = Environment.GetEnvironmentVariable("IDD_ROUTE_EVAL_MODEL") ?? "gpt-6";
         var effort = Environment.GetEnvironmentVariable("IDD_ROUTE_EVAL_REASONING") ?? "medium";
         var sandbox = ResolveSandbox(Environment.GetEnvironmentVariable(
@@ -79,6 +101,9 @@ public sealed class RouteRoutingLiveTests
         var limit = int.TryParse(Environment.GetEnvironmentVariable(
             "IDD_ROUTE_EVAL_MAX_CASES"), out var max) && max > 0
             ? max : config.Scenarios.Length;
+        if (!string.IsNullOrWhiteSpace(requestedIds) && limit < selectedScenarios.Length)
+            throw new InvalidOperationException(
+                "IDD_ROUTE_EVAL_MAX_CASES is smaller than the explicitly selected scenario count.");
         var useJudge = Environment.GetEnvironmentVariable("IDD_ROUTE_EVAL_SKIP_JUDGE") != "1";
         var root = Environment.GetEnvironmentVariable("IDD_ROUTE_EVAL_OUTPUT_DIR") ??
             Path.Combine(Path.GetTempPath(), "idd-route-eval", Guid.NewGuid().ToString("N"));
@@ -103,7 +128,7 @@ public sealed class RouteRoutingLiveTests
                 baseline, Path.Combine(root, "baseline"), codex)));
 
         var results = new List<CaseResult>();
-        foreach (var scenario in config.Scenarios.Take(limit))
+        foreach (var scenario in selectedScenarios.Take(limit))
         {
             foreach (var (revision, _, home) in candidates)
             {
@@ -193,7 +218,12 @@ public sealed class RouteRoutingLiveTests
                 this.output.WriteLine(FormatCaseResult(results[^1]));
                 await SaveReportAsync(root, repo, baseline, model, effort, codex,
                     sandbox, timeoutMinutes, results);
+                if (status == "not evaluated / host invocation unavailable")
+                    break;
             }
+            if (results.Any(result => result.Scenario == scenario.Id &&
+                result.Status == "not evaluated / host invocation unavailable"))
+                break;
         }
 
         await SaveReportAsync(root, repo, baseline, model, effort, codex,
@@ -219,13 +249,18 @@ public sealed class RouteRoutingLiveTests
         if (!workspaceUnchanged)
             return ("route incorrect", "Routing altered files in the test workspace.");
 
+        if (!trace.RouteRead || !trace.CoreRead)
+            return ("not evaluated / host invocation unavailable",
+                "The installed idd-route invocation was not confirmed by captured reads " +
+                "of both SKILL.md and references/routing-core.md: " + trace.Summary);
+
         if (exitCode != 0 || executionError is not null || fields.Count == 0 ||
             !fields.ContainsKey("Recommended first skill"))
-            return ("not evaluated / host invocation unavailable",
+            return ("route incorrect",
                 DescribeMissingRoute(exitCode, executionError, execCommandErrors, raw));
 
         if (!Regex.IsMatch(raw, @"(?m)^\s*#\s+IDD Route\s*$"))
-            return ("not evaluated / host invocation unavailable",
+            return ("route incorrect",
                 "The response did not contain the required '# IDD Route' heading.");
 
         var expected = scenario.Expected;
@@ -255,14 +290,14 @@ public sealed class RouteRoutingLiveTests
         }
         else if (ordinary.Any(name => !fields.ContainsKey(name)))
         {
-            return ("not evaluated / host invocation unavailable",
-                "Incomplete ordinary route; automatic host invocation may not have selected the router.");
+            return ("route incorrect", "Incomplete ordinary route; missing " +
+                string.Join(", ", ordinary.Where(name => !fields.ContainsKey(name))));
         }
 
         foreach (var name in new[]
             { "Expected complete workflow", "Requested scope", "Current handoff", "Stop after" })
             if (!fields.ContainsKey(name))
-                return ("not evaluated / host invocation unavailable",
+                return ("route incorrect",
                     "Missing required route field: " + name);
 
         if (fields["Requested scope"] == "route-only" &&
@@ -273,12 +308,6 @@ public sealed class RouteRoutingLiveTests
                 StringComparison.OrdinalIgnoreCase))
             return ("route incorrect",
                 "An expected handoff cannot stop at the routing recommendation.");
-
-        if (trace.Available && (!trace.RouteRead || !trace.CoreRead))
-            return ("not evaluated / host invocation unavailable",
-                "The captured tool trace does not confirm successful reads of both " +
-                "installed idd-route/SKILL.md and references/routing-core.md: " +
-                trace.Summary);
 
         return ("route correct", "Complete '# IDD Route' fields and unchanged workspace passed.");
     }
