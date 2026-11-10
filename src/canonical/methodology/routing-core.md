@@ -17,7 +17,10 @@ list of manual-only skills here.
 3. For other requests classify the **original user's requested work**, not
    wrapper instructions governing the router's output or execution. Apply the
    dimensions below, choose the smallest scope, then apply approval, clarity,
-   preservation and host availability gates.
+   preservation and host availability gates. Evaluate special-purpose gates
+   **before** the generic classification-to-first-skill table: an explicitly
+   unresolved visual-reference decision uses the visual discovery gate, not
+   the generic Product brainstorm gate.
 4. `Expected complete workflow` describes the full safe lifecycle, not
    permission to execute it. Only `Current handoff` authorizes the next
    caller-owned step; the router itself is read-only.
@@ -201,7 +204,15 @@ bypasses routing.
 ### Execution Depth
 
 Classify execution depth independently from the product operation and requested
-scope:
+scope. **First decide whether execution depth applies at all.** For
+`intent-bootstrap`, including reconstruction and a proposal for user approval,
+and for Engineering Rule management without requested code changes, the value
+is **always `not-applicable`**. Neither a multi-stage discovery workflow nor
+a single Engineering Rule modification is implementation execution.
+Do not use `orchestrated` to describe bootstrap's discovery/approval stages,
+or `focused` merely because one Engineering Rule is being changed.
+Only after ruling out these knowledge-only categories choose a depth for
+eligible Product/implementation work:
 
 - `focused`: one bounded owner/change and localized implementation, without
   complex migration, staged rollout or multiple independent approval gates.
@@ -271,7 +282,12 @@ for standalone Factory model-policy routing (no invented placeholders).
 - A `product-change` with visual references but unconfirmed visual meaning,
   scope or strictness must first use read-only
   `idd-intent-visual-brainstorm` to establish Essential/Preferred/Free/Avoid
-  traits and exceptions, then **stop**. Set `Requested scope: intent-only`
+  traits and exceptions, then **stop**. This specialized gate **takes
+  precedence** over generic `idd-intent-brainstorm` when the specific
+  outstanding question is which traits of a visual reference to preserve,
+  including a request to add a new page using a screenshot as inspiration.
+  The generic Product brainstorm applies to unresolved product goals or
+  behavior, not in place of this visual-trait clarification. Set `Requested scope: intent-only`
   and `Execution depth: not-applicable` for this discovery-only task,
   regardless of whether the request says "use" or "create" a visual style.
   Do not claim `end-to-end` permission for later stages. Later Intent writing
@@ -366,8 +382,12 @@ recommendation. Do not invoke a manual-only command on the user's behalf.
 Keep the ordinary route output fields; this recommendation does not create
 a new classification or authorize glossary changes.
 
-For ordinary classified routes, use the following first-skill index; the standalone Factory
-model-policy route above is selected before the table:
+For ordinary classified routes, use the following first-skill index **only
+after** evaluating special-purpose gates (including the unconfirmed
+visual-reference gate) and explicit Engineering ownership. The standalone
+Factory model-policy route above is selected before the table. In particular,
+the generic `product-change` entry does **not** override the mandatory
+`idd-intent-visual-brainstorm` first step when visual traits remain undecided:
 
 | Classification | Recommended first skill |
 | --- | --- |
