@@ -98,6 +98,22 @@ references it; report conditional or known-unavailable handoff accurately.
 ## Routing result and caller-owned handoff
 
 Derive the six ordinary classification fields and all decisions from Core.
+Before returning, validate the ordinary fields against Core, then fix any
+inconsistent field **before** producing the final Markdown:
+- `Classification` is an exact Core classification token, never a skill name
+  or a shortened variant such as `intent-change`. `Operation` is
+  `not-applicable` except for `product-change` and `engineering-change`.
+- `intent-import` and `intent-bootstrap` have
+  `Execution depth: not-applicable`; so does policy-only
+  `engineering-change` and an `unclear` Product discovery gate.
+- A desired Product improvement without an identifiable behavior/capability
+  uses `unclear`, not an invented `product-change` / `modify`.
+- A question only about the manual optional glossary workflow recommends
+  `idd-glossary-build` with `Classification: unknown` and
+  `Current handoff: none`, never an invented classification.
+- Implementing already-approved Product Intent is not a normative Product
+  change. Preserve Core's scope and special gates.
+Resolve these constraints from Core, not from the worked output example below.
 Standalone Factory model-policy routing **omits** the ordinary fields
 altogether. Keep `Expected complete workflow` separate from the permitted
 `Current handoff` and `Stop after` boundary. A blocked or `route-only`

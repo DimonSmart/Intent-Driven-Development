@@ -17,7 +17,10 @@ list of manual-only skills here.
 3. For other requests classify the **original user's requested work**, not
    wrapper instructions governing the router's output or execution. Apply the
    dimensions below, choose the smallest scope, then apply approval, clarity,
-   preservation and host availability gates.
+   preservation and host availability gates. Evaluate special-purpose gates
+   **before** the generic classification-to-first-skill table: an explicitly
+   unresolved visual-reference decision uses the visual discovery gate, not
+   the generic Product brainstorm gate.
 4. `Expected complete workflow` describes the full safe lifecycle, not
    permission to execute it. Only `Current handoff` authorizes the next
    caller-owned step; the router itself is read-only.
@@ -36,8 +39,10 @@ Standalone Factory model-policy requests select their skill directly:
   architecture changes.
 - `engineering policy`: an explicit project decision adds, modifies, or removes
   a durable implementation-only Engineering Rule.
-- `implementation only`: code structure changes while current product intent
-  remains unchanged.
+- `implementation only`: implement an already-approved Product Intent requirement,
+  or change code structure while the normative product intent remains unchanged.
+  New behavior in **code** that fulfills an existing approved requirement is not
+  by itself a new Product Intent decision.
 - `intent structure`: current intent is moved, split, merged, renamed, or
   cross-referenced without changing product meaning.
 - `implementation versus intent`: observed behavior may not match current
@@ -55,7 +60,10 @@ Standalone Factory model-policy requests select their skill directly:
   comparison, refresh, upgrade, downgrade, or inheritance changes. For this
   standalone concern, select `idd-factory-configure` directly instead of
   creating a classification.
-- `unknown`: the request does not provide enough information to choose safely.
+- `unknown`: the request does not provide enough information to choose safely,
+  or a route-only question concerns a known manual-only capability that is
+  outside the ordinary classification taxonomy. In the latter case the first
+  skill can be known even though no ordinary work classification applies.
 
 Initial product truth discovery and raw imported knowledge are different:
 
@@ -75,6 +83,17 @@ Ordinary new Engineering decisions still route as `engineering-change`.
 Code may be evidence during both workflows, but import must not become an
 implicit reverse-engineering workflow or derive Engineering policy from current
 implementation.
+
+When the user asks to **implement an already-approved existing requirement**
+(e.g., a named `IDD-NNNN` spec), classify `implementation-change` and select
+`idd-code-implement`, unless the user independently requests a change to the
+normative product requirement. Implementing approved behavior may change what
+code currently does; it does not change what the *product is required to do*.
+Do not route through `idd-intent-change` solely because the new implementation
+will make that approved behavior observable. If the referenced specification is
+missing, contradictory or insufficient to implement, preserve the implementation
+classification but block/clarify the missing authority before code; never invent
+or silently rewrite Product Intent.
 
 ### Product and Engineering Operation
 
@@ -118,6 +137,31 @@ workflow still retains both owners and implementation after confirmation.
 Conversely, an explicit observable contract such as "users can export the
 report as CSV" may be `clear` without prescribing implementation details.
 
+For an Engineering-only request with a named but underspecified constraint
+(e.g., "make logging stricter"), retain `Classification: engineering-change`
+and `Clarity: ambiguous`, but select its semantic owner `idd-engineering-change`.
+That skill must identify the missing enforceable decision and return `ambiguous`
+before any mutation; `idd-intent-brainstorm` clarifies *Product Intent*, not
+standalone Engineering policy. Do not silently invent an Engineering Rule.
+
+For mixed Product + Engineering + implementation work, when a new Product
+capability is identifiable, keep `Classification: product-change` even if its
+behavior or the separate Engineering decision is underspecified. In that
+case, `Clarity: ambiguous` and `Recommended first skill: idd-intent-brainstorm`
+establish the Product clarity gate; the complete workflow retains the
+Engineering owner and authorized implementation.
+
+Distinguish an **identified change with missing details** from an
+**unidentified change**. "Add an upload feature" identifies a capability:
+`product-change`, `Operation: add`, `Clarity: ambiguous` if needed.
+"Make the product nicer; I do not know which behavior should change"
+identifies no specific feature, behavior, contract, or add/modify/remove
+operation: `Classification: unclear`, `Operation: not-applicable`,
+`Clarity: ambiguous`, `Execution depth: not-applicable`, and first
+`idd-intent-brainstorm`. Do not guess a `modify` operation from a vague
+desire to improve the product. Discovery must stop at the missing Product
+decision, not assume that implementation is already actionable.
+
 ### Requested Scope
 
 Classify how much of the workflow the user authorizes in the current request:
@@ -150,12 +194,27 @@ Distinguish three different instructions:
 For a request limited to creating, importing, changing or normalizing **IDD
 knowledge**, use `intent-only` unless code implementation is explicitly
 requested. This covers Product Intent, Engineering Rules, and
-`implementation-to-intent`. A user asking to "import into IDD" authorizes
+`implementation-to-intent`. A request to add, change or remove a **requirement
+or specification** is knowledge-side work, even when that requirement describes
+observable product behavior. Do not infer implementation authorization just
+because the user did not expressly forbid code changes. A user asking to "import into IDD" authorizes
 knowledge migration and its conflict/validation/lint stages, **not** code
 implementation. Keep an unavailable import source as an explicit handoff
 blocker without broadening the scope. For implementation-only work preserving
 approved Intent/Engineering use `intent-preserving` when requested;
 use `end-to-end` for authorized implementation plus its necessary checks.
+A refactor with no intended behavior change is `intent-preserving`, including
+when the user explicitly forbids modifying specs and Engineering Rules; the
+refactor and its verification still run. Implementing a confirmed requirement
+already owned by an approved current spec, while leaving normative Product
+Intent unchanged, is also `intent-preserving`; implement and verify against
+that owner without automatically entering an Intent mutation workflow. A prohibition on spec edits **alone**
+does not authorize changing product behavior or establish preservation intent.
+
+Project initialization is `end-to-end` when the user asks to carry out the
+complete IDD structure setup: completing the requested setup does not imply
+reverse-engineering Product Intent or implementing product code. Do not treat
+its lack of application implementation as a reason to select `intent-only`.
 
 Initial bootstrap is normally `intent-only`. It becomes `end-to-end` only when
 the user also explicitly requests later implementation work after the initial
@@ -174,7 +233,20 @@ bypasses routing.
 ### Execution Depth
 
 Classify execution depth independently from the product operation and requested
-scope:
+scope. **First decide whether execution depth applies at all.** For
+`intent-bootstrap` and `intent-import`, including reconstruction, source
+migration, approval and mechanical validation, the value is
+**always `not-applicable`**. The same applies to Engineering Rule management
+without requested code changes, and to a route whose only safe current action
+is an `unclear` Product discovery gate. Neither a multi-stage discovery workflow nor
+a single Engineering Rule modification is implementation execution.
+Do not use `orchestrated` to describe bootstrap's discovery/approval stages,
+or `focused` merely because one Engineering Rule is being changed. As a final
+field consistency invariant: if `Classification: engineering-change` and the
+request is policy-only (`Requested scope: intent-only`), `Execution depth` MUST
+be `not-applicable` regardless of the rule count, `Clarity` or operation.
+Only after ruling out these knowledge-only categories choose a depth for
+eligible Product/implementation work:
 
 - `focused`: one bounded owner/change and localized implementation, without
   complex migration, staged rollout or multiple independent approval gates.
@@ -187,6 +259,8 @@ scope:
 - `not-applicable`: routing, initialization, verification configuration,
   bootstrap, imports, audits, lint checks, brainstorms, and knowledge-only
   Engineering Rule management without separately requested implementation.
+  Adding or modifying one Engineering Rule is not a `focused` implementation
+  just because the policy targets source code.
   An actionable Product requirement may still describe the depth of a later
   implementation stage even when the present scope is `intent-only`.
 
@@ -242,7 +316,12 @@ for standalone Factory model-policy routing (no invented placeholders).
 - A `product-change` with visual references but unconfirmed visual meaning,
   scope or strictness must first use read-only
   `idd-intent-visual-brainstorm` to establish Essential/Preferred/Free/Avoid
-  traits and exceptions, then **stop**. Set `Requested scope: intent-only`
+  traits and exceptions, then **stop**. This specialized gate **takes
+  precedence** over generic `idd-intent-brainstorm` when the specific
+  outstanding question is which traits of a visual reference to preserve,
+  including a request to add a new page using a screenshot as inspiration.
+  The generic Product brainstorm applies to unresolved product goals or
+  behavior, not in place of this visual-trait clarification. Set `Requested scope: intent-only`
   and `Execution depth: not-applicable` for this discovery-only task,
   regardless of whether the request says "use" or "create" a visual style.
   Do not claim `end-to-end` permission for later stages. Later Intent writing
@@ -261,6 +340,8 @@ for standalone Factory model-policy routing (no invented placeholders).
   consult installed invocation metadata/`skill-descriptions.json`.
   Direct skill invocation is user selection, not the result of this router.
   The router never executes an advised skill or any Factory preflight.
+  Engineering-only ambiguity stays with `idd-engineering-change`: its own
+  semantic planning gate asks for clarification before changing any Rules.
 - `idd-factory-run` owns mandatory preflight under the existing
   `intent-preflight.md`. The router must not inspect Factory state broadly,
   duplicate preflight, or change policy. Missing known Factory installation
@@ -310,14 +391,41 @@ request handoff; never substitute a summary.
 `idd-factory-configure` is in the separate `idd-factory` plugin.
 A recommendation does not establish installation. If known unavailable,
 keep the recommended skill but set `Current handoff: none` and stop with
-the dependency diagnostic. If unknown, state availability conditionally,
-not as a claimed installed capability. Never fabricate an availability API,
-substitute another skill or write policy from the router.
+the dependency diagnostic. If unknown, state availability conditionally in the free-text rationale or
+handoff instructions, not as a claimed installed capability. Keep
+`Current handoff` as a **single canonical skill ID** if conditionally allowed,
+or `none` if a required dependency is known to be missing; do not append
+"if available" or other explanatory text to this structured field.
+Never fabricate an availability API, substitute another skill or write policy
+from the router.
 
 ## First Skill
 
-For ordinary classified routes, use the following first-skill index; the standalone Factory
-model-policy route above is selected before the table:
+For an **advice-only** request asking which IDD workflow handles a specific
+operation, identify its actual capability owner before applying the ordinary
+classification-to-skill index. Consult registered skill metadata when the
+matching workflow is manual-only. A manual-only skill may be **recommended**
+without being invoked; do not substitute a generic Product Intent change just
+because the question uses verbs such as "create" or "update".
+
+In particular, questions about which workflow creates, reviews, or updates
+the optional project glossary must recommend `idd-glossary-build`, not
+`idd-intent-change`. For a question **only** about this manual-only
+glossary workflow, use `Classification: unknown` (no ordinary mutation
+category), `Operation: not-applicable`, `Clarity: clear`,
+`Execution depth: not-applicable`, `Requested scope: route-only`,
+and `Current handoff: none`; stop after the recommendation.
+This is a known manual capability, not a request to mutate Product Intent.
+Do not invoke a manual-only command on the user's behalf.
+Keep the ordinary route output fields; this recommendation does not create
+a new classification or authorize glossary changes.
+
+For ordinary classified routes, use the following first-skill index **only
+after** evaluating special-purpose gates (including the unconfirmed
+visual-reference gate) and explicit Engineering ownership. The standalone
+Factory model-policy route above is selected before the table. In particular,
+the generic `product-change` entry does **not** override the mandatory
+`idd-intent-visual-brainstorm` first step when visual traits remain undecided:
 
 | Classification | Recommended first skill |
 | --- | --- |
@@ -371,6 +479,11 @@ stages. Mixed Factory model-policy + code requests keep
 the separate `idd-factory-configure` stage and the implementation stages.
 Large new tasks may have Factory coordinate the authorized owners during its
 own preflight, but only those owners can mutate durable decisions.
+
+`Recommended first skill` and `Current handoff` are structured IDs: use exactly
+one registered `idd-*` skill name, or `none` for `Current handoff`. Put availability
+conditions, blockers and explanations in `Why`, `Stop after`, or `Handoff`,
+never inside an ID field.
 
 `Current handoff` is the next user-authorized action after scope, clarity,
 manual-only, availability and owner gates; use `none` for `route-only`,
