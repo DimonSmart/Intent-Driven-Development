@@ -38,7 +38,7 @@ is required to claim live behavior; a generated file or `task_name` is not
 proof. Older custom-agent TOML files do not need to be removed.
 See [Factory installation](factory-native-agent-installation.md).
 
-## Verify Repository Initialization## Verify Repository Initialization
+## Verify Repository Initialization
 
 After running:
 

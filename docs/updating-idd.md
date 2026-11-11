@@ -45,7 +45,7 @@ custom-agent files from old versions are left untouched and are not used by
 Factory. Check [Factory installation](factory-native-agent-installation.md)
 for the host capabilities required for ordinary generic child execution.
 
-## After Updating## After Updating
+## After Updating
 
 1. Review [Updates and Breaking Changes](updates-and-breaking-changes.md) and apply any relevant project migrations.
 2. Check the installed versions using [Verify Installation](verify-installation.md).
