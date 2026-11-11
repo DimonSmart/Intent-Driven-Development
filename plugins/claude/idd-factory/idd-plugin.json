@@ -1,5 +1,5 @@
 {
-  "version": "2.0.91",
+  "version": "2.0.94",
   "platform": "claude",
   "dependencies": [
     "idd-intent"

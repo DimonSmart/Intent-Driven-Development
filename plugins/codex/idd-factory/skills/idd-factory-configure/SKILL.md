@@ -10,15 +10,25 @@ the project lifecycle: initial setup, exact edits, read-only review, and
 evidence-based model refresh. This is the **only** skill that validates and
 writes Factory model policy; no separate model-update command or writer exists.
 
-**First** read `references/factory-execution-policy.md`. Do not read or change
-`.idd/factory/current/`, Product Intent, Engineering Rules, the Factory runtime,
-planner classification, or existing child agents. Configuration is operational
-policy, not durable product or engineering intent.
+On Codex, this skill additionally supports an **explicit native-agent
+registration request**. This is a separate installation operation, not model
+configuration. Follow the Codex-specific generated registration section for
+that request. Never infer permission to install roles from an ordinary Factory
+run, initial model setup, or an automatically selected skill. A request only
+to register or check roles must not read, validate, create or modify
+`.idd/execution.yaml`, and must not ask which model strategy to use.
+
+For **model-policy** requests, first read `references/factory-execution-policy.md`.
+Do not read or change `.idd/factory/current/`, Product Intent, Engineering Rules,
+the Factory runtime, planner classification, or existing child agents.
+Configuration is operational policy, not durable product or engineering intent.
 
 ## Interpret the request and authorization
 
 Read the original user request, not merely a router summary. Direct invocation
-of this skill does not require `idd-route`. Recognize these modes:
+of this skill does not require `idd-route`. Native-agent registration in Codex
+is handled before model-policy mode selection; for model-policy requests,
+recognize these modes:
 
 - **Initial setup:** Factory is being explicitly configured, the policy is absent,
   and no strategy was chosen previously. Ask one blocking strategy choice below.
@@ -226,6 +236,42 @@ The only project-owned model policy is optional `.idd/execution.yaml`.
 Do not modify `.idd/factory/current/`, run Factory, spawn workers, migrate
 valid policies, or introduce a second persistence service. Git provides
 configuration history.
+
+## Codex native-agent installation and registration
+
+Codex CLI 0.167.1 does not register native roles merely because
+the installed Marketplace manifest advertises agents/*.toml.
+An explicit registration operation is required in that host.
+For a user request to install/check/update Factory native roles,
+use the bundled script at
+scripts/register-codex-agents.py relative to THIS SKILL.md.
+Resolve this installed file by its real absolute path, not by
+guessing a plugin cache version or reading a different checkout.
+
+- Determine whether the request authorizes project-local or user-scope
+  changes. Ask for the target scope if ambiguous. Never silently
+  modify CODEX_HOME, global agents, project trust or config.toml.
+- First run the script with --scope project --project <repo> --check,
+  or --scope user --check, using python3 (or a verified Python 3
+  interpreter). It is read-only and reports missing/stale/conflicting
+  definitions. The script obtains canonical TOML from the SAME installed
+  plugin version and does not create Product Intent, Factory state,
+  or execution.yaml.
+- For explicitly authorized registration, repeat with --apply.
+  Existing differing roles block without edits. --replace is permitted
+  only after explicit approval to replace those exact role paths;
+  content-addressed backups are retained.
+- Read-only review must never invoke --apply; an automatic routing
+  recommendation must never authorize role installation.
+- When installation succeeds, independently check the destination
+  bytes, advise user to trust the project through supported Codex UI
+  when project-scoped, and start a NEW Codex session. Do not report a
+  ready Factory until real native agent_type selection, host-loaded
+  instructions and terminal wait are verified.
+- A Desktop host that hides agent_type remains unsupported even
+  after registration; use a compatible Codex CLI session.
+Registration is orthogonal to Factory model policy. Never create or
+modify .idd/execution.yaml as part of native role registration.
 
 ## Codex Factory model configuration
 

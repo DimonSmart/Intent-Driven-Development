@@ -45,6 +45,9 @@ are `idd-factory:idd-internal-factory-planner` and
 `idd-factory:idd-internal-factory-worker`; use the exact name reported by
 the installed host. On Codex use their registered custom-agent `agent_type`,
 never a generic child with a role-like `task_name`.
+Use the actual top-level host tool schema for role selection and lifecycle
+checks. A nested tool inventory is not authoritative for the root tool surface;
+absence from that inventory alone is not a capability failure.
 
 Before **any durable owner or Factory write** during new-run preflight, inspect
 the installed host's native child-agent capabilities and resolve BOTH registered
@@ -725,6 +728,21 @@ Use native Codex child-agent delegation for Factory semantic work.
   returns `# Done`. On success, remove `.idd/factory/current/` or
   move it under `.idd/factory/results/`; an active request must not
   remain after a completed result.
+
+## Codex native-agent capability diagnostics
+
+Inspect the direct host-visible native tool schema, not an inventory
+exposed by a nested helper such as functions.exec/ALL_TOOLS.
+A nested tool inventory may omit the top-level agents namespace.
+Never conclude that native tools are absent from that inventory alone.
+Require direct evidence of agent_type selection for both registered
+Factory roles, fresh fork_turns, native wait and interrupt/stop,
+repository access and the actual role instructions.
+If no agent_type selector is exposed by this host (including some
+Codex Desktop collaboration sessions), stop before any durable write.
+If agent_type is exposed but the roles are unknown, tell the user to
+use idd-factory-configure for explicit role registration and restart
+Codex; do not silently substitute generic children or change trust.
 
 ## Codex Factory execution policy
 

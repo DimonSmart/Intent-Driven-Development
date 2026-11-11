@@ -47,6 +47,9 @@ are `idd-factory:idd-internal-factory-planner` and
 `idd-factory:idd-internal-factory-worker`; use the exact name reported by
 the installed host. On Codex use their registered custom-agent `agent_type`,
 never a generic child with a role-like `task_name`.
+Use the actual top-level host tool schema for role selection and lifecycle
+checks. A nested tool inventory is not authoritative for the root tool surface;
+absence from that inventory alone is not a capability failure.
 
 Before **any durable owner or Factory write** during new-run preflight, inspect
 the installed host's native child-agent capabilities and resolve BOTH registered
