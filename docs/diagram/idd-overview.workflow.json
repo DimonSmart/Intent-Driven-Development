@@ -76,9 +76,21 @@
       "lane": "request",
       "col": 1,
       "type": "frontend",
-      "label": "Classify Request",
-      "sublabel": "which truth changes?",
-      "width": 184
+      "label": "IDD Router",
+      "sublabel": "classify, scope & handoff",
+      "width": 184,
+      "sources": [
+        {
+          "path": "src/canonical/skills/idd-route.md",
+          "line": 1,
+          "label": "Read-only router"
+        },
+        {
+          "path": "src/canonical/methodology/routing-core.md",
+          "line": 30,
+          "label": "Routing dimensions"
+        }
+      ]
     },
     {
       "id": "discover",
@@ -99,7 +111,7 @@
       "sources": [
         {
           "path": "src/canonical/methodology/common-workflows.md",
-          "line": 439,
+          "line": 275,
           "label": "Product change"
         }
       ],
@@ -116,7 +128,7 @@
       "sources": [
         {
           "path": "src/canonical/methodology/intent-driven-development.md",
-          "line": 23,
+          "line": 38,
           "label": "Intent contract"
         }
       ],
@@ -168,7 +180,7 @@
       "sources": [
         {
           "path": "src/canonical/methodology/common-workflows.md",
-          "line": 606,
+          "line": 442,
           "label": "Verification"
         }
       ],
@@ -193,7 +205,7 @@
       "sources": [
         {
           "path": "src/canonical/methodology/intent-driven-development.md",
-          "line": 125,
+          "line": 172,
           "label": "Audit"
         }
       ],
@@ -222,8 +234,15 @@
       "id": "route_discover",
       "from": "route",
       "to": "discover",
-      "label": "product change",
+      "label": "needs clarity",
       "variant": "emphasis",
+      "role": "branch"
+    },
+    {
+      "id": "route_owner",
+      "from": "route",
+      "to": "owner",
+      "label": "clear approved change",
       "role": "branch"
     },
     {
@@ -244,7 +263,7 @@
       "id": "route_choice",
       "from": "route",
       "to": "choice",
-      "label": "implement",
+      "label": "implementation authorized",
       "role": "main"
     },
     {

@@ -1,0 +1,412 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Request Routing",
+    "subtitle": "One read-only router. Mandatory Core, lazy details, caller-owned handoff.",
+    "output": "site/views/routing.html",
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "standard",
+    "repository": {
+      "url": "https://github.com/DimonSmart/Intent-Driven-Development.git",
+      "provider": "github",
+      "revision": "b8db839829be2a2a04827618d2cc7c4d977e2bac"
+    }
+  },
+  "lanes": [
+    {
+      "id": "entry",
+      "label": "User request & host selection"
+    },
+    {
+      "id": "router",
+      "label": "Read-only routing decision"
+    },
+    {
+      "id": "references",
+      "label": "References loaded only when relevant"
+    },
+    {
+      "id": "handoff",
+      "label": "Result & caller-owned execution"
+    },
+    {
+      "id": "exceptions",
+      "label": "Direct invocation or stop"
+    }
+  ],
+  "mainPath": [
+    "request",
+    "host",
+    "router",
+    "core",
+    "decision",
+    "result",
+    "caller",
+    "skill"
+  ],
+  "phases": [
+    {
+      "id": "entry",
+      "label": "Select entry point",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "routing",
+      "label": "Classify and apply gates",
+      "fromCol": 2,
+      "toCol": 4,
+      "variant": "emphasis"
+    },
+    {
+      "id": "handoff",
+      "label": "Authorize next step",
+      "fromCol": 5,
+      "toCol": 7
+    }
+  ],
+  "nodes": [
+    {
+      "id": "request",
+      "lane": "entry",
+      "col": 0,
+      "type": "external",
+      "label": "User Request",
+      "sublabel": "original goal + all constraints",
+      "width": 188
+    },
+    {
+      "id": "host",
+      "lane": "entry",
+      "col": 1,
+      "type": "frontend",
+      "label": "Host Selection",
+      "sublabel": "automatic or directly named skill",
+      "sources": [
+        {
+          "path": "README.md",
+          "line": 134,
+          "label": "Automatic workflows & commands"
+        }
+      ],
+      "width": 190
+    },
+    {
+      "id": "router",
+      "lane": "router",
+      "col": 2,
+      "type": "backend",
+      "label": "idd-route",
+      "sublabel": "read-only; does not execute skills",
+      "sources": [
+        {
+          "path": "src/canonical/skills/idd-route.md",
+          "line": 1,
+          "label": "Router contract"
+        }
+      ],
+      "width": 190
+    },
+    {
+      "id": "core",
+      "lane": "router",
+      "col": 3,
+      "type": "security",
+      "label": "routing-core.md",
+      "sublabel": "mandatory routing authority",
+      "sources": [
+        {
+          "path": "src/canonical/methodology/routing-core.md",
+          "line": 1,
+          "label": "Routing Core"
+        }
+      ],
+      "width": 192
+    },
+    {
+      "id": "decision",
+      "lane": "router",
+      "col": 4,
+      "type": "frontend",
+      "label": "Dimensions + Gates",
+      "sublabel": "what, clarity, scope, depth, permission",
+      "sources": [
+        {
+          "path": "src/canonical/methodology/routing-core.md",
+          "line": 30,
+          "label": "Classification dimensions"
+        },
+        {
+          "path": "src/canonical/methodology/routing-core.md",
+          "line": 245,
+          "label": "Safety gates"
+        }
+      ],
+      "width": 208
+    },
+    {
+      "id": "details",
+      "lane": "references",
+      "col": 4,
+      "type": "database",
+      "label": "Workflow Details",
+      "sublabel": "exact sections; only if needed",
+      "sources": [
+        {
+          "path": "src/canonical/methodology/routing-core.md",
+          "line": 478,
+          "label": "Selective workflow index"
+        },
+        {
+          "path": "src/canonical/methodology/common-workflows.md",
+          "line": 3,
+          "label": "Detailed workflow authority"
+        }
+      ],
+      "width": 192
+    },
+    {
+      "id": "metadata",
+      "lane": "references",
+      "col": 5,
+      "type": "database",
+      "label": "Skill Metadata",
+      "sublabel": "manual-only, exposure, invocation",
+      "sources": [
+        {
+          "path": "src/canonical/skills/skill-descriptions.json",
+          "line": 1,
+          "label": "Skill registry"
+        },
+        {
+          "path": "src/canonical/skills/idd-route.md",
+          "line": 7,
+          "label": "Lazy metadata check"
+        }
+      ],
+      "width": 192
+    },
+    {
+      "id": "factory",
+      "lane": "exceptions",
+      "col": 4,
+      "type": "messagebus",
+      "label": "Factory Shortcut",
+      "sublabel": "standalone model policy only",
+      "sources": [
+        {
+          "path": "src/canonical/methodology/routing-core.md",
+          "line": 317,
+          "label": "Direct Factory model-policy route"
+        }
+      ],
+      "width": 192
+    },
+    {
+      "id": "result",
+      "lane": "handoff",
+      "col": 5,
+      "type": "database",
+      "label": "Route Result",
+      "sublabel": "first skill; lifecycle; handoff; stop",
+      "sources": [
+        {
+          "path": "src/canonical/methodology/routing-core.md",
+          "line": 412,
+          "label": "Complete workflow and current boundary"
+        }
+      ],
+      "width": 198
+    },
+    {
+      "id": "caller",
+      "lane": "handoff",
+      "col": 6,
+      "type": "security",
+      "label": "Caller Gate",
+      "sublabel": "scope, approval, available skill",
+      "sources": [
+        {
+          "path": "src/canonical/skills/idd-route.md",
+          "line": 93,
+          "label": "Caller-owned handoff"
+        }
+      ],
+      "width": 190
+    },
+    {
+      "id": "skill",
+      "lane": "handoff",
+      "col": 7,
+      "type": "backend",
+      "label": "Selected Skill",
+      "sublabel": "execute only authorized stage",
+      "sources": [
+        {
+          "path": "src/canonical/methodology/routing-core.md",
+          "line": 450,
+          "label": "Current handoff rules"
+        }
+      ],
+      "width": 190
+    },
+    {
+      "id": "direct",
+      "lane": "exceptions",
+      "col": 2,
+      "type": "backend",
+      "label": "Direct Named Skill",
+      "sublabel": "bypasses router; own gates apply",
+      "sources": [
+        {
+          "path": "src/canonical/methodology/routing-core.md",
+          "line": 10,
+          "label": "Direct invocation priority"
+        }
+      ],
+      "width": 198
+    },
+    {
+      "id": "stop",
+      "lane": "exceptions",
+      "col": 7,
+      "type": "external",
+      "label": "Stop / Explain",
+      "sublabel": "route-only, blocker or manual-only",
+      "sources": [
+        {
+          "path": "src/canonical/methodology/routing-core.md",
+          "line": 450,
+          "label": "Stop and availability rules"
+        }
+      ],
+      "width": 198
+    }
+  ],
+  "edges": [
+    {
+      "id": "request_host",
+      "from": "request",
+      "to": "host",
+      "label": "request",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "host_router",
+      "from": "host",
+      "to": "router",
+      "label": "auto route",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "router_core",
+      "from": "router",
+      "to": "core",
+      "label": "always read",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "core_decision",
+      "from": "core",
+      "to": "decision",
+      "label": "ordinary route",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "decision_result",
+      "from": "decision",
+      "to": "result",
+      "label": "decide route",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "result_caller",
+      "from": "result",
+      "to": "caller",
+      "label": "recommend",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "caller_skill",
+      "from": "caller",
+      "to": "skill",
+      "label": "permitted handoff",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "core_details",
+      "from": "core",
+      "to": "details",
+      "label": "special case",
+      "role": "branch"
+    },
+    {
+      "id": "details_decision",
+      "from": "details",
+      "to": "decision",
+      "label": "selected section",
+      "role": "branch"
+    },
+    {
+      "id": "decision_metadata",
+      "from": "decision",
+      "to": "metadata",
+      "label": "invocation unclear",
+      "role": "branch"
+    },
+    {
+      "id": "metadata_result",
+      "from": "metadata",
+      "to": "result",
+      "label": "manual-only check",
+      "role": "branch"
+    },
+    {
+      "id": "core_factory",
+      "from": "core",
+      "to": "factory",
+      "label": "model policy only",
+      "role": "branch"
+    },
+    {
+      "id": "factory_result",
+      "from": "factory",
+      "to": "result",
+      "label": "direct configure",
+      "role": "branch"
+    },
+    {
+      "id": "host_direct",
+      "from": "host",
+      "to": "direct",
+      "label": "explicit skill",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "direct_skill",
+      "from": "direct",
+      "to": "skill",
+      "label": "skip router",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "caller_stop",
+      "from": "caller",
+      "to": "stop",
+      "label": "none / blocked",
+      "variant": "dashed",
+      "role": "branch"
+    }
+  ]
+}

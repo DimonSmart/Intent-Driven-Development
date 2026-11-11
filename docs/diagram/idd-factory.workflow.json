@@ -80,7 +80,7 @@
       "sources": [
         {
           "path": "src/canonical/methodology/intent-preflight.md",
-          "line": 11,
+          "line": 190,
           "label": "Durable preflight"
         }
       ],
@@ -96,7 +96,7 @@
       "sources": [
         {
           "path": "docs/factory-workflow.md",
-          "line": 8,
+          "line": 48,
           "label": "Preparation"
         }
       ],
@@ -121,7 +121,7 @@
       "sources": [
         {
           "path": "src/canonical/skills/idd-factory-run.md",
-          "line": 540,
+          "line": 450,
           "label": "Worker"
         }
       ],
@@ -137,7 +137,7 @@
       "sources": [
         {
           "path": "src/canonical/skills/idd-factory-run.md",
-          "line": 456,
+          "line": 363,
           "label": "Planner"
         }
       ],
@@ -164,7 +164,7 @@
       "sources": [
         {
           "path": "src/canonical/skills/idd-factory-run.md",
-          "line": 723,
+          "line": 621,
           "label": "Review"
         }
       ],

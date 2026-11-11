@@ -56,9 +56,10 @@
     </div>
     <nav aria-label="Diagram sections">
       <a href="./views/overview.html" target="idd-diagram" data-view="overview" aria-current="page"><span class="num">01</span> Overview</a>
-      <a href="./views/intent.html" target="idd-diagram" data-view="intent"><span class="num">02</span> Intent Lifecycle</a>
-      <a href="./views/factory.html" target="idd-diagram" data-view="factory"><span class="num">03</span> Factory Execution</a>
-      <a href="./views/quality.html" target="idd-diagram" data-view="quality"><span class="num">04</span> Quality &amp; Conformance</a>
+      <a href="./views/routing.html" target="idd-diagram" data-view="routing"><span class="num">02</span> Request Routing</a>
+      <a href="./views/intent.html" target="idd-diagram" data-view="intent"><span class="num">03</span> Intent Lifecycle</a>
+      <a href="./views/factory.html" target="idd-diagram" data-view="factory"><span class="num">04</span> Factory Execution</a>
+      <a href="./views/quality.html" target="idd-diagram" data-view="quality"><span class="num">05</span> Quality &amp; Conformance</a>
     </nav>
   </header>
   <section class="description" aria-live="polite">
@@ -74,6 +75,7 @@
     (() => {
       const views = {
         overview: {title: "Overview", description: "See how requests are routed through current product truth, optional execution and independent audits."},
+        routing: {title: "Request Routing", description: "Follow automatic skill selection, required Routing Core, optional details, and the caller-owned handoff or stop."},
         intent: {title: "Intent Lifecycle", description: "Understand discovery, confirmation, ownership and the living product contract."},
         factory: {title: "Factory Execution", description: "Follow preflight, original Git baseline, fresh Planner and Worker contexts, verification and review."},
         quality: {title: "Quality & Conformance", description: "Distinguish mechanical lint, semantic organization, implementation drift and project verification."}

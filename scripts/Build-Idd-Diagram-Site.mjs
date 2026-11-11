@@ -8,7 +8,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const archifyArgIndex = process.argv.indexOf('--archify');
 const archifyPath = path.resolve(root, archifyArgIndex < 0 ? '.archify/archify/bin/archify.mjs' : process.argv[archifyArgIndex + 1]);
 const revision = process.env.GITHUB_SHA || execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
-const names = ['overview', 'intent', 'factory', 'quality'];
+const names = ['overview', 'routing', 'intent', 'factory', 'quality'];
 if (!/^[a-f0-9]{40}$/i.test(revision)) throw new Error('A full Git commit SHA is required');
 if (!existsSync(archifyPath)) throw new Error('Missing pinned Archify CLI: ' + archifyPath);
 
@@ -46,7 +46,7 @@ try {
   if (failures.length) throw new Error('Archify validation failed for: ' + failures.join(', '));
   copyFileSync(path.join(root, 'docs/diagram/site-shell.html'), path.join(site, 'index.html'));
   for (const name of names) if (!existsSync(path.join(site, 'views', name + '.html'))) throw new Error('Missing generated page: ' + name);
-  console.log('Generated four verified interactive diagrams and site/index.html at ' + revision);
+  console.log('Generated five verified interactive diagrams and site/index.html at ' + revision);
 } finally {
   rmSync(workspace, { recursive: true, force: true });
 }

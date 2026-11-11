@@ -77,9 +77,16 @@
       "lane": "entry",
       "col": 1,
       "type": "frontend",
-      "label": "Classify Scope",
-      "sublabel": "product change or known truth",
-      "width": 184
+      "label": "Route Product Request",
+      "sublabel": "scope & clarity gates",
+      "width": 184,
+      "sources": [
+        {
+          "path": "src/canonical/methodology/routing-core.md",
+          "line": 98,
+          "label": "Clarity and scope"
+        }
+      ]
     },
     {
       "id": "discover",
@@ -91,7 +98,7 @@
       "sources": [
         {
           "path": "src/canonical/methodology/common-workflows.md",
-          "line": 302,
+          "line": 140,
           "label": "Entry routes"
         }
       ],
@@ -125,7 +132,7 @@
       "sources": [
         {
           "path": "src/canonical/methodology/common-workflows.md",
-          "line": 439,
+          "line": 275,
           "label": "Product change"
         }
       ],

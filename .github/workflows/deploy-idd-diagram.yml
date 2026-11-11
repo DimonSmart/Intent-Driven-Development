@@ -7,6 +7,10 @@ on:
     paths:
       - docs/diagram/**
       - scripts/Build-Idd-Diagram-Site.mjs
+      - src/canonical/skills/idd-route.md
+      - src/canonical/skills/skill-descriptions.json
+      - src/canonical/methodology/routing-core.md
+      - src/canonical/methodology/common-workflows.md
       - .github/workflows/deploy-idd-diagram.yml
   workflow_dispatch:
 

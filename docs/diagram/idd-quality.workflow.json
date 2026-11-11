@@ -72,7 +72,7 @@
       "sources": [
         {
           "path": "src/canonical/methodology/common-workflows.md",
-          "line": 560,
+          "line": 398,
           "label": "Lint"
         }
       ],
@@ -115,7 +115,7 @@
       "sources": [
         {
           "path": "src/canonical/methodology/common-workflows.md",
-          "line": 606,
+          "line": 442,
           "label": "Conformance"
         }
       ],
