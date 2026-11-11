@@ -365,12 +365,12 @@ public sealed class CodexRolloutReader
                     var threadSpawn = subagent is { } subagentValue
                         ? Object(subagentValue, "thread_spawn")
                         : null;
-                    if (threadSpawn is { } metadata)
+                    if (threadSpawn is { } spawnMetadata)
                     {
-                        rollout.ParentThreadId ??= FindString(metadata,
+                        rollout.ParentThreadId ??= FindString(spawnMetadata,
                             "parent_thread_id", "parentThreadId", "parent_id");
-                        rollout.AgentRoleHint ??= FindString(metadata, "agent_role", "agentRole");
-                        rollout.AgentPath ??= FindString(metadata, "agent_path", "agentPath");
+                        rollout.AgentRoleHint ??= FindString(spawnMetadata, "agent_role", "agentRole");
+                        rollout.AgentPath ??= FindString(spawnMetadata, "agent_path", "agentPath");
                     }
                 }
 
