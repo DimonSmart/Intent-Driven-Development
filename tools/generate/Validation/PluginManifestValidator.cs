@@ -6,7 +6,8 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
         encoderShouldEmitUTF8Identifier: false,
         throwOnInvalidBytes: true);
 
-    public void Validate(PluginManifest manifest, IReadOnlyDictionary<string, RoleDefinition> roleDefinitions)
+    public void Validate(PluginManifest manifest, IReadOnlyDictionary<string, RoleDefinition> roleDefinitions,
+        IReadOnlyDictionary<string, SkillDescription> skillDescriptions)
     {
         if (manifest.Plugins.Count == 0)
         {
@@ -22,6 +23,7 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
                 .ToHashSet(StringComparer.Ordinal)
             : new HashSet<string>(StringComparer.Ordinal);
 
+        var assignedSkills = new HashSet<string>(StringComparer.Ordinal);
         foreach (var (pluginName, plugin) in manifest.Plugins)
         {
             if (!pluginName.StartsWith("idd-", StringComparison.Ordinal))
@@ -39,10 +41,17 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
 
             foreach (var skill in plugin.Skills)
             {
-                if (!knownSkills.Contains(skill))
-                {
+                if (!assignedSkills.Add(skill))
+                    throw new InvalidOperationException($"Duplicate skill ownership for '{skill}'.");
+                if (!skillDescriptions.TryGetValue(skill, out var description))
+                    throw new InvalidOperationException($"Plugin '{pluginName}' lacks description for skill '{skill}'.");
+                var isInternal = plugin.SkillSourcesOrEmpty.ContainsKey(skill);
+                if (description.Exposure == SkillExposure.Internal != isInternal)
+                    throw new InvalidOperationException($"Skill '{skill}' internal exposure/source mismatch in plugin '{pluginName}'.");
+                if (isInternal && (description.Invocation != SkillInvocation.Auto || description.Interface is not null))
+                    throw new InvalidOperationException($"Internal skill '{skill}' cannot be manual or have public interface metadata.");
+                if (!knownSkills.Contains(skill) && !isInternal)
                     throw new InvalidOperationException($"Plugin '{pluginName}' references unknown skill '{skill}'.");
-                }
             }
 
             foreach (var role in plugin.Roles)
@@ -80,7 +89,7 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
             }
 
             ValidateSkillReferences(pluginName, plugin);
-            ValidateNativeAgents(pluginName, plugin);
+            ValidateInternalSkillSources(pluginName, plugin);
 
             foreach (var asset in plugin.SkillAssetsOrEmpty)
             {
@@ -115,40 +124,36 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
         }
     }
 
-    private void ValidateNativeAgents(string pluginName, PluginDefinition plugin)
+    private void ValidateInternalSkillSources(string pluginName, PluginDefinition plugin)
     {
-        var definitions = plugin.NativeAgentsOrEmpty;
-        if (!StringComparer.Ordinal.Equals(pluginName, "idd-factory") && definitions.Count != 0)
-            throw new InvalidOperationException($"Only idd-factory may declare native agents: {pluginName}.");
-        if (!StringComparer.Ordinal.Equals(pluginName, "idd-factory")) return;
-
-        var expected = new[] { "planner", "worker" };
-        if (definitions.Count != expected.Length || definitions.Select(a => a.Name).Distinct(StringComparer.Ordinal).Count() != expected.Length)
-            throw new InvalidOperationException("Factory must declare exactly two distinct native agents.");
-        foreach (var role in expected)
+        foreach (var (skill, sourcePath) in plugin.SkillSourcesOrEmpty)
         {
-            var agent = definitions.SingleOrDefault(a => StringComparer.Ordinal.Equals(a.Name, $"idd-internal-factory-{role}"));
-            if (agent is null || !StringComparer.Ordinal.Equals(agent.Source, $"src/canonical/factory/{role}.md") ||
-                string.IsNullOrWhiteSpace(agent.Description))
-                throw new InvalidOperationException($"Missing or invalid native Factory {role} definition/source.");
-            var source = ResolveRepositoryPath(agent.Source);
-            if (!File.Exists(source)) throw new InvalidOperationException($"Missing canonical native-agent source: {agent.Source}");
-            ValidateUtf8NativeSource(agent, source);
+            if (!StringComparer.Ordinal.Equals(pluginName, "idd-factory") ||
+                (skill is not ("idd-internal-factory-planner" or "idd-internal-factory-worker")) ||
+                !plugin.Skills.Contains(skill, StringComparer.Ordinal))
+                throw new InvalidOperationException($"Invalid internal skill ownership: '{pluginName}/{skill}'.");
+            var role = skill["idd-internal-factory-".Length..];
+            if (!StringComparer.Ordinal.Equals(sourcePath, $"src/canonical/factory/{role}.md"))
+                throw new InvalidOperationException($"Invalid canonical source for internal skill '{skill}': {sourcePath}.");
+            var source = ResolveRepositoryPath(sourcePath);
+            if (!File.Exists(source))
+                throw new InvalidOperationException($"Missing internal skill source: {sourcePath}.");
+            try
+            {
+                var content = File.ReadAllText(source, StrictUtf8);
+                if (string.IsNullOrWhiteSpace(content) || content.Contains('\0'))
+                    throw new InvalidOperationException($"Empty or invalid internal skill source: {sourcePath}.");
+            }
+            catch (DecoderFallbackException ex)
+            {
+                throw new InvalidOperationException($"Invalid UTF-8 internal skill source: {sourcePath}.", ex);
+            }
         }
-    }
-
-    private static void ValidateUtf8NativeSource(NativeAgentDefinition agent, string path)
-    {
-        try
-        {
-            var value = File.ReadAllText(path, StrictUtf8);
-            if (string.IsNullOrWhiteSpace(value) || value.Contains('\0'))
-                throw new InvalidOperationException($"Empty or invalid native-agent source: {agent.Source}");
-        }
-        catch (DecoderFallbackException exception)
-        {
-            throw new InvalidOperationException($"Invalid UTF-8 native-agent source: {agent.Source}", exception);
-        }
+        if (StringComparer.Ordinal.Equals(pluginName, "idd-factory") &&
+            (plugin.SkillSourcesOrEmpty.Count != 2 ||
+             !plugin.SkillSourcesOrEmpty.ContainsKey("idd-internal-factory-planner") ||
+             !plugin.SkillSourcesOrEmpty.ContainsKey("idd-internal-factory-worker")))
+            throw new InvalidOperationException("Factory must package exactly the Planner and Worker internal Skills.");
     }
 
     private void ValidateSkillReferences(string pluginName, PluginDefinition plugin)

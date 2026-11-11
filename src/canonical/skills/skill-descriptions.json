@@ -185,7 +185,7 @@
     }
   },
   "idd-factory-run": {
-    "description": "Prepare required durable Product Intent and explicit Engineering policy before starting a new run, then orchestrate incremental planning and isolated native-agent workers while mechanically applying project-owned execution-profile mappings.",
+    "description": "Prepare durable Intent/Engineering policy and orchestrate fresh generic child agents that fully load installed internal Factory Skills for bounded Planner and Worker assignments.",
     "exposure": "command",
     "interface": {
       "displayName": "IDD Factory Run",
@@ -195,5 +195,13 @@
   "idd-intent-visual-brainstorm": {
     "description": "Clarify user-confirmed Visual Intent from screenshots or mockups using professional design interpretation and optional locally supplied comparison-card images, without changing specs or code.",
     "exposure": "workflow"
+  },
+  "idd-internal-factory-planner": {
+    "description": "Internal Factory Planner protocol. Use only inside a fresh child context spawned by idd-factory-run with the full phase-appropriate bounded assignment; otherwise return BLOCKED.",
+    "exposure": "internal"
+  },
+  "idd-internal-factory-worker": {
+    "description": "Internal Factory Worker protocol. Use only inside a fresh child context spawned by idd-factory-run with exactly one complete Task and verified scope/provenance; otherwise return BLOCKED.",
+    "exposure": "internal"
   }
 }

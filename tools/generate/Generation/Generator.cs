@@ -20,7 +20,7 @@ internal sealed class Generator(RepositoryLayout layout)
         var skillDescriptions = new SkillDescriptionReader().Read(layout.SkillDescriptionsPath, supportedCodingAgents);
         var pluginManifest = new PluginManifestReader(layout).Read();
         var roleDefinitions = ReadRoleDefinitions(pluginManifest);
-        new PluginManifestValidator(layout).Validate(pluginManifest, roleDefinitions);
+        new PluginManifestValidator(layout).Validate(pluginManifest, roleDefinitions, skillDescriptions);
 
         var expectedFiles = new List<GeneratedFile>();
         foreach (var adapterDefinition in adapterDefinitions)
