@@ -34,6 +34,12 @@ try {
     }
     const nodes = new Set(diagram.nodes.map(node => node.id));
     if (nodes.size !== diagram.nodes.length) throw new Error('Duplicate diagram nodes: ' + name);
+    const placements = new Set();
+    for (const node of diagram.nodes) {
+      const place = node.lane + '|' + node.col + '|' + (node.yOffset ?? 0);
+      if (placements.has(place)) throw new Error('Duplicate diagram placement in ' + name + ': ' + place);
+      placements.add(place);
+    }
     const connected = new Set();
     for (const edge of diagram.edges) {
       if (!nodes.has(edge.from) || !nodes.has(edge.to)) throw new Error('Dangling diagram edge: ' + name + ': ' + edge.id);

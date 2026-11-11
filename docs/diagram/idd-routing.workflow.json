@@ -206,7 +206,7 @@
     },
     {
       "id": "result",
-      "lane": "handoff",
+      "lane": "router",
       "col": 5,
       "type": "database",
       "label": "Route Result",
