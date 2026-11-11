@@ -25,9 +25,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Test Codex native agent registration
-        run: python -m unittest discover -s tests/Idd.Codex.Setup.Tests -p 'test_*.py'
-
       - name: Run fast validation
         shell: pwsh
         run: pwsh ./scripts/Check.ps1 -Mode Fast -Version 0.0.0
@@ -48,9 +45,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
-      - name: Test Codex native agent registration
-        run: python -m unittest discover -s tests/Idd.Codex.Setup.Tests -p 'test_*.py'
 
       - name: Run fast validation
         id: check

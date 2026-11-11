@@ -32,19 +32,31 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
         var inventory = new SkillDescriptionReader().Read(
             Path.Combine(fixture.RepoRoot, "src", "canonical", "skills", "skill-descriptions.json"),
             new HashSet<string>(StringComparer.Ordinal) { "claude", "codex" });
-        Assert.Equal(20, inventory.Count);
+        Assert.Equal(22, inventory.Count);
         Assert.Equal(7, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Command));
         Assert.Equal(13, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Workflow));
         Assert.Equal(5, inventory.Count(skill => skill.Value.Invocation == SkillInvocation.Manual));
-        Assert.Equal(15, inventory.Count(skill => skill.Value.Invocation == SkillInvocation.Auto));
+        Assert.Equal(17, inventory.Count(skill => skill.Value.Invocation == SkillInvocation.Auto));
+        Assert.Equal(2, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Internal));
+
+        using var manifest = JsonDocument.Parse(fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "plugins", "plugin-manifest.json")));
+        var owners = manifest.RootElement.GetProperty("plugins").EnumerateObject()
+            .SelectMany(plugin => plugin.Value.GetProperty("skills").EnumerateArray()
+                .Select(name => new { Name = name.GetString()!, Owner = plugin.Name }))
+            .ToDictionary(entry => entry.Name, entry => entry.Owner, StringComparer.Ordinal);
+        Assert.Equal(inventory.Count, owners.Count);
 
         foreach (var (name, description) in inventory)
         {
-            Assert.Equal(Commands.Contains(name) ? SkillExposure.Command : SkillExposure.Workflow, description.Exposure);
+            var exposure = Commands.Contains(name) ? SkillExposure.Command :
+                name.StartsWith("idd-internal-factory-", StringComparison.Ordinal)
+                    ? SkillExposure.Internal : SkillExposure.Workflow;
+            Assert.Equal(exposure, description.Exposure);
             Assert.Equal(Manual.Contains(name) ? SkillInvocation.Manual : SkillInvocation.Auto, description.Invocation);
             foreach (var platform in new[] { "claude", "codex" })
             {
-                var plugin = name.StartsWith("idd-factory-", StringComparison.Ordinal) ? "idd-factory" : "idd-intent";
+                var plugin = owners[name];
                 var folder = Path.Combine(fixture.MarketplaceRoot, "plugins", platform, plugin, "skills", name);
                 var skill = fixture.ReadText(Path.Combine(folder, "SKILL.md"));
 
@@ -116,7 +128,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
         {
             var root = Path.Combine(fixture.MarketplaceRoot, "plugins", platform);
             Assert.Equal(18, Directory.GetDirectories(Path.Combine(root, "idd-intent", "skills")).Length);
-            Assert.Equal(2, Directory.GetDirectories(Path.Combine(root, "idd-factory", "skills")).Length);
+            Assert.Equal(4, Directory.GetDirectories(Path.Combine(root, "idd-factory", "skills")).Length);
         }
     }
 
@@ -182,6 +194,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
     [InlineData("{\"description\":\"Example\",\"exposure\":\"command\"}", "Auto", "Command")]
     [InlineData("{\"description\":\"Example\",\"invocation\":\"manual\",\"exposure\":\"command\"}", "Manual", "Command")]
     [InlineData("{\"description\":\"Example\",\"exposure\":\"workflow\"}", "Auto", "Workflow")]
+    [InlineData("{\"description\":\"Example\",\"exposure\":\"internal\"}", "Auto", "Internal")]
     public void Reader_AcceptsCompatibleDescriptions(string description, string expectedInvocation, string expectedExposure)
     {
         var value = ReadDescription(description);
@@ -191,6 +204,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
 
     [Theory]
     [InlineData("{\"description\":\"Example\",\"invocation\":\"manual\",\"exposure\":\"workflow\"}")]
+    [InlineData("{\"description\":\"Example\",\"invocation\":\"manual\",\"exposure\":\"internal\"}")]
     [InlineData("{\"description\":\"Example\",\"exposure\":null}")]
     [InlineData("{\"description\":\"Example\",\"exposure\":\"\"}")]
     [InlineData("{\"description\":\"Example\",\"exposure\":\"unsupported\"}")]

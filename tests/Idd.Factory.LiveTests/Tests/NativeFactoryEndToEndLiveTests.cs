@@ -114,8 +114,6 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             {
                 "exec", generator, "--version", "0.0.0-live", "--output", marketplace
             };
-            if (Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_INTERNAL_SKILLS") == "1")
-                generationArguments.Add("--internal-agent-experiment");
             await RunAsync(
                 "dotnet",
                 generationArguments,
@@ -129,11 +127,12 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             Assert.False(Directory.Exists(Path.Combine(generatedFactory, "runtime")));
             Assert.False(File.Exists(Path.Combine(generatedFactory, ".mcp.json")));
 
-            // This eval exercises Factory itself, not Marketplace-only agent discovery.
-            // Register the exact generated TOML definitions only inside its disposable
-            // project; the separate Marketplace discovery test deliberately omits this.
-            FactoryEvalAgentRegistration.StageProjectAgents(generatedFactory, workspace, artifactRoot);
-            await InitializeGitRepositoryAsync(workspace, artifactRoot, includeProjectAgents: true);
+            // Factory uses the generated internal Skills, not project custom agents.
+            foreach (var role in new[] { "planner", "worker" })
+                Assert.True(File.Exists(Path.Combine(generatedFactory, "skills",
+                    "idd-internal-factory-" + role, "SKILL.md")));
+            Assert.False(Directory.Exists(Path.Combine(generatedFactory, "agents")));
+            await InitializeGitRepositoryAsync(workspace, artifactRoot);
             await VerifyGitBaselineAsync(workspace, artifactRoot);
             await RunAsync("dotnet", ["restore", "MiniCatalog.sln", "--nologo"],
                 workspace, null, null, artifactRoot, "05-workspace-restore");
@@ -160,12 +159,6 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 null,
                 artifactRoot,
                 "09-codex-plugin-add");
-
-            // Preflight native role resolution in a separate isolated Codex home.
-            // Its sessions cannot contaminate the Factory run report or root trace.
-            await ProbeProjectAgentRegistrationAsync(
-                codex, workspace, Path.Combine(tempRoot, "codex-agent-probe-home"),
-                artifactRoot, model, reasoning, timeoutMinutes);
 
             var task = await File.ReadAllTextAsync(Path.Combine(caseRoot,
                 unavailableWorkerModel ? "task-model-unavailable.md" : "task.md"));
@@ -454,22 +447,12 @@ public sealed partial class NativeFactoryEndToEndLiveTests
     }
 
     private static async Task InitializeGitRepositoryAsync(
-        string workspace, string artifactRoot, bool includeProjectAgents = false)
+        string workspace, string artifactRoot)
     {
         await RunAsync("git", ["init"], workspace, null, null, artifactRoot, "01-git-init");
         await RunAsync("git", ["config", "user.name", "IDD Factory Eval"], workspace, null, null, artifactRoot, "02-git-config-name");
         await RunAsync("git", ["config", "user.email", "idd-factory-eval@localhost"], workspace, null, null, artifactRoot, "03-git-config-email");
         await RunAsync("git", ["add", "--all"], workspace, null, null, artifactRoot, "04-git-add");
-        if (includeProjectAgents)
-        {
-            // The fixture deliberately ignores .codex/ as a local-agent directory.
-            // Track only these generated role definitions in the disposable
-            // baseline; never force-add unrelated ignored files.
-            var files = FactoryEvalAgentRegistration.RequiredRoles
-                .Select(name => ".codex/agents/" + name + ".toml").ToArray();
-            await RunAsync("git", ["add", "-f", "--", ..files],
-                workspace, null, null, artifactRoot, "04-git-add-factory-agents");
-        }
         await RunAsync("git", ["commit", "-m", "Initial eval workspace"], workspace, null, null, artifactRoot, "05-git-commit");
     }
 
@@ -493,7 +476,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         File.WriteAllText(Path.Combine(idd, "execution.yaml"), yaml.ToString().ReplaceLineEndings("\n"));
     }
 
-    private static async Task VerifyGitBaselineAsync(string workspace, string artifactRoot, bool requireProjectAgents = true)
+    private static async Task VerifyGitBaselineAsync(string workspace, string artifactRoot)
     {
         // ArgumentList passes the revision verbatim, including braces. This check
         // distinguishes a missing Git baseline from a later agent/shell failure.
@@ -521,17 +504,6 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         var kind = await RunAsync("git", ["cat-file", "-t", hash],
             workspace, null, null, artifactRoot, "05-git-baseline-object");
         Assert.Equal("commit", kind.Stdout.Trim());
-
-        if (requireProjectAgents)
-        {
-            var tracked = await RunAsync("git", ["ls-files", "--", ".codex/agents"],
-                workspace, null, null, artifactRoot, "05-git-agents-tracked");
-            var actual = tracked.Stdout.Split('\n', StringSplitOptions.TrimEntries |
-                                                       StringSplitOptions.RemoveEmptyEntries);
-            var expected = FactoryEvalAgentRegistration.RequiredRoles
-                .Select(name => ".codex/agents/" + name + ".toml").ToArray();
-            Assert.Equal(expected.Order(StringComparer.Ordinal), actual.Order(StringComparer.Ordinal));
-        }
 
         await File.WriteAllTextAsync(Path.Combine(artifactRoot, "git-baseline.txt"), hash + "\n");
     }
