@@ -1,6 +1,6 @@
 ---
 name: idd-factory-run
-description: Prepare required durable Product Intent and explicit Engineering policy before starting a new run, then orchestrate incremental planning and isolated native-agent workers while mechanically applying project-owned execution-profile mappings.
+description: Prepare durable Intent/Engineering policy and orchestrate fresh generic child agents that fully load installed internal Factory Skills for bounded Planner and Worker assignments.
 ---
 
 # IDD Factory Run
@@ -37,45 +37,57 @@ loop to compensate.
 
 A new thread is not sufficient if it automatically receives the parent history.
 
-## Registered native agent gate and assignment transport
+## Installed internal Skills and generic child-agent transport
 
-Internal native agents are `idd-internal-factory-planner` and
-`idd-internal-factory-worker`. On Claude Code the plugin-scoped identifiers
-are `idd-factory:idd-internal-factory-planner` and
-`idd-factory:idd-internal-factory-worker`; use the exact name reported by
-the installed host. On Codex use their registered custom-agent `agent_type`,
-never a generic child with a role-like `task_name`.
-Use the actual top-level host tool schema for role selection and lifecycle
-checks. A nested tool inventory is not authoritative for the root tool surface;
-absence from that inventory alone is not a capability failure.
+The Factory Planner and Worker protocols are shipped as
+`skills/idd-internal-factory-planner/SKILL.md` and
+`skills/idd-internal-factory-worker/SKILL.md` inside the SAME installed
+`idd-factory` plugin as this `idd-factory-run/SKILL.md`. These are internal
+instruction Skills, not registered custom-agent types or separate processes.
 
-Before **any durable owner or Factory write** during new-run preflight, inspect
-the installed host's native child-agent capabilities and resolve BOTH registered
-roles unambiguously: exact type identity, host-loaded developer/system
-instructions, fresh context, repository access, terminal wait and stop/close.
-Repeat the concrete role-resolution check immediately before every spawn. A
-missing, overridden, ambiguous, corrupt or unresolvable role blocks Factory;
-neither Root nor a generic agent may substitute the role or discover a child
-Skill from a short prompt. Internal names are not authorization.
+Before any new durable owner/Factory write, resolve this currently loaded
+Factory Run Skill to its real installed absolute path; derive its sibling
+Planner/Worker Skill paths from that exact installed plugin root. Do not guess
+plugin cache versions, search globally by name, use the source checkout or
+assume the project working directory is the plugin root. Check both SKILL.md
+files exist and are accessible, and verify any statically declared mandatory
+references. Root may inspect paths, file attributes and package metadata, but
+MUST NOT read, summarize, quote or relay the full child protocols.
 
-Root must not read, reproduce, quote, or transmit the Planner/Worker protocol
-bodies. The host supplies the registered instructions to the selected child.
-Both child definitions contain their complete canonical role protocols,
-including role-specific Engineering obligations. Root reads
-`references/engineering-guardrails.md` when required by its workflow,
-but never forwards the full methodology to children.
+Inspect the actual top-level host-native child-agent schema, including direct
+operations that might not appear inside a nested helper tool list. Require
+fresh child context without inherited history, child access to installed files
+and the shared project working copy, bounded task delivery, final result,
+native blocking/event-driven waiting, stop/interrupt and confirmation that a
+writer has stopped, and exact model/effort overrides when required by policy.
+Absence of a Factory-specific `agent_type` argument is NOT a failure.
+If the host requires a type, use its builtin generic child type, not a
+custom registered Factory role. A per-child read-only sandbox for Planner is
+preferred, not mandatory; a textual rule is not a technical sandbox.
 
-Every spawn carries only the bounded Factory assignment and accessible paths
-(or exact materialized request/answers where needed). Resolve paths against
-the **child repository working directory**, not the plugin source tree or a
-parent-only variable. Require the child's assignment guard and all required
-references. A role without a complete verified packet returns `BLOCKED`
-without work. Missing host capabilities, incorrect child identity, absent
-instructions, malformed results, denied model overrides or unconfirmed child
-termination are fail-closed: report host, role, phase and reason; preserve
-pending work and forbid concurrent replacement writers. Do not switch to a
-legacy Root-relayed protocol or custom runtime.
+Spawn ordinary native children with explicitly disabled transcript inheritance.
+For Codex use `fork_turns: "none"` and unique `task_name` arguments as
+specified below. In EVERY spawn message include the semantic Planner/Worker
+role, the concrete accessible absolute path to that role's installed SKILL.md,
+an explicit instruction to read ALL of it (and its required references) as
+its first substantive action, the explicit project working-copy path, and
+only the phase-appropriate bounded assignment. Parent and child must refer
+to the SAME installed plugin version. Quote paths with spaces; use real paths
+supported by the host on Windows and Unix. Partial/truncated file reads must
+be continued until complete; no independent project work before loading and
+guarding the assignment. The child returns `BLOCKED` when Skill, references,
+phase, baseline/provenance or required assignment is missing or ambiguous.
+It must not improvise a protocol from memory.
 
+Root never injects protocol bodies, the whole Intent/Engineering tree, previous
+worker conversations or the parent transcript. Root performs required
+Engineering enumeration and execution policy mapping as before. If a child
+fails to load a Skill after valid preparation, preserve the existing phase
+state and pending Task; never declare successful completion. On wait failure,
+stop or interrupt the child, confirm Writer termination before another write,
+and end this attempt with recoverable state. No status polling loop or runtime
+fallback. These are checks for necessary host capabilities, not a requirement
+to prove a future child has already read its Skill before spawning it.
 
 ## Factory Preflight — Root entrypoint
 
@@ -94,13 +106,11 @@ mutating Product/Engineering preflight. A direct invocation bypassing
 cancelled or explicitly replaced runs, select the applicable mode from
 `intent-preflight.md`, not a fabricated new state machine.
 
-**Before any durable owner/Factory write**, Root must complete the host
-capability gate and resolve **both** registered native Planner/Worker roles
-as described in `Registered native agent gate and assignment transport`.
-Stop before preparation if either role or required capability is missing,
-ambiguous or inaccessible. Repeat the identity/readiness gate before each
-spawn. Do not substitute generic agents, relay full protocols from Root,
-or assume a child can read parent-only paths.
+**Before any durable owner/Factory write**, Root must validate the actual native
+child-agent capabilities and both installed internal Skill paths described
+above. Missing required tools/files block before preparation; an absent
+`agent_type` or unregistered legacy Factory role does not. Recheck the
+chosen Skill path and required capabilities before each spawn.
 
 For a **new independent end-to-end run**, execute these named Preflight
 phases in the normative order, with Root responsible for the concrete actions:
@@ -125,7 +135,7 @@ phases in the normative order, with Root responsible for the concrete actions:
 6. Validate durable coverage against full request, exact Q/A, both
    applicable durable layers, safety, compatibility and explicit non-goals.
    Record the verified boundary in provenance.
-7. Spawn a fresh **registered** initial Planner while inactive, using the
+7. Spawn a fresh generic child for the initial Planner while inactive, using the
    ordinary bounded assignment. Handle `# Question`, `# Done` or a
    complete validated `# Task` batch according to the Preflight reference
    and the operational activation section below. No Planner outcome
@@ -262,8 +272,8 @@ questions and renewed coverage`, and `Request identity` in
 native-agent and temporary-file operations, not a second Preflight policy.
 
 1. After approved durable coverage and saved
-   `preparation/{request,baseline,provenance}.md`, resolve the registered
-   Planner identity again. Spawn the same fresh isolated native Planner
+   `preparation/{request,baseline,provenance}.md`, recheck the installed
+   Planner Skill path. Spawn a fresh generic child as Planner
    used in active runs with the unchanged request, chronological exact Q/A,
    repository paths, current Engineering discovery context and bounded
    preparation verification failure. No active marker or `completed.md`
@@ -327,7 +337,7 @@ while true:
     if that profile/platform mapping is absent, inherit host settings
     deterministically re-read the current Engineering INDEX
     enumerate all current Always ENG IDs
-    verify registered worker type and prepare the isolated worker assignment
+    verify installed Worker Skill path and prepare the isolated worker assignment
     record pending Worker before-checkpoint in provenance.md
     spawn a fresh native worker with the resolved native model override
     wait natively for its terminal result
@@ -351,8 +361,8 @@ On Codex MultiAgentV2, **every Factory-owned native `spawn_agent` call**
 `idd_factory_planner_01`, `idd_factory_planner_02`, ... for planners,
 or `idd_factory_worker_01`, `idd_factory_worker_02`, ... for workers.
 Only names matching `^idd_factory_(planner|worker)_[0-9]+$` are valid.
-A `task_name` identifies an attempt, not its `agent_type`; supply both
-when the host supports these arguments.
+A `task_name` identifies an attempt, not a role type or evidence that
+its Skill was loaded.
 Use a fresh name for **each attempt**, including a spawn rejected by the host.
 Keep names unique within the root-session/Factory invocation and any shared
 host namespace; inspect visible native calls before selecting the next suffix.
@@ -370,46 +380,19 @@ unchanged when they lack `task_name`.
 
 ### Fresh planner
 
-Resolve and spawn the **registered** `idd-internal-factory-planner`
-native agent (Claude plugin-scoped name where applicable). Host-loaded role
-instructions must be current and complete. Root supplies only the bounded
-Planner assignment, never a copy or citation of the full Planner protocol.
-Require no parent transcript, and verify the actual child type in native trace.
-Malformed `Tasks`, `Question`, or `Done` is not a successful result.
-
-Give the planner only:
-
-- the complete unchanged base Factory request (from preparation/request.md or current/request.md);
-- current repository access;
-- chronological exact question AND answer pairs (preparation/answers.md or current/answers.md);
-- bounded completed summaries (active runs only);
-- the latest bounded project-verification failure from the same phase, when present;
-- original immutable baseline and bounded verified preflight/Worker
-  provenance, including any unknown changes or deferred contract issues;
-- whether the optional Engineering layer exists and the validated discovery
-  paths; the child's host-loaded Planner protocol contains its Engineering
-  obligations.
-
-The planner discovers current durable intent through the normal
-`.idd/intent/README.md` and `INDEX.md` flow and reads only relevant documents.
-When `.idd/engineering/` exists, also give it access to the repository's
-Engineering README and INDEX. The planner semantically selects only relevant
-Conditional rules and emits them as `TaskRelatedEngineering`. It does not emit
-Always rules. Full Always documents are not automatically loaded into planner
-context, though the planner may read one when its content is necessary for
-correct decomposition.
-
-Do not rely on child Skill discovery or inherited Root references. Do not
-forward the Root transcript, earlier child transcripts, full role protocols,
-or complete Intent/Engineering trees. Fail closed if host-loaded role
-instructions or required repository references cannot be established.
-
-The planner creates only implementation/research tasks. It must not execute
-implementation or create tasks to update Product Intent, create/modify
-Engineering Rules, run `idd-engineering-change`, import the request, or
-perform durable preparation. Before activation, Planner questions may expose
-new durable decisions; only Factory entry orchestration and normal durable
-owners can resolve those decisions while the marker is absent.
+Spawn a generic native child with a new context and no inherited history.
+Pass the absolute installed `idd-internal-factory-planner/SKILL.md` path,
+full original request (or its accessible persisted path), preparation/active
+phase, chronological exact Q/A, original baseline, verified provenance,
+repository root and phase-specific optional completed summaries/verification
+failure. The child reads its entire installed Skill as its first substantive
+action, validates assignment completeness and required references, then
+semantically selects relevant current Intent and Conditional Engineering.
+The Planner is read-only: it must not mutate project or Factory state, read
+execution policy, or inherit Root/other agent transcripts. Use native read-only
+permissions when available. Do not require active-only files in preparation.
+Root does not copy the protocol, full Intent tree or prior transcripts.
+A missing/unreadable Skill or invalid packet gives `BLOCKED` without planning.
 
 ### Worker execution profile
 
@@ -457,72 +440,42 @@ own model.
 
 ### Fresh worker
 
-Before **every** Worker spawn, resolve the registered native
-`idd-internal-factory-worker` (`idd-factory:idd-internal-factory-worker`
-for Claude) and validate its host-loaded instructions and effective tool/model
-capabilities. If missing, corrupt, ambiguous or unreadable, block the spawn
-and leave the Task first in `plan.md`. Never reconstruct the protocol,
-invoke a public Worker Skill or fall back to a generic agent.
+Immediately before every Worker spawn, verify the installed internal Worker
+Skill path and material current Intent/Engineering constraints, request/answer
+freshness and baseline/provenance. Replan stale Task batches. Prepare exactly
+one complete self-contained Task and the current TaskRelatedIntent,
+Planner-selected Conditional TaskRelatedEngineering, mechanically enumerated
+AlwaysEngineering, authorized scope and explicit user prohibitions. Resolve
+exact stable IDs and provide accessible project/context paths. Do not create a
+second `# Task` header in the bootstrap.
 
-Before every Worker spawn, recheck material Intent/Engineering constraints,
-request/answer freshness and the effective contract. A stale Task batch is
-replanned by a fresh Planner rather than run with outdated commitments.
-For the first remaining task, prepare one self-contained worker assignment.
-Immediately before execution, check whether `.idd/engineering/` exists.
-Absence is normal: do not bootstrap the layer, invent ENG identifiers, or
-require a nonexistent INDEX. When present, mechanically validate its structure,
-re-read the current INDEX, enumerate every `Always` entry, and ensure that
-each ID resolves uniquely to a valid matching document. Pass those IDs
-separately from the planner-selected Conditional `TaskRelatedEngineering`
-IDs. A missing, duplicated, malformed, or metadata-inconsistent mandatory
-rule blocks execution without repairing the Engineering layer. Do not
-semantically reselect Conditional rules.
+Spawn a fresh generic child with no inherited transcript. Pass the absolute
+installed `idd-internal-factory-worker/SKILL.md` path and instruct the child
+to read it entirely first, validate the one-Task packet and required references,
+then implement only that Task. The Skill is the Worker's protocol; Root never
+reads or relays its body. The worker never selects a model or reads execution
+policy. Use exact policy-resolved native model/effort arguments or omit both
+when inheriting; never silently substitute.
 
-The host-loaded Worker protocol contains its Engineering obligations; pass
-the Worker verified baseline/provenance context or paths to the saved files,
-and carry explicit user document prohibitions and conservative legacy
-scope. Do not add another `# Task` section. The root resolves the execution
-profile and native model settings before spawn; the worker never selects a model or reads execution
-policy.
-
-Use this logical native spawn instruction structure, keeping role instructions
-separate from the one-task assignment:
+Use this bounded task structure (omit empty optional sections):
 
 ```text
 --- Factory worker assignment ---
 # Task
-<exactly one self-contained Task>
+<exactly one complete Task>
 # TaskRelatedIntent
-<optional IDD-NNNN identifiers>
+<selected IDD-NNNN identifiers>
 # TaskRelatedEngineering
-<optional planner-selected Conditional ENG-NNNN identifiers>
+<planner-selected Conditional ENG-NNNN identifiers>
 # AlwaysEngineering
-<all current Always ENG-NNNN identifiers, if Engineering exists>
+<all current Always ENG-NNNN identifiers, if any>
 --- End Factory worker assignment ---
 ```
 
-Omit empty optional sections. The delimiters define a delivery boundary for
-native traces, not a persistent Factory task schema. The native adapter sends
-this packet as the child task, and the host adds its registered role instructions
-separately. Never put role bodies in the packet or task metadata into the
-canonical role definition.
-
-Spawn a **fresh registered native Worker** with only its one-task assignment.
-Use the shared repository without inheriting the parent conversation, Planner
-transcript or earlier Workers. Verify the child identity and actual model/effort
-when evidence is available. `inherit` omits Factory-specific overrides;
-explicit model/effort must match the validated mapping exactly. A host that
-cannot apply required exact settings must block the affected Worker without
-fallback and recommend `idd-factory-configure`.
-
-The worker mechanically resolves and reads every supplied current Intent and
-Engineering ID before implementation, performs focused task-local checks, and
-returns a short semantic result. Workers run sequentially against the shared
-workspace; no next writer may start until a trusted terminal result is received
-and the prior child is no longer writing.
-
-`AlwaysEngineering` is not planner output and is never persisted in
-`plan.md`. Preserve the existing task format and continuation state.
+Each Worker mechanically resolves its supplied Intent/Engineering IDs, performs
+focused task-local checks, and returns a short semantic result. Workers share
+the working copy and execute sequentially. A failed Skill load or guard keeps
+the Task pending, with no replacement writer until termination is confirmed.
 
 ### Waiting and interruption
 
@@ -673,93 +626,36 @@ those operations as strict protocol steps without semantic selection. Any propos
 state, retry class, transition type, or recovery protocol should be presumed
 outside Factory unless separately justified.
 
-## Codex native-agent orchestration
+## Codex generic Factory subagents
 
-Use native Codex child-agent delegation for Factory semantic work.
+Use the host's native generic child-agent spawn. A Factory-specific
+agent_type is not required. Resolve the internal Planner and Worker
+SKILL.md files relative to THIS installed Factory Run Skill; pass
+absolute paths and a bounded assignment to each new child. Children
+read the complete installed Skill themselves before other work.
+Use fork_turns: "none" for every spawn, including Planner.
+Never send protocol bodies or previous child transcripts.
 
-- Spawn every planner and worker in a fresh semantic context with
-  parent-history inheritance explicitly disabled. Pass
-  `fork_turns: "none"` (or the host-equivalent setting); never
-  rely on an inheritance default.
-- Spawn only the verified registered native `agent_type` (never a
-  generic agent or prompt-based Skill discovery). Verify both
-  internal roles before durable preflight and the specific
-  role again before each spawn. On missing/conflicting role,
-  block without fallback.
-- Prefer a read-only planner and a workspace-writing worker when the
-  host exposes those sandbox choices.
-- Sandbox selection is an optional hardening feature, not a Factory
-  capability requirement. When Codex exposes no per-child sandbox
-  choice, continue with fresh no-parent-history children that share
-  repository access; do not report Factory as unsupported solely for
-  that reason.
-- Use the native `spawn_agent` operation (or its current native
-  equivalent) and a blocking/event-driven `wait_agent` operation.
-- Before **every** Factory-owned planner or worker spawn attempt,
-  choose an unused structured `task_name`: `idd_factory_planner_01`,
-  `idd_factory_planner_02`, ... for planners, or
-  `idd_factory_worker_01`, `idd_factory_worker_02`, ... for workers
-  (format `^idd_factory_(planner|worker)_[0-9]+$`).
-  Names must be unique within this Factory invocation and the
-  visible shared host namespace. Reserve the name even if the host
-  rejects the attempt; use a new suffix for any retry.
-- Pass `task_name` in native `spawn_agent` arguments, never only
-  inside `message`, and pass `fork_turns: "none"` for **both**
-  planners and workers. Example without optional model overrides:
-  `{"agent_type":"idd-internal-factory-worker","task_name":"idd_factory_worker_01","fork_turns":"none","message":"<bounded one-task Factory assignment>"}`.
-  The `agent_type` selects the registered native role; `task_name`
-  is only a trace identity, never an agent type.
-  Include `model` and `reasoning_effort` only when required by the
-  validated execution profile mapping; never substitute models.
-- Prefer one long wait on the critical path. Do not build a
-  short-wait/status-polling loop that consumes parent model turns.
-- If a wait fails or the host times out, do not start a replacement
-  worker while the previous child may still write to the workspace.
-  Stop or close the child natively when possible, leave the task in
-  `plan.md`, and end the current Factory invocation.
-- If Codex cannot provide fresh/no-parent-history children, shared
-  repository access, terminal waiting without model polling, final
-  child results, and stop/close lifecycle control, Factory is
-  unsupported on that host. Do not emulate the missing capability
-  with a packaged runtime, MCP transport, shell process supervisor,
-  or polling protocol.
-- Do not return a completed Factory result until the root has run
-  every configured final verification check after the last planner
-  returns `# Done`. On success, remove `.idd/factory/current/` or
-  move it under `.idd/factory/results/`; an active request must not
-  remain after a completed result.
+Inspect the direct host-visible tool schema, including tools not
+exposed inside functions.exec/ALL_TOOLS. An absent agent_type is
+NOT a capability failure. If the host requires a built-in generic
+agent type, use that built-in type, never a registered Factory role.
+Check fresh context, shared workspace/installed files, terminal
+results, native wait and stop/interrupt. Prefer read-only Planner
+permissions if available but do not confuse a text guard with a
+technical sandbox. Diagnose missing mandatory capabilities precisely.
 
-## Codex native-agent capability diagnostics
+Reserve unique task_name arguments idd_factory_planner_01,
+idd_factory_worker_01, etc. Rejected attempts consume their names.
+Example without model overrides:
+{"task_name":"idd_factory_worker_01","fork_turns":"none","message":"Read the entire installed Worker SKILL.md at <absolute path>, then perform exactly this bounded Factory assignment: <one Task packet>"}.
+Replace placeholders with real paths and task data.
+Never add an unsupported spawn argument.
 
-Inspect the direct host-visible native tool schema, not an inventory
-exposed by a nested helper such as functions.exec/ALL_TOOLS.
-A nested tool inventory may omit the top-level agents namespace.
-Never conclude that native tools are absent from that inventory alone.
-Require direct evidence of agent_type selection for both registered
-Factory roles, fresh fork_turns, native wait and interrupt/stop,
-repository access and the actual role instructions.
-If no agent_type selector is exposed by this host (including some
-Codex Desktop collaboration sessions), stop before any durable write.
-If agent_type is exposed but the roles are unknown, tell the user to
-use idd-factory-configure for explicit role registration and restart
-Codex; do not silently substitute generic children or change trust.
-
-## Codex Factory execution policy
-
-Immediately before each worker spawn, map the planner's
-`ExecutionProfile` through the validated project-owned
-`.idd/execution.yaml` policy.
-
-- `inherit` means omit Factory-specific model and reasoning
-  overrides so the normal host/session/default model applies.
-- For an explicit active-platform mapping, pass
-  `codex.model` as the native spawn `model` argument and optional
-  `codex.reasoningEffort` as `reasoning_effort`, together with
-  `fork_turns: "none"`. Do not place a model-switching instruction
-  in the worker prompt.
-- Do not reconsider task complexity or substitute a different
-  model. The configured mapping is authoritative.
-- If the host rejects the configured model/settings or cannot
-  honor an explicit per-child override, stop with a diagnostic
-  that names the profile, requested settings, and rejection reason;
-  suggest `idd-factory-configure` and never pick a fallback model.
+If an explicit Codex policy mapping is active, pass the exact
+codex.model as model and codex.reasoningEffort as reasoning_effort;
+inherit omits both overrides. No prompt-based switching or fallback.
+Wait natively without short model-driven polling. On timeout or
+failure, stop/interrupt the writer and confirm termination before
+starting another; preserve the pending Task. A final Planner Done
+always requires the configured final verification checks.

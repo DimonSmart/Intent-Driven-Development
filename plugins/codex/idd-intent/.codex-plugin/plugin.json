@@ -1,9 +1,8 @@
 {
   "name": "idd-intent",
-  "version": "2.0.94",
+  "version": "2.0.96",
   "description": "Durable product intent plus optional project-owned Engineering Guardrails for Intent-Driven Development.",
   "skills": "./skills/",
-  "agents": "./agents/",
   "author": {
     "name": "DimonSmart"
   },
