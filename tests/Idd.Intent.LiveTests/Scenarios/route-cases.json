@@ -243,7 +243,8 @@
         "auditScope": null,
         "standaloneFactory": false,
         "clarity": "ambiguous",
-        "executionDepth": "not-applicable"
+        "executionDepth": "not-applicable",
+        "currentHandoff": "idd-engineering-change"
       },
       "contract": "No implementation implied",
       "kind": "ordinary"
@@ -271,7 +272,10 @@
         "requestedScope": "intent-preserving",
         "firstSkill": "idd-code-implement",
         "auditScope": null,
-        "standaloneFactory": false
+        "standaloneFactory": false,
+        "clarity": "clear",
+        "executionDepth": "focused",
+        "currentHandoff": "idd-code-implement"
       },
       "contract": "Focused implementation and verify",
       "kind": "ordinary"

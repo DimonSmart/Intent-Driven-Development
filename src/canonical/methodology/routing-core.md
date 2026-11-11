@@ -39,8 +39,10 @@ Standalone Factory model-policy requests select their skill directly:
   architecture changes.
 - `engineering policy`: an explicit project decision adds, modifies, or removes
   a durable implementation-only Engineering Rule.
-- `implementation only`: code structure changes while current product intent
-  remains unchanged.
+- `implementation only`: implement an already-approved Product Intent requirement,
+  or change code structure while the normative product intent remains unchanged.
+  New behavior in **code** that fulfills an existing approved requirement is not
+  by itself a new Product Intent decision.
 - `intent structure`: current intent is moved, split, merged, renamed, or
   cross-referenced without changing product meaning.
 - `implementation versus intent`: observed behavior may not match current
@@ -78,6 +80,17 @@ Ordinary new Engineering decisions still route as `engineering-change`.
 Code may be evidence during both workflows, but import must not become an
 implicit reverse-engineering workflow or derive Engineering policy from current
 implementation.
+
+When the user asks to **implement an already-approved existing requirement**
+(e.g., a named `IDD-NNNN` spec), classify `implementation-change` and select
+`idd-code-implement`, unless the user independently requests a change to the
+normative product requirement. Implementing approved behavior may change what
+code currently does; it does not change what the *product is required to do*.
+Do not route through `idd-intent-change` solely because the new implementation
+will make that approved behavior observable. If the referenced specification is
+missing, contradictory or insufficient to implement, preserve the implementation
+classification but block/clarify the missing authority before code; never invent
+or silently rewrite Product Intent.
 
 ### Product and Engineering Operation
 
@@ -179,7 +192,10 @@ approved Intent/Engineering use `intent-preserving` when requested;
 use `end-to-end` for authorized implementation plus its necessary checks.
 A refactor with no intended behavior change is `intent-preserving`, including
 when the user explicitly forbids modifying specs and Engineering Rules; the
-refactor and its verification still run. A prohibition on spec edits **alone**
+refactor and its verification still run. Implementing a confirmed requirement
+already owned by an approved current spec, while leaving normative Product
+Intent unchanged, is also `intent-preserving`; implement and verify against
+that owner without automatically entering an Intent mutation workflow. A prohibition on spec edits **alone**
 does not authorize changing product behavior or establish preservation intent.
 
 Project initialization is `end-to-end` when the user asks to carry out the
@@ -210,7 +226,10 @@ and for Engineering Rule management without requested code changes, the value
 is **always `not-applicable`**. Neither a multi-stage discovery workflow nor
 a single Engineering Rule modification is implementation execution.
 Do not use `orchestrated` to describe bootstrap's discovery/approval stages,
-or `focused` merely because one Engineering Rule is being changed.
+or `focused` merely because one Engineering Rule is being changed. As a final
+field consistency invariant: if `Classification: engineering-change` and the
+request is policy-only (`Requested scope: intent-only`), `Execution depth` MUST
+be `not-applicable` regardless of the rule count, `Clarity` or operation.
 Only after ruling out these knowledge-only categories choose a depth for
 eligible Product/implementation work:
 

@@ -247,8 +247,12 @@ public sealed class RouteRoutingLiveTests
                 var work = Path.Combine(root, revision, "workspaces", scenario.Id);
                 Directory.CreateDirectory(work);
                 if (scenario.Id is "product-modify" or "drift-focused" or
-                    "implementation-simple" or "engineering-modify")
+                    "implementation-simple")
                     SeedMinimalIntent(work);
+                if (scenario.Id == "implementation-simple")
+                    SeedSimpleImplementationWorkspace(work);
+                if (scenario.Id == "engineering-modify")
+                    SeedMinimalEngineering(work);
                 if (scenario.Id == "bootstrap")
                     SeedBootstrapWorkspace(work);
                 if (scenario.Id == "import-present")
@@ -784,6 +788,40 @@ public sealed class RouteRoutingLiveTests
             "else Console.WriteLine(\"Usage: --status\");\n");
     }
 
+    private static void SeedSimpleImplementationWorkspace(string work)
+    {
+        // Approved intent exists, but the implementation has not caught up.
+        var source = Path.Combine(work, "src", "ExampleApp");
+        Directory.CreateDirectory(source);
+        File.WriteAllText(Path.Combine(source, "ExampleApp.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup>" +
+            "<OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework>" +
+            "<ImplicitUsings>enable</ImplicitUsings></PropertyGroup></Project>");
+        File.WriteAllText(Path.Combine(source, "Program.cs"),
+            "if (args.Contains(\"--status\", StringComparer.Ordinal))\n" +
+            "    Console.WriteLine(\"Not implemented\");\n");
+    }
+
+    private static void SeedMinimalEngineering(string work)
+    {
+        // ENG-0003 must exist for a genuine modify route.
+        var directory = Path.Combine(work, ".idd", "engineering");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(Path.Combine(directory, "README.md"),
+            "# Engineering Rules\n\nDurable implementation-only policy.\n");
+        File.WriteAllText(Path.Combine(directory, "INDEX.md"),
+            "# Engineering Rules Index\n\nNext ID: ENG-0004\n\n" +
+            "| Rule | Applicability | Applies when | Summary |\n" +
+            "| --- | --- | --- | --- |\n" +
+            "| ENG-0003 | Always | Every implementation task | " +
+            "Produce structured error logs with correlation IDs |\n");
+        File.WriteAllText(Path.Combine(directory,
+            "ENG-0003.rule-structured-logging.md"),
+            "# ENG-0003.rule-structured-logging\n\n" +
+            "## Rule\n\nCode must emit structured error logs with correlation IDs.\n\n" +
+            "## Applicability\n\nAlways\n");
+    }
+
     private static void SeedMinimalIntent(string work)
     {
         var directory = Path.Combine(work, ".idd", "intent");
@@ -793,7 +831,9 @@ public sealed class RouteRoutingLiveTests
         File.WriteAllText(Path.Combine(directory, "INDEX.md"),
             "# Index\n\n- IDD-0005\n- IDD-0012\n");
         File.WriteAllText(Path.Combine(directory, "IDD-0005.spec-main.md"),
-            "# IDD-0005\n\nApproved: preserve existing service behavior.\n");
+            "# IDD-0005\n\nApproved Product Intent.\n\n" +
+            "## Requirement\n\nWhen the service receives `--status`, " +
+            "it must write `Ready` to standard output.\n");
         File.WriteAllText(Path.Combine(directory, "IDD-0012.spec-login.md"),
             "# IDD-0012\n\nUsers can log in with valid credentials.\n");
     }

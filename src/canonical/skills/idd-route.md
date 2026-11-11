@@ -93,6 +93,12 @@ references it; report conditional or known-unavailable handoff accurately.
 ## Routing result and caller-owned handoff
 
 Derive the six ordinary classification fields and all decisions from Core.
+Before returning, do a consistency pass against Core's classification, scope,
+execution-depth applicability and special-gate rules. In particular verify
+that implementing already-approved Product Intent is not mistaken for a
+normative Product change, and that knowledge-only Engineering management has
+no implementation execution depth. Resolve inconsistent fields from Core,
+not from the worked output example below.
 Standalone Factory model-policy routing **omits** the ordinary fields
 altogether. Keep `Expected complete workflow` separate from the permitted
 `Current handoff` and `Stop after` boundary. A blocked or `route-only`
