@@ -89,7 +89,7 @@ obvious. Verify product behavior independently before judging token savings.
 Record the host/model version alongside results. Token counts from different
 host releases are not directly comparable without that context.
 
-## Native registered role accounting
+
 
 Unlike the earlier Root-relayed protocol, registered Factory children load
 the Planner/Worker instructions from their host definitions. The Root sees

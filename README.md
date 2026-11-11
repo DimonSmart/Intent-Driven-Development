@@ -108,16 +108,15 @@ codex plugin add idd-intent@intent-driven-development
 codex plugin add idd-factory@intent-driven-development
 ```
 
-**Codex Factory setup:** In Codex CLI, ask `idd-factory-configure` to
-"Register the IDD Factory native Planner and Worker for this project".
-Codex 0.167.1 does not discover these roles from the Marketplace plugin alone.
-The skill first checks exact generated definitions and, with authorization,
-registers them in the Codex project/user configuration layer. Trust the project
-using supported Codex controls and start a **new CLI session** before running
-Factory. Current Desktop sessions without an `agent_type` selector cannot
-run Factory even after registration.
-See [Native agent installation and verification](docs/factory-native-agent-installation.md).
-
+**Factory setup:** Install `idd-intent` and optional `idd-factory` from the
+Marketplace, then start a new Codex or Claude session to load the current
+Skills. No registration of custom Planner/Worker types, TOML copying or
+project/user agent scope selection is needed. Factory creates ordinary
+children, which read their internal Skills from the same installed Factory
+package. Native child creation, fresh context, access to installed files,
+blocking wait and safe cancellation still need host support. The absence of
+`agent_type` in Codex Desktop is not itself a blocker. See
+[Factory installation and capabilities](docs/factory-native-agent-installation.md).
 
 Questions about IDD itself can be addressed at any time by manually invoking `idd-help`. Use it to ask how the methodology works, why a workflow is chosen, what a skill does, or how a particular IDD rule should be interpreted.
 
@@ -156,10 +155,10 @@ IDD distinguishes three kinds of capabilities:
   lint, conformance audit, or implementation). `idd-route` is an internal
   read-only classifier, not a separate user command. To inspect a route, ask
   naturally which workflow would apply and explicitly say not to execute it.
-- **Internal agents** are host-registered native Factory Planner and Worker
-  roles with canonical generated instructions; the Root does not load their
-  bodies. Intent document creation remains a reference to its
-  owning workflows.
+- **Internal Factory Skills** are the canonical Planner/Worker protocols in
+  the Factory package. Generic native child agents load them independently;
+  Root provides the installed Skill paths and bounded assignments, not bodies.
+  Intent document creation remains owned by its existing workflows.
 
 Claude Code hides automatic workflows from the slash-command menu but retains
 model invocation. Codex retains all registered skills and implicit invocation;

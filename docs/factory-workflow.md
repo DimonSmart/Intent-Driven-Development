@@ -245,7 +245,7 @@ For deterministic post-run diagnostics and statistics over the host-owned trace,
 see [`idd-factory-report`](factory-report.md). The reporter is a development
 utility and is not part of the Factory workflow or plugin runtime.
 
-## Registered child roles
+
 
 Factory requires host-registered `idd-internal-factory-planner` and
 `idd-internal-factory-worker`; Claude uses plugin-scoped identifiers prefixed
