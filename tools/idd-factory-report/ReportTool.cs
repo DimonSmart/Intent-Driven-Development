@@ -358,6 +358,20 @@ public sealed class CodexRolloutReader
                     rollout.ParentThreadId = FindString(payload, "parent_thread_id", "parentThreadId", "parent_id") ?? rollout.ParentThreadId;
                     rollout.AgentRoleHint = FindString(payload, "agent_role", "agentRole") ?? rollout.AgentRoleHint;
                     rollout.AgentPath = FindString(payload, "agent_path", "agentPath") ?? rollout.AgentPath;
+
+                    // Codex MultiAgentV2 nests child identity in session_meta.source.subagent.thread_spawn.
+                    var source = Object(payload, "source");
+                    var subagent = source is { } sourceValue ? Object(sourceValue, "subagent") : null;
+                    var threadSpawn = subagent is { } subagentValue
+                        ? Object(subagentValue, "thread_spawn")
+                        : null;
+                    if (threadSpawn is { } spawnMetadata)
+                    {
+                        rollout.ParentThreadId ??= FindString(spawnMetadata,
+                            "parent_thread_id", "parentThreadId", "parent_id");
+                        rollout.AgentRoleHint ??= FindString(spawnMetadata, "agent_role", "agentRole");
+                        rollout.AgentPath ??= FindString(spawnMetadata, "agent_path", "agentPath");
+                    }
                 }
 
                 var timestamp = Timestamp(root) ?? Timestamp(payload);

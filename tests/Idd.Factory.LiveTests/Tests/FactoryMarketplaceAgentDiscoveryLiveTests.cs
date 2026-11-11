@@ -43,7 +43,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 "Disposable Codex Marketplace native-agent discovery probe.\n");
             await InitializeGitRepositoryAsync(workspace, artifacts);
             await VerifyGitBaselineAsync(workspace, artifacts, requireProjectAgents: false);
-            PrepareCodexHome(codexHome);
+            PrepareCodexHome(codexHome, workspace);
 
             await RunAsync("dotnet",
                 ["build", "tools/generate/Generate.csproj", "--nologo"],

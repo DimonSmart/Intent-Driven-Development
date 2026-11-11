@@ -10,19 +10,22 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         This is an isolated native-agent registration probe, not a Factory run.
         Probe exactly these two registered agent types sequentially:
         idd-internal-factory-planner and idd-internal-factory-worker.
-        Use native spawn_agent with the exact agent_type, a unique task_name,
-        fork_turns "none", and a short message saying there is NO valid Factory
+        Use native spawn_agent with the exact agent_type, task_name
+        `idd_factory_planner_01` for Planner and `idd_factory_worker_01` for
+        Worker, fork_turns "none", and a short message saying there is NO valid Factory
         assignment and the child must return BLOCKED without modifying files.
         Wait for each child to finish. Do not use generic agents, construct
         role prompts, edit project files or run Factory.
-        If a type is missing, report its native rejection without substitution.
+        Stop before Worker if Planner was rejected or its registered identity
+        is not idd-internal-factory-planner. Report missing role rejections
+        without substituting a generic child.
         """;
 
     private static async Task ProbeProjectAgentRegistrationAsync(
         string codex, string workspace, string probeHome, string artifacts,
         string model, string reasoning, int timeoutMinutes)
     {
-        PrepareCodexHome(probeHome);
+        PrepareCodexHome(probeHome, workspace);
         var env = new Dictionary<string, string?> { ["CODEX_HOME"] = probeHome };
         try
         {
@@ -43,6 +46,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
 
             await File.WriteAllTextAsync(Path.Combine(artifacts, "project-agent-probe-trace.jsonl"), result.Stdout);
             var root = FindRootRollout(probeHome, requireSpawn: false);
+            CorrelateNativeSpawnsForAssertions(root, probeHome, new FactoryRunReport());
             VerifyRegisteredNativeRoleSpawns(root, artifacts, "project-local");
         }
         finally

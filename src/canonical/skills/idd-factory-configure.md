@@ -5,15 +5,25 @@ the project lifecycle: initial setup, exact edits, read-only review, and
 evidence-based model refresh. This is the **only** skill that validates and
 writes Factory model policy; no separate model-update command or writer exists.
 
-**First** read `references/factory-execution-policy.md`. Do not read or change
-`.idd/factory/current/`, Product Intent, Engineering Rules, the Factory runtime,
-planner classification, or existing child agents. Configuration is operational
-policy, not durable product or engineering intent.
+On Codex, this skill additionally supports an **explicit native-agent
+registration request**. This is a separate installation operation, not model
+configuration. Follow the Codex-specific generated registration section for
+that request. Never infer permission to install roles from an ordinary Factory
+run, initial model setup, or an automatically selected skill. A request only
+to register or check roles must not read, validate, create or modify
+`.idd/execution.yaml`, and must not ask which model strategy to use.
+
+For **model-policy** requests, first read `references/factory-execution-policy.md`.
+Do not read or change `.idd/factory/current/`, Product Intent, Engineering Rules,
+the Factory runtime, planner classification, or existing child agents.
+Configuration is operational policy, not durable product or engineering intent.
 
 ## Interpret the request and authorization
 
 Read the original user request, not merely a router summary. Direct invocation
-of this skill does not require `idd-route`. Recognize these modes:
+of this skill does not require `idd-route`. Native-agent registration in Codex
+is handled before model-policy mode selection; for model-policy requests,
+recognize these modes:
 
 - **Initial setup:** Factory is being explicitly configured, the policy is absent,
   and no strategy was chosen previously. Ask one blocking strategy choice below.

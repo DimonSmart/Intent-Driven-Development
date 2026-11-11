@@ -38,6 +38,43 @@ public sealed class NativeCodexTraceTests : IDisposable
     }
 
     [Fact]
+    public void Reader_extracts_nested_v2_child_identity_from_session_metadata()
+    {
+        var path = Path.Combine(_root, "child.jsonl");
+        var payload = new
+        {
+            id = "child-thread",
+            cwd = Path.Combine(_root, "repo"),
+            source = new
+            {
+                subagent = new
+                {
+                    thread_spawn = new
+                    {
+                        parent_thread_id = "root-thread",
+                        depth = 1,
+                        agent_path = "/root/idd_factory_planner_01",
+                        agent_nickname = "Euler",
+                        agent_role = "idd-internal-factory-planner"
+                    }
+                }
+            }
+        };
+        File.WriteAllText(path, JsonSerializer.Serialize(new
+        {
+            type = "session_meta",
+            payload
+        }));
+
+        var rollout = new CodexRolloutReader().Read(path);
+
+        Assert.Equal("child-thread", rollout.ThreadId);
+        Assert.Equal("root-thread", rollout.ParentThreadId);
+        Assert.Equal("/root/idd_factory_planner_01", rollout.AgentPath);
+        Assert.Equal("idd-internal-factory-planner", rollout.AgentRoleHint);
+    }
+
+    [Fact]
     public void Live_native_fixture_reconstructs_factory_topology_metrics_and_completion()
     {
         var repository = Path.Combine(_root, "repo");

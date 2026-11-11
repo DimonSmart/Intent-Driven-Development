@@ -28,6 +28,15 @@ The marketplace list should include `intent-driven-development`. The installed p
 
 `idd-factory` should appear only when it was installed explicitly.
 
+For **Codex Factory**, installation and native role registration are separate.
+Ask `idd-factory-configure` to check/register native roles for the selected
+project or user scope. A plugin in `codex plugin list` or TOML in the Marketplace
+cache does not establish registration. Restart Codex after authorization and
+registration; validate explicit `agent_type`, both role identities, loaded
+instructions and native wait via a no-assignment `BLOCKED` probe. Codex Desktop
+sessions whose spawn schema hides `agent_type` remain unsupported even if the
+CLI registers roles. See [installation details](factory-native-agent-installation.md).
+
 ## Verify Repository Initialization
 
 After running:

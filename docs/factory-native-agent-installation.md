@@ -41,29 +41,61 @@ mapping inherits model and reasoning behavior.
 
 ## Codex
 
-The Factory plugin packages `agents/*.toml` native definitions, advertises
-the component as `agents` in its plugin manifest, and uses canonical
-`developer_instructions`. Neither definition pins a model or reasoning
-effort. The Root requests the registered `agent_type`; `task_name`
-identifies an attempt, not the agent type.
+The Codex plugin ships generated native TOML in `agents/*.toml`, derived from
+the canonical Planner/Worker protocols. **Marketplace installation alone does
+not make these roles callable in Codex CLI 0.167.1.** Its plugin manifest parser
+does not consume the `agents` field, while role discovery scans the active
+project/user Codex configuration layers. A Marketplace-only live probe returned
+`unknown agent_type` for both roles. Do not treat files in plugin cache as
+evidence that the host registered them.
 
-Codex also documents project/user custom-agent search locations:
-`.codex/agents/*.toml` and `~/.codex/agents/*.toml`. **Do not copy the
-plugin's definitions into those locations or alter global configuration
-silently.** Whether the specific installed Codex version discovers plugin
-`agents/` directly must be checked with the real Marketplace installation.
-If a version requires a user-approved project/user registration step, state
-that prerequisite and perform it only with the user's permission. The isolated
-`Factory_UsesNativeAgentsAndCompletesTwoStepCatalog` evaluation deliberately
-copies **generated** agent definitions into its disposable workspace's
-`.codex/agents/` before committing the test baseline. This is an
-**eval-only** registration mechanism, not proof that a normal Marketplace
-install discovers plugin-supplied agents and not an instruction to modify
-real projects. `Factory_MarketplaceAloneDiscoversNativeAgents` is a
-separate explicit opt-in Live probe without this copy. Missing,
-conflicting or shadowed definitions block Factory; there is no generic-agent
-fallback. Codex Planner is read-only **by role behavior**, not by a separate
-sandbox: native custom agents may inherit the parent's sandbox/approvals.
+### One-time role registration after Marketplace installation
+
+In a new Codex CLI session, run `idd-factory-configure` with a request such as:
+
+```text
+Register the IDD Factory native Planner and Worker for this project.
+```
+
+The skill locates the bundled `scripts/register-codex-agents.py` inside the
+**installed** Factory plugin and runs its read-only `--check` first. With
+explicit authorization it runs `--apply` for the selected scope. The script
+copies exact generated TOML from the same plugin version.
+
+For advanced/manual use, resolve the script's actual installed path (not a
+hardcoded cache version), then run:
+
+```bash
+python3 "/absolute/path/to/installed/idd-factory/skills/idd-factory-configure/scripts/register-codex-agents.py" --scope project --project "/absolute/path/to/repository" --check
+# After reviewing the target files and explicitly authorizing installation:
+python3 "/absolute/path/to/installed/idd-factory/skills/idd-factory-configure/scripts/register-codex-agents.py" --scope project --project "/absolute/path/to/repository" --apply
+```
+
+Use `--scope user` only when explicitly requested. User scope writes to
+`$CODEX_HOME/agents/` (or `~/.codex/agents/` when CODEX_HOME is unset).
+Existing identical definitions are left unchanged; differing definitions
+block installation. `--replace` requires explicit authorization and retains
+content-addressed backups. The helper never writes `config.toml`, trust,
+`.idd/execution.yaml`, Product Intent or Factory state. Python 3 is required
+for this helper; manual registration is possible when unavailable.
+
+Project scope requires Codex to **trust the project**; only the user should
+grant trust through supported Codex controls. The script does not alter trust.
+After registration or an IDD plugin update, start a new Codex CLI session so
+role definitions are reloaded, then run the read-only native role probe.
+Validate the actual child role identity and host-loaded instructions.
+
+Codex native calls must support explicit `agent_type` and `fork_turns: "none"`,
+wait/stop, repository access and per-child model overrides when configured.
+Some Codex Desktop collaboration tool surfaces omit `agent_type` even when the
+bundled CLI executable supports it; registering TOML does **not** fix that
+Desktop host limitation. Use a compatible CLI session instead.
+
+Factory may not replace a registered Planner/Worker with a generic agent.
+`task_name` identifies a child attempt, not the agent type. A failure to
+resolve roles must block before any durable write with a concrete diagnostic.
+Determine host support from the real top-level native schema, never only from
+`functions.exec` or `ALL_TOOLS` inventory inside another tool.
 
 ## Host capability preflight
 

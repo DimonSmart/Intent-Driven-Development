@@ -1,5 +1,18 @@
 # Updates and Breaking Changes
 
+## Pending patch — Codex Factory native-role registration (2026-11-11)
+
+Codex CLI 0.167.1 does not register agents from the IDD Factory Marketplace
+plugin manifest. Factory now packages an opt-in `idd-factory-configure`
+registration helper for trusted project `.codex/agents/` or the user Codex
+config layer. Registration and replacement are explicit, conflict-safe actions,
+not automatic side effects of installing a plugin. Existing execution policy
+does not change. Restart Codex after registering roles; some Desktop host tool
+surfaces still cannot select `agent_type`. CLI installation/live smoke is
+required before declaring full end-to-end compatibility. See
+[Factory native agent installation](factory-native-agent-installation.md).
+
+
 ## 2026-10-15 — IDD Intent router is an automatic workflow
 
 `idd-route` changed from a user command to an automatic, read-only workflow.

@@ -32,6 +32,14 @@ jobs:
           $version = $Matches.version
           "VERSION=$version" >> $env:GITHUB_OUTPUT
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test Codex native agent registration
+        run: python -m unittest discover -s tests/Idd.Codex.Setup.Tests -p 'test_*.py'
+
       - name: Run release validation
         shell: pwsh
         run: pwsh ./scripts/Check.ps1 -Mode Release -Version "${{ steps.version.outputs.VERSION }}"

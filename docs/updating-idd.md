@@ -38,6 +38,15 @@ When Factory is installed, reinstall it as well:
 codex plugin add idd-factory@intent-driven-development
 ```
 
+After a Codex Factory update, re-run `idd-factory-configure` to **check native
+role registration** for the scope you previously selected. If definitions have
+changed, inspect differences and explicitly authorize `--replace` (backups are
+retained); never silently overwrite user-managed roles. Start a new CLI
+session and verify both native `agent_type` registrations. Marketplace
+installation by itself does not register them in Codex 0.167.1.
+See [Factory native-agent installation](factory-native-agent-installation.md).
+
+
 ## After Updating
 
 1. Review [Updates and Breaking Changes](updates-and-breaking-changes.md) and apply any relevant project migrations.

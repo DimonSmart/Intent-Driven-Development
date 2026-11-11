@@ -98,7 +98,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             }
             var initialPolicy = await File.ReadAllTextAsync(Path.Combine(workspace, ".idd", "execution.yaml"));
             var initialCatalog = await File.ReadAllTextAsync(Path.Combine(workspace, "src", "MiniCatalog", "Catalog.cs"));
-            PrepareCodexHome(codexHome);
+            PrepareCodexHome(codexHome, workspace);
 
             await RunAsync(
                 "dotnet",
@@ -501,8 +501,14 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             workspace, null, null, artifactRoot, "05-git-root");
         var expectedRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(workspace));
         var actualRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root.Stdout.Trim()));
-        Assert.True(string.Equals(expectedRoot, actualRoot,
-                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal),
+        var prefix = await RunAsync("git", ["rev-parse", "--show-prefix"],
+            workspace, null, null, artifactRoot, "05-git-prefix");
+        // macOS /var and /private/var name the same directory; an empty Git
+        // prefix also proves the working directory is the repository root.
+        var sameRoot = string.Equals(expectedRoot, actualRoot,
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal) ||
+            string.IsNullOrWhiteSpace(prefix.Stdout);
+        Assert.True(sameRoot,
             $"Git resolved a different repository: {actualRoot} (expected {expectedRoot})");
 
         var revision = await RunAsync("git", ["rev-parse", "--verify", "HEAD^{commit}"],
@@ -530,7 +536,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         await File.WriteAllTextAsync(Path.Combine(artifactRoot, "git-baseline.txt"), hash + "\n");
     }
 
-    private static void PrepareCodexHome(string target)
+    private static void PrepareCodexHome(string target, string? trustedProject = null)
     {
         Directory.CreateDirectory(target);
         var source = Environment.GetEnvironmentVariable("CODEX_HOME");
@@ -539,6 +545,22 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         var auth = Path.Combine(source, "auth.json");
         if (File.Exists(auth))
             File.Copy(auth, Path.Combine(target, "auth.json"), overwrite: true);
+
+        if (!string.IsNullOrWhiteSpace(trustedProject))
+        {
+            // The disposable workspace must be trusted to load project-local
+            // agent definitions. Never change the user's real trust configuration.
+            var projectKey = JsonSerializer.Serialize(Path.TrimEndingDirectorySeparator(
+                Path.GetFullPath(trustedProject)));
+            File.WriteAllText(Path.Combine(target, "config.toml"),
+                $"[projects.{projectKey}]\ntrust_level = \"trusted\"\n\n" +
+                "[features.multi_agent_v2]\n" +
+                "enabled = true\n" +
+                "hide_spawn_agent_metadata = false\n" +
+                "tool_namespace = \"agents\"\n" +
+                "expose_spawn_agent_model_overrides = true\n" +
+                "wait_agent_enabled = true\n");
+        }
     }
 
     private static async Task<RunResult> RunAsync(
