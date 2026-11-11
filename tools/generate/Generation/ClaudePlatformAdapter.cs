@@ -46,7 +46,7 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
                     Root has already created the fresh child. Preserve bounded
                     assignments and native waiting without model-based polling.
 
-                    ## Claude Factory execution policy                    ## Claude Factory execution policy
+                    ## Claude Factory execution policy
 
                     Immediately before each worker spawn, map the planner's
                     `ExecutionProfile` through the validated project-owned

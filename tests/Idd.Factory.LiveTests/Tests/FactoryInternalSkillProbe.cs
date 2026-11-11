@@ -1,3 +1,4 @@
+using Idd.Factory.Report;
 using System.Text.Json;
 using Xunit;
 

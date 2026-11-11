@@ -247,21 +247,22 @@ utility and is not part of the Factory workflow or plugin runtime.
 
 
 
-Factory requires host-registered `idd-internal-factory-planner` and
-`idd-internal-factory-worker`; Claude uses plugin-scoped identifiers prefixed
-`idd-factory:`. Before new-run owner writes Root validates both roles and
-native lifecycle capabilities; it revalidates each target before spawn.
-Registered role definitions load their own canonical protocol and Engineering
-contract in the child. Root passes only current request/phase, exact Q/A,
-bounded baseline/provenance, and for Workers one Task and selected
-`TaskRelatedIntent`, Conditional `TaskRelatedEngineering` and current
-`AlwaysEngineering` IDs. It never forwards child protocols or full
-Engineering/Intent trees. Direct use without a verified assignment returns
-`BLOCKED`. Missing/conflicting definitions or unsupported exact model/effort
-settings block without generic fallback or concurrent Writers.
+## Generic native children and internal Skills
 
-Codex definitions are generated as `agents/*.toml` in the Factory plugin;
-Claude uses `agents/*.md`. Planner is read-only by behavior on Codex
-(custom agents inherit the parent sandbox), and tool-restricted on Claude.
-The installed host's effective permissions and role registration must be
-verified separately; file generation alone does not prove discovery.
+Factory packages two internal Skills from the canonical Planner and Worker
+protocols. Root derives their `SKILL.md` paths from the exact installed
+`idd-factory-run` Skill and checks they are available before durable preflight.
+For every Planner or Worker it launches a fresh native generic child with no
+inherited history, the correct absolute installed Skill path, an instruction
+to read the entire Skill first, the project path and only a bounded assignment.
+The child validates the assignment and returns `BLOCKED` without work if it is
+incomplete or its Skill/reference cannot be read. Root never sends protocol
+bodies or full Intent/Engineering trees. Workers run sequentially; Root checks
+final verification after the last Planner `# Done`.
+
+No registered Factory `agent_type`, project/user custom agent definitions or
+registration helper is needed. Codex names attempts with `task_name` and uses
+`fork_turns: "none"`; these are not proofs that the Skill was read. Actual
+host capabilities (generic spawn, fresh context, file access, terminal wait,
+stop/interrupt and exact configured worker model/effort) remain required.
+Legacy custom agent files are ignored and preserved.

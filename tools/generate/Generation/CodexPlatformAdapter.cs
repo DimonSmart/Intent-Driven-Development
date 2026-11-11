@@ -98,10 +98,6 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
             };
         }
 
-        if (StringComparer.Ordinal.Equals(skillName, "idd-factory-configure"))                    """))
-            };
-        }
-
         if (StringComparer.Ordinal.Equals(skillName, "idd-factory-configure"))
         {
             var skill = files.Single(file => StringComparer.Ordinal.Equals(
@@ -122,7 +118,7 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                     to register an old Factory role, explain the changed mechanism;
                     do not create .idd/execution.yaml as a side effect.
 
-                    ## Codex Factory model configuration                    ## Codex Factory model configuration
+                    ## Codex Factory model configuration
 
                     Use native `request_user_input` for blocking configuration
                     choices when it is available; do not reproduce its tool schema.
