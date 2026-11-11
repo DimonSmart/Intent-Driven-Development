@@ -50,6 +50,18 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                 NativeFactoryAgentRenderer.CodexToml(agent)))
             .ToArray();
 
+    protected override IReadOnlyList<GeneratedFile> BuildAdditionalPluginFiles(string pluginName, string version)
+    {
+        var files = base.BuildAdditionalPluginFiles(pluginName, version).ToList();
+        if (StringComparer.Ordinal.Equals(pluginName, "idd-factory"))
+        {
+            files.Add(new GeneratedFile(
+                Path.Combine("skills", "idd-factory-configure", "scripts", "register-codex-agents.py"),
+                RequiredFileReader.Read("src/canonical/factory/register-codex-agents.py")));
+        }
+        return files;
+    }
+
     protected override IReadOnlyList<GeneratedFile> BuildSkillFiles(
         AdapterConfig adapter,
         PluginDefinition plugin,
@@ -125,6 +137,21 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                       move it under `.idd/factory/results/`; an active request must not
                       remain after a completed result.
 
+                    ## Codex native-agent capability diagnostics
+
+                    Inspect the direct host-visible native tool schema, not an inventory
+                    exposed by a nested helper such as functions.exec/ALL_TOOLS.
+                    A nested tool inventory may omit the top-level agents namespace.
+                    Never conclude that native tools are absent from that inventory alone.
+                    Require direct evidence of agent_type selection for both registered
+                    Factory roles, fresh fork_turns, native wait and interrupt/stop,
+                    repository access and the actual role instructions.
+                    If no agent_type selector is exposed by this host (including some
+                    Codex Desktop collaboration sessions), stop before any durable write.
+                    If agent_type is exposed but the roles are unknown, tell the user to
+                    use idd-factory-configure for explicit role registration and restart
+                    Codex; do not silently substitute generic children or change trust.
+
                     ## Codex Factory execution policy
 
                     Immediately before each worker spawn, map the planner's
@@ -158,6 +185,42 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                 Content = ContentNormalizer.NormalizeContent(ContentNormalizer.JoinBlocks(
                     skill.Content!,
                     """
+                    ## Codex native-agent installation and registration
+
+                    Codex CLI 0.167.1 does not register native roles merely because
+                    the installed Marketplace manifest advertises agents/*.toml.
+                    An explicit registration operation is required in that host.
+                    For a user request to install/check/update Factory native roles,
+                    use the bundled script at
+                    scripts/register-codex-agents.py relative to THIS SKILL.md.
+                    Resolve this installed file by its real absolute path, not by
+                    guessing a plugin cache version or reading a different checkout.
+
+                    - Determine whether the request authorizes project-local or user-scope
+                      changes. Ask for the target scope if ambiguous. Never silently
+                      modify CODEX_HOME, global agents, project trust or config.toml.
+                    - First run the script with --scope project --project <repo> --check,
+                      or --scope user --check, using python3 (or a verified Python 3
+                      interpreter). It is read-only and reports missing/stale/conflicting
+                      definitions. The script obtains canonical TOML from the SAME installed
+                      plugin version and does not create Product Intent, Factory state,
+                      or execution.yaml.
+                    - For explicitly authorized registration, repeat with --apply.
+                      Existing differing roles block without edits. --replace is permitted
+                      only after explicit approval to replace those exact role paths;
+                      content-addressed backups are retained.
+                    - Read-only review must never invoke --apply; an automatic routing
+                      recommendation must never authorize role installation.
+                    - When installation succeeds, independently check the destination
+                      bytes, advise user to trust the project through supported Codex UI
+                      when project-scoped, and start a NEW Codex session. Do not report a
+                      ready Factory until real native agent_type selection, host-loaded
+                      instructions and terminal wait are verified.
+                    - A Desktop host that hides agent_type remains unsupported even
+                      after registration; use a compatible Codex CLI session.
+                    Registration is orthogonal to Factory model policy. Never create or
+                    modify .idd/execution.yaml as part of native role registration.
+
                     ## Codex Factory model configuration
 
                     Use native `request_user_input` for blocking configuration

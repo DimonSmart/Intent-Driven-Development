@@ -15,6 +15,27 @@ public sealed class NativeFactoryAgentTests(GenerationFixture fixture)
         Assert.Contains("Unknown option: --internal-agent-experiment", result.Stderr);
     }
 
+    [Fact]
+    public void Codex_factory_registration_is_packaged_from_canonical_source()
+    {
+        var script = fixture.ReadText(Path.Combine(fixture.MarketplaceRoot,
+            "plugins", "codex", "idd-factory", "skills",
+            "idd-factory-configure", "scripts", "register-codex-agents.py"));
+        var canonical = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "factory", "register-codex-agents.py"));
+        Assert.Equal(canonical, script);
+
+        var configure = fixture.ReadText(Path.Combine(fixture.MarketplaceRoot,
+            "plugins", "codex", "idd-factory", "skills",
+            "idd-factory-configure", "SKILL.md"));
+        Assert.Contains("scripts/register-codex-agents.py", configure);
+        Assert.Contains("Never silently", configure);
+        var run = fixture.ReadText(Path.Combine(fixture.MarketplaceRoot,
+            "plugins", "codex", "idd-factory", "skills", "idd-factory-run", "SKILL.md"));
+        Assert.Contains("functions.exec/ALL_TOOLS", run);
+        Assert.Contains("direct host-visible native tool schema", run);
+    }
+
     [Theory]
     [InlineData("codex")]
     [InlineData("claude")]

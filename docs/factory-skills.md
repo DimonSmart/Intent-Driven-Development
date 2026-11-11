@@ -44,6 +44,14 @@ and evidence-based refreshes of `economy`, `standard` and `strong`.
 It owns validation and authorized persistence of optional `.idd/execution.yaml`.
 No other Factory model-update command or persistence entry point is published.
 
+For Codex, this command also manages explicitly authorized **native role
+registration** (separate from model-policy configuration). It checks the
+installed Marketplace TOML and registers Planner/Worker into project/user Codex
+configuration layers with a bundled deterministic helper. No model policy,
+project trust, or global agent directory is modified without the appropriate
+user request; a new Codex session and a real host spawn check are required.
+See [Factory native agent installation](factory-native-agent-installation.md).
+
 - **Initial setup:** choose once between `default (inherit)` and
   `configure` for explicit partial platform/profile mappings. For selected
   mappings, propose model and optional effort together, with an explicit

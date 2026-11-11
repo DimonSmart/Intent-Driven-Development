@@ -108,6 +108,17 @@ codex plugin add idd-intent@intent-driven-development
 codex plugin add idd-factory@intent-driven-development
 ```
 
+**Codex Factory setup:** In Codex CLI, ask `idd-factory-configure` to
+"Register the IDD Factory native Planner and Worker for this project".
+Codex 0.167.1 does not discover these roles from the Marketplace plugin alone.
+The skill first checks exact generated definitions and, with authorization,
+registers them in the Codex project/user configuration layer. Trust the project
+using supported Codex controls and start a **new CLI session** before running
+Factory. Current Desktop sessions without an `agent_type` selector cannot
+run Factory even after registration.
+See [Native agent installation and verification](docs/factory-native-agent-installation.md).
+
+
 Questions about IDD itself can be addressed at any time by manually invoking `idd-help`. Use it to ask how the methodology works, why a workflow is chosen, what a skill does, or how a particular IDD rule should be interpreted.
 
 ```text
