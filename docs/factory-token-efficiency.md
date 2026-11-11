@@ -89,13 +89,20 @@ obvious. Verify product behavior independently before judging token savings.
 Record the host/model version alongside results. Token counts from different
 host releases are not directly comparable without that context.
 
-## Native registered role accounting
 
-Unlike the earlier Root-relayed protocol, registered Factory children load
-the Planner/Worker instructions from their host definitions. The Root sees
-only role metadata, bounded task packets and short results. Smaller spawn
-prompts alone do **not** prove lower total token cost. Benchmark Root,
-Planner, Worker and complete run separately, recording input, cached input,
-new input (input minus cached), output, total only with complete native
-usage, spawns, latency, and independent verification. The historical
-opt-in Skill-loading experiment is not evidence of native registration.
+
+## Internal Skill loading and token accounting
+
+Each fresh generic Planner/Worker child reads its complete internal Skill from
+the installed `idd-factory` package. Root transmits only the absolute Skill
+path and bounded task packet; it neither loads nor forwards the body. A new
+child context does not inherit the Root or previous child transcript, and Root
+waits natively without model-driven status polling.
+
+This architecture can reduce Root-context consumption but does not guarantee a
+particular percentage of total token savings. Compare complete Root, Planner,
+Worker and run counters with an equivalent baseline; distinguish total, input,
+cached input, new input, output, spawns, duration and independent verification.
+Do not count the same events twice. Missing usage counters are unavailable,
+not zero. Old native-role and opt-in internal-Skill experiments are historical
+rather than proof of the new transport.

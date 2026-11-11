@@ -6,23 +6,17 @@ native-agent Factory architecture. They are skipped unless
 
 The primary scenario builds the current generator and Codex `idd-factory`
 plugin, creates a disposable `TwoStepCatalog` workspace, and invokes a real
-Codex host with `$idd-factory-run`. It copies the **generated** Planner and
-Worker TOML definitions to that workspace's `.codex/agents/` directory, then
-force-adds only those two otherwise ignored definitions to its initial Git
-commit. Before starting Codex, the harness independently verifies the exact
-`HEAD^{commit}` object, Git root, and both tracked agent files; it stores
-`git-baseline.txt` and `agent-registration.json` as evidence.
-It then runs a separate native `spawn_agent` preflight for both roles in a
-fresh isolated `CODEX_HOME` before starting Factory. A failure produces an
-explicit registration diagnostic and preserves
-`project-agent-probe-trace.jsonl`; preflight sessions do not contaminate
-the main Factory report. The direct probe intentionally carries no valid
-assignment, so children may return `BLOCKED` after successful spawn.
-No global user or host agent configuration is changed.
+Codex host with `$idd-factory-run`. The harness uses ordinary
+Marketplace installation into a disposable `CODEX_HOME` and verifies that
+both canonical internal Planner/Worker Skills are present in the generated
+Factory package. It does NOT copy, register, force-add, or track custom
+`.codex/agents/` role files. Before Codex starts, the harness independently
+verifies the exact Git `HEAD^{commit}`, repository root and clean workspace,
+recording `git-baseline.txt`. It does not alter real host/user registration.
 
-This makes the main scenario a Factory orchestration/routing evaluation;
-it is **not evidence** that the Marketplace plugin independently registers
-its native roles. That question is tested separately below.
+The main scenario tests actual Factory orchestration without hidden native
+Factory-role setup. A separate read-only Marketplace generic-child probe
+below checks bounded child spawn and guards; it does not replace full E2E.
 The host is started with MultiAgentV2 explicitly enabled; a model-selected
 runtime that does not report V2 fails the evaluation instead of silently
 testing a different spawn protocol.
@@ -145,17 +139,17 @@ own mappings in `.idd/execution.yaml`, managed by `idd-factory-configure` and
 tracked in Git. Factory re-reads that project file before each worker spawn;
 planner output contains only the execution profile.
 
-## Native agent discovery through Marketplace (separate opt-in test)
+## Internal Skill discovery through Marketplace (separate opt-in test)
 
-`Factory_MarketplaceAloneDiscoversNativeAgents` uses a fresh Git repository,
-a separate `CODEX_HOME`, and a normal generated Marketplace plugin
-installation. It **does not** create `.codex/agents/` or copy role definitions.
-The root attempts one native `spawn_agent` for each of the two required agent
-types with an intentionally invalid, no-write Factory assignment. The child
-role guard is expected to block work; the test succeeds only with host trace
-evidence that each **named native role was actually accepted and spawned**.
-No generic-agent fallback counts as discovery. The test is separate because
-some Codex versions may install the plugin but not register its `agents/`.
+`Factory_MarketplaceRunsGenericInternalSkillsWithoutRegisteredRoles` uses a
+fresh Git repository, separate `CODEX_HOME`, and the normal generated
+Marketplace plugin installation. It does NOT create custom `.codex/agents/`
+definitions. It checks both internal `SKILL.md` files are packaged and asks
+generic native children (without Factory-specific `agent_type`) to read their
+respective installed Skills and reject intentionally incomplete assignments
+with `BLOCKED`, without changing project files. The test examines native
+`task_name`, `fork_turns: "none"`, bounded Skill-path delivery and accepted
+child spawns; full file-read and lifecycle evidence needs the real child trace.
 
 To run only this token-consuming capability test:
 
@@ -163,16 +157,16 @@ To run only this token-consuming capability test:
 $env:IDD_RUN_LIVE_FACTORY_MARKETPLACE_EVALS = "1"
 try {
     dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj `
-        --filter "FullyQualifiedName~Factory_MarketplaceAloneDiscoversNativeAgents"
+        --filter "FullyQualifiedName~Factory_MarketplaceRunsGenericInternalSkillsWithoutRegisteredRoles"
 }
 finally {
     Remove-Item Env:IDD_RUN_LIVE_FACTORY_MARKETPLACE_EVALS -ErrorAction SilentlyContinue
 }
 ```
 
-It is excluded from the normal `Check.ps1 -Mode Live` selection.
-Native traces, Git verification and failure diagnostics are retained under
-`artifacts/factory-evals/marketplace-agents-*/`.
+This probe is excluded from normal `Check.ps1 -Mode Live`.
+Native traces and failure artifacts remain under
+`artifacts/factory-evals/marketplace-internal-skills-*/`.
 
 ## Effort configuration (opt-in live test)
 

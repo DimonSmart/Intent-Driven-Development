@@ -93,117 +93,41 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
     }
 
     [Fact]
-    public void FactoryMetadata_HasOnlyUserSkillsAndRegisteredNativeAgents()
+    public void FactoryMetadata_HasTwoInternalSkillsWithoutNativeRoles()
     {
-        var manifestPath = Path.Combine(fixture.RepoRoot, "src", "canonical", "plugins", "plugin-manifest.json");
-        using var manifest = JsonDocument.Parse(fixture.ReadText(manifestPath));
+        using var manifest = JsonDocument.Parse(fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "plugins", "plugin-manifest.json")));
         var factory = manifest.RootElement.GetProperty("plugins").GetProperty("idd-factory");
-        var registeredSkills = factory.GetProperty("skills").EnumerateArray()
-            .Select(value => value.GetString())
-            .ToArray();
-
-        Assert.Equal(
-            new[]
-            {
-                "idd-factory-run",
-                "idd-factory-configure"
-            },
-            registeredSkills);
-        Assert.DoesNotContain("idd-factory-decompose-task", registeredSkills);
-        Assert.DoesNotContain("idd-factory-execute-subtask", registeredSkills);
-        Assert.DoesNotContain("idd-factory-update-effort-models", registeredSkills);
-        Assert.DoesNotContain(factory.GetProperty("skillReferences").EnumerateArray(),
-            reference => reference.GetProperty("skill").GetString() == "idd-factory-update-effort-models");
-
-        Assert.DoesNotContain(factory.GetProperty("skillReferences").EnumerateArray(),
-            reference => reference.GetProperty("destination").GetString() is "factory-planner.md" or "factory-worker.md");
-        var nativeAgents = factory.GetProperty("nativeAgents").EnumerateArray().ToArray();
-        Assert.Equal(2, nativeAgents.Length);
-        foreach (var role in new[] { "planner", "worker" })
-        {
-            var agent = Assert.Single(nativeAgents, entry => entry.GetProperty("name").GetString() == "idd-internal-factory-" + role);
-            AssertString(agent, "source", "src/canonical/factory/" + role + ".md");
-        }
-        Assert.DoesNotContain(factory.GetProperty("skillReferences").EnumerateArray(),
-            reference => reference.GetProperty("skill").GetString() == "idd-factory-execute-subtask");
-
-        var canonicalWorkerPath = Path.Combine(fixture.RepoRoot, "src", "canonical", "factory", "worker.md");
-        fixture.AssertFile(canonicalWorkerPath);
-        fixture.AssertMissing(Path.Combine(
-            fixture.RepoRoot, "src", "canonical", "skills", "idd-factory-execute-subtask.md"));
-        var canonicalWorker = GenerationFixture.NormalizeText(fixture.ReadText(canonicalWorkerPath));
-
-        var canonicalPlannerPath = Path.Combine(fixture.RepoRoot, "src", "canonical", "factory", "planner.md");
-        fixture.AssertFile(canonicalPlannerPath);
-        fixture.AssertMissing(Path.Combine(
-            fixture.RepoRoot, "src", "canonical", "skills", "idd-factory-decompose-task.md"));
-        var canonicalPlanner = GenerationFixture.NormalizeText(fixture.ReadText(canonicalPlannerPath));
-
-        using (var descriptions = JsonDocument.Parse(fixture.ReadText(Path.Combine(
-                   fixture.RepoRoot, "src", "canonical", "skills", "skill-descriptions.json"))))
-        {
-            Assert.False(descriptions.RootElement.TryGetProperty("idd-factory-decompose-task", out _));
-            Assert.False(descriptions.RootElement.TryGetProperty("idd-factory-execute-subtask", out _));
-            Assert.False(descriptions.RootElement.TryGetProperty("idd-factory-update-effort-models", out _));
-        }
-
-        foreach (var platform in new[] { "claude", "codex" })
+        var skills = factory.GetProperty("skills").EnumerateArray().Select(value => value.GetString()).ToArray();
+        Assert.Equal(new[] { "idd-factory-run", "idd-factory-configure",
+            "idd-internal-factory-planner", "idd-internal-factory-worker" }, skills);
+        Assert.False(factory.TryGetProperty("nativeAgents", out _));
+        foreach (var platform in new[] { "codex", "claude" })
         {
             var root = Path.Combine(fixture.MarketplaceRoot, "plugins", platform, "idd-factory");
-            var skills = Directory.GetDirectories(Path.Combine(root, "skills"))
-                .Select(Path.GetFileName)
-                .Where(name => name is not null)
-                .Select(name => name!)
-                .Order(StringComparer.Ordinal)
-                .ToArray();
-
-            Assert.Equal(
-                new[]
-                {
-                    "idd-factory-configure",
-                    "idd-factory-run"
-                },
-                skills);
-            fixture.AssertMissing(Path.Combine(root, "skills", "idd-factory-decompose-task"));
-            fixture.AssertMissing(Path.Combine(root, "skills", "idd-factory-execute-subtask"));
-            fixture.AssertMissing(Path.Combine(root, "skills", "idd-factory-update-effort-models"));
-
-            fixture.AssertMissing(Path.Combine(root, "skills", "idd-factory-run", "references", "factory-planner.md"));
-            fixture.AssertMissing(Path.Combine(root, "skills", "idd-factory-run", "references", "factory-worker.md"));
+            fixture.AssertMissing(Path.Combine(root, "agents"));
+            fixture.AssertMissing(Path.Combine(root, "skills", "idd-factory-configure", "scripts", "register-codex-agents.py"));
             foreach (var role in new[] { "planner", "worker" })
             {
                 var name = "idd-internal-factory-" + role;
-                var canonical = role == "planner" ? canonicalPlanner : canonicalWorker;
-                var file = Path.Combine(root, "agents", name + (platform == "codex" ? ".toml" : ".md"));
-                var generated = fixture.ReadText(file);
-                if (platform == "codex")
+                var canonical = GenerationFixture.NormalizeText(fixture.ReadText(
+                    Path.Combine(fixture.RepoRoot, "src", "canonical", "factory", role + ".md")));
+                Assert.Equal("src/canonical/factory/" + role + ".md",
+                    factory.GetProperty("skillSources").GetProperty(name).GetString());
+                var skill = GenerationFixture.NormalizeText(fixture.ReadText(
+                    Path.Combine(root, "skills", name, "SKILL.md")));
+                Assert.Contains(canonical.Trim(), skill);
+                if (platform == "claude")
                 {
-                    Assert.Contains("name = " + JsonSerializer.Serialize(name), generated);
-                    var instructionLine = generated.Split((char)10).Single(line => line.StartsWith("developer_instructions = ", StringComparison.Ordinal));
-                    var decoded = JsonSerializer.Deserialize<string>(instructionLine["developer_instructions = ".Length..]);
-                    Assert.NotNull(decoded);
-                    Assert.Contains(canonical.Trim(), decoded);
-                    Assert.DoesNotContain(generated.Split((char)10), line => line.StartsWith("model = ", StringComparison.Ordinal));
-                    Assert.DoesNotContain(generated.Split((char)10), line => line.StartsWith("model_reasoning_effort = ", StringComparison.Ordinal));
+                    Assert.Contains("user-invocable: false", skill);
+                    Assert.Contains("disable-model-invocation: false", skill);
+                    Assert.DoesNotContain("context: fork", GenerationFixture.ReadFrontMatter(skill));
                 }
-                else
-                {
-                    Assert.Contains("name: " + name, generated);
-                    Assert.Contains(canonical.Trim(), generated);
-                    Assert.Contains("tools:", generated);
-                    Assert.Contains("disallowedTools:", generated);
-                    Assert.DoesNotContain("permissionMode:", generated);
-                    Assert.DoesNotContain("mcpServers:", generated);
-                }
+                else fixture.AssertMissing(Path.Combine(root, "skills", name, "agents", "openai.yaml"));
             }
-            fixture.AssertFile(Path.Combine(
-                root, "skills", "idd-factory-run", "references", "engineering-guardrails.md"));
-
+            fixture.AssertFile(Path.Combine(root, "skills", "idd-factory-run", "references", "engineering-guardrails.md"));
             using var metadata = JsonDocument.Parse(fixture.ReadText(Path.Combine(root, "idd-plugin.json")));
-            if (metadata.RootElement.TryGetProperty("roleDefinitions", out var roleDefinitions))
-                Assert.Equal(0, roleDefinitions.GetArrayLength());
-            if (metadata.RootElement.TryGetProperty("skillRoleBindings", out var roleBindings))
-                Assert.Equal(0, roleBindings.GetArrayLength());
+            Assert.False(metadata.RootElement.TryGetProperty("nativeAgents", out _));
         }
     }
 

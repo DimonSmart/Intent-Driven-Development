@@ -16,10 +16,10 @@ public sealed partial class NativeFactoryEndToEndLiveTests
 {
     [LiveFactoryMarketplaceFact]
     [Trait("Category", "LiveFactoryMarketplace")]
-    public async Task Factory_MarketplaceAloneDiscoversNativeAgents()
+    public async Task Factory_MarketplaceRunsGenericInternalSkillsWithoutRegisteredRoles()
     {
         var repo = FindRepositoryRoot();
-        var runId = "marketplace-agents-" + Guid.NewGuid().ToString("N");
+        var runId = "marketplace-internal-skills-" + Guid.NewGuid().ToString("N");
         var tempRoot = Path.Combine(Path.GetTempPath(), "idd-factory-marketplace-eval", runId);
         var workspace = Path.Combine(tempRoot, "workspace");
         var marketplace = Path.Combine(tempRoot, "marketplace");
@@ -40,9 +40,9 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         try
         {
             await File.WriteAllTextAsync(Path.Combine(workspace, "README.md"),
-                "Disposable Codex Marketplace native-agent discovery probe.\n");
+                "Disposable Codex Marketplace internal-Skill probe.\n");
             await InitializeGitRepositoryAsync(workspace, artifacts);
-            await VerifyGitBaselineAsync(workspace, artifacts, requireProjectAgents: false);
+            await VerifyGitBaselineAsync(workspace, artifacts);
             PrepareCodexHome(codexHome, workspace);
 
             await RunAsync("dotnet",
@@ -54,7 +54,10 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 repo, null, null, artifacts, "07-generate-marketplace");
 
             var generated = Path.Combine(marketplace, "plugins", "codex", "idd-factory");
-            Assert.Equal(2, FactoryEvalAgentRegistration.ResolveGeneratedAgents(generated).Count);
+            Assert.False(Directory.Exists(Path.Combine(generated, "agents")));
+            foreach (var role in new[] { "planner", "worker" })
+                Assert.True(File.Exists(Path.Combine(generated, "skills",
+                    "idd-internal-factory-" + role, "SKILL.md")));
 
             await RunAsync(codex,
                 ["plugin", "marketplace", "add", marketplace, "--json"],
@@ -80,12 +83,12 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                     "--sandbox", "read-only",
                     "--cd", workspace, "-"
                 ],
-                workspace, env, NativeRoleProbePrompt, artifacts, "10-marketplace-agent-probe",
+                workspace, env, InternalSkillProbePrompt, artifacts, "10-marketplace-skill-probe",
                 timeout: TimeSpan.FromMinutes(timeoutMinutes));
 
             await File.WriteAllTextAsync(Path.Combine(artifacts, "codex-trace.jsonl"), result.Stdout);
             var root = FindRootRollout(codexHome, requireSpawn: false);
-            VerifyRegisteredNativeRoleSpawns(root, artifacts, "marketplace-only");
+            VerifyGenericInternalSkillSpawns(root, artifacts);
 
             var status = await RunAsync("git", ["status", "--porcelain=v1"],
                 workspace, null, null, artifacts, "11-marketplace-workspace-status");

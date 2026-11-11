@@ -38,14 +38,12 @@ When Factory is installed, reinstall it as well:
 codex plugin add idd-factory@intent-driven-development
 ```
 
-After a Codex Factory update, re-run `idd-factory-configure` to **check native
-role registration** for the scope you previously selected. If definitions have
-changed, inspect differences and explicitly authorize `--replace` (backups are
-retained); never silently overwrite user-managed roles. Start a new CLI
-session and verify both native `agent_type` registrations. Marketplace
-installation by itself does not register them in Codex 0.167.1.
-See [Factory native-agent installation](factory-native-agent-installation.md).
-
+After updating Factory, start a **new Codex/Claude session** so the host
+loads the newly packaged internal Planner/Worker Skills. No custom role
+registration, replacement or scope choice is required. Existing project/user
+custom-agent files from old versions are left untouched and are not used by
+Factory. Check [Factory installation](factory-native-agent-installation.md)
+for the host capabilities required for ordinary generic child execution.
 
 ## After Updating
 

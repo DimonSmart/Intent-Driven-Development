@@ -29,7 +29,6 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
             ["version"] = version,
             ["description"] = plugin.Description,
             ["skills"] = "./skills/",
-            ["agents"] = "./agents/",
             ["author"] = new JsonObject { ["name"] = AuthorName },
             ["repository"] = RepositoryUrl,
             ["license"] = "MIT",
@@ -41,25 +40,6 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
         };
 
         return pluginJson.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n";
-    }
-
-    protected override IReadOnlyList<GeneratedFile> BuildNativeAgentFiles(PluginDefinition plugin) =>
-        plugin.NativeAgentsOrEmpty.OrderBy(agent => agent.Name, StringComparer.Ordinal)
-            .Select(agent => new GeneratedFile(
-                Path.Combine("agents", agent.Name + ".toml"),
-                NativeFactoryAgentRenderer.CodexToml(agent)))
-            .ToArray();
-
-    protected override IReadOnlyList<GeneratedFile> BuildAdditionalPluginFiles(string pluginName, string version)
-    {
-        var files = base.BuildAdditionalPluginFiles(pluginName, version).ToList();
-        if (StringComparer.Ordinal.Equals(pluginName, "idd-factory"))
-        {
-            files.Add(new GeneratedFile(
-                Path.Combine("skills", "idd-factory-configure", "scripts", "register-codex-agents.py"),
-                RequiredFileReader.Read("src/canonical/factory/register-codex-agents.py")));
-        }
-        return files;
     }
 
     protected override IReadOnlyList<GeneratedFile> BuildSkillFiles(
@@ -81,96 +61,39 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                 Content = ContentNormalizer.NormalizeContent(ContentNormalizer.JoinBlocks(
                     skill.Content!,
                     """
-                    ## Codex native-agent orchestration
+                    ## Codex generic Factory subagents
 
-                    Use native Codex child-agent delegation for Factory semantic work.
+                    Use the host's native generic child-agent spawn. A Factory-specific
+                    agent_type is not required. Resolve the internal Planner and Worker
+                    SKILL.md files relative to THIS installed Factory Run Skill; pass
+                    absolute paths and a bounded assignment to each new child. Children
+                    read the complete installed Skill themselves before other work.
+                    Use fork_turns: "none" for every spawn, including Planner.
+                    Never send protocol bodies or previous child transcripts.
 
-                    - Spawn every planner and worker in a fresh semantic context with
-                      parent-history inheritance explicitly disabled. Pass
-                      `fork_turns: "none"` (or the host-equivalent setting); never
-                      rely on an inheritance default.
-                    - Spawn only the verified registered native `agent_type` (never a
-                      generic agent or prompt-based Skill discovery). Verify both
-                      internal roles before durable preflight and the specific
-                      role again before each spawn. On missing/conflicting role,
-                      block without fallback.
-                    - Prefer a read-only planner and a workspace-writing worker when the
-                      host exposes those sandbox choices.
-                    - Sandbox selection is an optional hardening feature, not a Factory
-                      capability requirement. When Codex exposes no per-child sandbox
-                      choice, continue with fresh no-parent-history children that share
-                      repository access; do not report Factory as unsupported solely for
-                      that reason.
-                    - Use the native `spawn_agent` operation (or its current native
-                      equivalent) and a blocking/event-driven `wait_agent` operation.
-                    - Before **every** Factory-owned planner or worker spawn attempt,
-                      choose an unused structured `task_name`: `idd_factory_planner_01`,
-                      `idd_factory_planner_02`, ... for planners, or
-                      `idd_factory_worker_01`, `idd_factory_worker_02`, ... for workers
-                      (format `^idd_factory_(planner|worker)_[0-9]+$`).
-                      Names must be unique within this Factory invocation and the
-                      visible shared host namespace. Reserve the name even if the host
-                      rejects the attempt; use a new suffix for any retry.
-                    - Pass `task_name` in native `spawn_agent` arguments, never only
-                      inside `message`, and pass `fork_turns: "none"` for **both**
-                      planners and workers. Example without optional model overrides:
-                      `{"agent_type":"idd-internal-factory-worker","task_name":"idd_factory_worker_01","fork_turns":"none","message":"<bounded one-task Factory assignment>"}`.
-                      The `agent_type` selects the registered native role; `task_name`
-                      is only a trace identity, never an agent type.
-                      Include `model` and `reasoning_effort` only when required by the
-                      validated execution profile mapping; never substitute models.
-                    - Prefer one long wait on the critical path. Do not build a
-                      short-wait/status-polling loop that consumes parent model turns.
-                    - If a wait fails or the host times out, do not start a replacement
-                      worker while the previous child may still write to the workspace.
-                      Stop or close the child natively when possible, leave the task in
-                      `plan.md`, and end the current Factory invocation.
-                    - If Codex cannot provide fresh/no-parent-history children, shared
-                      repository access, terminal waiting without model polling, final
-                      child results, and stop/close lifecycle control, Factory is
-                      unsupported on that host. Do not emulate the missing capability
-                      with a packaged runtime, MCP transport, shell process supervisor,
-                      or polling protocol.
-                    - Do not return a completed Factory result until the root has run
-                      every configured final verification check after the last planner
-                      returns `# Done`. On success, remove `.idd/factory/current/` or
-                      move it under `.idd/factory/results/`; an active request must not
-                      remain after a completed result.
+                    Inspect the direct host-visible tool schema, including tools not
+                    exposed inside functions.exec/ALL_TOOLS. An absent agent_type is
+                    NOT a capability failure. If the host requires a built-in generic
+                    agent type, use that built-in type, never a registered Factory role.
+                    Check fresh context, shared workspace/installed files, terminal
+                    results, native wait and stop/interrupt. Prefer read-only Planner
+                    permissions if available but do not confuse a text guard with a
+                    technical sandbox. Diagnose missing mandatory capabilities precisely.
 
-                    ## Codex native-agent capability diagnostics
+                    Reserve unique task_name arguments idd_factory_planner_01,
+                    idd_factory_worker_01, etc. Rejected attempts consume their names.
+                    Example without model overrides:
+                    {"task_name":"idd_factory_worker_01","fork_turns":"none","message":"Read the entire installed Worker SKILL.md at <absolute path>, then perform exactly this bounded Factory assignment: <one Task packet>"}.
+                    Replace placeholders with real paths and task data.
+                    Never add an unsupported spawn argument.
 
-                    Inspect the direct host-visible native tool schema, not an inventory
-                    exposed by a nested helper such as functions.exec/ALL_TOOLS.
-                    A nested tool inventory may omit the top-level agents namespace.
-                    Never conclude that native tools are absent from that inventory alone.
-                    Require direct evidence of agent_type selection for both registered
-                    Factory roles, fresh fork_turns, native wait and interrupt/stop,
-                    repository access and the actual role instructions.
-                    If no agent_type selector is exposed by this host (including some
-                    Codex Desktop collaboration sessions), stop before any durable write.
-                    If agent_type is exposed but the roles are unknown, tell the user to
-                    use idd-factory-configure for explicit role registration and restart
-                    Codex; do not silently substitute generic children or change trust.
-
-                    ## Codex Factory execution policy
-
-                    Immediately before each worker spawn, map the planner's
-                    `ExecutionProfile` through the validated project-owned
-                    `.idd/execution.yaml` policy.
-
-                    - `inherit` means omit Factory-specific model and reasoning
-                      overrides so the normal host/session/default model applies.
-                    - For an explicit active-platform mapping, pass
-                      `codex.model` as the native spawn `model` argument and optional
-                      `codex.reasoningEffort` as `reasoning_effort`, together with
-                      `fork_turns: "none"`. Do not place a model-switching instruction
-                      in the worker prompt.
-                    - Do not reconsider task complexity or substitute a different
-                      model. The configured mapping is authoritative.
-                    - If the host rejects the configured model/settings or cannot
-                      honor an explicit per-child override, stop with a diagnostic
-                      that names the profile, requested settings, and rejection reason;
-                      suggest `idd-factory-configure` and never pick a fallback model.
+                    If an explicit Codex policy mapping is active, pass the exact
+                    codex.model as model and codex.reasoningEffort as reasoning_effort;
+                    inherit omits both overrides. No prompt-based switching or fallback.
+                    Wait natively without short model-driven polling. On timeout or
+                    failure, stop/interrupt the writer and confirm termination before
+                    starting another; preserve the pending Task. A final Planner Done
+                    always requires the configured final verification checks.
                     """))
             };
         }
@@ -185,41 +108,15 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                 Content = ContentNormalizer.NormalizeContent(ContentNormalizer.JoinBlocks(
                     skill.Content!,
                     """
-                    ## Codex native-agent installation and registration
+                    ## Codex Factory installation compatibility
 
-                    Codex CLI 0.167.1 does not register native roles merely because
-                    the installed Marketplace manifest advertises agents/*.toml.
-                    An explicit registration operation is required in that host.
-                    For a user request to install/check/update Factory native roles,
-                    use the bundled script at
-                    scripts/register-codex-agents.py relative to THIS SKILL.md.
-                    Resolve this installed file by its real absolute path, not by
-                    guessing a plugin cache version or reading a different checkout.
-
-                    - Determine whether the request authorizes project-local or user-scope
-                      changes. Ask for the target scope if ambiguous. Never silently
-                      modify CODEX_HOME, global agents, project trust or config.toml.
-                    - First run the script with --scope project --project <repo> --check,
-                      or --scope user --check, using python3 (or a verified Python 3
-                      interpreter). It is read-only and reports missing/stale/conflicting
-                      definitions. The script obtains canonical TOML from the SAME installed
-                      plugin version and does not create Product Intent, Factory state,
-                      or execution.yaml.
-                    - For explicitly authorized registration, repeat with --apply.
-                      Existing differing roles block without edits. --replace is permitted
-                      only after explicit approval to replace those exact role paths;
-                      content-addressed backups are retained.
-                    - Read-only review must never invoke --apply; an automatic routing
-                      recommendation must never authorize role installation.
-                    - When installation succeeds, independently check the destination
-                      bytes, advise user to trust the project through supported Codex UI
-                      when project-scoped, and start a NEW Codex session. Do not report a
-                      ready Factory until real native agent_type selection, host-loaded
-                      instructions and terminal wait are verified.
-                    - A Desktop host that hides agent_type remains unsupported even
-                      after registration; use a compatible Codex CLI session.
-                    Registration is orthogonal to Factory model policy. Never create or
-                    modify .idd/execution.yaml as part of native role registration.
+                    Factory Planner and Worker are shipped as internal Skills in the
+                    same installed idd-factory package. They run in fresh generic
+                    child agents, without installing roles or choosing a registry
+                    scope. Older project/user custom Factory agent files are ignored
+                    by this workflow and must not be modified automatically. If asked
+                    to register an old Factory role, explain the changed mechanism;
+                    do not create .idd/execution.yaml as a side effect.
 
                     ## Codex Factory model configuration
 
@@ -300,10 +197,6 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
             ["platform"] = adapter.CodingAgent,
             ["dependencies"] = JsonStringArray(plugin.Dependencies),
             ["roles"] = JsonStringArray(plugin.Roles),
-            ["nativeAgents"] = new JsonArray(plugin.NativeAgentsOrEmpty.Select(agent => (JsonNode?)new JsonObject
-            {
-                ["name"] = agent.Name, ["source"] = agent.Source
-            }).ToArray()),
             ["roleDefinitions"] = BuildRoleDefinitions(plugin, roleDefinitions),
             ["skillRoleBindings"] = BuildSkillRoleBindings(plugin),
             ["assets"] = BuildAssets(plugin),

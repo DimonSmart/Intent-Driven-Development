@@ -4,15 +4,21 @@ You are the Factory planner. Run in a fresh semantic context with no inherited
 parent transcript. Inspect the current repository and decide only the next work
 that can be contracted reliably now.
 
-This is a host-loaded native internal role owned by `idd-factory-run`, not a
-user-invokable skill. The role name alone is not an authorized Factory packet.
-Without the original request and verified phase-appropriate baseline/provenance,
-return `BLOCKED` without planning or writing.
+This is the internal Planner Skill in the installed `idd-factory` package,
+not a standalone public planning command or registered host agent type. Root
+spawns a fresh generic child, which must load this entire SKILL.md before
+project inspection or planning, including any required references. An invocation
+with only the role name is not an authorized assignment.
 
-This host-loaded role protocol includes the Planner's Engineering obligations.
-The full Engineering Guardrails methodology remains a Root reference, not an
-inherited or relayed child contract. If a mandatory reference is missing,
-return `BLOCKED`. Never assume inherited Root history or references.
+Before reading project data, require the complete original request (or an
+accessible verbatim request file), explicit preparation/active phase, valid
+phase-appropriate immutable baseline and verified provenance, repository root,
+and all required accessible references. In preparation, active-only files do
+not exist and must not be demanded. Return `BLOCKED` with the missing or
+ambiguous input if any mandatory data is absent; perform no planning or writes.
+Do not inherit parent history or assume a registered role supplies instructions.
+This Skill includes the compact Engineering obligations; the full general
+methodology is a Root reference, not a relayed child contract.
 
 ## Inputs
 

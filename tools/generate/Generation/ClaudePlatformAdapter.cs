@@ -10,13 +10,6 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
     public override GeneratedFile BuildMarketplaceFile(PluginManifest manifest, string version) =>
         ClaudeMarketplaceBuilder.Build(manifest, version);
 
-    protected override IReadOnlyList<GeneratedFile> BuildNativeAgentFiles(PluginDefinition plugin) =>
-        plugin.NativeAgentsOrEmpty.OrderBy(agent => agent.Name, StringComparer.Ordinal)
-            .Select(agent => new GeneratedFile(
-                Path.Combine("agents", agent.Name + ".md"),
-                NativeFactoryAgentRenderer.ClaudeMarkdown(agent)))
-            .ToArray();
-
     protected override IReadOnlyList<GeneratedFile> BuildSkillFiles(
         AdapterConfig adapter,
         PluginDefinition plugin,
@@ -36,30 +29,22 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
                 Content = ContentNormalizer.NormalizeContent(ContentNormalizer.JoinBlocks(
                     skill.Content!,
                     """
-                    ## Claude registered Factory agents
+                    ## Claude generic Factory subagents
 
-                    Spawn only `idd-factory:idd-internal-factory-planner` and
-                    `idd-factory:idd-internal-factory-worker` via native
-                    `subagent_type` (or the host equivalent). Confirm both
-                    definitions before any durable preflight and again before
-                    each role spawn. Never substitute a generic subagent or
-                    ask a child to discover a Skill. Definitions are loaded
-                    into the child by the host; Root passes only the bounded
-                    assignment packet. Do not send the full protocol.
-
-                    ## Claude native-agent capability
-
-                    Use a native Claude fork/subagent mechanism only when the host can
-                    provide every Factory capability required by the canonical skill:
-                    a fresh semantic context with controlled input and no substantial
-                    inherited parent transcript, shared repository access, terminal
-                    waiting without model-driven polling, a final child result, and
-                    stop/close lifecycle control.
-
-                    When those properties cannot be guaranteed, report Factory as
-                    unsupported on the current Claude host. Do not restore or emulate
-                    Factory through the removed .NET runtime, a packaged CLI launcher,
-                    MCP transport, process supervision, or a status-polling loop.
+                    Use a native generic Agent/subagent or fork when it guarantees
+                    a fresh bounded context without parent transcript, repository
+                    and installed Skill access, terminal wait, final result and
+                    stop/interrupt lifecycle. Do not depend on registered custom
+                    Factory subagent_type identifiers. Use a built-in general-purpose
+                    agent if the host requires a type. Give the child the unambiguous
+                    absolute path to the installed internal Planner or Worker SKILL.md
+                    relative to THIS Factory Run Skill; it must fully load the Skill
+                    before reading task/project data. Root must not copy its contents.
+                    A Skill is instruction material, not a process or sandbox.
+                    The Planner must act read-only; use host permissions when provided.
+                    Do not insert context: fork metadata into the internal Skills:
+                    Root has already created the fresh child. Preserve bounded
+                    assignments and native waiting without model-based polling.
 
                     ## Claude Factory execution policy
 

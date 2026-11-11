@@ -1,3 +1,20 @@
+## 2026-11-11 — Factory internal Skills replace registered native roles
+
+Factory now packages `idd-internal-factory-planner` and
+`idd-internal-factory-worker` as two internal Skills, generated from the same
+canonical role protocols. Root spawns ordinary native children with fresh
+contexts; each child reads its entire installed Skill before working. No
+`agent_type` selector, registered custom Factory role, project/user TOML copy,
+or separate registration helper is required. `idd-factory-configure` continues
+to manage only model policy. Existing custom agent definitions are neither
+modified nor automatically deleted. Restart Codex/Claude after plugin update.
+
+This change addresses the Codex Desktop regression where `spawn_agent` can
+be available without an `agent_type` parameter. It does **not** remove the
+requirements for native child spawn, fresh context, shared access, terminal
+wait, exact policy overrides where configured, or safe stop. Desktop/CLI/Claude
+live verification must be reported separately. Old traces remain historical.
+
 # Updates and Breaking Changes
 
 ## 2026-11-11 — Codex Factory native-role registration

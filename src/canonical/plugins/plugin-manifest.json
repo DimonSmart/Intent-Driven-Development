@@ -205,7 +205,9 @@
       ],
       "skills": [
         "idd-factory-run",
-        "idd-factory-configure"
+        "idd-factory-configure",
+        "idd-internal-factory-planner",
+        "idd-internal-factory-worker"
       ],
       "roles": [],
       "skillRoleReferences": {},
@@ -246,18 +248,10 @@
         "entryPoint": false,
         "temporaryWorkspace": ".idd/factory"
       },
-      "nativeAgents": [
-        {
-          "name": "idd-internal-factory-planner",
-          "source": "src/canonical/factory/planner.md",
-          "description": "Internal Factory planner; use only with verified Factory assignment."
-        },
-        {
-          "name": "idd-internal-factory-worker",
-          "source": "src/canonical/factory/worker.md",
-          "description": "Internal Factory worker; use only with one verified Factory task."
-        }
-      ]
+      "skillSources": {
+        "idd-internal-factory-planner": "src/canonical/factory/planner.md",
+        "idd-internal-factory-worker": "src/canonical/factory/worker.md"
+      }
     }
   }
 }

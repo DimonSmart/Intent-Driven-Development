@@ -15,7 +15,7 @@ internal static partial class SkillDescriptionValidator
     {
         if (value.ValueKind != JsonValueKind.Object)
         {
-            throw new InvalidOperationException($"Invalid skill description for '{skillName}' in {path}: expected an object with 'description' and required 'exposure' (command, workflow); string entries are not supported.");
+            throw new InvalidOperationException($"Invalid skill description for '{skillName}' in {path}: expected an object with 'description' and required 'exposure' (command, workflow, internal); string entries are not supported.");
         }
 
         if (!value.TryGetProperty("description", out var descriptionElement) ||
@@ -58,7 +58,7 @@ internal static partial class SkillDescriptionValidator
 
     public static void GuardInvocationExposure(string skillName, SkillInvocation invocation, SkillExposure exposure)
     {
-        if (invocation == SkillInvocation.Manual && exposure == SkillExposure.Workflow)
+        if (invocation == SkillInvocation.Manual && exposure != SkillExposure.Command)
             throw new InvalidOperationException(
                 $"Invalid invocation/exposure for skill '{skillName}': manual + workflow has no activation path.");
     }
@@ -182,6 +182,6 @@ internal static partial class SkillDescriptionValidator
             $"Invalid frontmatter for {skillName}/{adapterName} in {path}: '{fieldName}' must be a string, bool, number, or string array.");
     }
 
-    [GeneratedRegex("^(?:idd-help|idd-skip|idd-route|idd-project-init|idd-glossary-build|idd-verification-configure|idd-engineering-change|idd-(intent|code|factory)-[a-z0-9]+(?:-[a-z0-9]+)*)$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^(?:idd-internal-factory-(?:planner|worker)|idd-help|idd-skip|idd-route|idd-project-init|idd-glossary-build|idd-verification-configure|idd-engineering-change|idd-(intent|code|factory)-[a-z0-9]+(?:-[a-z0-9]+)*)$", RegexOptions.CultureInvariant)]
     private static partial Regex PublicSkillNamePattern();
 }
