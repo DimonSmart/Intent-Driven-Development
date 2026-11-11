@@ -197,10 +197,6 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
             ["platform"] = adapter.CodingAgent,
             ["dependencies"] = JsonStringArray(plugin.Dependencies),
             ["roles"] = JsonStringArray(plugin.Roles),
-            ["nativeAgents"] = new JsonArray(plugin.NativeAgentsOrEmpty.Select(agent => (JsonNode?)new JsonObject
-            {
-                ["name"] = agent.Name, ["source"] = agent.Source
-            }).ToArray()),
             ["roleDefinitions"] = BuildRoleDefinitions(plugin, roleDefinitions),
             ["skillRoleBindings"] = BuildSkillRoleBindings(plugin),
             ["assets"] = BuildAssets(plugin),
