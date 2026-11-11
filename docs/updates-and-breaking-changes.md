@@ -1,6 +1,6 @@
 # Updates and Breaking Changes
 
-## Pending patch — Codex Factory native-role registration (2026-11-11)
+## 2026-11-11 — Codex Factory native-role registration
 
 Codex CLI 0.167.1 does not register agents from the IDD Factory Marketplace
 plugin manifest. Factory now packages an opt-in `idd-factory-configure`
