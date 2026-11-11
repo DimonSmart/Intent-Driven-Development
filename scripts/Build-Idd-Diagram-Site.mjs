@@ -47,6 +47,13 @@ try {
       connected.add(edge.to);
     }
     for (const id of nodes) if (!connected.has(id)) throw new Error('Isolated diagram node: ' + name + ': ' + id);
+    for (let i = 1; i < (diagram.mainPath ?? []).length; i++) {
+      const prev = diagram.nodes.find(n => n.id === diagram.mainPath[i - 1]);
+      const next = diagram.nodes.find(n => n.id === diagram.mainPath[i]);
+      if (!prev || !next || next.col < prev.col || !diagram.edges.some(e => e.from === prev.id && e.to === next.id)) {
+        throw new Error('Invalid non-monotonic mainPath in ' + name + ': ' + diagram.mainPath[i - 1] + ' -> ' + diagram.mainPath[i]);
+      }
+    }
     diagram.meta.repository.revision = revision;
     const stampedInput = path.join(workspace, name + '.workflow.json');
     writeFileSync(stampedInput, JSON.stringify(diagram, null, 2) + '\n');

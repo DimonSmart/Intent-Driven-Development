@@ -42,9 +42,7 @@
     "router",
     "core",
     "decision",
-    "result",
-    "caller",
-    "skill"
+    "result"
   ],
   "phases": [
     {
@@ -332,7 +330,7 @@
       "to": "caller",
       "label": "recommend",
       "variant": "emphasis",
-      "role": "main"
+      "role": "branch"
     },
     {
       "id": "caller_skill",
@@ -340,7 +338,7 @@
       "to": "skill",
       "label": "permitted handoff",
       "variant": "emphasis",
-      "role": "main"
+      "role": "branch"
     },
     {
       "id": "core_details",
