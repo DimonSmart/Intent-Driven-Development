@@ -116,22 +116,43 @@ model/reasoning edits, read-only review, and later refreshes, upgrades or
 downgrades. There is no separate model-update command. An exact specified ID
 needs no additional approval or independent model search. Alternatives chosen
 by the agent require explicit confirmation; a review-only request returns a
-comparison without saving. Unselected levels, other platform mappings and
-existing optional reasoning settings (including their absence) are preserved.
-Known effort incompatibilities must be resolved explicitly. Before writing,
+comparison without saving. Unselected levels and other platform mappings are
+preserved. Exact model-only edits preserve optional reasoning settings, including
+their absence. Guided replacements propose a new model/effort pair for
+confirmation. Known effort incompatibilities must be resolved explicitly. Before
+writing,
 revalidate the full policy and check for intervening edits; stop on unsafe
 conflicts. A no-op does not rewrite the file.
 
 For fine-grained configuration the active Coding Agent proposes **model and
-optional effort together** for each requested profile, based on verified
-host/platform capabilities and user goals (quality, cost, latency). It shows
-`host default (omitted)` when no compatible explicit effort is requested.
-There is no fixed `economy = low` / `standard = medium` / `strong = high` rule,
-and no obligation to fill every profile or effort field. It states when account
-availability or model/effort compatibility cannot be verified and waits for
-user confirmation only for interpreted recommendations. Exact model/effort
-edits need no extra approval. Clearing effort removes that optional key but
-keeps the model mapping.
+optional effort together** for each requested profile. Initial selection aims to
+reduce cost per successfully completed task, including repeat attempts:
+
+| Profile | Model goal | Effort heuristic |
+| --- | --- | --- |
+| `economy` | Cheap model suitable for simple tasks | Maximum supported |
+| `standard` | Middle price class suitable for ordinary tasks | Next-to-maximum supported |
+| `strong` | Most capable model suitable for complex tasks | Middle supported; lower middle for an even scale |
+
+The agent verifies the ordered levels supported by the chosen model through the
+active child-agent platform. One supported level is used as-is. If effort is
+unsupported, or its values/ordering are unknown, propose `host default (omitted)`
+with an explanation. Explicit user choices and constraints take priority. This
+is a starting heuristic, not a guarantee of minimum cost or a fixed vendor scale.
+The same model may serve several profiles.
+
+Show current/proposed exact model IDs and effort (or omission), rationale and
+uncertainties in one table, with one confirmation for the complete interpreted
+proposal. Save native Codex `reasoningEffort` or Claude `effort` values, never
+relative selectors such as "maximum". A guided model replacement resolves effort
+again; confirmation of the displayed pair covers its shown effort change or
+removal. Exact model-only edits preserve existing effort. Exact model/effort
+edits need no extra approval. Clearing effort removes only its optional key.
+
+Existing policies are not automatically retuned. Worker startup uses the saved
+pair exactly, without recalculating effort, automatic cost optimization,
+benchmarks or result-driven model switching. Missing mappings still inherit;
+no obligation to fill every profile or effort field is introduced.
 
 The initial question has two answers: `default`/`inherit` for the current
 session/host model at every level, or `configure` for selected overrides.

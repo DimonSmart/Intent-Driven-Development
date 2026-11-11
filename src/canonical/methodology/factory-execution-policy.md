@@ -104,6 +104,56 @@ Do not persist dynamic aliases such as `cheapest`, `best`, `strongest`,
 requests during configuration to a concrete model ID, obtain confirmation, and
 persist the concrete result.
 
+## Cost-oriented model and effort selection
+
+Use these initial heuristics for guided configuration of requested mappings and
+guided model replacements. Aim for minimum expected cost per successfully
+completed task, including repeat attempts, subject to the required capability.
+Maximum effort on a cheap model is a starting assumption, not guaranteed savings.
+Explicit user settings and constraints take precedence; do not require different
+model IDs for different profiles.
+
+| Profile | Model selection goal | Effort selection |
+| --- | --- | --- |
+| `economy` | Cheap model suitable for simple, bounded tasks | Maximum supported level |
+| `standard` | Middle price class suitable for ordinary engineering | Next-to-maximum supported level |
+| `strong` | Most capable model suitable for complex tasks | Middle supported level; lower middle when even |
+
+Verify the ordered effort levels accepted for the concrete model through the
+active native child-agent platform, using reliable host capabilities and current
+platform/vendor information. API support alone does not prove the child-agent
+tool can pass the setting. Never infer support from a name, sort labels
+alphabetically, or reuse another provider/model's scale. For an ascending list
+of `n` verified levels, select these zero-based indices:
+
+- `economy`: `n - 1`;
+- `standard`: `max(0, n - 2)`;
+- `strong`: `floor((n - 1) / 2)`.
+
+A single supported level serves every profile. For unsupported explicit effort,
+unknown allowed values, or unknown ordering, propose `host default (omitted)`
+and explain that this delegates to the child platform/model default. Never
+invent a value, numeric budget, or provider-independent effort enum.
+
+Resolve the pair once during configuration and present current/proposed exact
+model and effort (including omission), rationale and uncertainties in one table.
+One Apply/Edit/Reject decision covers the complete interpreted proposal; no
+separate effort questionnaire is required. Persist only concrete model IDs and
+native values in Codex `reasoningEffort` or Claude `effort`, never relative
+selectors such as `maximum`, `maximum-minus-one`, or `middle`.
+
+A guided replacement resolves effort again for the new model. Confirmation of
+the displayed pair authorizes its shown effort change or removal; preserve all
+unselected mappings. Exact model-only edits instead preserve existing effort,
+including omission. Known incompatibility with that preserved value requires
+an explicitly approved compatible effort or removal before saving. Effort-only
+edits require an existing concrete model mapping; clearing effort removes only
+its optional key. Do not retune existing policies without a requested change.
+Review-only proposals never write policy.
+
+Runtime passes the saved pair exactly. It never recomputes these heuristics,
+benchmarks models, optimizes costs, or switches models based on results.
+
 ## Structural validation
 
 Before applying an explicit policy, perform bounded structural validation.
@@ -133,8 +183,9 @@ Canonical IDD does not define concrete model IDs or enumerate allowed effort
 values. A guided model-selection proposal presents model and optional effort
 as one decision per selected platform/profile. Recommend an effort only when
 current host/vendor evidence supports its compatibility; otherwise disclose
-uncertainty and offer omission. Complexity profiles do not prescribe vendor
-effort values. Clearing effort removes only its optional key, not the model.
+uncertainty and offer omission. The selection heuristics resolve against each
+model/platform scale; complexity profiles do not name fixed vendor effort values.
+Clearing effort removes only its optional key, not the model.
 
 Do not silently convert malformed explicit policy to `inherit`. Return a clear
 diagnostic and stop before spawning the affected worker.
@@ -200,9 +251,10 @@ alternatives require explicit confirmation; review-only requests never write.
 Only an initial configuration with an absent policy and no previously chosen
 strategy needs a blocking `default (inherit)` versus `configure` choice.
 
-Preserve unselected profiles, platform mappings, and optional reasoning values
-(including absence). One-model-for-many-profiles is valid. A reasoning-only
-override without a concrete model is invalid. To inherit one mapping, remove
+Preserve unselected profiles/platform mappings. Exact model-only edits preserve
+optional reasoning values (including absence); guided replacements resolve a new
+pair under the cost-oriented selection rules, confirmed together.
+One-model-for-many-profiles is valid. A reasoning-only override without a concrete model is invalid. To inherit one mapping, remove
 that mapping; to inherit all profiles, use global `modelStrategy: inherit`.
 The final mapping may be an empty `executionProfiles: {}` when the last
 explicit override was removed without a request to change the global strategy.
@@ -211,8 +263,8 @@ Research alternative models only when needed. Prefer native host capabilities,
 platform-provided information, and fresh verifiable vendor documentation.
 For exact user assignments, this hierarchy does not override the provided ID.
 Never infer vendor model quality, price, latency, reasoning compatibility, or
-per-account availability from names. If a proposed model is known to conflict
-with preserved reasoning, block that candidate until separately resolved;
+per-account availability from names. If an exact model-only edit conflicts
+with preserved reasoning, block that candidate until explicitly resolved;
 unknown compatibility is reported as uncertainty, not a forced fallback.
 
 Before an authorized save, validate every mapping (including inactive-platform
