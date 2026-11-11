@@ -60,7 +60,10 @@ Standalone Factory model-policy requests select their skill directly:
   comparison, refresh, upgrade, downgrade, or inheritance changes. For this
   standalone concern, select `idd-factory-configure` directly instead of
   creating a classification.
-- `unknown`: the request does not provide enough information to choose safely.
+- `unknown`: the request does not provide enough information to choose safely,
+  or a route-only question concerns a known manual-only capability that is
+  outside the ordinary classification taxonomy. In the latter case the first
+  skill can be known even though no ordinary work classification applies.
 
 Initial product truth discovery and raw imported knowledge are different:
 
@@ -146,8 +149,18 @@ capability is identifiable, keep `Classification: product-change` even if its
 behavior or the separate Engineering decision is underspecified. In that
 case, `Clarity: ambiguous` and `Recommended first skill: idd-intent-brainstorm`
 establish the Product clarity gate; the complete workflow retains the
-Engineering owner and authorized implementation. Use `Classification: unclear`
-only when the primary concern itself cannot be identified.
+Engineering owner and authorized implementation.
+
+Distinguish an **identified change with missing details** from an
+**unidentified change**. "Add an upload feature" identifies a capability:
+`product-change`, `Operation: add`, `Clarity: ambiguous` if needed.
+"Make the product nicer; I do not know which behavior should change"
+identifies no specific feature, behavior, contract, or add/modify/remove
+operation: `Classification: unclear`, `Operation: not-applicable`,
+`Clarity: ambiguous`, `Execution depth: not-applicable`, and first
+`idd-intent-brainstorm`. Do not guess a `modify` operation from a vague
+desire to improve the product. Discovery must stop at the missing Product
+decision, not assume that implementation is already actionable.
 
 ### Requested Scope
 
@@ -221,9 +234,11 @@ bypasses routing.
 
 Classify execution depth independently from the product operation and requested
 scope. **First decide whether execution depth applies at all.** For
-`intent-bootstrap`, including reconstruction and a proposal for user approval,
-and for Engineering Rule management without requested code changes, the value
-is **always `not-applicable`**. Neither a multi-stage discovery workflow nor
+`intent-bootstrap` and `intent-import`, including reconstruction, source
+migration, approval and mechanical validation, the value is
+**always `not-applicable`**. The same applies to Engineering Rule management
+without requested code changes, and to a route whose only safe current action
+is an `unclear` Product discovery gate. Neither a multi-stage discovery workflow nor
 a single Engineering Rule modification is implementation execution.
 Do not use `orchestrated` to describe bootstrap's discovery/approval stages,
 or `focused` merely because one Engineering Rule is being changed. As a final
@@ -395,9 +410,13 @@ because the question uses verbs such as "create" or "update".
 
 In particular, questions about which workflow creates, reviews, or updates
 the optional project glossary must recommend `idd-glossary-build`, not
-`idd-intent-change`. For "which workflow?" / "advise only" requests set
-`Requested scope: route-only`, `Current handoff: none`, and stop after the
-recommendation. Do not invoke a manual-only command on the user's behalf.
+`idd-intent-change`. For a question **only** about this manual-only
+glossary workflow, use `Classification: unknown` (no ordinary mutation
+category), `Operation: not-applicable`, `Clarity: clear`,
+`Execution depth: not-applicable`, `Requested scope: route-only`,
+and `Current handoff: none`; stop after the recommendation.
+This is a known manual capability, not a request to mutate Product Intent.
+Do not invoke a manual-only command on the user's behalf.
 Keep the ordinary route output fields; this recommendation does not create
 a new classification or authorize glossary changes.
 

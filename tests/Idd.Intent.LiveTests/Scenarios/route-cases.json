@@ -445,11 +445,14 @@
       "request": "Make the product nicer, but I do not know which behavior should change.",
       "expected": {
         "classification": "unclear",
-        "operation": null,
+        "operation": "not-applicable",
         "requestedScope": null,
         "firstSkill": "idd-intent-brainstorm",
         "auditScope": null,
-        "standaloneFactory": false
+        "standaloneFactory": false,
+        "clarity": "ambiguous",
+        "executionDepth": "not-applicable",
+        "currentHandoff": "idd-intent-brainstorm"
       },
       "contract": "No unauthorized change",
       "kind": "ordinary"
@@ -528,8 +531,8 @@
       "id": "manual-command",
       "request": "Which workflow would create an optional IDD glossary? Advise only; do not invoke it.",
       "expected": {
-        "classification": null,
-        "operation": null,
+        "classification": "unknown",
+        "operation": "not-applicable",
         "requestedScope": "route-only",
         "firstSkill": "idd-glossary-build",
         "auditScope": null,
