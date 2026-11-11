@@ -25,15 +25,11 @@
     },
     {
       "id": "references",
-      "label": "References loaded only when relevant"
+      "label": "Conditional references & special cases"
     },
     {
       "id": "handoff",
       "label": "Result & caller-owned execution"
-    },
-    {
-      "id": "exceptions",
-      "label": "Direct invocation or stop"
     }
   ],
   "mainPath": [
@@ -73,7 +69,7 @@
       "type": "external",
       "label": "User Request",
       "sublabel": "original goal + all constraints",
-      "width": 188
+      "width": 170
     },
     {
       "id": "host",
@@ -89,7 +85,7 @@
           "label": "Automatic workflows & commands"
         }
       ],
-      "width": 190
+      "width": 170
     },
     {
       "id": "router",
@@ -105,7 +101,7 @@
           "label": "Router contract"
         }
       ],
-      "width": 190
+      "width": 170
     },
     {
       "id": "core",
@@ -121,7 +117,7 @@
           "label": "Routing Core"
         }
       ],
-      "width": 192
+      "width": 170
     },
     {
       "id": "decision",
@@ -142,7 +138,7 @@
           "label": "Safety gates"
         }
       ],
-      "width": 208
+      "width": 184
     },
     {
       "id": "details",
@@ -163,7 +159,7 @@
           "label": "Detailed workflow authority"
         }
       ],
-      "width": 192
+      "width": 170
     },
     {
       "id": "metadata",
@@ -184,12 +180,12 @@
           "label": "Lazy metadata check"
         }
       ],
-      "width": 192
+      "width": 170
     },
     {
       "id": "factory",
-      "lane": "exceptions",
-      "col": 4,
+      "lane": "references",
+      "col": 3,
       "type": "messagebus",
       "label": "Factory Shortcut",
       "sublabel": "standalone model policy only",
@@ -200,7 +196,7 @@
           "label": "Direct Factory model-policy route"
         }
       ],
-      "width": 192
+      "width": 170
     },
     {
       "id": "result",
@@ -216,7 +212,7 @@
           "label": "Complete workflow and current boundary"
         }
       ],
-      "width": 198
+      "width": 174
     },
     {
       "id": "caller",
@@ -232,7 +228,7 @@
           "label": "Caller-owned handoff"
         }
       ],
-      "width": 190
+      "width": 170
     },
     {
       "id": "skill",
@@ -248,11 +244,11 @@
           "label": "Current handoff rules"
         }
       ],
-      "width": 190
+      "width": 170
     },
     {
       "id": "direct",
-      "lane": "exceptions",
+      "lane": "references",
       "col": 2,
       "type": "backend",
       "label": "Direct Named Skill",
@@ -264,11 +260,11 @@
           "label": "Direct invocation priority"
         }
       ],
-      "width": 198
+      "width": 170
     },
     {
       "id": "stop",
-      "lane": "exceptions",
+      "lane": "entry",
       "col": 5,
       "type": "external",
       "label": "Stop / Explain",
@@ -280,7 +276,7 @@
           "label": "Stop and availability rules"
         }
       ],
-      "width": 198
+      "width": 170
     }
   ],
   "edges": [
