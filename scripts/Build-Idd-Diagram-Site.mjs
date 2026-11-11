@@ -21,6 +21,17 @@ try {
     const sourcePath = path.join(root, 'docs', 'diagram', 'idd-' + name + '.workflow.json');
     const diagram = JSON.parse(readFileSync(sourcePath, 'utf8'));
     if (diagram.meta.output !== 'site/views/' + name + '.html') throw new Error('Unexpected diagram output: ' + name);
+    // Archify workflow schema limits horizontal layout to columns 0..5.
+    for (const node of diagram.nodes) {
+      if (!Number.isInteger(node.col) || node.col < 0 || node.col > 5) {
+        throw new Error('Invalid Archify column in ' + name + ': ' + node.id + ' (' + node.col + '); allowed 0..5');
+      }
+    }
+    for (const phase of diagram.phases ?? []) {
+      if (![phase.fromCol, phase.toCol].every(n => Number.isInteger(n) && n >= 0 && n <= 5) || phase.fromCol > phase.toCol) {
+        throw new Error('Invalid Archify phase column range in ' + name + ': ' + phase.id);
+      }
+    }
     const nodes = new Set(diagram.nodes.map(node => node.id));
     if (nodes.size !== diagram.nodes.length) throw new Error('Duplicate diagram nodes: ' + name);
     const connected = new Set();

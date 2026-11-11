@@ -64,7 +64,7 @@
       "id": "handoff",
       "label": "Authorize next step",
       "fromCol": 5,
-      "toCol": 7
+      "toCol": 5
     }
   ],
   "nodes": [
@@ -223,7 +223,7 @@
     {
       "id": "caller",
       "lane": "handoff",
-      "col": 6,
+      "col": 4,
       "type": "security",
       "label": "Caller Gate",
       "sublabel": "scope, approval, available skill",
@@ -239,7 +239,7 @@
     {
       "id": "skill",
       "lane": "handoff",
-      "col": 7,
+      "col": 5,
       "type": "backend",
       "label": "Selected Skill",
       "sublabel": "execute only authorized stage",
@@ -271,7 +271,7 @@
     {
       "id": "stop",
       "lane": "exceptions",
-      "col": 7,
+      "col": 5,
       "type": "external",
       "label": "Stop / Explain",
       "sublabel": "route-only, blocker or manual-only",
