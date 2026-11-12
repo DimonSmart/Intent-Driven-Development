@@ -416,12 +416,12 @@
         "classification": "product-change",
         "operation": "add",
         "requestedScope": "end-to-end",
-        "firstSkill": "idd-intent-brainstorm",
+        "firstSkill": "idd-intent-clarify",
         "auditScope": null,
         "standaloneFactory": false,
         "clarity": "ambiguous",
         "executionDepth": "orchestrated",
-        "currentHandoff": "idd-intent-brainstorm"
+        "currentHandoff": "idd-intent-clarify"
       },
       "contract": "Underspecified mixed request: clarity gate first; both durable owners before implementation, orchestrated depth.",
       "kind": "ordinary"
@@ -632,6 +632,175 @@
         "executionDepth": "orchestrated"
       },
       "contract": "Actionable mixed Product and Engineering changes; distinct owners and gates must precede implementation.",
+      "kind": "ordinary"
+    },
+    {
+      "id": "clarify-generic-permissions",
+      "request": "Add a universal configurable permission system; the user roles and required behavior are not yet defined.",
+      "expected": {
+        "classification": "product-change",
+        "operation": "add",
+        "requestedScope": null,
+        "firstSkill": "idd-intent-clarify",
+        "auditScope": null,
+        "standaloneFactory": false,
+        "clarity": "ambiguous",
+        "currentHandoff": "idd-intent-clarify"
+      },
+      "contract": "Proposed generic solution with no observable Product contract",
+      "kind": "ordinary"
+    },
+    {
+      "id": "clarify-uploads",
+      "request": "Help clarify the requirements for a new user file upload feature. Do not edit files.",
+      "expected": {
+        "classification": "product-change",
+        "operation": "add",
+        "requestedScope": "intent-only",
+        "firstSkill": "idd-intent-clarify",
+        "auditScope": null,
+        "standaloneFactory": false,
+        "currentHandoff": "idd-intent-clarify"
+      },
+      "contract": "Concrete incomplete requirement needs Clarify, not divergent ideas",
+      "kind": "ordinary"
+    },
+    {
+      "id": "clarify-mixed",
+      "request": "Add an upload feature and new logging Engineering Rules, then implement both; the accepted upload formats and required logging behavior are unspecified.",
+      "expected": {
+        "classification": "product-change",
+        "operation": "add",
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-clarify",
+        "auditScope": null,
+        "standaloneFactory": false,
+        "clarity": "ambiguous",
+        "executionDepth": "orchestrated",
+        "currentHandoff": "idd-intent-clarify"
+      },
+      "contract": "Product gate first, preserve Engineering and code stages",
+      "kind": "ordinary"
+    },
+    {
+      "id": "brainstorm-access-options",
+      "request": "Explore fundamentally different ways to manage access in this product; I have not decided which feature to add. Do not edit files.",
+      "expected": {
+        "classification": "unclear",
+        "operation": "not-applicable",
+        "requestedScope": "intent-only",
+        "firstSkill": "idd-intent-brainstorm",
+        "auditScope": null,
+        "standaloneFactory": false,
+        "executionDepth": "not-applicable",
+        "currentHandoff": "idd-intent-brainstorm"
+      },
+      "contract": "Read-only broad alternatives with no artificial add/modify",
+      "kind": "ordinary"
+    },
+    {
+      "id": "brainstorm-file-manager-opportunities",
+      "request": "Research unusual product capabilities a file manager could offer, and generate different directions. No decision or implementation yet.",
+      "expected": {
+        "classification": "unclear",
+        "operation": "not-applicable",
+        "requestedScope": "intent-only",
+        "firstSkill": "idd-intent-brainstorm",
+        "auditScope": null,
+        "standaloneFactory": false,
+        "executionDepth": "not-applicable",
+        "currentHandoff": "idd-intent-brainstorm"
+      },
+      "contract": "Opportunity discovery, not clarify interview",
+      "kind": "ordinary"
+    },
+    {
+      "id": "brainstorm-named",
+      "request": "Let's brainstorm new product features, not refine a single known requirement. No changes to files.",
+      "expected": {
+        "classification": "unclear",
+        "operation": "not-applicable",
+        "requestedScope": "intent-only",
+        "firstSkill": "idd-intent-brainstorm",
+        "auditScope": null,
+        "standaloneFactory": false,
+        "executionDepth": "not-applicable",
+        "currentHandoff": "idd-intent-brainstorm"
+      },
+      "contract": "Semantic named brainstorming",
+      "kind": "ordinary"
+    },
+    {
+      "id": "brainstorm-visual-context",
+      "request": "Explore different product concepts for a dashboard; the screenshot is only context, not a visual style to copy. Do not change files.",
+      "expected": {
+        "classification": null,
+        "operation": null,
+        "requestedScope": "intent-only",
+        "firstSkill": "idd-intent-brainstorm",
+        "auditScope": null,
+        "standaloneFactory": false,
+        "currentHandoff": "idd-intent-brainstorm"
+      },
+      "contract": "Screenshot context is not a visual-trait gate",
+      "kind": "ordinary"
+    },
+    {
+      "id": "brainstorm-then-implement",
+      "request": "Brainstorm fundamentally different options to manage permissions first, then implement whichever we select after my approval.",
+      "expected": {
+        "classification": null,
+        "operation": null,
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-brainstorm",
+        "auditScope": null,
+        "standaloneFactory": false,
+        "currentHandoff": "idd-intent-brainstorm"
+      },
+      "contract": "First stage Brainstorm with preservation of future requested work",
+      "kind": "ordinary"
+    },
+    {
+      "id": "direct-clarify",
+      "request": "/idd-intent-clarify Help resolve this ambiguous upload requirement.",
+      "expected": {
+        "classification": null,
+        "operation": null,
+        "requestedScope": null,
+        "firstSkill": "idd-intent-clarify",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Explicit named-skill invocation bypasses router",
+      "kind": "direct-skill"
+    },
+    {
+      "id": "direct-brainstorm",
+      "request": "/idd-intent-brainstorm Explore fundamentally different solutions for access control.",
+      "expected": {
+        "classification": null,
+        "operation": null,
+        "requestedScope": null,
+        "firstSkill": "idd-intent-brainstorm",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Explicit named-skill invocation bypasses router",
+      "kind": "direct-skill"
+    },
+    {
+      "id": "route-only-brainstorm",
+      "request": "Which IDD skill should I use to explore alternative product strategies? Just tell me the route; do not execute anything.",
+      "expected": {
+        "classification": null,
+        "operation": null,
+        "requestedScope": "route-only",
+        "firstSkill": "idd-intent-brainstorm",
+        "auditScope": null,
+        "standaloneFactory": false,
+        "currentHandoff": "none"
+      },
+      "contract": "Route-only never authorizes discovery",
       "kind": "ordinary"
     }
   ]
