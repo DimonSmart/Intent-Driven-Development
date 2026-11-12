@@ -85,9 +85,7 @@ public sealed class DiscoverySkillsLiveTests
                  "--cd", work, "--output-last-message", responsePath, "-"],
                 work, env, "Use the installed $" + scenario.Skill +
                     " skill explicitly. Do not modify any project files. " +
-                    "Respond to the following original user request as that skill:
-
-" +
+                    "Respond to the following original user request as that skill:\n\n" +
                     scenario.Request, timeout);
             var response = File.Exists(responsePath)
                 ? await File.ReadAllTextAsync(responsePath) : "";
@@ -101,8 +99,7 @@ public sealed class DiscoverySkillsLiveTests
             if (succeeded && judgeEnabled)
             {
                 var judgePath = Path.Combine(root, scenario.Id + "-judge.json");
-                var rubric = string.Join("
-", scenario.Expect.Select(x => "- " + x));
+                var rubric = string.Join("\n", scenario.Expect.Select(x => "- " + x));
                 var prompt = "Evaluate the assistant response against the user's request and " +
                     "the scenario-specific behavioral expectations. Consider semantic substance, " +
                     "not exact phrasing, headings, number of options or questions. Treat unsupported " +
@@ -110,18 +107,9 @@ public sealed class DiscoverySkillsLiveTests
                     "repetition of skill boilerplate without addressing the task. Distinguish " +
                     "read-only compliance, explicit approval and hypothetical suggestions. " +
                     "Respond ONLY in JSON with a boolean pass and a concise string reason. " +
-                    "The evaluation is not a request to perform Product work.
-
-" +
-                    "Request:
-" + scenario.Request + "
-
-Expectations:
-" + rubric +
-                    "
-
-Assistant response:
-" + response;
+                    "The evaluation is not a request to perform Product work.\n\n" +
+                    "Request:\n" + scenario.Request + "\n\nExpectations:\n" + rubric +
+                    "\n\nAssistant response:\n" + response;
                 var judged = await Run(codex,
                     ["exec", "--skip-git-repo-check", "--ignore-rules",
                      "-c", "approval_policy=never",
@@ -145,17 +133,14 @@ Assistant response:
                 }
             }
             results.Add(new DiscoveryResult(scenario.Id, scenario.Skill, succeeded,
-                reason, response, run.Stdout + "
-" + run.Stderr, judgeResponse));
+                reason, response, run.Stdout + "\n" + run.Stderr, judgeResponse));
             await File.WriteAllTextAsync(Path.Combine(root, "report.json"),
                 JsonSerializer.Serialize(results, JsonOptions));
         }
 
         Assert.True(results.All(r => r.Passed),
             "Discovery live evaluation failed. See " + Path.Combine(root, "report.json") +
-            "
-" + string.Join("
-", results.Where(r => !r.Passed)
+            "\n" + string.Join("\n", results.Where(r => !r.Passed)
                 .Select(r => r.Id + ": " + r.Reason)));
     }
 
@@ -244,10 +229,7 @@ Assistant response:
         var run = await Run(app, args, cwd, env, null, timeout);
         if (run.ExitCode != 0 || run.Error is not null)
             throw new InvalidOperationException(app + " " + string.Join(" ", args) +
-                "
-" + run.Error + "
-" + run.Stderr + "
-" + run.Stdout);
+                "\n" + run.Error + "\n" + run.Stderr + "\n" + run.Stdout);
     }
 
     private static async Task<ProcessResult> Run(string app, IReadOnlyList<string> args,
