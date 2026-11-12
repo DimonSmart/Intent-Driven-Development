@@ -129,3 +129,33 @@ route + full workflow read. The harness saves JSONL events, but it does not
 invent actual prompt-token counts or reference-read traces when the host does
 not expose them. Consult `docs/routing-core-migration.md` for the baseline
 ownership map and explicitly unverified cases.
+
+## Opt-in Clarify / Brainstorm behavioral evaluations
+
+The discovery suite contains five Clarify scenarios (C1–C5) and eight Brainstorm
+scenarios (B1–B8) in Scenarios/discovery-cases.json. A dedicated opt-in live
+test invokes the **generated and installed Codex skills** in isolated read-only
+workspaces, checks for unauthorized file mutations, and asks a separate
+semantic judge to evaluate the requested problem coverage, meaningful idea
+diversity, assumptions, counterarguments, user confirmation and handoff
+boundaries. Judges assess substance, not fixed words, headings or quotas.
+
+These live tests are **not** executed in ordinary CI or standard dotnet test
+runs: they consume model tokens, require local dotnet, Codex CLI and working
+credentials, and are nondeterministic. Full runs have not been executed through
+the GitHub connector; run in an authenticated environment for behavioral
+acceptance:
+
+```powershell
+$env:IDD_RUN_LIVE_DISCOVERY_EVALS = "1"
+dotnet test tests/Idd.Intent.LiveTests/Idd.Intent.LiveTests.csproj --filter "Category=LiveDiscoveryEval"
+```
+
+Options: IDD_DISCOVERY_EVAL_CASE_IDS=C1,B1 for a focused run;
+IDD_DISCOVERY_EVAL_MAX_CASES=2 for initial smoke;
+IDD_DISCOVERY_EVAL_MODEL, IDD_DISCOVERY_EVAL_REASONING,
+IDD_DISCOVERY_EVAL_TIMEOUT_MINUTES, IDD_DISCOVERY_EVAL_OUTPUT_DIR,
+IDD_DISCOVERY_EVAL_CODEX and IDD_DISCOVERY_EVAL_SKIP_JUDGE=1 for manual review.
+Raw responses, event logs and semantic verdicts are written to report.json
+under the specified output directory. Failed evaluations must be inspected and
+fixed rather than weakening the rubric.
