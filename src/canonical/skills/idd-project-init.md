@@ -267,7 +267,7 @@ Do not offer bootstrap when:
 - the repository is empty or represents a new product;
 - current numbered intent already exists;
 - the user explicitly requested initialization only;
-- the user already chose `idd-intent-import`, `idd-intent-brainstorm`, or another
+- the user already chose `idd-intent-import`, `idd-intent-clarify`, `idd-intent-brainstorm`, or another
   explicit initial-intent workflow;
 - bootstrap was already offered and declined during the current initialization.
 

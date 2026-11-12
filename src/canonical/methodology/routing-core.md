@@ -132,7 +132,7 @@ enforceable constraint, lacks sufficient normative meaning. Do not supply missin
 defaults or acceptance decisions on the user's behalf. In a mixed Product +
 Engineering + implementation request, assess **both** durable owners: if either
 has an unresolved material decision, use `Clarity: ambiguous` and
-`idd-intent-brainstorm` before starting durable mutations. The complete
+`idd-intent-clarify` before starting durable mutations. The complete
 workflow still retains both owners and implementation after confirmation.
 Conversely, an explicit observable contract such as "users can export the
 report as CSV" may be `clear` without prescribing implementation details.
@@ -141,13 +141,13 @@ For an Engineering-only request with a named but underspecified constraint
 (e.g., "make logging stricter"), retain `Classification: engineering-change`
 and `Clarity: ambiguous`, but select its semantic owner `idd-engineering-change`.
 That skill must identify the missing enforceable decision and return `ambiguous`
-before any mutation; `idd-intent-brainstorm` clarifies *Product Intent*, not
+before any mutation; `idd-intent-clarify` clarifies *Product Intent*, not
 standalone Engineering policy. Do not silently invent an Engineering Rule.
 
 For mixed Product + Engineering + implementation work, when a new Product
 capability is identifiable, keep `Classification: product-change` even if its
 behavior or the separate Engineering decision is underspecified. In that
-case, `Clarity: ambiguous` and `Recommended first skill: idd-intent-brainstorm`
+case, `Clarity: ambiguous` and `Recommended first skill: idd-intent-clarify`
 establish the Product clarity gate; the complete workflow retains the
 Engineering owner and authorized implementation.
 
@@ -158,9 +158,20 @@ Distinguish an **identified change with missing details** from an
 identifies no specific feature, behavior, contract, or add/modify/remove
 operation: `Classification: unclear`, `Operation: not-applicable`,
 `Clarity: ambiguous`, `Execution depth: not-applicable`, and first
-`idd-intent-brainstorm`. Do not guess a `modify` operation from a vague
+`idd-intent-brainstorm` for open-ended opportunity discovery. Do not guess a `modify` operation from a vague
 desire to improve the product. Discovery must stop at the missing Product
 decision, not assume that implementation is already actionable.
+
+### Clarification versus exploratory brainstorming
+
+Choose by **semantic intent** and the user-selected research goal:
+- A named feature with missing observable behavior, a proposed implementation without a known user need, or possible excessive complexity goes to idd-intent-clarify. Mixed Product + Engineering + code ambiguity keeps the Product Clarify gate and every later owner.
+- Explicit product alternatives, novel opportunities, a broad "what else could we do?" search or a request to challenge the original premise goes to idd-intent-brainstorm. The agent may continue without selecting a winner.
+- The words plugin, AI, configurable, engine or framework are not sufficient to trigger Brainstorm; neither Clarify nor Brainstorm is mandatory for already clear, approved changes.
+- A screenshot with unsettled visual traits goes to idd-intent-visual-brainstorm. If a screenshot is merely context for explicitly broad *product* alternatives, prefer idd-intent-brainstorm.
+- Direct invocation of either skill follows the existing named-skill priority and bypasses ordinary routing, without bypassing the skill's read-only gates.
+
+For standalone open-ended exploration without an identifiable operation, use Classification: unclear, Operation: not-applicable, Clarity: ambiguous, Execution depth: not-applicable and Requested scope: intent-only. This describes read-only discovery, not authority to persist any findings. Select idd-intent-brainstorm as the first skill and caller-owned handoff when authorized. For route advice only, preserve route-only and Current handoff: none. If the user explicitly wants Brainstorm *before* implementation, preserve the entire requested future lifecycle but stop before any normative change pending the needed confirmation. If an identifiable Product capability is being explored, keep product-change and its known operation while selecting Brainstorm first.
 
 ### Requested Scope
 
@@ -317,7 +328,7 @@ for standalone Factory model-policy routing (no invented placeholders).
   scope or strictness must first use read-only
   `idd-intent-visual-brainstorm` to establish Essential/Preferred/Free/Avoid
   traits and exceptions, then **stop**. This specialized gate **takes
-  precedence** over generic `idd-intent-brainstorm` when the specific
+  precedence** over generic `idd-intent-clarify` when the specific
   outstanding question is which traits of a visual reference to preserve,
   including a request to add a new page using a screenshot as inspiration.
   The generic Product brainstorm applies to unresolved product goals or
@@ -442,7 +453,7 @@ the generic `product-change` entry does **not** override the mandatory
 | `intent-drift-audit` | `idd-intent-drift-audit` |
 | `implementation-to-intent` | `idd-code-update-intent` |
 | `explicit-skip` | `idd-skip` |
-| `unclear` | `idd-intent-brainstorm` or a spike handoff |
+| `unclear` | `idd-intent-brainstorm` for open-ended product opportunities; `idd-intent-clarify` for a concrete unclear requirement; or focused technical research |
 
 Never select `idd-skip` automatically. Use it only when the user explicitly
 refuses IDD for the request.
@@ -459,7 +470,7 @@ remain in the detailed workflow sections indexed below.
 | `verification-configuration` | `idd-verification-configure` review/edit/no-op; no test execution implied. |
 | `intent-bootstrap` | `idd-project-init` if needed -> `idd-intent-bootstrap` discovery -> explicit boundary and semantic approval -> write current Intent -> `idd-intent-lint`; optional later scoped drift audit. Block before unapproved writes. |
 | `intent-import` | After verifying supplied sources: `idd-project-init` if needed -> `idd-intent-import` inventories and classifies existing Product / explicit Engineering knowledge -> identifies conflict/owner gates before mutations -> applies only safe changes -> directly performs Mechanical Intent Validation and, when applicable, Mechanical Engineering Validation -> reports blocked decisions and validation. No reverse-discovery or separate mandatory `idd-intent-lint` invocation. |
-| `product-change` | Clarity/visual discovery if needed -> `idd-intent-change` (add/modify/remove) -> `idd-code-implement` or optional Factory when implementation authorized -> focused `idd-intent-drift-audit`. Stop before code for `intent-only`. |
+| `product-change` | Clarify / explicitly requested Brainstorm / visual discovery if needed -> `idd-intent-change` (add/modify/remove) -> `idd-code-implement` or optional Factory when implementation authorized -> focused `idd-intent-drift-audit`. Stop before code for `intent-only`. |
 | `engineering-change` | `idd-engineering-change` -> direct Mechanical Engineering Validation; implementation/checks only if independently requested. Active Factory blocks Engineering mutation. |
 | `implementation-change` | `idd-code-implement` preserving current Intent, or optional `idd-factory-run` for orchestrated execution -> verification -> applicable scoped conformance. Stop at missing durable decision/approved preservation boundary. |
 | `intent-normalization` | Optional structure audit -> targeted `idd-intent-normalize-current` proposal/confirmation/apply -> `idd-intent-lint`; preserve Product meaning. |
@@ -468,12 +479,12 @@ remain in the detailed workflow sections indexed below.
 | `intent-drift-audit` | `idd-intent-drift-audit` read-only with explicit focused or project-wide scope; no automatic implementation. |
 | `implementation-to-intent` | `idd-code-update-intent` only for user-confirmed behavior, with owner's semantic checks; code alone is not authority. |
 | `explicit-skip` | No automatic route or handoff. Only direct explicit `idd-skip` invocation bypasses IDD. |
-| `unclear` | `idd-intent-brainstorm` or focused spike/research; stop at unresolved owner decision. |
+| `unclear` | `idd-intent-brainstorm` for broad directions, `idd-intent-clarify` for specific requirements, or a focused spike; stop before any normative mutation. |
 
 Mixed Product + Engineering + implementation requests keep *both* durable
 owners before implementation and normally have `Execution depth: orchestrated`
 because their distinct semantic owners and approval gates must be sequenced.
-If the decisions are underspecified, route first to `idd-intent-brainstorm`
+If the decisions are underspecified, route first to `idd-intent-clarify`
 as a clarity gate, **without** discarding the Engineering owner or later code
 stages. Mixed Factory model-policy + code requests keep
 the separate `idd-factory-configure` stage and the implementation stages.

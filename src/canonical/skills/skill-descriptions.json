@@ -103,8 +103,12 @@
       "shortDescription": "Perform a request without IDD routing"
     }
   },
+  "idd-intent-clarify": {
+    "description": "Resolve ambiguity, disproportionate complexity and missing user-facing behavior in a proposed Product requirement with focused read-only discovery; propose confirmed or unconfirmed clarified intent without file edits or automatic handoff.",
+    "exposure": "workflow"
+  },
   "idd-intent-brainstorm": {
-    "description": "Clarify real product intent before changing `.idd/intent/`, using focused customer-development questions and simplification options without editing product intent, planning implementation, or writing code.",
+    "description": "Explore alternative Product directions and substantially different ideas, challenge assumptions using bounded read-only research, and propose optional user-confirmed handoffs without editing Product Intent or code.",
     "exposure": "workflow"
   },
   "idd-intent-change": {

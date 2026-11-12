@@ -12,6 +12,7 @@
         "idd-glossary-build",
         "idd-skip",
         "idd-intent-structure-audit",
+        "idd-intent-clarify",
         "idd-intent-brainstorm",
         "idd-intent-visual-brainstorm",
         "idd-intent-change",
@@ -175,6 +176,11 @@
           "skill": "idd-intent-visual-brainstorm",
           "source": "src/canonical/methodology/visual-card-library.md",
           "destination": "visual-card-library.md"
+        },
+        {
+          "skill": "idd-intent-brainstorm",
+          "source": "src/canonical/methodology/brainstorm-method.md",
+          "destination": "brainstorm-method.md"
         }
       ],
       "assets": [

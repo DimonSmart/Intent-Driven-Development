@@ -103,6 +103,9 @@ inconsistent field **before** producing the final Markdown:
   `engineering-change` and an `unclear` Product discovery gate.
 - A desired Product improvement without an identifiable behavior/capability
   uses `unclear`, not an invented `product-change` / `modify`.
+- Choose `idd-intent-clarify` for an ambiguous specific requirement and
+  `idd-intent-brainstorm` for explicitly divergent or open-ended product discovery;
+  do not require Brainstorm for clear Product decisions.
 - A question only about the manual optional glossary workflow recommends
   `idd-glossary-build` with `Classification: unknown` and
   `Current handoff: none`, never an invented classification.
