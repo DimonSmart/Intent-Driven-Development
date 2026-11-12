@@ -62,7 +62,7 @@ Ask in ordinary language:
 Help me clarify the first useful version of this product without editing files.
 ```
 
-Provide the informal vision from step 1. The brainstorming workflow should focus on product meaning, boundaries, trade-offs, and missing decisions—not implementation planning.
+Provide the informal vision from step 1. The optional `idd-intent-clarify` workflow focuses on product meaning, boundaries, justified simplification and missing decisions, not implementation planning. If you instead want to invent multiple different directions, ask for `idd-intent-brainstorm`; it stays read-only until a product direction is explicitly confirmed.
 
 ## 6. Record Current Product Intent
 

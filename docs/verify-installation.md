@@ -38,6 +38,10 @@ is required to claim live behavior; a generated file or `task_name` is not
 proof. Older custom-agent TOML files do not need to be removed.
 See [Factory installation](factory-native-agent-installation.md).
 
+## Verify Clarify and Brainstorm
+
+Inspect the installed `idd-intent` plugin and confirm that both `skills/idd-intent-clarify/SKILL.md` and `skills/idd-intent-brainstorm/SKILL.md` exist. The latter must also contain `references/brainstorm-method.md` on Codex and Claude Code. These are optional read-only automatic workflows, not additional marketplace plugins. In a fresh session, ask the agent to classify a narrow ambiguous Product requirement (Clarify) and a request for fundamentally different product strategies (Brainstorm), without execution. Clear approved requirements should still route directly to `idd-intent-change`.
+
 ## Verify Repository Initialization
 
 After running:

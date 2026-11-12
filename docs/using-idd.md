@@ -52,7 +52,8 @@ are references belonging to other skills, not standalone commands.
 | Project terminology is genuinely ambiguous or project-specific | Explicitly run `idd-glossary-build` to create or update the optional glossary. |
 | You need to confirm that IDD is installed and initialized correctly | Follow [Verify Installation](verify-installation.md). |
 | You are starting from an idea | Run `idd-project-init`, then ask to clarify the first product behavior. |
-| The requested feature is still unclear | Ask for product clarification without changing intent or code. |
+| The requested feature is still unclear | Ask for `idd-intent-clarify` without changing intent or code. |
+| You want fundamentally different ideas or opportunities | Ask for `idd-intent-brainstorm` to investigate and challenge alternatives, without writing Intent. |
 | Product behavior must be added, changed, or removed | Describe the new behavior and ask to update Product Intent before implementation. |
 | Current intent is already correct and only code must change | Ask to implement the already-confirmed behavior without changing Product Intent. |
 | You need to check whether code still matches intent | Ask to audit implementation conformance with an explicit focused or project-wide scope. |
@@ -189,7 +190,17 @@ Use when product behavior, boundaries, constraints, or expected outcomes are not
 Clarify this feature before changing product intent or code.
 ```
 
-The result should clarify product meaning rather than produce an implementation plan.
+The result should clarify product meaning rather than produce an implementation plan. Use `idd-intent-clarify` when a concrete proposed requirement needs clarification. It asks only essential questions and may provide Specification-Ready Intent directly when enough is known.
+
+## Explore Alternative Product Directions
+
+Use `idd-intent-brainstorm` when you want fundamentally different approaches rather than a shorter version of the same idea:
+
+```text
+Brainstorm different ways to make archives convenient in a file manager, including unconventional approaches. Investigate and challenge the options; do not edit files or choose for me.
+```
+
+Brainstorm can inspect relevant project context and, when tools are available, external analogs. Its Decision Brief is temporary, not a new `.idd/intent/` record. The user may continue exploring, select a direction for Clarify, or explicitly approve enough behavior for `idd-intent-change`. Neither skill is a mandatory precursor to a clear, confirmed Product change. In Claude Code describe the workflow naturally (automatic workflows are not slash commands); in Codex you can also choose the installed skill by ID.
 
 ## Add, Change, or Remove Product Behavior
 

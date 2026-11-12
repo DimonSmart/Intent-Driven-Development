@@ -61,6 +61,15 @@ The direction is maximum economy: native child agents, no model-driven polling, 
 
 </details>
 
+## Clarification versus Brainstorm
+
+Two optional, read-only Product exploration workflows have different purposes:
+
+- `idd-intent-clarify` narrows one proposed Product requirement, resolves missing behavior and justified complexity, and prepares an explicit confirmation or an already-confirmed specification-ready handoff.
+- `idd-intent-brainstorm` explores substantially different strategies and challenges assumptions; it may produce a temporary Decision Brief without selecting a single winner.
+
+Ask naturally to **clarify this requirement**, or to **brainstorm alternative ways to solve this problem**. In Codex the installed `idd-intent` plugin also exposes the skill by its ID; Claude Code can select it automatically through natural language rather than a slash command. Neither skill writes Product Intent, and neither is mandatory before a clear user-confirmed `idd-intent-change`. Only explicitly approved Product decisions may be handed to that owner. Exploratory hypotheses and discussions are not persisted in `.idd/intent/`.
+
 ## Visual Intent discovery
 
 `idd-intent-visual-brainstorm` helps turn screenshots, visual inspiration and

@@ -1,3 +1,13 @@
+## 2026-11-12 — Product Clarify and Brainstorm are distinct (breaking behavior change)
+
+The previous `idd-intent-brainstorm` skill was a focused Product requirement clarification and simplification gate. That behavior is now `idd-intent-clarify`. The existing name `idd-intent-brainstorm` now denotes a new read-only research workflow that explores substantially different product approaches, challenges assumptions and optionally proposes a Decision Brief. There is **no legacy alias** for the previous semantics.
+
+Ambiguous concrete Product requirements (including mixed Product/Engineering/implementation requests) now route to Clarify; explicitly divergent product ideation routes to Brainstorm. Neither is required for clear already-approved Intent, and Visual Brainstorm remains specialized. Both skills ship inside the same `idd-intent` plugin. No new runtime dependency, Factory stage, routing enum or project-owned state format is introduced.
+
+Update/reinstall `idd-intent` and start a **new Codex or Claude Code session**. If scripts or personal prompts used `/idd-intent-brainstorm` for focused requirement clarification, change them to request `idd-intent-clarify` instead. Claude Code hides automatic workflow slash commands; describe the intent naturally. Codex may expose either workflow as a selectable skill. No user repository or existing `.idd/intent/` documents are migrated or changed automatically. Exploratory findings do not become normative Product Intent without user approval.
+
+Live agent quality evaluations require an authenticated Codex CLI and are opt-in; generation/structural tests run ordinarily.
+
 ## 2026-11-11 — Factory internal Skills replace registered native roles
 
 Factory now packages `idd-internal-factory-planner` and

@@ -67,6 +67,10 @@ setting is available. To inspect a route, ask in natural language for a
 classification without execution. The five manual-only Intent commands are
 unchanged.
 
+## Clarify and Brainstorm semantics after an update
+
+After updating `idd-intent`, check that `idd-intent-clarify` and the new `idd-intent-brainstorm` are both installed in a newly started session. Previous instructions that called Brainstorm for narrowing an unclear requirement should now use Clarify; explicit exploration still uses Brainstorm. No permanent alias exists and no `.idd/intent/` migration is needed. See [Updates and Breaking Changes](updates-and-breaking-changes.md).
+
 ## Obsolete Factory commands after an update
 
 Starting with the unified model-management interface, use
