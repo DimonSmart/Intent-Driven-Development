@@ -452,7 +452,7 @@ public sealed class RouteRoutingLiveTests
                 "intent-bootstrap", "intent-import", "product-change",
                 "engineering-change", "implementation-change",
                 "intent-normalization", "intent-structure-audit", "intent-lint",
-                "intent-drift-audit", "implementation-to-intent",
+                "intent-drift-audit", "intent-estimation", "implementation-to-intent",
                 "explicit-skip", "unclear", "unknown"
             ]),
             ("Operation", ["add", "modify", "remove", "not-applicable"]),

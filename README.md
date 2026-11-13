@@ -70,6 +70,26 @@ Two optional, read-only Product exploration workflows have different purposes:
 
 Ask naturally to **clarify this requirement**, or to **brainstorm alternative ways to solve this problem**. In Codex the installed `idd-intent` plugin also exposes the skill by its ID; Claude Code can select it automatically through natural language rather than a slash command. Neither skill writes Product Intent, and neither is mandatory before a clear user-confirmed `idd-intent-change`. Only explicitly approved Product decisions may be handed to that owner. Exploratory hypotheses and discussions are not persisted in `.idd/intent/`.
 
+## Business Complexity Assessment
+
+`idd-intent-estimate` assesses the **required target product** from current
+`.idd/intent/` specifications, including projects with no code. Its read-only
+Markdown report distinguishes **Product Scope** (Small/Medium/Large),
+**Implementation Complexity** (Low/Medium/High), and **Assessment Confidence**
+(Low/Medium/High), plus seven qualitative complexity dimensions. A preliminary
+**COSMIC Preparation** section identifies possible future measurement boundaries
+and functional-process candidates without calculating CFP. It does **not**
+predict budget, deadlines, effort, remaining work, or code quality.
+
+Ask naturally to *assess business complexity from current Product Intent* or
+invoke `/idd-intent-estimate` in Claude Code and select the installed
+`$idd-intent-estimate` skill in Codex. Both explicit and automatic invocation
+are supported; the command's visibility depends on the host/version. Scope can
+be limited to a product area or specific IDD IDs. No Factory plugin is required.
+
+See [Business Complexity Assessment](docs/business-complexity-assessment.md)
+for report interpretation, COSMIC boundaries, examples and limitations.
+
 ## Visual Intent discovery
 
 `idd-intent-visual-brainstorm` helps turn screenshots, visual inspiration and
@@ -192,6 +212,7 @@ Release-specific migration instructions are maintained on the dedicated [Updates
 
 ## Documentation
 
+- [Business Complexity Assessment](docs/business-complexity-assessment.md)
 - [Real-world IDD Showcase](docs/real-world-showcase.md)
 - [IDD Use Cases](docs/using-idd.md)
 - [Engineering Guardrails](docs/engineering-guardrails.md)

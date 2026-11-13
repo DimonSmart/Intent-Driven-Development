@@ -28,9 +28,10 @@ Engineering boundary and rule format.
 
 ## Selecting a workflow
 
-The five explicit IDD Intent commands are `idd-help`, `idd-project-init`,
+Five IDD Intent commands are **manual-only**: `idd-help`, `idd-project-init`,
 `idd-verification-configure`, `idd-glossary-build`, and `idd-skip`.
-Each is manual-only: routing may recommend it but cannot invoke it automatically.
+The additional `idd-intent-estimate` command supports **both explicit invocation
+and automatic selection** for read-only Business Complexity Assessment.
 The optional Factory plugin exposes `idd-factory-run` and `idd-factory-configure`.
 Other registered workflows, including the read-only `idd-route` router, are
 automatically selected from natural-language requests. In Claude Code these
@@ -56,12 +57,35 @@ are references belonging to other skills, not standalone commands.
 | You want fundamentally different ideas or opportunities | Ask for `idd-intent-brainstorm` to investigate and challenge alternatives, without writing Intent. |
 | Product behavior must be added, changed, or removed | Describe the new behavior and ask to update Product Intent before implementation. |
 | Current intent is already correct and only code must change | Ask to implement the already-confirmed behavior without changing Product Intent. |
+| You need to assess target-product complexity from current Product Intent | Use `idd-intent-estimate`, optionally scoped to an area; it reads Intent only and never changes files. |
 | You need to check whether code still matches intent | Ask to audit implementation conformance with an explicit focused or project-wide scope. |
 | Existing behavior has been confirmed as product truth but is missing from established intent | Ask to record the confirmed existing behavior in current Product Intent. |
 | Intent documents need semantic structure/ownership review | Ask for a semantic structure audit, a mechanical validity check, or focused normalization, as appropriate. |
 | The implementation task is large or naturally multi-stage | Install `idd-factory` and use `idd-factory-run`. |
 | A new IDD release is available | Follow [Updating IDD](updating-idd.md), then start a new session. |
 | The request must deliberately bypass IDD | Use `idd-skip`. |
+
+## Estimate Business Complexity from Intent
+
+Use `/idd-intent-estimate` in Claude Code or choose the installed
+`$idd-intent-estimate` skill in Codex. You can also ask *Assess the business
+complexity of the current product based on its Intent*, or specify an area
+(e.g. `IDD-0003`). This is a read-only `idd-intent` capability, not part of
+Factory or an obligatory development stage.
+
+The report distinguishes **functional scale**, **implementation difficulty**
+and **confidence in the evidence**, using seven qualitative dimensions.
+Unknown requirements are **Unknown**, not assumed Low. COSMIC Preparation lists
+possible functional-process candidates and boundary questions; it **does not
+calculate CFP**. Complexity does **not** predict effort, cost, deadlines, code
+quality or work completed. No implementation is needed. Read the
+[Business Complexity Assessment guide](business-complexity-assessment.md)
+for examples and interpretation.
+
+Structure audit evaluates how current Intent is organized; drift audit tests
+implementation conformance; Clarify resolves one ambiguous requirement;
+`idd-intent-estimate` analyzes target-product difficulty **without** reviewing
+code or rewriting requirements.
 
 ## Audit Existing Intent and Implementation
 

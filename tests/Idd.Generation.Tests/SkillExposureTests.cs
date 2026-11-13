@@ -11,7 +11,8 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
     private static readonly HashSet<string> Commands = new(StringComparer.Ordinal)
     {
         "idd-help", "idd-project-init", "idd-verification-configure",
-        "idd-glossary-build", "idd-skip", "idd-factory-run", "idd-factory-configure"
+        "idd-glossary-build", "idd-skip", "idd-factory-run", "idd-factory-configure",
+        "idd-intent-estimate"
     };
 
     private static readonly HashSet<string> Manual = new(StringComparer.Ordinal)
@@ -23,7 +24,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
     private static readonly HashSet<string> ClaudeForked = new(StringComparer.Ordinal)
     {
         "idd-help", "idd-route", "idd-intent-structure-audit",
-        "idd-intent-drift-audit", "idd-intent-lint"
+        "idd-intent-drift-audit", "idd-intent-lint", "idd-intent-estimate"
     };
 
     [Fact]
@@ -32,11 +33,11 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
         var inventory = new SkillDescriptionReader().Read(
             Path.Combine(fixture.RepoRoot, "src", "canonical", "skills", "skill-descriptions.json"),
             new HashSet<string>(StringComparer.Ordinal) { "claude", "codex" });
-        Assert.Equal(23, inventory.Count);
-        Assert.Equal(7, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Command));
+        Assert.Equal(24, inventory.Count);
+        Assert.Equal(8, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Command));
         Assert.Equal(14, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Workflow));
         Assert.Equal(5, inventory.Count(skill => skill.Value.Invocation == SkillInvocation.Manual));
-        Assert.Equal(18, inventory.Count(skill => skill.Value.Invocation == SkillInvocation.Auto));
+        Assert.Equal(19, inventory.Count(skill => skill.Value.Invocation == SkillInvocation.Auto));
         Assert.Equal(2, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Internal));
 
         using var manifest = JsonDocument.Parse(fixture.ReadText(Path.Combine(fixture.RepoRoot,
@@ -78,6 +79,12 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
                         {
                             AssertScalar(yaml, "allowed-tools", "Read Glob Grep");
                             AssertScalar(yaml, "argument-hint", "[request or workflow question]");
+                        }
+                        if (name == "idd-intent-estimate")
+                        {
+                            AssertScalar(yaml, "allowed-tools", "Read Glob Grep");
+                            AssertScalar(yaml, "argument-hint",
+                                "[product area or IDD-NNNN IDs; default: available current intent]");
                         }
                         AssertScalar(yaml, "background", "false");
                         var background = Assert.IsType<YamlScalarNode>(yaml.Children[new YamlScalarNode("background")]);
@@ -127,7 +134,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
         foreach (var platform in new[] { "claude", "codex" })
         {
             var root = Path.Combine(fixture.MarketplaceRoot, "plugins", platform);
-            Assert.Equal(19, Directory.GetDirectories(Path.Combine(root, "idd-intent", "skills")).Length);
+            Assert.Equal(20, Directory.GetDirectories(Path.Combine(root, "idd-intent", "skills")).Length);
             Assert.Equal(4, Directory.GetDirectories(Path.Combine(root, "idd-factory", "skills")).Length);
         }
     }

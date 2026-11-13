@@ -98,6 +98,11 @@ inconsistent field **before** producing the final Markdown:
 - `Classification` is an exact Core classification token, never a skill name
   or a shortened variant such as `intent-change`. `Operation` is
   `not-applicable` except for `product-change` and `engineering-change`.
+- `intent-estimation` uses exactly `idd-intent-estimate`, with `Operation`,
+  `Execution depth` and `Audit scope: not-applicable`; `end-to-end` means
+  the complete **read-only assessment**, `route-only` only advice. Preserve
+  the requested product area/IDs and its dependencies in the handoff.
+  Neither code complexity nor implementation-drift requests are estimates.
 - `intent-import` and `intent-bootstrap` have
   `Execution depth: not-applicable`; so does policy-only
   `engineering-change` and an `unclear` Product discovery gate.

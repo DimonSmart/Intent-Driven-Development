@@ -67,7 +67,7 @@ read-only, and scoped reporting) require further isolated live evaluations.
 `IDD_RUN_LIVE_INTENT_EVALS=1`, ordinary `dotnet test`, or
 `scripts/Check.ps1 -Mode Live` (the latter runs Factory evaluations).
 
-The scenarios live in `Scenarios/route-cases.json` (42 cases). They check
+The scenarios live in `Scenarios/route-cases.json` (46 cases). They check
 typed classification, scope, clarity, execution depth and handoff fields plus
 unchanged workspace snapshots. The import suite has both a deliberately
 missing-source blocker and a scenario with an actual supplied source.
@@ -159,3 +159,44 @@ IDD_DISCOVERY_EVAL_CODEX and IDD_DISCOVERY_EVAL_SKIP_JUDGE=1 for manual review.
 Raw responses, event logs and semantic verdicts are written to report.json
 under the specified output directory. Failed evaluations must be inspected and
 fixed rather than weakening the rubric.
+
+
+## Opt-in Business Complexity Assessment evaluation
+
+BusinessComplexityLiveTests exercises the **idd-intent-estimate** skill in
+**21 version-controlled scenarios** in Scenarios/estimate-cases.json: 20
+synthetic cases (including pre-code-only intent, bounded CRUD, difficult
+algorithms, integrations, duplicate requirements, spikes, partial/missing
+coverage, conflicts, ambiguous COSMIC boundaries, and embedded untrusted
+instructions), plus one scenario using this repository's **current**
+.idd/intent/ documents.
+
+It builds the generator, installs the generated **idd-intent** plugin into
+an isolated Codex home, seeds disposable workspaces, invokes the skill
+**explicitly** in a read-only sandbox, and checks that no workspace file
+changed. By default it uses a separate Codex semantic judge against
+the case-specific qualitative expectations, with response/traces/verdicts
+saved in report.json. This checks behavior, not merely wording in SKILL.md.
+
+**Not part of ordinary CI.** To run on an authenticated Codex installation
+(requires tokens and network):
+
+    $env:IDD_RUN_LIVE_ESTIMATE_EVALS = "1"
+    $env:IDD_ESTIMATE_EVAL_CASE_IDS = "P01-pre-code,P03-algorithm,P21-self-IDD"
+    dotnet test tests/Idd.Intent.LiveTests/Idd.Intent.LiveTests.csproj --filter "Category=LiveEstimateEval"
+
+Remove the CASE_IDS variable to execute all 21. Other overrides:
+IDD_ESTIMATE_EVAL_CODEX, IDD_ESTIMATE_EVAL_MODEL (default gpt-6),
+IDD_ESTIMATE_EVAL_REASONING (medium), IDD_ESTIMATE_EVAL_MAX_CASES,
+IDD_ESTIMATE_EVAL_TIMEOUT_MINUTES (15), IDD_ESTIMATE_EVAL_OUTPUT_DIR,
+and IDD_ESTIMATE_EVAL_SKIP_JUDGE=1 (skip semantic judging, **not** evidence
+of semantic success). The JSON report identifies selected case IDs, model,
+source revision, host, result and errors. Inspect recorded claims/citations
+manually when a conclusion depends on nuanced source content.
+
+Claude Code live execution and host-level natural-language auto-invocation
+are **not evaluated** by this Codex-only suite; route-cases.json covers
+routing decisions separately, and the ordinary generation tests verify
+Claude/Codex package metadata. Run a manual Claude smoke on a disposable
+project with only current specs; do not report success until it is actually
+observed. Host unavailability is **not evaluated**, not "pass".

@@ -12,6 +12,7 @@
         "idd-glossary-build",
         "idd-skip",
         "idd-intent-structure-audit",
+        "idd-intent-estimate",
         "idd-intent-clarify",
         "idd-intent-brainstorm",
         "idd-intent-visual-brainstorm",

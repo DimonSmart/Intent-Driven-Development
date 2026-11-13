@@ -802,6 +802,69 @@
       },
       "contract": "Route-only never authorizes discovery",
       "kind": "ordinary"
+    },
+    {
+      "id": "estimate-all",
+      "request": "Assess the business complexity of this product from current .idd/intent specifications. Do not inspect the implementation.",
+      "expected": {
+        "classification": "intent-estimation",
+        "operation": null,
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-estimate",
+        "auditScope": null,
+        "standaloneFactory": false,
+        "clarity": "clear",
+        "executionDepth": "not-applicable"
+      },
+      "contract": "Read-only assessment, not change or drift audit",
+      "kind": "ordinary"
+    },
+    {
+      "id": "estimate-area",
+      "request": "Estimate business complexity only for the authentication area described by IDD-0007, using current Intent and related dependencies.",
+      "expected": {
+        "classification": "intent-estimation",
+        "operation": null,
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-estimate",
+        "auditScope": null,
+        "standaloneFactory": false,
+        "clarity": "clear",
+        "executionDepth": "not-applicable"
+      },
+      "contract": "Selected area preserved in original handoff",
+      "kind": "ordinary"
+    },
+    {
+      "id": "estimate-route-only",
+      "request": "Which IDD skill can evaluate business complexity from current Product Intent? Only tell me which one, do not execute the assessment.",
+      "expected": {
+        "classification": "intent-estimation",
+        "operation": null,
+        "requestedScope": "route-only",
+        "firstSkill": "idd-intent-estimate",
+        "auditScope": null,
+        "standaloneFactory": false,
+        "clarity": "clear",
+        "executionDepth": "not-applicable",
+        "currentHandoff": "none"
+      },
+      "contract": "Advice only; no execution",
+      "kind": "ordinary"
+    },
+    {
+      "id": "code-complexity-other",
+      "request": "Analyze cyclomatic complexity of my C# backend implementation, not its Product Intent.",
+      "expected": {
+        "classification": "unclear",
+        "operation": null,
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-brainstorm",
+        "auditScope": null,
+        "standaloneFactory": false
+      },
+      "contract": "Source code complexity must not route to Intent estimator",
+      "kind": "manual-review"
     }
   ]
 }

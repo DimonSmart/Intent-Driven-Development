@@ -94,6 +94,26 @@
     },
     "exposure": "workflow"
   },
+  "idd-intent-estimate": {
+    "description": "Assess qualitative business complexity from current Product Intent without code inspection or file changes.",
+    "invocation": "auto",
+    "exposure": "command",
+    "interface": {
+      "displayName": "IDD Complexity Assessment",
+      "shortDescription": "Assess business complexity from Product Intent"
+    },
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "background": false,
+          "argument-hint": "[product area or IDD-NNNN IDs; default: available current intent]",
+          "allowed-tools": "Read Glob Grep"
+        }
+      }
+    }
+  },
   "idd-skip": {
     "description": "Manual-only command. Perform the current request without applying Intent-Driven Development routing or updating durable intent.",
     "invocation": "manual",

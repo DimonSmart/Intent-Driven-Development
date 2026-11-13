@@ -47,6 +47,10 @@ Standalone Factory model-policy requests select their skill directly:
   cross-referenced without changing product meaning.
 - `implementation versus intent`: observed behavior may not match current
   intent.
+- `intent-estimation`: requested qualitative business complexity of the target
+  product **from current Product Intent**, independent of whether code exists.
+  This is read-only analysis, not conformance, content normalization, or effort
+  forecasting.
 - `initial product truth discovery`: an existing implementation lacks an
   adequate current intent model and needs interactive discovery and owner
   confirmation.
@@ -197,9 +201,10 @@ Distinguish three different instructions:
   modify files while classifying**: these govern this read-only router's
   behavior and output. They do **not** reduce the original task's requested
   scope to `route-only` or suppress an otherwise authorized handoff.
-- A user requests **read-only work** (audit, lint check, review) rather than
-  route advice: route to the appropriate read-only skill; ordinarily
-  `end-to-end` means completing that read-only task, not writing files.
+- A user requests **read-only work** (audit, lint check, review, or business
+  complexity estimation from Intent) rather than route advice: route to the
+  appropriate read-only skill; `end-to-end` means completing **only that read-only
+  task**, not writing files.
   "Do not change files" alone is not "only tell me the route".
 
 For a request limited to creating, importing, changing or normalizing **IDD
@@ -312,6 +317,17 @@ for standalone Factory model-policy routing (no invented placeholders).
   `idd-intent-change` or an ambiguity gate. A durable Engineering rule must
   be an explicit authorized decision; recurring code patterns are evidence,
   not authority.
+- `intent-estimation` is a qualitative complexity assessment of the target
+  Product Intent, optionally limited to a named area/IDD-NNNN. It is not a
+  source-code complexity assessment, implementation-vs-intent drift audit,
+  intent structure audit, Product change, Simplification/Brainstorm or an
+  automatic stage of implementation/Factory. Scope is `end-to-end` when the
+  user requests the actual **read-only report**; `route-only` if they ask
+  only which skill to use. Set `Operation`, `Execution depth`, `Audit scope` to
+  `not-applicable`, and `Clarity: clear` if assessment scope is identifiable.
+  Pass the exact requested area and constraints; never generalize a selected
+  area to whole-product scope. A generic 'estimate' or 'assess code complexity'
+  does not itself select this classification.
 - `intent-lint` is `mode: check` unless unambiguous **mechanical** repair
   is expressly allowed, then `mode: fix`. Changing the lint skill's code is
   `implementation-change`. Semantic duplicates and ownership are
@@ -449,6 +465,7 @@ the generic `product-change` entry does **not** override the mandatory
 | `implementation-change` | `idd-code-implement` or Factory |
 | `intent-normalization` | `idd-intent-normalize-current` |
 | `intent-structure-audit` | `idd-intent-structure-audit` |
+| `intent-estimation` | `idd-intent-estimate` |
 | `intent-lint` | `idd-intent-lint` |
 | `intent-drift-audit` | `idd-intent-drift-audit` |
 | `implementation-to-intent` | `idd-code-update-intent` |
@@ -475,6 +492,7 @@ remain in the detailed workflow sections indexed below.
 | `implementation-change` | `idd-code-implement` preserving current Intent, or optional `idd-factory-run` for orchestrated execution -> verification -> applicable scoped conformance. Stop at missing durable decision/approved preservation boundary. |
 | `intent-normalization` | Optional structure audit -> targeted `idd-intent-normalize-current` proposal/confirmation/apply -> `idd-intent-lint`; preserve Product meaning. |
 | `intent-structure-audit` | `idd-intent-structure-audit` read-only; no automatic normalization. |
+| `intent-estimation` | `idd-intent-estimate` reads current Product Intent, assesses only the stated target product/area, returns an evidence-backed business report and preliminary COSMIC preparation; **read-only end-to-end**, no code review, Intent edits, Factory or follow-on implementation. `route-only` recommends without running it. |
 | `intent-lint` | `idd-intent-lint` check, or explicitly approved mechanical fix -> recheck; no semantic mutations. |
 | `intent-drift-audit` | `idd-intent-drift-audit` read-only with explicit focused or project-wide scope; no automatic implementation. |
 | `implementation-to-intent` | `idd-code-update-intent` only for user-confirmed behavior, with owner's semantic checks; code alone is not authority. |
