@@ -8,13 +8,14 @@ import { calculate, validate } from "../../src/canonical/methodology/cosmic-vali
 
 const srcPath = ".idd/intent/IDD-0001.spec-product.md";
 const text = "# Product\nThe user starts the function, the software moves required data and responds.\n";
-const evidence = [{ path: srcPath, quote: "The user starts the function" }];
+const baseEvidence = [{ path: srcPath, quote: "The user starts the function" }];
 const store = mkdtempSync(join(tmpdir(), "idd-cosmic-tests-"));
 mkdirSync(join(store, ".idd", "intent"), { recursive: true });
 writeFileSync(join(store, srcPath), text);
 test.after(() => rmSync(store, { recursive: true, force: true }));
 
 function model(spec = ["E", "W"], opts = {}) {
+  const evidence = structuredClone(baseEvidence);
   const users = opts.users ?? [{id:"User",kind:"human"}];
   const unit = { measurementUnitId:"U1", softwarePiece:"App", boundary:"App boundary",
     layer:"Application", decompositionLevel:"whole", furGranularity:"functional process",
