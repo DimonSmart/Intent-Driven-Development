@@ -126,4 +126,53 @@ public sealed class BusinessComplexityAssessmentContractTests(GenerationFixture 
         Assert.Contains("P15-boundaries", ids);
         Assert.Contains("P21-self-IDD", ids);
     }
+    [Fact]
+    public void Estimator_MandatesEvidenceGatheringAndPortableSources()
+    {
+        var source = fixture.ReadText(Path.Combine(fixture.RepoRoot, "src",
+            "canonical", "skills", "idd-intent-estimate.md"));
+        foreach (var contract in new[]
+        {
+            "Stage A — Discovery", "Stage B — Requirements", "Stage C — Evidence review",
+            "fully read", "partially read", "discovered but not read", "inaccessible",
+            "Assessed", "Partially assessed", "Not assessed", "Undetermined",
+            "Top Complexity Drivers", "Coverage and Confidence",
+            "repository-relative", "seven-dimension", "specific requirement"
+        })
+            Assert.Contains(contract, source, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Do not artificially force a bell curve", source);
+        Assert.Contains("never generate a Markdown link to a local absolute path", source,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("INDEX-only discovery", source);
+    }
+
+    [Fact]
+    public void NewBehavioralScenarios_HaveConcreteEvidenceAndSemanticExpectations()
+    {
+        using var suite = JsonDocument.Parse(fixture.ReadText(Path.Combine(
+            fixture.RepoRoot, "tests", "Idd.Intent.LiveTests", "Scenarios",
+            "estimate-cases.json")));
+        var scenarios = suite.RootElement.GetProperty("scenarios")
+            .EnumerateArray().ToArray();
+        Assert.Equal(33, scenarios.Length);
+        foreach (var number in Enumerable.Range(1, 12))
+        {
+            var prefix = $"E{number:D2}-";
+            var scenario = Assert.Single(scenarios.Where(x =>
+                x.GetProperty("id").GetString()!.StartsWith(prefix,
+                    StringComparison.Ordinal)));
+            Assert.True(scenario.GetProperty("documents").EnumerateObject().Any());
+            Assert.All(scenario.GetProperty("expected").EnumerateArray(), criterion =>
+                Assert.True(criterion.GetString()!.Length > 30,
+                    "Expected behavior must be a meaningful semantic criterion"));
+        }
+        var limited = scenarios.Single(x =>
+            x.GetProperty("id").GetString() == "E02-partial-documents");
+        Assert.True(limited.GetProperty("documents").EnumerateObject().Count() >= 15);
+        Assert.Contains(scenarios, x =>
+            x.GetProperty("id").GetString() == "E04-all-high-legitimate");
+        Assert.Contains(scenarios, x =>
+            x.GetProperty("id").GetString() == "E09-portable-local-links");
+    }
+
 }

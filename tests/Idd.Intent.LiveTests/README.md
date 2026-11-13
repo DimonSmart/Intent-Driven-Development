@@ -164,12 +164,13 @@ fixed rather than weakening the rubric.
 ## Opt-in Business Complexity Assessment evaluation
 
 BusinessComplexityLiveTests exercises the **idd-intent-estimate** skill in
-**21 version-controlled scenarios** in Scenarios/estimate-cases.json: 20
-synthetic cases (including pre-code-only intent, bounded CRUD, difficult
-algorithms, integrations, duplicate requirements, spikes, partial/missing
-coverage, conflicts, ambiguous COSMIC boundaries, and embedded untrusted
-instructions), plus one scenario using this repository's **current**
-.idd/intent/ documents.
+**33 version-controlled scenarios** in Scenarios/estimate-cases.json: 20
+original synthetic cases, 12 additional E01–E12 evidence/coverage/driver
+scenarios, plus one scenario using this repository's **current**
+.idd/intent/ documents. The new cases exercise staged inventory, read/unread
+coverage states, justified High ratings, independent dimensions, ranked
+complexity drivers, portable references, scoped assessment and conservative
+confidence.
 
 It builds the generator, installs the generated **idd-intent** plugin into
 an isolated Codex home, seeds disposable workspaces, invokes the skill
@@ -185,7 +186,7 @@ saved in report.json. This checks behavior, not merely wording in SKILL.md.
     $env:IDD_ESTIMATE_EVAL_CASE_IDS = "P01-pre-code,P03-algorithm,P21-self-IDD"
     dotnet test tests/Idd.Intent.LiveTests/Idd.Intent.LiveTests.csproj --filter "Category=LiveEstimateEval"
 
-Remove the CASE_IDS variable to execute all 21. Other overrides:
+Remove the CASE_IDS variable to execute all 33. Other overrides:
 IDD_ESTIMATE_EVAL_CODEX, IDD_ESTIMATE_EVAL_MODEL (default gpt-6),
 IDD_ESTIMATE_EVAL_REASONING (medium), IDD_ESTIMATE_EVAL_MAX_CASES,
 IDD_ESTIMATE_EVAL_TIMEOUT_MINUTES (15), IDD_ESTIMATE_EVAL_OUTPUT_DIR,

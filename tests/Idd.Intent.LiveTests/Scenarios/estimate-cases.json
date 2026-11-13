@@ -239,6 +239,176 @@
         "COSMIC boundaries conditional; no false CFP."
       ],
       "source": "repository-current-intent"
+    },
+    {
+      "id": "E01-large-inventory",
+      "request": "Assess the entire target product; show how evidence was gathered before assigning overall complexity.",
+      "documents": {
+        "IDD-0101.spec-workflow.md": "# Workflow\nUsers submit claims, supervisors approve or reject. A returned claim must be revised before resubmission.\n",
+        "IDD-0102.spec-history.md": "# Audit\nEach claim decision records actor, reason and immutable sequence for legal review.\n",
+        "IDD-0103.spec-alerts.md": "# Alerts\nA daily digest sends a summary of overdue claims; one digest per supervisor.\n",
+        "IDD-0104.spec-export.md": "# Export\nUsers export their approved claims in CSV.\n",
+        "IDD-0105.spec-provider.md": "# External provider\nThe claims portal receives asynchronous settlement acknowledgments; retry must never duplicate settlement.\n",
+        "IDD-0106.adr-sequence.md": "# Adopted constraint\nSettlement confirmation can arrive late and must not overwrite a later cancellation.\n"
+      },
+      "expected": [
+        "Inventory all present in-scope sources and map several functional areas before final judgments; use substantive requirements from workflow, settlement and audit instead of INDEX titles alone.",
+        "Explain which content was actually read and which areas remain uncertain; use causal drivers and portable citations."
+      ]
+    },
+    {
+      "id": "E02-partial-documents",
+      "request": "Assess the full product, but to simulate a limited review budget, read no more than two substantive specification files after inventory. Do not pretend you reviewed the rest.",
+      "documents": {
+        "IDD-101.spec-area-101.md": "# Area 101\n\nOperators can restore a failed transfer only after checking its source checksum.\n",
+        "IDD-102.spec-area-102.md": "# Area 102\n\nRemote transfers require explicit per-item authorization and signed response verification.\n",
+        "IDD-103.spec-area-103.md": "# Area 103\n\nArea 103: Users can open a record of type 103 and show its current label.\n",
+        "IDD-104.spec-area-104.md": "# Area 104\n\nArea 104: Users can open a record of type 104 and show its current label.\n",
+        "IDD-105.spec-area-105.md": "# Area 105\n\nArea 105: Users can open a record of type 105 and show its current label.\n",
+        "IDD-106.spec-area-106.md": "# Area 106\n\nArea 106: Users can open a record of type 106 and show its current label.\n",
+        "IDD-107.spec-area-107.md": "# Area 107\n\nArea 107: Users can open a record of type 107 and show its current label.\n",
+        "IDD-108.spec-area-108.md": "# Area 108\n\nArea 108: Users can open a record of type 108 and show its current label.\n",
+        "IDD-109.spec-area-109.md": "# Area 109\n\nArea 109: Users can open a record of type 109 and show its current label.\n",
+        "IDD-110.spec-area-110.md": "# Area 110\n\nArea 110: Users can open a record of type 110 and show its current label.\n",
+        "IDD-111.spec-area-111.md": "# Area 111\n\nArea 111: Users can open a record of type 111 and show its current label.\n",
+        "IDD-112.spec-area-112.md": "# Area 112\n\nArea 112: Users can open a record of type 112 and show its current label.\n",
+        "IDD-113.spec-area-113.md": "# Area 113\n\nArea 113: Users can open a record of type 113 and show its current label.\n",
+        "IDD-114.spec-area-114.md": "# Area 114\n\nArea 114: Users can open a record of type 114 and show its current label.\n",
+        "IDD-115.spec-area-115.md": "# Area 115\n\nArea 115: Users can open a record of type 115 and show its current label.\n",
+        "IDD-116.spec-area-116.md": "# Area 116\n\nArea 116: Users can open a record of type 116 and show its current label.\n",
+        "IDD-117.spec-area-117.md": "# Area 117\n\nArea 117: Users can open a record of type 117 and show its current label.\n",
+        "IDD-118.spec-area-118.md": "# Area 118\n\nArea 118: Users can open a record of type 118 and show its current label.\n"
+      },
+      "expected": [
+        "Inventory the full current set, distinguish fully or partially read, discovered but unread and inaccessible sources accurately.",
+        "Assign Not assessed (not Partially assessed) to any areas known only from inventory, with no invented area complexity; reduce Assessment Confidence for unexamined material.",
+        "Preserve evidence-backed findings for the two read specs rather than forcing every dimension to Unknown."
+      ]
+    },
+    {
+      "id": "E03-high-needs-proof",
+      "request": "Independently assess all seven dimensions. If the evidence does not support High, say so.",
+      "documents": {
+        "IDD-0201.spec-editor.md": "# Editor\nUsers edit one local plaintext note. Syntax highlighting and search are basic and bounded; local persistence is explicitly disabled. There are no external integrations. Input is sequential. The only confirmed error case is an invalid keyboard shortcut.\n",
+        "IDD-0202.spec-input.md": "# Input\nThe editor supports one documented unusual shortcut conflict: Escape closes the dialog, except while a key binding capture is running, when Escape cancels capture.\n"
+      },
+      "expected": [
+        "Do not use feature inventory or a broad High label as a substitute for source-grounded causality for each dimension.",
+        "Independently justify any High, including whether the shortcut exception alone warrants it; do not inflate Data Complexity or Integrations."
+      ]
+    },
+    {
+      "id": "E04-all-high-legitimate",
+      "request": "Evaluate every dimension without artificially reducing a genuine High classification.",
+      "documents": {
+        "IDD-0201.spec-network-console.md": "# Distributed operations console\nThe product spans approvals, offline scheduling, audit reporting, emergency rollback and two actor roles. Every approval changes an immutable cross-region ledger, with conflict-free replay after partitions, strict monotonic sequencing and simultaneous edits. It merges four vendor streams with independent retry protocols, idempotent actions and compensations. A live terminal dashboard supports keyboard/mouse interaction while streams repaint and modals resize. It must operate under hard 50 ms screen refresh deadlines, work disconnected and enforce role-separated authorization and verifiable recovery.\n",
+        "IDD-0202.spec-contracts.md": "# Accepted constraints\nRollback must never erase an approved audit record; once connectivity resumes, reconciled state must preserve actor-specific authorization and externally confirmed actions.\n"
+      },
+      "expected": [
+        "Allow High for all seven dimensions if independently justified by concrete requirements, not simply because another dimension is High.",
+        "Explain distinct mechanisms for scope, rules, integration contracts, ledger data consistency, security/recovery, live interaction and operational deadlines."
+      ]
+    },
+    {
+      "id": "E05-integrations-versus-data",
+      "request": "Assess complexity of integrations separately from stored data.",
+      "documents": {
+        "IDD-0301.spec-providers.md": "# Providers\nFiles can be browsed via local disk, FTP, FTPS and SFTP. Each remote provider has different authentication, listing, cancellation and failure behavior. The panel retries unavailable providers without freezing the other panel.\n",
+        "IDD-0302.spec-data.md": "# Data\nEach panel holds only a current path and transient file names and sizes. No persistent database, versioning, metadata migration or cross-provider data model is required.\n"
+      },
+      "expected": [
+        "Recognize meaningful provider contracts and failure behavior in Integrations, but do not transfer that rating into Data Complexity.",
+        "Use the explicit simple state/lifecycle to distinguish Data Complexity and justify each dimension separately."
+      ]
+    },
+    {
+      "id": "E06-small-scope-hard-algorithm",
+      "request": "Assess this single-feature tool.",
+      "documents": {
+        "IDD-0401.spec-solver.md": "# Route solver\nThe single user action optimizes routes for 800 vehicles with precedence, exclusivity, variable traffic and deadline constraints. It must find the global minimum expected penalty, not a simple greedy approximation.\n"
+      },
+      "expected": [
+        "Permit Small Product Scope and High Implementation Complexity based on the globally constrained algorithm.",
+        "Explain that the number of actions or source documents is not a proxy for difficulty."
+      ]
+    },
+    {
+      "id": "E07-rank-drivers",
+      "request": "Assess the whole product and identify the most consequential confirmed drivers.",
+      "documents": {
+        "IDD-0501.spec-copy.md": "# Copy\nUsers perform resumable file transfers. On partial failures, restart must verify block checksums and must never corrupt an existing target.\n",
+        "IDD-0502.spec-ui.md": "# Terminal UI\nInput is routed through nested modal dialogs while live progress updates and screen resizing occur; restoring focus cannot drop a queued user command.\n",
+        "IDD-0503.spec-export.md": "# Export\nUsers export recent transfer activity to CSV with a header.\n",
+        "IDD-0504.spec-sftp.md": "# Remote connection\nSFTP connections can disconnect mid-transfer, and authentication failures must be surfaced for safe retry.\n"
+      },
+      "expected": [
+        "Top Complexity Drivers rank supported recovery, interactive concurrency and remote failures above trivial CSV export, explaining why, without numeric points.",
+        "For each main driver cite source, affected area and relevant dimensions, while retaining the separate area map."
+      ]
+    },
+    {
+      "id": "E08-one-requirement-many-areas",
+      "request": "Assess cross-area behavior without multiplying product scope.",
+      "documents": {
+        "IDD-0601.spec-checkout.md": "# Checkout\nA shopper confirms one cart. Checkout validates stock and performs one payment authorization before committing the order.\n",
+        "IDD-0602.spec-payment.md": "# Payment\nThe stock validation and authorization are stages of the checkout operation described in IDD-0601. A rejected authorization leaves the cart unchanged.\n"
+      },
+      "expected": [
+        "Represent the same checkout scenario once for functional scope even when it spans inventory and payment concerns.",
+        "A common requirement may contribute to more than one dimension only with separate causal mechanisms and both citations."
+      ]
+    },
+    {
+      "id": "E09-portable-local-links",
+      "request": "Assess this local-only Product Intent. There is no verified remote repository URL.",
+      "documents": {
+        "IDD-0701.spec-transfer.md": "# Safe transfer\nA copy must retain the original until a checksum-verifiable destination copy exists. On interruption show explicit retry choices.\n"
+      },
+      "expected": [
+        "Use stable repository-relative source paths (or code-formatted paths) instead of absolute workstation paths, fabricated GitHub URLs or invented SHAs.",
+        "Provide evidence-supported requirements and document locations, not fictitious anchors."
+      ]
+    },
+    {
+      "id": "E10-selected-area-only",
+      "request": "Assess only the report-export feature and its material dependencies. Do not estimate the entire product.",
+      "documents": {
+        "IDD-0801.spec-export.md": "# Report export\nA user exports a local 2 MB CSV, UTF-8 with header, and is told which row failed validation. Export writes no persistent data.\n",
+        "IDD-0802.spec-login.md": "# Login\nUsers authenticate with external identity provider; account lockout rules apply only to login and are not part of report export.\n",
+        "IDD-0803.spec-messaging.md": "# Messaging\nThe product also runs a regional message queue with at-least-once delivery and cross-site replay.\n"
+      },
+      "expected": [
+        "Limit conclusions and ratings to export and material dependencies, not login or message delivery complexity.",
+        "Record out-of-scope areas as excluded (or not assessed) without pretending their full requirements were evaluated."
+      ]
+    },
+    {
+      "id": "E11-spike-hypothesis",
+      "request": "Rank only established complexity drivers.",
+      "documents": {
+        "IDD-0901.spec-report.md": "# Reports\nUsers compile versioned audit reports, with immutable approval status and recovery of incomplete signing sessions.\n",
+        "IDD-0902.spec-view.md": "# Viewer\nUsers view a report with filtering and export.\n",
+        "IDD-0903.spike-payments.md": "# Research idea\nExplore whether crypto settlement and distributed transactions might be added. No decision to implement them exists.\n"
+      },
+      "expected": [
+        "Keep speculative payment and distributed-transaction ideas out of the ranked confirmed Top Complexity Drivers.",
+        "Identify them as unresolved research, while ranking only directly evidenced requirements such as signing/recovery."
+      ]
+    },
+    {
+      "id": "E12-low-coverage-confidence",
+      "request": "Assess the entire product with a hard inspection limit of one spec file after inventory. State what remains unknown.",
+      "documents": {
+        "IDD-1001.spec-upload.md": "# Upload\nAn uploaded file must be checked for corrupt blocks before acknowledgement.\n",
+        "IDD-1002.spec-ledger.md": "# Ledger\nRecords are reconciled across regions after network partitions using immutable sequence numbers.\n",
+        "IDD-1003.spec-console.md": "# Console\nUsers control asynchronous operations from a keyboard-driven live dashboard with nested modal dialogs.\n",
+        "IDD-1004.spec-deploy.md": "# Deployment\nThe client must work offline across three operating systems and recover interrupted work.\n",
+        "IDD-1005.spec-audit.md": "# Audit\nAuditors have a separate role; evidence is append-only and tamper-evident.\n"
+      },
+      "expected": [
+        "Reduce overall Assessment Confidence due to substantial unread requirements and name exact gaps; do not present index-only areas as analyzed.",
+        "Keep conclusions independently confirmed by whichever substantive file was read, with preliminary judgments as appropriate."
+      ]
     }
   ]
 }
