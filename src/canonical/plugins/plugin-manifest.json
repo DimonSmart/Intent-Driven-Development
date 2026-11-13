@@ -188,6 +188,11 @@
           "skill": "idd-intent-cosmic",
           "source": "src/canonical/methodology/cosmic-measurement-guide.md",
           "destination": "cosmic-measurement-guide.md"
+        },
+        {
+          "skill": "idd-intent-cosmic",
+          "source": "src/canonical/methodology/cosmic-delegation-protocol.md",
+          "destination": "cosmic-delegation-protocol.md"
         }
       ],
       "assets": [
