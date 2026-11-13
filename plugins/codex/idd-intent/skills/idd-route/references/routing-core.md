@@ -53,7 +53,7 @@ Standalone Factory model-policy requests select their skill directly:
   forecasting.
 - `intent-cosmic-measurement`: COSMIC v5.0 functional size measurement of the
   current Product Intent, globally or for a named product area. This is a
-  separate read-only operation returning verified CFP where FUR are sufficient,
+  separate read-only operation returning evidence-backed CFP where FUR are sufficient,
   never a code-complexity, effort, budget or delivery estimate.
 - `initial product truth discovery`: an existing implementation lacks an
   adequate current intent model and needs interactive discovery and owner
@@ -509,7 +509,7 @@ remain in the detailed workflow sections indexed below.
 | `intent-normalization` | Optional structure audit -> targeted `idd-intent-normalize-current` proposal/confirmation/apply -> `idd-intent-lint`; preserve Product meaning. |
 | `intent-structure-audit` | `idd-intent-structure-audit` read-only; no automatic normalization. |
 | `intent-estimation` | `idd-intent-estimate` reads current Product Intent, assesses only the stated target product/area, returns an evidence-backed business report and preliminary COSMIC preparation; **read-only end-to-end**, no code review, Intent edits, Factory or follow-on implementation. `route-only` recommends without running it. |
-| `intent-cosmic-measurement` | `idd-intent-cosmic` independently inventories current documented FUR, defines COSMIC Strategy, maps functional processes/data groups/E/X/R/W, validates structural arithmetic with the packaged read-only helper, and reports measured CFP or coverage/host diagnostics; **read-only end-to-end**. `route-only` recommends without running it. No effort/cost forecast, code inspection, Intent edits, Factory or automatic handoff. |
+| `intent-cosmic-measurement` | `idd-intent-cosmic` independently inventories current documented FUR, defines COSMIC Strategy, maps functional processes/data groups/E/X/R/W, self-checks semantic evidence and CFP arithmetic without executable helpers, and reports measured CFP or coverage diagnostics; **read-only end-to-end**. `route-only` recommends without running it. No effort/cost forecast, code inspection, Intent edits, Factory or automatic handoff. |
 | `intent-lint` | `idd-intent-lint` check, or explicitly approved mechanical fix -> recheck; no semantic mutations. |
 | `intent-drift-audit` | `idd-intent-drift-audit` read-only with explicit focused or project-wide scope; no automatic implementation. |
 | `implementation-to-intent` | `idd-code-update-intent` only for user-confirmed behavior, with owner's semantic checks; code alone is not authority. |
