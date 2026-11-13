@@ -23,7 +23,8 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         var references = intent.GetProperty("skillReferences").EnumerateArray()
             .Where(x => x.GetProperty("skill").GetString() == "idd-intent-cosmic")
             .Select(x => x.GetProperty("destination").GetString()).ToArray();
-        Assert.Equal(new[] { "cosmic-measurement-guide.md", "cosmic-delegation-protocol.md" }, references);
+        Assert.Equal(new[] { "cosmic-measurement-guide.md", "cosmic-delegation-protocol.md",
+            "cosmic-execution-state.md" }, references);
 
         using var descriptions = JsonDocument.Parse(fixture.ReadText(Path.Combine(
             fixture.RepoRoot, "src", "canonical", "skills", "skill-descriptions.json")));
@@ -36,7 +37,7 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         Assert.Equal("fork", claude.GetProperty("context").GetString());
         Assert.Equal("general-purpose", claude.GetProperty("agent").GetString());
         Assert.False(claude.GetProperty("background").GetBoolean());
-        Assert.Equal("Read Glob Grep Agent Write", claude.GetProperty("allowed-tools").GetString());
+        Assert.Equal("Read Glob Grep Agent Write Bash", claude.GetProperty("allowed-tools").GetString());
 
         var core = fixture.ReadText(Path.Combine(fixture.RepoRoot, "src",
             "canonical", "methodology", "routing-core.md"));
@@ -62,14 +63,20 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         var skillPath = Path.Combine(skill, "SKILL.md");
         var guidePath = Path.Combine(skill, "references", "cosmic-measurement-guide.md");
         var protocolPath = Path.Combine(skill, "references", "cosmic-delegation-protocol.md");
+        var statePath = Path.Combine(skill, "references", "cosmic-execution-state.md");
+        var helperPath = Path.Combine(skill, "assets", "cosmic-state", "cosmic_state.py");
         fixture.AssertFile(skillPath);
         fixture.AssertFile(guidePath);
         fixture.AssertFile(protocolPath);
+        fixture.AssertFile(statePath);
+        fixture.AssertFile(helperPath);
         Assert.False(File.Exists(Path.Combine(skill, "references", "cosmic-validator.mjs")));
 
         var skillText = fixture.ReadText(skillPath);
         var guideText = fixture.ReadText(guidePath);
         var protocolText = fixture.ReadText(protocolPath);
+        var stateText = fixture.ReadText(statePath);
+        var helperText = fixture.ReadText(helperPath);
         Assert.Contains("Phase 3", skillText);
         Assert.Contains("fresh native child reader", skillText);
         Assert.Contains("Measured subtotal", skillText);
@@ -81,6 +88,14 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         Assert.Contains("6,000 tokens", skillText);
         Assert.Contains("20% of usable context", skillText);
         Assert.Contains("Recursive reducer", protocolText);
+        Assert.Contains("IDD single-owner rule", protocolText);
+        Assert.Contains("Coupling / Change Impact", protocolText);
+        Assert.Contains("Process measurer", protocolText);
+        Assert.Contains("bounded retries", stateText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("SHA-256", stateText);
+        Assert.Contains("cfp-arithmetic:", helperText);
+// The helper never attempts semantic process identification.
+        Assert.DoesNotContain("guess process", helperText, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("lossless", protocolText);
         Assert.Contains("outside the target repository", protocolText);
         Assert.Contains("BLOCKED", protocolText);
@@ -95,6 +110,9 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         Assert.Equal(fixture.ReadText(Path.Combine(canonical, "methodology",
                 "cosmic-delegation-protocol.md")).ReplaceLineEndings("\n").TrimEnd(),
             protocolText.ReplaceLineEndings("\n").TrimEnd());
+        Assert.Equal(fixture.ReadText(Path.Combine(canonical, "methodology",
+                "cosmic-execution-state.md")).ReplaceLineEndings("\n").TrimEnd(),
+            stateText.ReplaceLineEndings("\n").TrimEnd());
 
         if (host == "codex")
         {
@@ -106,7 +124,7 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         {
             Assert.Contains("user-invocable: true", skillText);
             Assert.Contains("disable-model-invocation: false", skillText);
-            Assert.Contains("allowed-tools: Read Glob Grep Agent Write", skillText);
+            Assert.Contains("allowed-tools: Read Glob Grep Agent Write Bash", skillText);
         }
     }
 
@@ -141,7 +159,29 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         Assert.Contains(scenario.GetProperty("expectedRestrictions").EnumerateArray(),
             x => x.GetString()!.Contains("60/60", StringComparison.Ordinal));
         Assert.Contains(scenario.GetProperty("expectedRestrictions").EnumerateArray(),
-            x => x.GetString()!.Contains("companion", StringComparison.OrdinalIgnoreCase));
+            x => x.GetString()!.Contains("connector", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void CouplingAndLargeSpecLiveCases_PreserveOwnershipWithoutInflatingCfp()
+    {
+        using var corpus = JsonDocument.Parse(fixture.ReadText(Path.Combine(
+            fixture.RepoRoot, "tests", "Idd.Intent.LiveTests",
+            "Scenarios", "cosmic-cases.json")));
+        var scenarios = corpus.RootElement.GetProperty("scenarios").EnumerateArray().ToArray();
+        var coupling = scenarios.Single(x => x.GetProperty("id").GetString()
+            == "C24-single-owner-coupling");
+        Assert.Equal(4, coupling.GetProperty("documents").EnumerateObject().Count());
+        Assert.Equal(4, coupling.GetProperty("expectedProcesses").GetArrayLength());
+        Assert.Contains(coupling.GetProperty("expectedRestrictions").EnumerateArray(),
+            x => x.GetString()!.Contains("12 CFP", StringComparison.Ordinal));
+        var large = scenarios.Single(x => x.GetProperty("id").GetString()
+            == "C25-large-spec-sections");
+        var spec = large.GetProperty("documents").EnumerateObject().Single();
+        Assert.True(spec.Value.GetString()!.Length > 60_000);
+        Assert.Equal(1, large.GetProperty("expectedProcesses").GetArrayLength());
+        Assert.Contains(large.GetProperty("expectedRestrictions").EnumerateArray(),
+            x => x.GetString()!.Contains("range-covered", StringComparison.Ordinal));
     }
 
     [Fact]
