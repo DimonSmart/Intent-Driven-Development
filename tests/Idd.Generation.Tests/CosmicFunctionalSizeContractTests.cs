@@ -211,6 +211,35 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
     }
 
     [Fact]
+    public void NumberedCacheLiveCases_SeedCompletePacketsForReuseAndRefresh()
+    {
+        using var corpus = JsonDocument.Parse(fixture.ReadText(Path.Combine(
+            fixture.RepoRoot, "tests", "Idd.Intent.LiveTests",
+            "Scenarios", "cosmic-cases.json")));
+        var scenarios = corpus.RootElement.GetProperty("scenarios").EnumerateArray().ToArray();
+        var reuse = scenarios.Single(x =>
+            x.GetProperty("id").GetString() == "C26-numbered-cache-scoped-reuse");
+        Assert.Equal("reuse", reuse.GetProperty("cacheMode").GetString());
+        Assert.Equal(3, reuse.GetProperty("documents").EnumerateObject().Count());
+        Assert.Equal(2, reuse.GetProperty("precomputedPackets").EnumerateObject().Count());
+        Assert.Equal(2, reuse.GetProperty("expectedProcesses").GetArrayLength());
+        var refresh = scenarios.Single(x =>
+            x.GetProperty("id").GetString() == "C27-numbered-cache-explicit-refresh");
+        Assert.Equal("refresh", refresh.GetProperty("cacheMode").GetString());
+        Assert.Equal(1, refresh.GetProperty("precomputedPackets").EnumerateObject().Count());
+        Assert.Contains(refresh.GetProperty("expectedRestrictions").EnumerateArray(),
+            x => x.GetString()!.Contains("4 CFP", StringComparison.Ordinal));
+        foreach (var scenario in new[] { reuse, refresh })
+            foreach (var packet in scenario.GetProperty("precomputedPackets").EnumerateObject())
+            {
+                Assert.StartsWith("IDD-", packet.Name);
+                Assert.EndsWith(".cosmic.md", packet.Name);
+                Assert.Contains("Packet complete: " + packet.Name[..8],
+                    packet.Value.GetString());
+            }
+    }
+
+    [Fact]
     public void GoldenExamples_RetainDocumentedMovementCounts()
     {
         using var fixtureJson = JsonDocument.Parse(fixture.ReadText(Path.Combine(
