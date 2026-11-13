@@ -209,12 +209,13 @@ def change_dependent_sources(data: dict, records: Path | None) -> set[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["init", "mark", "status", "invalidate", "verify"])
+    parser.add_argument("command", choices=["init", "mark", "fail", "status", "invalidate", "verify"])
     parser.add_argument("--project")
     parser.add_argument("--state-dir", required=True)
     parser.add_argument("--boundary")
     parser.add_argument("--source")
     parser.add_argument("--packet")
+    parser.add_argument("--reason")
     parser.add_argument("--records")
     parser.add_argument("--strategy-file")
     parser.add_argument("--complete", action="store_true")
@@ -235,7 +236,7 @@ def main() -> int:
                 "boundary": args.boundary, "strategy_file": str(strategy),
                 "strategy_sha256": digest(strategy),
                 "sources": {name: {"sha256": sha, "status": "Pending", "packet": None,
-                                   "packet_sha256": None}
+                                   "packet_sha256": None, "failed_attempts": 0, "last_failure": None}
                             for name, sha in inventory(project).items()}}
         write_atomic(state_path, data)
         result = {"initialized": len(data["sources"]), "state": str(state_path)}
@@ -244,12 +245,15 @@ def main() -> int:
         if args.boundary is not None:
             require(args.boundary == data["boundary"], "Boundary differs from saved run")
         if args.command == "status":
-            result = {"stale": stale(data), "statuses": {name: x["status"]
+            result = {"stale": stale(data), "statuses": {name: {"status": x["status"],
+                     "failed_attempts": x.get("failed_attempts", 0)}
                      for name, x in data["sources"].items()}}
         elif args.command == "mark":
             require(args.source and args.packet, "mark requires source and packet")
             name = args.source
             require(name in data["sources"], f"Unknown source {name}")
+            require(data["sources"][name]["status"] != "Blocked",
+                    "Blocked source requires explicit recovery decision")
             invalid = stale(data)
             require("@strategy" not in invalid, "Measurement strategy changed: start new run")
             require(name not in invalid, f"Stale source or packet: {name}")
@@ -263,6 +267,18 @@ def main() -> int:
                                          packet_sha256=digest(packet))
             write_atomic(state_path, data)
             result = {"completed": name}
+        elif args.command == "fail":
+            require(args.source and args.reason, "fail requires source and reason")
+            require(args.source in data["sources"], "Unknown source")
+            item = data["sources"][args.source]
+            require(item["status"] not in {"Completed", "Blocked"},
+                    "Cannot fail an already completed or blocked task")
+            attempts = item.get("failed_attempts", 0) + 1
+            item.update(failed_attempts=attempts, last_failure=args.reason,
+                        status="Blocked" if attempts >= 3 else "Retryable failure")
+            write_atomic(state_path, data)
+            result = {"source": args.source, "failed_attempts": attempts,
+                      "status": item["status"]}
         elif args.command == "invalidate":
             require("@strategy" not in stale(data),
                     "Measurement strategy changed: initialize new run")
@@ -274,7 +290,7 @@ def main() -> int:
             for name, sha in current.items():
                 if name in invalidated:
                     data["sources"][name].update(sha256=sha, status="Invalidated",
-                                                packet=None, packet_sha256=None)
+                                                packet=None, packet_sha256=None, failed_attempts=0, last_failure=None)
             write_atomic(state_path, data)
             result = {"invalidated": sorted(invalidated),
                       "pending": sorted(name for name, x in data["sources"].items()
