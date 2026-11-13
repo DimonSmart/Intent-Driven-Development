@@ -4,7 +4,7 @@ This is the required file-based reuse protocol for `idd-intent-cosmic`. It repla
 
 ## Location and naming
 
-Choose **one user-visible, persistent, writable cache directory outside the target project/repository**, scoped to that project (never share a numbered cache between unrelated projects). Reuse the same folder on later invocations, including after a new conversation, when its path is available. The user may specify the folder. Do not put reader packets into `.idd/intent/`, commit them, or treat them as a new source of product truth. A temporary run folder that disappears after the session is not a resumable cache.
+Choose **one user-visible, persistent, writable cache directory outside the target project/repository**, scoped to that project (never share a numbered cache between unrelated projects). Use a **stable default** such as `~/.cache/idd-cosmic/<project-folder-name>/` on macOS/Linux or `%LOCALAPPDATA%\\IDD\\Cosmic\\<project-folder-name>\\` on Windows, or the user's explicitly chosen location; do not create a new timestamped/random directory on each invocation. If the default name conflicts with a different project, choose/ask for a distinct readable folder name. If host sandbox permissions prohibit writes there, request a writable external location or report the capability limit, rather than silently modifying the target repository. Reuse that same folder on later invocations, including after a new conversation, when available. The user may override the location. Do not put reader packets into `.idd/intent/`, commit them, or treat them as a new source of product truth. A temporary run folder that disappears after the session is not a resumable cache.
 
 Example:
 
