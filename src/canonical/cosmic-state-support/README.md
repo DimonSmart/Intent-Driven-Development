@@ -9,14 +9,14 @@ A host may use an equivalent built-in deterministic tool instead. When no reliab
 Example, with `STATE` **outside** the target repository and a declared measurement boundary:
 
 ```sh
-python3 cosmic_state.py init --project /path/to/project --state-dir /safe/state/run-1 --boundary product-api
+python3 cosmic_state.py init --project /path/to/project --state-dir /safe/state/run-1 --boundary product-api --strategy-file /safe/state/run-1/strategy.md
 python3 cosmic_state.py status --state-dir /safe/state/run-1
 python3 cosmic_state.py mark --state-dir /safe/state/run-1 --source IDD-0001.spec-api.md --packet /safe/state/run-1/packet-0001.md
 python3 cosmic_state.py verify --state-dir /safe/state/run-1 --records /safe/state/run-1/records.txt --complete
 python3 cosmic_state.py invalidate --state-dir /safe/state/run-1 --records /safe/state/run-1/records.txt
 ```
 
-The optional flat `records.txt` contains **agent-validated** facts, not guesses inferred from filenames:
+The `strategy.md` file is created by the coordinator in the same safe state directory and records scope, inclusions/exclusions, boundary, users, layer and granularity; its SHA-256 is checked before reuse. Changing measurement strategy requires a new run. The helper currently inventories **all** current numbered specs; for a partial-scope run, use a separate host-native scoped ledger rather than claiming that the helper verified that scope.\n\nThe optional flat `records.txt` contains **agent-validated** facts, not guesses inferred from filenames:
 
 ```text
 OWNER | IDD-0001#P1 | IDD-0001.spec-api.md | # Create record
