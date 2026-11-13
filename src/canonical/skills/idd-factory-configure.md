@@ -116,18 +116,26 @@ refresh, consider the **model/effort pair** for each requested platform/profile:
   determine whether the concrete model accepts an explicit per-child effort
   and which values are available. Do not infer support or valid values from a
   model name, an execution profile, or another provider's naming convention.
-- If supported, propose a suitable effort alongside the model, balancing the
-  task's complexity with quality, latency, and cost. `economy`, `standard`, and
-  `strong` are not hardwired to `low`, `medium`, or `high`; the same model can
-  be proposed for several profiles with different effort settings.
-- If support or allowed values are unknown, disclose that uncertainty. Offer
-  `host default (omitted)` rather than inventing a value. On a new mapping
-  for a model known not to support explicit effort, propose omission. If an
-  existing effort is incompatible with a proposed replacement model, block the
-  change until the user separately authorizes a compatible effort or removal;
-  never silently discard that setting to make a new model fit.
-- Show the resulting platform/profile, model, and effort (or omission) before
-  seeking the usual single Apply/Edit/Reject decision for interpreted proposals.
+- Use the reference's cost-oriented selection heuristics: a cheap suitable
+  model at maximum effort for `economy`, a suitable middle price class model
+  at next-to-maximum effort for `standard`, and the most capable suitable
+  model at middle effort for `strong`. Resolve against the verified ordered
+  levels exposed by the active child-agent platform, not a fixed vendor enum.
+  Use the lower middle for even scales and the sole level for a one-level
+  scale. Explicit user choices/constraints take precedence; the same model
+  may serve several profiles. Aim for cost per successfully completed task,
+  including repeat attempts, without claiming guaranteed savings.
+- If support, allowed values, or their ordering are unknown, disclose that
+  uncertainty and offer `host default (omitted)` rather than inventing a value.
+  For a model known not to support explicit effort, propose omission with an
+  explanation. Resolve effort again on a guided model replacement and show
+  any effort change/removal in the pair; confirmation of that complete pair
+  authorizes the shown reasoning edit. Exact model-only edits preserve effort,
+  including omission, and block known incompatibilities until the user explicitly
+  authorizes a compatible effort or removal. Never silently discard a setting.
+- Show current/proposed platform/profile, model, and exact effort (or omission)
+  with rationale and uncertainties in one table. Seek one Apply/Edit/Reject
+  decision for the complete interpreted proposal.
   Do not run a separate mandatory effort questionnaire. An exact, unambiguous
   user-specified model/effort edit is already authorized.
 
@@ -137,6 +145,11 @@ It is distinct from an absent platform/profile mapping, which inherits both
 host model selection and reasoning behavior. To clear an existing explicit
 effort, remove that field, not the entire model mapping or a null placeholder.
 
+Save only concrete native effort values, never relative selectors such as
+`maximum`, `maximum-minus-one`, or `middle`. The heuristic is applied here, not
+at worker startup. Do not automatically retune existing policies or unselected
+mappings, run benchmarks, or switch models based on task results.
+
 ## Exact changes and minimality
 
 Express changes as a set of authorized operations on specific
@@ -144,8 +157,9 @@ Express changes as a set of authorized operations on specific
 Preserve every other profile, other platform, model, and reasoning field,
 including intentionally absent optional fields. Examples:
 
-- Replacing `economy.codex.model` preserves its `reasoningEffort` if present,
-  every `claude` mapping, and every unselected profile.
+- An exact model-only replacement of `economy.codex.model` preserves its
+  `reasoningEffort` if present, every `claude` mapping, and every unselected
+  profile.
 - Editing only `reasoningEffort` or Claude `effort` requires an existing model
   mapping. Never create a reasoning-only mapping: ask for a concrete model or
   report the operation cannot be represented. An explicit request to clear an
@@ -189,10 +203,12 @@ concrete options only for an explicitly chosen scope. If current evidence is
 insufficient for reliable comparison or host compatibility, state the unknowns
 and request concrete IDs or a bounded alternative rather than inventing a winner.
 
-Preserve existing optional reasoning settings during model replacements.
-If a candidate is **known** to be incompatible with a preserved
+On a guided replacement, resolve the proposed effort for the new model using
+the reference's heuristics and include any reasoning edit in the single confirmed
+pair. Exact model-only replacements preserve optional reasoning settings,
+including omission. If a candidate is **known** to be incompatible with a preserved
 `reasoningEffort`/`effort`, show the conflict and block that candidate until
-a compatible model or a separately authorized reasoning edit is selected.
+a compatible model or an explicitly authorized reasoning edit is selected.
 Unknown compatibility is uncertainty, not proof of incompatibility. A host
 rejection at spawn is the authoritative error: do not silently switch models,
 drop reasoning, or revert to inherit in response.
