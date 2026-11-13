@@ -35,5 +35,5 @@ The helper accepts only one normative OWNER per exact owner ID. It cannot identi
 Run the deterministic regression tests with:
 
 ```sh
-python3 -m unittest discover -s src/canonical/cosmic-state-support -p 'test_*.py'
+python3 -m unittest discover -s tests/Idd.Cosmic.State.Tests -p 'test_*.py'
 ```
