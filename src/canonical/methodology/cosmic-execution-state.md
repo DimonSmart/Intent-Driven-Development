@@ -15,7 +15,7 @@ Example:
   IDD-0042.cosmic.md
 ```
 
-**One current numbered Intent source ID -> one completed reader packet**. The suffix is `.cosmic.md`; do not use the full original filename as the cache key. A rename of `IDD-0042.spec-old.md` to `IDD-0042.spec-new.md` is detectable because the packet records its exact source path. Multiple current normative files with the same ID are a structure-audit issue, not a reason to overwrite a packet unpredictably.
+**One current numbered Intent source ID -> one completed reader packet**. The suffix is `.cosmic.md`; do not use the full original filename as the cache key. Write to `IDD-NNNN.cosmic.partial.md` first; only a successful native rename to `IDD-NNNN.cosmic.md` publishes a completed result. A rename of `IDD-0042.spec-old.md` to `IDD-0042.spec-new.md` is detectable because the packet records its exact source path. Multiple current normative files with the same ID are a structure-audit issue, not a reason to overwrite a packet unpredictably.
 
 Do **not** require a per-run `run.json`, `sources.json`, timestamp database, file fingerprint or process checkpoint. Enumerating the current numbered sources and the corresponding `IDD-NNNN.cosmic.md` packets is the recovery ledger. Do not persist every reducer/measurement agent's state by default; they can recompute from reader packets.
 
