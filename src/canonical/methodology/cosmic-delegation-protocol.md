@@ -29,6 +29,7 @@ Use this structure; repeat a Process block for each distinct triggering-event ca
 
     Source: .idd/intent/IDD-0012.spec-orders.md
     Coverage: Read in full | Read failed | Not yet read
+    Read ranges: [complete file / exact inclusive lines or sections; gaps if any]
     Evidence: [heading or short exact quote; line when available]
     Process: <local candidate name / triggering event / external user>
     Movements: E <group> [source anchor]; X <group> [anchor]; R <group> [anchor]; W <group> [anchor]
@@ -36,6 +37,7 @@ Use this structure; repeat a Process block for each distinct triggering-event ca
     Open: <unknown boundary, lifecycle, duplicate or missing evidence; or None>
 
 - Omit empty movement types, but never infer an R/W from assumed database implementation or an X from assumed UI behavior. One process can have many movement lines, each with its **own** source anchor; identify object-of-interest/data-group meaning and recipient/persistence when known. A candidate may have **no** supported movements.
+- Include read-range evidence from actual read-tool results, not just a statement that the file was read. The coordinator compares the ranges with the discovered source length and must not claim full coverage when gaps remain.
 - If no independent process is defined, return `No independent process: <verified reason and anchor>` instead of a fabricated empty process.
 - A source can extend processes owned elsewhere; retain these facts as cross-spec dependencies, **not** extra measured processes.
 - Add concise notes only for materially relevant alternatives, conflicts, exclusions and unanswered questions. Exact source location is required for material assertions. The output is **source extraction**, not a claim of complete CFP.
@@ -67,8 +69,8 @@ First check the **coverage gate**: every in-scope current spec accounted for, no
 
 Apply the COSMIC rules to each **unique complete process**, with source-backed E/X/R/W and their data groups/OOI, and independently recount movements. Use compatible measurement units only. Do **not** sum per-file CFP or reducer subtotals (these are never authoritative). Preserve analytical uncertainty and incomplete evidence as such.
 
-Publish **two separate outputs**:
-1. A compact machine-consumable-in-the-conversation reconciliation summary (scope, inventory X/Y, distinct process IDs/statuses, packet references, unresolved owners and totals only if justified). It can be reused by further child contexts without the full report.
-2. A detailed user-facing Markdown report with the per-spec coverage ledger, full unique process inventory, source-backed movement tables, CFP where justified, source gaps, confidence/applicability limits and explicit non-certification.
+Maintain **two separate artifacts**:
+1. A **compact internal handoff** for subsequent child contexts (scope, inventory X/Y, distinct process IDs/statuses, packet references, unresolved owners and totals only if justified). Retain it in session scratch or other retrievable native result storage; do **not** dump it into the user-facing report by default.
+2. A **detailed user-facing Markdown report** containing the per-spec coverage ledger, unique process inventory, source-backed movement tables, defensible CFP, unresolved issues, applicability limits and explicit non-certification. If an exceptionally large ledger cannot fit the output budget, keep the complete ledger as an accessible session artifact outside the repository, provide its exact location and an area-level coverage summary in the report, or emit the report in bounded sections. Never truncate the underlying ledger or claim complete coverage based on an inaccessible artifact.
 
 Treat `Complete`, `Analytical Partial`, `Diagnostic only`, `Execution incomplete (BLOCKED)` as defined in the main skill. An explicitly unprocessed accessible source is **BLOCKED**, not a successful Analytical Partial. If even the compact final process index cannot fit, continue hierarchical reconciliation by clusters; use a bounded final index of reconciled clusters and explicitly verify **cross-cluster duplicate identities** via focused retrieval before computing the overall total. If this cannot be established, do not claim a complete total.
