@@ -497,7 +497,7 @@
         "Exactly 18 independent create-record processes, each with E+W+X; ten companion specs extend those processes",
         "Human validation failure and success share the same X per process; no duplicate process per companion spec",
         "No premature 2-CFP partial result or generic 'other specifications not reconciled' bucket",
-        "No executable validators, temporary files, or implementation inspection"
+        "No executable validators, no temporary files inside the target project, and no implementation inspection"
       ],
       "additionalIndexIds": [],
       "source": null
