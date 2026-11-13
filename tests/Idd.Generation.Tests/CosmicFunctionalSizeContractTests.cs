@@ -125,6 +125,26 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
     }
 
     [Fact]
+    public void HierarchicalLiveScenario_PreservesAllSourcesAndCrossGroupOwners()
+    {
+        using var corpus = JsonDocument.Parse(fixture.ReadText(Path.Combine(
+            fixture.RepoRoot, "tests", "Idd.Intent.LiveTests",
+            "Scenarios", "cosmic-cases.json")));
+        var scenario = corpus.RootElement.GetProperty("scenarios").EnumerateArray()
+            .Single(x => x.GetProperty("id").GetString() == "C23-hierarchical-60-specs");
+        Assert.Equal("Complete", scenario.GetProperty("expectedStatus").GetString());
+        var documents = scenario.GetProperty("documents").EnumerateObject().ToArray();
+        Assert.Equal(60, documents.Length);
+        Assert.Equal(60, documents.Select(x => x.Name).Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(20, scenario.GetProperty("expectedProcesses").GetArrayLength());
+        Assert.Equal(20, scenario.GetProperty("expectedMovements").GetArrayLength());
+        Assert.Contains(scenario.GetProperty("expectedRestrictions").EnumerateArray(),
+            x => x.GetString()!.Contains("60/60", StringComparison.Ordinal));
+        Assert.Contains(scenario.GetProperty("expectedRestrictions").EnumerateArray(),
+            x => x.GetString()!.Contains("companion", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void GoldenExamples_RetainDocumentedMovementCounts()
     {
         using var fixtureJson = JsonDocument.Parse(fixture.ReadText(Path.Combine(
