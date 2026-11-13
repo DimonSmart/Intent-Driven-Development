@@ -37,7 +37,7 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         Assert.Equal("fork", claude.GetProperty("context").GetString());
         Assert.Equal("general-purpose", claude.GetProperty("agent").GetString());
         Assert.False(claude.GetProperty("background").GetBoolean());
-        Assert.Equal("Read Glob Grep Agent Write Bash", claude.GetProperty("allowed-tools").GetString());
+        Assert.Equal("Read Glob Grep Agent Write", claude.GetProperty("allowed-tools").GetString());
 
         var core = fixture.ReadText(Path.Combine(fixture.RepoRoot, "src",
             "canonical", "methodology", "routing-core.md"));
@@ -124,7 +124,7 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         {
             Assert.Contains("user-invocable: true", skillText);
             Assert.Contains("disable-model-invocation: false", skillText);
-            Assert.Contains("allowed-tools: Read Glob Grep Agent Write Bash", skillText);
+            Assert.Contains("allowed-tools: Read Glob Grep Agent Write", skillText);
         }
     }
 
