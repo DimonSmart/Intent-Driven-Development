@@ -119,9 +119,12 @@ public sealed class CosmicFunctionalSizeLiveTests
                 var judgePrompt = "You are evaluating a COSMIC v5.0 response. Do not perform " +
                     "the user's task. Compare the COMPLETE normalized process inventory " +
                     "and per-process movement sets against the explicit scenario FUR and " +
-                    "expected semantic facts, not just overall CFP. Reject duplicate or " +
-                    "invented processes/movements, missing sources, wrong boundaries, " +
-                    "claims of independent mechanical validation, workspace writes, incorrect " +
+                    "expected semantic facts, not just overall CFP. Every process has " +
+                    "one normative owner; a connector LINK from another spec is not a " +
+                    "second process or new movement. Do not perform semantic process " +
+                    "deduplication across owners. Reject invented/duplicate owner IDs, " +
+                    "inflated CFP from coupling, missing sources, wrong boundaries, " +
+                    "claims of independent COSMIC certification, workspace writes, incorrect " +
                     "full CFP, or a numerical claim inconsistent with the required movements. " +
                     "Some negative cases correctly report diagnostic only. " +
                     "Reply ONLY with JSON {\"pass\":boolean,\"reason\":string," +
