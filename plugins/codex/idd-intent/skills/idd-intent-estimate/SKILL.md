@@ -5,7 +5,7 @@ description: Assess qualitative business complexity from current Product Intent 
 
 # idd-intent-estimate
 
-Assess **qualitative business complexity of the current target product** from the project's current Product Intent, even when no code exists. The result is a read-only business assessment, not an implementation audit, product redesign, cost/schedule/effort estimate or COSMIC size measurement.
+Assess **qualitative business complexity of the current target product** from the project's current Product Intent, even when no code exists. The result is a read-only business assessment, not an implementation audit, product redesign, cost/schedule/effort estimate or COSMIC size measurement. For actual CFP measurement use the separate independent idd-intent-cosmic skill.
 
 Use for direct invocation or natural-language requests such as "Assess business complexity based on intents" or "Assess the IDD-0012 area". A request about source-code complexity *without* Product Intent is different. Requirements changes go to Product change / Clarify / Brainstorm; intent structure review to idd-intent-structure-audit; implementation conformance to idd-intent-drift-audit.
 

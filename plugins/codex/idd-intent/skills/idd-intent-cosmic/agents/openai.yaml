@@ -1,0 +1,6 @@
+interface:
+  display_name: "IDD COSMIC Functional Size"
+  short_description: "Measure COSMIC function points from Product Intent"
+
+policy:
+  allow_implicit_invocation: true

@@ -227,5 +227,25 @@
   "idd-internal-factory-worker": {
     "description": "Internal Factory Worker protocol. Use only inside a fresh child context spawned by idd-factory-run with exactly one complete Task and verified scope/provenance; otherwise return BLOCKED.",
     "exposure": "internal"
+  },
+  "idd-intent-cosmic": {
+    "description": "Measure COSMIC v5.0 functional size from current Product Intent with evidence-backed E/X/R/W, a packaged deterministic validator, and explicit coverage gates; read-only and independent of business complexity.",
+    "invocation": "auto",
+    "exposure": "command",
+    "interface": {
+      "displayName": "IDD COSMIC Functional Size",
+      "shortDescription": "Measure COSMIC function points from Product Intent"
+    },
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "background": false,
+          "argument-hint": "[product area or IDD-NNNN IDs; default: current documented intent]",
+          "allowed-tools": "Read Glob Grep Bash(node *cosmic-validator.mjs *)"
+        }
+      }
+    }
   }
 }

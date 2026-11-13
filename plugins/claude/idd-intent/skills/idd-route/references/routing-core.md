@@ -51,6 +51,10 @@ Standalone Factory model-policy requests select their skill directly:
   product **from current Product Intent**, independent of whether code exists.
   This is read-only analysis, not conformance, content normalization, or effort
   forecasting.
+- `intent-cosmic-measurement`: COSMIC v5.0 functional size measurement of the
+  current Product Intent, globally or for a named product area. This is a
+  separate read-only operation returning verified CFP where FUR are sufficient,
+  never a code-complexity, effort, budget or delivery estimate.
 - `initial product truth discovery`: an existing implementation lacks an
   adequate current intent model and needs interactive discovery and owner
   confirmation.
@@ -201,8 +205,8 @@ Distinguish three different instructions:
   modify files while classifying**: these govern this read-only router's
   behavior and output. They do **not** reduce the original task's requested
   scope to `route-only` or suppress an otherwise authorized handoff.
-- A user requests **read-only work** (audit, lint check, review, or business
-  complexity estimation from Intent) rather than route advice: route to the
+- A user requests **read-only work** (audit, lint check, review, business
+  complexity assessment or COSMIC measurement from Intent) rather than route advice: route to the
   appropriate read-only skill; `end-to-end` means completing **only that read-only
   task**, not writing files.
   "Do not change files" alone is not "only tell me the route".
@@ -273,7 +277,7 @@ eligible Product/implementation work:
   Product/Engineering owners with separate review gates**, or major capability
   removal.
 - `not-applicable`: routing, initialization, verification configuration,
-  bootstrap, imports, audits, lint checks, brainstorms, and knowledge-only
+  bootstrap, imports, audits, lint checks, COSMIC measurements, brainstorms, and knowledge-only
   Engineering Rule management without separately requested implementation.
   Adding or modifying one Engineering Rule is not a `focused` implementation
   just because the policy targets source code.
@@ -317,6 +321,17 @@ for standalone Factory model-policy routing (no invented placeholders).
   `idd-intent-change` or an ambiguity gate. A durable Engineering rule must
   be an explicit authorized decision; recurring code patterns are evidence,
   not authority.
+- `intent-cosmic-measurement` identifies measured functional processes and data
+  movements only from current documented FUR. Use for requests such as "Measure
+  COSMIC functional size", "Count COSMIC Function Points", "Show CFP for current
+  intents", or "Measure the order module with COSMIC". Route directly to
+  `idd-intent-cosmic`; no prerequisite `idd-intent-estimate`. Classify an actual
+  read-only measurement as `end-to-end` and route advice as `route-only`; use
+  `Operation`, `Execution depth`, `Audit scope: not-applicable`. Do not treat
+  generic complexity, source complexity, effort, deadline or cost requests as
+  COSMIC measurement. For simultaneous business complexity and CFP requests,
+  return two independent read-only assessments with separate output and no
+  conversion between ratings and CFP.
 - `intent-estimation` is a qualitative complexity assessment of the target
   Product Intent, optionally limited to a named area/IDD-NNNN. It is not a
   source-code complexity assessment, implementation-vs-intent drift audit,
@@ -466,6 +481,7 @@ the generic `product-change` entry does **not** override the mandatory
 | `intent-normalization` | `idd-intent-normalize-current` |
 | `intent-structure-audit` | `idd-intent-structure-audit` |
 | `intent-estimation` | `idd-intent-estimate` |
+| `intent-cosmic-measurement` | `idd-intent-cosmic` |
 | `intent-lint` | `idd-intent-lint` |
 | `intent-drift-audit` | `idd-intent-drift-audit` |
 | `implementation-to-intent` | `idd-code-update-intent` |
@@ -493,6 +509,7 @@ remain in the detailed workflow sections indexed below.
 | `intent-normalization` | Optional structure audit -> targeted `idd-intent-normalize-current` proposal/confirmation/apply -> `idd-intent-lint`; preserve Product meaning. |
 | `intent-structure-audit` | `idd-intent-structure-audit` read-only; no automatic normalization. |
 | `intent-estimation` | `idd-intent-estimate` reads current Product Intent, assesses only the stated target product/area, returns an evidence-backed business report and preliminary COSMIC preparation; **read-only end-to-end**, no code review, Intent edits, Factory or follow-on implementation. `route-only` recommends without running it. |
+| `intent-cosmic-measurement` | `idd-intent-cosmic` independently inventories current documented FUR, defines COSMIC Strategy, maps functional processes/data groups/E/X/R/W, validates structural arithmetic with the packaged read-only helper, and reports measured CFP or coverage/host diagnostics; **read-only end-to-end**. `route-only` recommends without running it. No effort/cost forecast, code inspection, Intent edits, Factory or automatic handoff. |
 | `intent-lint` | `idd-intent-lint` check, or explicitly approved mechanical fix -> recheck; no semantic mutations. |
 | `intent-drift-audit` | `idd-intent-drift-audit` read-only with explicit focused or project-wide scope; no automatic implementation. |
 | `implementation-to-intent` | `idd-code-update-intent` only for user-confirmed behavior, with owner's semantic checks; code alone is not authority. |
