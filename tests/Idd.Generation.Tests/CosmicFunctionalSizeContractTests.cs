@@ -64,19 +64,16 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         var guidePath = Path.Combine(skill, "references", "cosmic-measurement-guide.md");
         var protocolPath = Path.Combine(skill, "references", "cosmic-delegation-protocol.md");
         var statePath = Path.Combine(skill, "references", "cosmic-execution-state.md");
-        var helperPath = Path.Combine(skill, "assets", "cosmic-state", "cosmic_state.py");
         fixture.AssertFile(skillPath);
         fixture.AssertFile(guidePath);
         fixture.AssertFile(protocolPath);
         fixture.AssertFile(statePath);
-        fixture.AssertFile(helperPath);
         Assert.False(File.Exists(Path.Combine(skill, "references", "cosmic-validator.mjs")));
 
         var skillText = fixture.ReadText(skillPath);
         var guideText = fixture.ReadText(guidePath);
         var protocolText = fixture.ReadText(protocolPath);
         var stateText = fixture.ReadText(statePath);
-        var helperText = fixture.ReadText(helperPath);
         Assert.Contains("Phase 3", skillText);
         Assert.Contains("fresh native child reader", skillText);
         Assert.Contains("Measured subtotal", skillText);
@@ -91,11 +88,13 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         Assert.Contains("IDD single-owner rule", protocolText);
         Assert.Contains("Coupling / Change Impact", protocolText);
         Assert.Contains("Process measurer", protocolText);
-        Assert.Contains("bounded retries", stateText, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("SHA-256", stateText);
-        Assert.Contains("cfp-arithmetic:", helperText);
-// The helper never attempts semantic process identification.
-        Assert.DoesNotContain("guess process", helperText);
+        Assert.Contains("one completed reader packet", stateText);
+        Assert.Contains("IDD-NNNN.cosmic.md", stateText);
+        Assert.Contains("Packet complete: IDD-NNNN", stateText);
+        Assert.Contains("Refresh all", stateText);
+        Assert.Contains("source freshness not verified", stateText);
+        Assert.Contains("no hash", stateText, StringComparison.OrdinalIgnoreCase);
+        Assert.False(File.Exists(Path.Combine(skill, "assets", "cosmic-state", "cosmic_state.py")));
         Assert.Contains("lossless", protocolText);
         Assert.Contains("outside the target repository", protocolText);
         Assert.Contains("BLOCKED", protocolText);
@@ -182,6 +181,33 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         Assert.Equal(1, large.GetProperty("expectedProcesses").GetArrayLength());
         Assert.Contains(large.GetProperty("expectedRestrictions").EnumerateArray(),
             x => x.GetString()!.Contains("range-covered", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void NumberedCacheContract_RequiresExplicitRefreshAndScopedReuseWithoutScripts()
+    {
+        var cache = fixture.ReadText(Path.Combine(fixture.RepoRoot, "src",
+            "canonical", "methodology", "cosmic-execution-state.md"));
+        var skill = fixture.ReadText(Path.Combine(fixture.RepoRoot, "src",
+            "canonical", "skills", "idd-intent-cosmic.md"));
+        Assert.Contains("IDD-NNNN.cosmic.md", cache);
+        Assert.Contains("Packet complete: IDD-NNNN", cache);
+        Assert.Contains("Refresh specific", cache);
+        Assert.Contains("Refresh all", cache);
+        Assert.Contains("Clear specific/all", cache);
+        Assert.Contains("source freshness not verified", cache);
+        Assert.Contains("requested scope", cache);
+        Assert.Contains("without rereading", cache);
+        Assert.Contains("no hash", cache, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("native file", skill);
+        Assert.DoesNotContain("cosmic_state.py", skill);
+        Assert.DoesNotContain("SHA-256", cache);
+        using var manifest = JsonDocument.Parse(fixture.ReadText(Path.Combine(
+            fixture.RepoRoot, "src", "canonical", "plugins", "plugin-manifest.json")));
+        var assets = manifest.RootElement.GetProperty("plugins")
+            .GetProperty("idd-intent").GetProperty("skillAssets").EnumerateArray();
+        Assert.DoesNotContain(assets, a => a.GetProperty("skill").GetString() ==
+            "idd-intent-cosmic");
     }
 
     [Fact]
