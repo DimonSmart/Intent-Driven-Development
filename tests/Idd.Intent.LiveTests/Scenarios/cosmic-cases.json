@@ -679,6 +679,66 @@
       ],
       "additionalIndexIds": [],
       "source": null
+    },
+    {
+      "id": "C26-numbered-cache-scoped-reuse",
+      "request": "Measure ONLY the two owner processes in IDD-0001 and IDD-0002. They already have completed numbered Markdown extraction packets in the supplied cache folder. Reuse both packets without rereading/replacing them, recompute CFP for just these two owners and state source freshness has not been checked. IDD-0003 is outside the selected scope; do not size it.",
+      "documents": {
+        "IDD-0001.spec-create-ticket.md": "# Create ticket\nClerk submits ticket details. The application stores the new ticket persistently and shows a success or human error response.\n",
+        "IDD-0002.spec-create-label.md": "# Create label\nClerk submits label details. The application stores a label persistently and shows a success or human error response.\n",
+        "IDD-0003.spec-create-batch.md": "# Create batch\nClerk submits batch details. The application stores a batch persistently and confirms completion or failure.\n"
+      },
+      "precomputedPackets": {
+        "IDD-0001.cosmic.md": "Source ID: IDD-0001\nSource: .idd/intent/IDD-0001.spec-create-ticket.md\nPacket format: idd-cosmic-reader-v1\nCoverage: Read in full\nRead ranges: 1-2 (complete file)\nPROCESS | P1 | Create ticket | Clerk | # Create ticket\nEVENT | P1 | Clerk requests create ticket | # Create ticket\nMOVE CANDIDATE | P1 | E | Ticket details | # Create ticket\nMOVE CANDIDATE | P1 | W | Stored ticket | # Create ticket\nMOVE CANDIDATE | P1 | X | Human confirmation | # Create ticket\nNo other processes identified\nPacket complete: IDD-0001\n",
+        "IDD-0002.cosmic.md": "Source ID: IDD-0002\nSource: .idd/intent/IDD-0002.spec-create-label.md\nPacket format: idd-cosmic-reader-v1\nCoverage: Read in full\nRead ranges: 1-2 (complete file)\nPROCESS | P1 | Create label | Clerk | # Create label\nEVENT | P1 | Clerk requests create label | # Create label\nMOVE CANDIDATE | P1 | E | Label details | # Create label\nMOVE CANDIDATE | P1 | W | Stored label | # Create label\nMOVE CANDIDATE | P1 | X | Human confirmation | # Create label\nNo other processes identified\nPacket complete: IDD-0002\n"
+      },
+      "cacheMode": "reuse",
+      "expectedStatus": "Complete",
+      "expectedProcesses": [
+        "Create ticket",
+        "Create label"
+      ],
+      "expectedMovements": [
+        "Create ticket: E ticket details / W ticket / X confirmation",
+        "Create label: E label details / W label / X confirmation"
+      ],
+      "expectedRestrictions": [
+        "Exactly the selected IDD-0001 and IDD-0002 own the measured processes; IDD-0003 is out of scope",
+        "Both existing complete numbered cache packets remain unchanged",
+        "Coverage 2/2; two packet reuse hits, zero newly read",
+        "Recompute two process totals for 6 CFP; do not reuse any previous CFP verdict",
+        "Cached input — source freshness not verified",
+        "No hashes, scripts, state database, source-code inspection or mandatory validator"
+      ],
+      "additionalIndexIds": [],
+      "source": null
+    },
+    {
+      "id": "C27-numbered-cache-explicit-refresh",
+      "request": "I changed the current Intent. Explicitly REFRESH IDD-0001: ignore the existing completed stale cache packet and fully re-read the actual current IDD-0001 spec, replace its numbered packet, then measure the updated process.",
+      "documents": {
+        "IDD-0001.spec-update-label.md": "# Update label\nClerk submits an existing label ID and updated label text. The product reads the current persisted label, writes the changed label, and shows a human success or error message. One update operation.\n"
+      },
+      "precomputedPackets": {
+        "IDD-0001.cosmic.md": "Source ID: IDD-0001\nSource: .idd/intent/IDD-0001.spec-update-label.md\nPacket format: idd-cosmic-reader-v1\nCoverage: Read in full\nRead ranges: 1-2 (complete file)\nPROCESS | P1 | Old create label | Clerk | # Old create label\nEVENT | P1 | Clerk requests old create label | # Old create label\nMOVE CANDIDATE | P1 | E | New label | # Old create label\nMOVE CANDIDATE | P1 | W | Stored label | # Old create label\nMOVE CANDIDATE | P1 | X | Confirmation | # Old create label\nNo other processes identified\nPacket complete: IDD-0001\n"
+      },
+      "cacheMode": "refresh",
+      "expectedStatus": "Complete",
+      "expectedProcesses": [
+        "Update label"
+      ],
+      "expectedMovements": [
+        "Update label: E ID and text / R existing label / W changed label / X human success/error"
+      ],
+      "expectedRestrictions": [
+        "Explicitly ignore stale completed packet content and actually read current source",
+        "Replace only IDD-0001.cosmic.md with fresh complete Update label extraction",
+        "Current measured process is Update label, not Old create label",
+        "Updated process has supported E R W X, 4 CFP",
+        "No automatic hash/mTimestamp invalidation or executable helper"
+      ],
+      "additionalIndexIds": [],
+      "source": null
     }
   ]
 }
