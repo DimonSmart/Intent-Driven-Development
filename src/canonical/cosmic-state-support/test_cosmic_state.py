@@ -121,7 +121,7 @@ class StateTests(unittest.TestCase):
             lines.append(f"OWNER | {caller} | IDD-0002.spec-p2.md | # Caller {n}")
             lines.append(
                 f"LINK | {caller} | IDD-0001#P1 | IDD-0002.spec-p2.md | # Caller {n}")
-        records.write_text("\\n".join(lines) + "\\n", encoding="utf8")
+        records.write_text("\n".join(lines) + "\n", encoding="utf8")
         result = mod.audit(self.data, records, complete=False)
         self.assertTrue(result["valid"], result)
         self.assertEqual(2, result["total_cfp"])
@@ -137,7 +137,7 @@ class StateTests(unittest.TestCase):
     def test_undocumented_connector_target_rejected(self):
         records = self.complete_fixture()
         with records.open("a", encoding="utf8") as stream:
-            stream.write("LINK | IDD-0002#P1 | IDD-0099#P1 | IDD-0002.spec-p2.md | # Missing\\n")
+            stream.write("LINK | IDD-0002#P1 | IDD-0099#P1 | IDD-0002.spec-p2.md | # Missing\n")
         result = mod.audit(self.data, records, True)
         self.assertIn("unresolved-link-target:IDD-0099#P1", result["errors"])
 
