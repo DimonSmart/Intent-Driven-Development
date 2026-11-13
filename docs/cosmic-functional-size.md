@@ -40,7 +40,7 @@ Example folder structure:
   IDD-0042.cosmic.md
 ```
 
-The cache folder is a separate, user-visible persistent directory outside the repository. The filenames use the same ID as `.idd/intent/IDD-NNNN.spec-*.md`, so the source inventory itself serves as the work queue. A completed packet must identify its exact source path and end with `Packet complete: IDD-NNNN`. Incomplete `.partial.md` files are ignored. No hashes, timestamps, file-change watchers, manifests or separate state engine are required.
+The cache folder is a separate, user-visible persistent directory outside the repository (for example, `~/.cache/idd-cosmic/<project-folder-name>/` on macOS/Linux, or a user-chosen writable directory). Reuse the same folder on later runs; if the host's sandbox cannot write there, obtain permission or choose another external directory rather than changing Product Intent. The filenames use the same ID as `.idd/intent/IDD-NNNN.spec-*.md`, so the source inventory itself serves as the work queue. A completed packet must identify its exact source path and end with `Packet complete: IDD-NNNN`. Incomplete `.partial.md` files are ignored. No hashes, timestamps, file-change watchers, manifests or separate state engine are required.
 
 Natural-language usage:
 
