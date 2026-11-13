@@ -38,6 +38,11 @@ The business summary reports **three separate judgments**:
 
 No weighted average, arbitrary points, delivery percent, time estimate, price, team size or person-days are generated.
 
+### Cross-spec connectors and change impact
+
+IDD assumes that a product process has one normative owning specification. Other specs may **reference** the process without redefining it; these are connectors, not duplicate processes to merge. If confirmed references establish distinct caller processes, report their **fan-in** separately from the number of merely referring specs and explain any corresponding interface/compatibility/failure-propagation risk. Greater confirmed fan-in can mean greater *qualitative* change and integration difficulty even when functional size is unchanged. It is not a new eighth dimension or a numeric multiplication of COSMIC CFP. Actual duplicate normative definitions should be referred to Intent structure audit/lint, not repaired in this assessment.
+
+
 ## COSMIC Preparation is not COSMIC Measurement
 
 The final section identifies possible software pieces, measurement scope, boundary, functional users, events, input/output, persistent data and functional process **candidates** where requirements allow. Data movement labels **Entry (E), Exit (X), Read (R), Write (W)** can appear only when the boundary and supporting requirements justify them. A REST call or SQL query is **not** automatically a COSMIC movement. Without a defined boundary the analysis reports **Unresolved** rather than inventing movements. It never calculates CFP, and a preliminary process candidate is **not** a verified COSMIC Functional Process.
