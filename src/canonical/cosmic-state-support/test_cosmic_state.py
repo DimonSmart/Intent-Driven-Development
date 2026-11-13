@@ -23,7 +23,12 @@ class StateTests(unittest.TestCase):
         for i in (1, 2):
             (self.intent / f"IDD-{i:04d}.spec-p{i}.md").write_text(
                 f"# Process {i}\n", encoding="utf8")
+        strategy = self.state / "strategy.md"
+        strategy.write_text(
+            "Boundary system; user clerk; layer application; granularity functional process",
+            encoding="utf8")
         self.data = {
+            "strategy_file": str(strategy), "strategy_sha256": mod.digest(strategy),
             "schema": 1, "protocol": mod.VERSION, "project": str(self.project),
             "boundary": "system", "state_dir": str(self.state),
             "sources": {
@@ -102,6 +107,19 @@ class StateTests(unittest.TestCase):
         records.write_text(content, encoding="utf8")
         self.assertIn("cosmic-rule-10c:IDD-0001#P1",
                       mod.audit(self.data, records, True)["errors"])
+
+    def test_changed_strategy_blocks_reuse(self):
+        records = self.complete_fixture()
+        Path(self.data["strategy_file"]).write_text("new boundary", encoding="utf8")
+        result = mod.audit(self.data, records, True)
+        self.assertIn("stale:@strategy:changed-or-unavailable", result["errors"])
+
+    def test_undocumented_connector_target_rejected(self):
+        records = self.complete_fixture()
+        with records.open("a", encoding="utf8") as stream:
+            stream.write("LINK | IDD-0002#P1 | IDD-0099#P1 | IDD-0002.spec-p2.md | # Missing\\n")
+        result = mod.audit(self.data, records, True)
+        self.assertIn("unresolved-link-target:IDD-0099#P1", result["errors"])
 
 
 if __name__ == "__main__":
