@@ -202,22 +202,23 @@ Claude/Codex package metadata. Run a manual Claude smoke on a disposable
 project with only current specs; do not report success until it is actually
 observed. Host unavailability is **not evaluated**, not "pass".
 
-## COSMIC v5.0 hierarchical owner/connector evaluations
+## COSMIC v5.0 hierarchical reader-cache evaluations
 
-`CosmicFunctionalSizeLiveTests` is a separate **opt-in real LLM** evaluation using generated installed skills, not a text-only contract test. It requires a working authenticated Codex or Claude host and native child-agent capability. Select targeted cases before attempting the full suite:
+`CosmicFunctionalSizeLiveTests` are separate **opt-in real-LLM** evaluations of the installed Codex/Claude skill. They are not included in normal CI. A real host with native child-agent and file access is required.
 
-- `C03-shared-fur`, `C21-multiple-owners`: one normative owner; other specifications are connector references, not duplicate process definitions.
-- `C22-full-scope-exhaustive`: 28 specs with 18 process owners and ten connector specs.
-- `C23-hierarchical-60-specs`: 60 specs, 20 owning processes and 40 connector specs; checks coverage, bounded hierarchy and **no CFP increase** from references.
-- `C24-single-owner-coupling`: three owner-defined calling processes reference another one; coupling must be separated from CFP.
-- `C25-large-spec-sections`: a single 75k-character spec; verifies exhaustive chunked range reading and consolidation.
+The fixture provides one external, persistent **per-case numbered cache directory**, which the agent can access without editing the target project. It tests natural language behaviors:
 
-Use `IDD_COSMIC_EVAL_CASE_IDS=C24-single-owner-coupling,C25-large-spec-sections` with `IDD_RUN_LIVE_COSMIC_EVALS=1` and `dotnet test tests/Idd.Intent.LiveTests/Idd.Intent.LiveTests.csproj --filter Category=LiveCosmicEval`. Both frameworks' model availability and runtime limits are host-dependent. These cases are **not** claims of executed LLM results.
+- `C03-shared-fur`, `C21-multiple-owners`: each process has exactly one normative owner; external specs are LINK references.
+- `C23-hierarchical-60-specs`: 60 documents, 20 owners, 40 non-owning connector specs.
+- `C24-single-owner-coupling`: three callers; fan-in is not additional CFP.
+- `C25-large-spec-sections`: one 75k-character spec requiring gap-free range consolidation.
+- **`C26-numbered-cache-scoped-reuse`**: seed two finished `IDD-NNNN.cosmic.md` packets, measure selected 2/3 sources, verify the existing packets stay unchanged, do not measure the third source, and disclose that reused source freshness is unverified.
+- **`C27-numbered-cache-explicit-refresh`**: seed a stale but identity-matching old extract, explicitly refresh, verify the cache entry changes, and measure the updated requirement rather than the old cached behavior.
 
-The separate optional, deterministic state helper can be checked without an LLM:
+To run targeted scenarios, set `IDD_RUN_LIVE_COSMIC_EVALS=1`, `IDD_COSMIC_EVAL_CASE_IDS=C26-numbered-cache-scoped-reuse,C27-numbered-cache-explicit-refresh`, then run:
 
 ```sh
-python3 -m unittest discover -s tests/Idd.Cosmic.State.Tests -p 'test_*.py'
+dotnet test tests/Idd.Intent.LiveTests/Idd.Intent.LiveTests.csproj --filter 'Category=LiveCosmicEval'
 ```
 
-It verifies checksum freshness, owner/link references, fan-in counts and CFP arithmetic only; it does **not** judge COSMIC semantics or the real native-agent trace. A complete acceptance run should additionally inspect spawn/reader/reducer/measurer traces and successful recovery on an interrupted large real project.
+The live harness uses host-native file operations, supports a separate cache folder, and checks the target workspace for changes. It does **not** execute extra COSMIC scripts, Python checkers or hash-based resume logic. A full acceptance run should also review native subagent traces and behavior on a substantial real project; scenario presence alone is not a live result.
