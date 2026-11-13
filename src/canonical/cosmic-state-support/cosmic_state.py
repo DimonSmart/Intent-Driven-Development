@@ -14,7 +14,7 @@ import tempfile
 
 SPEC = re.compile(r"IDD-\d{4}\.spec-[A-Za-z0-9_-]+\.md$")
 OWNER = re.compile(r"IDD-\d{4}#P[1-9]\d*$")
-VERSION = "owner-links-v1"
+VERSION = "owner-links-v2"
 
 
 def require(condition: bool, message: str) -> None:
@@ -64,7 +64,11 @@ def load(state_dir: Path) -> dict:
 def stale(data: dict) -> dict[str, str]:
     current = inventory(Path(data["project"]))
     old = data["sources"]
-    problems = {p: "new" for p in current.keys() - old.keys()}
+    strategy = Path(data["strategy_file"])
+    problems = {}
+    if not strategy.is_file() or digest(strategy) != data["strategy_sha256"]:
+        problems["@strategy"] = "changed-or-unavailable"
+    problems.update({p: "new" for p in current.keys() - old.keys()})
     problems.update({p: "removed" for p in old.keys() - current.keys()})
     problems.update({p: "changed" for p in current.keys() & old.keys()
                      if current[p] != old[p]["sha256"]})
@@ -212,18 +216,24 @@ def main() -> int:
     parser.add_argument("--source")
     parser.add_argument("--packet")
     parser.add_argument("--records")
+    parser.add_argument("--strategy-file")
     parser.add_argument("--complete", action="store_true")
     args = parser.parse_args()
     state_dir = Path(args.state_dir).resolve()
     state_path = state_dir / "run.json"
     if args.command == "init":
-        require(args.project and args.boundary, "init requires project and boundary")
+        require(args.project and args.boundary and args.strategy_file,
+                "init requires project, boundary and --strategy-file")
         project = Path(args.project).resolve()
         require(not contained(state_dir, project), "State directory must be outside project")
         require(not state_path.exists(), "Existing state: use status/invalidate rather than resetting")
+        strategy = Path(args.strategy_file).resolve()
+        require(contained(strategy, state_dir) and strategy.is_file(),
+                "Strategy file must exist inside state directory")
         data = {"schema": 1, "protocol": VERSION, "edition": "COSMIC 5.0",
                 "project": str(project), "state_dir": str(state_dir),
-                "boundary": args.boundary,
+                "boundary": args.boundary, "strategy_file": str(strategy),
+                "strategy_sha256": digest(strategy),
                 "sources": {name: {"sha256": sha, "status": "Pending", "packet": None,
                                    "packet_sha256": None}
                             for name, sha in inventory(project).items()}}
@@ -240,7 +250,9 @@ def main() -> int:
             require(args.source and args.packet, "mark requires source and packet")
             name = args.source
             require(name in data["sources"], f"Unknown source {name}")
-            require(name not in stale(data), f"Stale source or packet: {name}")
+            invalid = stale(data)
+            require("@strategy" not in invalid, "Measurement strategy changed: start new run")
+            require(name not in invalid, f"Stale source or packet: {name}")
             packet = Path(args.packet).resolve()
             require(contained(packet, state_dir) and packet.is_file(),
                     "Evidence packet must exist inside state directory")
@@ -252,6 +264,8 @@ def main() -> int:
             write_atomic(state_path, data)
             result = {"completed": name}
         elif args.command == "invalidate":
+            require("@strategy" not in stale(data),
+                    "Measurement strategy changed: initialize new run")
             invalidated = change_dependent_sources(data,
                         Path(args.records).resolve() if args.records else None)
             current = inventory(Path(data["project"]))
