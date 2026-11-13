@@ -19,7 +19,8 @@ public sealed class CosmicFunctionalSizeLiveTests
 {
     private sealed record CosmicCase(string Id, string Request, Dictionary<string, string> Documents,
         string ExpectedStatus, string[] ExpectedProcesses, string[] ExpectedMovements,
-        string[] ExpectedRestrictions, string[] AdditionalIndexIds, string? Source);
+        string[] ExpectedRestrictions, string[] AdditionalIndexIds, string? Source,
+        Dictionary<string, string>? PrecomputedPackets = null, string? CacheMode = null);
     private sealed record Corpus(int SchemaVersion, CosmicCase[] Scenarios);
     private sealed record RunResult(int? Code, string Output, string Error, string? Failure);
     private sealed record CaseResult(string Id, string Host, string Status, string Explanation,
@@ -75,7 +76,19 @@ public sealed class CosmicFunctionalSizeLiveTests
         {
             var work = Path.Combine(hostRoot, "workspaces", scenario.Id);
             Directory.CreateDirectory(work);
+            var cache = Path.Combine(hostRoot, "cache", scenario.Id);
+            Directory.CreateDirectory(cache);
             Seed(root, work, scenario);
+            if (scenario.PrecomputedPackets is not null)
+                foreach (var (fileName, content) in scenario.PrecomputedPackets)
+                {
+                    if (fileName != Path.GetFileName(fileName) ||
+                        !System.Text.RegularExpressions.Regex.IsMatch(fileName,
+                            @"^IDD-\d{4}\.cosmic\.md$"))
+                        throw new InvalidOperationException("Unsafe cache filename " + fileName);
+                    await File.WriteAllTextAsync(Path.Combine(cache, fileName), content);
+                }
+            var originalCache = Snapshot(cache);
             var before = Snapshot(work);
             var reply = Path.Combine(hostRoot, scenario.Id + "-response.md");
             var prompt = scenario.Id is "C11-business-only" or "C13-cost"
@@ -83,14 +96,24 @@ public sealed class CosmicFunctionalSizeLiveTests
                 : "Use the installed idd-intent-cosmic skill directly, read current " +
                   "FUR, and carry out this read-only measurement using isolated readers " +
                   "and bounded hierarchical reducers. Do not write any target-project " +
-                  "file. Session scratch Markdown evidence/ledger packets are allowed " +
-                  "only outside the target workspace. Do not execute project code, " +
-                  "scripts or validators, or create intermediate JSON models. " +
+                  "file. Store/reuse completed IDD-NNNN.cosmic.md reader packets in " +
+                  "the persistent project-specific cache directory: " + cache + ". " +
+                  "Use only native file tools. Do not use checksums, scripts, " +
+                  "validators or helper executables; do not create JSON state models. " +
                   "Do not invent CFP or claim independent mechanical validation:\n\n" + scenario.Request;
-            var invoke = await Invoke(agent, host, model, installed, work, reply, prompt, timeout);
+            var invoke = await Invoke(agent, host, model, installed, work, reply, prompt, timeout, cacheDirectory: cache);
             var answer = File.Exists(reply) ? await File.ReadAllTextAsync(reply) :
                 host == "claude" ? invoke.Output : "";
             var unchanged = before.SequenceEqual(Snapshot(work));
+            var newCache = Snapshot(cache);
+            var cacheError = scenario.CacheMode switch
+            {
+                "reuse" when !originalCache.SequenceEqual(newCache) =>
+                    "Reuse case unexpectedly changed the completed cache packets",
+                "refresh" when originalCache.SequenceEqual(newCache) =>
+                    "Explicit refresh did not replace any cache packet",
+                _ => null
+            };
             var status = "pass";
             var reason = "";
             var judge = "";
@@ -100,10 +123,10 @@ public sealed class CosmicFunctionalSizeLiveTests
                 reason = invoke.Failure ?? ("Agent exited with " + invoke.Code +
                     ": " + invoke.Error);
             }
-            else if (!unchanged)
+            else if (!unchanged || cacheError is not null)
             {
                 status = "semantic-failure";
-                reason = "The agent modified the target workspace";
+                reason = cacheError ?? "The agent modified the target workspace";
             }
             else
             {
@@ -250,12 +273,13 @@ public sealed class CosmicFunctionalSizeLiveTests
 
     private static async Task<RunResult> Invoke(string agent, string host, string model,
         string installed, string cwd, string output, string prompt, TimeSpan timeout,
-        bool judgeMode = false)
+        bool judgeMode = false, string? cacheDirectory = null)
     {
         if (host == "claude")
         {
             return await Run(agent,
-                ["-p", "--plugin-dir", installed, "--output-format", "text"],
+                ["-p", "--plugin-dir", installed, "--add-dir", cacheDirectory ?? cwd,
+                 "--output-format", "text"],
                 cwd, null, prompt, timeout);
         }
         return await Run(agent,
@@ -264,6 +288,7 @@ public sealed class CosmicFunctionalSizeLiveTests
              "-c", "approval_policy=never",
              "-c", "model_reasoning_effort=medium",
              "--model", model, "--sandbox", "workspace-write",
+             "--add-dir", cacheDirectory ?? cwd,
              "--cd", cwd, "--output-last-message", output, "-"],
             cwd, new Dictionary<string, string?> { ["CODEX_HOME"] = installed },
             prompt, timeout);
