@@ -81,10 +81,11 @@ public sealed class CosmicFunctionalSizeLiveTests
             var prompt = scenario.Id is "C11-business-only" or "C13-cost"
                 ? scenario.Request
                 : "Use the installed idd-intent-cosmic skill directly, read current " +
-                  "FUR, and carry out this read-only measurement. Do not write any " +
-                  "project file or create any intermediate model file. " +
-                  "Perform semantic self-review without executing project code, scripts, " +
-                  "validators or creating temporary models. " +
+                  "FUR, and carry out this read-only measurement using isolated readers " +
+                  "and bounded hierarchical reducers. Do not write any target-project " +
+                  "file. Session scratch Markdown evidence/ledger packets are allowed " +
+                  "only outside the target workspace. Do not execute project code, " +
+                  "scripts or validators, or create intermediate JSON models. " +
                   "Do not invent CFP or claim independent mechanical validation:\n\n" + scenario.Request;
             var invoke = await Invoke(agent, host, model, installed, work, reply, prompt, timeout);
             var answer = File.Exists(reply) ? await File.ReadAllTextAsync(reply) :
