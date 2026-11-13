@@ -52,6 +52,14 @@ Each gets **Low / Medium / High / Unknown**, or **Not applicable** only when doc
 | User Interaction | Linear interaction and few UI states | Complex real-time interactions, coordinated or multistage interfaces |
 | Operational Constraints | Confirmed ordinary limits | Strict performance, deployment/platform, compatibility or offline constraints |
 
+## Canonical ownership and change-impact coupling
+
+IDD assumes that every product process is normatively defined by exactly **one** owning current spec; another spec's use of the process is a **connector/reference**, not a second functional capability or an invitation to semantically deduplicate requirements. Actual duplicate normative definitions are outside the complexity-estimate skill and belong to Intent structure audit/lint; identify obvious structural anomalies as such without modifying Intent.
+
+When the actual requirements establish directed dependencies, report a **separate non-COSMIC Coupling / Change Impact** observation for materially reused capabilities. Distinguish (1) the number of **distinct confirmed caller processes** and (2) distinct referring specifications where the calling processes are not identifiable. A process with 100 independently confirmed consumers can have a larger verification, compatibility and change blast radius than one with one consumer, even when their COSMIC CFP sizes are identical. Count each caller only once, cite evidence, and explain the causal difficulty. Unknown caller identity is not evidence of zero incoming calls. Raw mention count is not caller-process fan-in.
+
+This observation may inform the already-existing qualitative **Integrations**, **Reliability & Security** or **Implementation Complexity** judgments only where actual interface, failure propagation, rollout, backward compatibility or coordinated behavior causes difficulty. It is not an eighth global dimension, not a numeric weight, not a multiplication of CFP and not an effort/time prediction. Many links alone do not automatically justify High in every dimension.
+
 Medium is a **substantiated intermediate difficulty**. No mechanical keyword, file-count, heading-count, criteria-count, screen-count or points algorithm. Many CRUD tasks need not mean High Business Logic; one difficult optimization algorithm may make a small product hard.
 
 For **each** dimension state the level, the **specific requirement** (not merely a feature list), how that requirement causes difficulty in **this** dimension, actual verified source file IDs/paths (prefer section or unique short excerpt), and material uncertainties. Silence about security, integrations, data and similar categories is **Unknown** when potentially significant: never default to Low or Not applicable.
