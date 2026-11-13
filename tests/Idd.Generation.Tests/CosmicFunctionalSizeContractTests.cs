@@ -90,7 +90,8 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         Assert.Contains("Process measurer", protocolText);
         Assert.Contains("one completed reader packet", stateText);
         Assert.Contains("IDD-NNNN.cosmic.md", stateText);
-        Assert.Contains("Packet complete: IDD-NNNN", stateText);
+        Assert.Contains("IDD-NNNN.cosmic.partial.md", stateText);
+        Assert.DoesNotContain("Packet complete:", stateText);
         Assert.Contains("Refresh all", stateText);
         Assert.Contains("source freshness not verified", stateText);
         Assert.Contains("no hash", stateText, StringComparison.OrdinalIgnoreCase);
@@ -191,7 +192,9 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         var skill = fixture.ReadText(Path.Combine(fixture.RepoRoot, "src",
             "canonical", "skills", "idd-intent-cosmic.md"));
         Assert.Contains("IDD-NNNN.cosmic.md", cache);
-        Assert.Contains("Packet complete: IDD-NNNN", cache);
+        Assert.Contains("IDD-NNNN.cosmic.partial.md", cache);
+        Assert.DoesNotContain("Packet complete:", cache);
+        Assert.Contains("final filename", cache);
         Assert.Contains("Refresh specific", cache);
         Assert.Contains("Refresh all", cache);
         Assert.Contains("Clear specific/all", cache);
@@ -234,8 +237,9 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
             {
                 Assert.StartsWith("IDD-", packet.Name);
                 Assert.EndsWith(".cosmic.md", packet.Name);
-                Assert.Contains("Packet complete: " + packet.Name[..8],
-                    packet.Value.GetString());
+                Assert.Contains("Source ID: " + packet.Name[..8], packet.Value.GetString());
+                Assert.Contains("Coverage: Read in full", packet.Value.GetString());
+                Assert.DoesNotContain("Packet complete:", packet.Value.GetString());
             }
     }
 
