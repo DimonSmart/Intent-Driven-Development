@@ -243,7 +243,7 @@
           "agent": "general-purpose",
           "background": false,
           "argument-hint": "[product area or IDD-NNNN IDs; default: current documented intent]",
-          "allowed-tools": "Read Glob Grep Agent Write"
+          "allowed-tools": "Read Glob Grep Agent Write Bash"
         }
       }
     }
