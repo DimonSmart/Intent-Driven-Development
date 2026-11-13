@@ -3,6 +3,9 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+import subprocess
+import sys
+import json
 
 spec = importlib.util.spec_from_file_location(
     "cosmic_state", Path(__file__).with_name("cosmic_state.py"))
@@ -127,6 +130,26 @@ class StateTests(unittest.TestCase):
         self.assertEqual(2, result["total_cfp"])
         self.assertEqual(100, result["coupling"]["IDD-0001#P1"]["confirmed_callers"])
         self.assertEqual(1, result["coupling"]["IDD-0001#P1"]["referring_specs"])
+
+    def test_retry_is_bounded_and_resume_state_is_durable(self):
+        script = Path(__file__).with_name("cosmic_state.py")
+        source = "IDD-0001.spec-p1.md"
+        for attempt in range(1, 4):
+            result = subprocess.run([
+                sys.executable, str(script), "fail", "--state-dir", str(self.state),
+                "--source", source, "--reason", "incomplete reader packet",
+            ], capture_output=True, text=True)
+            self.assertEqual(0, result.returncode, result.stderr)
+            info = json.loads(result.stdout)
+            self.assertEqual(attempt, info["failed_attempts"])
+        saved = mod.load(self.state)
+        self.assertEqual("Blocked", saved["sources"][source]["status"])
+        self.assertEqual(3, saved["sources"][source]["failed_attempts"])
+        again = subprocess.run([
+            sys.executable, str(script), "fail", "--state-dir", str(self.state),
+            "--source", source, "--reason", "repeat",
+        ], capture_output=True, text=True)
+        self.assertNotEqual(0, again.returncode)
 
     def test_changed_strategy_blocks_reuse(self):
         records = self.complete_fixture()
