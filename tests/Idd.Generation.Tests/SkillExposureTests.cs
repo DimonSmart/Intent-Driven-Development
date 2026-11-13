@@ -69,7 +69,8 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
                     if (ClaudeForked.Contains(name))
                     {
                         AssertScalar(yaml, "context", "fork");
-                        AssertScalar(yaml, "agent", name == "idd-intent-lint" ? "general-purpose" : "Explore");
+                        AssertScalar(yaml, "agent", name is "idd-intent-lint" or "idd-intent-cosmic"
+                            ? "general-purpose" : "Explore");
                         if (name == "idd-intent-lint")
                         {
                             AssertScalar(yaml, "argument-hint", "[scope] [mode: check|fix]");
@@ -82,7 +83,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
                         }
                         if (name == "idd-intent-cosmic")
                         {
-                            AssertScalar(yaml, "allowed-tools", "Read Glob Grep");
+                            AssertScalar(yaml, "allowed-tools", "Read Glob Grep Agent Write");
                             AssertScalar(yaml, "argument-hint",
                                 "[product area or IDD-NNNN IDs; default: current documented intent]");
                         }
