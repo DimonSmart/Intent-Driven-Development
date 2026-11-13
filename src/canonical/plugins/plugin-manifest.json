@@ -193,6 +193,11 @@
           "skill": "idd-intent-cosmic",
           "source": "src/canonical/methodology/cosmic-delegation-protocol.md",
           "destination": "cosmic-delegation-protocol.md"
+        },
+        {
+          "skill": "idd-intent-cosmic",
+          "source": "src/canonical/methodology/cosmic-execution-state.md",
+          "destination": "cosmic-execution-state.md"
         }
       ],
       "assets": [
@@ -213,6 +218,11 @@
           "skill": "idd-intent-visual-brainstorm",
           "source": "src/canonical/visual-intent-library",
           "destination": "visual-intent"
+        },
+        {
+          "skill": "idd-intent-cosmic",
+          "source": "src/canonical/cosmic-state-support",
+          "destination": "cosmic-state"
         }
       ]
     },
