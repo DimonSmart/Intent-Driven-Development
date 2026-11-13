@@ -70,9 +70,15 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         Assert.Contains("Phase 3", skillText);
         Assert.Contains("Read the full contents", skillText);
         Assert.Contains("Measured subtotal", skillText);
+        Assert.Contains("Completion contract", skillText);
+        Assert.Contains("Full-text sources reviewed: X/Y", skillText);
+        Assert.Contains("Execution incomplete / BLOCKED", skillText);
+        Assert.Contains("per-spec coverage ledger", skillText);
         Assert.Contains("Rule 10c", skillText);
         Assert.Contains("CFP = E + X + R + W", guideText);
         Assert.Contains("self-review", guideText);
+        Assert.Contains("Exhaustive scope contract", guideText);
+        Assert.Contains("Execution incomplete (BLOCKED)", guideText);
         Assert.Equal(fixture.ReadText(Path.Combine(canonical, "methodology",
                 "cosmic-measurement-guide.md")).ReplaceLineEndings("\n").TrimEnd(),
             guideText.ReplaceLineEndings("\n").TrimEnd());
@@ -89,6 +95,20 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
             Assert.Contains("disable-model-invocation: false", skillText);
             Assert.Contains("allowed-tools: Read Glob Grep", skillText);
         }
+    }
+
+    [Fact]
+    public void LargeLiveScenario_RequiresFullCoverageNotOneProcessSubtotal()
+    {
+        using var corpus = JsonDocument.Parse(fixture.ReadText(Path.Combine(
+            fixture.RepoRoot, "tests", "Idd.Intent.LiveTests", "Scenarios", "cosmic-cases.json")));
+        var scenario = corpus.RootElement.GetProperty("scenarios").EnumerateArray()
+            .Single(x => x.GetProperty("id").GetString() == "C22-full-scope-exhaustive");
+        Assert.Equal("Complete", scenario.GetProperty("expectedStatus").GetString());
+        Assert.Equal(28, scenario.GetProperty("documents").EnumerateObject().Count());
+        Assert.Equal(18, scenario.GetProperty("expectedProcesses").GetArrayLength());
+        Assert.Contains(scenario.GetProperty("expectedRestrictions").EnumerateArray(),
+            r => r.GetString()!.Contains("28/28", StringComparison.Ordinal));
     }
 
     [Fact]
