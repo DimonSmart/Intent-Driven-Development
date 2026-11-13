@@ -1,8 +1,8 @@
 # COSMIC experimental measurement: Intent-Driven-Development (13 Nov 2026)
 
-Status: **Diagnostic only — no mechanically validated CFP result**.
+Status: **Diagnostic only — no defensible CFP measurement in this preparation trial**.
 
-This is a conservative read-only **preparation trial**, not a claim of executing the generated skill with an active local Coding Agent. The document records the visible normative sources and the unresolved questions before any defensible full measurement. Running the installed idd-intent-cosmic skill with workspace access and the packaged validator is still needed for an actual numeric report.
+This is a conservative read-only **preparation trial**, not a claim of executing the generated skill with an active local Coding Agent. The document records the visible normative sources and the unresolved questions before any defensible full measurement. Running the installed idd-intent-cosmic skill with complete workspace FUR access and semantic self-review is still needed for a defensible numerical report. No executable validator is required.
 
 ## Verified current source inventory (GitHub main, 13 Nov 2026)
 
@@ -39,10 +39,10 @@ Measurement date: 2026-11-13.
 
 Overall product size: **Not determined**.
 
-Measured subtotal: **Not available** (no locally validated measurement model).
+Measured subtotal: **Not available** (the candidate processes and their movements have not been fully analyzed).
 
 Documentation inventory: reviewed listed current normative paths; semantic functional-process coverage incomplete.
 
 Method applicability: COSMIC captures justified data movement but does not value Factory reasoning/computational complexity.
 
-Required next action: run idd-intent-cosmic on the installed plugin in this repository, verify current FUR, resolve the boundary and event questions, create the temporary JSON model, and validate it with the **packaged** Node validator. Do not infer an effort estimate from any eventual CFP.
+Required next action: run idd-intent-cosmic on the installed plugin in this repository, verify current FUR, resolve the boundary and event questions, and produce an evidence-backed process/movement breakdown with semantic self-review. Do not infer an effort estimate from any eventual CFP.

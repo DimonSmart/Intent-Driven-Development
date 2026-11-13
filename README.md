@@ -12,7 +12,7 @@
 
 ## COSMIC Functional Size Measurement
 
-The read-only `idd-intent-cosmic` command measures COSMIC v5.0 Function Points from current `.idd/intent/` Functional User Requirements. It is separate from qualitative `idd-intent-estimate`: the scope, software boundary, functional users and E/X/R/W movements must be supported by the product specs. A packaged local Node.js validator (Node 20+) checks JSON structure, source anchors and CFP arithmetic; it does **not** certify semantic correctness. Incomplete FUR yield only measured subtotals or diagnostics, never a guessed total or effort prediction. See [usage and model limitations](docs/cosmic-functional-size.md).
+The read-only `idd-intent-cosmic` command measures COSMIC v5.0 Function Points from current `.idd/intent/` Functional User Requirements. It is separate from qualitative `idd-intent-estimate`: the scope, software boundary, functional users and E/X/R/W movements must be supported by the product specs. The skill needs no executable validator or temporary files: it uses exact spec evidence, a documented semantic self-review checklist, and explicit E/X/R/W arithmetic. Results are LLM-reviewed, not independently mechanically validated. Incomplete FUR yield only supported subtotals or diagnostics, never a guessed total or effort prediction. See [usage and model limitations](docs/cosmic-functional-size.md).
 
 ## What Is Intent-Driven Development?
 

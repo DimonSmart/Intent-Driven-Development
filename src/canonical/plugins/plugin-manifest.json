@@ -188,11 +188,6 @@
           "skill": "idd-intent-cosmic",
           "source": "src/canonical/methodology/cosmic-measurement-guide.md",
           "destination": "cosmic-measurement-guide.md"
-        },
-        {
-          "skill": "idd-intent-cosmic",
-          "source": "src/canonical/methodology/cosmic-validator.mjs",
-          "destination": "cosmic-validator.mjs"
         }
       ],
       "assets": [

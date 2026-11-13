@@ -82,9 +82,9 @@ public sealed class CosmicFunctionalSizeLiveTests
                 ? scenario.Request
                 : "Use the installed idd-intent-cosmic skill directly, read current " +
                   "FUR, and carry out this read-only measurement. Do not write any " +
-                  "project file; any model must be stored outside this workspace. " +
-                  "Run the *packaged* local validator where safely permitted. " +
-                  "Do not invent CFP or a successful validator run:\n\n" + scenario.Request;
+                  "project file or create any intermediate model file. " +
+                  "Perform semantic self-review without shell commands or temporary models. " +
+                  "Do not invent CFP or claim independent mechanical validation:\n\n" + scenario.Request;
             var invoke = await Invoke(agent, host, model, installed, work, reply, prompt, timeout);
             var answer = File.Exists(reply) ? await File.ReadAllTextAsync(reply) :
                 host == "claude" ? invoke.Output : "";
@@ -119,7 +119,7 @@ public sealed class CosmicFunctionalSizeLiveTests
                     "and per-process movement sets against the explicit scenario FUR and " +
                     "expected semantic facts, not just overall CFP. Reject duplicate or " +
                     "invented processes/movements, missing sources, wrong boundaries, " +
-                    "unverified mechanical validation claims, workspace writes, incorrect " +
+                    "claims of independent mechanical validation, workspace writes, incorrect " +
                     "full CFP, or a numerical claim inconsistent with the required movements. " +
                     "Some negative cases correctly report diagnostic only. " +
                     "Reply ONLY with JSON {\"pass\":boolean,\"reason\":string," +

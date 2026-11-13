@@ -380,6 +380,42 @@
       ],
       "additionalIndexIds": [],
       "source": null
+    },
+    {
+      "id": "C21-multiple-owners",
+      "request": "Measure the whole documented product across six owning specs. Reconcile duplicate parts of one workflow rather than counting each file or heading as a process.",
+      "documents": {
+        "IDD-0001.spec-copy.md": "# Copy\nThe user requests copying a file. The application reads its content from persistent file storage, writes a destination file to persistent storage, and displays success or a human-facing failure.\n",
+        "IDD-0002.spec-copy-options.md": "# Copy options\nThis document extends the same user-triggered Copy process: the user may select overwrite behavior. The application still copies the requested source and reports success or failure; this is not a second independently triggered copy workflow.\n",
+        "IDD-0003.spec-open.md": "# Open file\nThe user selects Open. The application reads the selected persisted file content and displays it to the user.\n",
+        "IDD-0004.spec-rename.md": "# Rename file\nThe user submits a new name for a selected persisted file. The application updates the stored name and confirms the result or reports an error to the user.\n",
+        "IDD-0005.spec-folder.md": "# Create folder\nThe user requests creation of a named folder. The application persists the folder and confirms completion or reports an error.\n",
+        "IDD-0006.spec-preferences.md": "# Display preferences\nThe user opens Preferences. The application reads previously saved settings from persistent storage and displays them to the user.\n"
+      },
+      "expectedStatus": "Complete",
+      "expectedProcesses": [
+        "Copy file",
+        "Open file",
+        "Rename file",
+        "Create folder",
+        "Display preferences"
+      ],
+      "expectedMovements": [
+        "Copy: E request / R source / W destination / X result",
+        "Open: E request / R file / X content",
+        "Rename: E request / W stored name / X result",
+        "Create folder: E request / W folder / X result",
+        "Preferences: E request / R settings / X settings"
+      ],
+      "expectedRestrictions": [
+        "Read all six current numbered specs, not only headings",
+        "Copy is one process spanning two specs, not two",
+        "Every measured movement cites source evidence",
+        "Show per-process CFP and a complete total only if all current FUR are covered",
+        "Use no validator, Node.js, Bash, or temporary model"
+      ],
+      "additionalIndexIds": [],
+      "source": null
     }
   ]
 }

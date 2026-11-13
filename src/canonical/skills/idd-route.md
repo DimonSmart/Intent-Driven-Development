@@ -101,8 +101,8 @@ inconsistent field **before** producing the final Markdown:
 - `intent-cosmic-measurement` uses exactly `idd-intent-cosmic`, with
   `Operation`, `Execution depth` and `Audit scope: not-applicable`;
   a requested measurement is `end-to-end` read-only and route advice is
-  `route-only`. No prerequisite estimate, no code/Factory, and no CFP from
-  unverified or incomplete FUR. Preserve the exact selected scope; do not
+  `route-only`. No prerequisite estimate, no code/Factory, and no whole-product CFP from
+  incomplete FUR; supported partial subtotals remain allowed. Preserve the exact selected scope; do not
   confuse Business Complexity or effort forecasting with functional size.
 - `intent-estimation` uses exactly `idd-intent-estimate`, with `Operation`,
   `Execution depth` and `Audit scope: not-applicable`; `end-to-end` means
