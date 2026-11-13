@@ -6,19 +6,20 @@
 
 Ask **"Measure the current documented product in COSMIC v5.0 CFP"**, **"Count COSMIC Function Points for the order module"** or invoke `idd-intent-cosmic` directly. Optional area/IDD IDs restrict the requested scope, but all specs that jointly define its functional processes must be read.
 
-**No Node.js validator, execution permission, shell command, temporary JSON/model file or additional runtime is needed.** The skill reads current Intent documents and returns a Markdown report; it never edits project files or executes product code. The installed skill has one bundled reference: `references/cosmic-measurement-guide.md`.
+**Native isolated child agents are required.** A fresh reader analyzes each spec, and fresh reducers merge compact indices under an input-size budget. There is no Node.js validator, custom execution engine, structured nested JSON, or target-project file edit. When supported, session-only Markdown packets and the separate coverage ledger can be stored in scratch **outside** the repository. The installed skill bundles `references/cosmic-measurement-guide.md` and `references/cosmic-delegation-protocol.md`. Without native child-agent isolation the result must be `Execution incomplete (BLOCKED)`, not a silently downgraded same-context run.
 
 ## Measurement procedure
 
 1. Inventory the actual numbered files and reconcile `INDEX.md`. Read *full* current in-scope spec contents rather than just headings, including related owners. ADRs clarify accepted context but do not introduce missing FUR.
 2. Define purpose, scope, software boundary, layer, decomposition, functional-process granularity and external functional users.
-3. For a large scope, process **every current in-scope spec** in repeated manageable groups. Maintain a coverage ledger (exact path, actually read full text, owned/related process IDs or specific no-process rationale, source anchor). Reconcile cross-spec overlap before counting. The default whole-product request is **exhaustive**, not a convenient partial sample.
-4. Identify triggering events, unique complete functional processes, objects of interest and data groups. Include alternatives.
-5. Assign Entry (E), Exit (X), Read (R) and Write (W) only for supported data movements. Every Measured process needs an initiating E and at least one X or W (Rule 10c). A movement normally counts once per type/group/recipient within a process unless distinct required semantics are supported.
-6. Cite the current spec path and short exact quote/heading for **every process and movement**. Independently re-count `CFP = E + X + R + W` in the displayed per-process breakdown.
-7. Reconcile duplicate and ambiguous candidates and report coverage, compatible totals, exclusions and applicability limitations.
+3. Dispatch **every current in-scope spec** to a fresh native child reader. Each reader returns a small Markdown packet (source, read status, candidate process/trigger/user, movement evidence, related owners, unresolved questions). If a single spec is too large, isolate its sections and reconcile gap-free source coverage.
+4. Keep a **separate per-spec coverage ledger** (actual path, read state, packet reference, candidates/no-process rationale, source anchor and errors), independent of any summaries. Source-backed packets must stay retrievable.
+5. Merge small groups of **compact process indices** through fresh reducer agents. Use no more than approximately 6,000 input tokens or 20% of usable context per handoff, whichever is smaller, including reserve for instructions and output in the overall budget. Recurse as needed; partition every packet exactly once at each level, and preserve evidence outside the compressed summary.
+6. Reconcile duplicate/related processes across groups using lossless evidence, then identify complete triggering events, data groups and boundaries. Do not simply add per-file CFP estimates.
+7. Assign Entry (E), Exit (X), Read (R) and Write (W) only for supported data movements. Every Measured process needs an initiating E and at least one X or W (Rule 10c). Cite the actual current spec and short exact quote/heading for **every process and movement**.
+8. Independently re-count `CFP = E + X + R + W` for each unique compatible process; report coverage, totals/subtotals only if justified, exclusions and applicability limitations. Return the complete **user-facing Markdown report** separately from the compact handoff used by child agents.
 
-The analysis uses **semantic LLM self-review**, not an independent mechanical validation. No tool can infer absent requirements. Full-product size requires reading all declared documented FUR, not merely inventorying file names. Before a finished report, the skill must show `Full-text sources reviewed: X/Y` and the per-spec ledger. An available spec simply left unread is an unfinished execution, **not an acceptable reason to return an otherwise successful Partial result**. Keep processing unless a concrete tool/context limit prevents it; when blocked, report that limit and the unread paths.
+The reading, reduction and final reconciliation remain **semantic LLM analysis**, not independent mechanical validation. The new protocol is implemented as prompt-level native-agent orchestration, not a hard-coded deterministic pipeline. No tool can infer absent requirements. Full-product size requires reading all declared documented FUR, not merely inventorying file names. Before a finished report, the skill must show `Full-text sources reviewed: X/Y` and the per-spec ledger. An available spec simply left unread is an unfinished execution, **not an acceptable reason to return an otherwise successful Partial result**. Keep processing unless a concrete tool/context limit prevents it; when blocked, report that limit and the unread paths.
 
 ## Complete, Partial, Diagnostic only
 
@@ -49,6 +50,7 @@ COSMIC measures movements, not internal algorithm or AI complexity. A small CFP 
 
 - `src/canonical/skills/idd-intent-cosmic.md` — canonical read-only skill.
 - `src/canonical/methodology/cosmic-measurement-guide.md` — rule mapping and manual analytical self-review.
+- `src/canonical/methodology/cosmic-delegation-protocol.md` — isolated per-spec readers, compact Markdown packet schema, scratch evidence ledger, recursive bounded reducers and cross-group reconciliation.
 - `tests/Idd.Generation.Tests/CosmicFunctionalSizeContractTests.cs` — generated skill/metadata packaging and read-only tooling requirements.
 - `tests/Idd.Intent.LiveTests/Scenarios/cosmic-cases.json` and `CosmicFunctionalSizeLiveTests.cs` — optional **real LLM** semantic checks of process and movement inventories; opt in via `IDD_RUN_LIVE_COSMIC_EVALS=1`. Not run in regular CI.
 - [IDD scope diagnostic example](examples/cosmic-idd-diagnostic.md).
