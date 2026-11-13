@@ -58,7 +58,7 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
     [Theory]
     [InlineData("claude")]
     [InlineData("codex")]
-    public void InstalledGeneratedPlugin_PackagesAndRunsRealValidator(string host)
+    public async Task InstalledGeneratedPlugin_PackagesAndRunsRealValidator(string host)
     {
         var canonical = Path.Combine(fixture.RepoRoot, "src", "canonical");
         var skill = Path.Combine(fixture.MarketplaceRoot, "plugins", host,
@@ -115,9 +115,10 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
                 throw new InvalidOperationException("Node.js is required for COSMIC validator");
             var stdout = launched.StandardOutput.ReadToEndAsync();
             var stderr = launched.StandardError.ReadToEndAsync();
-            Assert.True(launched.WaitForExit(30_000), "Validator did not terminate");
-            Assert.True(launched.ExitCode == 0, stderr.GetAwaiter().GetResult());
-            using var calculated = JsonDocument.Parse(stdout.GetAwaiter().GetResult());
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await launched.WaitForExitAsync(deadline.Token);
+            Assert.True(launched.ExitCode == 0, await stderr);
+            using var calculated = JsonDocument.Parse(await stdout);
             var result = calculated.RootElement;
             Assert.True(result.GetProperty("mechanicallyValidated").GetBoolean());
             Assert.Equal(2, result.GetProperty("overallSize").GetInt32());
@@ -125,8 +126,8 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
             Assert.Equal("Complete", result.GetProperty("status").GetString());
             Assert.Equal(original, File.ReadAllText(Path.Combine(docs,
                 "IDD-0001.spec-task.md")));
-            Assert.Single(Directory.GetFiles(workspace, "*", SearchOption.AllDirectories)
-                .Where(x => x.EndsWith(".md", StringComparison.Ordinal)));
+            Assert.Single(Directory.GetFiles(workspace, "*", SearchOption.AllDirectories),
+                x => x.EndsWith(".md", StringComparison.Ordinal));
         }
         finally
         {
