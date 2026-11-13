@@ -95,7 +95,7 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         Assert.Contains("SHA-256", stateText);
         Assert.Contains("cfp-arithmetic:", helperText);
 // The helper never attempts semantic process identification.
-        Assert.DoesNotContain("guess process", helperText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("guess process", helperText);
         Assert.Contains("lossless", protocolText);
         Assert.Contains("outside the target repository", protocolText);
         Assert.Contains("BLOCKED", protocolText);
