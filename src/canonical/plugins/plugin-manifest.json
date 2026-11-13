@@ -218,11 +218,6 @@
           "skill": "idd-intent-visual-brainstorm",
           "source": "src/canonical/visual-intent-library",
           "destination": "visual-intent"
-        },
-        {
-          "skill": "idd-intent-cosmic",
-          "source": "src/canonical/cosmic-state-support",
-          "destination": "cosmic-state"
         }
       ]
     },
