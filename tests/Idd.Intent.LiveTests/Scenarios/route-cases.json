@@ -865,6 +865,74 @@
       },
       "contract": "Source code complexity must not route to Intent estimator",
       "kind": "manual-review"
+    },
+    {
+      "id": "cosmic-measure-whole",
+      "request": "Measure the current documented Product Intent in COSMIC Function Points (CFP) across the intended product.",
+      "expected": {
+        "classification": "intent-cosmic-measurement",
+        "operation": "not-applicable",
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-cosmic",
+        "currentHandoff": "idd-intent-cosmic",
+        "auditScope": "not-applicable",
+        "standaloneFactory": false,
+        "clarity": "clear",
+        "executionDepth": "not-applicable"
+      },
+      "contract": "Read-only COSMIC measurement without Factory or business complexity mixing",
+      "kind": "ordinary"
+    },
+    {
+      "id": "cosmic-measure-area",
+      "request": "Show COSMIC v5.0 CFP for only the order management area of the current intents.",
+      "expected": {
+        "classification": "intent-cosmic-measurement",
+        "operation": "not-applicable",
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-cosmic",
+        "currentHandoff": "idd-intent-cosmic",
+        "auditScope": "not-applicable",
+        "standaloneFactory": false,
+        "clarity": "clear",
+        "executionDepth": "not-applicable"
+      },
+      "contract": "Scoped FUR measurement preserves area and excludes unknown unrelated areas",
+      "kind": "ordinary"
+    },
+    {
+      "id": "cosmic-advice-only",
+      "request": "Which IDD skill measures functional size by COSMIC? Just tell me the route, don't execute.",
+      "expected": {
+        "classification": "intent-cosmic-measurement",
+        "operation": "not-applicable",
+        "requestedScope": "route-only",
+        "firstSkill": "idd-intent-cosmic",
+        "currentHandoff": "none",
+        "auditScope": "not-applicable",
+        "standaloneFactory": false,
+        "clarity": "clear",
+        "executionDepth": "not-applicable"
+      },
+      "contract": "Advice-only route, no handoff",
+      "kind": "ordinary"
+    },
+    {
+      "id": "cosmic-business-distinct",
+      "request": "Assess qualitative business complexity from current Product Intent, not CFP.",
+      "expected": {
+        "classification": "intent-estimation",
+        "operation": "not-applicable",
+        "requestedScope": "end-to-end",
+        "firstSkill": "idd-intent-estimate",
+        "currentHandoff": "idd-intent-estimate",
+        "auditScope": "not-applicable",
+        "standaloneFactory": false,
+        "clarity": "clear",
+        "executionDepth": "not-applicable"
+      },
+      "contract": "Keep qualitative first stage separate from numerical CFP",
+      "kind": "ordinary"
     }
   ]
 }

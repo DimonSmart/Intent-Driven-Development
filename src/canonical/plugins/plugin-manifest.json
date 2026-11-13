@@ -13,6 +13,7 @@
         "idd-skip",
         "idd-intent-structure-audit",
         "idd-intent-estimate",
+        "idd-intent-cosmic",
         "idd-intent-clarify",
         "idd-intent-brainstorm",
         "idd-intent-visual-brainstorm",
@@ -182,6 +183,16 @@
           "skill": "idd-intent-brainstorm",
           "source": "src/canonical/methodology/brainstorm-method.md",
           "destination": "brainstorm-method.md"
+        },
+        {
+          "skill": "idd-intent-cosmic",
+          "source": "src/canonical/methodology/cosmic-measurement-guide.md",
+          "destination": "cosmic-measurement-guide.md"
+        },
+        {
+          "skill": "idd-intent-cosmic",
+          "source": "src/canonical/methodology/cosmic-validator.mjs",
+          "destination": "cosmic-validator.mjs"
         }
       ],
       "assets": [

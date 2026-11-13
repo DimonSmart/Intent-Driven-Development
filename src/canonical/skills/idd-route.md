@@ -98,6 +98,12 @@ inconsistent field **before** producing the final Markdown:
 - `Classification` is an exact Core classification token, never a skill name
   or a shortened variant such as `intent-change`. `Operation` is
   `not-applicable` except for `product-change` and `engineering-change`.
+- `intent-cosmic-measurement` uses exactly `idd-intent-cosmic`, with
+  `Operation`, `Execution depth` and `Audit scope: not-applicable`;
+  a requested measurement is `end-to-end` read-only and route advice is
+  `route-only`. No prerequisite estimate, no code/Factory, and no CFP from
+  unverified or incomplete FUR. Preserve the exact selected scope; do not
+  confuse Business Complexity or effort forecasting with functional size.
 - `intent-estimation` uses exactly `idd-intent-estimate`, with `Operation`,
   `Execution depth` and `Audit scope: not-applicable`; `end-to-end` means
   the complete **read-only assessment**, `route-only` only advice. Preserve
