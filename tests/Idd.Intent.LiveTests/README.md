@@ -217,7 +217,7 @@ Use `IDD_COSMIC_EVAL_CASE_IDS=C24-single-owner-coupling,C25-large-spec-sections`
 The separate optional, deterministic state helper can be checked without an LLM:
 
 ```sh
-python3 -m unittest discover -s src/canonical/cosmic-state-support -p 'test_*.py'
+python3 -m unittest discover -s tests/Idd.Cosmic.State.Tests -p 'test_*.py'
 ```
 
 It verifies checksum freshness, owner/link references, fan-in counts and CFP arithmetic only; it does **not** judge COSMIC semantics or the real native-agent trace. A complete acceptance run should additionally inspect spawn/reader/reducer/measurer traces and successful recovery on an interrupted large real project.
