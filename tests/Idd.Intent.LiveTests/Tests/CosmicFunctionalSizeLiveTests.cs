@@ -83,7 +83,8 @@ public sealed class CosmicFunctionalSizeLiveTests
                 : "Use the installed idd-intent-cosmic skill directly, read current " +
                   "FUR, and carry out this read-only measurement. Do not write any " +
                   "project file or create any intermediate model file. " +
-                  "Perform semantic self-review without shell commands or temporary models. " +
+                  "Perform semantic self-review without executing project code, scripts, " +
+                  "validators or creating temporary models. " +
                   "Do not invent CFP or claim independent mechanical validation:\n\n" + scenario.Request;
             var invoke = await Invoke(agent, host, model, installed, work, reply, prompt, timeout);
             var answer = File.Exists(reply) ? await File.ReadAllTextAsync(reply) :
