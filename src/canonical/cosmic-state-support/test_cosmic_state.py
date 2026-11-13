@@ -108,6 +108,26 @@ class StateTests(unittest.TestCase):
         self.assertIn("cosmic-rule-10c:IDD-0001#P1",
                       mod.audit(self.data, records, True)["errors"])
 
+    def test_one_hundred_inbound_links_do_not_inflate_owner_cfp(self):
+        records = self.state / "many-links.txt"
+        lines = [
+            "OWNER | IDD-0001#P1 | IDD-0001.spec-p1.md | # Main",
+            "MOVE | IDD-0001#P1 | E | Request | # Main",
+            "MOVE | IDD-0001#P1 | W | Record | # Main",
+            "MEASURE | IDD-0001#P1 | system | E=1,X=0,R=0,W=1 | CFP=2",
+        ]
+        for n in range(1, 101):
+            caller = f"IDD-0002#P{n}"
+            lines.append(f"OWNER | {caller} | IDD-0002.spec-p2.md | # Caller {n}")
+            lines.append(
+                f"LINK | {caller} | IDD-0001#P1 | IDD-0002.spec-p2.md | # Caller {n}")
+        records.write_text("\\n".join(lines) + "\\n", encoding="utf8")
+        result = mod.audit(self.data, records, complete=False)
+        self.assertTrue(result["valid"], result)
+        self.assertEqual(2, result["total_cfp"])
+        self.assertEqual(100, result["coupling"]["IDD-0001#P1"]["confirmed_callers"])
+        self.assertEqual(1, result["coupling"]["IDD-0001#P1"]["referring_specs"])
+
     def test_changed_strategy_blocks_reuse(self):
         records = self.complete_fixture()
         Path(self.data["strategy_file"]).write_text("new boundary", encoding="utf8")
