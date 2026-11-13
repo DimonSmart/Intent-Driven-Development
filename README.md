@@ -1,7 +1,7 @@
 # Intent-Driven Development
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/DimonSmart/Intent-Driven-Development/v2.0.96/docs/assets/idd-thought-experiment.png" alt="Intent-Driven Development thought experiment: delete the implementation, keep only the intent, and rebuild the product" />
+  <img src="https://raw.githubusercontent.com/DimonSmart/Intent-Driven-Development/v2.0.97/docs/assets/idd-thought-experiment.png" alt="Intent-Driven Development thought experiment: delete the implementation, keep only the intent, and rebuild the product" />
 </p>
 
 <p align="center">
@@ -34,7 +34,7 @@ IDD organizes product knowledge so the answer can move closer to **yes**.
 
 IDD is used in substantial public projects, not only small examples. **[CSharpFar](https://github.com/DimonSmart/CSharpFar)** includes a custom terminal window and UI subsystem, dual-panel file management, remote providers, and extensive behavior specifications. **[CSharpGit](https://github.com/DimonSmart/CSharpGit)** applies durable Intent to a cross-platform Git desktop client with history editing, repository-state coordination, and platform-specific presentation concerns.
 
-[Explore the Real-world IDD Showcase](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/real-world-showcase.md) for real demos, measured source-code scope, and direct links to the projects' current Intent documents.
+[Explore the Real-world IDD Showcase](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/real-world-showcase.md) for real demos, measured source-code scope, and direct links to the projects' current Intent documents.
 
 ## Core Intent Plugin and Optional Factory
 
@@ -61,6 +61,35 @@ The direction is maximum economy: native child agents, no model-driven polling, 
 
 </details>
 
+## Clarification versus Brainstorm
+
+Two optional, read-only Product exploration workflows have different purposes:
+
+- `idd-intent-clarify` narrows one proposed Product requirement, resolves missing behavior and justified complexity, and prepares an explicit confirmation or an already-confirmed specification-ready handoff.
+- `idd-intent-brainstorm` explores substantially different strategies and challenges assumptions; it may produce a temporary Decision Brief without selecting a single winner.
+
+Ask naturally to **clarify this requirement**, or to **brainstorm alternative ways to solve this problem**. In Codex the installed `idd-intent` plugin also exposes the skill by its ID; Claude Code can select it automatically through natural language rather than a slash command. Neither skill writes Product Intent, and neither is mandatory before a clear user-confirmed `idd-intent-change`. Only explicitly approved Product decisions may be handed to that owner. Exploratory hypotheses and discussions are not persisted in `.idd/intent/`.
+
+## Business Complexity Assessment
+
+`idd-intent-estimate` assesses the **required target product** from current
+`.idd/intent/` specifications, including projects with no code. Its read-only
+Markdown report distinguishes **Product Scope** (Small/Medium/Large),
+**Implementation Complexity** (Low/Medium/High), and **Assessment Confidence**
+(Low/Medium/High), plus seven qualitative complexity dimensions. A preliminary
+**COSMIC Preparation** section identifies possible future measurement boundaries
+and functional-process candidates without calculating CFP. It does **not**
+predict budget, deadlines, effort, remaining work, or code quality.
+
+Ask naturally to *assess business complexity from current Product Intent* or
+invoke `/idd-intent-estimate` in Claude Code and select the installed
+`$idd-intent-estimate` skill in Codex. Both explicit and automatic invocation
+are supported; the command's visibility depends on the host/version. Scope can
+be limited to a product area or specific IDD IDs. No Factory plugin is required.
+
+See [Business Complexity Assessment](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/business-complexity-assessment.md)
+for report interpretation, COSMIC boundaries, examples and limitations.
+
 ## Visual Intent discovery
 
 `idd-intent-visual-brainstorm` helps turn screenshots, visual inspiration and
@@ -80,7 +109,7 @@ The brainstorm alone does not write Product Intent; confirmed handoffs can be
 saved separately without restarting discovery.
 
 Branch development and local validation are documented in
-[Testing plugins locally](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/local-plugin-development.md).
+[Testing plugins locally](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/local-plugin-development.md).
 Windows Codex users can switch between published and local IDD using
 `scripts/Switch-Idd-Codex.bat published` or `scripts/Switch-Idd-Codex.bat local`.
 
@@ -116,7 +145,7 @@ children, which read their internal Skills from the same installed Factory
 package. Native child creation, fresh context, access to installed files,
 blocking wait and safe cancellation still need host support. The absence of
 `agent_type` in Codex Desktop is not itself a blocker. See
-[Factory installation and capabilities](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/factory-native-agent-installation.md).
+[Factory installation and capabilities](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/factory-native-agent-installation.md).
 
 Questions about IDD itself can be addressed at any time by manually invoking `idd-help`. Use it to ask how the methodology works, why a workflow is chosen, what a skill does, or how a particular IDD rule should be interpreted.
 
@@ -165,43 +194,44 @@ model invocation. Codex retains all registered skills and implicit invocation;
 its current skill metadata has no equivalent guaranteed user-menu visibility
 control. Hiding a command does not change manual-only invocation restrictions.
 Describe the outcome and scope instead of invoking hidden Claude skills
-directly. See [IDD Use Cases](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/using-idd.md) for examples.
+directly. See [IDD Use Cases](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/using-idd.md) for examples.
 
 ## Update an Existing Installation
 
-Already have `idd-intent` or `idd-factory` installed? Follow [Updating IDD](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/updating-idd.md) to refresh the marketplace, update or reinstall the plugins, verify the installed versions, and load them in a new session.
+Already have `idd-intent` or `idd-factory` installed? Follow [Updating IDD](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/updating-idd.md) to refresh the marketplace, update or reinstall the plugins, verify the installed versions, and load them in a new session.
 
-Updating the plugin does not automatically migrate project-owned intent documents. Review [Updates and Breaking Changes](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/updates-and-breaking-changes.md) for repository migration instructions.
+Updating the plugin does not automatically migrate project-owned intent documents. Review [Updates and Breaking Changes](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/updates-and-breaking-changes.md) for repository migration instructions.
 
 ## Use Cases
 
-Open [IDD Use Cases](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/using-idd.md) when you need to decide what to do next. It covers existing and new projects, product changes, implementation-only work, audits, verification, Factory, installation checks, updates, and deliberate IDD bypass.
+Open [IDD Use Cases](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/using-idd.md) when you need to decide what to do next. It covers existing and new projects, product changes, implementation-only work, audits, verification, Factory, installation checks, updates, and deliberate IDD bypass.
 
 ## Updates and Breaking Changes
 
-Release-specific migration instructions are maintained on the dedicated [Updates and Breaking Changes](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/updates-and-breaking-changes.md) page.
+Release-specific migration instructions are maintained on the dedicated [Updates and Breaking Changes](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/updates-and-breaking-changes.md) page.
 
 ## Documentation
 
-- [Real-world IDD Showcase](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/real-world-showcase.md)
-- [IDD Use Cases](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/using-idd.md)
-- [Engineering Guardrails](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/engineering-guardrails.md)
-- [Verify Installation](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/verify-installation.md)
-- [Updating IDD](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/updating-idd.md)
-- [Updates and Breaking Changes](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/updates-and-breaking-changes.md)
-- [Factory Workflow](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/factory-workflow.md)
-- [Factory Native Agent Installation & Limitations](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/factory-native-agent-installation.md)
-- [Factory Workflow Configuration](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/factory-workflow-configuration.md)
-- [Existing Project Guide](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/existing-project.md)
-- [New Project Guide](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/new-project.md)
-- [Methodology](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/methodology.md)
-- [Interactive IDD Overview](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/diagram/README.md)
-- [Factory Skills Reference](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/factory-skills.md)
-- [Factory Token Efficiency & Benchmarking](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/factory-token-efficiency.md)
+- [Business Complexity Assessment](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/business-complexity-assessment.md)
+- [Real-world IDD Showcase](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/real-world-showcase.md)
+- [IDD Use Cases](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/using-idd.md)
+- [Engineering Guardrails](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/engineering-guardrails.md)
+- [Verify Installation](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/verify-installation.md)
+- [Updating IDD](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/updating-idd.md)
+- [Updates and Breaking Changes](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/updates-and-breaking-changes.md)
+- [Factory Workflow](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/factory-workflow.md)
+- [Factory Native Agent Installation & Limitations](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/factory-native-agent-installation.md)
+- [Factory Workflow Configuration](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/factory-workflow-configuration.md)
+- [Existing Project Guide](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/existing-project.md)
+- [New Project Guide](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/new-project.md)
+- [Methodology](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/methodology.md)
+- [Interactive IDD Overview](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/diagram/README.md)
+- [Factory Skills Reference](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/factory-skills.md)
+- [Factory Token Efficiency & Benchmarking](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/factory-token-efficiency.md)
 
 ### For contributors and maintainers
 
-- [Project Maintenance](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.96/docs/project-maintenance.md)
+- [Project Maintenance](https://github.com/DimonSmart/Intent-Driven-Development/blob/v2.0.97/docs/project-maintenance.md)
 
 ## License
 

@@ -94,6 +94,26 @@
     },
     "exposure": "workflow"
   },
+  "idd-intent-estimate": {
+    "description": "Assess qualitative business complexity from current Product Intent without code inspection or file changes.",
+    "invocation": "auto",
+    "exposure": "command",
+    "interface": {
+      "displayName": "IDD Complexity Assessment",
+      "shortDescription": "Assess business complexity from Product Intent"
+    },
+    "adapters": {
+      "claude": {
+        "frontmatter": {
+          "context": "fork",
+          "agent": "Explore",
+          "background": false,
+          "argument-hint": "[product area or IDD-NNNN IDs; default: available current intent]",
+          "allowed-tools": "Read Glob Grep"
+        }
+      }
+    }
+  },
   "idd-skip": {
     "description": "Manual-only command. Perform the current request without applying Intent-Driven Development routing or updating durable intent.",
     "invocation": "manual",
@@ -103,8 +123,12 @@
       "shortDescription": "Perform a request without IDD routing"
     }
   },
+  "idd-intent-clarify": {
+    "description": "Resolve ambiguity, disproportionate complexity and missing user-facing behavior in a proposed Product requirement with focused read-only discovery; propose confirmed or unconfirmed clarified intent without file edits or automatic handoff.",
+    "exposure": "workflow"
+  },
   "idd-intent-brainstorm": {
-    "description": "Clarify real product intent before changing `.idd/intent/`, using focused customer-development questions and simplification options without editing product intent, planning implementation, or writing code.",
+    "description": "Explore alternative Product directions and substantially different ideas, challenge assumptions using bounded read-only research, and propose optional user-confirmed handoffs without editing Product Intent or code.",
     "exposure": "workflow"
   },
   "idd-intent-change": {

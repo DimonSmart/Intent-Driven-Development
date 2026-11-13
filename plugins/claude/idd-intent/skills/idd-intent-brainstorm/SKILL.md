@@ -1,529 +1,79 @@
 ---
 name: idd-intent-brainstorm
-description: Clarify real product intent before changing `.idd/intent/`, using focused customer-development questions and simplification options without editing product intent, planning implementation, or writing code.
+description: Explore alternative Product directions and substantially different ideas, challenge assumptions using bounded read-only research, and propose optional user-confirmed handoffs without editing Product Intent or code.
 user-invocable: false
 disable-model-invocation: false
 ---
 
 # idd-intent-brainstorm
 
-Use this skill before changing `.idd/intent/` when the user describes a product idea,
-feature, behavior change, or requirement whose real product intent may be
-unclear, over-specified, implementation-shaped, or unnecessarily complex.
+Explore product opportunities and substantially different solution principles. This skill performs read-only divergent research, optional critical comparison and user-led convergence. It is not the default ambiguity or simplification gate.
 
-This skill clarifies intent. It does not update specifications, design architecture, or implement code.
+## When and how to use
 
-Formula:
+Choose Brainstorm when the user explicitly wants creative possibilities, different product strategies, analogies, reframing, new opportunities or an open-ended "what else could we do?" conversation. A single incomplete feature request goes to idd-intent-clarify; extracting unconfirmed visual traits goes to idd-intent-visual-brainstorm. Terms like plugin, configurable, framework, AI or engine alone do not trigger Brainstorm. Direct named-skill selection takes precedence over automatic routing.
 
-```text
-idd-intent-brainstorm = proposed solution + customer discovery + intent clarification + simplification options
-```
-
-## Purpose
-
-A user often describes the first solution they imagined, not the underlying
-problem they need solved.
-
-This skill helps separate:
-
-1. real product intent;
-2. user/customer problem;
-3. current workaround;
-4. success criterion;
-5. minimum useful outcome;
-6. proposed solution;
-7. accidental complexity.
-
-The goal is to avoid turning an expensive solution idea into durable product
-intent before checking whether a simpler product-level outcome would satisfy the
-same need.
-
-## When to use this skill
-
-Use this skill when:
-
-- the user asks for a new feature and the product goal is not yet clear;
-- the user describes a solution rather than a problem;
-- the request contains complexity multipliers such as configurable, dynamic,
-  generic, workflow engine, rule engine, plugin system, fully customizable,
-  AI-powered, metadata-driven, multi-tenant, extensible, or framework;
-- the requested feature may be much more complex than the visible product value;
-- there may be a simpler product-level alternative;
-- the user is unsure what the product should do;
-- the user asks to brainstorm the product behavior or intent;
-- the requested behavior may belong in specs, but the exact intent is not ready
-  for `idd-intent-change`.
-
-## When not to use this skill
-
-Do not use this skill when:
-
-- the relevant current specification is already clear and the user asks to implement it;
-- the user has already made the product decision and asks to update specs;
-- the task is only a local refactor, cleanup, dependency update, build fix, or
-  implementation detail;
-- the request is about checking implementation against current specs;
-- the request is about importing, linting, auditing, or normalizing `.idd/intent/`;
-- the request is mainly architectural and should be handled as an ADR or spike;
-- the user explicitly asks not to discuss product intent.
+Respect initiative: when asked for ideas, produce ideas rather than only questions; when asked for guided co-creation, ask productive questions; when asked to independently research and recommend, use accessible evidence before requesting optional clarification. Never require a mode or preliminary interview.
 
 ## Boundaries
 
-`idd-intent-brainstorm` never edits files.
+- Read-only: no edits to files, Product Intent, Engineering Rules, specs, ADRs, spikes, code or implementation plans. Do not create a permanent brainstorm state or discussion history under .idd.
+- Do not assume the first user idea is best, nor that reduction in scope is always good.
+- Distinguish confirmed facts, inspected current behavior, hypotheses, unknowns and explicit user decisions. Implementation is not itself Product truth.
+- Never invent source citations, code inspection or external research; say when a needed tool or source is unavailable.
+- Recommendations, rankings and agent-selected directions are NOT user approval. Do not automatically invoke another skill or turn exploratory hypotheses into normative specs.
+- Preserve all user constraints, prior confirmations, rejected directions and independent requested Engineering/implementation stages at handoff.
 
-If the user confirms a product direction and asks to persist it, route to
-`idd-intent-change` whether the result updates an existing owner or needs a
-new owning spec, ADR, or spike. Brainstorm remains read-only until confirmation.
+## Adaptive cycle
 
-It must not:
+Understand -> Investigate -> Reframe -> Diverge -> Challenge -> Converge -> Confirm / Continue is a toolbox, **not seven mandatory sequential steps**. Skip, merge or loop stages as the user needs.
 
-- update `.idd/intent/`;
-- create new specs;
-- create ADRs;
-- create spikes;
-- implement code;
-- create implementation plans;
-- choose architecture;
-- verify implementation against specs;
-- normalize existing specs;
-- import external source material;
-- treat the current implementation as product intent.
+### Understand
+Identify the opportunity and actors, the aim of this discussion, agreed constraints and material unknowns. If the user is still exploring their goal, help discover it without forcing a precise goal statement up front.
 
-The output of this skill may become input for `idd-intent-change`, but only after the
-user confirms the intended product direction.
+### Investigate
+When useful and permitted, read only relevant Product Intent README/INDEX/owning spec, targeted code/tests/docs and external analogs or approaches. Code can establish *existing behavior* but cannot authorize desired behavior. Bound each investigation; do not scan the entire repository or internet by default. Use web/search only when available. Attribute grounded facts; label unsupported ideas as hypotheses.
 
-Do not automatically continue into `idd-intent-change`. First present the clarified
-intent or simplification proposal and wait for explicit user confirmation.
+### Reframe
+Separate means from ends and offer possible alternate problem definitions. A request for more automation could actually concern poor visibility; a proposed platform could be a one-off job. These are candidate framings, not declarations of the user's "true problem".
 
-## Reading Existing Specs
+### Diverge
+Generate conceptually distinct approaches, including ones requiring no new feature. Select techniques as useful: First Principles, Assumption Reversal, Analogical Thinking, Reverse Brainstorming, Constraint Removal and Opportunity Exploration. The optional references/brainstorm-method.md explains compact recipes; load it only when it improves exploration.
 
-Do not load the whole `.idd/intent/` tree.
+Three to five meaningfully different approaches is a useful starting point, never a quota or hard cap. Basic/Advanced/Universal versions of the same plugin engine are not diverse concepts. Do not invent a third direction when only two are credible. Support additional creative rounds on request.
 
-If the brainstorm concerns an existing product area, read only enough context to
-avoid brainstorming in a vacuum:
+### Challenge
+For promising alternatives, test core assumptions, conditions of success, failure modes, hidden cost, risks, reversibility and problem coverage. Challenge the agent's own recommendation as well. Identify plausible experiments that would distinguish alternatives. Separate actual constraints and risks from speculation; a formal risk assessment is optional.
 
-1. `.idd/intent/README.md`;
-2. `.idd/intent/INDEX.md`;
-3. the likely owning current spec, if it can be identified cheaply.
+### Converge
+Only when useful or requested, compare user value, completeness, evidence, cost, implementation complexity, time to benefit, reversibility, risks and confirmed Product Intent. Low cost alone is not the goal. Outcomes can be a selected option, combination, shortlist, rejected initial idea, deferred decision, more investigation or continued ideation. Do not force a winner.
 
-Use existing specs only to understand current product intent and ownership
-boundaries.
+### Confirm / Continue
+Ask for explicit approval when it would create a Product decision. If the user asks for more alternatives, keep exploring without demanding a specification. For an approved but still ambiguous Product direction, recommend idd-intent-clarify; for sufficiently specified, user-confirmed Product behavior, recommend idd-intent-change. For technical validation or normative architecture, recommend existing spike / ADR owner workflows, not decisions made here. Handoffs never automatically execute.
 
-Do not treat current implementation as product intent.
+## Adaptive depth
 
-Do not update specs from this skill.
+Focused: one narrow alternative or a quick reframing. Exploratory: compare multiple genuinely different concepts. Deep: bounded analogy research, multiple techniques and adversarial review. These are not public commands, new routing enums or forced modes. Choose by discussion needs, not simply the word "complex".
 
-## Relationship to other skills
+Possible architectural patterns may be *candidates* in a Product comparison (for example, fixed roles, RBAC or capabilities), but this skill cannot approve architecture, create ADRs, plan implementation or write code.
 
-Use `idd-intent-brainstorm` before `idd-intent-change` when the desired product intent is not
-clear enough to write or update specs.
+## Brainstorm Decision Brief (temporary)
 
-Use `idd-intent-change` when the user has confirmed a desired product behavior change
-and `.idd/intent/` should be updated.
+Use compact conversational output when suitable, or a Decision Brief with only useful sections:
+- Problem / Opportunity and possible reframings.
+- Known Facts, with evidence/source and scope.
+- Assumptions and Unknowns.
+- Alternative Directions with different principles.
+- Trade-offs, Risks, strongest counterarguments and possible experiments.
+- Promising Direction and Rejected or Deferred Alternatives, where applicable.
+- Decision Status: exploring, recommended but unconfirmed, user-confirmed or deferred.
+- Next Step: more exploration, Clarify, Intent Change, or existing spike/ADR owner.
 
-For a new durable product area, ADR, or spike, use `idd-intent-change` after
-confirmation; its internal document-creation workflow performs ownership checks.
-
-Use `idd-code-implement` when current specs already describe the behavior to build.
-
-Use `idd-intent-drift-audit` when the task is to compare implementation
-behavior with current specs.
-
-Use `idd-code-update-intent` only when implementation behavior already
-exists and the user explicitly confirms that it represents current product
-intent.
-
-Use `idd-intent-normalize-current` when accepted current specs need focused structural
-normalization without changing product meaning.
-
-Use `idd-intent-structure-audit` for broad structural diagnostics over `.idd/intent/`.
-
-Use `idd-intent-lint` for cheap mechanical validation.
-
-Use `idd-intent-import` when raw external source material must become normalized IDD
-specs.
-
-## Customer discovery questions
-
-Ask questions that reveal the real problem, not questions that merely validate
-the proposed solution.
-
-Prefer questions about actual current or past behavior over hypothetical
-preferences.
-
-Useful questions:
-
-```text
-- What problem are you trying to solve with this?
-- What happens today without this feature?
-- Can you describe the last time this problem happened?
-- Who experiences the problem?
-- How often does this happen?
-- How painful is it when it happens?
-- What do you do now to work around it?
-- What part of the current workaround is most annoying?
-- What result would be good enough for the first version?
-- What would still be acceptable even if it is not perfect?
-- What would make this feature unnecessary?
-- If a simpler version solved 80% of the problem, would that be acceptable?
-- Is the real goal speed, fewer errors, less manual work, better control, better
-  visibility, compliance, or something else?
-```
-
-Ask only the smallest number of high-leverage questions needed. Usually ask 3-5
-questions, not a full interview.
-
-## Bad questions
-
-Avoid questions that invite the user to approve complexity.
-
-Bad:
-
-```text
-- Do you want a configurable workflow engine?
-- Should this be fully customizable?
-- Would an AI-powered version be useful?
-- Should we prepare this for future scaling?
-- Do you want a plugin system?
-```
-
-Better:
-
-```text
-- When did you last need to change this workflow?
-- Who would change it?
-- How often would it change?
-- What happens if changing it requires a developer?
-- Is the current problem about flexibility, or about one missing behavior?
-- What is the simplest fixed workflow that would work for now?
-```
-
-## Problem evidence classification
-
-Classify the request as one of:
-
-```text
-observed-problem
-expected-problem
-hypothetical-problem
-solution-preference
-unclear-intent
-```
-
-Use `observed-problem` when the user has already experienced the problem.
-
-Use `expected-problem` when the user reasonably expects the problem soon.
-
-Use `hypothetical-problem` when the user is preparing for a possible future
-situation without current evidence.
-
-Use `solution-preference` when the user mainly describes how they imagine the
-feature should be implemented.
-
-Use `unclear-intent` when the real problem or desired outcome is not yet clear.
-
-Observed problems may justify updating specs.
-
-Expected problems may justify a small scoped requirement or extension point.
-
-Hypothetical problems should usually not justify heavy generic infrastructure.
-
-Solution preferences must be translated back into product intent before specs
-are changed.
-
-## Workflow
-
-1. Restate the apparent intent in product language.
-2. Separate:
-
-   - underlying problem;
-   - proposed solution;
-   - possible implementation assumption.
-
-3. Ask focused customer-discovery questions when the real intent is unclear.
-4. Identify current workaround, frequency, pain level, and success criterion.
-5. Classify problem evidence.
-6. Identify possible accidental complexity.
-7. Propose product-level alternatives:
-
-   - original requested version;
-   - simpler useful version;
-   - minimal first version.
-
-8. Recommend a specification direction.
-9. Stop before editing `.idd/intent/`.
-10. Tell the user which follow-up skill should be used next.
-
-## Output formats
-
-### Intent clarification
-
-Use when more information is needed.
-
-```md
-# Intent Clarification
-
-## Current Understanding
-
-...
-
-## Proposed Solution Mentioned By User
-
-...
-
-## Possible Underlying Problem
-
-...
-
-## Questions That May Simplify The Requirement
-
-1. ...
-2. ...
-3. ...
-
-## Next Step
-
-After the product intent is confirmed, use `idd-intent-change` to update `.idd/intent/`.
-```
-
-### Intent simplification proposal
-
-Use when the request looks more complex than needed.
-
-```md
-# Intent Simplification Proposal
-
-## Original Request
-
-...
-
-## Underlying Intent
-
-...
-
-## Problem Evidence
-
-Classification: `observed-problem | expected-problem | hypothetical-problem | solution-preference | unclear-intent`
-
-Evidence:
-
-...
-
-## Complexity Risk
-
-...
-
-## Options
-
-### Option A - Original Request
-
-What it gives:
-
-...
-
-Cost/risk:
-
-...
-
-When it makes sense:
-
-...
-
-### Option B - Simpler Product Version
-
-What it gives:
-
-...
-
-Cost/risk:
-
-...
-
-What it does not cover:
-
-...
-
-### Option C - Minimal Useful Version
-
-What it gives:
-
-...
-
-Cost/risk:
-
-...
-
-Upgrade path:
-
-...
-
-## Recommended Direction
-
-...
-
-## Next Step
-
-If the user confirms the direction, use `idd-intent-change` for both existing
-and new owners, ADRs, or spikes.
-```
-
-### Specification-ready intent
-
-Use when the intent is clear enough to become a spec change.
-
-```md
-# Specification-Ready Intent
-
-## Intent
-
-...
-
-## Problem
-
-...
-
-## User / Actor
-
-...
-
-## Current Workaround
-
-...
-
-## Desired Outcome
-
-...
-
-## Minimum Useful Version
-
-...
-
-## Accepted Simplifications
-
-...
-
-## Out Of Scope
-
-...
-
-## Acceptance Criteria Candidate
-
-- ...
-- ...
-- ...
-
-## Open Questions
-
-- ...
-
-## Handoff To `idd-intent-change`
-
-- Confirmed direction:
-- Owning product area:
-- Candidate existing spec, if known:
-- Minimum useful version:
-- Accepted simplifications:
-- Explicitly out of scope:
-- Open product questions:
-
-## Next Step
-
-Use `idd-intent-change` to update an existing owner or create a justified new
-spec, ADR, or spike through its internal workflow.
-```
-
-## Rules
-
-- Do not jump to code.
-- Do not create an implementation plan.
-- Do not update `.idd/intent/`.
-- Do not discuss architecture unless it is necessary to expose accidental
-  complexity.
-- Do not automatically continue into `idd-intent-change`.
-- Do not assume the user's proposed solution is the real requirement.
-- Do not force simplification if the user confirms that the complexity is
-  essential.
-- Do not ask generic questions when a concrete alternative can be offered.
-- Preserve the user's real product goal.
-- Prefer small, useful, reversible first versions.
-- Treat future flexibility as a cost unless there is a real current need.
-- Treat configuration, extensibility, plugins, workflows, generic engines, and
-  AI automation as complexity multipliers.
-- Ask what outcome would be acceptable, not how the system should be built.
+A brief is temporary and is not a new .idd/intent document. Only explicitly confirmed Product decisions can be transferred to Specification-Ready Intent; no intermediate ranking, guess or discussion transcript may be persisted as truth automatically.
 
 ## Examples
 
-### Generic permission engine
-
-User request:
-
-```text
-Add a configurable permission engine with custom roles and nested rules.
-```
-
-Expected behavior:
-
-- identify that this may be a solution preference;
-- ask who needs different permissions and how often rules change;
-- propose fixed roles or a narrow permission rule if sufficient;
-- do not design the permission engine;
-- do not update specs until the user confirms the intended product direction.
-
-### AI categorization
-
-User request:
-
-```text
-Use AI to automatically categorize all uploaded documents.
-```
-
-Expected behavior:
-
-- ask what problem categorization solves;
-- ask how documents are found today;
-- distinguish document search, customer grouping, manual tagging reduction, and
-  document-type detection;
-- propose non-AI alternatives if they satisfy the desired outcome;
-- recommend `idd-intent-change` only after the outcome is confirmed.
-
-### Already clear spec
-
-User request:
-
-```text
-Implement IDD-0018.
-```
-
-Expected behavior:
-
-- do not use `idd-intent-brainstorm`;
-- use `idd-code-implement`.
-
-### Confirmed behavior change
-
-User request:
-
-```text
-Update the command completion spec so Enter no longer accepts the first
-suggestion by default.
-```
-
-Expected behavior:
-
-- do not use `idd-intent-brainstorm`;
-- use `idd-intent-change`.
-
-## Non-goals
-
-This skill does not:
-
-- edit specifications;
-- create specifications;
-- create ADRs or spikes;
-- implement product behavior;
-- design architecture;
-- compare implementation with specs;
-- update specs from implementation;
-- normalize or audit `.idd/intent/`;
-- perform a broad product discovery process;
-- replace user confirmation of product intent.
+- "Find unusual ways to work with archives": consider virtual browsing, integration with OS utilities, temporary extraction, external apps, improved workflows and no-change alternatives; do not limit options to different plugin sizes.
+- "Give me more ideas, don't choose": continue research without pushing a decision.
+- "Use this screenshot to specify typography": use Visual Brainstorm instead.
+- "Write the already approved ZIP read-only behavior to Intent": use Intent Change directly.

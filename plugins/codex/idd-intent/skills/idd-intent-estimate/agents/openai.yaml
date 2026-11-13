@@ -1,0 +1,6 @@
+interface:
+  display_name: "IDD Complexity Assessment"
+  short_description: "Assess business complexity from Product Intent"
+
+policy:
+  allow_implicit_invocation: true

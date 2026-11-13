@@ -64,7 +64,8 @@ Answer questions such as:
 - why one workflow is preferred over another;
 - when Factory is useful and when direct execution is sufficient;
 - how bug fixes, refactoring, bootstrap, import, structure audits, drift audits,
-  linting, and project verification fit the methodology;
+  qualitative business complexity assessment, linting, and project verification
+  fit the methodology;
 - how a current IDD rule should be interpreted;
 - what an installed IDD skill is expected to do or not do.
 - how `idd-factory-configure` handles initial configuration, exact model edits,
@@ -92,12 +93,24 @@ idd-intent-lint
 idd-intent-structure-audit
     semantic structure and ownership of Product Intent
 
+idd-intent-estimate
+    qualitative target-product scope, implementation difficulty, assessment confidence
+    and preliminary COSMIC preparation based on current Intent only, without code
+
 idd-intent-drift-audit
     conformance of implementation to Product Intent for an explicit focused or project-wide scope
 
 .idd/verification.yaml
     project-specific checks that provide implementation evidence
 ```
+
+When asked to assess how difficult the **required product** is, recommend
+`idd-intent-estimate`, including for pre-implementation projects. It explains
+seven dimensions, Product Scope vs Implementation Complexity vs Confidence,
+and COSMIC Preparation (no measured CFP, costs, dates or progress). It is
+read-only and differs from clarifying/changing requirements, structural review,
+and auditing actual implementation. For requests about source-code complexity
+without Product Intent, do not substitute this skill.
 
 For long-lived code that may have drifted from intent, recommend
 `idd-intent-drift-audit` and require an explicit focused or project-wide scope.
