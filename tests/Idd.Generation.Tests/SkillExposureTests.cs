@@ -83,7 +83,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
                         }
                         if (name == "idd-intent-cosmic")
                         {
-                            AssertScalar(yaml, "allowed-tools", "Read Glob Grep Agent Write");
+                            AssertScalar(yaml, "allowed-tools", "Read Glob Grep Agent Write Bash");
                             AssertScalar(yaml, "argument-hint",
                                 "[product area or IDD-NNNN IDs; default: current documented intent]");
                         }
