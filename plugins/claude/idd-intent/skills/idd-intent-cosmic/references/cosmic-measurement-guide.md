@@ -13,20 +13,30 @@ Normative source: [COSMIC Measurement Manual v5.0 (combined September 2024)](htt
 - **Aggregation — Rules 21–23:** CFP equals justified E+X+R+W movements. Count each unique process once; avoid double-counting shared FUR. Sum only compatible units at matching boundary/layer/decomposition/FUR granularity. Never add nested system/component sizes or unrelated layers. Report incompatible units separately.
 - **Reporting — Rule 25:** state COSMIC v5.0, date, scope, sources, measurement boundaries, every process/movement, coverage, CFP calculation and limitations. CFP is not an effort, cost, schedule or implementation-complexity estimate.
 
+## Exhaustive scope contract (whole-product requests)
+
+The default `idd-intent-cosmic` request means **measure all current documented in-scope FUR**, not "measure whatever is convenient in one pass". A model must not end after a single easily counted process while other current spec files are still accessible. A file title or INDEX description cannot stand in for reading its complete contents.
+
+Maintain an in-conversation **coverage ledger**, one record per in-scope numbered spec: actual path, full-text read status, functional process IDs owned/extended by that spec (or "No independent functional process" with a concrete reason), exact evidence anchor and cross-spec dependencies. Read every accessible spec in bounded batches, then reconcile every process across all specs. Optional host-native read-only delegation is acceptable if its responses are source-backed and merged; no executable validation or project writes.
+
+**Finish gate:** the ledger must cover every numbered current in-scope spec, with no accessible document unattempted. Show `Full-text sources reviewed: X/Y` and this per-spec ledger in the final report. Only after passing that gate can a requested whole-product measurement be Complete or Analytical Partial. Inability to access a spec must be supported by an actual attempted read and the resulting error. Unknown functional semantics after reading are Analytical Partial; simply stopping before reading available specs is **Execution incomplete (BLOCKED)**, never a successful Partial report. Report a concrete host/context/tool limit if one truly prevented further attempts, and list the unprocessed sources. File volume or finding a supported subtotal is not itself a blocker.
+
+A confirmed, independently measured sub-scope may have a valid CFP, but when the user requested the whole product, do not promote a single opportunistic CFP into a finished whole-product assessment. If the task is still executable, continue reading rather than returning a sample.
+
 ## Workflow for small and large projects
 
 1. **Inventory real files.** Read README/INDEX and independently list numbered files in `.idd/intent/`. Include current specs absent from INDEX, record stale INDEX entries and inaccessible sources. README, INDEX, ADR, Spike and GLOSSARY do not independently supply missing FUR.
-2. **Read full FUR.** Work through all current in-scope specs, in manageable batches when there are many files. For each, identify initiating events, outcomes, data groups, actors, persistence, relationships with other owners and exact source headings/quotes. Keep temporary notes in the conversation only. A pass through titles/headings is *not* full coverage.
+2. **Read full FUR.** Work through **every** current in-scope spec, in manageable repeated batches. For each record the full-text-read status, initiating events, outcomes, data groups, actors, persistence, related owners, unique process IDs and exact source headings/quotes in the coverage ledger. Keep temporary notes in the conversation only. A pass through titles/headings is *not* full coverage. Do not finish while available source files remain unread.
 3. **Reconcile cross-spec behavior.** Create a unique process inventory: merge multiple specs that describe one cohesive process; split a spec if it defines independent triggering events. Mark all remaining candidates as Measured, Needs clarification, Ambiguous, Out of scope or Not a functional process.
 4. **Fix the boundary first.** Identify the software piece, external functional users and the storage boundary before assigning E/X/R/W. In distributed systems, different perspectives may produce different CFP; do not silently mix them.
 5. **Establish movements and evidence.** Identify complete data-group movements, success/error alternatives and actual persistent lifecycle. Attach an existing current spec path plus a local exact heading or verbatim short quote to every Measured process **and** each of its movements. Source headings must substantively support the claim; they are not an automatic proof by themselves.
 6. **Review and count.** Apply the checklist, independently re-count E/X/R/W in the displayed table for each supported process, reconcile ownership and total only compatible measurement units. Do not depend on a machine-generated CFP number or a tool execution.
-7. **Report gaps, not guesses.** If some specs were unread, report the unmeasured scope, but preserve defensible independent process subtotals. An unknown reaction blocks that process, not necessarily every other process. An unknown initial boundary may block all CFP.
+7. **Report gaps, not guesses.** If some specs could not be read after attempted access, report their exact paths, failures and implications; defensible independent CFP may still form an Analytical Partial subtotal after all other sources are processed. If accessible specs were simply left unread, report an explicitly unfinished execution with its real blocker, **not** a completed Partial with a sample CFP. An unknown reaction blocks that process, not necessarily every other process. An unknown initial boundary may block all CFP.
 
 ## Mandatory analytical self-review
 
 - [ ] Declared purpose/scope and software boundary are explicit; a whole-product request is not silently narrowed.
-- [ ] All numbered current specs in scope are accounted for as read, unread or inaccessible; INDEX discrepancies are recorded.
+- [ ] Full-text source coverage is X/Y, with an evidence-based per-spec ledger. Every accessible spec has actually been read, or a real host/tool blocker and remaining files are explicitly reported; INDEX discrepancies are recorded.
 - [ ] All triggering events in read FUR have candidate processes, including required alternatives and cross-spec ownership.
 - [ ] Every Measured process has a triggering E from its functional user and at least one X or W (Rule 10c).
 - [ ] Each named functional user is external to the selected boundary; logical persistent storage is not itself a user.
@@ -46,8 +56,9 @@ These checks improve traceability but do not guarantee semantic correctness. An 
 | Status | When to use | What to publish |
 | --- | --- | --- |
 | Complete | All declared documented FUR in scope read and reconciled, compatible units and applicable method | `Overall size: N CFP (v5.0)` |
-| Partial | At least one complete process is measured but other requirements are unread, unresolved or method applicability limited | `Measured subtotal: N CFP (v5.0)`; `Overall size: Not determined` |
-| Diagnostic only | No defensibly measured processes or no defensible initial software boundary | Blockers and no numeric CFP |
+| Analytical Partial | After attempting the full declared scope, at least one complete process is measured but other requirements are inaccessible, unresolved or method applicability limited | `Measured subtotal: N CFP (v5.0)`; `Overall size: Not determined` |
+| Diagnostic only | Source analysis is completed/attempted but no defensibly measured processes or stable boundary is available | Blockers and no numeric CFP |
+| Execution incomplete (BLOCKED) | An explicit host/tool/context limit prevents completing analysis of accessible current specs | Actual blocker, full-text X/Y, remaining paths; no completed measurement claim |
 | Proven empty | All current documented requirements in the declared scope prove it contains no functional processes | Explicitly justified `0 CFP (v5.0)` |
 
 Complete describes the *documented scope*, not the complete real-world product. A partial subtotal is never extrapolated into a whole-product size.
@@ -62,4 +73,4 @@ Complete describes the *documented scope*, not the complete real-world product. 
 
 ## Report contract
 
-Provide Measurement Strategy (date, scope, real inventory, exclusions, boundaries, layer, functional users), unique candidate process inventory (with statuses), and for each Measured process a table of every movement with type, data group, OOI, functional user or persistence, current spec path and exact heading/quote. Show E/X/R/W counts, per-process CFP, compatible unit subtotals and a complete overall total only when justified. State unresolved questions and absence of independent mechanical validation. No executable validation contract exists.
+Provide Measurement Strategy (date, scope, real inventory, full-text X/Y and per-spec coverage ledger, exclusions, boundaries, layer, functional users), unique candidate process inventory (with statuses), and for each Measured process a table of every movement with type, data group, OOI, functional user or persistence, current spec path and exact heading/quote. Show E/X/R/W counts, per-process CFP, compatible unit subtotals and a complete overall total only when justified. State unresolved questions and absence of independent mechanical validation. No executable validation contract exists.

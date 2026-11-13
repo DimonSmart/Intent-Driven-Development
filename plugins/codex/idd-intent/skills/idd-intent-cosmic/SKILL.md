@@ -20,12 +20,27 @@ Read the entire sibling `references/cosmic-measurement-guide.md` before mapping 
 
 Normative basis: [COSMIC Measurement Manual v5.0](https://cosmic-sizing.org/wp-content/uploads/2022/11/Combination-of-Parts-v5.0-Sep-2024.pdf), combined September 2024. Part 1 Rules 1–9 define strategy, Rule 10 processes, Rule 11 data groups, Rules 12–20 movements, Rules 21–23 aggregation and Rule 25 reporting; use Part 2 for edge cases. Do not require web access.
 
+## Completion contract — mandatory for default whole-product requests
+
+**Default = exhaustive measurement, not best-effort sampling.** A whole-product request is not satisfied by a documented partial subtotal while other accessible specs remain unread. Continue reading, analyzing, and reconciling until each in-scope current spec has been fully inspected. Neither elapsed time, number of documents, nor finding one valid measured process is a stopping condition.
+
+Use a **coverage ledger** for every current in-scope spec: exact path, `Read in full / Read failed / Not yet read`, identified functional-process IDs (or `No independent process` with a specific reason), related owners, and evidence anchor. Populate it from actual file contents, not INDEX summaries or headings. Process documents in manageable batches and reconcile across batches; native read-only delegation is optional when the host supports it, but each delegated result must supply the same evidence. No temporary files, shell scripts, implementation inspection or persistent state are required.
+
+**Mandatory finish gate:** before reporting a completed measurement, verify that the ledger accounts for **100% of the declared in-scope numbered specs** and that no accessible spec is still `Not yet read`. Every read spec must have a process mapping or a reason it creates no independent process. A successful report must state `Full-text sources reviewed: X/Y` and show the per-spec coverage ledger. Do not merely list "other specs" as an unclassified bucket. Do not present a completed whole-product assessment if X < Y.
+
+**Distinguish two kinds of incompleteness:**
+
+- **Analytical Partial**: source review has been carried through the scope (or a concrete read/access failure has been attempted and recorded), but some FUR remain semantically ambiguous, inapplicable or unreadable. Independently supported CFP may be published as a labeled subtotal; never as the whole-product size.
+- **Execution incomplete / BLOCKED**: accessible sources were simply not processed, or the host hit an explicit tool/context/budget limit before attempting the remaining sources. State the exact reason, read/total count, and specific unfinished paths. **Do not call this a completed "Partial measurement" or present a sample CFP as the measurement result.** Any already derived number is at most provisional working evidence and cannot be the executive-summary CFP.
+
+If no blocker exists, *continue the analysis* instead of taking the BLOCKED branch. Lack of time inferred by the model, a large file count, or convenience is not a blocker. If only a limited subset was requested explicitly, declare that smaller scope from the beginning.
+
 ## Phase 1 — actual inventory and measurement strategy
 
 1. Read target `.idd/intent/README.md` and `INDEX.md` if present. Independently list all numbered files. Reconcile INDEX entries with actual files; distinguish current specs, ADRs, Spikes, templates, missing INDEX entries, inaccessible and unindexed specs. An existing spec missing from INDEX remains in scope.
 2. Declare purpose, **precise documented scope**, software piece/boundary, layer, decomposition, functional-process FUR granularity and functional users relative to that boundary. Persistent storage is inside the boundary, not a functional user. Never combine a system measurement with nested components or with different layers/granularity.
-3. **Read the full contents of every in-scope current spec**, including related owners needed to describe complete functional processes. A headings-only inspection is inventory, not measurement. For large projects read specs in manageable groups, noting their actual triggers, outcomes, dependencies and exact source anchors *in conversation context*; reconcile groups before calculating an overall result. Do not store intermediate artifacts.
-4. A user-requested named area excludes unrelated functionality but includes all jointly defining specs. A whole-product request must not silently become one example or arbitrary subset. If some documents cannot be read, mark them Unread, finish the defensible independent processes, and produce Partial or Diagnostic only.
+3. **Read the full contents of every in-scope current spec**, including related owners needed to describe complete functional processes. A headings-only inspection is inventory, not measurement. For large projects, repeatedly select the next unread batch, read its complete contents, update the coverage ledger with events/outcomes/process IDs/evidence and continue to the next batch. Reconcile groups before calculating an overall result. Do not store intermediate artifacts.
+4. A user-requested named area excludes unrelated functionality but includes all jointly defining specs. A whole-product request must not silently become one example or arbitrary subset. If a read actually fails, record the file, attempted operation and error in the ledger, then continue processing **all other** accessible specs; classify as Analytical Partial only after the scope has been processed as far as the host permits. Unattempted accessible files are an unfinished execution, not a semantic limitation.
 5. If boundary, layer or functional user alternatives materially change movements, mark affected candidates Ambiguous or Needs clarification. Ask only a targeted question if needed, otherwise report the blocker.
 
 ## Phase 2 — functional processes and E/X/R/W
@@ -41,17 +56,17 @@ Normative basis: [COSMIC Measurement Manual v5.0](https://cosmic-sizing.org/wp-c
 1. Follow **every check** in the reference guide. Compare the document inventory with scope, the process inventory with all read FUR, and movement evidence with actual sources. Recheck inter-spec processes, alternatives, actors, logical persistence, duplicate groups and Rule 10c.
 2. For each **Measured** process independently re-count the displayed movements: `CFP = E + X + R + W`. Sum each distinct compatible process exactly once per measurement unit. Do not add nested, overlapping or incompatible unit sizes. Self-review is not an independent mechanical validation.
 3. **Complete**: all declared documented FUR in scope have been inventoried, read, mapped and reconciled; aggregation is compatible and COSMIC applicability is established. Only then publish `Overall size: N CFP (v5.0)`. This never proves unwritten real-world requirements absent.
-4. **Partial**: at least one complete evidenced process is counted but some scope/requirements remain unresolved or applicability is limited. Publish `Measured subtotal: N CFP (v5.0)` and `Overall size: Not determined`. Unread or ambiguous unrelated requirements do **not** invalidate independently measured processes.
-5. **Diagnostic only**: no defensible measured process or stable measurement boundary. Do not give a numeric result. `0 CFP` is reserved for an explicitly demonstrated empty documented scope. Never extrapolate from a subset.
-6. State limitations of the COSMIC method for algorithm-heavy, AI or continuous-media products separately from missing documentation.
-
+4. **Partial**: after the exhaustive read/reconciliation work or a demonstrated source access failure, at least one complete evidenced process is counted but some FUR remain unresolved or applicability is limited. Publish `Measured subtotal: N CFP (v5.0)` and `Overall size: Not determined`. Unread or ambiguous unrelated requirements do **not** invalidate independently measured processes.
+5. **Diagnostic only**: no defensible measured process or stable measurement boundary after the required source analysis. Do not give a numeric result. `0 CFP` is reserved for an explicitly demonstrated empty documented scope. Never extrapolate from a subset.
+6. **Execution incomplete / BLOCKED**: the host demonstrably cannot finish reading accessible documents. Explain the real limitation and remaining paths; do not disguise sampled CFP as an Analytical Partial. Do not stop while accessible sources can still be read.
+7. State limitations of the COSMIC method for algorithm-heavy, AI or continuous-media products separately from missing documentation.
 ## Response format (Markdown only)
 
-1. Summary: scope, Complete/Partial/Diagnostic status, supported CFP/subtotal if any, and limitations.
-2. Measurement Strategy/coverage: date, actual documents and read/unread/missing/INDEX discrepancies, boundary, layer, decomposition, FUR granularity, functional users and exclusions.
+1. Summary: scope, Complete/Analytical Partial/Diagnostic only/Execution incomplete (BLOCKED) status; full-text sources reviewed X/Y; supported CFP or subtotal **only where the completion contract permits**, and limitations.
+2. Measurement Strategy/coverage: date, exact per-spec coverage ledger (full read state + related process IDs or explicit no-process reason), read errors, INDEX discrepancies, boundary, layer, decomposition, FUR granularity, functional users and exclusions.
 3. **Complete candidate inventory**: unique process IDs, triggers, source owners, supported initiating E where applicable, statuses and exclusions.
 4. **Movement breakdown** for every Measured process: each E/X/R/W, group, OOI or special human-message case, user/persistence, exact current spec path and supporting quote/heading. Show per-process E/X/R/W counts and CFP.
 5. Compatible measured unit subtotal(s); overall total **only when Complete**.
 6. Unmeasured requirements, precise questions, methodological limitations and explicit warning that results have only LLM semantic self-review, not independent mechanical certification.
 
-Stop after reporting. No Factory, mutation, commit or implementation follow-up. A combined business complexity + COSMIC request produces **two independent analyses**, never a conversion.
+Stop only after the completion gate is satisfied or an explicit, evidenced blocker prevents progress. No Factory, mutation, commit or implementation follow-up. A combined business complexity + COSMIC request produces **two independent analyses**, never a conversion.
