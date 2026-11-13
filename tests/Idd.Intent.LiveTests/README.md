@@ -201,3 +201,23 @@ routing decisions separately, and the ordinary generation tests verify
 Claude/Codex package metadata. Run a manual Claude smoke on a disposable
 project with only current specs; do not report success until it is actually
 observed. Host unavailability is **not evaluated**, not "pass".
+
+## COSMIC v5.0 hierarchical owner/connector evaluations
+
+`CosmicFunctionalSizeLiveTests` is a separate **opt-in real LLM** evaluation using generated installed skills, not a text-only contract test. It requires a working authenticated Codex or Claude host and native child-agent capability. Select targeted cases before attempting the full suite:
+
+- `C03-shared-fur`, `C21-multiple-owners`: one normative owner; other specifications are connector references, not duplicate process definitions.
+- `C22-full-scope-exhaustive`: 28 specs with 18 process owners and ten connector specs.
+- `C23-hierarchical-60-specs`: 60 specs, 20 owning processes and 40 connector specs; checks coverage, bounded hierarchy and **no CFP increase** from references.
+- `C24-single-owner-coupling`: three owner-defined calling processes reference another one; coupling must be separated from CFP.
+- `C25-large-spec-sections`: a single 75k-character spec; verifies exhaustive chunked range reading and consolidation.
+
+Use `IDD_COSMIC_EVAL_CASE_IDS=C24-single-owner-coupling,C25-large-spec-sections` with `IDD_RUN_LIVE_COSMIC_EVALS=1` and `dotnet test tests/Idd.Intent.LiveTests/Idd.Intent.LiveTests.csproj --filter Category=LiveCosmicEval`. Both frameworks' model availability and runtime limits are host-dependent. These cases are **not** claims of executed LLM results.
+
+The separate optional, deterministic state helper can be checked without an LLM:
+
+```sh
+python3 -m unittest discover -s src/canonical/cosmic-state-support -p 'test_*.py'
+```
+
+It verifies checksum freshness, owner/link references, fan-in counts and CFP arithmetic only; it does **not** judge COSMIC semantics or the real native-agent trace. A complete acceptance run should additionally inspect spawn/reader/reducer/measurer traces and successful recovery on an interrupted large real project.
