@@ -77,7 +77,7 @@ public sealed class FactoryGitBaselineTests
     }
 
     [Fact]
-    public void CleanIdd_AllowsDirtyCodeButBlocksStagedUnstagedAndUntrackedIdd()
+    public void ManagedStatus_IgnoresDirtyCodeAndDetectsStagedUnstagedUntrackedIdd()
     {
         using var repo = new Repo();
         Assert.Equal(string.Empty, repo.ManagedStatus());
@@ -103,8 +103,13 @@ public sealed class FactoryGitBaselineTests
     public void ApprovedIddCheckpoint_CommitsOnlyManagedPathsAndPreservesStagedCode()
     {
         using var repo = new Repo();
+        repo.Write(".idd/engineering/ENG-0000.rule-obsolete.md", "old rule");
+        repo.Git("add", ".idd/engineering/ENG-0000.rule-obsolete.md");
+        repo.Git("commit", "-qm", "seed old rule");
         repo.Git("mv", ".idd/intent/IDD-0001.spec-sample.md",
             ".idd/intent/IDD-0001.spec-renamed.md");
+        File.Delete(Path.Combine(repo.Root, ".idd", "engineering",
+            "ENG-0000.rule-obsolete.md"));
         repo.Write(".idd/intent/new document.md", "new intent");
         repo.Write(".idd/engineering/ENG-0001.rule-new.md", "new engineering");
         repo.Write("src/code.cs", "staged code");
@@ -120,6 +125,7 @@ public sealed class FactoryGitBaselineTests
             "--", ".idd/intent/IDD-0001.spec-sample.md",
             ".idd/intent/IDD-0001.spec-renamed.md",
             ".idd/intent/new document.md",
+            ".idd/engineering/ENG-0000.rule-obsolete.md",
             ".idd/engineering/ENG-0001.rule-new.md");
 
         Assert.Equal(string.Empty, repo.ManagedStatus());
@@ -133,6 +139,7 @@ public sealed class FactoryGitBaselineTests
         Assert.Contains("IDD-0001.spec-renamed.md", committed);
         Assert.Contains("new document.md", committed);
         Assert.Contains("ENG-0001.rule-new.md", committed);
+        Assert.Contains("ENG-0000.rule-obsolete.md", committed);
     }
 
     [Fact]
