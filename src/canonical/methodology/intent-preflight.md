@@ -222,7 +222,8 @@ prerequisites to (not substitutes for) the following normative phases.
 1. materialize complete logical request
 2. resolve scope and non-mutating Product / Engineering classifications
 3. detect request-level blockers before any write or preparation
-4. for a new independent run: require clean managed IDD and valid Git HEAD
+4. for a new independent run: verify Git HEAD; if managed IDD is dirty, ask
+   permission to commit only affected managed paths, then require clean IDD
 5. persist complete preparation/request.md, baseline.md, provenance.md
 6. checkpoint BEFORE mutating Engineering owner workflow; execute if required
 7. success/no-op: record result; blocked/ambiguous/crashed: preserve preparation
@@ -251,11 +252,41 @@ From the repository root check
 including staged/unstaged/untracked, deleted and renamed paths. Parse NUL
 delimiters, including rename pairs, never split by whitespace. The optional
 Engineering directory may be absent. Dirty code/tests outside the managed
-paths do not block a new run. Refuse a dirty managed tree with affected paths;
-never auto-commit. Resolve a real full `HEAD^{commit}` SHA (pass the revision as one literal,
-quoted argument in shells such as PowerShell) and check again immediately
-before mutating if managed state could have changed. An invocation/shell
-parsing failure is not evidence of an absent commit.
+paths do not block a new run.
+
+Resolve a real full `HEAD^{commit}` SHA first (pass the revision as one
+literal, quoted argument in shells such as PowerShell). An invocation/shell
+parsing failure is not evidence of an absent commit. If managed IDD is dirty,
+do not immediately refuse the run:
+
+1. Show the exact affected managed paths (including both sides of a rename),
+   the proposed commit message `Checkpoint IDD before Factory run`, and ask
+   for explicit yes/no approval to commit **only these managed paths**. Use a
+   host-native user question when available; otherwise ask in the conversation
+   and stop until answered. This is a Git checkpoint question, not a Planner
+   `# Question`. Do not create Factory preparation or active state.
+2. On refusal, missing approval, or inability to ask, stop without committing
+   or starting Factory. The request to run Factory is not commit consent.
+3. On approval, recheck the affected paths and their staged, unstaged and
+   untracked contents against what was approved. If anything changed, show
+   the updated changes and obtain fresh approval instead of widening consent.
+   Reject renames that cross the managed-path boundary rather than silently
+   committing unrelated files.
+4. Stage only approved paths (for example `git add -A -- <approved paths>`)
+   and commit only those paths (`git commit --only -m "Checkpoint IDD before Factory run" -- <approved paths>`).
+   Include old/new rename paths, additions and deletions. Use NUL-safe argument
+   handling, not interpolated shell commands. Never use a repository-wide
+   `git add -A` or unrestricted `git commit`; preserve unrelated staged
+   and unstaged code and other user changes.
+5. If staging or committing fails, stop before Factory state is written; report
+   the failure and do not force, reset, revert or retry the commit automatically.
+   After success, verify a clean managed IDD tree and the new real full HEAD
+   before saving the immutable baseline. A remaining dirty managed path blocks.
+
+Recheck managed cleanliness immediately before mutating if it could have
+changed. When no checkpoint was required, keep the original full HEAD.
+Once the original baseline is saved, it never moves forward on continuation
+or replacement.
 
 Save the original complete request and `preparation/baseline.md` (immutable
 full HEAD SHA, sanitized Git repository identity, managed-document cleanliness

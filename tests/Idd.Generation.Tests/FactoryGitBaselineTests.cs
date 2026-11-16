@@ -77,7 +77,7 @@ public sealed class FactoryGitBaselineTests
     }
 
     [Fact]
-    public void CleanIdd_AllowsDirtyCodeButBlocksStagedUnstagedAndUntrackedIdd()
+    public void ManagedStatus_IgnoresDirtyCodeAndDetectsStagedUnstagedUntrackedIdd()
     {
         using var repo = new Repo();
         Assert.Equal(string.Empty, repo.ManagedStatus());
@@ -96,6 +96,50 @@ public sealed class FactoryGitBaselineTests
         var status = repo.ManagedStatus();
         Assert.Contains("new rule.txt", status);
         Assert.Contains('\0', status);
+    }
+
+
+    [Fact]
+    public void ApprovedIddCheckpoint_CommitsOnlyManagedPathsAndPreservesStagedCode()
+    {
+        using var repo = new Repo();
+        repo.Write(".idd/engineering/ENG-0000.rule-obsolete.md", "old rule");
+        repo.Git("add", ".idd/engineering/ENG-0000.rule-obsolete.md");
+        repo.Git("commit", "-qm", "seed old rule");
+        repo.Git("mv", ".idd/intent/IDD-0001.spec-sample.md",
+            ".idd/intent/IDD-0001.spec-renamed.md");
+        File.Delete(Path.Combine(repo.Root, ".idd", "engineering",
+            "ENG-0000.rule-obsolete.md"));
+        repo.Write(".idd/intent/new document.md", "new intent");
+        repo.Write(".idd/engineering/ENG-0001.rule-new.md", "new engineering");
+        repo.Write("src/code.cs", "staged code");
+        repo.Git("add", "src/code.cs");
+        repo.Write("src/new.cs", "untracked code");
+
+        Assert.NotEqual(string.Empty, repo.ManagedStatus());
+
+        // Explicit approval is a precondition for these commands. Stage and
+        // commit the approved managed paths without consuming staged code.
+        repo.Git("add", "-A", "--", ".idd/intent/", ".idd/engineering/");
+        repo.Git("commit", "--only", "-m", "Checkpoint IDD before Factory run",
+            "--", ".idd/intent/IDD-0001.spec-sample.md",
+            ".idd/intent/IDD-0001.spec-renamed.md",
+            ".idd/intent/new document.md",
+            ".idd/engineering/ENG-0000.rule-obsolete.md",
+            ".idd/engineering/ENG-0001.rule-new.md");
+
+        Assert.Equal(string.Empty, repo.ManagedStatus());
+        Assert.Contains("M  src/code.cs", repo.Git("status", "--short", "--", "src/code.cs"));
+        Assert.Contains("?? src/new.cs", repo.Git("status", "--short", "--", "src/new.cs"));
+        Assert.Equal("initial", repo.Git("show", "HEAD:src/code.cs").Trim());
+
+        var committed = repo.Git("show", "--pretty=format:", "--name-only", "HEAD");
+        Assert.DoesNotContain("src/code.cs", committed);
+        Assert.DoesNotContain("src/new.cs", committed);
+        Assert.Contains("IDD-0001.spec-renamed.md", committed);
+        Assert.Contains("new document.md", committed);
+        Assert.Contains("ENG-0001.rule-new.md", committed);
+        Assert.Contains("ENG-0000.rule-obsolete.md", committed);
     }
 
     [Fact]

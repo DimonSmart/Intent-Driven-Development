@@ -117,9 +117,12 @@ phases in the normative order, with Root responsible for the concrete actions:
    durable write: missing normative decisions, contradictions, forbidden
    scope mutation, incomplete input and prohibited active replacement.
    On a blocker, do not invoke an owner or create `preparation/`.
-3. Check clean managed IDD paths and the original real `HEAD^{commit}`
-   using the exact Git gate in the reference. A dirty unrelated code tree
-   alone is not a blocker. Never auto-commit or invent a baseline.
+3. Validate the real `HEAD^{commit}` and managed IDD cleanliness using the
+   exact Git gate in the reference. If managed IDD paths are dirty, ask for
+   explicit approval to checkpoint only those paths; an approved, successful
+   scoped commit permits continuation. Refusal or failure stops before Factory
+   state. Unrelated code changes do not block or enter the commit. Never
+   commit without approval or invent a baseline.
 4. Persist `preparation/request.md`, `baseline.md` and `provenance.md`
    BEFORE invoking a potentially mutating owner. Record bounded pending
    provenance and verify trusted after-state for each owner action.

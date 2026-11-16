@@ -13,7 +13,10 @@ For a new implementation-capable Factory run:
 Complete materialized logical request
 -> Factory Preflight
    -> non-mutating Product Intent analysis and blocker checks
-   -> verify managed IDD clean and original Git HEAD (new run only)
+   -> verify Git HEAD and managed IDD cleanliness (new run only)
+      -> dirty IDD: ask user to commit only affected IDD paths
+         -> approved and committed: recheck clean, continue
+         -> declined or failed: stop before preparation
    -> persist preparation/request.md, baseline.md and provenance.md BEFORE writes
    -> checkpoint idd-engineering-change when required
    -> normal Product Intent mutation when required
@@ -48,6 +51,9 @@ normal and is not bootstrapped merely by entering Factory.
 ## Immutable baseline and review
 
 New independent Factory runs require clean managed IDD files, not clean code.
+If those IDD files are dirty, Factory asks whether to checkpoint only the
+affected IDD paths. Approval permits a scoped commit before preparation;
+refusal or a failed commit stops the run. Unrelated staged code is preserved.
 Before mutating preflight they save the original full Git HEAD, verbatim
 request, and bounded owner provenance. Interrupted preparation or active runs
 continue without a clean-tree gate or a new baseline; partially applied owner
