@@ -119,7 +119,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             var sessions = Path.Combine(codexHome, "sessions");
             Assert.True(Directory.Exists(sessions), "No native Codex sessions captured.");
             var traces = Directory.EnumerateFiles(sessions, "*.jsonl", SearchOption.AllDirectories)
-                .Select(reader.Read).ToArray();
+                .Select(path => reader.Read(path)).ToArray();
             var supervisor = Assert.Single(traces, trace =>
                 !string.IsNullOrWhiteSpace(trace.ThreadId) &&
                 string.IsNullOrWhiteSpace(trace.ParentThreadId));
