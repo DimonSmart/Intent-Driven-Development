@@ -239,3 +239,47 @@ invocation fails until the normal bounded failure diagnostic exists. The
 evaluation requires a fresh planner before verification resumes, another
 `# Done`, successful gate/build/tests checks, and archived failure evidence.
 The gate does not maintain attempts or implement a Factory runtime.
+
+
+## Stage 0: native nested Factory-agent compatibility gate (opt-in)
+
+Before migrating `idd-factory-run` to a Supervisor, run
+`Factory_Stage0ProvesNestedNativeGenericAgents` on the **actual intended Codex
+host and account**. This is a pre-migration, technical native-capability probe,
+not the two-level Factory implementation or its 10-task acceptance test.
+It uses a disposable repository, generated and installed Marketplace package,
+and generic native children without custom `agents/` registrations.
+
+```powershell
+$env:IDD_RUN_LIVE_FACTORY_MARKETPLACE_EVALS = "1"
+try {
+    dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj `
+        --filter "FullyQualifiedName~Factory_Stage0ProvesNestedNativeGenericAgents"
+}
+finally {
+    Remove-Item Env:IDD_RUN_LIVE_FACTORY_MARKETPLACE_EVALS -ErrorAction SilentlyContinue
+}
+```
+
+The test captures `codex --version`, the generated Marketplace package and
+the Codex native JSONL trace under
+`artifacts/factory-evals/nested-stage0-*/`. It requires a genuine
+Supervisor -> generic Root -> generic Planner/Worker thread hierarchy,
+independent native session IDs, exact parent IDs and task names, accepted
+spawns at both levels with `fork_turns=none`, Skill reads from the installed
+package, sequential assignments, native waits, successful explicit
+grandchild model/effort routing, and an unchanged shared Git workspace.
+It injects a Supervisor-only nonce to detect accidental transcript inheritance.
+A false/partial signal fails the test; `stage0-result.json` is written only
+when the assertions pass, while `stage0-blocker.txt` retains failure details.
+
+The technical probe intentionally exercises both internal Skills with
+incomplete, read-only assignments, expecting `BLOCKED` from each.
+It does **not** prove simultaneous write safety, full Factory checkpoint
+semantics, forced child cancellation or end-to-end rotation. Those require
+additional live evaluations (including a controlled writer probe and
+10-worker / limit-3 E2E) before the public Supervisor can be shipped.
+A green normal CI build, `agents.max_depth=2`, a trace from a different
+host, or an unexecuted smoke test do not satisfy the Stage 0 gate.
+Until verified native nested-spawn evidence exists, preserve the current
+one-level `idd-factory-run` behavior.
