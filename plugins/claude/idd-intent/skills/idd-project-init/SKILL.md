@@ -105,8 +105,11 @@ Use installed IDD skills for intent, implementation, and verification.
 Plugin: `idd-intent` (optional `idd-factory`).
 Install: https://github.com/DimonSmart/Intent-Driven-Development#quick-start
 If IDD skills are unavailable, share the installation link; do not simulate them.
+Explicit user requests to correct or change Intent are handled by installed
+Intent skills, including corrections to imported specifications.
 Only Factory Workers may add confirmed monotonic refinements to existing Intent
-owners; never independently revise requirements. User prohibitions win.
+owners during implementation; never independently revise requirements.
+User prohibitions win.
 No competing normative docs in `doc/` or `docs/`. Preserve external originals.
 <!-- idd:project:end -->
 ```
