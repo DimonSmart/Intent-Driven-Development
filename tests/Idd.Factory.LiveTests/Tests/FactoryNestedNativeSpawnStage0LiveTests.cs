@@ -153,8 +153,10 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 item.Text?.Contains("BLOCKED", StringComparison.OrdinalIgnoreCase) == true);
             Assert.Contains(workerChild.Events, item => item.Role == "assistant" &&
                 item.Text?.Contains("BLOCKED", StringComparison.OrdinalIgnoreCase) == true);
-            Assert.Contains(planner.Events, item => IsNativeSkillRead(item, "planner"));
-            Assert.Contains(workerChild.Events, item => IsNativeSkillRead(item, "worker"));
+            Assert.True(planner.Events.Any(item => IsNativeSkillRead(item, "planner")),
+                SkillReadDiagnostic(planner, "planner", artifacts));
+            Assert.True(workerChild.Events.Any(item => IsNativeSkillRead(item, "worker")),
+                SkillReadDiagnostic(workerChild, "worker", artifacts));
 
             // Native terminal waits must be visible at both orchestration levels.
             Assert.Contains(supervisor.Events, item => item.ToolName == "wait_agent");
@@ -234,12 +236,45 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         }
     }
 
-    private static bool IsNativeSkillRead(CodexEvent item, string role)
+    // An operation must be a native file-content read, not merely a path check
+    // or a spawn message mentioning the Skill. Codex may serialize a Windows
+    // command as JSON, so C:\\path\\SKILL.md needs its JSON-escaped separators
+    // decoded before matching the installed Skill path.
+    internal static bool IsNativeSkillRead(CodexEvent item, string role)
     {
-        var expected = "idd-internal-factory-" + role;
-        return item.ToolName is not null &&
-            item.ToolName != "spawn_agent" &&
-            item.ToolArguments?.Replace('\\', '/').Contains(
-                expected + "/SKILL.md", StringComparison.OrdinalIgnoreCase) == true;
+        if (string.IsNullOrWhiteSpace(item.ToolName) ||
+            item.ToolName is "spawn_agent" or "file_change" or "wait_agent" ||
+            string.IsNullOrWhiteSpace(item.ToolArguments))
+            return false;
+
+        var arguments = NormalizeNativePathText(item.ToolArguments);
+        var path = $"idd-internal-factory-{role}/SKILL.md";
+        if (!arguments.Contains(path, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var command = item.ToolName + " " + arguments;
+        return System.Text.RegularExpressions.Regex.IsMatch(command,
+            @"(?<![\w-])(?:Get-Content|gc|cat|type|more|ReadAllText|read_file|read_text_file)(?![\w-])",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    }
+
+    private static string NormalizeNativePathText(string text) =>
+        text.Replace(@"\\", "/", StringComparison.Ordinal).Replace('\\', '/');
+
+    private static string SkillReadDiagnostic(CodexRollout child, string role, string artifacts)
+    {
+        var path = $"idd-internal-factory-{role}/SKILL.md";
+        var calls = child.Events.Where(item => item.ToolName is not null &&
+            item.ToolName is not "spawn_agent" and not "wait_agent")
+            .Take(15)
+            .Select(item =>
+            {
+                var args = NormalizeNativePathText(item.ToolArguments ?? "");
+                return $"{item.ToolName} (skillPath={args.Contains(path, StringComparison.OrdinalIgnoreCase)}, phase={item.ToolPhase ?? "unknown"})";
+            });
+        return $"No native content-read operation for installed {role} SKILL.md was found " +
+            $"in child thread {child.ThreadId}. Observed calls: {string.Join(", ", calls)}. " +
+            $"Inspect saved native trace at {artifacts}/report-source; " +
+            "a BLOCKED response or a simple file-existence check is not proof of reading the Skill.";
     }
 }
