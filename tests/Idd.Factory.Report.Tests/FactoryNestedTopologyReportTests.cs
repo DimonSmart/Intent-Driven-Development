@@ -32,7 +32,7 @@ public sealed class FactoryNestedTopologyReportTests
             var supervisorLines = new List<string>
             {
                 SessionMeta(start, supervisor, directory),
-                UserMessage(start.AddSeconds(1), "Invoke idd-factory-run now.")
+                UserMessage(start.AddSeconds(1), "Implement the ten approved features in this repository.")
             };
 
             var workerCursor = 0;
