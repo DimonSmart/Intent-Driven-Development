@@ -39,7 +39,10 @@ public static partial class FactoryBatchTrace
     // The Supervisor MUST carry the explicit effective budget in each Root
     // spawn message. Missing, malformed or conflicting values are not inferred
     // from user dialogue or previous Root sessions.
-    [GeneratedRegex(@"(?<![A-Za-z0-9_])""?max_workers_per_batch""?\s*[:=]\s*(?<limit>[0-9]+)(?=\s|[,;}]|$)",
+    // Capture EVERY explicit assignment, including malformed ones: a valid
+    // numeric occurrence must never mask a contradictory negative, fractional
+    // or non-numeric assignment elsewhere in the native child prompt.
+    [GeneratedRegex(@"(?<![A-Za-z0-9_])""?max_workers_per_batch""?\s*[:=]\s*(?<value>[^\s,;}]+)",
         RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)]
     private static partial Regex BatchLimitPattern();
 
@@ -48,10 +51,17 @@ public static partial class FactoryBatchTrace
         if (string.IsNullOrWhiteSpace(nativeRootAssignment)) return null;
         var matches = BatchLimitPattern().Matches(nativeRootAssignment);
         if (matches.Count == 0) return null;
-        var values = matches.Select(match => match.Groups["limit"].Value).Distinct(
-            StringComparer.Ordinal).ToArray();
-        return values.Length == 1 && int.TryParse(values[0], out var limit) &&
-               limit > 0 ? limit : null;
+        int? effective = null;
+        foreach (Match match in matches)
+        {
+            var value = match.Groups["value"].Value;
+            if (!Regex.IsMatch(value, @"\A[0-9]+\z", RegexOptions.CultureInvariant) ||
+                !int.TryParse(value, out var parsed) || parsed <= 0 ||
+                effective is not null && effective != parsed)
+                return null;
+            effective = parsed;
+        }
+        return effective;
     }
 
     /// <summary>
