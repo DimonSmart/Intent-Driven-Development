@@ -1,7 +1,7 @@
 # IDD Factory Root (internal)
 
 This is the **internal** Factory Root protocol, loaded by a fresh generic native
-child of the Supervisor (future `idd-factory-run`). It owns the existing Factory
+child of the public `idd-factory-run` Supervisor. It owns the existing Factory
 preflight, planning, implementation, provenance, execution policy, and verification.
 Do not invoke this Skill as a public command or automatically start a new Factory
 run merely because it was loaded. A complete bounded Supervisor assignment and
