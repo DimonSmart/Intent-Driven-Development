@@ -1436,8 +1436,16 @@ public sealed class FactoryReportEngine
             return explicitStarts;
 
         // A quoted marker in root dialogue is not proof of a Factory run.
+        // The public Supervisor may be invoked implicitly by routing; its
+        // original user request need not literally contain idd-factory-run.
+        // In a nested trace a native Root spawn with the exact reserved
+        // task_name is sufficient to find the run's derived start boundary.
         var fallback = root.Events.FirstOrDefault(x =>
-            IsNativeSpawn(x) && HasUnambiguousFactoryRole(x.SpawnTask));
+            IsNativeSpawn(x) &&
+            (HasUnambiguousFactoryRole(x.SpawnTask) ||
+             x.ToolId is not null &&
+             root.SpawnRecords.TryGetValue(x.ToolId, out var spawn) &&
+             FactoryTaskNameRole(spawn.RequestedTaskName) == "root"));
         return fallback is null ? [] : [fallback];
     }
 
