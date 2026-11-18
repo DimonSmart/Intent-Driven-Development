@@ -1842,12 +1842,36 @@ public sealed class FactoryReportEngine
         }
 
         AddTopologyDiagnostics(agents, diagnostics);
+        var finalizingBatch = batches.LastOrDefault(item => item.Status == "COMPLETED");
+        var finalizingRollout = finalizingBatch is null ? null :
+            byId.GetValueOrDefault(finalizingBatch.RootThreadId);
+        var completionEvents = nested && finalizingRollout is not null
+            ? finalizingRollout.Events.ToArray() : segmentRootEvents;
+        var completionTerminal = nested && finalizingRollout is not null
+            ? completionEvents.LastOrDefault(item =>
+                item.Role == "assistant" && !string.IsNullOrWhiteSpace(item.Text))
+            : terminalEvent;
+
+        if (nested && result == "unknown" && batches.LastOrDefault() is { } lastBatch &&
+            lastBatch.Status is "COMPLETED" or "BLOCKED" or "NEEDS_INPUT")
+        {
+            result = lastBatch.Status switch
+            {
+                "COMPLETED" => "completed",
+                "BLOCKED" => "blocked",
+                "NEEDS_INPUT" => "question",
+                _ => "unknown"
+            };
+            resultReason = lastBatch.Reason;
+            resultEvidence.Add("native_internal_root_terminal");
+        }
+
         var completionInfo = BuildCompletion(
             agents,
-            segmentRootEvents,
+            completionEvents,
             result,
-            structuredResult is not null,
-            terminalEvent,
+            structuredResult is not null || finalizingRollout is not null,
+            completionTerminal,
             verificationPolicy,
             diagnostics);
         if (completionInfo.ProjectVerification == "unavailable")
@@ -1957,6 +1981,97 @@ public sealed class FactoryReportEngine
             FactoryProjectState = stateInfo,
             Completion = completionInfo
         };
+    }
+
+    private static List<FactoryBatchReport> BuildBatchReports(
+        IReadOnlyList<AgentReport> agents,
+        IReadOnlyDictionary<string, CodexRollout> rollouts)
+    {
+        var reports = new List<FactoryBatchReport>();
+        foreach (var root in agents.Where(agent => agent.Role == "root" &&
+                     agent.ParentThreadId is not null && agent.BatchOrdinal is not null)
+                     .OrderBy(agent => agent.BatchOrdinal).ThenBy(agent => agent.StartedAt))
+        {
+            var status = "unavailable";
+            int? completed = null;
+            string? reason = null;
+            var evidence = "no confirmed final native child message";
+            if (rollouts.TryGetValue(root.ThreadId, out var rollout))
+            {
+                var finished = rollout.Events.Any(item => item.Type is
+                    "turn.completed" or "turn_completed" or "task_complete");
+                var lastAssistant = rollout.Events.LastOrDefault(item =>
+                    item.Role == "assistant" && !string.IsNullOrWhiteSpace(item.Text));
+                if (finished && lastAssistant is not null &&
+                    FactoryBatchTrace.TryParseTerminal(lastAssistant.Text, null, out var terminal))
+                {
+                    status = terminal!.Status;
+                    completed = terminal.CompletedWorkers;
+                    reason = terminal.Reason;
+                    evidence = "completed native child turn with strict terminal fields";
+                }
+                else
+                    evidence = finished
+                        ? "native turn ended without valid batch terminal fields"
+                        : "native Root turn completion unavailable";
+            }
+            reports.Add(new FactoryBatchReport
+            {
+                BatchOrdinal = root.BatchOrdinal,
+                RootThreadId = root.ThreadId,
+                NativeTaskName = root.NativeTaskName,
+                Status = status,
+                CompletedWorkers = completed,
+                Reason = reason,
+                TerminalEvidence = evidence
+            });
+        }
+        return reports;
+    }
+
+    private static void AddBatchDiagnostics(
+        IReadOnlyList<FactoryBatchReport> batches,
+        IReadOnlyList<AgentReport> agents,
+        List<Diagnostic> diagnostics)
+    {
+        foreach (var duplicate in batches.Where(item => item.BatchOrdinal is not null)
+                     .GroupBy(item => item.BatchOrdinal).Where(group => group.Count() > 1))
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "warning", Category = "host-trace", Code = "duplicate_factory_batch",
+                Message = $"Multiple native Factory Roots use batch ordinal {duplicate.Key}."
+            });
+
+        for (var i = 0; i < batches.Count; i++)
+        {
+            var batch = batches[i];
+            var workers = agents.Where(agent => agent.Role == "worker" &&
+                agent.ParentThreadId == batch.RootThreadId).ToArray();
+            if (batch.Status == "unavailable")
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "host-trace", Code = "batch_terminal_unavailable",
+                    Message = $"Factory Root {batch.RootThreadId}: {batch.TerminalEvidence}."
+                });
+            if (batch.CompletedWorkers is int count && count > workers.Length)
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "factory", Code = "batch_worker_count_unverified",
+                    Message = $"Factory Root {batch.RootThreadId} declares {count} confirmed Workers, but only {workers.Length} native Worker children were discovered. Successful durable checkpoints cannot be inferred from the message."
+                });
+            if (i + 1 < batches.Count && batch.Status != "CONTINUE")
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "factory", Code = "batch_rotation_without_continue",
+                    Message = $"A later Root followed batch {batch.BatchOrdinal} without a confirmed CONTINUE terminal."
+                });
+            foreach (var worker in workers.Where(worker => worker.BatchOrdinal != batch.BatchOrdinal))
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "host-trace", Code = "worker_batch_identity_conflict",
+                    Message = $"Worker {worker.ThreadId} has batch {worker.BatchOrdinal?.ToString() ?? "unavailable"} but native parent belongs to batch {batch.BatchOrdinal}."
+                });
+        }
     }
 
     private static bool HasConfirmedExecutionSettingsMismatch(TaskReport task) =>
