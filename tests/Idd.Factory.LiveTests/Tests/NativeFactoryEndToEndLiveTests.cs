@@ -525,15 +525,24 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             var projectKey = JsonSerializer.Serialize(Path.TrimEndingDirectorySeparator(
                 Path.GetFullPath(trustedProject)));
             File.WriteAllText(Path.Combine(target, "config.toml"),
-                $"[projects.{projectKey}]\ntrust_level = \"trusted\"\n\n" +
-                "[features.multi_agent_v2]\n" +
-                "enabled = true\n" +
-                "hide_spawn_agent_metadata = false\n" +
-                "tool_namespace = \"agents\"\n" +
-                "expose_spawn_agent_model_overrides = true\n" +
-                "wait_agent_enabled = true\n");
+                BuildIsolatedCodexConfig(projectKey, OperatingSystem.IsWindows()));
         }
     }
+
+    // The live eval's private CODEX_HOME does not inherit the user's
+    // ~/.codex/config.toml. On native Windows, omitting this sandbox backend
+    // can cause even read-only shell commands to fail with "blocked by policy"
+    // (openai/codex#42172). This selects a supported native sandbox backend;
+    // the CLI still requests --sandbox read-only for the Stage-0 probe.
+    internal static string BuildIsolatedCodexConfig(string projectKey, bool isWindows) =>
+        $"[projects.{projectKey}]\ntrust_level = \"trusted\"\n\n" +
+        "[features.multi_agent_v2]\n" +
+        "enabled = true\n" +
+        "hide_spawn_agent_metadata = false\n" +
+        "tool_namespace = \"agents\"\n" +
+        "expose_spawn_agent_model_overrides = true\n" +
+        "wait_agent_enabled = true\n" +
+        (isWindows ? "\n[windows]\nsandbox = \"elevated\"\n" : "");
 
     private static async Task<RunResult> RunAsync(
         string executable,

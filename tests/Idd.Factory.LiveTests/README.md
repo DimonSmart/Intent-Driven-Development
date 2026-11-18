@@ -263,7 +263,14 @@ finally {
 
 The test captures `codex --version`, the generated Marketplace package and
 the Codex native JSONL trace under
-`artifacts/factory-evals/nested-stage0-*/`. It requires a genuine
+`artifacts/factory-evals/nested-stage0-*/`.
+Its isolated `CODEX_HOME` does not inherit the user's `config.toml`.
+On native Windows, it therefore explicitly configures
+`[windows] sandbox = "elevated"` (the native Windows sandbox backend),
+while still running Codex with `--sandbox read-only`.
+Without this setting, Codex can reject even `Get-Content` as
+`blocked by policy`; a successful command in the user's normal
+`CODEX_HOME` does not verify the isolated environment. It requires a genuine
 Supervisor -> generic Root -> generic Planner/Worker thread hierarchy,
 independent native session IDs, exact parent IDs and task names, accepted
 spawns at both levels with `fork_turns=none`, Skill reads from the installed
