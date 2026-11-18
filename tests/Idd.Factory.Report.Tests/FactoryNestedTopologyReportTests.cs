@@ -134,6 +134,11 @@ public sealed class FactoryNestedTopologyReportTests
                 "batch_rotation_without_continue" or "duplicate_factory_batch");
             Assert.Equal(report.Agents.Count, report.Agents.Select(agent => agent.ThreadId)
                 .Distinct(StringComparer.Ordinal).Count());
+            Assert.Equal("per-thread", report.Metrics.TokenAggregationMethod);
+            Assert.True(report.Metrics.TokenAggregationComplete);
+            Assert.Equal(250, report.Metrics.Tokens.InputTokens);
+            Assert.Equal(32, report.Metrics.Tokens.CachedInputTokens);
+            Assert.Equal(69, report.Metrics.Tokens.OutputTokens);
         }
         finally
         {
@@ -166,6 +171,42 @@ public sealed class FactoryNestedTopologyReportTests
                 limit, out var final));
             Assert.Equal("COMPLETED", final!.Status);
         }
+    }
+
+    [Theory]
+    [InlineData(0, 8, 1)]
+    [InlineData(1, 8, 1)]
+    [InlineData(7, 8, 1)]
+    [InlineData(8, 8, 2)]
+    [InlineData(9, 8, 2)]
+    [InlineData(17, 8, 3)]
+    [InlineData(3, 3, 2)]
+    [InlineData(6, 3, 3)]
+    [InlineData(7, 3, 3)]
+    [InlineData(9, 3, 4)]
+    [InlineData(10, 3, 4)]
+    public void BoundaryCasesRequireOneFinalizingRootAfterEveryExactLimit(
+        int workers, int limit, int expectedRoots)
+    {
+        var remaining = workers;
+        var batches = new List<FactoryBatchTrace.Terminal>();
+        while (remaining >= limit)
+        {
+            Assert.True(FactoryBatchTrace.TryParseTerminal(
+                $"Status: CONTINUE\nCompletedWorkers: {limit}\nReason: BATCH_LIMIT" ,
+                limit, out var terminal));
+            batches.Add(terminal!);
+            remaining -= limit;
+        }
+
+        Assert.True(FactoryBatchTrace.TryParseTerminal(
+            $"Status: COMPLETED\nCompletedWorkers: {remaining}\nReason: DONE" ,
+            limit, out var done));
+        batches.Add(done!);
+        Assert.Equal(expectedRoots, batches.Count);
+        Assert.True(batches.Take(batches.Count - 1).All(item =>
+            item.Status == "CONTINUE" && item.CompletedWorkers == limit));
+        Assert.Equal("COMPLETED", batches.Last().Status);
     }
 
     private static void Spawn(List<string> lines, DateTimeOffset timestamp,
