@@ -205,11 +205,28 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             $"Missing fork_turns=none: {taskName}");
         var spawn = Assert.Single(parent.SpawnRecords.Values, record =>
             record.CallId == call.ToolId);
-        Assert.Equal("accepted", spawn.SpawnOutcome);
         Assert.False(spawn.CorrelationConflict);
         Assert.Equal(taskName, spawn.RequestedTaskName);
-        Assert.Contains(child.ThreadId, spawn.Children);
+        Assert.Equal(parent.ThreadId, spawn.SenderThreadId);
         Assert.Equal(parent.ThreadId, child.ParentThreadId);
+        Assert.Equal(taskName, child.AgentPath?.Split('/').Last());
+        Assert.NotEqual("rejected", spawn.SpawnOutcome);
+
+        // CodexRolloutReader reads each rollout independently. A successful native
+        // spawn can remain "unknown" until FactoryReportEngine correlates child
+        // session_meta with the parent's spawn call. This technical probe is not
+        // a Factory run, so reconcile against the actual child rollout instead
+        // of requiring the report engine to classify its raw SpawnRecord.
+        // Do NOT infer acceptance from the requested task_name alone.
+        Assert.Single(parent.SpawnRecords.Values, record =>
+            record.RequestedTaskName == taskName);
+        if (spawn.Children.Any())
+            Assert.Equal(child.ThreadId, Assert.Single(spawn.Children));
+        if (spawn.ChildAgentPath?.StartsWith('/') == true)
+            Assert.Equal(spawn.ChildAgentPath, child.AgentPath);
+        Assert.Contains(child.Events, item =>
+            item.Role == "assistant" && !string.IsNullOrWhiteSpace(item.Text));
+
         if (model is not null)
         {
             Assert.Equal(model, spawn.RequestedModel);
