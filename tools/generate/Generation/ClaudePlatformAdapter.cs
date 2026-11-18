@@ -19,7 +19,7 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
     {
         var files = base.BuildSkillFiles(adapter, plugin, roleDefinitions, skillName, skillDescriptions).ToList();
 
-        if (StringComparer.Ordinal.Equals(skillName, "idd-factory-run"))
+        if (StringComparer.Ordinal.Equals(skillName, "idd-internal-factory-root"))
         {
             var skill = files.Single(file => StringComparer.Ordinal.Equals(
                 file.RelativePath,
@@ -29,7 +29,7 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
                 Content = ContentNormalizer.NormalizeContent(ContentNormalizer.JoinBlocks(
                     skill.Content!,
                     """
-                    ## Claude generic Factory subagents
+                    ## Claude internal Root → Planner/Worker subagents
 
                     Use a native generic Agent/subagent or fork when it guarantees
                     a fresh bounded context without parent transcript, repository
@@ -38,7 +38,7 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
                     Factory subagent_type identifiers. Use a built-in general-purpose
                     agent if the host requires a type. Give the child the unambiguous
                     absolute path to the installed internal Planner or Worker SKILL.md
-                    relative to THIS Factory Run Skill; it must fully load the Skill
+                    relative to THIS installed internal Factory Root Skill; it must fully load the Skill
                     before reading task/project data. Root must not copy its contents.
                     A Skill is instruction material, not a process or sandbox.
                     The Planner must act read-only; use host permissions when provided.
@@ -64,6 +64,46 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
                       explicit per-child override, stop with a diagnostic that names
                       the profile, requested settings, and rejection reason; suggest
                       `idd-factory-configure` and never pick a fallback model.
+                    """))
+            };
+        }
+
+        if (StringComparer.Ordinal.Equals(skillName, "idd-factory-run"))
+        {
+            var skill = files.Single(file => StringComparer.Ordinal.Equals(
+                file.RelativePath,
+                Path.Combine("skills", skillName, "SKILL.md")));
+            files[files.IndexOf(skill)] = skill with
+            {
+                Content = ContentNormalizer.NormalizeContent(ContentNormalizer.JoinBlocks(
+                    skill.Content!,
+                    """
+                    ## Claude native two-level Supervisor
+
+                    Use one fresh native generic Agent/subagent per Factory Root
+                    batch. Each must receive the absolute installed internal Root
+                    SKILL.md path, effective batch limit (default 8), explicit
+                    entry mode and exact complete original request or active
+                    saved request path. The Root reads its own entire Skill before
+                    project work. Parent transcript/history is never inherited.
+
+                    Require the host to genuinely support nested generic agents:
+                    Supervisor → Factory Root → Planner/Worker, shared workspace,
+                    terminal native waits, writer/descendant quiescence and exact
+                    explicit child model/effort overrides. A builtin general-purpose
+                    agent is permitted if the host requires a subtype. Do not
+                    require a registered custom Factory role or silently use a
+                    child process as a fallback. No unsupported host may claim
+                    two-level compatibility: return BLOCKED before mutation.
+
+                    Never implement Product tasks, read full normative Factory
+                    references, plan Tasks, execute verification or edit the
+                    Factory state in the public Supervisor. Native terminal
+                    CONTINUE is only valid after full batch checkpoint, with
+                    BATCH_LIMIT and CompletedWorkers equal to the effective
+                    limit. Confirm every writing descendant is stopped before
+                    starting the next fresh Root. No auto retry after any other
+                    terminal status or an ambiguous host result.
                     """))
             };
         }
