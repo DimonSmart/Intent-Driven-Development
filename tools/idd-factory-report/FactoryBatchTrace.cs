@@ -36,6 +36,24 @@ public static partial class FactoryBatchTrace
         return legacy.Success ? new Name(legacy.Groups["role"].Value, 0, null) : null;
     }
 
+    // The Supervisor MUST carry the explicit effective budget in each Root
+    // spawn message. Missing, malformed or conflicting values are not inferred
+    // from user dialogue or previous Root sessions.
+    [GeneratedRegex(@"(?<![A-Za-z0-9_])max_workers_per_batch\\s*[:=]\\s*(?<limit>[0-9]+)(?![0-9])",
+        RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)]
+    private static partial Regex BatchLimitPattern();
+
+    public static int? ParseBatchLimit(string? nativeRootAssignment)
+    {
+        if (string.IsNullOrWhiteSpace(nativeRootAssignment)) return null;
+        var matches = BatchLimitPattern().Matches(nativeRootAssignment);
+        if (matches.Count == 0) return null;
+        var values = matches.Select(match => match.Groups["limit"].Value).Distinct(
+            StringComparer.Ordinal).ToArray();
+        return values.Length == 1 && int.TryParse(values[0], out var limit) &&
+               limit > 0 ? limit : null;
+    }
+
     /// <summary>
     /// Parses one complete final message, not arbitrary quoted intermediate
     /// content or a tool output. The caller must independently attest that the
@@ -92,6 +110,7 @@ public sealed class FactoryBatchReport
     public int? BatchOrdinal { get; init; }
     public string RootThreadId { get; init; } = "";
     public string? NativeTaskName { get; init; }
+    public int? EffectiveWorkerLimit { get; init; }
     public string Status { get; init; } = "unavailable";
     public int? CompletedWorkers { get; init; }
     public string? Reason { get; init; }
