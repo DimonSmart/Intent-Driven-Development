@@ -7,146 +7,76 @@ MCP transport, retry engine, or durable implementation database.
 
 ## Required references
 
-Read `references/intent-preflight.md` before starting or replacing a Factory
-run. Read `references/engineering-guardrails.md` before using an optional
-`.idd/engineering/` layer. Read `references/project-verification.md` before
-project verification. Read `references/factory-execution-policy.md` before
-interpreting `ExecutionProfile` or `.idd/execution.yaml`.
+Read `references/engineering-guardrails.md` before using `.idd/engineering/`,
+`references/project-verification.md` before project verification, and
+`references/factory-execution-policy.md` before interpreting `ExecutionProfile`
+or `.idd/execution.yaml`. The full preflight reference is required below.
 
-## Required host capabilities
+## Native child readiness and spawn
 
-Factory requires the platform adapter to provide all of these properties:
+Before any durable owner or Factory write, resolve the loaded
+`idd-factory-run/SKILL.md` to its real installed path. From the same installed
+plugin root derive and verify these accessible files and their statically
+declared mandatory references:
 
-- spawn a child agent in a fresh isolated semantic context;
-- explicitly avoid inheriting the parent transcript;
-- give the child access to the current repository;
-- wait for a terminal child result without model-driven polling;
-- receive the final child result;
-- stop or close a child when necessary.
+- `skills/idd-internal-factory-planner/SKILL.md`
+- `skills/idd-internal-factory-worker/SKILL.md`
 
-Use a read-only planner and workspace-writing workers when the platform can
-express those sandboxes natively. If the host cannot provide the required
-properties, Factory is unsupported on that host. Do not recreate the removed
-C# runtime, MCP transport, shell process supervisor, status protocol, or polling
-loop to compensate.
+Use the exact installed version, never a guessed cache path, global name
+search, source checkout or repository-relative path. Root inspects package
+metadata and accessibility only. Each child reads its own protocol.
 
-A new thread is not sufficient if it automatically receives the parent history.
+Check the actual native tool schema, including direct top-level tools. Require
+fresh isolated contexts without inherited transcripts, access to installed
+files and the shared working copy, bounded assignment delivery, terminal
+results, blocking or event-driven wait, and native stop/interrupt with writer
+termination evidence. Require exact model/effort overrides when policy calls
+for them. Use the host's builtin generic child type if needed. A missing
+Factory-specific `agent_type` or legacy role registration is valid. Prefer
+native read-only Planner and workspace-writing Worker permissions when
+available. Text instructions are not a sandbox. Missing required capabilities
+or files block the run with a diagnostic. Use native tools throughout.
 
-## Installed internal Skills and generic child-agent transport
+Before each spawn, recheck the selected Skill path and required capabilities.
+Pass the semantic role, accessible absolute installed Skill path, explicit
+working-copy path and bounded role packet. Require the child to read the entire
+Skill and required references before project work, continuing truncated reads
+until complete. Use quoted paths supported by the host. Root neither reads nor
+relays child protocol bodies. Omit transcripts and full Intent/Engineering
+trees. A child unable to load its Skill or validate its assignment returns
+`BLOCKED` without work. Preserve phase state and any pending Task on failure.
 
-The Factory Planner and Worker protocols are shipped as
-`skills/idd-internal-factory-planner/SKILL.md` and
-`skills/idd-internal-factory-worker/SKILL.md` inside the SAME installed
-`idd-factory` plugin as this `idd-factory-run/SKILL.md`. These are internal
-instruction Skills, not registered custom-agent types or separate processes.
-
-Before any new durable owner/Factory write, resolve this currently loaded
-Factory Run Skill to its real installed absolute path; derive its sibling
-Planner/Worker Skill paths from that exact installed plugin root. Do not guess
-plugin cache versions, search globally by name, use the source checkout or
-assume the project working directory is the plugin root. Check both SKILL.md
-files exist and are accessible, and verify any statically declared mandatory
-references. Root may inspect paths, file attributes and package metadata, but
-MUST NOT read, summarize, quote or relay the full child protocols.
-
-Inspect the actual top-level host-native child-agent schema, including direct
-operations that might not appear inside a nested helper tool list. Require
-fresh child context without inherited history, child access to installed files
-and the shared project working copy, bounded task delivery, final result,
-native blocking/event-driven waiting, stop/interrupt and confirmation that a
-writer has stopped, and exact model/effort overrides when required by policy.
-Absence of a Factory-specific `agent_type` argument is NOT a failure.
-If the host requires a type, use its builtin generic child type, not a
-custom registered Factory role. A per-child read-only sandbox for Planner is
-preferred, not mandatory; a textual rule is not a technical sandbox.
-
-Spawn ordinary native children with explicitly disabled transcript inheritance.
-For Codex use `fork_turns: "none"` and unique `task_name` arguments as
-specified below. In EVERY spawn message include the semantic Planner/Worker
-role, the concrete accessible absolute path to that role's installed SKILL.md,
-an explicit instruction to read ALL of it (and its required references) as
-its first substantive action, the explicit project working-copy path, and
-only the phase-appropriate bounded assignment. Parent and child must refer
-to the SAME installed plugin version. Quote paths with spaces; use real paths
-supported by the host on Windows and Unix. Partial/truncated file reads must
-be continued until complete; no independent project work before loading and
-guarding the assignment. The child returns `BLOCKED` when Skill, references,
-phase, baseline/provenance or required assignment is missing or ambiguous.
-It must not improvise a protocol from memory.
-
-Root never injects protocol bodies, the whole Intent/Engineering tree, previous
-worker conversations or the parent transcript. Root performs required
-Engineering enumeration and execution policy mapping as before. If a child
-fails to load a Skill after valid preparation, preserve the existing phase
-state and pending Task; never declare successful completion. On wait failure,
-stop or interrupt the child, confirm Writer termination before another write,
-and end this attempt with recoverable state. No status polling loop or runtime
-fallback. These are checks for necessary host capabilities, not a requirement
-to prove a future child has already read its Skill before spawning it.
+On Codex MultiAgentV2 set `fork_turns: "none"` for both roles. Every native
+`spawn_agent` call uses an explicit `task_name` matching
+`^idd_factory_(planner|worker)_[0-9]+$`, for example `idd_factory_planner_01`
+or `idd_factory_worker_01`. Use a fresh name for each attempt, including rejected
+spawns. Inspect visible native calls for collisions in the shared host namespace
+and keep counters out of project state. Pass the name as a tool argument and
+use it only for trace correlation. Verify loading, settings and completion
+from their own evidence. Platforms without this argument use their native
+generic spawn schema.
 
 ## Factory Preflight — Root entrypoint
 
-`references/intent-preflight.md` is the **sole detailed normative contract**
-for logical request identity, Requested scope, Product classification,
-Factory-level Engineering disposition, request-level blockers, Git baseline,
-owner order, durable coverage, preparation recovery, initial Planner outcomes,
-activation and replacement. Read it **in full** before starting/replacing a
-run. Do not reconstruct its protocol from this abbreviated Root checklist.
-If unavailable, stop as an incomplete installation.
+Read `references/intent-preflight.md` **in full** before starting or replacing a
+run. It owns the logical request, requested scope, durable classifications,
+blockers, baseline, mutation order, coverage, recovery and activation. If it
+is unavailable, stop with an incomplete-installation diagnostic.
 
-Factory is implementation-capable only: `route-only` and `intent-only`
-stop before Factory orchestration; `intent-preserving` cannot authorize
-mutating Product/Engineering preflight. A direct invocation bypassing
-`idd-route` does not bypass Preflight. For new, continuing, recovering,
-cancelled or explicitly replaced runs, select the applicable mode from
-`intent-preflight.md`, not a fabricated new state machine.
+Apply its mode and scope rules even when invoked directly. `route-only` and
+`intent-only` stop before orchestration. `intent-preserving` forbids mutating
+Product or Engineering preflight.
 
-**Before any durable owner/Factory write**, Root must validate the actual native
-child-agent capabilities and both installed internal Skill paths described
-above. Missing required tools/files block before preparation; an absent
-`agent_type` or unregistered legacy Factory role does not. Recheck the
-chosen Skill path and required capabilities before each spawn.
+Follow the reference's **New-run ordering**. Materialize the full request and
+resolve determinable blockers before writes. Save the request, baseline and
+pending provenance before authorized owner actions. Run Engineering management
+first when required, then the authorized Product Intent owner. Verify coverage
+against the full request and exact Q/A before initial planning. Use the Root
+operations below to checkpoint actions, launch the initial Planner and activate.
 
-For a **new independent end-to-end run**, execute these named Preflight
-phases in the normative order, with Root responsible for the concrete actions:
-
-1. Materialize the FULL self-contained original request, including
-   explicitly included textual attachments; resolve Requested scope and
-   independently analyze Product Intent and Engineering dispositions.
-2. Evaluate **all determinable request-level blockers** before ANY
-   durable write: missing normative decisions, contradictions, forbidden
-   scope mutation, incomplete input and prohibited active replacement.
-   On a blocker, do not invoke an owner or create `preparation/`.
-3. Check clean managed IDD paths and the original real `HEAD^{commit}`
-   using the exact Git gate in the reference. A dirty unrelated code tree
-   alone is not a blocker. Never auto-commit or invent a baseline.
-4. Persist `preparation/request.md`, `baseline.md` and `provenance.md`
-   BEFORE invoking a potentially mutating owner. Record bounded pending
-   provenance and verify trusted after-state for each owner action.
-5. Invoke `idd-engineering-change` (only when required) before the
-   authorized Product Intent owner; pass the complete request, not a
-   summary. `success`/`no-op` continue; `ambiguous`/`blocked`
-   or an unknown after-state stop and preserve recoverable preparation.
-6. Validate durable coverage against full request, exact Q/A, both
-   applicable durable layers, safety, compatibility and explicit non-goals.
-   Record the verified boundary in provenance.
-7. Spawn a fresh generic child for the initial Planner while inactive, using the
-   ordinary bounded assignment. Handle `# Question`, `# Done` or a
-   complete validated `# Task` batch according to the Preflight reference
-   and the operational activation section below. No Planner outcome
-   overrides a request-level blocker.
-8. Only after validated executable Tasks and transfer of verified plan,
-   exact answers, baseline and provenance, write
-   `current/request.md` **LAST**. Then enter the sequential Worker loop.
-
-Do not re-run the new-independent-run cleanliness/baseline gate on an
-active continuation, valid preparation recovery or genuine active
-replacement. For recovery reconcile exact saved request/Q/A and pending
-evidence before retrying a mutating action; never blindly replay owners.
-For explicit active replacement, preserve old active state until authorized
-replacement preflight/coverage succeeds, and block any Engineering-changing
-replacement before writing. Timeouts or interrupted owners are not proof of
-termination, success, authorization, or safe rollback.
+On continuation or replacement follow the reference's recovery and replacement
+rules. Reconcile pending evidence before retrying an owner. Preserve existing
+active state until authorized replacement preflight and coverage succeed.
 
 ## Minimal temporary state
 
@@ -199,260 +129,104 @@ replacement request and may archive the old directory for diagnostics.
 
 ## User-level operations
 
-New:
-- materialize the full logical base request and resolve requested scope;
-- execute existing durable preflight and coverage validation;
-- persist preparation, run the fresh initial planner and handle its result;
-- activate only on a validated Task batch, then enter the worker loop.
-
-Continue:
-- if `current/request.md` exists, use ordinary active-run continuation
-  without repeating entry preflight or initial planning;
-- otherwise if `preparation/request.md` exists, restore the full base request,
-  exact Q/A and pending question without depending on parent transcript;
-- treat a precise reply as the answer to the saved `question.md`; when a new
-  independent request appears, ask whether to continue or explicitly replace
-  the pending preparation instead of silently combining two requests;
-- incomplete preparation blocks automatic execution. Explain which source is
-  missing rather than reconstructing it from memory.
-
-Cancel:
-- remove pending preparation, or archive/remove the active state as appropriate;
-- never roll back repository or durable-knowledge changes automatically.
-
-Restart / explicit replacement:
-- preserve existing active replacement semantics and guard;
-- an independent new request cannot silently overwrite pending preparation;
-- on explicit replacement of preparation, discard only that temporary directory
-  and perform new preflight. Existing active runs retain their own rules.
-
-These are skill-level operations, not new transport operations or state schemas.
-
+- **New** follows the preflight and initial Planner flow.
+- **Continue** uses active state when `current/request.md` exists. Otherwise
+  resume valid preparation from the saved request, exact Q/A and pending
+  question. A precise reply answers that question. Ask whether to continue or
+  explicitly replace when a new independent request arrives. Report missing
+  preparation inputs instead of reconstructing them from memory.
+- **Cancel** removes pending preparation or archives/removes active state as
+  appropriate. Repository and durable knowledge changes are preserved.
+- **Replace** an inactive preparation only on explicit request by discarding
+  that temporary directory and running new preflight. For active replacement,
+  follow the reference's Engineering guard and preserve the current run until
+  the authorized replacement is ready.
 
 ## Original Git baseline and bounded provenance — Root operations
 
-Follow `Original Git baseline and preflight provenance`, `Request
-identity`, and `Replacement semantics` in
-`references/intent-preflight.md`. The concrete new-independent-run
-commands from the repository root are:
+Follow the baseline, provenance and replacement rules in the preflight
+reference. For a new independent run only, run from the repository root:
 
 ```text
 git status --porcelain=v1 -z --untracked-files=all -- .idd/intent/ .idd/engineering/
 git rev-parse --verify "HEAD^{commit}"
 ```
 
-Parse the status as **NUL-delimited**, including paired rename paths;
-check staged, unstaged, untracked and deleted managed files. Missing
-`.idd/engineering/` is valid; changes outside the managed paths are not
-by themselves a blocker. Require a full real HEAD SHA. Preserve the
-original baseline on recovery/continuation/replacement.
+Parse the NUL-delimited managed status, including rename pairs, and verify the
+full commit SHA. Preserve the original baseline on continuation, recovery and
+replacement.
 
-Before each mutating owner or Worker, durably checkpoint the bounded
-pending action and original authorization in `provenance.md`; after a
-trusted result record affected paths and before/after evidence.
-`external-unknown` is not confirmed authorization. An unavailable
-original Git object, ambiguous provenance or partial activation blocks
-unsafe writes/refinement: preserve evidence and diagnose; no automatic
-rollback or baseline reset. Validate inactive plan, answers and
-provenance before writing the sole active marker
-`current/request.md` last. Neither a stray `current/plan.md` nor
-legacy `state.json` marks an active run.
-
+Before each mutating owner or Worker, save the pending action and original
+authorization in `provenance.md`. After a trusted result, record affected paths
+and bounded before/after evidence. Treat unverified attribution as
+`external-unknown`. If provenance, unavailable Git objects or partial
+activation make a write/refinement unsafe, diagnose and preserve the evidence.
+An unfinished legacy run keeps its original no-Intent-write boundary when it
+had implementation-only scope. Ambiguous legacy scope/provenance forbids
+Worker Intent writes.
 
 ## Preparation planner and activation — Root operations
 
-Use `New-run ordering`, `Durable coverage validation`, `Preparation
-questions and renewed coverage`, and `Request identity` in
-`references/intent-preflight.md`. This section specifies Root's
-native-agent and temporary-file operations, not a second Preflight policy.
+After verified durable coverage, use the **Fresh Planner** packet in preparation.
+Handle the result under the preflight reference:
 
-1. After approved durable coverage and saved
-   `preparation/{request,baseline,provenance}.md`, recheck the installed
-   Planner Skill path. Spawn a fresh generic child as Planner
-   used in active runs with the unchanged request, chronological exact Q/A,
-   repository paths, current Engineering discovery context and bounded
-   preparation verification failure. No active marker or `completed.md`
-   exists before Workers.
-2. For `# Question`, require exactly one concrete question, write its
-   exact text to `preparation/question.md`, and stop **without** creating
-   `current/request.md` or `plan.md` or spawning a Worker. On reply,
-   append exact question AND answer chronologically to
-   `preparation/answers.md`, remove the pending question, and perform
-   the renewed blocker/owner/coverage checks from Preflight before a
-   NEW isolated Planner. Never inherit the previous child's transcript.
-3. For `# Done` before activation, run project verification in the
-   `final` context. Success removes preparation and completes with
-   **no active marker and no empty plan**. Failure writes only bounded
-   `preparation/verification-failure.md` and goes to a fresh Planner.
-   Do not call an unverified check success, retry unchanged failure
-   endlessly, or run fixes from Root.
-4. For `# Task`, validate the WHOLE fresh executable batch:
-   self-contained contracts, one explicit `ExecutionProfile` from
-   `economy | standard | strong` per new Task, unique existing
-   `TaskRelatedIntent` owners, existing unique Conditional
-   `TaskRelatedEngineering` owners (not Always), structural Engineering
-   validity and durable/repository freshness. Malformed, mixed,
-   empty, stale or unresolved output is a blocking protocol diagnostic,
-   never an executable task.
-5. Recheck no `current/request.md` exists. Reconcile orphaned inactive
-   files with trusted preparation evidence; write `current/plan.md` from
-   the validated batch and transfer exact Q/A, immutable baseline and
-   provenance. Write the complete original `current/request.md` LAST
-   (prefer a same-directory atomic rename). Only then launch the normal
-   Worker loop. Never claim multi-file atomicity or overwrite a competing
-   active marker.
-
-An unfinished legacy run with explicit implementation-only scope keeps
-its no-Intent-write boundary; ambiguous legacy scope/provenance forbids
-Worker Intent writes. The installed plugin version does not grant permission.
-A clarification cannot silently expand `intent-preserving` scope.
+1. **Question.** Save the exact question to `preparation/question.md` and stop
+   before activation. On reply append exact Q/A to `preparation/answers.md`,
+   remove the pending question and renew blocker/owner/coverage checks before a
+   fresh Planner.
+2. **Done.** Run `final` project verification. Success removes preparation and
+   completes without an active marker or empty plan. Failure writes a bounded
+   `preparation/verification-failure.md` and goes to a fresh Planner, following
+   the verification rules below.
+3. **Tasks.** Validate the entire fresh batch as described under **Planner
+   outcomes**. Recheck that `current/request.md` is absent and reconcile any
+   orphaned files against trusted preparation evidence. Write `current/plan.md`
+   and transfer exact Q/A, the immutable baseline and provenance. Write the
+   complete original `current/request.md` **LAST**, preferring a same-directory
+   atomic rename. Then enter the Worker loop. A competing active marker blocks
+   activation.
 
 ## Orchestration loop
 
-Conceptually:
+While active, stop for pending user input. When `plan.md` has no remaining
+Tasks, spawn a fresh Planner and handle its outcome below. Otherwise execute
+the first remaining Task:
 
-```text
-while true:
-    if waiting for user:
-        stop
-
-    if plan.md has no remaining task:
-        run a fresh planner
-
-        Question -> persist question.md and stop
-        Done     -> run project verification
-        Tasks    -> require one canonical ExecutionProfile per new task, then persist in plan.md
-
-    take the first remaining task
-    read its ExecutionProfile; missing metadata in existing plan.md means standard
-    reject empty, repeated, or unknown explicit profiles
-    if .idd/execution.yaml is absent, inherit host settings
-    otherwise re-read and structurally validate .idd/execution.yaml
-    mechanically resolve the active-platform profile mapping
-    if that profile/platform mapping is absent, inherit host settings
-    deterministically re-read the current Engineering INDEX
-    enumerate all current Always ENG IDs
-    verify installed Worker Skill path and prepare the isolated worker assignment
-    record pending Worker before-checkpoint in provenance.md
-    spawn a fresh native worker with the resolved native model override
-    wait natively for its terminal result
-
-    if no trusted completed result:
-        leave the task first in plan.md
-        stop
-
-    record bounded Worker after-checkpoint, including unknown edits
-    append a short result to completed.md
-    remove the completed task from plan.md
-```
-
-This is conceptual behavior, not a requirement to implement a new programmatic
-state machine.
-
-### Codex MultiAgentV2 spawn identity
-
-On Codex MultiAgentV2, **every Factory-owned native `spawn_agent` call**
-(planner and worker) MUST include a unique explicit `task_name` argument:
-`idd_factory_planner_01`, `idd_factory_planner_02`, ... for planners,
-or `idd_factory_worker_01`, `idd_factory_worker_02`, ... for workers.
-Only names matching `^idd_factory_(planner|worker)_[0-9]+$` are valid.
-A `task_name` identifies an attempt, not a role type or evidence that
-its Skill was loaded.
-Use a fresh name for **each attempt**, including a spawn rejected by the host.
-Keep names unique within the root-session/Factory invocation and any shared
-host namespace; inspect visible native calls before selecting the next suffix.
-Do not persist counters or create another Factory runtime/state machine.
-
-Pass `task_name` in native spawn arguments, **not** in child instructions or
-worker assignments. This is a trace-visible role marker, not evidence that a
-child was accepted, completed or used its requested model. Also explicitly set
-`fork_turns: "none"` for **planner and worker** spawns; a fresh context must
-not inherit the parent or an earlier child's transcript. Apply exact model and
-reasoning overrides when execution policy requires them; if the host cannot
-express a required argument or honor an override, block with a host-compatibility
-diagnostic rather than changing model or backend. Other platform adapters are
-unchanged when they lack `task_name`.
+1. Validate the Worker packet, resolve native model settings immediately
+   before spawn, and checkpoint the pending action.
+2. Spawn one fresh Worker and wait natively for a trusted terminal result.
+3. Only on trusted successful completion, record the after-checkpoint including
+   unknown edits, append a short result to `completed.md`, and remove that Task
+   from `plan.md`. Otherwise leave the Task first and stop the invocation.
 
 ### Fresh planner
 
-Spawn a generic native child with a new context and no inherited history.
-Pass the absolute installed `idd-internal-factory-planner/SKILL.md` path,
-full original request (or its accessible persisted path), preparation/active
-phase, chronological exact Q/A, original baseline, verified provenance,
-repository root and phase-specific optional completed summaries/verification
-failure. The child reads its entire installed Skill as its first substantive
-action, validates assignment completeness and required references, then
-semantically selects relevant current Intent and Conditional Engineering.
-The Planner is read-only: it must not mutate project or Factory state, read
-execution policy, or inherit Root/other agent transcripts. Use native read-only
-permissions when available. Do not require active-only files in preparation.
-Root does not copy the protocol, full Intent tree or prior transcripts.
-A missing/unreadable Skill or invalid packet gives `BLOCKED` without planning.
+Give the fresh read-only Planner the complete original request or its accessible
+saved path, preparation/active phase, exact chronological Q/A, original baseline,
+verified provenance, current Engineering discovery context and latest bounded
+verification failure for that phase. Include completed summaries only in
+active runs. Planner selects relevant Intent and Conditional Engineering
+semantically. Execution policy is outside Planner inputs.
 
 ### Worker execution profile
 
-Immediately before every worker spawn, apply the bounded lookup from
-`references/factory-execution-policy.md`:
-
-```text
-planner ExecutionProfile
--> missing ExecutionProfile in an existing plan.md means standard
--> reject empty, repeated, or unknown explicit profiles
--> re-read one project configuration document when present
--> absent policy or absent profile/platform mapping means inherit
--> otherwise use exact configured active-platform model/settings
--> native child-agent spawn
-```
-
-New planner output must include exactly one canonical profile per task; validate
-it before saving a new batch. When continuing an existing run, pending tasks in
-`.idd/factory/current/plan.md` without `# ExecutionProfile` remain valid and use
-`standard`. Do not require a restart, migrate the plan, or reconsider complexity
-solely because that legacy metadata is absent.
-
-This is a mechanical protocol step. Do not reconsider task complexity, compare
-candidate models, optimize cost, upgrade/downgrade the profile, or choose a
-model that is not the exact configured mapping.
-
-If the file is absent, inherit normal host model/reasoning settings without
-writing a default file. Partial mappings are valid: a missing profile or missing
-active-platform mapping also inherits host model/reasoning settings. Validate
-all present mappings. A malformed existing policy blocks the affected worker
-with a concrete diagnostic, as do unknown profile/platform names and empty or
-repeated explicit task profiles. Inheritance omits Factory-specific model and reasoning
-overrides; it does not copy the current model into the policy.
-
-Malformed explicit configuration blocks the worker spawn with a clear
-diagnostic; never silently fall back to `inherit`. If the native host rejects a
-configured model/reasoning value or cannot honor an explicit per-child override,
-stop without spawning a substitute worker and suggest rerunning
-`idd-factory-configure`.
-
-Model selection changes only native spawn settings. The same canonical Factory
-worker protocol is used for every execution profile; profiles change native
-child-agent settings, never worker instructions. The worker does not choose its
-own model.
+For every Worker spawn, follow **Runtime lookup** in
+`references/factory-execution-policy.md`. Re-read and validate the policy when
+present, then use the exact resolved model and optional effort or omit both
+overrides on inheritance. The reference distinguishes legacy missing profile
+metadata from invalid explicit or new output. Report a blocking diagnostic
+when validation fails or the host cannot honor required arguments. Keep the
+resolved profile and the common Worker protocol.
 
 ### Fresh worker
 
-Immediately before every Worker spawn, verify the installed internal Worker
-Skill path and material current Intent/Engineering constraints, request/answer
-freshness and baseline/provenance. Replan stale Task batches. Prepare exactly
-one complete self-contained Task and the current TaskRelatedIntent,
-Planner-selected Conditional TaskRelatedEngineering, mechanically enumerated
-AlwaysEngineering, authorized scope and explicit user prohibitions. Resolve
-exact stable IDs and provide accessible project/context paths. Do not create a
-second `# Task` header in the bootstrap.
-
-Spawn a fresh generic child with no inherited transcript. Pass the absolute
-installed `idd-internal-factory-worker/SKILL.md` path and instruct the child
-to read it entirely first, validate the one-Task packet and required references,
-then implement only that Task. The Skill is the Worker's protocol; Root never
-reads or relays its body. The worker never selects a model or reads execution
-policy. Use exact policy-resolved native model/effort arguments or omit both
-when inheriting; never silently substitute.
-
-Use this bounded task structure (omit empty optional sections):
+Before spawn, check material current Intent/Engineering constraints,
+request/answer freshness and baseline/provenance. Replan a stale Task batch.
+Supply one self-contained Task, authorized scope, explicit user prohibitions
+and accessible context paths. Resolve supplied stable IDs mechanically.
+If Engineering is present, validate it and re-read its current INDEX to
+enumerate all Always IDs separately from the Planner's Conditional IDs. Use
+this packet, omitting empty optional sections:
 
 ```text
 --- Factory worker assignment ---
@@ -467,64 +241,45 @@ Use this bounded task structure (omit empty optional sections):
 --- End Factory worker assignment ---
 ```
 
-Each Worker mechanically resolves its supplied Intent/Engineering IDs, performs
-focused task-local checks, and returns a short semantic result. Workers share
-the working copy and execute sequentially. A failed Skill load or guard keeps
-the Task pending, with no replacement writer until termination is confirmed.
+Workers share the working copy, execute sequentially, run focused task-local
+checks and return a short semantic result. A failed Skill load or guard leaves
+the Task pending.
 
 ### Waiting and interruption
 
 Use the platform's longest appropriate blocking or event-driven native wait.
-Worker duration by itself must not create repeated parent model turns.
+A long execution alone warrants no model-driven polling. On timeout or wait
+failure, stop or close the child natively when possible, preserve pending state
+and end the invocation. Require confirmed termination before starting any
+replacement writer in the same workspace.
 
-If native waiting ends with a host timeout or error:
-
-1. do not start another worker for the same task;
-2. do not begin status polling;
-3. stop or close the still-running child natively when possible;
-4. leave the task first in `plan.md`;
-5. end the current Factory invocation.
-
-Never run a replacement writer while the previous child may still be writing to
-the same workspace.
-
-Factory deliberately uses at-least-once execution. A later fresh worker must
-inspect current repository reality, finish partially completed work, and avoid
-reverting correct existing changes merely because an interrupted execution may
-have produced them.
+At-least-once recovery uses a fresh Worker on the pending Task. Inspect actual
+repository state and preserve correct partial work.
 
 ## Technical autonomy during execution
 
-Planner can select a suitable compliant implementation direction, delegate
-bounded technical choices to Worker, or contract focused research with
-observable evidence. A fresh Planner consumes research results from the
-repository before dependent Tasks are contracted. Multiple viable techniques
-alone do not justify `# Question`; ask only for a genuine user-owned
-product, normative, trust, compatibility or external-obligation decision.
+Planner chooses a compliant direction, delegates bounded implementation choices
+or contracts focused research with observable evidence. A fresh Planner uses
+that evidence before contracting dependent Tasks. Ask only for a user-owned
+product, policy, trust, compatibility or external-obligation decision.
 
-When realistic alternatives left to Worker activate different Conditional
-Rules, Planner semantically supplies the relevant `TaskRelatedEngineering`
-IDs *before* Worker spawn, or first narrows the Task/researches the decision.
-Conditions remain conditional. The root only resolves IDs and enumerates
-Always Rules; no heuristic Conditional rule selection is introduced.
-
-Worker chooses local implementation methods inside the Task and supplied
-Rules. If rules are insufficient for the selected approach or required
-constraints conflict, Worker reports a precise blocker and cannot widen
-the packet, write `# Question`, alter Task, edit Engineering or approved product decisions or
-remove/rename the active marker. Factory handles further planning/stopping. Worker may add only permitted
-monotonic refinements to existing Product Intent owners.
-A new Engineering policy remains forbidden during an active run.
-
+If realistic Worker choices could trigger different Conditional Rules, Planner
+selects their relevant IDs or contracts a narrower approach or research first.
+Worker honors applicable assigned rules and reports a blocker for missing
+coverage, incompatible constraints or scope conflicts. Factory handles
+replanning or stopping. Worker may refine existing Product Intent owners only
+under its monotonic refinement contract. Engineering mutations stay with the
+authorized owner before activation.
 
 ## Planner outcomes
 
-For the legal `# Task`, `# Question`, `# Done` forms and
-pre-activation handling, use `references/intent-preflight.md` and
-`Preparation planner and activation` above. A fresh planner returns
-exactly one of these forms; blank or mixed output is invalid.
-New `# Task` contracts require exactly one `ExecutionProfile`.
-Do not reinterpret `# Done` as an empty batch.
+Accept exactly one Planner result form: a nonempty batch of `# Task` contracts,
+one concrete `# Question`, or exact `# Done`. Reject blank, mixed or malformed
+output. Before saving a fresh batch, verify self-contained executable contracts,
+exactly one canonical `ExecutionProfile` per Task, unique resolvable current
+Intent and Conditional Engineering IDs, structural validity of any Engineering
+layer, and durable/repository freshness. Use the preflight reference for preparation
+outcomes. During active runs, a valid Task batch is saved in `plan.md`.
 
 During an **active** run, a Planner `# Question` stops task execution:
 persist exactly one `current/question.md`, then on answer append the
@@ -539,11 +294,8 @@ child transcript.
 
 ## Project verification and completion
 
-Workers perform focused checks needed for their own tasks.
-
-When the planner returns `# Done`, use the existing project verification
-configuration if one is configured. Factory does not own a separate verification
-engine.
+When the Planner returns `# Done`, run the existing project checks in the
+`final` context according to `references/project-verification.md`.
 
 On verification success, record Implementation Result and perform the bounded
 Intent Refinement Review below. Archive required review context in ignored
@@ -611,12 +363,8 @@ changes; `idd-engineering-change` remains Engineering mutation owner.
 Planner is read-only; Factory Worker may only refine existing Product Intent
 monotonically and never edit Engineering Rules.
 
-Do not solve semantic tasks with deterministic code. Execution-profile
-classification and Conditional Engineering applicability are model decisions.
-Profile-to-model lookup is mechanical and must follow the project policy exactly.
-Conditional Engineering applicability is a model decision. Do not ask an LLM to do simple mechanical
-resolution, persistence, structural validation, or Always-rule enumeration that
-the host can perform directly. When the host has no native non-LLM hook, execute
-those operations as strict protocol steps without semantic selection. Any proposed Factory feature that requires a new lifecycle
-state, retry class, transition type, or recovery protocol should be presumed
-outside Factory unless separately justified.
+Keep profile classification and Conditional applicability with semantic
+agents. Use bounded host operations for lookup, persistence, validation and
+Always enumeration. When the host lacks a mechanical hook, follow the exact
+protocol steps. New lifecycle states, retry classes, transitions or recovery
+protocols require separate justification.

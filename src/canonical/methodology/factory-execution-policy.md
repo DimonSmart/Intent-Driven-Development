@@ -3,6 +3,8 @@
 Factory execution policy is project-owned operational configuration for choosing
 native child-agent model overrides. It is not Product Intent, an Engineering
 Rule, Factory temporary state, or a Factory workflow/runtime configuration.
+`idd-factory-configure` owns model selection, policy review and authorized
+writes to `.idd/execution.yaml`.
 
 ## Execution profiles
 
@@ -100,9 +102,9 @@ factory:
 Codex `economy` and `standard`, and every Claude profile, inherit host settings.
 
 Do not persist dynamic aliases such as `cheapest`, `best`, `strongest`,
-`latest`, or `recommended` as runtime model identifiers. Resolve such user
-requests during configuration to a concrete model ID, obtain confirmation, and
-persist the concrete result.
+`latest`, or `recommended` as runtime model identifiers. Explicit effort values
+are native to the platform and model. Relative selectors such as `maximum` or
+`maximum-minus-one` are configuration guidance only.
 
 ## Structural validation
 
@@ -130,11 +132,7 @@ no overrides. Never fill absent mappings with the current session model ID.
 For the current adapters, Codex mappings use `model` and optional
 `reasoningEffort`; Claude mappings use `model` and optional `effort`.
 Canonical IDD does not define concrete model IDs or enumerate allowed effort
-values. A guided model-selection proposal presents model and optional effort
-as one decision per selected platform/profile. Recommend an effort only when
-current host/vendor evidence supports its compatibility; otherwise disclose
-uncertainty and offer omission. Complexity profiles do not prescribe vendor
-effort values. Clearing effort removes only its optional key, not the model.
+values.
 
 Do not silently convert malformed explicit policy to `inherit`. Return a clear
 diagnostic and stop before spawning the affected worker.
@@ -185,43 +183,3 @@ setting, or change the profile. Stop with a clear diagnostic and suggest rerunni
 The same canonical Factory worker protocol is used for every execution profile.
 Profiles affect native child-agent model settings, not worker instructions.
 The worker never selects its own model.
-
-## Configuration lifecycle
-
-`idd-factory-configure` is the **single** Factory configuration, model-review,
-and lifecycle refresh skill. It owns initial setup, exact assignments, read-only
-reviews, alternative selection, and authorized persistence to
-`.idd/execution.yaml`. No second update skill or persistence handoff exists.
-
-An absent policy means inheritance, not a prompt to create a policy during
-read-only review. Exact, unambiguous user-authorized model IDs do not require
-separate approval or autonomous research. Automatically selected or interpreted
-alternatives require explicit confirmation; review-only requests never write.
-Only an initial configuration with an absent policy and no previously chosen
-strategy needs a blocking `default (inherit)` versus `configure` choice.
-
-Preserve unselected profiles, platform mappings, and optional reasoning values
-(including absence). One-model-for-many-profiles is valid. A reasoning-only
-override without a concrete model is invalid. To inherit one mapping, remove
-that mapping; to inherit all profiles, use global `modelStrategy: inherit`.
-The final mapping may be an empty `executionProfiles: {}` when the last
-explicit override was removed without a request to change the global strategy.
-
-Research alternative models only when needed. Prefer native host capabilities,
-platform-provided information, and fresh verifiable vendor documentation.
-For exact user assignments, this hierarchy does not override the provided ID.
-Never infer vendor model quality, price, latency, reasoning compatibility, or
-per-account availability from names. If a proposed model is known to conflict
-with preserved reasoning, block that candidate until separately resolved;
-unknown compatibility is reported as uncertainty, not a forced fallback.
-
-Before an authorized save, validate every mapping (including inactive-platform
-ones), preserve a baseline of the file or its absence, show the relevant diff,
-and re-read immediately before writing. Rebase **only** authorized operations
-onto a valid concurrent version; get a new decision when the approved result
-would change. Stop on unsafe conflicts. Perform a no-op without a file write
-when nothing changes; prefer supported atomic persistence and re-read after
-saving. Never silently reset malformed input to inheritance.
-
-Policy changes apply at the next worker spawn; the planner's complexity
-classification and already running workers are unaffected.

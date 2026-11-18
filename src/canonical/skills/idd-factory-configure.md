@@ -1,38 +1,22 @@
 # IDD Factory Configure
 
-Manage project-owned Factory model-selection policy in `.idd/execution.yaml` throughout
-the project lifecycle: initial setup, exact edits, read-only review, and
-evidence-based model refresh. This is the **only** skill that validates and
-writes Factory model policy; no separate model-update command or writer exists.
+Own selection, review, validation and authorized writes of the project model
+policy in `.idd/execution.yaml`, including setup, exact edits and model refresh.
 
 Factory Planner and Worker protocols are now installed as internal Skills and
 loaded by ordinary native child agents. If asked to install or register the
 previous custom Factory agent types, explain that registration is obsolete.
-Do not modify legacy project/user agent definitions, trust, global config or
-create `.idd/execution.yaml` for such a request. This command owns only the
-model-selection policy.
+Leave legacy agent definitions, trust, global config and project policy alone
+for such a request.
 
-Read `references/factory-execution-policy.md` for model-policy requests.
-Do not change `.idd/factory/current/`, Product Intent, Engineering Rules,
-child agents or runtime. Configuration is operational policy, not durable
-intent.
+Read `references/factory-execution-policy.md` first for model-policy requests.
+Keep this workflow scoped to the policy file, outside Factory runs, planner
+classification, child agents, Product Intent and Engineering Rules.
 
 ## Interpret the request and authorization
 
 Read the original request, not just a router summary. Direct invocation does
 not require `idd-route`. For model-policy requests recognize these modes:
-
-For **model-policy** requests, first read `references/factory-execution-policy.md`.
-Do not read or change `.idd/factory/current/`, Product Intent, Engineering Rules,
-the Factory runtime, planner classification, or existing child agents.
-Configuration is operational policy, not durable product or engineering intent.
-
-## Interpret the request and authorization
-
-Read the original user request, not merely a router summary. Direct invocation
-of this skill does not require `idd-route`. Native-agent registration in Codex
-is handled before model-policy mode selection; for model-policy requests,
-recognize these modes:
 
 - **Initial setup:** Factory is being explicitly configured, the policy is absent,
   and no strategy was chosen previously. Ask one blocking strategy choice below.
@@ -45,17 +29,12 @@ recognize these modes:
 - **Review-only:** read, compare, or recommend without writing, including
   "propose but do not change." Return findings/proposals only; do not create
   `.idd/execution.yaml`, request write permission, or start Factory.
-- **Refresh/selection:** cheaper economy, faster standard, stronger strong,
-  upgrade/downgrade, outdated model review, or comparing available options.
-  Research only the requested platforms/profiles/criteria, propose changes with
-  evidence, and obtain explicit approval before writing. A newer release alone
-  is not a reason to change a working assignment.
+- **Refresh/selection:** research options for the requested profiles, platforms
+  and criteria, then present an evidence-based proposal for confirmation.
 
-Automatic activation alone does not authorize a policy write. An absent file,
-an observed worker failure, and an agent-selected recommendation do not authorize
-a change. **A review-only request must not write the policy.** Reuse already
-confirmed, unchanged choices instead of asking again. If scope is ambiguous,
-request the specific missing decision; never silently expand scope.
+Write only precise user-authorized edits or confirmed proposals. Activation,
+an absent file or a worker failure alone grants no write authority. Reuse
+unchanged approvals. If scope is ambiguous, ask for the missing decision.
 
 Use the active host platform unless the user names another supported platform.
 Factory supports only `economy`, `standard`, `strong`; these describe task
@@ -69,10 +48,9 @@ with the referenced structural contract, including mappings for the inactive
 platform. A malformed existing policy is a blocking diagnostic, not permission
 to reset it or treat it as absent. Repair only with explicit authorization.
 
-Missing policy means `inherit (host)` for every platform/profile, with no
-concrete model ID known or implied. Global `modelStrategy: inherit` has the same
-effective inheritance. Do not claim to know the actual host model or copy it
-into mappings. Review-only use must not create the file.
+Display missing or inherited mappings as `inherit (host)`. Create overrides
+only for explicitly requested scope, including when asked to update existing
+models and there are no explicit mappings. Never guess or copy the host model.
 
 ## Initial strategy choice
 
@@ -90,52 +68,34 @@ Use native interaction when available: Codex `request_user_input`, Claude Code
 `AskUserQuestion`; otherwise use a concise plain-text question. No second
 question when the answer came from `idd-project-init`.
 
-An explicitly selected `default`/`inherit` may be saved, when authorized, as:
-
-```yaml
-version: 1
-factory:
-  modelStrategy: inherit
-```
-
-For `configure`, create `executionProfiles` only for requested platform/profile
-mappings. All missing mappings inherit host behavior. Do not require a model
-for every profile, install-time defaults, or an automatic configuration merely
-because the policy is absent. For each selected mapping, present the concrete
-`model` **and** its optional reasoning choice as one configuration decision:
-`reasoningEffort` for Codex, `effort` for Claude, or `host default (omitted)`.
-Do not require an extra question when the user already specified the pair, or
-force an effort override for models that cannot support it.
+Save an authorized `default`/`inherit` choice as `modelStrategy: inherit`.
+For `configure`, use `executionProfiles` only for requested mappings.
 
 ## Guided model and reasoning selection
 
-When helping the user choose models during initial `configure` or a later
-refresh, consider the **model/effort pair** for each requested platform/profile:
+For guided setup and model replacements, aim for the lowest expected cost per
+successfully completed task, including retries, while meeting the profile's
+capability needs. Use these starting heuristics and honor explicit user choices
+and constraints. The same model can serve multiple profiles.
 
-- Prefer reliable active-host capabilities and current vendor information to
-  determine whether the concrete model accepts an explicit per-child effort
-  and which values are available. Do not infer support or valid values from a
-  model name, an execution profile, or another provider's naming convention.
-- If supported, propose a suitable effort alongside the model, balancing the
-  task's complexity with quality, latency, and cost. `economy`, `standard`, and
-  `strong` are not hardwired to `low`, `medium`, or `high`; the same model can
-  be proposed for several profiles with different effort settings.
-- If support or allowed values are unknown, disclose that uncertainty. Offer
-  `host default (omitted)` rather than inventing a value. On a new mapping
-  for a model known not to support explicit effort, propose omission. If an
-  existing effort is incompatible with a proposed replacement model, block the
-  change until the user separately authorizes a compatible effort or removal;
-  never silently discard that setting to make a new model fit.
-- Show the resulting platform/profile, model, and effort (or omission) before
-  seeking the usual single Apply/Edit/Reject decision for interpreted proposals.
-  Do not run a separate mandatory effort questionnaire. An exact, unambiguous
-  user-specified model/effort edit is already authorized.
+| Profile | Model selection goal | Effort from the model's supported levels |
+| --- | --- | --- |
+| `economy` | Cheap model suitable for simple tasks | Maximum |
+| `standard` | Middle price class suitable for ordinary engineering | Next to maximum |
+| `strong` | Most capable model suitable for complex tasks | Middle, using the lower middle on an even scale |
 
-Omitting an effort key for an **explicit model mapping** delegates reasoning
-behavior to the child host/model defaults; it does not pin the parent's effort.
-It is distinct from an absent platform/profile mapping, which inherits both
-host model selection and reasoning behavior. To clear an existing explicit
-effort, remove that field, not the entire model mapping or a null placeholder.
+Verify which effort levels the target native child-agent platform accepts for
+the chosen model and order them by reasoning intensity. API support alone does
+not establish native support. Use the sole supported level if there is just
+one. If explicit effort is unsupported or the ordered levels cannot be verified,
+explain the reason and propose `host default (omitted)` for that model.
+
+Resolve effort again for a guided replacement. Confirmation of the proposed
+pair authorizes the displayed effort change or removal. Save concrete model IDs
+and native effort values (`reasoningEffort` for Codex, `effort` for Claude).
+Relative selectors, dynamic model aliases and invented effort values are not
+configuration values. Retune only the requested mappings. Worker startup
+applies the saved pair.
 
 ## Exact changes and minimality
 
@@ -144,8 +104,10 @@ Express changes as a set of authorized operations on specific
 Preserve every other profile, other platform, model, and reasoning field,
 including intentionally absent optional fields. Examples:
 
-- Replacing `economy.codex.model` preserves its `reasoningEffort` if present,
-  every `claude` mapping, and every unselected profile.
+- An exact model-only replacement preserves the effort field, including its
+  absence. If the new model is known to conflict with the existing effort,
+  require a compatible model or explicit authorization to change or remove
+  effort before saving. Report unknown compatibility as uncertainty.
 - Editing only `reasoningEffort` or Claude `effort` requires an existing model
   mapping. Never create a reasoning-only mapping: ask for a concrete model or
   report the operation cannot be represented. An explicit request to clear an
@@ -174,40 +136,18 @@ When the request actually requires selecting alternatives, prefer:
 3. fresh vendor documentation, verified with available tools;
 4. user information as supplementary evidence.
 
-This precedence is for **researching alternatives**, not overriding exact user
-instructions. Consider target complexity, quality, cost, latency, available
-reasoning controls, and user constraints. Explain which source was used and
-how current it is. Never infer these properties or account availability from
-the model's spelling. IDD must not hardcode a table of recommended concrete IDs
-or require distinct models for different profiles. Do not persist the aliases
-`cheapest`, `best`, `strongest`, `latest`, or `recommended` as model IDs.
+Use evidence about quality, cost, latency, reasoning controls and account
+availability. A newer release alone does not justify replacing a working model.
+Avoid hardcoded recommendations and inferences from model names. If evidence
+cannot support a reliable comparison, state the unknowns and ask for concrete
+IDs or a bounded alternative.
 
-An inherited current value is displayed as `inherit (host)`, not a guessed
-model. A request to "update existing models" with no explicit mappings does
-not authorize creating overrides: explain the inherited state and propose
-concrete options only for an explicitly chosen scope. If current evidence is
-insufficient for reliable comparison or host compatibility, state the unknowns
-and request concrete IDs or a bounded alternative rather than inventing a winner.
-
-Preserve existing optional reasoning settings during model replacements.
-If a candidate is **known** to be incompatible with a preserved
-`reasoningEffort`/`effort`, show the conflict and block that candidate until
-a compatible model or a separately authorized reasoning edit is selected.
-Unknown compatibility is uncertainty, not proof of incompatibility. A host
-rejection at spawn is the authoritative error: do not silently switch models,
-drop reasoning, or revert to inherit in response.
-
-For review or proposals involving existing mappings, show a comparison with at
-least platform/profile, current model, proposed model, previous/proposed reasoning
-(including `host default (omitted)`), and rationale. Identify targeted and unchanged scope, recommendation sources
-and freshness, unverified account availability, and confirmation required.
-For global inherit, a short resulting-strategy explanation is sufficient.
-
-Ask one explicit decision for automatically chosen or ambiguously interpreted
-changes: **Apply**, **Edit**, or **Reject**. An edited proposal requiring
-interpretation must be presented again; do not ask again for an unchanged
-previously approved decision. An exact unambiguous user-authored mapping needs
-no further approval. If rejected or review-only, stop with no writes.
+Show one table with targeted platforms/profiles, current and proposed model/effort
+pairs (including omitted effort), rationale, sources and freshness, and any
+unverified account availability. Identify unaffected scope briefly. For global
+inherit, summarize the resulting strategy. Seek one **Apply**, **Edit**, or
+**Reject** decision for the whole interpreted proposal. Show a revised proposal
+if it requires new interpretation. Exact edits need no extra confirmation.
 
 ## Validate and persist authorized changes safely
 
@@ -221,12 +161,8 @@ no further approval. If rejected or review-only, stop with no writes.
    new current policy; never overwrite intervening edits with a stale snapshot.
    If changes conflict or alter an already approved result, show the revised
    proposal and seek a new decision. Stop rather than risk loss of user edits.
-4. Validate the **complete** resulting document: `version: 1`; exactly one
-   `factory.modelStrategy: inherit` or `factory.executionProfiles` mapping;
-   only supported profiles and `codex`/`claude` platforms; valid nonempty
-   explicit `model`; optional nonempty `reasoningEffort` for Codex or
-   `effort` for Claude. No malformed inactive-platform mapping, mixed
-   strategy, placeholder alias, or invented effort-value allowlist.
+4. Validate the **complete** result, including inactive-platform mappings,
+   against `references/factory-execution-policy.md`.
 5. If semantically/structurally unchanged, report **no-op**, without rewriting
    formatting or timestamps. Otherwise use the host's supported safe/atomic
    write if available, preserving unrelated user data and formatting.
@@ -235,8 +171,3 @@ no further approval. If rejected or review-only, stop with no writes.
 6. Re-read the saved policy; report exact overrides and inherited profiles.
    Updated policy applies only at the **next worker spawn**, without
    replanning. Already running workers and the planner profile do not change.
-
-The only project-owned model policy is optional `.idd/execution.yaml`.
-Do not modify `.idd/factory/current/`, run Factory, spawn workers, migrate
-valid policies, or introduce a second persistence service. Git provides
-configuration history.
