@@ -1924,6 +1924,21 @@ public sealed class FactoryReportEngine
             completionTerminal,
             verificationPolicy,
             diagnostics);
+        if (nested && result == "completed" &&
+            (completionInfo.PlannerDone != true ||
+             completionInfo.ProjectVerification != "passed" ||
+             completionInfo.ProtocolValidation != "ok"))
+        {
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "warning", Category = "factory",
+                Code = "nested_completed_without_verified_final_gate",
+                Message = "The final native Factory Root declared COMPLETED, but a fresh final Planner # Done and successful project verification were not independently established. The reporter will not attest completed execution."
+            });
+            result = "unknown";
+            resultReason = null;
+            resultEvidence.Clear();
+        }
         if (completionInfo.ProjectVerification == "unavailable")
             diagnostics.Add(new Diagnostic
             {
