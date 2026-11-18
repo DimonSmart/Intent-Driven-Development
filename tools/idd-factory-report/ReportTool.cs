@@ -2038,12 +2038,14 @@ public sealed class FactoryReportEngine
             int? completed = null;
             string? reason = null;
             var evidence = "no confirmed final native child message";
-            var parentSpawn = root.ParentThreadId is null ||
-                !rollouts.TryGetValue(root.ParentThreadId, out var supervisor)
-                    ? null : supervisor.SpawnRecords.Values.SingleOrDefault(
-                        spawn => !spawn.CorrelationConflict &&
-                        spawn.RequestedTaskName == root.NativeTaskName);
-            var effectiveLimit = FactoryBatchTrace.ParseBatchLimit(parentSpawn?.Task);
+            var candidates = root.ParentThreadId is not null &&
+                rollouts.TryGetValue(root.ParentThreadId, out var supervisor)
+                    ? supervisor.SpawnRecords.Values.Where(spawn =>
+                        !spawn.CorrelationConflict &&
+                        spawn.RequestedTaskName == root.NativeTaskName).Take(2).ToArray()
+                    : [];
+            var effectiveLimit = candidates.Length == 1
+                ? FactoryBatchTrace.ParseBatchLimit(candidates[0].Task) : null;
             if (rollouts.TryGetValue(root.ThreadId, out var rollout))
             {
                 var finished = rollout.Events.Any(item => item.Type is
