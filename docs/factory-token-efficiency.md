@@ -106,3 +106,33 @@ cached input, new input, output, spawns, duration and independent verification.
 Do not count the same events twice. Missing usage counters are unavailable,
 not zero. Old native-role and opt-in internal-Skill experiments are historical
 rather than proof of the new transport.
+
+
+## Two-level rotation comparison (measurements required)
+
+The Stage-0 nested-agent capability smoke is not a token-efficiency benchmark.
+For the same approved product scenario and exact starting Git snapshot,
+compare the old native flat Factory and the new Supervisor/Root-batched Factory,
+using identical host/model/reasoning settings and independent final tests.
+
+| Measurement | One-level native Factory | Two-level native Factory |
+| --- | --- | --- |
+| Host / model / snapshot | Not yet measured | Not yet measured |
+| Verified product result | Not yet measured | Not yet measured |
+| Total input and output tokens | Not yet measured | Not yet measured |
+| Supervisor input / output tokens | N/A | Not yet measured |
+| Each Factory Root input / output tokens | Not yet measured | Not yet measured |
+| Maximum Root context and compactions | Not yet measured | Not yet measured |
+| Number of Roots, Planners and Workers | Not yet measured | Not yet measured |
+| Native wait calls / repeated model turns | Not yet measured | Not yet measured |
+
+Collect all native thread counters exactly once per thread (never sum a
+parent-inclusive counter with its children). Record per-batch terminal
+`CompletedWorkers` and `Reason` and native parent/child IDs. To judge
+context growth, compare the maximum per-Root context and full Supervisor
+turn-by-turn usage; Supervisor legitimately grows by short batch results.
+Also check context consumed by rereading `completed.md` and provenance
+from each new Root. Never claim constant or infinite context capacity, a
+fixed 8x improvement or any savings without equivalent successful product
+verification.
+
