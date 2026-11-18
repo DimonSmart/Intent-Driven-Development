@@ -1,13 +1,26 @@
 # Factory Planner/Worker installation and host capabilities
 
 Factory has two user-facing commands, `idd-factory-run` and
-`idd-factory-configure`, plus two internal Skills. The normal generator
+`idd-factory-configure`, plus three internal Skills. The normal generator
 packages each protocol from a unique canonical source into both platforms:
 
 | Internal Skill | Canonical source | Installed relative path |
 | --- | --- | --- |
+| `idd-internal-factory-root` | `src/canonical/factory/root.md` | `skills/idd-internal-factory-root/SKILL.md` |
 | `idd-internal-factory-planner` | `src/canonical/factory/planner.md` | `skills/idd-internal-factory-planner/SKILL.md` |
 | `idd-internal-factory-worker` | `src/canonical/factory/worker.md` | `skills/idd-internal-factory-worker/SKILL.md` |
+
+## Staged Supervisor migration
+
+The new internal Root is now packaged with its own mandatory references,
+but **the public `idd-factory-run` retains the existing one-level behavior
+until native stop/writer gates and the 10-task / 3-per-batch E2E pass**.
+Do not route user requests into the internal Root directly or interpret
+Skill packaging alone as activation of two-level orchestration. During this
+transitional stage the existing public and internal Root both carry the
+necessary normative references to keep old runs compatible. The public
+command will become the thin Supervisor and surrender those references
+only in the final verified migration.
 
 ## Normal setup
 
