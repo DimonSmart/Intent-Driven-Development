@@ -91,10 +91,10 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             Assert.Equal(4, report.Metrics.FactoryRootInvocations);
             Assert.Equal("completed", report.Run.Result);
             var ordered = report.Batches.OrderBy(item => item.BatchOrdinal).ToArray();
-            Assert.Equal(new[] { 1, 2, 3, 4 }, ordered.Select(item => item.BatchOrdinal).ToArray());
+            Assert.Equal(new int?[] { 1, 2, 3, 4 }, ordered.Select(item => item.BatchOrdinal).ToArray());
             Assert.Equal(new[] { "CONTINUE", "CONTINUE", "CONTINUE", "COMPLETED" },
                 ordered.Select(item => item.Status).ToArray());
-            Assert.Equal(new[] { 3, 3, 3, 1 }, ordered.Select(item => item.CompletedWorkers).ToArray());
+            Assert.Equal(new int?[] { 3, 3, 3, 1 }, ordered.Select(item => item.CompletedWorkers).ToArray());
             Assert.Equal(10, report.Metrics.WorkerInvocations);
             Assert.Equal(10, report.Tasks.Count);
             Assert.All(report.Tasks, item => Assert.Equal("completed", item.Status));
@@ -116,7 +116,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                     root.AgentPath?.Split('/').Last());
                 var workers = report.Agents.Where(item => item.Role == "worker" &&
                     item.ParentThreadId == root.ThreadId).OrderBy(item => item.StartedAt).ToArray();
-                Assert.Equal(batch.CompletedWorkers, workers.Length);
+                Assert.Equal(batch.CompletedWorkers, (int?)workers.Length);
                 Assert.All(workers, item => Assert.Equal(batch.BatchOrdinal, item.BatchOrdinal));
                 for (var i = 1; i < workers.Length; i++)
                     Assert.True(workers[i - 1].FinishedAt <= workers[i].StartedAt,
