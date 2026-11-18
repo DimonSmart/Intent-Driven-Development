@@ -304,3 +304,60 @@ A green normal CI build, `agents.max_depth=2`, a trace from a different
 host, or an unexecuted smoke test do not satisfy the Stage 0 gate.
 Until verified native nested-spawn evidence exists, preserve the current
 one-level `idd-factory-run` behavior.
+
+## Two-level Supervisor acceptance gates (feature branch only)
+
+Before merging the public Factory Supervisor into main, run these **real native
+Codex host tests** on the same supported host used for the successful Stage-0
+nested-smoke gate. Normal Linux/Windows CI does NOT run either live test.
+Tests consume Codex tokens and write only disposable temporary workspaces.
+Use a separate working branch/worktree rather than switching away from active
+user project modifications. The intended host must be able to invoke real
+native depth-2 generic agents, deliver installed Skills, run a write-capable
+child and attest full child/descendant stop.
+
+In PowerShell, from a checkout of the feature branch:
+
+~~~powershell
+$env:IDD_RUN_LIVE_FACTORY_MARKETPLACE_EVALS = "1"
+$env:IDD_FACTORY_EVAL_STANDARD_MODEL = "gpt-6.1-terra"
+$env:IDD_FACTORY_EVAL_TIMEOUT_MINUTES = "15"
+
+dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj --filter "FullyQualifiedName~Factory_Stage0NativeRootCancellationStopsGrandchildWriter"
+
+$env:IDD_FACTORY_EVAL_TIMEOUT_MINUTES = "60"
+dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj --filter "FullyQualifiedName~Factory_NativeTenTasksRotatesFourRootsWithLimitThree"
+
+Remove-Item Env:IDD_RUN_LIVE_FACTORY_MARKETPLACE_EVALS -ErrorAction SilentlyContinue
+Remove-Item Env:IDD_FACTORY_EVAL_STANDARD_MODEL -ErrorAction SilentlyContinue
+Remove-Item Env:IDD_FACTORY_EVAL_TIMEOUT_MINUTES -ErrorAction SilentlyContinue
+~~~
+
+**Controlled writer/stop gate:** the technical test creates a disposable Git
+repository, launches a native Supervisor → Root → synthetic Writer, starts a
+bounded heartbeat-write loop, deliberately interrupts the Root, and checks
+the native event plus that no further heartbeat is written during a
+post-interruption observation window. The synthetic Writer is not a Product
+Worker and does not run Factory Preflight; the earlier read-only Stage-0
+installed-Skill probe independently checks child Skill loading. If safe
+descendant stop is not provable, it must fail and the public Supervisor MUST
+NOT be merged.
+
+**Ten-step/limit-3 gate:** the test installs a fresh generated Marketplace
+package into a new isolated CODEX_HOME, creates a minimal self-contained
+`.idd/intent/` + .NET project, invokes the public Supervisor ONCE, requires
+four sequential native Root sessions with confirmed batch counts 3/3/3/1,
+10 distinct Worker child threads, exact batch-scoped native task names,
+valid model/effort routing, final `# Done`/Project Verification and ten
+independently passing xUnit cases. It stores raw native sessions,
+`factory-report.json`, trace, Git status/diff and xUnit TRX under
+`artifacts/factory-evals/batch-ten-*/`.
+A successful code build, synthetic topology fixture or Stage-0 read-only
+smoke does not substitute for this real end-to-end gate. Inspect any failures
+rather than automatically retrying expensive live execution.
+
+For the final acceptance report, also capture and compare equivalent
+one-level vs two-level host/model/snapshot runs with per-thread input/output,
+Supervisor/Root usage, compactions, waits and independently passing project
+tests. Do not claim token savings based on unexecuted experiments or compare
+different project outcomes.
