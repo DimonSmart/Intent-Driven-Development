@@ -19,12 +19,13 @@ public sealed class FactoryNestedTopologyReportTests
         {
             var home = Path.Combine(directory, "home");
             Directory.CreateDirectory(Path.Combine(home, "sessions"));
-            var ids = Enumerable.Range(1, 15)
+            var ids = Enumerable.Range(1, 16)
                 .Select(index => $"11111111-0000-4000-8000-{index:000000000000}")
                 .ToArray();
             var supervisor = ids[0];
             var roots = ids.Skip(1).Take(4).ToArray();
-            var workers = ids.Skip(5).ToArray();
+            var workers = ids.Skip(5).Take(10).ToArray();
+            var plannerId = ids[15];
             var start = DateTimeOffset.Parse("2026-11-18T10:00:00Z");
 
             string Session(int slot) => Path.Combine(home, "sessions", $"rollout-{slot:00}.jsonl");
@@ -49,13 +50,33 @@ public sealed class FactoryNestedTopologyReportTests
                     UserMessage(batchTime.AddSeconds(2),
                         "Read installed Factory Root Skill; continue the saved request.")
                 };
+                if (index == 0)
+                {
+                    var plannerName = "idd_factory_planner_b0001_0001";
+                    var plannerTime = batchTime.AddSeconds(3);
+                    Spawn(rootLines, plannerTime, "planner-1", plannerName, plannerId, null);
+                    var tasks = string.Join("\n",
+                        Enumerable.Range(1, 10).Select(step =>
+                            $"# Task\nImplement Step{step:00}\n# ExecutionProfile\nstandard\n"));
+                    File.WriteAllLines(Session(16), new[]
+                    {
+                        SessionMeta(plannerTime.AddSeconds(1), plannerId, directory, rootId,
+                            $"/root/{rootName}/{plannerName}"),
+                        UserMessage(plannerTime.AddSeconds(2), "Plan ten independent Tasks."),
+                        AssistantMessage(plannerTime.AddSeconds(4), tasks),
+                        Complete(plannerTime.AddSeconds(5)),
+                        Usage(plannerTime.AddSeconds(6), plannerId, 10, 1, 3)
+                    });
+                }
+
                 var count = index == 3 ? 1 : 3;
                 for (var i = 0; i < count; i++)
                 {
                     var workerId = workers[workerCursor++];
                     var taskName = $"idd_factory_worker_b{batch:0000}_{i + 1:0000}";
                     var workerTime = batchTime.AddSeconds(10 + 40 * i);
-                    Spawn(rootLines, workerTime, $"worker-{batch}-{i + 1}", taskName, workerId, "standard");
+                    Spawn(rootLines, workerTime, $"worker-{batch}-{i + 1}", taskName, workerId,
+                        "standard", workerCursor);
                     File.WriteAllLines(Session(5 + workerCursor), new[]
                     {
                         SessionMeta(workerTime.AddSeconds(1), workerId, directory, rootId,
@@ -89,6 +110,10 @@ public sealed class FactoryNestedTopologyReportTests
             Assert.Equal(4, report.Agents.Count(agent => agent.Role == "root"));
             Assert.Equal(10, report.Agents.Count(agent => agent.Role == "worker"));
             Assert.Equal(10, report.Tasks.Count);
+            Assert.All(report.Tasks, task => Assert.Equal("standard", task.ExecutionProfile));
+            Assert.True(report.Tasks.Select(task => task.Text?.Trim())
+                .SequenceEqual(Enumerable.Range(1, 10)
+                    .Select(number => $"Implement Step{number:00}")));
             Assert.True(report.Batches.Select(batch => batch.BatchOrdinal)
                 .SequenceEqual(new int?[] { 1, 2, 3, 4 }));
             Assert.True(report.Batches.Select(batch => batch.Status)
@@ -144,15 +169,17 @@ public sealed class FactoryNestedTopologyReportTests
     }
 
     private static void Spawn(List<string> lines, DateTimeOffset timestamp,
-        string callId, string taskName, string childId, string? profile)
+        string callId, string taskName, string childId, string? profile, int? step = null)
     {
         var args = JsonSerializer.Serialize(new
         {
             task_name = taskName,
             fork_turns = "none",
-            message = profile is null
+            message = taskName.StartsWith("idd_factory_root_", StringComparison.Ordinal)
                 ? "Load installed Root SKILL.md; max_workers_per_batch = 3"
-                : $"Read installed Worker Skill; ExecutionProfile: {profile}"
+                : profile is null
+                    ? "Read installed Planner SKILL.md"
+                    : $"Read installed Worker SKILL.md\n--- Factory worker assignment ---\n# Task\nImplement Step{step:00}\n# ExecutionProfile\n{profile}\n--- End Factory worker assignment ---"
         });
         lines.Add(Json(timestamp, "response_item", new
         {
