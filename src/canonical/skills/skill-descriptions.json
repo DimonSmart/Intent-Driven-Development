@@ -209,7 +209,7 @@
     }
   },
   "idd-factory-run": {
-    "description": "Prepare durable Intent/Engineering policy and orchestrate fresh generic child agents that fully load installed internal Factory Skills for bounded Planner and Worker assignments.",
+    "description": "Public two-level Factory Supervisor: validate native nested execution, spawn fresh internal Factory Root batches (default eight confirmed Workers), automatically rotate on verified checkpoint, and return terminal result or question without performing project work.",
     "exposure": "command",
     "interface": {
       "displayName": "IDD Factory Run",
@@ -221,11 +221,11 @@
     "exposure": "workflow"
   },
   "idd-internal-factory-planner": {
-    "description": "Internal Factory Planner protocol. Use only inside a fresh child context spawned by idd-factory-run with the full phase-appropriate bounded assignment; otherwise return BLOCKED.",
+    "description": "Internal Factory Planner protocol. Use only inside a fresh generic child spawned by the internal Factory Root with a complete phase-appropriate bounded assignment; otherwise return BLOCKED.",
     "exposure": "internal"
   },
   "idd-internal-factory-worker": {
-    "description": "Internal Factory Worker protocol. Use only inside a fresh child context spawned by idd-factory-run with exactly one complete Task and verified scope/provenance; otherwise return BLOCKED.",
+    "description": "Internal Factory Worker protocol. Use only inside a fresh generic child spawned by the internal Factory Root with exactly one complete Task and verified scope/provenance; otherwise return BLOCKED.",
     "exposure": "internal"
   },
   "idd-intent-cosmic": {
@@ -249,7 +249,7 @@
     }
   },
   "idd-internal-factory-root": {
-    "description": "Internal Factory Root protocol. Use only when a fresh generic child of the public Supervisor receives a complete bounded Factory assignment and exact installed Skill path; otherwise return BLOCKED.",
+    "description": "Internal Factory Root protocol: fresh generic child of the Supervisor, own canonical Preflight, Planner/Worker, Engineering, checkpoint, recovery, project verification and concise terminal result; complete at most the assigned number of confirmed Workers per batch.",
     "exposure": "internal"
   }
 }
