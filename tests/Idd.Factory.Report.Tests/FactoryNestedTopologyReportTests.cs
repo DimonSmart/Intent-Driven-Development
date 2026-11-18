@@ -134,11 +134,13 @@ public sealed class FactoryNestedTopologyReportTests
                 "batch_rotation_without_continue" or "duplicate_factory_batch");
             Assert.Equal(report.Agents.Count, report.Agents.Select(agent => agent.ThreadId)
                 .Distinct(StringComparer.Ordinal).Count());
-            Assert.Equal("per-thread", report.Metrics.TokenAggregationMethod);
-            Assert.True(report.Metrics.TokenAggregationComplete);
-            Assert.Equal(250, report.Metrics.Tokens.InputTokens);
-            Assert.Equal(32, report.Metrics.Tokens.CachedInputTokens);
-            Assert.Equal(69, report.Metrics.Tokens.OutputTokens);
+            // The fixture does not contain a trusted invocation-start token
+            // baseline for the Supervisor. Do not manufacture an additive total
+            // from the child's independent thread counters.
+            Assert.Equal("overlap-unknown", report.Metrics.TokenAggregationMethod);
+            Assert.False(report.Metrics.TokenAggregationComplete);
+            Assert.Null(report.Metrics.Tokens.InputTokens);
+            Assert.Null(report.Metrics.Tokens.OutputTokens);
         }
         finally
         {
