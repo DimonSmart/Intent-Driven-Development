@@ -2558,11 +2558,10 @@ public sealed class FactoryReportEngine
         var pending = new Queue<PlannedTask>();
         foreach (var agent in agents.OrderBy(x => x.StartedAt).ThenBy(x => x.ThreadId, StringComparer.Ordinal))
         {
-            if (agent.Role == "root")
-            {
-                pending.Clear();
-                continue;
-            }
+            // A fully validated plan.md batch can legitimately span successive
+            // fresh Roots. Keep the pending Planner-to-Worker queue across
+            // boundaries; ONLY a new real Planner result resets it. This avoids
+            // losing ExecutionProfile provenance in subsequent Root batches.
             if (agent.Role == "planner" && rollouts.TryGetValue(agent.ThreadId, out var planner))
             {
                 pending.Clear();
