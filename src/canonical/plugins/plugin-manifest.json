@@ -229,6 +229,7 @@
       "skills": [
         "idd-factory-run",
         "idd-factory-configure",
+        "idd-internal-factory-root",
         "idd-internal-factory-planner",
         "idd-internal-factory-worker"
       ],
@@ -259,6 +260,26 @@
           "skill": "idd-factory-run",
           "source": "src/canonical/methodology/engineering-guardrails.md",
           "destination": "engineering-guardrails.md"
+        },
+        {
+          "skill": "idd-internal-factory-root",
+          "source": "src/canonical/methodology/intent-preflight.md",
+          "destination": "intent-preflight.md"
+        },
+        {
+          "skill": "idd-internal-factory-root",
+          "source": "src/canonical/methodology/project-verification.md",
+          "destination": "project-verification.md"
+        },
+        {
+          "skill": "idd-internal-factory-root",
+          "source": "src/canonical/methodology/factory-execution-policy.md",
+          "destination": "factory-execution-policy.md"
+        },
+        {
+          "skill": "idd-internal-factory-root",
+          "source": "src/canonical/methodology/engineering-guardrails.md",
+          "destination": "engineering-guardrails.md"
         }
       ],
       "assets": [
@@ -272,6 +293,7 @@
         "temporaryWorkspace": ".idd/factory"
       },
       "skillSources": {
+        "idd-internal-factory-root": "src/canonical/factory/root.md",
         "idd-internal-factory-planner": "src/canonical/factory/planner.md",
         "idd-internal-factory-worker": "src/canonical/factory/worker.md"
       }
