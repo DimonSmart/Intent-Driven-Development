@@ -51,7 +51,7 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
     {
         var files = base.BuildSkillFiles(adapter, plugin, roleDefinitions, skillName, skillDescriptions).ToList();
 
-        if (StringComparer.Ordinal.Equals(skillName, "idd-factory-run"))
+        if (StringComparer.Ordinal.Equals(skillName, "idd-internal-factory-root"))
         {
             var skill = files.Single(file => StringComparer.Ordinal.Equals(
                 file.RelativePath,
@@ -61,14 +61,14 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                 Content = ContentNormalizer.NormalizeContent(ContentNormalizer.JoinBlocks(
                     skill.Content!,
                     """
-                    ## Codex generic Factory subagents
+                    ## Codex generic Planner/Worker children from internal Root
 
-                    Use the host's native generic child-agent spawn. A Factory-specific
-                    agent_type is not required. Resolve the internal Planner and Worker
-                    SKILL.md files relative to THIS installed Factory Run Skill; pass
-                    absolute paths and a bounded assignment to each new child. Children
-                    read the complete installed Skill themselves before other work.
-                    Use fork_turns: "none" for every spawn, including Planner.
+                    This is the INSTALLED internal Factory Root Skill, not the public
+                    Supervisor. A Factory-specific agent_type is not required. Resolve
+                    Planner and Worker SKILL.md files from THIS internal Root's installed
+                    plugin version; pass their exact absolute paths and bounded
+                    assignments. Children read full Skills before other work.
+                    Use fork_turns: "none" for every Planner and Worker spawn.
                     Never send protocol bodies or previous child transcripts.
 
                     Inspect the direct host-visible tool schema, including tools not
@@ -80,10 +80,12 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                     permissions if available but do not confuse a text guard with a
                     technical sandbox. Diagnose missing mandatory capabilities precisely.
 
-                    Reserve unique task_name arguments idd_factory_planner_01,
-                    idd_factory_worker_01, etc. Rejected attempts consume their names.
-                    Example without model overrides:
-                    {"task_name":"idd_factory_worker_01","fork_turns":"none","message":"Read the entire installed Worker SKILL.md at <absolute path>, then perform exactly this bounded Factory assignment: <one Task packet>"}.
+                    Reserve unique batch-scoped task_name arguments such as
+                    idd_factory_planner_b0001_0001 and idd_factory_worker_b0001_0001.
+                    The batch ordinal is supplied by Supervisor; the local suffix
+                    counts ATTEMPTS and rejected attempts consume names.
+                    Example (replace placeholders with exact real values):
+                    {"task_name":"idd_factory_worker_b0001_0001","fork_turns":"none","message":"Read the entire installed Worker SKILL.md at <absolute path>, then perform exactly one bounded Task: <one Task packet>"}.
                     Replace placeholders with real paths and task data.
                     Never add an unsupported spawn argument.
 
@@ -94,6 +96,50 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                     failure, stop/interrupt the writer and confirm termination before
                     starting another; preserve the pending Task. A final Planner Done
                     always requires the configured final verification checks.
+                    """))
+            };
+        }
+
+        if (StringComparer.Ordinal.Equals(skillName, "idd-factory-run"))
+        {
+            var skill = files.Single(file => StringComparer.Ordinal.Equals(
+                file.RelativePath,
+                Path.Combine("skills", skillName, "SKILL.md")));
+            files[files.IndexOf(skill)] = skill with
+            {
+                Content = ContentNormalizer.NormalizeContent(ContentNormalizer.JoinBlocks(
+                    skill.Content!,
+                    """
+                    ## Codex native Supervisor → Factory Root
+
+                    Use MultiAgentV2 native generic spawn_agent. The absence of an
+                    agent_type parameter is NOT a capability failure. The public
+                    Supervisor must never spawn Planner or Worker directly.
+
+                    Each distinct batch uses a unique native task_name of the form
+                    idd_factory_root_b0001, idd_factory_root_b0002, etc., and
+                    explicitly passes fork_turns: "none". The message includes the
+                    exact absolute path to the installed idd-internal-factory-root
+                    SKILL.md, shared cwd, entry mode and full New/Restart request or
+                    exact active request file for Continue, the batch ordinal and
+                    effective positive max_workers_per_batch (default 8).
+                    Never copy the internal Root Skill body or previous transcripts.
+
+                    Require a real nested spawn capability through depth 2, native
+                    wait_agent terminal results with parent-thread correlation,
+                    reliable stop AND child-descendant quiescence, and exact model/
+                    reasoning overrides to Planner/Worker grandchildren when policy
+                    requires them. MultiAgentV2 flags alone do not prove capability;
+                    unsupported hosts BLOCK, never fall back to flat execution or
+                    invoke separate Codex CLI processes.
+
+                    Wait natively for the Root's genuine terminal child result.
+                    CONTINUE requires a fully confirmed checkpoint, idle descendants,
+                    BATCH_LIMIT and CompletedWorkers exactly equal to the limit.
+                    Only then spawn ONE new fresh Root with mode Continue. A new
+                    Root starts from existing .idd/factory state, not Supervisor's
+                    summary. Keep all Preflight, verification and implementation
+                    responsibilities in the internal Root.
                     """))
             };
         }
