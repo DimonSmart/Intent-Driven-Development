@@ -59,7 +59,9 @@ public static partial class FactoryBatchTrace
         var questions = Fields("QuestionFile");
         if (statuses.Length != 1 || counts.Length != 1 ||
             reasons.Length != 1 || questions.Length > 1 ||
-            reasons[0].Length == 0 || !uint.TryParse(counts[0], out var count) ||
+            reasons[0].Length == 0 ||
+            !Regex.IsMatch(counts[0], @"\A[0-9]+\z", RegexOptions.CultureInvariant) ||
+            !uint.TryParse(counts[0], out var count) ||
             count > int.MaxValue || (limit is not null && count > limit.Value))
             return false;
 
