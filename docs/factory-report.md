@@ -196,3 +196,30 @@ Unknown unrelated Codex events are tolerated. Missing Factory-relevant evidence 
 ## Regression fixture
 
 The test suite includes sanitized native root JSONL fixtures from the three October 16 Live Eval token-counter shapes, with the final usage record following the structured Factory reply, plus a sanitized current-native JSONL fixture preserving `event_msg/item_completed`, `CollabAgentToolCall`, `CommandExecution`, `FileChange`, and `token_usage_record` structures. Synthetic helpers remain appropriate for isolated legacy/parser unit tests.
+
+
+## Two-level native batch reporting
+
+The additive report retains legacy flat Root/Planner/Worker traces unchanged,
+including task names `idd_factory_(planner|worker)_[0-9]+`.
+For new native nested traces, the top-level agent is `supervisor`;
+its direct generic child `idd_factory_root_bNNNN` is `root`, and its
+children `idd_factory_(planner|worker)_bNNNN_NNNN` retain their familiar
+roles. Native parent thread IDs, accepted spawn correlation and matching
+`agent_path` are preferred over names and timestamps.
+
+`agents[]` additionally includes optional `nativeTaskName` and
+`batchOrdinal`. `tasks[]` has optional `batchOrdinal`.
+`batches[]` lists each actual discovered native Root, exact batch
+ordinal, strict terminal `Status/CompletedWorkers/Reason` if verified,
+and a terminal-evidence classification. `metrics` includes
+`factoryRootInvocations` and `supervisorInvocations`.
+`run.supervisorThreadId` identifies new two-level runs. Existing fields
+and schema version remain backward compatible.
+
+An ambiguous role or incomplete terminal result remains `unavailable`.
+Never infer a batch checkpoint merely from a child summary, and never
+attribute a Worker in one batch to a Planner from another Root. Total tokens
+sum independent authoritative thread counters once per unique thread;
+overlapping/missing counters remain unavailable rather than double-counted.
+
