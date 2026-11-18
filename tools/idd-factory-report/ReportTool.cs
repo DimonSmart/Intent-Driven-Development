@@ -16,6 +16,7 @@ public sealed class FactoryRunReport
     public RunInfo Run { get; init; } = new();
     public List<AgentReport> Agents { get; init; } = [];
     public List<TaskReport> Tasks { get; init; } = [];
+    public List<FactoryBatchReport> Batches { get; init; } = [];
     public ReportMetrics Metrics { get; init; } = new();
     public List<TimelineEvent> Timeline { get; init; } = [];
     public List<Diagnostic> Diagnostics { get; init; } = [];
@@ -49,6 +50,7 @@ public sealed class CodexCapabilities
 public sealed class RunInfo
 {
     public string RootThreadId { get; init; } = "";
+    public string? SupervisorThreadId { get; init; }
     public int RunIndex { get; init; }
     public DateTimeOffset? StartedAt { get; init; }
     public DateTimeOffset? FinishedAt { get; init; }
@@ -70,6 +72,8 @@ public sealed class AgentReport
     public string ThreadId { get; init; } = "";
     public string? ParentThreadId { get; init; }
     public string Role { get; set; } = "unknown";
+    public string? NativeTaskName { get; init; }
+    public int? BatchOrdinal { get; init; }
     public int Sequence { get; set; }
     public DateTimeOffset? StartedAt { get; init; }
     public DateTimeOffset? FinishedAt { get; init; }
@@ -99,6 +103,7 @@ public sealed class TaskReport
 {
     public int Number { get; init; }
     public string AgentThreadId { get; init; } = "";
+    public int? BatchOrdinal { get; init; }
     public string? Text { get; init; }
     public string? ExecutionProfile { get; init; }
     public string? SpawnExecutionProfile { get; init; }
@@ -194,6 +199,8 @@ public sealed class ReportMetrics
     public long? TotalWorkerWallTimeMilliseconds { get; init; }
     public long? SumAgentDurationsMilliseconds { get; init; }
     public int PlannerInvocations { get; init; }
+    public int FactoryRootInvocations { get; init; }
+    public int SupervisorInvocations { get; init; }
     public int WorkerInvocations { get; init; }
     public int OtherChildAgents { get; init; }
     public int MaximumDepth { get; init; }
@@ -1690,9 +1697,16 @@ public sealed class FactoryReportEngine
             });
         }
 
+        var nested = agents.Any(x => x.Role == "root" &&
+            x.ParentThreadId == root.ThreadId && x.BatchOrdinal is not null);
         var rootAgent = BuildRootAgent(root, start, end, terminalEvent, segmentRootEvents, verbose, diagnostics);
+        if (nested)
+            rootAgent.Role = "supervisor";
         agents.Insert(0, rootAgent);
 
+        var batches = BuildBatchReports(agents, byId);
+        if (nested)
+            AddBatchDiagnostics(batches, agents, diagnostics);
         AssignSequences(agents);
         var tasks = workerAgents.Select((x, index) =>
         {
@@ -1708,6 +1722,7 @@ public sealed class FactoryReportEngine
             {
                 Number = index + 1,
                 AgentThreadId = x.ThreadId,
+                BatchOrdinal = x.BatchOrdinal,
                 Text = x.Task,
                 ExecutionProfile = x.ExecutionProfile,
                 SpawnExecutionProfile = x.SpawnExecutionProfile,
@@ -1894,6 +1909,7 @@ public sealed class FactoryReportEngine
             Run = new RunInfo
             {
                 RootThreadId = root.ThreadId,
+                SupervisorThreadId = nested ? root.ThreadId : null,
                 RunIndex = runIndex,
                 StartedAt = start.Timestamp,
                 FinishedAt = end,
@@ -1911,6 +1927,7 @@ public sealed class FactoryReportEngine
             },
             Agents = agents,
             Tasks = tasks,
+            Batches = batches,
             Metrics = new ReportMetrics
             {
                 Tokens = tokenMetrics,
@@ -1926,6 +1943,8 @@ public sealed class FactoryReportEngine
                 TotalWorkerWallTimeMilliseconds = workerWall,
                 SumAgentDurationsMilliseconds = sumAgent,
                 PlannerInvocations = plannerAgents.Length,
+                FactoryRootInvocations = batches.Count,
+                SupervisorInvocations = nested ? 1 : 0,
                 WorkerInvocations = workerAgents.Length,
                 OtherChildAgents = otherAgents,
                 MaximumDepth = maxDepth
@@ -2049,6 +2068,9 @@ public sealed class FactoryReportEngine
                 ThreadId = child.ThreadId,
                 ParentThreadId = child.ParentThreadId ?? state.ParentByChild.GetValueOrDefault(child.ThreadId),
                 Role = role,
+                NativeTaskName = spawn?.RequestedTaskName,
+                BatchOrdinal = FactoryBatchTrace.ParseName(spawn?.RequestedTaskName) is { BatchOrdinal: > 0 } batch
+                    ? batch.BatchOrdinal : null,
                 StartedAt = spawn?.Timestamp ?? ActivityStartedAt(child),
                 FinishedAt = ExecutionFinishedAt(child),
                 Task = task,
@@ -2201,10 +2223,7 @@ public sealed class FactoryReportEngine
     {
         if (name is null)
             return null;
-        if (Regex.IsMatch(name, @"\Aidd_factory_planner_[0-9]+\z", RegexOptions.CultureInvariant))
-            return "planner";
-        return Regex.IsMatch(name, @"\Aidd_factory_worker_[0-9]+\z", RegexOptions.CultureInvariant)
-            ? "worker" : null;
+        return FactoryBatchTrace.ParseName(name)?.Role;
     }
 
     private static string? TrustedFactoryRole(string? hint) =>
@@ -2212,6 +2231,7 @@ public sealed class FactoryReportEngine
         {
             "planner" or "factory-planner" or "factory_planner" or "idd-factory-planner" => "planner",
             "worker" or "factory-worker" or "factory_worker" or "idd-factory-worker" => "worker",
+            "factory-root" or "factory_root" or "idd-factory-root" => "root",
             _ => null
         };
 
@@ -2370,6 +2390,11 @@ public sealed class FactoryReportEngine
         var pending = new Queue<PlannedTask>();
         foreach (var agent in agents.OrderBy(x => x.StartedAt).ThenBy(x => x.ThreadId, StringComparer.Ordinal))
         {
+            if (agent.Role == "root")
+            {
+                pending.Clear();
+                continue;
+            }
             if (agent.Role == "planner" && rollouts.TryGetValue(agent.ThreadId, out var planner))
             {
                 pending.Clear();
@@ -3052,7 +3077,7 @@ public sealed class FactoryReportEngine
         List<Diagnostic> diagnostics)
     {
         var byId = agents.ToDictionary(x => x.ThreadId, StringComparer.Ordinal);
-        foreach (var agent in agents.Where(x => x.Role != "root"))
+        foreach (var agent in agents.Where(x => x.ParentThreadId is not null))
         {
             if (agent.ParentThreadId is not null && !byId.ContainsKey(agent.ParentThreadId))
             {
@@ -3104,7 +3129,7 @@ public sealed class FactoryReportEngine
         };
 
         var ordinal = start.Ordinal + 1;
-        foreach (var agent in agents.Where(x => x.Role != "root")
+        foreach (var agent in agents.Where(x => x.ParentThreadId is not null)
                      .OrderBy(x => x.StartedAt)
                      .ThenBy(x => x.ThreadId, StringComparer.Ordinal))
         {
