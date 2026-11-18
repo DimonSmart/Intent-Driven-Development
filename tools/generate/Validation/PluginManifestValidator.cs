@@ -129,7 +129,7 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
         foreach (var (skill, sourcePath) in plugin.SkillSourcesOrEmpty)
         {
             if (!StringComparer.Ordinal.Equals(pluginName, "idd-factory") ||
-                (skill is not ("idd-internal-factory-planner" or "idd-internal-factory-worker")) ||
+                (skill is not ("idd-internal-factory-root" or "idd-internal-factory-planner" or "idd-internal-factory-worker")) ||
                 !plugin.Skills.Contains(skill, StringComparer.Ordinal))
                 throw new InvalidOperationException($"Invalid internal skill ownership: '{pluginName}/{skill}'.");
             var role = skill["idd-internal-factory-".Length..];
@@ -150,10 +150,11 @@ internal sealed class PluginManifestValidator(RepositoryLayout layout)
             }
         }
         if (StringComparer.Ordinal.Equals(pluginName, "idd-factory") &&
-            (plugin.SkillSourcesOrEmpty.Count != 2 ||
+            (plugin.SkillSourcesOrEmpty.Count != 3 ||
+             !plugin.SkillSourcesOrEmpty.ContainsKey("idd-internal-factory-root") ||
              !plugin.SkillSourcesOrEmpty.ContainsKey("idd-internal-factory-planner") ||
              !plugin.SkillSourcesOrEmpty.ContainsKey("idd-internal-factory-worker")))
-            throw new InvalidOperationException("Factory must package exactly the Planner and Worker internal Skills.");
+            throw new InvalidOperationException("Factory must package exactly the Root, Planner and Worker internal Skills.");
     }
 
     private void ValidateSkillReferences(string pluginName, PluginDefinition plugin)
