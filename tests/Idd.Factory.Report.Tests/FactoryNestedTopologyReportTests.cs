@@ -11,8 +11,10 @@ namespace Idd.Factory.Report.Tests;
 /// </summary>
 public sealed class FactoryNestedTopologyReportTests
 {
-    [Fact]
-    public void TenWorkerNestedTraceKeepsAllFourRootsAndWorkerBatchAttribution()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(21)]
+    public void TenWorkerNestedTraceKeepsAllFourRootsAndWorkerBatchAttribution(int firstOrdinal)
     {
         var directory = Path.Combine(Path.GetTempPath(), "idd-report-nested-" + Guid.NewGuid().ToString("N"));
         try
@@ -38,7 +40,7 @@ public sealed class FactoryNestedTopologyReportTests
             var workerCursor = 0;
             for (var index = 0; index < 4; index++)
             {
-                var batch = index + 1;
+                var batch = firstOrdinal + index;
                 var rootId = roots[index];
                 var rootName = $"idd_factory_root_b{batch:0000}";
                 var batchTime = start.AddMinutes(1 + index * 10);
@@ -52,7 +54,7 @@ public sealed class FactoryNestedTopologyReportTests
                 };
                 if (index == 0)
                 {
-                    var plannerName = "idd_factory_planner_b0001_0001";
+                    var plannerName = $"idd_factory_planner_b{firstOrdinal:0000}_0001";
                     var plannerTime = batchTime.AddSeconds(3);
                     Spawn(rootLines, plannerTime, "planner-1", plannerName, plannerId, null);
                     var tasks = string.Join("\n",
@@ -115,7 +117,8 @@ public sealed class FactoryNestedTopologyReportTests
                 .SequenceEqual(Enumerable.Range(1, 10)
                     .Select(number => $"Implement Step{number:00}")));
             Assert.True(report.Batches.Select(batch => batch.BatchOrdinal)
-                .SequenceEqual(new int?[] { 1, 2, 3, 4 }));
+                .SequenceEqual(Enumerable.Range(firstOrdinal, 4)
+                    .Select(number => (int?)number)));
             Assert.True(report.Batches.Select(batch => batch.Status)
                 .SequenceEqual(new[] { "CONTINUE", "CONTINUE", "CONTINUE", "COMPLETED" }));
             Assert.True(report.Batches.Select(batch => batch.CompletedWorkers)
