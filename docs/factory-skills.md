@@ -15,7 +15,7 @@ visibility switch, so its automatic workflows may remain visible.
 
 ## `idd-factory-run`
 
-This is the orchestration entry point.
+This is the public Supervisor entry point. The detailed preflight and implementation semantics below are owned by the internal Factory Root.
 
 For a new run it performs Factory Preflight: materialize the complete logical
 request, analyze Product Intent, hand explicit durable Engineering decisions to
@@ -170,3 +170,34 @@ adapters do not contain profile-to-concrete-model recommendations.
 
 Internal Skill installation and host limitations are documented in
 [Factory native-agent installation](factory-native-agent-installation.md).
+
+
+## Two-level Supervisor and bounded internal Root
+
+`idd-factory-run` is a thin public Supervisor. It resolves and validates the
+internal `idd-internal-factory-root/SKILL.md` from the same installed plugin,
+checks real nested native child capability and spawns one fresh Root per batch.
+The effective positive `max_workers_per_batch` is **8** unless overridden
+for this invocation; it is not written into `.idd/execution.yaml`.
+
+Each internal Root owns the former public Root's full semantic contract:
+Preflight, Engineering and Product owners, Planner/Worker, pending provenance,
+ExecutionProfile routing, project verification, Intent Refinement Review,
+recovery, and terminal cleanup. Root increments its ephemeral count ONLY
+after a trusted completed Worker and durable checkpoint; at the exact limit it
+returns CONTINUE/BATCH_LIMIT even if the plan is empty. The next new Root
+continues from unchanged `.idd/factory/current/request.md` and remaining
+plan; it does not rerun new-run preflight. Supervisor never performs these
+operations, replays Workers, or reads full child transcripts.
+
+Root returns strict flat `Status`, `CompletedWorkers`, `Reason` fields
+(and `QuestionFile` only for actual saved questions). A CONTINUE at a
+positive full limit, confirmed checkpoint and idle descendants is the only
+permission to start a new Root. NEEDS_INPUT, COMPLETED, BLOCKED, missing
+evidence or host stop uncertainty end automatic spawning.
+
+Codex native task names are batch-scoped; old flat
+`idd_factory_planner_01`/`idd_factory_worker_01` are historical report
+inputs only. Both Codex and Claude packages contain all three internal
+Skills, but compatibility must be established independently on each host.
+
