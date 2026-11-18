@@ -7,11 +7,42 @@ Do not invoke this Skill as a public command or automatically start a new Factor
 run merely because it was loaded. A complete bounded Supervisor assignment and
 verified current run mode are required.
 
-This staged canonical extraction preserves the existing one-level Factory
-behavior until the Supervisor, batch limits and E2E gate are implemented.
 Factory is a thin semantic orchestration skill over native child-agent
 capabilities. It is not a workflow engine, process runtime, MCP transport,
 retry engine, or durable implementation database.
+This Root NEVER spawns another Root. Its parent Supervisor does that.
+
+## Mandatory bounded batch assignment
+
+The internal Root is not a user-facing command. BEFORE any project mutation,
+require a native fresh generic-child invocation from the installed Supervisor
+with an exact full Skill read, a known compatible same-package methodology
+version, and a self-contained bounded assignment containing:
+
+- absolute shared project repository root and original entry mode
+  (New / Continue / Answer / Cancel / Restart);
+- this Root's positive integer `batch_ordinal` and explicitly supplied
+  positive integer `max_workers_per_batch` (Supervisor default is **8**);
+- for New/Restart the complete original request including contents of textual
+  attachments, or the exact unchanged current/request.md path for subsequent
+  Continue, or the complete applicable pending-recovery/user-answer context;
+- exact project access, required references and verified phase-appropriate
+  baseline/provenance, or explicit instructions to perform the authorized
+  new-run Preflight before any state mutation.
+
+Missing, inconsistent, unverifiable or contradictory data means
+`Status: BLOCKED`, `CompletedWorkers: 0` and a short diagnostic. Do not
+improvise the original request or infer an entry mode from a truncated prompt.
+A fresh Root starts `completed_workers = 0` regardless of earlier
+`completed.md` entries. The counter and batch ordinal are transient native
+assignment data, **not** additional durable state. Never persist them to
+`.idd/factory/` or `.idd/execution.yaml`.
+
+The Root independently checks and loads its mandatory normative references
+from its own installed internal Root Skill directory, not from the public
+Supervisor Skill. Recheck that the currently installed Planner/Worker Skills
+come from this same version of the package. Never read, quote or pass the
+complete Planner/Worker protocols in their spawn assignments.
 
 ## Required references
 
@@ -315,6 +346,88 @@ its no-Intent-write boundary; ambiguous legacy scope/provenance forbids
 Worker Intent writes. The installed plugin version does not grant permission.
 A clarification cannot silently expand `intent-preserving` scope.
 
+## Per-Root worker checkpoint budget
+
+Your Supervisor supplies an effective `max_workers_per_batch` (default 8)
+for this ONE Root instance. Never perform more successful Workers than this
+number. Increment `completed_workers` ONLY after the following exact existing
+sequence is fully confirmed for one Worker:
+
+1. Save pending provenance before spawning it and wait for its genuine
+   successful terminal result with native descendants quiescent.
+2. Verify trusted Worker after-state and reconcile scope, baseline and
+   provenance; do not assume success when a process exited or files changed.
+3. Append the bounded successful result to `completed.md` and remove its
+   Task from the remaining `plan.md` using the existing safe order.
+4. Confirm the pending checkpoint has been closed, all related
+   `provenance.md`/`completed.md`/`plan.md` entries are consistent, the
+   completed Task cannot be replayed by an ordinary Continue, and no writer
+   is still running.
+5. Only NOW increment `completed_workers` by one; never count Planner,
+   failed/interrupted Worker, host tools or final project verification.
+
+If after completing step 5 `completed_workers == max_workers_per_batch`,
+STOP the loop **immediately**. Do not spawn Worker 9, Planner, Project
+Verification, Intent Refinement Review, or other project writer after the
+eighth confirmed Worker when limit is 8. Do not delete remaining tasks,
+replan the empty plan, or remove active marker. Return the strict terminal:
+
+    Status: CONTINUE
+    CompletedWorkers: <effective batch limit>
+    Reason: BATCH_LIMIT
+
+The limit applies even if `plan.md` is now empty. The next brand-new Root
+uses Continue and may then request `# Done` and run final verification.
+One user invocation thus rotates automatically through fresh Root contexts.
+
+When a Worker succeeded but any part of the checkpoint is incomplete,
+ambiguous, or interrupted, return BLOCKED with reason
+CHECKPOINT_INCONSISTENT; do NOT increment or emit CONTINUE. Recovery must
+reconcile real worktree/Git evidence and existing pending provenance through
+the ordinary manual Continue rules. No exactly-once guarantee.
+
+A genuinely failed Worker or unconfirmed child termination is BLOCKED
+according to existing Factory semantics, with the Task still pending;
+a new batch is NOT a retry. For a Planner `# Question`, preserve exact
+question.md and return NEEDS_INPUT. For Planner `# Done` BEFORE reaching
+limit, carry out all existing final verification, Intent Refinement Review,
+normal cleanup and only then return COMPLETED. Final verification does not
+count as a Worker.
+
+Do not loop indefinitely over Planner `# Done` and identical failing
+verification with no trusted change of code, plan or check inputs. Return
+BLOCKED/VERIFICATION_NOT_CONFIRMED rather than fabricating work to reach
+the batch limit.
+
+## Strict terminal result for Supervisor
+
+A finished internal Root MUST return exactly one each of these separate
+plain-text fields in its genuine final child message:
+
+    Status: CONTINUE|COMPLETED|NEEDS_INPUT|BLOCKED
+    CompletedWorkers: <integer from 0 through batch limit>
+    Reason: <short nonempty reason>
+
+CONTINUE is legal ONLY after full checkpoint and positive equality to the
+batch limit with Reason BATCH_LIMIT. COMPLETED requires existing `# Done`,
+verified Project Verification, Intent Refinement Review and normal
+finalization; Reason DONE. NEEDS_INPUT must preserve a saved question and
+provide an additional `QuestionFile: .idd/factory/preparation/question.md`
+or `QuestionFile: .idd/factory/current/question.md` when actually present,
+and may omit that field only for a request-level question before any
+preparation write. BLOCKED must state a specific reason, such as
+HOST_UNSUPPORTED, CHILD_UNCONFIRMED, CHECKPOINT_INCONSISTENT,
+VERIFICATION_NOT_CONFIRMED or PREFLIGHT_DECISION. Never emit conflicting
+intermediate terminal fields, a false completed result, a full transcript,
+unbounded logs or internal Skill bodies.
+
+The fields describe this Root's local successful Workers, not historical
+completed entries from earlier Roots. Do not generate CONTINUE from a
+saved `completed.md` count or from empty tasks; count only completed and
+verified Workers launched in this native Root. Preserve all the existing
+durable files and phase semantics. No Supervisor-specific state files or
+retry counters.
+
 ## Orchestration loop
 
 Conceptually:
@@ -352,6 +465,10 @@ while true:
     record bounded Worker after-checkpoint, including unknown edits
     append a short result to completed.md
     remove the completed task from plan.md
+    verify complete trusted checkpoint and confirmed termination
+    increment this Root's local completed_workers
+    if completed_workers == max_workers_per_batch:
+        immediately return Status CONTINUE / CompletedWorkers / Reason BATCH_LIMIT
 ```
 
 This is conceptual behavior, not a requirement to implement a new programmatic
@@ -359,17 +476,27 @@ state machine.
 
 ### Codex MultiAgentV2 spawn identity
 
-On Codex MultiAgentV2, **every Factory-owned native `spawn_agent` call**
-(planner and worker) MUST include a unique explicit `task_name` argument:
-`idd_factory_planner_01`, `idd_factory_planner_02`, ... for planners,
-or `idd_factory_worker_01`, `idd_factory_worker_02`, ... for workers.
-Only names matching `^idd_factory_(planner|worker)_[0-9]+$` are valid.
-A `task_name` identifies an attempt, not a role type or evidence that
-its Skill was loaded.
-Use a fresh name for **each attempt**, including a spawn rejected by the host.
-Keep names unique within the root-session/Factory invocation and any shared
-host namespace; inspect visible native calls before selecting the next suffix.
-Do not persist counters or create another Factory runtime/state machine.
+This internal Root is already a fresh generic child of Supervisor, named
+`idd_factory_root_bNNNN` by the parent. Use that exact native batch
+ordinal for every descendant Planner/Worker spawn. Task names MUST be:
+
+- `idd_factory_planner_b0001_0001`, `idd_factory_planner_b0001_0002`, ...
+- `idd_factory_worker_b0001_0001`, `idd_factory_worker_b0001_0002`, ...
+
+The batch part is the Supervisor-assigned `b[0-9]+` and the final
+`_[0-9]+` is a LOCAL attempt number (rejected attempts consume an index).
+Digits can exceed four. Ensure uniqueness across visible native host history;
+never reuse a name after rejection. First worker of each new Root starts at
+local attempt 1, but must use the new batch ordinal. Legacy
+`idd_factory_planner_01` and `idd_factory_worker_01` are reporter-only
+historical formats; NEVER emit them from a new internal Root.
+
+The native `task_name` identifies and correlates a child; it is NOT proof
+that a child completed or read its installed Skill. Every spawn also requires
+`fork_turns: "none"`, real installed Skill path and complete bounded
+assignment. Require reliable parent/child thread IDs and no descendants
+alive before moving to the next Worker or returning CONTINUE. No concurrent
+writing Workers and no fallback to flat Factory or CLI processes.
 
 Pass `task_name` in native spawn arguments, **not** in child instructions or
 worker assignments. This is a trace-visible role marker, not evidence that a
