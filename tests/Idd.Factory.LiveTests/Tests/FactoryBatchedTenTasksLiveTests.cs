@@ -91,10 +91,12 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             Assert.Equal(4, report.Metrics.FactoryRootInvocations);
             Assert.Equal("completed", report.Run.Result);
             var ordered = report.Batches.OrderBy(item => item.BatchOrdinal).ToArray();
-            Assert.Equal(new int?[] { 1, 2, 3, 4 }, ordered.Select(item => item.BatchOrdinal).ToArray());
+            Assert.True(ordered.Select(item => item.BatchOrdinal).SequenceEqual(
+                new int?[] { 1, 2, 3, 4 }), "Expected exactly four sequential Root batch ordinals.");
             Assert.Equal(new[] { "CONTINUE", "CONTINUE", "CONTINUE", "COMPLETED" },
                 ordered.Select(item => item.Status).ToArray());
-            Assert.Equal(new int?[] { 3, 3, 3, 1 }, ordered.Select(item => item.CompletedWorkers).ToArray());
+            Assert.True(ordered.Select(item => item.CompletedWorkers).SequenceEqual(
+                new int?[] { 3, 3, 3, 1 }), "Expected exact 3/3/3/1 confirmed Worker checkpoints.");
             Assert.Equal(10, report.Metrics.WorkerInvocations);
             Assert.Equal(10, report.Tasks.Count);
             Assert.All(report.Tasks, item => Assert.Equal("completed", item.Status));
