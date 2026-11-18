@@ -266,3 +266,42 @@ registration helper is needed. Codex names attempts with `task_name` and uses
 host capabilities (generic spawn, fresh context, file access, terminal wait,
 stop/interrupt and exact configured worker model/effort) remain required.
 Legacy custom agent files are ignored and preserved.
+
+
+## Two levels of Factory orchestration
+
+The public `idd-factory-run` is a lightweight Supervisor:
+
+```text
+Supervisor (one user invocation)
+  -> Factory Root #1  (max 8 confirmed Workers by default)
+       -> Planner when needed; sequential Worker 1 ... Worker 8
+  -> Factory Root #2  (fresh no-history context)
+       -> continue pending plan; Planner/Worker or # Done and final verification
+  -> ... until COMPLETED, NEEDS_INPUT or BLOCKED
+```
+
+The Supervisor resolves the installed internal Root Skill, checks real
+nested-native host support and executes only one Root at a time. Each Root
+preserves the entire previously documented Factory Preflight, owner order,
+Planner, Worker, Engineering Guards, immutable baseline, provenance, final
+verification and Intent Refinement Review. No Worker may run concurrently
+with another writing Worker or with a new Root. The Supervisor does not write
+`.idd/factory/` state or revalidate Product Intent itself.
+
+Each Root-local `completed_workers` increments after a successful native
+Worker result and the COMPLETE verified checkpoint
+(`provenance.md`, `completed.md`, remaining `plan.md`). At the exact
+effective limit it emits:
+```text
+Status: CONTINUE
+CompletedWorkers: 8
+Reason: BATCH_LIMIT
+```
+This is required even when the last Worker emptied `plan.md`: the next Root
+is responsible for obtaining `# Done` and finishing verification. Any
+checkpoint, writer-stop, model or terminal ambiguity is BLOCKED with no
+automatic next batch. NEEDS_INPUT conveys the exact persisted question.
+The counter and batch ordinal are not durable state. The next Root uses
+Continue with the original saved request and baseline, not a transcript copy.
+
