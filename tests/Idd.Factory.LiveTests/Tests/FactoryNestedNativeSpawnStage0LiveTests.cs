@@ -49,8 +49,8 @@ public sealed partial class NativeFactoryEndToEndLiveTests
 
             var packaged = Path.Combine(marketplace, "plugins", "codex", "idd-factory");
             Assert.False(Directory.Exists(Path.Combine(packaged, "agents")));
-            foreach (var name in new[] { "idd-factory-run", "idd-internal-factory-planner",
-                         "idd-internal-factory-worker" })
+            foreach (var name in new[] { "idd-factory-run", "idd-internal-factory-root",
+                         "idd-internal-factory-planner", "idd-internal-factory-worker" })
                 Assert.True(File.Exists(Path.Combine(packaged, "skills", name, "SKILL.md")),
                     $"Missing packaged Skill: {name}");
 

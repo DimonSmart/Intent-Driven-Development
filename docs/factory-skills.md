@@ -3,9 +3,12 @@
 IDD Factory exposes two registered user commands: `idd-factory-run` and
 `idd-factory-configure`. Configure can also be selected automatically by the agent;
 selection alone never authorizes a write.
-Planner and Worker are internal Skills owned by `idd-factory-run` (not
-additional public commands). Each ordinary native child loads its full Skill
-from the same installed Factory package.
+The Factory Root, Planner and Worker are internal Skills shipped in the
+same installed Factory package, not additional public commands. The canonical
+internal Root is staged for two-level orchestration; until the complete
+migration passes its host and E2E gates, `idd-factory-run` still performs the
+existing one-level orchestration directly. Each ordinary native Planner/Worker
+child loads its full Skill from the same installed Factory package.
 Automatic Intent workflows remain available to the agent and are hidden from
 the Claude Code slash menu. Codex currently has no equivalent documented
 visibility switch, so its automatic workflows may remain visible.

@@ -33,12 +33,12 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
         var inventory = new SkillDescriptionReader().Read(
             Path.Combine(fixture.RepoRoot, "src", "canonical", "skills", "skill-descriptions.json"),
             new HashSet<string>(StringComparer.Ordinal) { "claude", "codex" });
-        Assert.Equal(25, inventory.Count);
+        Assert.Equal(26, inventory.Count);
         Assert.Equal(9, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Command));
         Assert.Equal(14, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Workflow));
         Assert.Equal(5, inventory.Count(skill => skill.Value.Invocation == SkillInvocation.Manual));
-        Assert.Equal(20, inventory.Count(skill => skill.Value.Invocation == SkillInvocation.Auto));
-        Assert.Equal(2, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Internal));
+        Assert.Equal(21, inventory.Count(skill => skill.Value.Invocation == SkillInvocation.Auto));
+        Assert.Equal(3, inventory.Count(skill => skill.Value.Exposure == SkillExposure.Internal));
 
         using var manifest = JsonDocument.Parse(fixture.ReadText(Path.Combine(fixture.RepoRoot,
             "src", "canonical", "plugins", "plugin-manifest.json")));
@@ -142,7 +142,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
         {
             var root = Path.Combine(fixture.MarketplaceRoot, "plugins", platform);
             Assert.Equal(21, Directory.GetDirectories(Path.Combine(root, "idd-intent", "skills")).Length);
-            Assert.Equal(4, Directory.GetDirectories(Path.Combine(root, "idd-factory", "skills")).Length);
+            Assert.Equal(5, Directory.GetDirectories(Path.Combine(root, "idd-factory", "skills")).Length);
         }
     }
 

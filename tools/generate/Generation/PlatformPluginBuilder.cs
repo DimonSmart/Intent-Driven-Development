@@ -54,10 +54,14 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
             ["schemaVersion"] = 1,
             ["methodologyVersion"] = version
         };
+        var versionContent = methodologyVersion.ToJsonString(
+            new JsonSerializerOptions { WriteIndented = true }) + "\n";
         var files = new List<GeneratedFile>
         {
             new(Path.Combine("skills", "idd-factory-run", "references", "methodology-version.json"),
-                methodologyVersion.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n")
+                versionContent),
+            new(Path.Combine("skills", "idd-internal-factory-root", "references", "methodology-version.json"),
+                versionContent)
         };
         return files;
     }

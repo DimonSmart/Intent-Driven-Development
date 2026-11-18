@@ -93,21 +93,21 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
     }
 
     [Fact]
-    public void FactoryMetadata_HasTwoInternalSkillsWithoutNativeRoles()
+    public void FactoryMetadata_HasThreeInternalSkillsWithoutNativeRoles()
     {
         using var manifest = JsonDocument.Parse(fixture.ReadText(Path.Combine(fixture.RepoRoot,
             "src", "canonical", "plugins", "plugin-manifest.json")));
         var factory = manifest.RootElement.GetProperty("plugins").GetProperty("idd-factory");
         var skills = factory.GetProperty("skills").EnumerateArray().Select(value => value.GetString()).ToArray();
         Assert.Equal(new[] { "idd-factory-run", "idd-factory-configure",
-            "idd-internal-factory-planner", "idd-internal-factory-worker" }, skills);
+            "idd-internal-factory-root", "idd-internal-factory-planner", "idd-internal-factory-worker" }, skills);
         Assert.False(factory.TryGetProperty("nativeAgents", out _));
         foreach (var platform in new[] { "codex", "claude" })
         {
             var root = Path.Combine(fixture.MarketplaceRoot, "plugins", platform, "idd-factory");
             fixture.AssertMissing(Path.Combine(root, "agents"));
             fixture.AssertMissing(Path.Combine(root, "skills", "idd-factory-configure", "scripts", "register-codex-agents.py"));
-            foreach (var role in new[] { "planner", "worker" })
+            foreach (var role in new[] { "root", "planner", "worker" })
             {
                 var name = "idd-internal-factory-" + role;
                 var canonical = GenerationFixture.NormalizeText(fixture.ReadText(
