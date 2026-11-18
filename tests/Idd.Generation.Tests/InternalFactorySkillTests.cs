@@ -79,8 +79,9 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
     {
         var skill = fixture.ReadText(Path.Combine(fixture.MarketplaceRoot,
             "plugins", platform, "idd-factory", "skills", "idd-factory-run", "SKILL.md"));
-        Assert.Contains("idd-internal-factory-planner/SKILL.md", skill);
-        Assert.Contains("idd-internal-factory-worker/SKILL.md", skill);
+        Assert.Contains("idd-internal-factory-root/SKILL.md", skill);
+        Assert.DoesNotContain("idd-internal-factory-planner/SKILL.md", skill);
+        Assert.DoesNotContain("idd-internal-factory-worker/SKILL.md", skill);
         Assert.Contains("BLOCKED", skill);
         Assert.DoesNotContain("use their registered custom-agent", skill);
     }
