@@ -182,6 +182,6 @@ internal static partial class SkillDescriptionValidator
             $"Invalid frontmatter for {skillName}/{adapterName} in {path}: '{fieldName}' must be a string, bool, number, or string array.");
     }
 
-    [GeneratedRegex("^(?:idd-internal-factory-(?:planner|worker)|idd-help|idd-skip|idd-route|idd-project-init|idd-glossary-build|idd-verification-configure|idd-engineering-change|idd-(intent|code|factory)-[a-z0-9]+(?:-[a-z0-9]+)*)$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^(?:idd-internal-factory-(?:root|planner|worker)|idd-help|idd-skip|idd-route|idd-project-init|idd-glossary-build|idd-verification-configure|idd-engineering-change|idd-(intent|code|factory)-[a-z0-9]+(?:-[a-z0-9]+)*)$", RegexOptions.CultureInvariant)]
     private static partial Regex PublicSkillNamePattern();
 }
