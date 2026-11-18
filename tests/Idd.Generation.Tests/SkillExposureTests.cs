@@ -142,7 +142,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
         {
             var root = Path.Combine(fixture.MarketplaceRoot, "plugins", platform);
             Assert.Equal(21, Directory.GetDirectories(Path.Combine(root, "idd-intent", "skills")).Length);
-            Assert.Equal(4, Directory.GetDirectories(Path.Combine(root, "idd-factory", "skills")).Length);
+            Assert.Equal(5, Directory.GetDirectories(Path.Combine(root, "idd-factory", "skills")).Length);
         }
     }
 
