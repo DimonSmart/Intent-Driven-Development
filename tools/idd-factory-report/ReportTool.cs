@@ -1852,25 +1852,67 @@ public sealed class FactoryReportEngine
                 item.Role == "assistant" && !string.IsNullOrWhiteSpace(item.Text))
             : terminalEvent;
 
-        if (nested && result == "unknown" && batches.LastOrDefault() is { } lastBatch &&
-            lastBatch.Status is "COMPLETED" or "BLOCKED" or "NEEDS_INPUT")
+        // In a nested run, a Supervisor's own "Factory completed" prose/JSON
+        // cannot override missing, ambiguous or conflicting internal Root
+        // terminal evidence. The completed run must have a contiguous chain of
+        // native Roots ending in a strict COMPLETED Root terminal.
+        var nestedTerminalConfirmed = false;
+        if (nested)
         {
-            result = lastBatch.Status switch
+            var orderedBatches = batches.OrderBy(batch => batch.BatchOrdinal).ToArray();
+            var validRotationChain = orderedBatches.Length > 0 &&
+                orderedBatches.Select(batch => batch.BatchOrdinal)
+                    .SequenceEqual(Enumerable.Range(1, orderedBatches.Length)
+                        .Select(number => (int?)number)) &&
+                orderedBatches.Take(orderedBatches.Length - 1)
+                    .All(batch => batch.Status == "CONTINUE" &&
+                        batch.CompletedWorkers is > 0 &&
+                        batch.Reason == "BATCH_LIMIT");
+            var lastBatch = orderedBatches.LastOrDefault();
+            var nestedResult = validRotationChain ? lastBatch?.Status switch
             {
                 "COMPLETED" => "completed",
                 "BLOCKED" => "blocked",
                 "NEEDS_INPUT" => "question",
                 _ => "unknown"
-            };
-            resultReason = lastBatch.Reason;
-            resultEvidence.Add("native_internal_root_terminal");
+            } : "unknown";
+            nestedTerminalConfirmed = nestedResult != "unknown";
+            if (!validRotationChain)
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "factory", Code = "batch_rotation_chain_invalid",
+                    Message = "Nested Factory batch ordinals, native terminal results or CONTINUE checkpoints are missing/contradictory. The run result cannot be trusted."
+                });
+            if (result is "completed" or "blocked" or "question" &&
+                nestedTerminalConfirmed && result != nestedResult)
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "host-trace", Code = "supervisor_root_terminal_conflict",
+                    Message = $"Supervisor declared {result}, but final nested Factory Root declared {nestedResult}. The run result remains unknown."
+                });
+            else if (result is "completed" or "blocked" or "question" &&
+                     !nestedTerminalConfirmed)
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "host-trace", Code = "supervisor_completion_unverified",
+                    Message = "Supervisor reported a final status without a complete confirmed native Root rotation chain."
+                });
+
+            var conflict = result is "completed" or "blocked" or "question" &&
+                nestedTerminalConfirmed && result != nestedResult;
+            result = nestedTerminalConfirmed && !conflict ? nestedResult : "unknown";
+            resultReason = result == "unknown" ? null : lastBatch?.Reason;
+            resultEvidence.Clear();
+            if (result != "unknown")
+                resultEvidence.Add("native_internal_root_terminal");
         }
 
         var completionInfo = BuildCompletion(
             agents,
             completionEvents,
             result,
-            structuredResult is not null || finalizingRollout is not null,
+            nested ? nestedTerminalConfirmed && result != "unknown"
+                : structuredResult is not null,
             completionTerminal,
             verificationPolicy,
             diagnostics);
