@@ -7,6 +7,7 @@ packages each protocol from a unique canonical source into both platforms:
 | Internal Skill | Canonical source | Installed relative path |
 | --- | --- | --- |
 | `idd-internal-factory-root` | `src/canonical/factory/root.md` | `skills/idd-internal-factory-root/SKILL.md` |
+| `idd-internal-factory-root` | `src/canonical/factory/root.md` | `skills/idd-internal-factory-root/SKILL.md` |
 | `idd-internal-factory-planner` | `src/canonical/factory/planner.md` | `skills/idd-internal-factory-planner/SKILL.md` |
 | `idd-internal-factory-worker` | `src/canonical/factory/worker.md` | `skills/idd-internal-factory-worker/SKILL.md` |
 
@@ -80,3 +81,25 @@ messages, native no-history settings, sequential Writers and independent
 product verification. CLI and Claude compatibility do not prove Desktop
 compatibility; each host must be verified on its own. A real Codex Desktop run
 with no `agent_type` selector is needed to close the original regression.
+
+
+## Two-level migration and native gating
+
+The new public Supervisor must find its internal Root in the same installed
+package; Root must find internal Planner and Worker there. Codex uses
+`idd_factory_root_b0001` and batch-scoped
+`idd_factory_(planner|worker)_b0001_0001` native task names, all with
+`fork_turns: "none"`. Supervisor never runs a Planner or Worker itself.
+On each confirmed checkpoint boundary at the positive
+`max_workers_per_batch` limit (default 8) it starts one brand-new Root;
+otherwise it does not auto-retry. No additional installed agent definitions
+or changes to `.idd/execution.yaml` are needed.
+
+The ordinary Linux/Windows CI proves generator contracts, syntax and report
+fixtures. The user-facing nested architecture MUST additionally pass the
+controlled native writer-stop/descendant-quiescence live gate, effective
+model/effort override, and the explicit 10-task limit-3 four-Root E2E on
+the intended Codex host. The Stage-0 read-only smoke result alone does not
+prove writer-stop or multi-batch completion. The PR is gated until those
+real-host checks pass; Claude requires separate runtime evidence.
+
