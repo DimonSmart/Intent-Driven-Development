@@ -41,6 +41,10 @@ public sealed class FactoryBatchTraceTests
     [InlineData("max_workers_per_batch = -1", null)]
     [InlineData("max_workers_per_batch = 1.5", null)]
     [InlineData("max_workers_per_batch=2\nmax_workers_per_batch=3", null)]
+    [InlineData("max_workers_per_batch=3\nmax_workers_per_batch=-1", null)]
+    [InlineData("max_workers_per_batch=3\nmax_workers_per_batch=2.5", null)]
+    [InlineData("max_workers_per_batch=3\nmax_workers_per_batch=unknown", null)]
+    [InlineData("max_workers_per_batch=2147483648", null)]
     [InlineData("No explicit limit", null)]
     public void BatchBudgetIsFromSingleUnambiguousNativeAssignment(string assignment, int? expected) =>
         Assert.Equal(expected, FactoryBatchTrace.ParseBatchLimit(assignment));
