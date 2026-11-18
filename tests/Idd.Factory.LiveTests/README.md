@@ -272,6 +272,20 @@ grandchild model/effort routing, and an unchanged shared Git workspace.
 It injects a Supervisor-only nonce to detect accidental transcript inheritance.
 A false/partial signal fails the test; `stage0-result.json` is written only
 when the assertions pass, while `stage0-blocker.txt` retains failure details.
+A requested `Get-Content` operation is not proof that a child read a Skill:
+the live probe correlates the native tool invocation and its response and
+requires the complete contents of the exact installed `SKILL.md` in a successful
+tool result. Tool denials (`blocked by policy`) and truncated responses fail
+closed. It also records each session's final native spawn/wait/interrupt events
+when the host process times out.
+
+On Windows Codex installations a read-only native `exec_command` may be
+rejected by **host policy**, independently of the Factory plugin. The same
+host must permit reading the installed Skill through an approved mechanism
+for Stage 0 to pass. Do not simulate the read, silently copy its text into
+spawn prompts, or change the public Factory in response to this blocker.
+The normal-completion probe must not call `interrupt_agent`: cancellation
+and descendant quiescence require a separate dedicated Stage 0 evaluation.
 
 The technical probe intentionally exercises both internal Skills with
 incomplete, read-only assignments, expecting `BLOCKED` from each.

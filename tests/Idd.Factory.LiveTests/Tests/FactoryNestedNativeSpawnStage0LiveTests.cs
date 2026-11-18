@@ -81,17 +81,25 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                     Include the installed Planner SKILL.md absolute path, instruct
                     the grandchild to read it completely and provide an intentionally
                     incomplete Planner assignment. Require BLOCKED, no project writes.
-                    Wait for terminal completion and close this grandchild before (2).
+                    Wait for terminal completion before (2); do NOT interrupt or
+                    cancel it as a substitute for a normal terminal result.
                 (2) idd_factory_worker_b0001_0001 with fork_turns "none",
                     model "{{worker.Model}}" and reasoning_effort
                     "{{worker.ReasoningEffort}}" as explicit native spawn arguments.
                     Include the installed Worker SKILL.md absolute path, instruct
                     it to read it completely and provide an intentionally incomplete
                     Worker assignment. Require BLOCKED, no project writes.
-                    Wait for terminal completion and close the grandchild.
+                    Wait for terminal completion. Do not interrupt or cancel the
+                    child even if it reports BLOCKED.
 
                 The Root probe then returns a short terminal result and closes.
-                Supervisor waits natively for its terminal result and closes it.
+                Supervisor waits natively for its terminal result.
+                Native wait_agent calls must request timeout_ms <= 60000.
+                Never invoke interrupt_agent or any other cancellation tool in
+                this normal-completion probe. If a Skill read fails due to host
+                policy, the affected child reports BLOCKED immediately and does
+                not retry the same operation. After at most three bounded waits
+                per child, return BLOCKED instead of starting an unbounded wait.
                 Never forward the Supervisor's private nonce to any child:
                 {{nonce}}
                 Do not retry rejected spawns, do not use CLI processes as subagents,
@@ -153,10 +161,24 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 item.Text?.Contains("BLOCKED", StringComparison.OrdinalIgnoreCase) == true);
             Assert.Contains(workerChild.Events, item => item.Role == "assistant" &&
                 item.Text?.Contains("BLOCKED", StringComparison.OrdinalIgnoreCase) == true);
-            Assert.True(planner.Events.Any(item => IsNativeSkillRead(item, "planner")),
-                SkillReadDiagnostic(planner, "planner", artifacts));
-            Assert.True(workerChild.Events.Any(item => IsNativeSkillRead(item, "worker")),
-                SkillReadDiagnostic(workerChild, "worker", artifacts));
+            var plannerSkillPath = Path.Combine(codexHome, "plugins", "cache",
+                "intent-driven-development", "idd-factory", "0.0.0-live",
+                "skills", "idd-internal-factory-planner", "SKILL.md");
+            var workerSkillPath = Path.Combine(codexHome, "plugins", "cache",
+                "intent-driven-development", "idd-factory", "0.0.0-live",
+                "skills", "idd-internal-factory-worker", "SKILL.md");
+            Assert.True(File.Exists(plannerSkillPath), $"Installed Planner Skill missing: {plannerSkillPath}");
+            Assert.True(File.Exists(workerSkillPath), $"Installed Worker Skill missing: {workerSkillPath}");
+            var plannerEvidence = NativeSkillReadEvidence.Inspect(planner.Path, plannerSkillPath,
+                await File.ReadAllTextAsync(plannerSkillPath));
+            var workerEvidence = NativeSkillReadEvidence.Inspect(workerChild.Path, workerSkillPath,
+                await File.ReadAllTextAsync(workerSkillPath));
+            Assert.True(plannerEvidence.Confirmed,
+                SkillReadDiagnostic(planner, "planner", artifacts) +
+                $" Content read evidence: {plannerEvidence}.");
+            Assert.True(workerEvidence.Confirmed,
+                SkillReadDiagnostic(workerChild, "worker", artifacts) +
+                $" Content read evidence: {workerEvidence}.");
 
             // Native terminal waits must be visible at both orchestration levels.
             Assert.Contains(supervisor.Events, item => item.ToolName == "wait_agent");
@@ -185,7 +207,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         catch (Exception exception)
         {
             await TryWriteTextAsync(Path.Combine(artifacts, "stage0-blocker.txt"),
-                exception.ToString());
+                await DescribeStage0FailureAsync(exception, codexHome, artifacts));
             throw;
         }
         finally
@@ -195,6 +217,52 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             if (Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_KEEP_TEMP") != "1")
                 try { Directory.Delete(temporary, recursive: true); } catch { }
         }
+    }
+
+    private static async Task<string> DescribeStage0FailureAsync(
+        Exception exception, string codexHome, string artifacts)
+    {
+        var details = new System.Text.StringBuilder(exception.ToString());
+        try
+        {
+            var stderrPath = Path.Combine(artifacts, "11-nested-native-probe.stderr.log");
+            if (File.Exists(stderrPath))
+            {
+                var stderr = await File.ReadAllTextAsync(stderrPath);
+                if (stderr.Contains("blocked by policy", StringComparison.OrdinalIgnoreCase))
+                    details.AppendLine().AppendLine(
+                        "HOST BLOCKER: exec_command was rejected by host policy. " +
+                        "This does not count as reading the installed Skills.");
+                if (stderr.Contains("HTTP 403", StringComparison.OrdinalIgnoreCase))
+                    details.AppendLine(
+                        "HOST WARNING: external MCP transports returned HTTP 403; " +
+                        "this is not proven to cause the native wait stall.");
+            }
+
+            var sessions = Path.Combine(codexHome, "sessions");
+            if (Directory.Exists(sessions))
+            {
+                var reader = new CodexRolloutReader();
+                foreach (var path in Directory.EnumerateFiles(sessions, "*.jsonl",
+                             SearchOption.AllDirectories).OrderBy(path => path, StringComparer.Ordinal))
+                {
+                    var trace = reader.Read(path);
+                    details.AppendLine(
+                        $"SESSION {trace.AgentPath ?? "/root"} " +
+                        $"thread={trace.ThreadId} parent={trace.ParentThreadId ?? "none"}");
+                    foreach (var tool in trace.Events.Where(item => item.ToolName is
+                                 "spawn_agent" or "interrupt_agent" or "wait_agent").TakeLast(5))
+                        details.AppendLine(
+                            $"  {tool.ToolName} phase={tool.ToolPhase ?? "unknown"} " +
+                            $"timestamp={tool.Timestamp:O}");
+                }
+            }
+        }
+        catch (Exception diagnosticError)
+        {
+            details.AppendLine($"Diagnostic collection failed: {diagnosticError.Message}");
+        }
+        return details.ToString();
     }
 
     private static void AssertAcceptedSpawn(CodexRollout parent, CodexRollout child,
