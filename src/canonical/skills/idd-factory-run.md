@@ -66,8 +66,12 @@ Supervisor → Root spawn explicitly sets `fork_turns: "none"`, one unique
 
 - Role = Factory Root; the absolute installed Root SKILL.md path and a command
   to read its entire content plus all required references BEFORE project work;
-- the shared absolute project cwd, explicit entry mode, `batch_ordinal` and
-  effective `max_workers_per_batch`;
+- the shared absolute project cwd, explicit entry mode, and these
+  unambiguous literal standalone assignment lines:
+  `batch_ordinal: <positive decimal ordinal>` and
+  `max_workers_per_batch: <positive decimal limit>` (for example
+  `max_workers_per_batch: 3`). Do not write another conflicting limit,
+  embed contradictory examples, or omit the effective value;
 - the complete original self-contained request for New/Restart, OR for
   subsequent batches the exact active path
   `.idd/factory/current/request.md` and entry mode Continue;
