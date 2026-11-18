@@ -24,7 +24,7 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
         fixture.AssertMissing(Path.Combine(plugin, "agents"));
         fixture.AssertMissing(Path.Combine(plugin, "skills", "idd-factory-configure",
             "scripts", "register-codex-agents.py"));
-        foreach (var role in new[] { "planner", "worker" })
+        foreach (var role in new[] { "root", "planner", "worker" })
         {
             var canonical = fixture.ReadText(Path.Combine(fixture.RepoRoot,
                 "src", "canonical", "factory", role + ".md"));
@@ -40,6 +40,36 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
             else fixture.AssertMissing(Path.Combine(plugin, "skills",
                 "idd-internal-factory-" + role, "agents", "openai.yaml"));
         }
+    }
+
+    [Theory]
+    [InlineData("codex")]
+    [InlineData("claude")]
+    public void InternalFactoryRoot_PackagesItsOwnCompletePreflightReferences(string platform)
+    {
+        var plugin = Path.Combine(fixture.MarketplaceRoot, "plugins", platform, "idd-factory");
+        var references = Path.Combine(plugin, "skills", "idd-internal-factory-root", "references");
+        foreach (var name in new[]
+        {
+            "intent-preflight.md",
+            "project-verification.md",
+            "factory-execution-policy.md",
+            "engineering-guardrails.md",
+            "methodology-version.json"
+        })
+            fixture.AssertFile(Path.Combine(references, name));
+
+        var run = Path.Combine(plugin, "skills", "idd-factory-run", "SKILL.md");
+        var root = Path.Combine(plugin, "skills", "idd-internal-factory-root", "SKILL.md");
+        var runText = fixture.ReadText(run);
+        var rootText = fixture.ReadText(root);
+        Assert.Contains("Factory Preflight", rootText);
+        Assert.Contains("current/request.md", rootText);
+        Assert.Contains("project-verification.md", rootText);
+        Assert.Contains("idd-internal-factory-root/SKILL.md", rootText);
+        Assert.Contains("Factory Preflight", runText); // Stage 1 retains public behavior.
+        fixture.AssertMissing(Path.Combine(plugin, "skills",
+            "idd-internal-factory-root", "agents", "openai.yaml"));
     }
 
     [Theory]
