@@ -2038,14 +2038,20 @@ public sealed class FactoryReportEngine
             int? completed = null;
             string? reason = null;
             var evidence = "no confirmed final native child message";
+            var parentSpawn = root.ParentThreadId is null ||
+                !rollouts.TryGetValue(root.ParentThreadId, out var supervisor)
+                    ? null : supervisor.SpawnRecords.Values.SingleOrDefault(
+                        spawn => !spawn.CorrelationConflict &&
+                        spawn.RequestedTaskName == root.NativeTaskName);
+            var effectiveLimit = FactoryBatchTrace.ParseBatchLimit(parentSpawn?.Task);
             if (rollouts.TryGetValue(root.ThreadId, out var rollout))
             {
                 var finished = rollout.Events.Any(item => item.Type is
                     "turn.completed" or "turn_completed" or "task_complete");
                 var lastAssistant = rollout.Events.LastOrDefault(item =>
                     item.Role == "assistant" && !string.IsNullOrWhiteSpace(item.Text));
-                if (finished && lastAssistant is not null &&
-                    FactoryBatchTrace.TryParseTerminal(lastAssistant.Text, null, out var terminal))
+                if (finished && lastAssistant is not null && effectiveLimit is > 0 &&
+                    FactoryBatchTrace.TryParseTerminal(lastAssistant.Text, effectiveLimit, out var terminal))
                 {
                     status = terminal!.Status;
                     completed = terminal.CompletedWorkers;
@@ -2053,15 +2059,18 @@ public sealed class FactoryReportEngine
                     evidence = "completed native child turn with strict terminal fields";
                 }
                 else
-                    evidence = finished
-                        ? "native turn ended without valid batch terminal fields"
-                        : "native Root turn completion unavailable";
+                    evidence = effectiveLimit is null
+                        ? "no unambiguous effective max_workers_per_batch in the native Root assignment"
+                        : finished
+                            ? "native turn ended without valid terminal fields for effective batch limit"
+                            : "native Root turn completion unavailable";
             }
             reports.Add(new FactoryBatchReport
             {
                 BatchOrdinal = root.BatchOrdinal,
                 RootThreadId = root.ThreadId,
                 NativeTaskName = root.NativeTaskName,
+                EffectiveWorkerLimit = effectiveLimit,
                 Status = status,
                 CompletedWorkers = completed,
                 Reason = reason,
