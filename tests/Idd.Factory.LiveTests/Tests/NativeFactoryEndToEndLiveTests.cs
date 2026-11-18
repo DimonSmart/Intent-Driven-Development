@@ -128,7 +128,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             Assert.False(File.Exists(Path.Combine(generatedFactory, ".mcp.json")));
 
             // Factory uses the generated internal Skills, not project custom agents.
-            foreach (var role in new[] { "planner", "worker" })
+            foreach (var role in new[] { "root", "planner", "worker" })
                 Assert.True(File.Exists(Path.Combine(generatedFactory, "skills",
                     "idd-internal-factory-" + role, "SKILL.md")));
             Assert.False(Directory.Exists(Path.Combine(generatedFactory, "agents")));
@@ -216,7 +216,16 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 $"Evidence: {artifactRoot}/factory-report.json, factory-report.md, codex-trace.jsonl, " +
                 $"last-message.json, exception.txt, summary.json.");
             AssertMultiAgentV2(rootRollout);
+            Assert.Equal(1, factoryReport.Metrics.SupervisorInvocations);
+            Assert.True(factoryReport.Metrics.FactoryRootInvocations >= 1);
+            var rollouts = Directory.EnumerateFiles(Path.Combine(codexHome, "sessions"),
+                    "*.jsonl", SearchOption.AllDirectories)
+                .Select(path => new CodexRolloutReader().Read(path)).ToArray();
+            var internalRoots = factoryReport.Batches.Select(batch =>
+                Assert.Single(rollouts, item => item.ThreadId == batch.RootThreadId)).ToArray();
             CorrelateNativeSpawnsForAssertions(rootRollout, codexHome, factoryReport);
+            foreach (var factoryRoot in internalRoots)
+                CorrelateNativeSpawnsForAssertions(factoryRoot, codexHome, factoryReport);
             RunResult? verification = null;
             if (!unavailableWorkerModel)
             {
@@ -231,7 +240,10 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             {
                 var pendingPlanPath = Path.Combine(workspace, ".idd", "factory", "current", "plan.md");
                 Assert.True(File.Exists(pendingPlanPath), "BLOCKED must preserve the pending Factory plan.");
-                FactoryRoutingAssertions.VerifyUnavailableModel(factoryReport, rootRollout,
+                var blockedRoot = Assert.Single(internalRoots, factoryRoot =>
+                    factoryRoot.SpawnRecords.Values.Any(spawn =>
+                        spawn.RequestedModel == unavailableModel));
+                FactoryRoutingAssertions.VerifyUnavailableModel(factoryReport, blockedRoot,
                     unavailableModel, settings.ExecutionProfiles["standard"].ReasoningEffort);
                 Assert.Equal(initialPolicy, await File.ReadAllTextAsync(Path.Combine(workspace, ".idd", "execution.yaml")));
                 Assert.Equal(initialCatalog, await File.ReadAllTextAsync(Path.Combine(workspace, "src", "MiniCatalog", "Catalog.cs")));
@@ -242,7 +254,8 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 return;
             }
 
-            FactoryRoutingAssertions.VerifyNativeSpawns(factoryReport, rootRollout, settings.ExecutionProfiles);
+            FactoryRoutingAssertions.VerifyNestedNativeSpawns(factoryReport, rootRollout,
+                internalRoots, settings.ExecutionProfiles);
             Assert.Equal("completed", factoryReport.Run.Result);
             Assert.Equal("passed", factoryReport.Completion.ProjectVerification);
             Assert.Equal("ok", factoryReport.Completion.ProtocolValidation);
