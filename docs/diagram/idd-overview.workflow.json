@@ -30,6 +30,10 @@
     {
       "id": "assurance",
       "label": "Independent conformance"
+    },
+    {
+      "id": "exploration",
+      "label": "Optional read-only exploration"
     }
   ],
   "mainPath": [
@@ -97,9 +101,16 @@
       "lane": "product",
       "col": 2,
       "type": "frontend",
-      "label": "Clarify / Discover",
-      "sublabel": "only when required",
-      "width": 184
+      "label": "Intent Clarify",
+      "sublabel": "resolve one ambiguous requirement",
+      "width": 184,
+      "sources": [
+        {
+          "path": "src/canonical/skills/idd-intent-clarify.md",
+          "line": 1,
+          "label": "Clarify Product meaning"
+        }
+      ]
     },
     {
       "id": "owner",
@@ -219,6 +230,22 @@
       "label": "Audit Findings",
       "sublabel": "diagnose, do not change",
       "width": 184
+    },
+    {
+      "id": "brainstorm",
+      "lane": "exploration",
+      "col": 2,
+      "type": "frontend",
+      "label": "Brainstorm",
+      "sublabel": "alternative directions; no spec writes",
+      "width": 184,
+      "sources": [
+        {
+          "path": "src/canonical/skills/idd-intent-brainstorm.md",
+          "line": 1,
+          "label": "Product alternatives"
+        }
+      ]
     }
   ],
   "edges": [
@@ -317,6 +344,27 @@
       "to": "findings",
       "label": "report",
       "variant": "dashed"
+    },
+    {
+      "id": "route_brainstorm",
+      "from": "route",
+      "to": "brainstorm",
+      "label": "exploratory request",
+      "role": "branch"
+    },
+    {
+      "id": "brainstorm_discover",
+      "from": "brainstorm",
+      "to": "discover",
+      "label": "selected, needs clarity",
+      "role": "branch"
+    },
+    {
+      "id": "brainstorm_owner",
+      "from": "brainstorm",
+      "to": "owner",
+      "label": "approved & specific",
+      "role": "branch"
     }
   ],
   "cards": [
@@ -342,6 +390,14 @@
       "items": [
         "Lint, structure audit, drift audit, and technical verification serve different purposes.",
         "Read-only audit never silently edits code or Intent."
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Optional discovery stays read-only",
+      "items": [
+        "Clarify narrows a concrete requirement; Brainstorm finds different approaches.",
+        "Only confirmed behavior can pass to Intent Change; neither is required for clear requests."
       ]
     }
   ]

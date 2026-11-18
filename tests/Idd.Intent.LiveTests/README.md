@@ -67,7 +67,7 @@ read-only, and scoped reporting) require further isolated live evaluations.
 `IDD_RUN_LIVE_INTENT_EVALS=1`, ordinary `dotnet test`, or
 `scripts/Check.ps1 -Mode Live` (the latter runs Factory evaluations).
 
-The scenarios live in `Scenarios/route-cases.json` (42 cases). They check
+The scenarios live in `Scenarios/route-cases.json` (46 cases). They check
 typed classification, scope, clarity, execution depth and handoff fields plus
 unchanged workspace snapshots. The import suite has both a deliberately
 missing-source blocker and a scenario with an actual supplied source.
@@ -129,3 +129,96 @@ route + full workflow read. The harness saves JSONL events, but it does not
 invent actual prompt-token counts or reference-read traces when the host does
 not expose them. Consult `docs/routing-core-migration.md` for the baseline
 ownership map and explicitly unverified cases.
+
+## Opt-in Clarify / Brainstorm behavioral evaluations
+
+The discovery suite contains five Clarify scenarios (C1–C5) and eight Brainstorm
+scenarios (B1–B8) in Scenarios/discovery-cases.json. A dedicated opt-in live
+test invokes the **generated and installed Codex skills** in isolated read-only
+workspaces, checks for unauthorized file mutations, and asks a separate
+semantic judge to evaluate the requested problem coverage, meaningful idea
+diversity, assumptions, counterarguments, user confirmation and handoff
+boundaries. Judges assess substance, not fixed words, headings or quotas.
+
+These live tests are **not** executed in ordinary CI or standard dotnet test
+runs: they consume model tokens, require local dotnet, Codex CLI and working
+credentials, and are nondeterministic. Full runs have not been executed through
+the GitHub connector; run in an authenticated environment for behavioral
+acceptance:
+
+```powershell
+$env:IDD_RUN_LIVE_DISCOVERY_EVALS = "1"
+dotnet test tests/Idd.Intent.LiveTests/Idd.Intent.LiveTests.csproj --filter "Category=LiveDiscoveryEval"
+```
+
+Options: IDD_DISCOVERY_EVAL_CASE_IDS=C1,B1 for a focused run;
+IDD_DISCOVERY_EVAL_MAX_CASES=2 for initial smoke;
+IDD_DISCOVERY_EVAL_MODEL, IDD_DISCOVERY_EVAL_REASONING,
+IDD_DISCOVERY_EVAL_TIMEOUT_MINUTES, IDD_DISCOVERY_EVAL_OUTPUT_DIR,
+IDD_DISCOVERY_EVAL_CODEX and IDD_DISCOVERY_EVAL_SKIP_JUDGE=1 for manual review.
+Raw responses, event logs and semantic verdicts are written to report.json
+under the specified output directory. Failed evaluations must be inspected and
+fixed rather than weakening the rubric.
+
+
+## Opt-in Business Complexity Assessment evaluation
+
+BusinessComplexityLiveTests exercises the **idd-intent-estimate** skill in
+**33 version-controlled scenarios** in Scenarios/estimate-cases.json: 20
+original synthetic cases, 12 additional E01–E12 evidence/coverage/driver
+scenarios, plus one scenario using this repository's **current**
+.idd/intent/ documents. The new cases exercise staged inventory, read/unread
+coverage states, justified High ratings, independent dimensions, ranked
+complexity drivers, portable references, scoped assessment and conservative
+confidence.
+
+It builds the generator, installs the generated **idd-intent** plugin into
+an isolated Codex home, seeds disposable workspaces, invokes the skill
+**explicitly** in a read-only sandbox, and checks that no workspace file
+changed. By default it uses a separate Codex semantic judge against
+the case-specific qualitative expectations, with response/traces/verdicts
+saved in report.json. This checks behavior, not merely wording in SKILL.md.
+
+**Not part of ordinary CI.** To run on an authenticated Codex installation
+(requires tokens and network):
+
+    $env:IDD_RUN_LIVE_ESTIMATE_EVALS = "1"
+    $env:IDD_ESTIMATE_EVAL_CASE_IDS = "P01-pre-code,P03-algorithm,P21-self-IDD"
+    dotnet test tests/Idd.Intent.LiveTests/Idd.Intent.LiveTests.csproj --filter "Category=LiveEstimateEval"
+
+Remove the CASE_IDS variable to execute all 33. Other overrides:
+IDD_ESTIMATE_EVAL_CODEX, IDD_ESTIMATE_EVAL_MODEL (default gpt-6),
+IDD_ESTIMATE_EVAL_REASONING (medium), IDD_ESTIMATE_EVAL_MAX_CASES,
+IDD_ESTIMATE_EVAL_TIMEOUT_MINUTES (15), IDD_ESTIMATE_EVAL_OUTPUT_DIR,
+and IDD_ESTIMATE_EVAL_SKIP_JUDGE=1 (skip semantic judging, **not** evidence
+of semantic success). The JSON report identifies selected case IDs, model,
+source revision, host, result and errors. Inspect recorded claims/citations
+manually when a conclusion depends on nuanced source content.
+
+Claude Code live execution and host-level natural-language auto-invocation
+are **not evaluated** by this Codex-only suite; route-cases.json covers
+routing decisions separately, and the ordinary generation tests verify
+Claude/Codex package metadata. Run a manual Claude smoke on a disposable
+project with only current specs; do not report success until it is actually
+observed. Host unavailability is **not evaluated**, not "pass".
+
+## COSMIC v5.0 hierarchical reader-cache evaluations
+
+`CosmicFunctionalSizeLiveTests` are separate **opt-in real-LLM** evaluations of the installed Codex/Claude skill. They are not included in normal CI. A real host with native child-agent and file access is required.
+
+The fixture provides one external, persistent **per-case numbered cache directory**, which the agent can access without editing the target project. It tests natural language behaviors:
+
+- `C03-shared-fur`, `C21-multiple-owners`: each process has exactly one normative owner; external specs are LINK references.
+- `C23-hierarchical-60-specs`: 60 documents, 20 owners, 40 non-owning connector specs.
+- `C24-single-owner-coupling`: three callers; fan-in is not additional CFP.
+- `C25-large-spec-sections`: one 75k-character spec requiring gap-free range consolidation.
+- **`C26-numbered-cache-scoped-reuse`**: seed two finished `IDD-NNNN.cosmic.md` packets, measure selected 2/3 sources, verify the existing packets stay unchanged, do not measure the third source, and disclose that reused source freshness is unverified.
+- **`C27-numbered-cache-explicit-refresh`**: seed a stale but identity-matching old extract, explicitly refresh, verify the cache entry changes, and measure the updated requirement rather than the old cached behavior.
+
+To run targeted scenarios, set `IDD_RUN_LIVE_COSMIC_EVALS=1`, `IDD_COSMIC_EVAL_CASE_IDS=C26-numbered-cache-scoped-reuse,C27-numbered-cache-explicit-refresh`, then run:
+
+```sh
+dotnet test tests/Idd.Intent.LiveTests/Idd.Intent.LiveTests.csproj --filter 'Category=LiveCosmicEval'
+```
+
+The live harness uses host-native file operations, supports a separate cache folder, and checks the target workspace for changes. It does **not** execute extra COSMIC scripts, Python checkers or hash-based resume logic. A full acceptance run should also review native subagent traces and behavior on a substantial real project; scenario presence alone is not a live result.

@@ -98,11 +98,25 @@ inconsistent field **before** producing the final Markdown:
 - `Classification` is an exact Core classification token, never a skill name
   or a shortened variant such as `intent-change`. `Operation` is
   `not-applicable` except for `product-change` and `engineering-change`.
+- `intent-cosmic-measurement` uses exactly `idd-intent-cosmic`, with
+  `Operation`, `Execution depth` and `Audit scope: not-applicable`;
+  a requested measurement is `end-to-end` read-only and route advice is
+  `route-only`. No prerequisite estimate, no code/Factory, and no whole-product CFP from
+  incomplete FUR; partial subtotals require exhaustive source review or a proven access blocker, never a voluntarily sampled first process. Preserve the exact selected scope; do not
+  confuse Business Complexity or effort forecasting with functional size.
+- `intent-estimation` uses exactly `idd-intent-estimate`, with `Operation`,
+  `Execution depth` and `Audit scope: not-applicable`; `end-to-end` means
+  the complete **read-only assessment**, `route-only` only advice. Preserve
+  the requested product area/IDs and its dependencies in the handoff.
+  Neither code complexity nor implementation-drift requests are estimates.
 - `intent-import` and `intent-bootstrap` have
   `Execution depth: not-applicable`; so does policy-only
   `engineering-change` and an `unclear` Product discovery gate.
 - A desired Product improvement without an identifiable behavior/capability
   uses `unclear`, not an invented `product-change` / `modify`.
+- Choose `idd-intent-clarify` for an ambiguous specific requirement and
+  `idd-intent-brainstorm` for explicitly divergent or open-ended product discovery;
+  do not require Brainstorm for clear Product decisions.
 - A question only about the manual optional glossary workflow recommends
   `idd-glossary-build` with `Classification: unknown` and
   `Current handoff: none`, never an invented classification.

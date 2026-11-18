@@ -64,14 +64,14 @@ read-only reviews, lifecycle model refresh and authorized persistence;
 protocols. No separate model-update entry point is published. Each worker child
 executes exactly one contracted task.
 
-The Planner and Worker are canonical sources for generated native agent definitions,
-not public skills or Root skill references. `src/canonical/factory/planner.md`
-and `worker.md` are referenced by the `nativeAgents` inventory. The planner creates the
+The Planner and Worker are canonical sources for generated **internal Skills**,
+not public user commands. `src/canonical/factory/planner.md` and `worker.md`
+are explicitly mapped by Factory `skillSources` inventory. The planner creates the
 current contractable batch and capability profile; the root agent mechanically
 maps that profile immediately before each fresh native worker; a fresh planner
 runs after the batch is exhausted.
 
-The generator publishes skills, registered native agent definitions, references,
+The generator publishes public and internal Skills, references,
 adapter metadata, and bootstrap assets. It must not publish `idd-factory.dll`, a runtime package, or a
 Factory `.mcp.json`.
 

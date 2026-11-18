@@ -323,6 +323,12 @@ independent tasks.
 Glossary work is deliberately outside automatic routing. It starts only from an
 explicit glossary request or an explicitly accepted bootstrap/import offer.
 
+## Optional Product Clarification and Exploration
+
+A missing behavioral decision in a **specific requirement** uses `idd-intent-clarify`: targeted evidence, adaptive questions and acceptance-ready Product meaning. An explicit search for **conceptually different solutions** uses `idd-intent-brainstorm`: bounded read-only investigation, reframing, divergent options, counterarguments and optional comparison. A visual screenshot with unconfirmed style traits belongs to the separate `idd-intent-visual-brainstorm`.
+
+Both are optional and read-only, with handoffs rather than automatic actions. Neither a Decision Brief nor an agent recommendation is Product Intent. Only user-confirmed obligations move through `idd-intent-change`; implementation follows the existing approval and scope gates. No new routing classification, Factory stage or persistent brainstorm storage is introduced.
+
 ## How IDD Differs from Broad Spec-Driven Workflows
 
 IDD is still specification-driven in the ordinary sense: implementation follows an explicit product description.

@@ -3,7 +3,7 @@
   "diagram_type": "workflow",
   "meta": {
     "title": "Intent Lifecycle",
-    "subtitle": "Discover, confirm, and maintain current product truth.",
+    "subtitle": "Clarify a requirement or brainstorm alternatives; only approved meaning becomes current Intent.",
     "output": "site/views/intent.html",
     "animation": "trace",
     "visual_preset": "signal-flow",
@@ -31,6 +31,10 @@
       "id": "exceptions",
       "label": "Questions / ambiguity",
       "variant": "exception"
+    },
+    {
+      "id": "exploration",
+      "label": "Exploration (optional)"
     }
   ],
   "mainPath": [
@@ -93,13 +97,13 @@
       "lane": "discovery",
       "col": 2,
       "type": "frontend",
-      "label": "Discover / Clarify",
-      "sublabel": "brainstorm, bootstrap, import",
+      "label": "Intent Clarify",
+      "sublabel": "specific ambiguous requirement",
       "sources": [
         {
-          "path": "src/canonical/methodology/common-workflows.md",
-          "line": 140,
-          "label": "Entry routes"
+          "path": "src/canonical/skills/idd-intent-clarify.md",
+          "line": 1,
+          "label": "Read-only requirement clarification"
         }
       ],
       "width": 184
@@ -156,6 +160,38 @@
       "label": "Question / Stop",
       "sublabel": "missing product decision",
       "width": 184
+    },
+    {
+      "id": "brainstorm",
+      "lane": "exploration",
+      "col": 2,
+      "type": "frontend",
+      "label": "Product Brainstorm",
+      "sublabel": "different solution principles; read-only",
+      "width": 184,
+      "sources": [
+        {
+          "path": "src/canonical/skills/idd-intent-brainstorm.md",
+          "line": 1,
+          "label": "Read-only alternative research"
+        }
+      ]
+    },
+    {
+      "id": "visual",
+      "lane": "exploration",
+      "col": 3,
+      "type": "frontend",
+      "label": "Visual Brainstorm",
+      "sublabel": "unconfirmed visual traits",
+      "width": 184,
+      "sources": [
+        {
+          "path": "src/canonical/skills/idd-intent-visual-brainstorm.md",
+          "line": 1,
+          "label": "Specialized visual discovery"
+        }
+      ]
     }
   ],
   "edges": [
@@ -227,6 +263,41 @@
       "label": "explicit answer",
       "variant": "security",
       "role": "return"
+    },
+    {
+      "id": "route_brainstorm",
+      "from": "route",
+      "to": "brainstorm",
+      "label": "explore alternatives",
+      "role": "branch"
+    },
+    {
+      "id": "brainstorm_clarify",
+      "from": "brainstorm",
+      "to": "discover",
+      "label": "chosen but unclear",
+      "role": "branch"
+    },
+    {
+      "id": "brainstorm_confirm",
+      "from": "brainstorm",
+      "to": "confirm",
+      "label": "user confirms direction",
+      "role": "branch"
+    },
+    {
+      "id": "route_visual",
+      "from": "route",
+      "to": "visual",
+      "label": "visual reference ambiguity",
+      "role": "branch"
+    },
+    {
+      "id": "visual_confirm",
+      "from": "visual",
+      "to": "confirm",
+      "label": "user confirms visual meaning",
+      "role": "branch"
     }
   ],
   "cards": [
@@ -252,6 +323,14 @@
       "items": [
         "Edit the smallest existing owner, create only when needed, remove obsolete specs rather than archiving them.",
         "Mechanical lint, normalization and drift audit are shown in Quality & Conformance."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Research is not durable truth",
+      "items": [
+        "Clarify resolves one incomplete requirement; Brainstorm compares fundamentally different directions.",
+        "Neither research result nor Visual Brainstorm writes Intent; approval and Intent Change own persistence."
       ]
     }
   ]

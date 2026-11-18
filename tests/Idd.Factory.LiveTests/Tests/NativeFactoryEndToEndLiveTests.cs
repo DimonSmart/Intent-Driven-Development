@@ -98,7 +98,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             }
             var initialPolicy = await File.ReadAllTextAsync(Path.Combine(workspace, ".idd", "execution.yaml"));
             var initialCatalog = await File.ReadAllTextAsync(Path.Combine(workspace, "src", "MiniCatalog", "Catalog.cs"));
-            PrepareCodexHome(codexHome);
+            PrepareCodexHome(codexHome, workspace);
 
             await RunAsync(
                 "dotnet",
@@ -114,8 +114,6 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             {
                 "exec", generator, "--version", "0.0.0-live", "--output", marketplace
             };
-            if (Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_INTERNAL_SKILLS") == "1")
-                generationArguments.Add("--internal-agent-experiment");
             await RunAsync(
                 "dotnet",
                 generationArguments,
@@ -129,11 +127,12 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             Assert.False(Directory.Exists(Path.Combine(generatedFactory, "runtime")));
             Assert.False(File.Exists(Path.Combine(generatedFactory, ".mcp.json")));
 
-            // This eval exercises Factory itself, not Marketplace-only agent discovery.
-            // Register the exact generated TOML definitions only inside its disposable
-            // project; the separate Marketplace discovery test deliberately omits this.
-            FactoryEvalAgentRegistration.StageProjectAgents(generatedFactory, workspace, artifactRoot);
-            await InitializeGitRepositoryAsync(workspace, artifactRoot, includeProjectAgents: true);
+            // Factory uses the generated internal Skills, not project custom agents.
+            foreach (var role in new[] { "planner", "worker" })
+                Assert.True(File.Exists(Path.Combine(generatedFactory, "skills",
+                    "idd-internal-factory-" + role, "SKILL.md")));
+            Assert.False(Directory.Exists(Path.Combine(generatedFactory, "agents")));
+            await InitializeGitRepositoryAsync(workspace, artifactRoot);
             await VerifyGitBaselineAsync(workspace, artifactRoot);
             await RunAsync("dotnet", ["restore", "MiniCatalog.sln", "--nologo"],
                 workspace, null, null, artifactRoot, "05-workspace-restore");
@@ -160,12 +159,6 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 null,
                 artifactRoot,
                 "09-codex-plugin-add");
-
-            // Preflight native role resolution in a separate isolated Codex home.
-            // Its sessions cannot contaminate the Factory run report or root trace.
-            await ProbeProjectAgentRegistrationAsync(
-                codex, workspace, Path.Combine(tempRoot, "codex-agent-probe-home"),
-                artifactRoot, model, reasoning, timeoutMinutes);
 
             var task = await File.ReadAllTextAsync(Path.Combine(caseRoot,
                 unavailableWorkerModel ? "task-model-unavailable.md" : "task.md"));
@@ -454,22 +447,12 @@ public sealed partial class NativeFactoryEndToEndLiveTests
     }
 
     private static async Task InitializeGitRepositoryAsync(
-        string workspace, string artifactRoot, bool includeProjectAgents = false)
+        string workspace, string artifactRoot)
     {
         await RunAsync("git", ["init"], workspace, null, null, artifactRoot, "01-git-init");
         await RunAsync("git", ["config", "user.name", "IDD Factory Eval"], workspace, null, null, artifactRoot, "02-git-config-name");
         await RunAsync("git", ["config", "user.email", "idd-factory-eval@localhost"], workspace, null, null, artifactRoot, "03-git-config-email");
         await RunAsync("git", ["add", "--all"], workspace, null, null, artifactRoot, "04-git-add");
-        if (includeProjectAgents)
-        {
-            // The fixture deliberately ignores .codex/ as a local-agent directory.
-            // Track only these generated role definitions in the disposable
-            // baseline; never force-add unrelated ignored files.
-            var files = FactoryEvalAgentRegistration.RequiredRoles
-                .Select(name => ".codex/agents/" + name + ".toml").ToArray();
-            await RunAsync("git", ["add", "-f", "--", ..files],
-                workspace, null, null, artifactRoot, "04-git-add-factory-agents");
-        }
         await RunAsync("git", ["commit", "-m", "Initial eval workspace"], workspace, null, null, artifactRoot, "05-git-commit");
     }
 
@@ -493,7 +476,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         File.WriteAllText(Path.Combine(idd, "execution.yaml"), yaml.ToString().ReplaceLineEndings("\n"));
     }
 
-    private static async Task VerifyGitBaselineAsync(string workspace, string artifactRoot, bool requireProjectAgents = true)
+    private static async Task VerifyGitBaselineAsync(string workspace, string artifactRoot)
     {
         // ArgumentList passes the revision verbatim, including braces. This check
         // distinguishes a missing Git baseline from a later agent/shell failure.
@@ -501,8 +484,14 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             workspace, null, null, artifactRoot, "05-git-root");
         var expectedRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(workspace));
         var actualRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root.Stdout.Trim()));
-        Assert.True(string.Equals(expectedRoot, actualRoot,
-                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal),
+        var prefix = await RunAsync("git", ["rev-parse", "--show-prefix"],
+            workspace, null, null, artifactRoot, "05-git-prefix");
+        // macOS /var and /private/var name the same directory; an empty Git
+        // prefix also proves the working directory is the repository root.
+        var sameRoot = string.Equals(expectedRoot, actualRoot,
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal) ||
+            string.IsNullOrWhiteSpace(prefix.Stdout);
+        Assert.True(sameRoot,
             $"Git resolved a different repository: {actualRoot} (expected {expectedRoot})");
 
         var revision = await RunAsync("git", ["rev-parse", "--verify", "HEAD^{commit}"],
@@ -516,21 +505,10 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             workspace, null, null, artifactRoot, "05-git-baseline-object");
         Assert.Equal("commit", kind.Stdout.Trim());
 
-        if (requireProjectAgents)
-        {
-            var tracked = await RunAsync("git", ["ls-files", "--", ".codex/agents"],
-                workspace, null, null, artifactRoot, "05-git-agents-tracked");
-            var actual = tracked.Stdout.Split('\n', StringSplitOptions.TrimEntries |
-                                                       StringSplitOptions.RemoveEmptyEntries);
-            var expected = FactoryEvalAgentRegistration.RequiredRoles
-                .Select(name => ".codex/agents/" + name + ".toml").ToArray();
-            Assert.Equal(expected.Order(StringComparer.Ordinal), actual.Order(StringComparer.Ordinal));
-        }
-
         await File.WriteAllTextAsync(Path.Combine(artifactRoot, "git-baseline.txt"), hash + "\n");
     }
 
-    private static void PrepareCodexHome(string target)
+    private static void PrepareCodexHome(string target, string? trustedProject = null)
     {
         Directory.CreateDirectory(target);
         var source = Environment.GetEnvironmentVariable("CODEX_HOME");
@@ -539,7 +517,32 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         var auth = Path.Combine(source, "auth.json");
         if (File.Exists(auth))
             File.Copy(auth, Path.Combine(target, "auth.json"), overwrite: true);
+
+        if (!string.IsNullOrWhiteSpace(trustedProject))
+        {
+            // The disposable workspace must be trusted to load project-local
+            // agent definitions. Never change the user's real trust configuration.
+            var projectKey = JsonSerializer.Serialize(Path.TrimEndingDirectorySeparator(
+                Path.GetFullPath(trustedProject)));
+            File.WriteAllText(Path.Combine(target, "config.toml"),
+                BuildIsolatedCodexConfig(projectKey, OperatingSystem.IsWindows()));
+        }
     }
+
+    // The live eval's private CODEX_HOME does not inherit the user's
+    // ~/.codex/config.toml. On native Windows, omitting this sandbox backend
+    // can cause even read-only shell commands to fail with "blocked by policy"
+    // (openai/codex#42172). This selects a supported native sandbox backend;
+    // the CLI still requests --sandbox read-only for the Stage-0 probe.
+    internal static string BuildIsolatedCodexConfig(string projectKey, bool isWindows) =>
+        $"[projects.{projectKey}]\ntrust_level = \"trusted\"\n\n" +
+        "[features.multi_agent_v2]\n" +
+        "enabled = true\n" +
+        "hide_spawn_agent_metadata = false\n" +
+        "tool_namespace = \"agents\"\n" +
+        "expose_spawn_agent_model_overrides = true\n" +
+        "wait_agent_enabled = true\n" +
+        (isWindows ? "\n[windows]\nsandbox = \"elevated\"\n" : "");
 
     private static async Task<RunResult> RunAsync(
         string executable,

@@ -28,9 +28,10 @@ Engineering boundary and rule format.
 
 ## Selecting a workflow
 
-The five explicit IDD Intent commands are `idd-help`, `idd-project-init`,
+Five IDD Intent commands are **manual-only**: `idd-help`, `idd-project-init`,
 `idd-verification-configure`, `idd-glossary-build`, and `idd-skip`.
-Each is manual-only: routing may recommend it but cannot invoke it automatically.
+The additional `idd-intent-estimate` command supports **both explicit invocation
+and automatic selection** for read-only Business Complexity Assessment.
 The optional Factory plugin exposes `idd-factory-run` and `idd-factory-configure`.
 Other registered workflows, including the read-only `idd-route` router, are
 automatically selected from natural-language requests. In Claude Code these
@@ -52,15 +53,39 @@ are references belonging to other skills, not standalone commands.
 | Project terminology is genuinely ambiguous or project-specific | Explicitly run `idd-glossary-build` to create or update the optional glossary. |
 | You need to confirm that IDD is installed and initialized correctly | Follow [Verify Installation](verify-installation.md). |
 | You are starting from an idea | Run `idd-project-init`, then ask to clarify the first product behavior. |
-| The requested feature is still unclear | Ask for product clarification without changing intent or code. |
+| The requested feature is still unclear | Ask for `idd-intent-clarify` without changing intent or code. |
+| You want fundamentally different ideas or opportunities | Ask for `idd-intent-brainstorm` to investigate and challenge alternatives, without writing Intent. |
 | Product behavior must be added, changed, or removed | Describe the new behavior and ask to update Product Intent before implementation. |
 | Current intent is already correct and only code must change | Ask to implement the already-confirmed behavior without changing Product Intent. |
+| You need to assess target-product complexity from current Product Intent | Use `idd-intent-estimate`, optionally scoped to an area; it reads Intent only and never changes files. |
 | You need to check whether code still matches intent | Ask to audit implementation conformance with an explicit focused or project-wide scope. |
 | Existing behavior has been confirmed as product truth but is missing from established intent | Ask to record the confirmed existing behavior in current Product Intent. |
 | Intent documents need semantic structure/ownership review | Ask for a semantic structure audit, a mechanical validity check, or focused normalization, as appropriate. |
 | The implementation task is large or naturally multi-stage | Install `idd-factory` and use `idd-factory-run`. |
 | A new IDD release is available | Follow [Updating IDD](updating-idd.md), then start a new session. |
 | The request must deliberately bypass IDD | Use `idd-skip`. |
+
+## Estimate Business Complexity from Intent
+
+Use `/idd-intent-estimate` in Claude Code or choose the installed
+`$idd-intent-estimate` skill in Codex. You can also ask *Assess the business
+complexity of the current product based on its Intent*, or specify an area
+(e.g. `IDD-0003`). This is a read-only `idd-intent` capability, not part of
+Factory or an obligatory development stage.
+
+The report distinguishes **functional scale**, **implementation difficulty**
+and **confidence in the evidence**, using seven qualitative dimensions.
+Unknown requirements are **Unknown**, not assumed Low. COSMIC Preparation lists
+possible functional-process candidates and boundary questions; it **does not
+calculate CFP**. Complexity does **not** predict effort, cost, deadlines, code
+quality or work completed. No implementation is needed. Read the
+[Business Complexity Assessment guide](business-complexity-assessment.md)
+for examples and interpretation.
+
+Structure audit evaluates how current Intent is organized; drift audit tests
+implementation conformance; Clarify resolves one ambiguous requirement;
+`idd-intent-estimate` analyzes target-product difficulty **without** reviewing
+code or rewriting requirements.
 
 ## Audit Existing Intent and Implementation
 
@@ -189,7 +214,17 @@ Use when product behavior, boundaries, constraints, or expected outcomes are not
 Clarify this feature before changing product intent or code.
 ```
 
-The result should clarify product meaning rather than produce an implementation plan.
+The result should clarify product meaning rather than produce an implementation plan. Use `idd-intent-clarify` when a concrete proposed requirement needs clarification. It asks only essential questions and may provide Specification-Ready Intent directly when enough is known.
+
+## Explore Alternative Product Directions
+
+Use `idd-intent-brainstorm` when you want fundamentally different approaches rather than a shorter version of the same idea:
+
+```text
+Brainstorm different ways to make archives convenient in a file manager, including unconventional approaches. Investigate and challenge the options; do not edit files or choose for me.
+```
+
+Brainstorm can inspect relevant project context and, when tools are available, external analogs. Its Decision Brief is temporary, not a new `.idd/intent/` record. The user may continue exploring, select a direction for Clarify, or explicitly approve enough behavior for `idd-intent-change`. Neither skill is a mandatory precursor to a clear, confirmed Product change. In Claude Code describe the workflow naturally (automatic workflows are not slash commands); in Codex you can also choose the installed skill by ID.
 
 ## Add, Change, or Remove Product Behavior
 

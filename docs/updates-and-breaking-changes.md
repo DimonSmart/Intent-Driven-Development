@@ -1,4 +1,44 @@
+## 2026-11-12 — Product Clarify and Brainstorm are distinct (breaking behavior change)
+
+The previous `idd-intent-brainstorm` skill was a focused Product requirement clarification and simplification gate. That behavior is now `idd-intent-clarify`. The existing name `idd-intent-brainstorm` now denotes a new read-only research workflow that explores substantially different product approaches, challenges assumptions and optionally proposes a Decision Brief. There is **no legacy alias** for the previous semantics.
+
+Ambiguous concrete Product requirements (including mixed Product/Engineering/implementation requests) now route to Clarify; explicitly divergent product ideation routes to Brainstorm. Neither is required for clear already-approved Intent, and Visual Brainstorm remains specialized. Both skills ship inside the same `idd-intent` plugin. No new runtime dependency, Factory stage, routing enum or project-owned state format is introduced.
+
+Update/reinstall `idd-intent` and start a **new Codex or Claude Code session**. If scripts or personal prompts used `/idd-intent-brainstorm` for focused requirement clarification, change them to request `idd-intent-clarify` instead. Claude Code hides automatic workflow slash commands; describe the intent naturally. Codex may expose either workflow as a selectable skill. No user repository or existing `.idd/intent/` documents are migrated or changed automatically. Exploratory findings do not become normative Product Intent without user approval.
+
+Live agent quality evaluations require an authenticated Codex CLI and are opt-in; generation/structural tests run ordinarily.
+
+## 2026-11-11 — Factory internal Skills replace registered native roles
+
+Factory now packages `idd-internal-factory-planner` and
+`idd-internal-factory-worker` as two internal Skills, generated from the same
+canonical role protocols. Root spawns ordinary native children with fresh
+contexts; each child reads its entire installed Skill before working. No
+`agent_type` selector, registered custom Factory role, project/user TOML copy,
+or separate registration helper is required. `idd-factory-configure` continues
+to manage only model policy. Existing custom agent definitions are neither
+modified nor automatically deleted. Restart Codex/Claude after plugin update.
+
+This change addresses the Codex Desktop regression where `spawn_agent` can
+be available without an `agent_type` parameter. It does **not** remove the
+requirements for native child spawn, fresh context, shared access, terminal
+wait, exact policy overrides where configured, or safe stop. Desktop/CLI/Claude
+live verification must be reported separately. Old traces remain historical.
+
 # Updates and Breaking Changes
+
+## 2026-11-11 — Codex Factory native-role registration
+
+Codex CLI 0.167.1 does not register agents from the IDD Factory Marketplace
+plugin manifest. Factory now packages an opt-in `idd-factory-configure`
+registration helper for trusted project `.codex/agents/` or the user Codex
+config layer. Registration and replacement are explicit, conflict-safe actions,
+not automatic side effects of installing a plugin. Existing execution policy
+does not change. Restart Codex after registering roles; some Desktop host tool
+surfaces still cannot select `agent_type`. CLI installation/live smoke is
+required before declaring full end-to-end compatibility. See
+[Factory native agent installation](factory-native-agent-installation.md).
+
 
 ## 2026-10-15 — IDD Intent router is an automatic workflow
 

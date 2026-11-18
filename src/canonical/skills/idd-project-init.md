@@ -98,8 +98,11 @@ Use installed IDD skills for intent, implementation, and verification.
 Plugin: `idd-intent` (optional `idd-factory`).
 Install: https://github.com/DimonSmart/Intent-Driven-Development#quick-start
 If IDD skills are unavailable, share the installation link; do not simulate them.
+Explicit user requests to correct or change Intent are handled by installed
+Intent skills, including corrections to imported specifications.
 Only Factory Workers may add confirmed monotonic refinements to existing Intent
-owners; never independently revise requirements. User prohibitions win.
+owners during implementation; never independently revise requirements.
+User prohibitions win.
 No competing normative docs in `doc/` or `docs/`. Preserve external originals.
 <!-- idd:project:end -->
 ```
@@ -267,7 +270,7 @@ Do not offer bootstrap when:
 - the repository is empty or represents a new product;
 - current numbered intent already exists;
 - the user explicitly requested initialization only;
-- the user already chose `idd-intent-import`, `idd-intent-brainstorm`, or another
+- the user already chose `idd-intent-import`, `idd-intent-clarify`, `idd-intent-brainstorm`, or another
   explicit initial-intent workflow;
 - bootstrap was already offered and declined during the current initialization.
 

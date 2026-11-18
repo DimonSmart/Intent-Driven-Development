@@ -3,7 +3,7 @@
   "diagram_type": "workflow",
   "meta": {
     "title": "Request Routing",
-    "subtitle": "One read-only router. Mandatory Core, lazy details, caller-owned handoff.",
+    "subtitle": "Read-only routing selects Clarify or Brainstorm by meaning; caller owns the handoff.",
     "output": "site/views/routing.html",
     "animation": "trace",
     "visual_preset": "signal-flow",
@@ -30,6 +30,10 @@
     {
       "id": "handoff",
       "label": "Result & caller-owned execution"
+    },
+    {
+      "id": "discovery",
+      "label": "Selected Product discovery route (optional)"
     }
   ],
   "mainPath": [
@@ -277,6 +281,38 @@
         }
       ],
       "width": 170
+    },
+    {
+      "id": "clarify",
+      "lane": "discovery",
+      "col": 4,
+      "type": "frontend",
+      "label": "Choose Clarify",
+      "sublabel": "missing behavior in one requirement",
+      "width": 175,
+      "sources": [
+        {
+          "path": "src/canonical/skills/idd-intent-clarify.md",
+          "line": 1,
+          "label": "Clarification skill"
+        }
+      ]
+    },
+    {
+      "id": "brainstorm",
+      "lane": "discovery",
+      "col": 5,
+      "type": "frontend",
+      "label": "Choose Brainstorm",
+      "sublabel": "divergent product alternatives",
+      "width": 175,
+      "sources": [
+        {
+          "path": "src/canonical/skills/idd-intent-brainstorm.md",
+          "line": 1,
+          "label": "Research skill"
+        }
+      ]
     }
   ],
   "edges": [
@@ -400,6 +436,34 @@
       "to": "stop",
       "label": "none / blocked",
       "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "decision_clarify",
+      "from": "decision",
+      "to": "clarify",
+      "label": "specific ambiguous need",
+      "role": "branch"
+    },
+    {
+      "id": "decision_brainstorm",
+      "from": "decision",
+      "to": "brainstorm",
+      "label": "explicit exploration",
+      "role": "branch"
+    },
+    {
+      "id": "clarify_result",
+      "from": "clarify",
+      "to": "result",
+      "label": "recommended skill",
+      "role": "branch"
+    },
+    {
+      "id": "brainstorm_result",
+      "from": "brainstorm",
+      "to": "result",
+      "label": "recommended skill",
       "role": "branch"
     }
   ]

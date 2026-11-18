@@ -6,7 +6,7 @@ The [GitHub Pages site](https://dimonsmart.github.io/Intent-Driven-Development/)
 | --- | --- | --- |
 | Overview | [idd-overview.workflow.json](idd-overview.workflow.json) | High-level request routing, durable truth, direct/Factory execution and audits |
 | Request Routing | [idd-routing.workflow.json](idd-routing.workflow.json) | Automatic `idd-route`, mandatory Core, lazy details, direct invocation, authorized handoff and stop gates |
-| Intent Lifecycle | [idd-intent.workflow.json](idd-intent.workflow.json) | Discover, confirm and update the current Intent owner |
+| Intent Lifecycle | [idd-intent.workflow.json](idd-intent.workflow.json) | Distinct Clarify / Brainstorm / Visual discovery, confirm, and update the current Intent owner |
 | Factory Execution | [idd-factory.workflow.json](idd-factory.workflow.json) | Durable preflight, fresh contexts, verification and refinement review |
 | Quality & Conformance | [idd-quality.workflow.json](idd-quality.workflow.json) | Lint, structure audit, drift audit and technical verification |
 

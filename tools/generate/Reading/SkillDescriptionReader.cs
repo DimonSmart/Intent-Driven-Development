@@ -87,18 +87,19 @@ internal sealed class SkillDescriptionReader
     {
         if (!value.TryGetProperty("exposure", out var element))
             throw new InvalidOperationException(
-                $"Invalid skill description for '{skillName}' in {path}: required property 'exposure' is missing. Allowed values: command, workflow.");
+                $"Invalid skill description for '{skillName}' in {path}: required property 'exposure' is missing. Allowed values: command, workflow, internal.");
 
         if (element.ValueKind != JsonValueKind.String)
             throw new InvalidOperationException(
-                $"Invalid exposure for skill '{skillName}': {element.GetRawText()}. Allowed values: command, workflow.");
+                $"Invalid exposure for skill '{skillName}': {element.GetRawText()}. Allowed values: command, workflow, internal.");
 
         return element.GetString() switch
         {
             "command" => SkillExposure.Command,
             "workflow" => SkillExposure.Workflow,
+            "internal" => SkillExposure.Internal,
             var invalid => throw new InvalidOperationException(
-                $"Invalid exposure for skill '{skillName}': '{invalid}'. Allowed values: command, workflow.")
+                $"Invalid exposure for skill '{skillName}': '{invalid}'. Allowed values: command, workflow, internal.")
         };
     }
 

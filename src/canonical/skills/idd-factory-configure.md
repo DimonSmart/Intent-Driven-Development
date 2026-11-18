@@ -5,15 +5,34 @@ the project lifecycle: initial setup, exact edits, read-only review, and
 evidence-based model refresh. This is the **only** skill that validates and
 writes Factory model policy; no separate model-update command or writer exists.
 
-**First** read `references/factory-execution-policy.md`. Do not read or change
-`.idd/factory/current/`, Product Intent, Engineering Rules, the Factory runtime,
-planner classification, or existing child agents. Configuration is operational
-policy, not durable product or engineering intent.
+Factory Planner and Worker protocols are now installed as internal Skills and
+loaded by ordinary native child agents. If asked to install or register the
+previous custom Factory agent types, explain that registration is obsolete.
+Do not modify legacy project/user agent definitions, trust, global config or
+create `.idd/execution.yaml` for such a request. This command owns only the
+model-selection policy.
+
+Read `references/factory-execution-policy.md` for model-policy requests.
+Do not change `.idd/factory/current/`, Product Intent, Engineering Rules,
+child agents or runtime. Configuration is operational policy, not durable
+intent.
+
+## Interpret the request and authorization
+
+Read the original request, not just a router summary. Direct invocation does
+not require `idd-route`. For model-policy requests recognize these modes:
+
+For **model-policy** requests, first read `references/factory-execution-policy.md`.
+Do not read or change `.idd/factory/current/`, Product Intent, Engineering Rules,
+the Factory runtime, planner classification, or existing child agents.
+Configuration is operational policy, not durable product or engineering intent.
 
 ## Interpret the request and authorization
 
 Read the original user request, not merely a router summary. Direct invocation
-of this skill does not require `idd-route`. Recognize these modes:
+of this skill does not require `idd-route`. Native-agent registration in Codex
+is handled before model-policy mode selection; for model-policy requests,
+recognize these modes:
 
 - **Initial setup:** Factory is being explicitly configured, the policy is absent,
   and no strategy was chosen previously. Ask one blocking strategy choice below.

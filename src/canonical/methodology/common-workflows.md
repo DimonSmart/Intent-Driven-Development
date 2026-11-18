@@ -272,6 +272,16 @@ old document or implementation detail as current product truth.
 When the main task is to infer what an undocumented implemented product is,
 route to bootstrap rather than import.
 
+## Workflow Family: Product Clarification and Brainstorm
+
+These are optional **read-only** discovery stages, not new mandatory Factory steps or durable document types. Routing Core selects a semantic owner:
+
+- idd-intent-clarify narrows an incomplete or over-specified Product requirement using available relevant Intent and targeted code/tests, adaptive customer discovery and symmetrical simplification. Its outcome is Clarification Required, Clarification Proposal, or Specification-Ready Intent with explicit confirmation status.
+- idd-intent-brainstorm investigates alternatives and opportunities using bounded read-only sources, problem reframing, divergent ideas, counterarguments and optional convergence. The Brainstorm Decision Brief is temporary and may end without a winner.
+- idd-intent-visual-brainstorm remains responsible for unconfirmed visual-reference traits.
+
+Neither Clarify nor Brainstorm updates .idd/intent/, creates ADRs/spikes or starts implementation. User-confirmed actionable results may pass to idd-intent-change; under-specified selections to Clarify; technical uncertainties to the existing spike workflow. Preserve confirmed decisions, unanswered questions, original restrictions and all independent Engineering/implementation stages during handoff. Do not repeat established research or force a choice when the user asks to continue exploring.
+
 ## Workflow Family: Product Change
 
 Product changes use `idd-intent-change` first. The ownership outcome is decided
@@ -284,7 +294,7 @@ spike/decision workflow.
 ### Add Product Requirement
 
 ```text
-brainstorm if the request is unclear
+idd-intent-clarify if the Product behavior is unclear
 -> idd-intent-change(operation: add)
 -> update existing owner or create new document internally in idd-intent-change
 -> idd-code-implement or Factory

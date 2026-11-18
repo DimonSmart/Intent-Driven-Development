@@ -1,5 +1,6 @@
 internal enum SkillExposure
 {
     Command,
-    Workflow
+    Workflow,
+    Internal
 }

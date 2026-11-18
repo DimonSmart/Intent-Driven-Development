@@ -3,8 +3,12 @@
 IDD Factory exposes two registered user commands: `idd-factory-run` and
 `idd-factory-configure`. Configure can also be selected automatically by the agent;
 selection alone never authorizes a write.
-Planner and Worker are internally registered native agent types owned by
-`idd-factory-run` (not additional public Skills).
+The Factory Root, Planner and Worker are internal Skills shipped in the
+same installed Factory package, not additional public commands. The canonical
+internal Root is staged for two-level orchestration; until the complete
+migration passes its host and E2E gates, `idd-factory-run` still performs the
+existing one-level orchestration directly. Each ordinary native Planner/Worker
+child loads its full Skill from the same installed Factory package.
 Automatic Intent workflows remain available to the agent and are hidden from
 the Claude Code slash menu. Codex currently has no equivalent documented
 visibility switch, so its automatic workflows may remain visible.
@@ -44,6 +48,11 @@ and evidence-based refreshes of `economy`, `standard` and `strong`.
 It owns validation and authorized persistence of optional `.idd/execution.yaml`.
 No other Factory model-update command or persistence entry point is published.
 
+Custom Factory agent registration is no longer part of this command.
+Requests to inspect obsolete project/user agent definitions receive an explanation
+of the internal-Skill mechanism; such files are not migrated or deleted.
+See [Factory installation](factory-native-agent-installation.md).
+
 - **Initial setup:** choose once between `default (inherit)` and
   `configure` for explicit partial platform/profile mappings. For selected
   mappings, propose model and optional effort together, with an explicit
@@ -81,10 +90,11 @@ from model names.
 
 ## Internal planner protocol
 
-The Planner is not a user-invokable skill. `idd-factory-run` resolves the
-registered `idd-internal-factory-planner` type (Claude plugin-scoped name when
-applicable), then sends a bounded request/phase/baseline/provenance packet.
-The host loads the complete canonical protocol directly into the child.
+The Planner is not a standalone public command. `idd-factory-run` resolves
+its installed internal `SKILL.md` alongside the currently loaded Factory Run
+Skill and spawns a fresh generic child with that exact path and bounded
+request/phase/baseline/provenance packet. The child reads its entire protocol
+before planning and rejects incomplete packets with `BLOCKED`.
 
 The same fresh Planner protocol accepts either
 `preparation/request.md` and `preparation/answers.md` before activation, or
@@ -130,11 +140,11 @@ Rules.
 
 ## Internal worker protocol
 
-The Worker is not a public skill. Before every spawn, `idd-factory-run`
-resolves the registered `idd-internal-factory-worker` type; the host loads its
-canonical protocol plus Engineering Guardrails directly. Root sends a single-task
-assignment. The optional Engineering contract is already included in the
-host-loaded Worker definition; Root does not forward it.
+The Worker is not a public command. Before each spawn, Root verifies the installed
+internal Worker SKILL.md path and sends it to a fresh generic child together with
+one bounded Task, selected Intent/Engineering IDs, scope and provenance. The
+child reads the whole Skill and required references first and returns `BLOCKED`
+if required context is missing. Root does not read or relay the protocol.
 
 Every task runs in a fresh isolated context against the shared current
 repository. The root agent has already selected the model/context before the
@@ -145,8 +155,9 @@ The worker receives one self-contained task plus optional `TaskRelatedIntent`
 IDs, optional Conditional `TaskRelatedEngineering` IDs, and the current
 mechanically enumerated `AlwaysEngineering` IDs. It resolves and reads those
 documents itself, performs the implementation, runs focused task-local checks,
-and returns a short semantic result. It never mutates `.idd/intent/*` or
-`.idd/engineering/*`.
+and returns a short semantic result. Only Factory Worker may make the existing
+strictly monotonic refinements to existing Intent owners when authorized; it
+cannot edit Engineering Rules or change approved product decisions.
 
 ## Context isolation
 
@@ -157,5 +168,5 @@ Codex and Claude generated guidance describe how to apply an already-authorized
 active-platform model override through native child-agent controls. Platform
 adapters do not contain profile-to-concrete-model recommendations.
 
-Native role installation and host limitations are documented in
+Internal Skill installation and host limitations are documented in
 [Factory native-agent installation](factory-native-agent-installation.md).

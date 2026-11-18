@@ -5,7 +5,7 @@ namespace Idd.Factory.LiveTests.Tests;
 public sealed partial class NativeFactoryEndToEndLiveTests
 {
     [Fact]
-    public async Task FactoryEvalGitBaseline_TracksGeneratedAgentsDespiteIgnoredCodexDirectory()
+    public async Task FactoryEvalGitBaseline_DoesNotStageLegacyCodexAgentFiles()
     {
         var root = Path.Combine(Path.GetTempPath(), "idd-factory-git-baseline-" + Guid.NewGuid().ToString("N"));
         var workspace = Path.Combine(root, "workspace");
@@ -19,12 +19,13 @@ public sealed partial class NativeFactoryEndToEndLiveTests
 
             var agents = Path.Combine(workspace, ".codex", "agents");
             Directory.CreateDirectory(agents);
-            foreach (var name in FactoryEvalAgentRegistration.RequiredRoles)
-                await File.WriteAllTextAsync(Path.Combine(agents, name + ".toml"),
-                    "name = \"" + name + "\"\n");
-
-            await InitializeGitRepositoryAsync(workspace, artifacts, includeProjectAgents: true);
+            await File.WriteAllTextAsync(Path.Combine(agents, "idd-internal-factory-planner.toml"), "legacy");
+            await File.WriteAllTextAsync(Path.Combine(agents, "idd-internal-factory-worker.toml"), "legacy");
+            await InitializeGitRepositoryAsync(workspace, artifacts);
             await VerifyGitBaselineAsync(workspace, artifacts);
+            var tracked = await RunAsync("git", ["ls-files", "--", ".codex/agents"],
+                workspace, null, null, artifacts, "06-git-agent-list");
+            Assert.True(string.IsNullOrWhiteSpace(tracked.Stdout));
 
             var status = await RunAsync("git", ["status", "--porcelain=v1"],
                 workspace, null, null, artifacts, "06-git-status");

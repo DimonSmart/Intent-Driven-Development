@@ -135,7 +135,7 @@ must remain unchanged.
 
 If the preservation boundary cannot be determined from the request and current
 intent, stop and route to `idd-intent-drift-audit`,
-`idd-intent-brainstorm`, or an intent change workflow instead of making code
+`idd-intent-clarify`, or an intent change workflow instead of making code
 changes.
 
 ## Report

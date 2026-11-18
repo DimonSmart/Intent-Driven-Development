@@ -38,6 +38,13 @@ When Factory is installed, reinstall it as well:
 codex plugin add idd-factory@intent-driven-development
 ```
 
+After updating Factory, start a **new Codex/Claude session** so the host
+loads the newly packaged internal Planner/Worker Skills. No custom role
+registration, replacement or scope choice is required. Existing project/user
+custom-agent files from old versions are left untouched and are not used by
+Factory. Check [Factory installation](factory-native-agent-installation.md)
+for the host capabilities required for ordinary generic child execution.
+
 ## After Updating
 
 1. Review [Updates and Breaking Changes](updates-and-breaking-changes.md) and apply any relevant project migrations.
@@ -59,6 +66,10 @@ Codex may still list it because no documented portable hide-but-auto-invoke
 setting is available. To inspect a route, ask in natural language for a
 classification without execution. The five manual-only Intent commands are
 unchanged.
+
+## Clarify and Brainstorm semantics after an update
+
+After updating `idd-intent`, check that `idd-intent-clarify` and the new `idd-intent-brainstorm` are both installed in a newly started session. Previous instructions that called Brainstorm for narrowing an unclear requirement should now use Clarify; explicit exploration still uses Brainstorm. No permanent alias exists and no `.idd/intent/` migration is needed. See [Updates and Breaking Changes](updates-and-breaking-changes.md).
 
 ## Obsolete Factory commands after an update
 

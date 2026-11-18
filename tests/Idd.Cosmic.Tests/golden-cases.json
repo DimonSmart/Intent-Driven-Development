@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "reference": {
+    "title": "COSMIC Measurement Manual v5.0",
+    "combinedEdition": "September 2024",
+    "part": "Part 3d: Standardized FUR with Big Data Cleaning Examples",
+    "partEdition": "May 2022",
+    "url": "https://cosmic-sizing.org/wp-content/uploads/2022/11/Combination-of-Parts-v5.0-Sep-2024.pdf"
+  },
+  "cases": [
+    {
+      "id": "CReg-add-professor",
+      "section": "4.1 Example MIS specification, Add a Professor",
+      "document": "IDD-0001.spec-professor.md",
+      "fur": "# Add a Professor\nRegistrar enters details for a Professor. The system checks existing Professor details, stores the new Professor, and shows an error when it already exists.\n",
+      "functionalUsers": [
+        {
+          "id": "Registrar",
+          "kind": "human"
+        }
+      ],
+      "triggerUser": "Registrar",
+      "movements": [
+        {
+          "type": "E",
+          "group": "Professor details",
+          "user": "Registrar"
+        },
+        {
+          "type": "R",
+          "group": "Professor details"
+        },
+        {
+          "type": "W",
+          "group": "Professor details"
+        },
+        {
+          "type": "X",
+          "group": "Error message",
+          "user": "Registrar",
+          "special": true
+        }
+      ],
+      "expectedCfp": 4
+    },
+    {
+      "id": "Rice-cooker-start",
+      "section": "4.2 Example Real-time specification, Start cooking",
+      "document": "IDD-0001.spec-rice-cooker.md",
+      "fur": "# Start cooking\nWhen start button is pressed it sends start signal to the software. Software sends Turn ON to Heater and Turn ON to Cooking Lamp.\n",
+      "functionalUsers": [
+        {
+          "id": "Button",
+          "kind": "hardware"
+        },
+        {
+          "id": "Heater",
+          "kind": "hardware"
+        },
+        {
+          "id": "Lamp",
+          "kind": "hardware"
+        }
+      ],
+      "triggerUser": "Button",
+      "movements": [
+        {
+          "type": "E",
+          "group": "Start signal",
+          "user": "Button"
+        },
+        {
+          "type": "X",
+          "group": "Turn ON heater",
+          "user": "Heater"
+        },
+        {
+          "type": "X",
+          "group": "Turn ON lamp",
+          "user": "Lamp"
+        }
+      ],
+      "expectedCfp": 3
+    },
+    {
+      "id": "Cleaning-display-list",
+      "section": "5.2 Display list of cleaning operations",
+      "document": "IDD-0001.spec-cleaning.md",
+      "fur": "# Display cleaning operations\nData scientist enters search term, software reads cleaning operation details, displays details and errors.\n",
+      "functionalUsers": [
+        {
+          "id": "Scientist",
+          "kind": "human"
+        }
+      ],
+      "triggerUser": "Scientist",
+      "movements": [
+        {
+          "type": "E",
+          "group": "Search term",
+          "user": "Scientist"
+        },
+        {
+          "type": "R",
+          "group": "Cleaning operation details"
+        },
+        {
+          "type": "X",
+          "group": "Cleaning operation details",
+          "user": "Scientist"
+        },
+        {
+          "type": "X",
+          "group": "Error message",
+          "user": "Scientist",
+          "special": true
+        }
+      ],
+      "expectedCfp": 4
+    }
+  ]
+}

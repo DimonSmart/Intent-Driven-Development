@@ -32,8 +32,6 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
             files.AddRange(BuildSkillFiles(adapter, plugin, roleDefinitions, skillName, skillDescriptions));
         }
 
-        files.AddRange(BuildNativeAgentFiles(plugin));
-
         foreach (var asset in plugin.Assets)
         {
             files.AddRange(BuildAssetFiles(asset));
@@ -43,8 +41,6 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
 
         return files;
     }
-
-    protected virtual IReadOnlyList<GeneratedFile> BuildNativeAgentFiles(PluginDefinition plugin) => [];
 
     protected virtual IReadOnlyList<GeneratedFile> BuildAdditionalPluginFiles(string pluginName, string version)
     {
@@ -58,10 +54,14 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
             ["schemaVersion"] = 1,
             ["methodologyVersion"] = version
         };
+        var versionContent = methodologyVersion.ToJsonString(
+            new JsonSerializerOptions { WriteIndented = true }) + "\n";
         var files = new List<GeneratedFile>
         {
             new(Path.Combine("skills", "idd-factory-run", "references", "methodology-version.json"),
-                methodologyVersion.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n")
+                versionContent),
+            new(Path.Combine("skills", "idd-internal-factory-root", "references", "methodology-version.json"),
+                versionContent)
         };
         return files;
     }
@@ -84,10 +84,6 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
             ["platform"] = adapter.CodingAgent,
             ["dependencies"] = JsonStringArray(plugin.Dependencies),
             ["roles"] = JsonStringArray(plugin.Roles),
-            ["nativeAgents"] = new JsonArray(plugin.NativeAgentsOrEmpty.Select(agent => (JsonNode?)new JsonObject
-            {
-                ["name"] = agent.Name, ["source"] = agent.Source
-            }).ToArray()),
             ["roleDefinitions"] = BuildRoleDefinitions(plugin, roleDefinitions),
             ["assets"] = BuildAssets(plugin),
             ["canonicalSource"] = "src/canonical"
@@ -108,7 +104,9 @@ internal abstract class PlatformPluginBuilder : IPlatformAdapter
             throw new InvalidOperationException($"Missing skill description for {skillName}.");
         }
 
-        var sourcePath = Path.Combine("src", "canonical", "skills", skillName + ".md");
+        var sourcePath = plugin.SkillSourcesOrEmpty.TryGetValue(skillName, out var internalSource)
+            ? internalSource
+            : Path.Combine("src", "canonical", "skills", skillName + ".md");
         var content = RequiredFileReader.Read(sourcePath);
         var roles = plugin.SkillRoleReferences.TryGetValue(skillName, out var roleNames)
             ? roleNames.Select(name => roleDefinitions[name]).ToArray()

@@ -12,6 +12,9 @@
         "idd-glossary-build",
         "idd-skip",
         "idd-intent-structure-audit",
+        "idd-intent-estimate",
+        "idd-intent-cosmic",
+        "idd-intent-clarify",
         "idd-intent-brainstorm",
         "idd-intent-visual-brainstorm",
         "idd-intent-change",
@@ -175,6 +178,26 @@
           "skill": "idd-intent-visual-brainstorm",
           "source": "src/canonical/methodology/visual-card-library.md",
           "destination": "visual-card-library.md"
+        },
+        {
+          "skill": "idd-intent-brainstorm",
+          "source": "src/canonical/methodology/brainstorm-method.md",
+          "destination": "brainstorm-method.md"
+        },
+        {
+          "skill": "idd-intent-cosmic",
+          "source": "src/canonical/methodology/cosmic-measurement-guide.md",
+          "destination": "cosmic-measurement-guide.md"
+        },
+        {
+          "skill": "idd-intent-cosmic",
+          "source": "src/canonical/methodology/cosmic-delegation-protocol.md",
+          "destination": "cosmic-delegation-protocol.md"
+        },
+        {
+          "skill": "idd-intent-cosmic",
+          "source": "src/canonical/methodology/cosmic-execution-state.md",
+          "destination": "cosmic-execution-state.md"
         }
       ],
       "assets": [
@@ -205,7 +228,10 @@
       ],
       "skills": [
         "idd-factory-run",
-        "idd-factory-configure"
+        "idd-factory-configure",
+        "idd-internal-factory-root",
+        "idd-internal-factory-planner",
+        "idd-internal-factory-worker"
       ],
       "roles": [],
       "skillRoleReferences": {},
@@ -234,6 +260,26 @@
           "skill": "idd-factory-run",
           "source": "src/canonical/methodology/engineering-guardrails.md",
           "destination": "engineering-guardrails.md"
+        },
+        {
+          "skill": "idd-internal-factory-root",
+          "source": "src/canonical/methodology/intent-preflight.md",
+          "destination": "intent-preflight.md"
+        },
+        {
+          "skill": "idd-internal-factory-root",
+          "source": "src/canonical/methodology/project-verification.md",
+          "destination": "project-verification.md"
+        },
+        {
+          "skill": "idd-internal-factory-root",
+          "source": "src/canonical/methodology/factory-execution-policy.md",
+          "destination": "factory-execution-policy.md"
+        },
+        {
+          "skill": "idd-internal-factory-root",
+          "source": "src/canonical/methodology/engineering-guardrails.md",
+          "destination": "engineering-guardrails.md"
         }
       ],
       "assets": [
@@ -246,18 +292,11 @@
         "entryPoint": false,
         "temporaryWorkspace": ".idd/factory"
       },
-      "nativeAgents": [
-        {
-          "name": "idd-internal-factory-planner",
-          "source": "src/canonical/factory/planner.md",
-          "description": "Internal Factory planner; use only with verified Factory assignment."
-        },
-        {
-          "name": "idd-internal-factory-worker",
-          "source": "src/canonical/factory/worker.md",
-          "description": "Internal Factory worker; use only with one verified Factory task."
-        }
-      ]
+      "skillSources": {
+        "idd-internal-factory-root": "src/canonical/factory/root.md",
+        "idd-internal-factory-planner": "src/canonical/factory/planner.md",
+        "idd-internal-factory-worker": "src/canonical/factory/worker.md"
+      }
     }
   }
 }

@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "C1",
+      "skill": "idd-intent-clarify",
+      "request": "We should add an AI-powered workflow engine for invoices, but I have not identified what customers need it for.",
+      "expect": [
+        "Do not assume the proposed solution is the requirement",
+        "Identify blocking user-facing outcome",
+        "Ask only material clarifying question(s)",
+        "Do not write files or invoke implementation"
+      ]
+    },
+    {
+      "id": "C2",
+      "skill": "idd-intent-clarify",
+      "request": "Build a universal permission editor for two employees who only need read versus write access to one shared document.",
+      "expect": [
+        "Offer a credible simpler Product behavior preserving the confirmed access need",
+        "Explain limits of simplification",
+        "Do not invent approved Intent"
+      ]
+    },
+    {
+      "id": "C3",
+      "skill": "idd-intent-clarify",
+      "request": "Our regulated enterprise clients already contractually require arbitrary per-resource permission rules administered by their compliance officers. I explicitly reject fixed roles or an MVP that omits custom rules. Help clarify any remaining behavioral uncertainty.",
+      "expect": [
+        "Acknowledge the justified full requirement",
+        "Do not push fixed roles or generic MVP",
+        "Only ask about consequential missing behavior"
+      ]
+    },
+    {
+      "id": "C4",
+      "skill": "idd-intent-clarify",
+      "request": "Clarify the export feature based on the existing .idd/intent specification; use its documented 5 MB limit rather than asking what the limit should be.",
+      "expect": [
+        "Read provided current Intent context",
+        "Recognize 5 MB as existing current requirement",
+        "Avoid asking again about the established limit"
+      ]
+    },
+    {
+      "id": "C5",
+      "skill": "idd-intent-clarify",
+      "request": "I approve this Product behavior: a logged-in user can export their own report to CSV, with one heading row and UTF-8, and only the requested report's rows. No batch export. Prepare specification-ready intent; no changes to files.",
+      "expect": [
+        "Produce a concise specification-ready Product outcome",
+        "Preserve acceptance and exclusions",
+        "Recognize explicit user approval",
+        "Avoid unnecessary questions or implementation"
+      ]
+    },
+    {
+      "id": "B1",
+      "skill": "idd-intent-brainstorm",
+      "request": "Suggest fundamentally different ways to let users work with ZIP archives in a file manager. Do not simply list small, medium and large plugin systems.",
+      "expect": [
+        "Produce conceptually distinct principles",
+        "Explain differences and user value",
+        "Do not impose one solution"
+      ]
+    },
+    {
+      "id": "B2",
+      "skill": "idd-intent-brainstorm",
+      "request": "I think we need a complex automatic notification system because customers miss updates. Explore whether the deeper product problem might be different.",
+      "expect": [
+        "Distinguish notifications as means versus ends",
+        "Offer plausible reframe(s) as hypotheses",
+        "Suggest alternate interventions"
+      ]
+    },
+    {
+      "id": "B3",
+      "skill": "idd-intent-brainstorm",
+      "request": "Explore surprising useful file-manager product ideas. Use an analogy from a different domain, but preserve the user's desire for a local offline product.",
+      "expect": [
+        "Apply a concrete creative technique",
+        "Provide a useful nontrivial opportunity",
+        "Preserve offline constraint"
+      ]
+    },
+    {
+      "id": "B4",
+      "skill": "idd-intent-brainstorm",
+      "request": "Explore the options for user-defined permissions, recommend the most promising direction, and then criticize your own recommendation.",
+      "expect": [
+        "Provide at least two substantially different principles",
+        "Challenge its own preferred concept with serious drawbacks",
+        "Identify assumptions and trade-offs"
+      ]
+    },
+    {
+      "id": "B5",
+      "skill": "idd-intent-brainstorm",
+      "request": "I propose an AI workflow engine to automatically export one static report per week. Evaluate alternate approaches, including whether we should abandon the engine idea.",
+      "expect": [
+        "Consider and explain an option to reject the original engine",
+        "Compare alternatives with real value and cost",
+        "Do not automatically pick a feature-heavy solution"
+      ]
+    },
+    {
+      "id": "B6",
+      "skill": "idd-intent-brainstorm",
+      "request": "In our earlier exploration we considered a plugin archive browser and temporary extraction. I do not want to choose yet. Generate additional genuinely different ideas.",
+      "expect": [
+        "Continue divergent exploration without forcing a vote",
+        "Avoid repackaging the two already considered concepts",
+        "Do not hand off to implementation"
+      ]
+    },
+    {
+      "id": "B7",
+      "skill": "idd-intent-brainstorm",
+      "request": "Research independently what useful capabilities could distinguish an offline terminal file manager. Use accessible project context and sources if possible. Do not start with an interview or edit files.",
+      "expect": [
+        "Propose meaningful ideas without pre-interview",
+        "Indicate evidence versus speculation and unavailable tools",
+        "Maintain bounded read-only exploration"
+      ]
+    },
+    {
+      "id": "B8",
+      "skill": "idd-intent-brainstorm",
+      "request": "We previously explored read-only ZIP browsing versus archive modification. I explicitly approve read-only browsing of ZIP entries and opening files without modifying the archive. I have NOT approved editing or RAR support. Prepare the next-step handoff only, do not save files.",
+      "expect": [
+        "Preserve exactly approved ZIP behaviors",
+        "Exclude unapproved archive editing and RAR",
+        "Clearly separate approved content from hypotheses",
+        "Recommend Intent Change without invoking it"
+      ]
+    }
+  ]
+}

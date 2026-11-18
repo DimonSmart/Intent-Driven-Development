@@ -10,6 +10,10 @@
 
 [**Explore the interactive IDD diagrams**](https://dimonsmart.github.io/Intent-Driven-Development/) — Overview, Intent Lifecycle, Factory Execution, and Quality & Conformance.
 
+## COSMIC Functional Size Measurement
+
+The read-only `idd-intent-cosmic` command measures COSMIC v5.0 Function Points from current `.idd/intent/` Functional User Requirements. It is separate from qualitative `idd-intent-estimate`: the scope, software boundary, functional users and E/X/R/W movements must be supported by the product specs. It uses native isolated readers for missing or explicitly refreshed source IDs, bounded owner/connector reducers and fresh process-measurer agents, with independently tracked coverage and reusable lossless evidence. IDD assumes one normative owning spec per functional process; references from other specs are connectors, not duplicate processes or extra COSMIC movements. The report also gives a separate non-COSMIC coupling/change-impact view (confirmed callers and referring specs) without inflating CFP. Reusable source-backed Markdown extracts are saved outside the target repository as one `IDD-NNNN.cosmic.md` file per Intent source: existing completed packets are reused by default, missing/explicitly refreshed IDs are read by fresh agents, and selected-scope CFP is recomputed each time. The user can refresh or clear selected/all packets explicitly. No hashes, automatic invalidation or executable helper scripts are needed; reused packets are labeled as not freshness-verified. Results are LLM-reviewed, not independently mechanically validated. For the default whole-product request, every accessible current spec must have an accepted complete extraction packet (freshly read or explicitly reused), with full per-ID coverage and reconciled ownership before finishing; merely returning an opportunistic partial subtotal is not completion. Truly unresolved FUR may yield supported subtotals or diagnostics, never a guessed total or effort prediction. See [usage and model limitations](docs/cosmic-functional-size.md).
+
 ## What Is Intent-Driven Development?
 
 Intent-Driven Development (IDD) is a lightweight methodology and plugin toolkit for AI-assisted software development.
@@ -61,6 +65,35 @@ The direction is maximum economy: native child agents, no model-driven polling, 
 
 </details>
 
+## Clarification versus Brainstorm
+
+Two optional, read-only Product exploration workflows have different purposes:
+
+- `idd-intent-clarify` narrows one proposed Product requirement, resolves missing behavior and justified complexity, and prepares an explicit confirmation or an already-confirmed specification-ready handoff.
+- `idd-intent-brainstorm` explores substantially different strategies and challenges assumptions; it may produce a temporary Decision Brief without selecting a single winner.
+
+Ask naturally to **clarify this requirement**, or to **brainstorm alternative ways to solve this problem**. In Codex the installed `idd-intent` plugin also exposes the skill by its ID; Claude Code can select it automatically through natural language rather than a slash command. Neither skill writes Product Intent, and neither is mandatory before a clear user-confirmed `idd-intent-change`. Only explicitly approved Product decisions may be handed to that owner. Exploratory hypotheses and discussions are not persisted in `.idd/intent/`.
+
+## Business Complexity Assessment
+
+`idd-intent-estimate` assesses the **required target product** from current
+`.idd/intent/` specifications, including projects with no code. Its read-only
+Markdown report distinguishes **Product Scope** (Small/Medium/Large),
+**Implementation Complexity** (Low/Medium/High), and **Assessment Confidence**
+(Low/Medium/High), plus seven qualitative complexity dimensions. A preliminary
+**COSMIC Preparation** section identifies possible future measurement boundaries
+and functional-process candidates without calculating CFP. It does **not**
+predict budget, deadlines, effort, remaining work, or code quality.
+
+Ask naturally to *assess business complexity from current Product Intent* or
+invoke `/idd-intent-estimate` in Claude Code and select the installed
+`$idd-intent-estimate` skill in Codex. Both explicit and automatic invocation
+are supported; the command's visibility depends on the host/version. Scope can
+be limited to a product area or specific IDD IDs. No Factory plugin is required.
+
+See [Business Complexity Assessment](docs/business-complexity-assessment.md)
+for report interpretation, COSMIC boundaries, examples and limitations.
+
 ## Visual Intent discovery
 
 `idd-intent-visual-brainstorm` helps turn screenshots, visual inspiration and
@@ -108,6 +141,16 @@ codex plugin add idd-intent@intent-driven-development
 codex plugin add idd-factory@intent-driven-development
 ```
 
+**Factory setup:** Install `idd-intent` and optional `idd-factory` from the
+Marketplace, then start a new Codex or Claude session to load the current
+Skills. No registration of custom Planner/Worker types, TOML copying or
+project/user agent scope selection is needed. Factory creates ordinary
+children, which read their internal Skills from the same installed Factory
+package. Native child creation, fresh context, access to installed files,
+blocking wait and safe cancellation still need host support. The absence of
+`agent_type` in Codex Desktop is not itself a blocker. See
+[Factory installation and capabilities](docs/factory-native-agent-installation.md).
+
 Questions about IDD itself can be addressed at any time by manually invoking `idd-help`. Use it to ask how the methodology works, why a workflow is chosen, what a skill does, or how a particular IDD rule should be interpreted.
 
 ```text
@@ -145,10 +188,10 @@ IDD distinguishes three kinds of capabilities:
   lint, conformance audit, or implementation). `idd-route` is an internal
   read-only classifier, not a separate user command. To inspect a route, ask
   naturally which workflow would apply and explicitly say not to execute it.
-- **Internal agents** are host-registered native Factory Planner and Worker
-  roles with canonical generated instructions; the Root does not load their
-  bodies. Intent document creation remains a reference to its
-  owning workflows.
+- **Internal Factory Skills** are the canonical Planner/Worker protocols in
+  the Factory package. Generic native child agents load them independently;
+  Root provides the installed Skill paths and bounded assignments, not bodies.
+  Intent document creation remains owned by its existing workflows.
 
 Claude Code hides automatic workflows from the slash-command menu but retains
 model invocation. Codex retains all registered skills and implicit invocation;
@@ -173,6 +216,7 @@ Release-specific migration instructions are maintained on the dedicated [Updates
 
 ## Documentation
 
+- [Business Complexity Assessment](docs/business-complexity-assessment.md)
 - [Real-world IDD Showcase](docs/real-world-showcase.md)
 - [IDD Use Cases](docs/using-idd.md)
 - [Engineering Guardrails](docs/engineering-guardrails.md)

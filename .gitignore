@@ -30,3 +30,7 @@ Thumbs.db
 
 # Developer-specific, token-consuming Live eval preset
 /scripts/Run-Live.local.ps1
+
+# Python test cache
+__pycache__/
+*.py[cod]

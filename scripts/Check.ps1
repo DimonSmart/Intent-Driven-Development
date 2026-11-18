@@ -71,6 +71,7 @@ function Invoke-FastValidation {
         Invoke-CheckedNative -FilePath "pwsh" -Arguments @("-NoProfile", "-File", "tests/DocumentationLinks.Tests.ps1")
         Invoke-CheckedNative -FilePath "pwsh" -Arguments @("-NoProfile", "-File", "tests/LiveCheck.Tests.ps1")
         Invoke-CheckedNative -FilePath "pwsh" -Arguments @("-NoProfile", "-File", "tests/MarketplaceReadme.Tests.ps1")
+        Invoke-CheckedNative -FilePath "pwsh" -Arguments @("-NoProfile", "-File", "tests/PublishWorkflow.Tests.ps1")
         Invoke-CheckedNative -FilePath "pwsh" -Arguments @("-NoProfile", "-File", "tests/CodexPluginSwitch.Tests.ps1")
         Invoke-CheckedNative -FilePath "pwsh" -Arguments @("-NoProfile", "-File", "tests/VisualIntentGallery.Tests.ps1")
         Invoke-CheckedNative -FilePath "dotnet" -Arguments @("build", "Intent-Driven-Development.slnx", "--nologo")
