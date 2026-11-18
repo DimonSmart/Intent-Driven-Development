@@ -67,7 +67,8 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
         Assert.Contains("current/request.md", rootText);
         Assert.Contains("project-verification.md", rootText);
         Assert.Contains("idd-internal-factory-root/SKILL.md", rootText);
-        Assert.Contains("Factory Preflight", runText); // Stage 1 retains public behavior.
+        Assert.DoesNotContain("## Factory Preflight — Root entrypoint", runText);
+        Assert.Contains("Factory Preflight", rootText);
         fixture.AssertMissing(Path.Combine(plugin, "skills",
             "idd-internal-factory-root", "agents", "openai.yaml"));
     }
