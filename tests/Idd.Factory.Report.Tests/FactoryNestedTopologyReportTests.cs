@@ -95,6 +95,8 @@ public sealed class FactoryNestedTopologyReportTests
                 .SequenceEqual(new[] { "CONTINUE", "CONTINUE", "CONTINUE", "COMPLETED" }));
             Assert.True(report.Batches.Select(batch => batch.CompletedWorkers)
                 .SequenceEqual(new int?[] { 3, 3, 3, 1 }));
+            Assert.All(report.Batches, batch =>
+                Assert.Equal(3, batch.EffectiveWorkerLimit));
             Assert.All(report.Agents.Where(agent => agent.Role == "worker"), agent =>
             {
                 var parent = Assert.Single(report.Agents,
@@ -148,8 +150,9 @@ public sealed class FactoryNestedTopologyReportTests
         {
             task_name = taskName,
             fork_turns = "none",
-            message = profile is null ? "Load installed Root SKILL.md" :
-                $"Read installed Worker Skill; ExecutionProfile: {profile}"
+            message = profile is null
+                ? "Load installed Root SKILL.md; max_workers_per_batch = 3"
+                : $"Read installed Worker Skill; ExecutionProfile: {profile}"
         });
         lines.Add(Json(timestamp, "response_item", new
         {
