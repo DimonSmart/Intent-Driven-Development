@@ -109,6 +109,21 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 item.AgentPath?.Split('/').Last() == "idd_factory_worker_b0001_0001");
             Assert.Equal(3, traces.Length);
             AssertMultiAgentV2(supervisor);
+            Assert.Single(supervisor.Events, item => item.ToolName == "spawn_agent");
+            Assert.Single(root.Events, item => item.ToolName == "spawn_agent");
+            Assert.Contains(writer.Events, item =>
+                item.ToolName is "exec" or "command_execution" &&
+                item.ToolArguments?.Contains("native-worker-heartbeat.txt",
+                    StringComparison.Ordinal) == true &&
+                item.ToolArguments.Contains("Add-Content", StringComparison.Ordinal));
+            Assert.DoesNotContain(supervisor.Events, item =>
+                item.ToolName is "exec" or "command_execution" &&
+                item.ToolArguments?.Contains("Add-Content", StringComparison.Ordinal) == true);
+            Assert.DoesNotContain(root.Events, item =>
+                item.ToolName is "exec" or "command_execution" &&
+                item.ToolArguments?.Contains("Add-Content", StringComparison.Ordinal) == true);
+            Assert.Contains(writer.Events, item => item.Type is
+                "turn_aborted" or "turn.cancelled" or "turn_cancelled");
             Assert.Contains(supervisor.Events, item => item.ToolName == "spawn_agent" &&
                 HasArgument(item.ToolArguments, "task_name", "idd_factory_root_b0001") &&
                 HasArgument(item.ToolArguments, "fork_turns", "none"));
