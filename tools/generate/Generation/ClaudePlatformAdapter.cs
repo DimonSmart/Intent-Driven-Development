@@ -31,39 +31,16 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
                     """
                     ## Claude generic Factory subagents
 
-                    Use a native generic Agent/subagent or fork when it guarantees
-                    a fresh bounded context without parent transcript, repository
-                    and installed Skill access, terminal wait, final result and
-                    stop/interrupt lifecycle. Do not depend on registered custom
-                    Factory subagent_type identifiers. Use a built-in general-purpose
-                    agent if the host requires a type. Give the child the unambiguous
-                    absolute path to the installed internal Planner or Worker SKILL.md
-                    relative to THIS Factory Run Skill; it must fully load the Skill
-                    before reading task/project data. Root must not copy its contents.
-                    A Skill is instruction material, not a process or sandbox.
-                    The Planner must act read-only; use host permissions when provided.
-                    Do not insert context: fork metadata into the internal Skills:
-                    Root has already created the fresh child. Preserve bounded
-                    assignments and native waiting without model-based polling.
+                    Use a native Agent/subagent or fork that meets the shared readiness
+                    requirements. If the host requires `subagent_type`, use its built-in
+                    general-purpose type. Root creates the fresh context, so keep the
+                    internal Skills free of `context: fork` metadata.
 
-                    ## Claude Factory execution policy
-
-                    Immediately before each worker spawn, map the planner's
-                    `ExecutionProfile` through the validated project-owned
-                    `.idd/execution.yaml` policy.
-
-                    - `inherit` means omit Factory-specific model and effort overrides.
-                    - For an explicit active-platform mapping, pass the configured
-                      `claude.model` and optional `claude.effort` through the native
-                      Agent/subagent invocation. If the host has no corresponding
-                      explicit per-child parameter, block the worker instead of
-                      embedding an override request in its prompt.
-                    - Do not reconsider task complexity or substitute a different
-                      model. The configured mapping is authoritative.
-                    - If the host rejects the configured settings or cannot honor an
-                      explicit per-child override, stop with a diagnostic that names
-                      the profile, requested settings, and rejection reason; suggest
-                      `idd-factory-configure` and never pick a fallback model.
+                    For an explicit Claude worker mapping, pass `claude.model` and
+                    optional `claude.effort` through the native Agent/subagent's
+                    per-child parameters. A host without the required parameters
+                    blocks the worker. Report the profile, requested settings and
+                    reason if the host rejects the override or cannot honor it.
                     """))
             };
         }

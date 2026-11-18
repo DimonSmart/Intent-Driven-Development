@@ -539,8 +539,8 @@ Factory's Product assessment distinguishes `AlreadyCovered`,
 and `EngineeringDecisionMissing`; Engineering Rule equivalence and
 changes belong to `idd-engineering-change`, not Factory. Ordinary
 unchosen implementation techniques do not create missing durable
-decisions. Root checks host support and both registered native roles
-before durable owner/Factory writes.
+decisions. Before durable owner/Factory writes, Root checks native child support
+and access to both internal Skills from the same installed Factory plugin.
 
 Missing durable Product/Engineering decisions, conflicts and unauthorized
 scope expansion block before `preparation/` and owner mutations.
@@ -563,9 +563,9 @@ document, packaged as a reference for `idd-factory-run`, **not**
 for `idd-help` or `idd-route`. The diagram above provides
 independent orientation for Help.
 
-Each active cycle plans remaining work, runs one fresh registered Worker
-at a time and re-plans in an isolated child context; workers share
-repository state but not transcripts. Planner Tasks identify existing
+Each active cycle runs one fresh native Worker at a time and replans in a
+fresh isolated child once the batch ends. Children load their internal Skills
+and share repository state without sharing transcripts. Planner Tasks identify existing
 relevant Conditional Engineering Rules; Root supplies the current
 Always set before Workers. New Tasks require exactly one
 `ExecutionProfile` (`economy`, `standard`, `strong`). Legacy

@@ -212,11 +212,10 @@ no new Factory state
 
 ## New-run ordering
 
-Before any durable owner or Factory write, the Factory Root also checks that the
-host supports isolated native children and that **both registered** Planner
-and Worker roles resolve unambiguously. The operational role-identity, spawn
-transport and readiness checks belong to `idd-factory-run.md`; they are
-prerequisites to (not substitutes for) the following normative phases.
+Before any durable owner or Factory write, the Factory Root verifies support for
+isolated generic native children and access to both internal Planner and Worker
+Skills from the same installed plugin. Follow the readiness checks in the active
+Factory orchestration Skill before proceeding with the phases below.
 
 ```text
 1. materialize complete logical request

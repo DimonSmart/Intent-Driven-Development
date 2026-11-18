@@ -63,37 +63,12 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                     """
                     ## Codex generic Factory subagents
 
-                    Use the host's native generic child-agent spawn. A Factory-specific
-                    agent_type is not required. Resolve the internal Planner and Worker
-                    SKILL.md files relative to THIS installed Factory Run Skill; pass
-                    absolute paths and a bounded assignment to each new child. Children
-                    read the complete installed Skill themselves before other work.
-                    Use fork_turns: "none" for every spawn, including Planner.
-                    Never send protocol bodies or previous child transcripts.
+                    Inspect the direct host-visible spawn schema. Native tools may be
+                    available outside `functions.exec` and `ALL_TOOLS`.
 
-                    Inspect the direct host-visible tool schema, including tools not
-                    exposed inside functions.exec/ALL_TOOLS. An absent agent_type is
-                    NOT a capability failure. If the host requires a built-in generic
-                    agent type, use that built-in type, never a registered Factory role.
-                    Check fresh context, shared workspace/installed files, terminal
-                    results, native wait and stop/interrupt. Prefer read-only Planner
-                    permissions if available but do not confuse a text guard with a
-                    technical sandbox. Diagnose missing mandatory capabilities precisely.
-
-                    Reserve unique task_name arguments idd_factory_planner_01,
-                    idd_factory_worker_01, etc. Rejected attempts consume their names.
-                    Example without model overrides:
-                    {"task_name":"idd_factory_worker_01","fork_turns":"none","message":"Read the entire installed Worker SKILL.md at <absolute path>, then perform exactly this bounded Factory assignment: <one Task packet>"}.
-                    Replace placeholders with real paths and task data.
-                    Never add an unsupported spawn argument.
-
-                    If an explicit Codex policy mapping is active, pass the exact
-                    codex.model as model and codex.reasoningEffort as reasoning_effort;
-                    inherit omits both overrides. No prompt-based switching or fallback.
-                    Wait natively without short model-driven polling. On timeout or
-                    failure, stop/interrupt the writer and confirm termination before
-                    starting another; preserve the pending Task. A final Planner Done
-                    always requires the configured final verification checks.
+                    For an explicit Codex worker mapping, pass `codex.model` as `model`
+                    and optional `codex.reasoningEffort` as `reasoning_effort` in the
+                    native spawn arguments. Use only arguments supported by the host.
                     """))
             };
         }

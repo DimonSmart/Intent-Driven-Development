@@ -40,6 +40,9 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
             else fixture.AssertMissing(Path.Combine(plugin, "skills",
                 "idd-internal-factory-" + role, "agents", "openai.yaml"));
         }
+
+        fixture.AssertFile(Path.Combine(plugin, "skills", "idd-internal-factory-worker",
+            "references", "factory-worker-intent-refinement.md"));
     }
 
     [Theory]

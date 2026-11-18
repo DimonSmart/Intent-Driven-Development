@@ -280,6 +280,11 @@
           "skill": "idd-internal-factory-root",
           "source": "src/canonical/methodology/engineering-guardrails.md",
           "destination": "engineering-guardrails.md"
+        },
+        {
+          "skill": "idd-internal-factory-worker",
+          "source": "src/canonical/methodology/factory-worker-intent-refinement.md",
+          "destination": "factory-worker-intent-refinement.md"
         }
       ],
       "assets": [
