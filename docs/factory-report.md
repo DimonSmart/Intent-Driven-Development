@@ -211,7 +211,9 @@ roles. Native parent thread IDs, accepted spawn correlation and matching
 `agents[]` additionally includes optional `nativeTaskName` and
 `batchOrdinal`. `tasks[]` has optional `batchOrdinal`.
 `batches[]` lists each actual discovered native Root, exact batch
-ordinal, strict terminal `Status/CompletedWorkers/Reason` if verified,
+ordinal, the positive `effectiveWorkerLimit` parsed from its own native
+Supervisor spawn assignment, strict terminal `Status/CompletedWorkers/Reason`
+only when that budget and native terminal completion can be verified,
 and a terminal-evidence classification. `metrics` includes
 `factoryRootInvocations` and `supervisorInvocations`.
 `run.supervisorThreadId` identifies new two-level runs. Existing fields
