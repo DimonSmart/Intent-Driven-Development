@@ -1868,9 +1868,14 @@ public sealed class FactoryReportEngine
         if (nested)
         {
             var orderedBatches = batches.OrderBy(batch => batch.BatchOrdinal).ToArray();
-            var validRotationChain = orderedBatches.Length > 0 &&
+            // Task names may already be reserved in a reused host session.
+            // Require a positive, contiguous native ordinal sequence, not an
+            // unconditional first batch of 1.
+            var firstBatch = orderedBatches.FirstOrDefault()?.BatchOrdinal;
+            var validRotationChain = firstBatch is > 0 &&
+                firstBatch.Value <= int.MaxValue - orderedBatches.Length + 1 &&
                 orderedBatches.Select(batch => batch.BatchOrdinal)
-                    .SequenceEqual(Enumerable.Range(1, orderedBatches.Length)
+                    .SequenceEqual(Enumerable.Range(firstBatch.Value, orderedBatches.Length)
                         .Select(number => (int?)number)) &&
                 orderedBatches.Take(orderedBatches.Length - 1)
                     .All(batch => batch.Status == "CONTINUE" &&
