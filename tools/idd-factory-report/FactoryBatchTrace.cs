@@ -39,7 +39,7 @@ public static partial class FactoryBatchTrace
     // The Supervisor MUST carry the explicit effective budget in each Root
     // spawn message. Missing, malformed or conflicting values are not inferred
     // from user dialogue or previous Root sessions.
-    [GeneratedRegex(@"(?<![A-Za-z0-9_])max_workers_per_batch\\s*[:=]\\s*(?<limit>[0-9]+)(?![0-9])",
+    [GeneratedRegex(@"(?<![A-Za-z0-9_])max_workers_per_batch\s*[:=]\s*(?<limit>[0-9]+)(?=\s|[,;}]|$)",
         RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)]
     private static partial Regex BatchLimitPattern();
 
