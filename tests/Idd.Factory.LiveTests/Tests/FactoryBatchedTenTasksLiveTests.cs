@@ -8,7 +8,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
 {
     [LiveFactoryMarketplaceFact]
     [Trait("Category", "LiveFactoryMarketplace")]
-    public async Task Factory_NativeTenTasksRotatesFourRootsWithLimitThree()
+    public async Task Factory_NativeTenTasksRotatesOnlyAtPlanBoundariesWithLimitThree()
     {
         var repo = FindRepositoryRoot();
         var runId = "batch-ten-" + Guid.NewGuid().ToString("N");
@@ -62,7 +62,11 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 The ten independent Step01 through Step10 product requirements
                 MUST be implemented by exactly ten sequential single-Task
                 Workers, each creating only its one corresponding StepNN.cs file.
-                Planner must issue one bounded task per step and not group them.
+                The FIRST Planner must issue Step01 through Step04 as FOUR
+                separate # Task sections in ONE Planner result, to test a plan
+                larger than the target of three Workers. Subsequent Planner
+                results must contain at most four # Task sections. Do not split
+                a single plan across Roots merely to meet the target.
                 The existing tests deliberately use reflection, so incomplete
                 steps do not stop intermediate dotnet build checkpoints.
                 Complete final project verification after Planner # Done.
@@ -88,15 +92,20 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             ReportWriters.WriteMarkdown(report, Path.Combine(artifacts, "factory-report.md"), verbose: false);
 
             Assert.Equal(1, report.Metrics.SupervisorInvocations);
-            Assert.Equal(4, report.Metrics.FactoryRootInvocations);
+            Assert.InRange(report.Metrics.FactoryRootInvocations, 2, 10);
             Assert.Equal("completed", report.Run.Result);
             var ordered = report.Batches.OrderBy(item => item.BatchOrdinal).ToArray();
             Assert.True(ordered.Select(item => item.BatchOrdinal).SequenceEqual(
-                new int?[] { 1, 2, 3, 4 }), "Expected exactly four sequential Root batch ordinals.");
-            Assert.Equal(new[] { "CONTINUE", "CONTINUE", "CONTINUE", "COMPLETED" },
-                ordered.Select(item => item.Status).ToArray());
-            Assert.True(ordered.Select(item => item.CompletedWorkers).SequenceEqual(
-                new int?[] { 3, 3, 3, 1 }), "Expected exact 3/3/3/1 confirmed Worker checkpoints.");
+                Enumerable.Range(1, ordered.Length).Select(n => (int?)n)),
+                "Native Root ordinals must be sequential.");
+            Assert.All(ordered.SkipLast(1), batch =>
+            {
+                Assert.Equal("CONTINUE", batch.Status);
+                Assert.Equal("BATCH_LIMIT", batch.Reason);
+                Assert.True(batch.CompletedWorkers >= 3);
+            });
+            Assert.Equal("COMPLETED", ordered[^1].Status);
+            Assert.Equal(10, ordered.Sum(batch => batch.CompletedWorkers ?? 0));
             Assert.Equal(10, report.Metrics.WorkerInvocations);
             Assert.Equal(10, report.Tasks.Count);
             Assert.All(report.Tasks, item => Assert.Equal("completed", item.Status));
@@ -123,6 +132,42 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 for (var i = 1; i < workers.Length; i++)
                     Assert.True(workers[i - 1].FinishedAt <= workers[i].StartedAt,
                         "Two writing Workers overlapped or native completion order was unknown.");
+            }
+            // Reconstruct every Planner's accepted Task plan from real native
+            // final messages. A normal Root rotation must never interrupt one.
+            var planners = report.Agents.Where(agent => agent.Role == "planner").ToArray();
+            var planCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var planner in planners)
+            {
+                var rollout = Assert.Single(rollouts, item => item.ThreadId == planner.ThreadId);
+                var lastText = rollout.Events.LastOrDefault(item =>
+                    item.Role == "assistant" && !string.IsNullOrWhiteSpace(item.Text))?.Text ?? "";
+                var count = System.Text.RegularExpressions.Regex.Matches(lastText,
+                    @"(?m)^# Task\s*$").Count;
+                Assert.InRange(count, 0, 4);
+                planCounts[planner.ThreadId] = count;
+            }
+            Assert.Contains(planCounts.Values, count => count == 4);
+            foreach (var root in roots)
+            {
+                var pendingTasks = 0;
+                var children = report.Agents.Where(item => item.ParentThreadId == root.ThreadId &&
+                    item.Role is "planner" or "worker").OrderBy(item => item.StartedAt).ToArray();
+                foreach (var child in children)
+                {
+                    if (child.Role == "planner")
+                    {
+                        Assert.Equal(0, pendingTasks);
+                        pendingTasks = planCounts[child.ThreadId];
+                    }
+                    else
+                    {
+                        Assert.True(pendingTasks > 0,
+                            "A Worker started without a currently active Planner Task.");
+                        pendingTasks--;
+                    }
+                }
+                Assert.Equal(0, pendingTasks);
             }
             foreach (var step in Enumerable.Range(1, 10))
                 Assert.True(File.Exists(Path.Combine(workspace, "src", "TenTasks",

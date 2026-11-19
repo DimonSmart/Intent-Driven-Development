@@ -51,11 +51,15 @@ public sealed class FactoryBatchTraceTests
 
     [Theory]
     [InlineData("CONTINUE", 3, "BATCH_LIMIT", true)]
+    [InlineData("CONTINUE", 4, "BATCH_LIMIT", true)]
+    [InlineData("CONTINUE", 9, "BATCH_LIMIT", true)]
     [InlineData("CONTINUE", 2, "BATCH_LIMIT", false)]
     [InlineData("CONTINUE", 0, "BATCH_LIMIT", false)]
     [InlineData("CONTINUE", 3, "ERROR", false)]
     [InlineData("COMPLETED", 0, "DONE", true)]
+    [InlineData("COMPLETED", 4, "DONE", true)]
     [InlineData("BLOCKED", 1, "CHILD_UNCONFIRMED", true)]
+    [InlineData("BLOCKED", 9, "CHECKPOINT_INCONSISTENT", true)]
     [InlineData("NEEDS_INPUT", 2, "PLANNER_QUESTION", true)]
     public void StrictBatchTerminalStatus(string status, int count, string reason, bool expected)
     {
@@ -70,7 +74,9 @@ public sealed class FactoryBatchTraceTests
     [InlineData("Status: COMPLETED\nCompletedWorkers: 0")]
     [InlineData("Status: NEEDS_INPUT\nCompletedWorkers: 0\nReason: PLANNER_QUESTION\nQuestionFile: /fake/question.md")]
     [InlineData("Status: CONTINUE\nCompletedWorkers: 3\nReason: BATCH_LIMIT\nQuestionFile: .idd/factory/current/question.md")]
-    [InlineData("Status: CONTINUE\nCompletedWorkers: 4\nReason: BATCH_LIMIT")]
+    [InlineData("Status: CONTINUE\nCompletedWorkers: 2147483648\nReason: BATCH_LIMIT")]
+    [InlineData("Status: CONTINUE\nCompletedWorkers: 99999999999999999999\nReason: BATCH_LIMIT")]
+    [InlineData("Status: CONTINUE\nCompletedWorkers: 2\nReason: BATCH_LIMIT")]
     public void TerminalContractRejectsAmbiguityAndInvalidCheckpoint(string text)
     {
         Assert.False(FactoryBatchTrace.TryParseTerminal(text, 3, out _));

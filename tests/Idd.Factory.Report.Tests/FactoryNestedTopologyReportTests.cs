@@ -6,28 +6,32 @@ namespace Idd.Factory.Report.Tests;
 
 /// <summary>
 /// Deterministic read-only native-rollout fixture: a Supervisor and four distinct
-/// Root contexts, with 3+3+3+1 sequential Worker children. Uses real Codex
+/// Root contexts; tests both legacy 3+3+3+1 and plan-safe 4+4+2
+/// sequential Worker children. Uses real Codex
 /// session_meta, spawn-agent call and task_complete event shapes.
 /// </summary>
 public sealed class FactoryNestedTopologyReportTests
 {
     [Theory]
-    [InlineData(1)]
-    [InlineData(21)]
-    public void TenWorkerNestedTraceKeepsAllFourRootsAndWorkerBatchAttribution(int firstOrdinal)
+    [InlineData(1, false)]
+    [InlineData(21, false)]
+    [InlineData(41, true)]
+    public void TenWorkerNestedTracePreservesLegacyAndPlanSafeBatchAttribution(int firstOrdinal, bool planBoundaryRotation)
     {
         var directory = Path.Combine(Path.GetTempPath(), "idd-report-nested-" + Guid.NewGuid().ToString("N"));
         try
         {
             var home = Path.Combine(directory, "home");
             Directory.CreateDirectory(Path.Combine(home, "sessions"));
-            var ids = Enumerable.Range(1, 16)
+            var rootCount = planBoundaryRotation ? 3 : 4;
+            var ids = Enumerable.Range(1, 1 + rootCount + 10 + (planBoundaryRotation ? 3 : 1))
                 .Select(index => $"11111111-0000-4000-8000-{index:000000000000}")
                 .ToArray();
             var supervisor = ids[0];
-            var roots = ids.Skip(1).Take(4).ToArray();
-            var workers = ids.Skip(5).Take(10).ToArray();
-            var plannerId = ids[15];
+            var roots = ids.Skip(1).Take(rootCount).ToArray();
+            var workers = ids.Skip(1 + rootCount).Take(10).ToArray();
+            var plannerIds = ids.Skip(11 + rootCount)
+                .Take(planBoundaryRotation ? 3 : 1).ToArray();
             var start = DateTimeOffset.Parse("2026-11-18T10:00:00Z");
 
             string Session(int slot) => Path.Combine(home, "sessions", $"rollout-{slot:00}.jsonl");
@@ -38,7 +42,7 @@ public sealed class FactoryNestedTopologyReportTests
             };
 
             var workerCursor = 0;
-            for (var index = 0; index < 4; index++)
+            for (var index = 0; index < rootCount; index++)
             {
                 var batch = firstOrdinal + index;
                 var rootId = roots[index];
@@ -52,15 +56,17 @@ public sealed class FactoryNestedTopologyReportTests
                     UserMessage(batchTime.AddSeconds(2),
                         "Read installed Factory Root Skill; continue the saved request.")
                 };
-                if (index == 0)
+                if (index == 0 || planBoundaryRotation)
                 {
+                    var plannerId = plannerIds[planBoundaryRotation ? index : 0];
                     var plannerName = $"idd_factory_planner_b{firstOrdinal:0000}_0001";
                     var plannerTime = batchTime.AddSeconds(3);
                     Spawn(rootLines, plannerTime, "planner-1", plannerName, plannerId, null);
                     var tasks = string.Join("\n",
-                        Enumerable.Range(1, 10).Select(step =>
+                        Enumerable.Range(planBoundaryRotation ? index * 4 + 1 : 1,
+                            planBoundaryRotation ? (index == 2 ? 2 : 4) : 10).Select(step =>
                             $"# Task\nImplement Step{step:00}\n# ExecutionProfile\nstandard\n"));
-                    File.WriteAllLines(Session(16), new[]
+                    File.WriteAllLines(Session(300 + index), new[]
                     {
                         SessionMeta(plannerTime.AddSeconds(1), plannerId, directory, rootId,
                             $"/root/{rootName}/{plannerName}"),
@@ -71,7 +77,7 @@ public sealed class FactoryNestedTopologyReportTests
                     });
                 }
 
-                var count = index == 3 ? 1 : 3;
+                var count = planBoundaryRotation ? (index == 2 ? 2 : 4) : (index == 3 ? 1 : 3);
                 for (var i = 0; i < count; i++)
                 {
                     var workerId = workers[workerCursor++];
@@ -79,7 +85,7 @@ public sealed class FactoryNestedTopologyReportTests
                     var workerTime = batchTime.AddSeconds(10 + 40 * i);
                     Spawn(rootLines, workerTime, $"worker-{batch}-{i + 1}", taskName, workerId,
                         "standard", workerCursor);
-                    File.WriteAllLines(Session(5 + workerCursor), new[]
+                    File.WriteAllLines(Session(200 + workerCursor), new[]
                     {
                         SessionMeta(workerTime.AddSeconds(1), workerId, directory, rootId,
                             $"/root/{rootName}/{taskName}"),
@@ -90,13 +96,13 @@ public sealed class FactoryNestedTopologyReportTests
                     });
                 }
 
-                var terminal = index == 3
-                    ? "Status: COMPLETED\nCompletedWorkers: 1\nReason: DONE"
-                    : "Status: CONTINUE\nCompletedWorkers: 3\nReason: BATCH_LIMIT";
+                var terminal = index == rootCount - 1
+                    ? $"Status: COMPLETED\nCompletedWorkers: {count}\nReason: DONE"
+                    : $"Status: CONTINUE\nCompletedWorkers: {count}\nReason: BATCH_LIMIT";
                 rootLines.Add(AssistantMessage(batchTime.AddSeconds(150), terminal));
                 rootLines.Add(Complete(batchTime.AddSeconds(151)));
                 rootLines.Add(Usage(batchTime.AddSeconds(152), rootId, 30, 5, 8));
-                File.WriteAllLines(Session(1 + batch), rootLines);
+                File.WriteAllLines(Session(100 + index), rootLines);
             }
             supervisorLines.Add(AssistantMessage(start.AddMinutes(45), "Factory completed."));
             supervisorLines.Add(Complete(start.AddMinutes(45).AddSeconds(1)));
@@ -105,11 +111,11 @@ public sealed class FactoryNestedTopologyReportTests
 
             var report = Assert.Single(new FactoryReportEngine().FindRuns(directory, home));
             Assert.Equal(1, report.Metrics.SupervisorInvocations);
-            Assert.Equal(4, report.Metrics.FactoryRootInvocations);
+            Assert.Equal(rootCount, report.Metrics.FactoryRootInvocations);
             Assert.Equal(10, report.Metrics.WorkerInvocations);
             Assert.Equal("supervisor", Assert.Single(report.Agents, agent =>
                 agent.ThreadId == supervisor).Role);
-            Assert.Equal(4, report.Agents.Count(agent => agent.Role == "root"));
+            Assert.Equal(rootCount, report.Agents.Count(agent => agent.Role == "root"));
             Assert.Equal(10, report.Agents.Count(agent => agent.Role == "worker"));
             Assert.Equal(10, report.Tasks.Count);
             Assert.All(report.Tasks, task => Assert.Equal("standard", task.ExecutionProfile));
@@ -117,14 +123,24 @@ public sealed class FactoryNestedTopologyReportTests
                 .SequenceEqual(Enumerable.Range(1, 10)
                     .Select(number => $"Implement Step{number:00}")));
             Assert.True(report.Batches.Select(batch => batch.BatchOrdinal)
-                .SequenceEqual(Enumerable.Range(firstOrdinal, 4)
+                .SequenceEqual(Enumerable.Range(firstOrdinal, rootCount)
                     .Select(number => (int?)number)));
             Assert.True(report.Batches.Select(batch => batch.Status)
-                .SequenceEqual(new[] { "CONTINUE", "CONTINUE", "CONTINUE", "COMPLETED" }));
+                .SequenceEqual(Enumerable.Repeat("CONTINUE", rootCount - 1).Append("COMPLETED"))));
             Assert.True(report.Batches.Select(batch => batch.CompletedWorkers)
-                .SequenceEqual(new int?[] { 3, 3, 3, 1 }));
+                .SequenceEqual(planBoundaryRotation
+                    ? new int?[] { 4, 4, 2 } : new int?[] { 3, 3, 3, 1 }));
             Assert.All(report.Batches, batch =>
                 Assert.Equal(3, batch.EffectiveWorkerLimit));
+            if (planBoundaryRotation)
+            {
+                Assert.Equal(3, report.Metrics.PlannerInvocations);
+                Assert.All(report.Agents.Where(agent => agent.Role == "planner"), agent =>
+                    Assert.Contains(roots, root => agent.ParentThreadId == root));
+                Assert.Equal(new[] { 4, 4, 2 },
+                    report.Tasks.GroupBy(task => task.BatchOrdinal)
+                        .OrderBy(group => group.Key).Select(group => group.Count()).ToArray());
+            }
             Assert.All(report.Agents.Where(agent => agent.Role == "worker"), agent =>
             {
                 var parent = Assert.Single(report.Agents,
@@ -152,66 +168,41 @@ public sealed class FactoryNestedTopologyReportTests
         }
     }
 
-    [Fact]
-    public void ExactBoundaryEightAndNineRequireSeparateFinalizingRoot()
-    {
-        foreach (var (workerCount, limit, expectedRoots) in new[]
-                 { (8, 8, 2), (9, 3, 4) })
-        {
-            var full = workerCount / limit;
-            Assert.Equal(expectedRoots, full + 1);
-            var remaining = workerCount;
-            for (var root = 0; root < full; root++)
-            {
-                var completed = Math.Min(limit, remaining);
-                remaining -= completed;
-                Assert.True(FactoryBatchTrace.TryParseTerminal(
-                    $"Status: CONTINUE\nCompletedWorkers: {completed}\nReason: BATCH_LIMIT",
-                    limit, out var result));
-                Assert.Equal("CONTINUE", result!.Status);
-            }
-            Assert.Equal(0, remaining);
-            Assert.True(FactoryBatchTrace.TryParseTerminal(
-                "Status: COMPLETED\nCompletedWorkers: 0\nReason: DONE",
-                limit, out var final));
-            Assert.Equal("COMPLETED", final!.Status);
-        }
-    }
-
     [Theory]
-    [InlineData(0, 8, 1)]
-    [InlineData(1, 8, 1)]
-    [InlineData(7, 8, 1)]
-    [InlineData(8, 8, 2)]
-    [InlineData(9, 8, 2)]
-    [InlineData(17, 8, 3)]
-    [InlineData(3, 3, 2)]
-    [InlineData(6, 3, 3)]
-    [InlineData(7, 3, 3)]
-    [InlineData(9, 3, 4)]
-    [InlineData(10, 3, 4)]
-    public void BoundaryCasesRequireOneFinalizingRootAfterEveryExactLimit(
-        int workers, int limit, int expectedRoots)
+    [InlineData("3,4,2", 8, "9,0")]
+    [InlineData("4", 3, "4,0")]
+    [InlineData("4,4,2", 3, "4,4,2")]
+    [InlineData("3,4,3", 3, "3,4,3,0")]
+    [InlineData("4,4", 8, "8,0")]
+    [InlineData("1,1,1,1", 3, "3,1")]
+    [InlineData("2,2,2,2,2", 8, "8,2")]
+    [InlineData("6", 3, "6,0")]
+    public void NormalRotationTargetsTheNextCompletePlanNotAnExactWorkerCount(
+        string planSizes, int target, string expectedRootCounts)
     {
-        var remaining = workers;
-        var batches = new List<FactoryBatchTrace.Terminal>();
-        while (remaining >= limit)
+        var expected = expectedRootCounts.Split(',').Select(int.Parse).ToArray();
+        var actual = new List<int>();
+        var currentRoot = 0;
+        foreach (var plan in planSizes.Split(',').Select(int.Parse))
         {
+            currentRoot += plan;
+            // Even an already-persisted six-Task legacy plan must finish.
+            if (currentRoot < target) continue;
             Assert.True(FactoryBatchTrace.TryParseTerminal(
-                $"Status: CONTINUE\nCompletedWorkers: {limit}\nReason: BATCH_LIMIT" ,
-                limit, out var terminal));
-            batches.Add(terminal!);
-            remaining -= limit;
+                $"Status: CONTINUE\nCompletedWorkers: {currentRoot}\nReason: BATCH_LIMIT",
+                target, out _));
+            actual.Add(currentRoot);
+            currentRoot = 0;
         }
 
+        // Planner # Done closes the current Root without another rotation if
+        // its checkpoint target was not reached; otherwise it needs the
+        // new fresh Root created by the last BATCH_LIMIT.
         Assert.True(FactoryBatchTrace.TryParseTerminal(
-            $"Status: COMPLETED\nCompletedWorkers: {remaining}\nReason: DONE" ,
-            limit, out var done));
-        batches.Add(done!);
-        Assert.Equal(expectedRoots, batches.Count);
-        Assert.True(batches.Take(batches.Count - 1).All(item =>
-            item.Status == "CONTINUE" && item.CompletedWorkers == limit));
-        Assert.Equal("COMPLETED", batches.Last().Status);
+            $"Status: COMPLETED\nCompletedWorkers: {currentRoot}\nReason: DONE",
+            target, out _));
+        actual.Add(currentRoot);
+        Assert.Equal(expected, actual);
     }
 
     private static void Spawn(List<string> lines, DateTimeOffset timestamp,

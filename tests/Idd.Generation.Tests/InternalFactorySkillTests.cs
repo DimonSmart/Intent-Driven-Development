@@ -73,6 +73,25 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
             "idd-internal-factory-root", "agents", "openai.yaml"));
     }
 
+    [Fact]
+    public void NativeFactoryRotationContractRequiresCompletePlans()
+    {
+        var root = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "factory", "root.md"));
+        var planner = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "factory", "planner.md"));
+        var supervisor = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "skills", "idd-factory-run.md"));
+
+        Assert.Contains("at most **4 `# Task`", planner);
+        Assert.Contains("five or more", root, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("previously persisted plan", root);
+        Assert.Contains("complete plan boundary", root);
+        Assert.Contains("CompletedWorkers >= max_workers_per_batch > 0", supervisor);
+        Assert.DoesNotContain("cannot exceed the effective per-batch limit", supervisor);
+        Assert.DoesNotContain("immediately return Status CONTINUE", root);
+    }
+
     [Theory]
     [InlineData("codex")]
     [InlineData("claude")]
