@@ -291,7 +291,8 @@ public sealed partial class NativeFactoryEndToEndLiveTests
 
         return Regex.IsMatch(command,
             @"(?ix)
-              (?: \b -File \s+ | (?<!\w) [&.] \s+ | (?<!\w) \.[\\/] )
+              (?: \b -File \s+ | (?<!\w) [&.] \s+
+                | (?: ^ | [;\r\n] \s* | \b -Command \s+ ) [""']? \.[\\/] )
               [^\s""';|]* native-writer-probe\.ps1
               (?= $ | [\s""';|] )",
             RegexOptions.CultureInvariant);
@@ -302,6 +303,8 @@ public sealed partial class NativeFactoryEndToEndLiveTests
     [InlineData("""["pwsh.exe","-Command","Test-Path -LiteralPath ./native-writer-probe.ps1"]""", false)]
     [InlineData("""["pwsh.exe","-Command","pwsh -NoProfile -File ./native-writer-probe.ps1"]""", true)]
     [InlineData("""["pwsh.exe","-File","./native-writer-probe.ps1"]""", true)]
+    [InlineData("""["pwsh.exe","-Command","Get-Content ./native-writer-probe.ps1"]""", false)]
+    [InlineData("""["pwsh.exe","-Command","./native-writer-probe.ps1"]""", true)]
     [InlineData("""["pwsh.exe","-Command","& ./native-writer-probe.ps1"]""", true)]
     public void Factory_WriterProbeClassifierDistinguishesExecutionFromRead(
         string toolArguments, bool expected)
