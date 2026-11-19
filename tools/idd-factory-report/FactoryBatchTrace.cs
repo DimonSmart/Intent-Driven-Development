@@ -90,7 +90,7 @@ public static partial class FactoryBatchTrace
             reasons[0].Length == 0 ||
             !Regex.IsMatch(counts[0], @"\A[0-9]+\z", RegexOptions.CultureInvariant) ||
             !uint.TryParse(counts[0], out var count) ||
-            count > int.MaxValue || (limit is not null && count > limit.Value))
+            count > int.MaxValue)
             return false;
 
         var status = statuses[0];
@@ -98,7 +98,7 @@ public static partial class FactoryBatchTrace
             return false;
         if (status == "CONTINUE" &&
             (reasons[0] != "BATCH_LIMIT" || count == 0 ||
-             limit is not null && count != limit.Value))
+             limit is not null && count < limit.Value))
             return false;
         if (status != "CONTINUE" && reasons[0] == "BATCH_LIMIT")
             return false;

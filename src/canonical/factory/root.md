@@ -330,9 +330,11 @@ native-agent and temporary-file operations, not a second Preflight policy.
    `economy | standard | strong` per new Task, unique existing
    `TaskRelatedIntent` owners, existing unique Conditional
    `TaskRelatedEngineering` owners (not Always), structural Engineering
-   validity and durable/repository freshness. Malformed, mixed,
-   empty, stale or unresolved output is a blocking protocol diagnostic,
-   never an executable task.
+   validity and durable/repository freshness, and **1–4 complete `# Task`
+   sections** in a fresh Planner result. Five or more tasks is a blocking
+   protocol diagnostic BEFORE writing the plan or launching any Worker.
+   Never truncate an oversized plan, select the first four, or automatically
+   retry it. Malformed, mixed, empty, stale or unresolved output also blocks.
 5. Recheck no `current/request.md` exists. Reconcile orphaned inactive
    files with trusted preparation evidence; write `current/plan.md` from
    the validated batch and transfer exact Q/A, immutable baseline and
@@ -346,58 +348,72 @@ its no-Intent-write boundary; ambiguous legacy scope/provenance forbids
 Worker Intent writes. The installed plugin version does not grant permission.
 A clarification cannot silently expand `intent-preserving` scope.
 
-## Per-Root worker checkpoint budget
+## Per-Root worker checkpoint target and safe plan boundary
 
-Your Supervisor supplies an effective `max_workers_per_batch` (default 8)
-for this ONE Root instance. Never perform more successful Workers than this
-number. Increment `completed_workers` ONLY after the following exact existing
-sequence is fully confirmed for one Worker:
+The Supervisor supplies an effective positive `max_workers_per_batch`
+(default **8**) for THIS Root only. It is a **minimum target for normal
+rotation**, not a hard maximum. Start `completed_workers = 0` in each
+fresh Root even when resuming an earlier Root's incomplete plan. Finish all
+remaining tasks in the current validated plan before normal rotation,
+even when the local count has reached or exceeded the target. A new
+Planner may return only 1–4 Tasks, but a previously persisted plan with
+more than four Tasks remains eligible for existing recovery/continuation
+and MUST NOT be truncated solely due to this new limit.
 
-1. Save pending provenance before spawning it and wait for its genuine
-   successful terminal result with native descendants quiescent.
-2. Verify trusted Worker after-state and reconcile scope, baseline and
-   provenance; do not assume success when a process exited or files changed.
-3. Append the bounded successful result to `completed.md` and remove its
-   Task from the remaining `plan.md` using the existing safe order.
-4. Confirm the pending checkpoint has been closed, all related
-   `provenance.md`/`completed.md`/`plan.md` entries are consistent, the
-   completed Task cannot be replayed by an ordinary Continue, and no writer
-   is still running.
-5. Only NOW increment `completed_workers` by one; never count Planner,
-   failed/interrupted Worker, host tools or final project verification.
+Increment `completed_workers` ONLY after the existing trusted checkpoint:
 
-If after completing step 5 `completed_workers == max_workers_per_batch`,
-STOP the loop **immediately**. Do not spawn Worker 9, Planner, Project
-Verification, Intent Refinement Review, or other project writer after the
-eighth confirmed Worker when limit is 8. Do not delete remaining tasks,
-replan the empty plan, or remove active marker. Return the strict terminal:
+1. Persist pending provenance before each Worker; wait for its genuinely
+   successful terminal native result and stopped writing descendants.
+2. Verify the Worker after-state, authorized scope, immutable baseline and
+   bounded provenance. A process exit or changed files alone is not proof.
+3. Append the verified bounded summary to `completed.md` and remove its
+   Task from `plan.md` in the existing safe checkpoint order.
+4. Confirm the pending checkpoint is closed; all corresponding provenance,
+   `completed.md` and remaining `plan.md` entries agree; that Task
+   cannot be replayed in an ordinary Continue; no writer remains alive.
+5. ONLY NOW increase the Root-local counter by one. Never count a Planner,
+   unsuccessful/interrupted Worker, project verification or other action.
 
-    Status: CONTINUE
-    CompletedWorkers: <effective batch limit>
-    Reason: BATCH_LIMIT
+After EVERY Worker checkpoint, proceed with any remaining tasks of the
+CURRENT plan regardless of the counter. Only after its last Task, confirm
+that **the whole plan is finished**: all its necessary Workers succeeded
+and have stopped; no plan Task remains, no pending checkpoint is open,
+`completed.md`, `plan.md` and `provenance.md` agree with trusted native
+results, no contradictory external-unknown changes remain and all writing
+descendants are quiescent. An empty `plan.md` ALONE is not sufficient.
 
-The limit applies even if `plan.md` is now empty. The next brand-new Root
-uses Continue and may then request `# Done` and run final verification.
-One user invocation thus rotates automatically through fresh Root contexts.
+At this verified plan boundary:
+- If `completed_workers >= max_workers_per_batch`, do NOT start
+  another Planner, Worker, final verification or Intent Refinement Review
+  in this Root. Preserve the active state and return exactly:
 
-When a Worker succeeded but any part of the checkpoint is incomplete,
-ambiguous, or interrupted, return BLOCKED with reason
-CHECKPOINT_INCONSISTENT; do NOT increment or emit CONTINUE. Recovery must
-reconcile real worktree/Git evidence and existing pending provenance through
-the ordinary manual Continue rules. No exactly-once guarantee.
+      Status: CONTINUE
+      CompletedWorkers: <actual confirmed successful Workers in this Root>
+      Reason: BATCH_LIMIT
 
-A genuinely failed Worker or unconfirmed child termination is BLOCKED
-according to existing Factory semantics, with the Task still pending;
-a new batch is NOT a retry. For a Planner `# Question`, preserve exact
-question.md and return NEEDS_INPUT. For Planner `# Done` BEFORE reaching
-limit, carry out all existing final verification, Intent Refinement Review,
-normal cleanup and only then return COMPLETED. Final verification does not
-count as a Worker.
+- If the target has not been reached, continue normal flow with a fresh
+  Planner (which may return `# Task`, `# Question` or `# Done`).
 
-Do not loop indefinitely over Planner `# Done` and identical failing
-verification with no trusted change of code, plan or check inputs. Return
-BLOCKED/VERIFICATION_NOT_CONFIRMED rather than fabricating work to reach
-the batch limit.
+When a Root begins with an empty pending plan and its local count is zero,
+it invokes a fresh Planner normally. Finishing a plan exactly at the
+target rotates before another Planner; the next Root may obtain `# Done`
+and finalize. Do not create an extra Root after ordinary `COMPLETED`
+when the target was never reached.
+
+An unsuccessful Worker, untrusted/incomplete checkpoint, invalid or stale
+remaining task, unknown writer status, missing capability or insufficient
+Root context must follow the EXISTING safe BLOCKED/NEEDS_INPUT recovery
+rules, NOT BATCH_LIMIT, even when the target has been reached. Preserve
+the remaining Tasks and confirmed checkpoints; never claim completion or
+force an invalid Task merely to finish the plan. Native stop uncertainty
+forbids any subsequent writer/Root. Do not automatically roll back,
+replace state, retry, or introduce a plan transaction. The at-least-once
+execution/reconciliation semantics remain unchanged.
+
+For Planner `# Done` before reaching the target, run the existing Project
+Verification, Intent Refinement Review and normal closure. Do not loop
+indefinitely after an identical unverified/failed final check without a
+trusted change; return BLOCKED/VERIFICATION_NOT_CONFIRMED instead.
 
 ## Strict terminal result for Supervisor
 
@@ -405,11 +421,16 @@ A finished internal Root MUST return exactly one each of these separate
 plain-text fields in its genuine final child message:
 
     Status: CONTINUE|COMPLETED|NEEDS_INPUT|BLOCKED
-    CompletedWorkers: <integer from 0 through batch limit>
+    CompletedWorkers: <nonnegative actual confirmed Root-local integer>
     Reason: <short nonempty reason>
 
-CONTINUE is legal ONLY after full checkpoint and positive equality to the
-batch limit with Reason BATCH_LIMIT. COMPLETED requires existing `# Done`,
+CompletedWorkers may exceed the target for ANY terminal status when
+supported by actual confirmed Worker checkpoints in this Root.
+CONTINUE is legal ONLY after full **plan-boundary** checkpoint with
+`CompletedWorkers >= max_workers_per_batch > 0` and Reason BATCH_LIMIT.
+Require the active Factory marker, no Tasks remaining from the current
+plan, no pending checkpoint and confirmed termination of writing descendants;
+neither terminal text nor an empty plan proves this alone. COMPLETED requires existing `# Done`,
 verified Project Verification, Intent Refinement Review and normal
 finalization; Reason DONE. NEEDS_INPUT must preserve a saved question and
 provide an additional `QuestionFile: .idd/factory/preparation/question.md`
@@ -433,46 +454,44 @@ retry counters.
 Conceptually:
 
 ```text
+completed_workers = 0
+
 while true:
     if waiting for user:
-        stop
+        stop under existing safe protocol
 
-    if plan.md has no remaining task:
-        run a fresh planner
+    if current plan is absent or fully drained:
+        if a plan was just drained:
+            confirm all Workers, descendants, provenance and checkpoints
+            if not trusted: BLOCKED (not BATCH_LIMIT)
+            if completed_workers >= max_workers_per_batch:
+                return CONTINUE / actual CompletedWorkers / BATCH_LIMIT
 
+        run a fresh Planner
         Question -> persist question.md and stop
-        Done     -> run project verification
-        Tasks    -> require one canonical ExecutionProfile per new task, then persist in plan.md
+        Done -> existing final verification, review and completion
+        Tasks -> validate whole fresh batch: 1..4 # Task sections,
+                 exactly one ExecutionProfile per Task, other normal rules
+                 on invalid/oversized output BLOCK before any persist/Worker
+                 persist complete plan
 
-    take the first remaining task
-    read its ExecutionProfile; missing metadata in existing plan.md means standard
-    reject empty, repeated, or unknown explicit profiles
-    if .idd/execution.yaml is absent, inherit host settings
-    otherwise re-read and structurally validate .idd/execution.yaml
-    mechanically resolve the active-platform profile mapping
-    if that profile/platform mapping is absent, inherit host settings
-    deterministically re-read the current Engineering INDEX
-    enumerate all current Always ENG IDs
-    verify installed Worker Skill path and prepare the isolated worker assignment
-    record pending Worker before-checkpoint in provenance.md
-    spawn a fresh native worker with the resolved native model override
-    wait natively for its terminal result
+    take first remaining task
+    apply existing baseline, provenance, Engineering and ExecutionProfile rules
+    persist pending Worker checkpoint, spawn one fresh native Worker
+    wait natively; confirm successful result and stopped writing descendants
+    if invalid/untrusted/failed: BLOCKED or other existing failure status
+    record bounded after-state and complete the safe Worker checkpoint
+    increment completed_workers
 
-    if no trusted completed result:
-        leave the task first in plan.md
-        stop
-
-    record bounded Worker after-checkpoint, including unknown edits
-    append a short result to completed.md
-    remove the completed task from plan.md
-    verify complete trusted checkpoint and confirmed termination
-    increment this Root's local completed_workers
-    if completed_workers == max_workers_per_batch:
-        immediately return Status CONTINUE / CompletedWorkers / Reason BATCH_LIMIT
+    if tasks remain in this SAME plan:
+        continue regardless of completed_workers
+    confirm complete plan boundary, no pending checkpoint or live writer
+    if completed_workers >= max_workers_per_batch:
+        return CONTINUE / actual CompletedWorkers / BATCH_LIMIT
+    otherwise proceed to the next Planner
 ```
 
-This is conceptual behavior, not a requirement to implement a new programmatic
-state machine.
+This describes semantics, NOT a new programmatic runtime or state machine.
 
 ### Codex MultiAgentV2 spawn identity
 
@@ -658,7 +677,11 @@ For the legal `# Task`, `# Question`, `# Done` forms and
 pre-activation handling, use `references/intent-preflight.md` and
 `Preparation planner and activation` above. A fresh planner returns
 exactly one of these forms; blank or mixed output is invalid.
-New `# Task` contracts require exactly one `ExecutionProfile`.
+New `# Task` contracts require exactly one `ExecutionProfile` per Task
+and at most **four** tasks per fresh Planner result. Validate the
+whole result before persisting or spawning Workers; five Tasks block
+with a protocol diagnostic, without truncation or automatic retry.
+Existing saved plans larger than four remain valid for ordinary recovery.
 Do not reinterpret `# Done` as an empty batch.
 
 During an **active** run, a Planner `# Question` stops task execution:

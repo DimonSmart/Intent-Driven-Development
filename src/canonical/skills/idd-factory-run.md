@@ -102,23 +102,34 @@ plain-text fields, on separate lines, with no ambiguous duplicate status:
     CompletedWorkers: <nonnegative decimal integer>
     Reason: <nonempty short reason>
 
-`CompletedWorkers` cannot exceed the effective per-batch limit. Only
-`CONTINUE` accepts `Reason: BATCH_LIMIT`, and it requires
-`CompletedWorkers == max_workers_per_batch > 0`; it is not an empty
-planning loop, a retry, or a verification result. It requires the Root's own
-confirmed full Worker checkpoint and the active marker
-`.idd/factory/current/request.md`. Check the marker and minimal mechanical
-checkpoint signs against the native terminal evidence. Never infer success from
-the short text alone. If the checkpoint, child identity, finality, or descendant
-quiescence is ambiguous, BLOCKED without new spawns.
+The counter `CompletedWorkers` includes only confirmed successful Workers
+of THIS Root; it may exceed the positive effective target in ANY terminal
+status. Only `CONTINUE` accepts `Reason: BATCH_LIMIT`; it requires
+`CompletedWorkers >= max_workers_per_batch > 0`, a fully completed
+current Planner plan and full trusted checkpoint. BATCH_LIMIT is never
+an empty planning loop, retry or verification result.
+
+After confirming native Root/descendant termination, BEFORE spawning another
+Root, mechanically verify the active marker
+`.idd/factory/current/request.md`, and consistency of the preserved
+`plan.md`, `completed.md`, `provenance.md` and trusted native
+results: no remaining executable tasks from the current Planner plan, no
+open pending checkpoint and all writing descendants quiescent. Never
+infer a full plan boundary solely from the terminal text, empty plan or
+Worker count. If saved state contradicts the result or evidence is
+insufficient, BLOCKED and do not start another Root. The Supervisor does
+not semantically interpret tasks, Product Intent or Engineering Rules;
+the Root remains responsible for older saved plans (including >4 Tasks)
+under existing recovery and continuation rules.
 
 On a valid CONTINUE, and only then, increment the ephemeral batch ordinal and
 spawn ONE NEW fresh Root with mode Continue. The new Root must start with its
 own zero completed-Worker count. No Planner/Worker history passes between
-batches. A batch that finishes exactly at the limit returns CONTINUE even when
-the remaining `plan.md` is empty; the NEXT Root may plan `# Done` and run
-verification. This also means exactly 8 workers with limit 8 use a second Root
-to finalize.
+batches. A Root reaching or exceeding its target rotates ONLY at a fully confirmed
+plan boundary. The NEXT Root may run a fresh Planner, obtain `# Done` and
+perform final verification. Eight completed Workers at limit eight ending a
+plan require another Root for finalization; a plan crossing the target must
+first finish within the original Root.
 
 `COMPLETED` requires a completed native Root result, credible normal Factory
 closure (including inactive-preparation `# Done`), the Root's completed

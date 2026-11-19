@@ -200,6 +200,16 @@ output is malformed and never means Done.
 
 ## Incremental planning
 
+Return at most **4 `# Task` sections per NEW Planner result**. This limit
+counts tasks, not files, effort or complexity. Choose the nearest coherent,
+independently verifiable group in logical order and defer remaining tasks to
+a subsequent fresh Planner invocation. Do not invent dependencies, split a
+coherent task merely to satisfy the limit, combine unrelated tasks to evade
+it, or add filler tasks to reach the Root's Worker target. Keep tests with
+the implementation they verify when they form one coherent contract.
+Never modify Product Intent, Engineering Rules or ExecutionProfile because
+of this task-count limit.
+
 Create only work whose contract is knowable now. Do not build a speculative
 full roadmap.
 
@@ -211,9 +221,9 @@ A batch may contain several tasks only when every contract is already
 well-defined. Workers execute the batch sequentially, so the repository after
 each task is the reality seen by the next worker.
 
-Materialize every task that can be contracted reliably, but stop at the first
-real evidence boundary. Do not manufacture a larger task merely to avoid a
-planning cycle.
+Contract only the next coherent group of up to four reliable tasks, stopping
+sooner at the first real evidence boundary. Do not manufacture a larger task
+merely to avoid a planning cycle.
 
 ## Task quality and size
 
