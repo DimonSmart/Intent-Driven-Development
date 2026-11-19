@@ -125,7 +125,12 @@ ENG-0004
 # Done
 ```
 
-Exactly one form is used per planner invocation. Blank output is invalid.
+Exactly one form is used per Planner invocation. Blank output is invalid.
+A new `# Task` result may contain **1–4** Tasks; a fifth Task makes the
+whole output invalid BEFORE saving a plan or launching a Worker. No
+truncation or automatic retry. Previously saved plans larger than four
+remain eligible for safe continuation. Tasks must stay coherent and
+independently verifiable; no fabricated dependencies or filler work.
 
 Every newly generated task has exactly one `# ExecutionProfile`: `economy`,
 `standard`, or `strong`. Validate new output before saving it. Existing pending
@@ -274,10 +279,13 @@ The public `idd-factory-run` is a lightweight Supervisor:
 
 ```text
 Supervisor (one user invocation)
-  -> Factory Root #1  (max 8 confirmed Workers by default)
-       -> Planner when needed; sequential Worker 1 ... Worker 8
-  -> Factory Root #2  (fresh no-history context)
-       -> continue pending plan; Planner/Worker or # Done and final verification
+  -> Factory Root #1 (target 8, not a hard cap)
+       -> Planner #1 -> Worker x3 -> full plan checkpoint
+       -> Planner #2 -> Worker x4 -> full plan checkpoint
+       -> Planner #3 -> Worker x2 -> full plan checkpoint
+       -> CONTINUE / BATCH_LIMIT (CompletedWorkers = 9)
+  -> Factory Root #2 (fresh no-history context)
+       -> fresh Planner -> # Done -> final project verification
   -> ... until COMPLETED, NEEDS_INPUT or BLOCKED
 ```
 
@@ -289,19 +297,29 @@ verification and Intent Refinement Review. No Worker may run concurrently
 with another writing Worker or with a new Root. The Supervisor does not write
 `.idd/factory/` state or revalidate Product Intent itself.
 
-Each Root-local `completed_workers` increments after a successful native
-Worker result and the COMPLETE verified checkpoint
-(`provenance.md`, `completed.md`, remaining `plan.md`). At the exact
-effective limit it emits:
+Each Root-local `completed_workers` increments only after a
+successful native Worker result and the COMPLETE verified Worker
+checkpoint (`provenance.md`, `completed.md`, remaining `plan.md`).
+The positive default `max_workers_per_batch = 8` is a minimum
+**rotation target**. All remaining Tasks in a current plan must
+complete even if the count reaches or exceeds the target. Only
+after a fully reconciled plan, stopped writing descendants and closed
+pending checkpoints can Root return `CONTINUE / BATCH_LIMIT`.
+For example, with plans of 3, 4 and 2 Tasks and target 8:
+
 ```text
 Status: CONTINUE
-CompletedWorkers: 8
+CompletedWorkers: 9
 Reason: BATCH_LIMIT
 ```
-This is required even when the last Worker emptied `plan.md`: the next Root
-is responsible for obtaining `# Done` and finishing verification. Any
-checkpoint, writer-stop, model or terminal ambiguity is BLOCKED with no
-automatic next batch. NEEDS_INPUT conveys the exact persisted question.
+
+The next Root starts with no outstanding plan, obtains a fresh Planner
+result and may run final verification after `# Done`. Supervisor
+must mechanically check the saved boundary rather than trusting an
+empty `plan.md` or Root's terminal text. Checkpoint, writer-stop,
+model or terminal ambiguity causes BLOCKED with no automatic new
+Root. NEEDS_INPUT conveys the exact persisted question.
+
 The counter and batch ordinal are not durable state. The next Root uses
 Continue with the original saved request and baseline, not a transcript copy.
 

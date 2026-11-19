@@ -5,7 +5,7 @@ using Xunit;
 namespace Idd.Factory.Report.Tests;
 
 /// <summary>
-/// Deterministic read-only native-rollout fixture: a Supervisor and four distinct
+/// Deterministic read-only native-rollout fixture: a Supervisor and distinct
 /// Root contexts; tests both legacy 3+3+3+1 and plan-safe 4+4+2
 /// sequential Worker children. Uses real Codex
 /// session_meta, spawn-agent call and task_complete event shapes.
@@ -59,7 +59,7 @@ public sealed class FactoryNestedTopologyReportTests
                 if (index == 0 || planBoundaryRotation)
                 {
                     var plannerId = plannerIds[planBoundaryRotation ? index : 0];
-                    var plannerName = $"idd_factory_planner_b{firstOrdinal:0000}_0001";
+                    var plannerName = $"idd_factory_planner_b{batch:0000}_0001";
                     var plannerTime = batchTime.AddSeconds(3);
                     Spawn(rootLines, plannerTime, "planner-1", plannerName, plannerId, null);
                     var tasks = string.Join("\n",
@@ -126,7 +126,7 @@ public sealed class FactoryNestedTopologyReportTests
                 .SequenceEqual(Enumerable.Range(firstOrdinal, rootCount)
                     .Select(number => (int?)number)));
             Assert.True(report.Batches.Select(batch => batch.Status)
-                .SequenceEqual(Enumerable.Repeat("CONTINUE", rootCount - 1).Append("COMPLETED"))));
+                .SequenceEqual(Enumerable.Repeat("CONTINUE", rootCount - 1).Append("COMPLETED")));
             Assert.True(report.Batches.Select(batch => batch.CompletedWorkers)
                 .SequenceEqual(planBoundaryRotation
                     ? new int?[] { 4, 4, 2 } : new int?[] { 3, 3, 3, 1 }));
