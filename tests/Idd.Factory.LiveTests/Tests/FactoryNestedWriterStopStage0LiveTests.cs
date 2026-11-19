@@ -186,10 +186,11 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             var writerInterrupt = Assert.Single(supervisor.Events, item =>
                 item.ToolName == "interrupt_agent" &&
                 HasArgument(item.ToolArguments, "target", writer.AgentPath!));
-            var readyWait = Assert.Single(supervisor.Events, item =>
-                item.ToolName is "exec" or "command_execution" &&
-                item.ToolArguments?.Contains("native-wait-for-heartbeat.ps1",
-                    StringComparison.OrdinalIgnoreCase) == true);
+            // Codex records one shell call as both a host tool wrapper and a
+            // native CommandExecution item; ItemStarted and ItemCompleted can
+            // also describe the same invocation. Count only completed native
+            // executions, so two real commands still fail the gate.
+            var readyWait = AssertSingleCompletedNativeHeartbeatWait(supervisor.Events);
             Assert.True(readyWait.Ordinal < writerInterrupt.Ordinal,
                 "Successful heartbeat wait must precede the Writer interruption.");
             var rootInterrupt = Assert.Single(supervisor.Events, item =>
@@ -252,6 +253,88 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_KEEP_TEMP") != "1")
                 try { Directory.Delete(temp, recursive: true); } catch { }
         }
+    }
+
+    private static CodexEvent AssertSingleCompletedNativeHeartbeatWait(
+        IEnumerable<CodexEvent> events)
+    {
+        var completedExecutions = events.Where(item =>
+            item.ItemKind == "CommandExecution" &&
+            item.Lifecycle == "ItemCompleted" &&
+            item.ToolName == "command_execution" &&
+            item.ToolArguments?.Contains("native-wait-for-heartbeat.ps1",
+                StringComparison.OrdinalIgnoreCase) == true).ToArray();
+        var execution = Assert.Single(completedExecutions);
+        Assert.Equal(0, execution.ExitCode);
+        return execution;
+    }
+
+    [Fact]
+    public void Factory_NativeHeartbeatWaitCountsOneExecutionAcrossTraceWrappers()
+    {
+        var command = """["pwsh","-NoProfile","-File","./native-wait-for-heartbeat.ps1"]""";
+        var records = new[]
+        {
+            new CodexEvent
+            {
+                ToolName = "exec", ToolPhase = "call",
+                ToolArguments = command, Ordinal = 1
+            },
+            new CodexEvent
+            {
+                ToolName = "command_execution", ItemKind = "CommandExecution",
+                Lifecycle = "ItemStarted", ToolPhase = "started",
+                ToolArguments = command, Ordinal = 2
+            },
+            new CodexEvent
+            {
+                ToolName = "command_execution", ItemKind = "CommandExecution",
+                Lifecycle = "ItemCompleted", ToolPhase = "completed",
+                ToolArguments = command, ExitCode = 0, Ordinal = 3
+            }
+        };
+        Assert.Equal(3,
+            AssertSingleCompletedNativeHeartbeatWait(records).Ordinal);
+    }
+
+    [Fact]
+    public void Factory_NativeHeartbeatWaitRejectsTwoCompletedCommands()
+    {
+        var command = """["pwsh","-File","./native-wait-for-heartbeat.ps1"]""";
+        var records = new[]
+        {
+            new CodexEvent
+            {
+                ToolName = "command_execution", ItemKind = "CommandExecution",
+                Lifecycle = "ItemCompleted", ToolArguments = command,
+                ExitCode = 0, Ordinal = 1
+            },
+            new CodexEvent
+            {
+                ToolName = "command_execution", ItemKind = "CommandExecution",
+                Lifecycle = "ItemCompleted", ToolArguments = command,
+                ExitCode = 0, Ordinal = 2
+            }
+        };
+        Assert.ThrowsAny<Exception>(() =>
+            AssertSingleCompletedNativeHeartbeatWait(records));
+    }
+
+    [Fact]
+    public void Factory_NativeHeartbeatWaitRejectsFailedExecution()
+    {
+        var records = new[]
+        {
+            new CodexEvent
+            {
+                ToolName = "command_execution", ItemKind = "CommandExecution",
+                Lifecycle = "ItemCompleted",
+                ToolArguments = """["pwsh","-File","./native-wait-for-heartbeat.ps1"]""",
+                ExitCode = 1
+            }
+        };
+        Assert.ThrowsAny<Exception>(() =>
+            AssertSingleCompletedNativeHeartbeatWait(records));
     }
 
     // Native CommandExecution.command can be a JSON array. Inspect the
