@@ -247,5 +247,9 @@
         }
       }
     }
+  },
+  "idd-internal-factory-root": {
+    "description": "Internal Factory Root protocol. Use only when a fresh generic child of the public Supervisor receives a complete bounded Factory assignment and exact installed Skill path; otherwise return BLOCKED.",
+    "exposure": "internal"
   }
 }
