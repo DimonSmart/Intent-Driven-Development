@@ -291,8 +291,8 @@ public sealed partial class NativeFactoryEndToEndLiveTests
 
         return Regex.IsMatch(command,
             @"(?ix)
-              (?: \b -File \s+ | (?<!\w) [&.] \s+
-                | (?: ^ | [;\r\n] \s* | \b -Command \s+ ) [""']? \.[\\/] )
+              (?: (?<![\w-]) -File \s+ | (?<!\w) [&.] \s+
+                | (?: ^ | [;\r\n] \s* | (?<![\w-]) -Command \s+ ) [""']? \.[\\/] )
               [^\s""';|]* native-writer-probe\.ps1
               (?= $ | [\s""';|] )",
             RegexOptions.CultureInvariant);
