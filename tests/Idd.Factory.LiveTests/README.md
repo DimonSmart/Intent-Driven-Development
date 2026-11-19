@@ -326,7 +326,7 @@ $env:IDD_FACTORY_EVAL_TIMEOUT_MINUTES = "15"
 dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj --filter "FullyQualifiedName~Factory_Stage0NativeRootCancellationStopsGrandchildWriter"
 
 $env:IDD_FACTORY_EVAL_TIMEOUT_MINUTES = "60"
-dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj --filter "FullyQualifiedName~Factory_NativeTenTasksRotatesFourRootsWithLimitThree"
+dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj --filter "FullyQualifiedName~Factory_NativeTenTasksRotatesOnlyAtPlanBoundariesWithLimitThree"
 
 Remove-Item Env:IDD_RUN_LIVE_FACTORY_MARKETPLACE_EVALS -ErrorAction SilentlyContinue
 Remove-Item Env:IDD_FACTORY_EVAL_STANDARD_MODEL -ErrorAction SilentlyContinue
