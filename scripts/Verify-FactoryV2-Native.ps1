@@ -23,10 +23,12 @@ try {
     $env:IDD_RUN_LIVE_FACTORY_MARKETPLACE_EVALS = "1"
     $env:IDD_FACTORY_EVAL_STANDARD_MODEL = $StandardModel
 
+    Write-Host "Native process profile: features.unified_exec=false (one-shot candidate)." -ForegroundColor Cyan
+    Write-Host "This is a real cancellation gate, not a deterministic CI test." -ForegroundColor Cyan
     $env:IDD_FACTORY_EVAL_TIMEOUT_MINUTES = "15"
     & dotnet test $project --filter "FullyQualifiedName~Factory_Stage0NativeDescendantFirstCancellationStopsGrandchildWriter"
     if ($LASTEXITCODE -ne 0) {
-        throw "Gate 1 FAIL: Writer cancellation or process quiescence was not proven. Do not run Gate 2."
+        throw "Gate 1 FAIL: Windows host did not prove native Writer process termination with unified_exec disabled. Preserve artifacts; do not run Gate 2 or merge Factory v2."
     }
 
     if (-not $WriterOnly) {

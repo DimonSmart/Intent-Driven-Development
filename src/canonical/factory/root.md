@@ -65,7 +65,12 @@ Factory requires the platform adapter to provide all of these properties:
 
 Use a read-only planner and workspace-writing workers when the platform can
 express those sandboxes natively. If the host cannot provide the required
-properties, Factory is unsupported on that host. Do not recreate the removed
+properties, Factory is unsupported on that host. On Windows Codex, disabling
+`unified_exec` BEFORE launching the host is a candidate one-shot execution
+workaround, not a proven fix: it MUST pass the real Writer-command stop
+gate for the exact binary/profile before any write-capable two-level run.
+`turn_aborted` or a stopped Agent alone does not establish process
+termination. Do not recreate the removed
 C# runtime, MCP transport, shell process supervisor, status protocol, or polling
 loop to compensate.
 

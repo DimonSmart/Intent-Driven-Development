@@ -316,6 +316,14 @@ user project modifications. The intended host must be able to invoke real
 native depth-2 generic agents, deliver installed Skills, run a write-capable
 child and attest full child/descendant stop.
 
+On Windows Codex, the test harness now explicitly passes
+`-c features.unified_exec=false` to BOTH Gate 1 and Gate 2. This selects
+a candidate one-shot execution backend to address the observed
+`turn_aborted`-but-still-writing shell process. The option is not
+a substitute for process termination evidence, and no compatible host
+is declared until the real Gate 1 completes successfully. The harness
+does not modify the user's normal Codex settings.
+
 In PowerShell, from a checkout of the feature branch (Gate 2 only runs when
 Gate 1 passes):
 
@@ -386,9 +394,12 @@ the natural-completion marker exists in the saved workspace. This is a
 **real host/process-cancellation failure**, not duplicate trace events.
 The live gate must fail with `HOST_UNSUPPORTED_WRITER_COMMAND_SURVIVED_INTERRUPT`
 rather than a misleading `Assert.Single` failure. Until the host demonstrably
-terminates in-flight writing commands, do not repeat the costly Gate 1 on the
-same host/version, run Gate 2, merge PR #77 or enable two-level Factory. A
-native host fix and fresh real-host Gate 1 are required.
+terminates in-flight writing commands, do not repeat the costly Gate 1
+with the SAME unified-exec profile, run Gate 2, merge PR #77 or enable
+two-level Factory. The new opt-in `features.unified_exec=false` profile
+is materially different and may be tested once; only a successful real-host
+Gate 1 demonstrates that it stops the command. If it still fails, a native
+host fix or another verified host is required.
 
 **Ten-step/limit-3 gate:** the test installs a fresh generated Marketplace
 package into a new isolated CODEX_HOME, creates a minimal self-contained

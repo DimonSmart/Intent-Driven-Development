@@ -133,6 +133,10 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 "exec", "--json", "--ignore-rules",
                 "--enable", "multi_agent", "--enable", "multi_agent_v2",
                 "-c", "agents.max_depth=2", "-c", "agents.max_threads=4",
+                // The Windows unified-exec backend keeps an in-flight pwsh
+                // alive after interrupt_agent(Writer). Probe the supported
+                // one-shot backend instead; never infer success from the flag.
+                "-c", "features.unified_exec=false",
                 "-c", "approval_policy=never",
                 "-c", $"model_reasoning_effort={settings.ReasoningEffort}",
                 "--model", settings.Model, "--sandbox", "danger-full-access",

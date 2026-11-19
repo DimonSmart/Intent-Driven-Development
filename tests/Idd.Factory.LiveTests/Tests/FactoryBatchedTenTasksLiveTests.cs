@@ -77,6 +77,9 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 "exec", "--json", "--ignore-rules",
                 "--enable", "multi_agent", "--enable", "multi_agent_v2",
                 "--enable", "plugins", "--disable", "remote_plugin",
+                // Gate 2 must use the same process cancellation mode as
+                // Gate 1. The live Writer stop gate must pass first.
+                "-c", "features.unified_exec=false",
                 "-c", "agents.max_depth=2", "-c", "agents.max_threads=18",
                 "-c", "approval_policy=never",
                 "-c", $"model_reasoning_effort={settings.ReasoningEffort}",

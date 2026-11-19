@@ -31,7 +31,16 @@ setting or absence of custom `agent_type` with proof of capability. For Codex,
 use the native MultiAgentV2 operations and require known compatible host
 capabilities; a proven Stage-0 smoke test for the host/configuration is needed.
 For Claude and other hosts, require independent real evidence of these same
-capabilities. If mandatory capabilities or version evidence are unavailable,
+capabilities. On Windows Codex, the native unified-exec backend has been
+observed to leave a writing PowerShell command running after
+`interrupt_agent(Writer)` and a native `turn_aborted`. A candidate host
+profile is `features.unified_exec=false` (one-shot shell execution),
+configured BEFORE the Codex session starts. This flag is NOT evidence of
+safe cancellation: the exact host/version/profile must still PASS a real
+descendant-first Writer process-stop gate before Factory is supported.
+Do not change the current session's tools or silently assume the profile
+can be changed from within this Skill. If mandatory capabilities or
+version evidence are unavailable,
 return BLOCKED without launching Factory or using a local CLI/workflow-engine
 fallback. A child stop is not enough while a grandchild writer may still run.
 
