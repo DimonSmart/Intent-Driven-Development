@@ -258,13 +258,24 @@ public sealed partial class NativeFactoryEndToEndLiveTests
     private static CodexEvent AssertSingleCompletedNativeHeartbeatWait(
         IEnumerable<CodexEvent> events)
     {
-        var completedExecutions = events.Where(item =>
+        var completedCandidates = events.Where(item =>
             item.ItemKind == "CommandExecution" &&
             item.Lifecycle == "ItemCompleted" &&
             item.ToolName == "command_execution" &&
             item.ToolArguments?.Contains("native-wait-for-heartbeat.ps1",
                 StringComparison.OrdinalIgnoreCase) == true).ToArray();
-        var execution = Assert.Single(completedExecutions);
+        // A completed shell operation mentioning this script may simply read it.
+        // Only count commands that actually invoke the script, and keep failing
+        // if there are multiple distinct completed native invocations.
+        var completedExecutions = completedCandidates.Where(InvokesHeartbeatWait).ToArray();
+        Assert.True(completedExecutions.Length == 1,
+            $"Expected exactly one completed native heartbeat wait execution, " +
+            $"found {completedExecutions.Length} among {completedCandidates.Length} " +
+            "completed commands mentioning the script. Candidates: " +
+            string.Join("; ", completedCandidates.Select(item =>
+                $"ordinal={item.Ordinal} exit={item.ExitCode?.ToString() ?? "null"} " +
+                $"command={item.ToolArguments}")));
+        var execution = completedExecutions[0];
         Assert.Equal(0, execution.ExitCode);
         return execution;
     }
@@ -295,6 +306,44 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         };
         Assert.Equal(3,
             AssertSingleCompletedNativeHeartbeatWait(records).Ordinal);
+    }
+
+    [Fact]
+    public void Factory_NativeHeartbeatWaitIgnoresCompletedInspectionCommand()
+    {
+        var records = new[]
+        {
+            new CodexEvent
+            {
+                ToolName = "command_execution", ItemKind = "CommandExecution",
+                Lifecycle = "ItemCompleted",
+                ToolArguments = """["pwsh","-Command","Get-Content -LiteralPath ./native-wait-for-heartbeat.ps1"]""",
+                ExitCode = 0, Ordinal = 1
+            },
+            new CodexEvent
+            {
+                ToolName = "command_execution", ItemKind = "CommandExecution",
+                Lifecycle = "ItemCompleted",
+                ToolArguments = """["pwsh","-NoProfile","-File","./native-wait-for-heartbeat.ps1"]""",
+                ExitCode = 0, Ordinal = 2
+            }
+        };
+        Assert.Equal(2, AssertSingleCompletedNativeHeartbeatWait(records).Ordinal);
+    }
+
+    [Theory]
+    [InlineData("""["pwsh","-Command","Get-Content ./native-wait-for-heartbeat.ps1"]""", false)]
+    [InlineData("""["pwsh","-Command","Test-Path ./native-wait-for-heartbeat.ps1"]""", false)]
+    [InlineData("""["pwsh","-NoProfile","-File","./native-wait-for-heartbeat.ps1"]""", true)]
+    [InlineData("""["pwsh","-Command","pwsh -NoProfile -File ./native-wait-for-heartbeat.ps1"]""", true)]
+    public void Factory_NativeHeartbeatWaitRecognizesScriptExecution(
+        string toolArguments, bool expected)
+    {
+        Assert.Equal(expected, InvokesHeartbeatWait(new CodexEvent
+        {
+            ToolName = "command_execution",
+            ToolArguments = toolArguments
+        }));
     }
 
     [Fact]
@@ -340,7 +389,13 @@ public sealed partial class NativeFactoryEndToEndLiveTests
     // Native CommandExecution.command can be a JSON array. Inspect the
     // executable command, not every mention of the script's filename.
     // A parent may legitimately read the script without executing it.
-    private static bool InvokesWriterProbe(CodexEvent item)
+    private static bool InvokesWriterProbe(CodexEvent item) =>
+        InvokesNativeProbe(item, "native-writer-probe.ps1");
+
+    private static bool InvokesHeartbeatWait(CodexEvent item) =>
+        InvokesNativeProbe(item, "native-wait-for-heartbeat.ps1");
+
+    private static bool InvokesNativeProbe(CodexEvent item, string scriptName)
     {
         if (item.ToolName is not ("exec" or "command_execution") ||
             string.IsNullOrWhiteSpace(item.ToolArguments))
@@ -373,10 +428,10 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         }
 
         return Regex.IsMatch(command,
-            @"(?ix)
+            $@"(?ix)
               (?: (?<![\w-]) -File \s+ | (?<!\w) [&.] \s+
                 | (?: ^ | [;\r\n] \s* | (?<![\w-]) -Command \s+ ) [""']? \.[\\/] )
-              [^\s""';|]* native-writer-probe\.ps1
+              [^\s""';|]* {Regex.Escape(scriptName)}
               (?= $ | [\s""';|] )",
             RegexOptions.CultureInvariant);
     }
