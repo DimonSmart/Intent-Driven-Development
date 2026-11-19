@@ -22,8 +22,11 @@ Inspect the actual native host tools for a generic fresh child spawn,
 `fork_turns: "none"` or equivalent no-history semantics, depth-two nested
 generic children, shared project cwd and installed Skill access, exact model
 and effort overrides of grandchildren, native event-driven terminal waiting,
-stop/interrupt with confirmed termination of the child **and its writing
-descendants**, and real terminal result correlation. Do not equate a depth
+visibility and direct native interruption of **every active descendant**
+(including grandchildren), confirmed termination of their in-flight writing
+commands, and real terminal result correlation. Parent-only interruption
+does NOT imply descendant cancellation. A host where direct grandchild
+interruption or command quiescence cannot be demonstrated is unsupported. Do not equate a depth
 setting or absence of custom `agent_type` with proof of capability. For Codex,
 use the native MultiAgentV2 operations and require known compatible host
 capabilities; a proven Stage-0 smoke test for the host/configuration is needed.
@@ -89,8 +92,30 @@ correlated, terminal Factory Root response. Do not interpret intermediate
 assistant messages, tool output, embedded examples or partial structured text
 as the terminal result. Require explicit native confirmation that the Root
 and its descendants, including any writing Worker, have completed/closed.
-If a wait fails, attempt native stop and confirm descendant quiescence; if
-uncertain, stop the invocation with BLOCKED and NEVER start another Root.
+
+### Descendant-first stop on failed wait, cancellation or replacement
+
+Native `interrupt_agent(Root)` is NOT a recursive stop contract: a nested
+Worker may continue writing after Root is interrupted. If a Root wait fails,
+times out, or the Root must be cancelled, first use `list_agents` or the
+host's equivalent native agent graph to identify every still-active descendant
+and its exact native target path. Interrupt active descendants deepest-first
+(Worker/Planner before Root), explicitly targeting each via native
+`interrupt_agent` or equivalent. Do not interrupt Root first and assume
+its descendants were stopped. Do not rely on Root to stop children after
+Root itself was interrupted.
+
+Confirm each relevant agent stopped and, for any Worker with an in-flight
+command, confirm the writing process/command is no longer executing before
+another writer or Root can start. A native agent's `interrupted` status
+alone does NOT prove its shell/process stopped. Eventual natural completion
+of a Writer, an idle-looking worktree, a terminal phrase or an agent status
+claim is not proof of timely cancellation. If the host cannot enumerate or
+directly interrupt a grandchild, cannot verify a running command has stopped,
+or cancellation leaves command execution uncertain, return
+`BLOCKED / CHILD_UNCONFIRMED`, preserve state and NEVER start another Root
+or mutating Worker. Never kill processes manually or add a shell supervisor,
+process runtime, polling engine or retry loop as a fallback.
 Do not automatically retry failed or rejected Root spawns.
 
 ## Terminal contract from Factory Root

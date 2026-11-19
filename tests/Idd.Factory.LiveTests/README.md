@@ -316,14 +316,27 @@ user project modifications. The intended host must be able to invoke real
 native depth-2 generic agents, deliver installed Skills, run a write-capable
 child and attest full child/descendant stop.
 
-In PowerShell, from a checkout of the feature branch:
+In PowerShell, from a checkout of the feature branch (Gate 2 only runs when
+Gate 1 passes):
+
+~~~powershell
+pwsh ./scripts/Verify-FactoryV2-Native.ps1
+~~~
+
+For the Writer gate alone:
+
+~~~powershell
+pwsh ./scripts/Verify-FactoryV2-Native.ps1 -WriterOnly
+~~~
+
+Equivalent manual commands:
 
 ~~~powershell
 $env:IDD_RUN_LIVE_FACTORY_MARKETPLACE_EVALS = "1"
 $env:IDD_FACTORY_EVAL_STANDARD_MODEL = "gpt-6.1-terra"
 $env:IDD_FACTORY_EVAL_TIMEOUT_MINUTES = "15"
 
-dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj --filter "FullyQualifiedName~Factory_Stage0NativeRootCancellationStopsGrandchildWriter"
+dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj --filter "FullyQualifiedName~Factory_Stage0NativeDescendantFirstCancellationStopsGrandchildWriter"
 
 $env:IDD_FACTORY_EVAL_TIMEOUT_MINUTES = "60"
 dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj --filter "FullyQualifiedName~Factory_NativeTenTasksRotatesOnlyAtPlanBoundariesWithLimitThree"
@@ -334,14 +347,22 @@ Remove-Item Env:IDD_FACTORY_EVAL_TIMEOUT_MINUTES -ErrorAction SilentlyContinue
 ~~~
 
 **Controlled writer/stop gate:** the technical test creates a disposable Git
-repository, launches a native Supervisor → Root → synthetic Writer, starts a
-bounded heartbeat-write loop, deliberately interrupts the Root, and checks
-the native event plus that no further heartbeat is written during a
-post-interruption observation window. The synthetic Writer is not a Product
-Worker and does not run Factory Preflight; the earlier read-only Stage-0
-installed-Skill probe independently checks child Skill loading. If safe
-descendant stop is not provable, it must fail and the public Supervisor MUST
-NOT be merged.
+repository, launches a native Supervisor → Root → synthetic Writer, and
+executes a tracked, single-use 40-second heartbeat script (atomic CreateNew
+guard rejects accidental reruns). It deliberately interrupts the *Writer
+directly first*, then the Root. It independently requires exact native
+interrupt targets in descendant-first order, aborted native child turns,
+fewer than 40 written heartbeat lines, no natural-completion marker and no
+further writes during an 8-second observation window. A native interrupted
+agent is not sufficient if its launched PowerShell command keeps writing.
+The prior parent-only Root interrupt failed on Windows Codex 0.163.0:
+Writer stayed running and executed the heartbeat loop twice (80 lines).
+This replacement gate tests direct descendant cancellation, not recursive
+host cancellation. The synthetic Writer is not a Product Worker and does
+not run Factory Preflight; the earlier read-only Stage-0 installed-Skill
+probe independently checks child Skill loading. If direct descendant stop
+or in-flight command quiescence is unproven, the gate MUST fail and the
+public Supervisor MUST NOT be merged.
 
 **Ten-step/limit-3 gate:** the test installs a fresh generated Marketplace
 package into a new isolated CODEX_HOME, creates a minimal self-contained

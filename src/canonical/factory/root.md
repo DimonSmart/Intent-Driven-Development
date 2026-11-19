@@ -117,10 +117,13 @@ Root never injects protocol bodies, the whole Intent/Engineering tree, previous
 worker conversations or the parent transcript. Root performs required
 Engineering enumeration and execution policy mapping as before. If a child
 fails to load a Skill after valid preparation, preserve the existing phase
-state and pending Task; never declare successful completion. On wait failure,
-stop or interrupt the child, confirm Writer termination before another write,
-and end this attempt with recoverable state. No status polling loop or runtime
-fallback. These are checks for necessary host capabilities, not a requirement
+state and pending Task; never declare successful completion. On wait failure, explicitly interrupt each active child and its descendants
+deepest-first via native tools, and confirm Writer command/process quiescence
+before another write. Interrupting an agent is not itself proof that its
+in-flight command stopped. If any active child or writing process cannot be
+identified, directly interrupted and confirmed stopped, preserve the pending
+Task and return BLOCKED / CHILD_UNCONFIRMED; do not start a replacement Worker
+or let the Supervisor rotate Root. No status polling loop or runtime fallback. These are checks for necessary host capabilities, not a requirement
 to prove a future child has already read its Skill before spawning it.
 
 ## Factory Preflight — Root entrypoint
@@ -633,14 +636,18 @@ Worker duration by itself must not create repeated parent model turns.
 
 If native waiting ends with a host timeout or error:
 
-1. do not start another worker for the same task;
-2. do not begin status polling;
-3. stop or close the still-running child natively when possible;
-4. leave the task first in `plan.md`;
-5. end the current Factory invocation.
+1. do not start another Worker for the same Task or begin status polling;
+2. identify the exact active child thread and any descendants via native tools;
+3. interrupt each active descendant deepest-first, then the direct child;
+4. require native termination evidence AND proof that every in-flight writing
+   command/process has stopped; `interrupt_agent` alone is insufficient;
+5. leave the Task first in `plan.md` and end the invocation. If command
+   termination is unavailable or uncertain, return BLOCKED / CHILD_UNCONFIRMED.
 
-Never run a replacement writer while the previous child may still be writing to
-the same workspace.
+A completed shell command after a cancellation request does NOT retroactively
+prove safe cancellation. Never run a replacement writer while the previous
+child or any started command may still be writing to the same workspace.
+Do not create a process supervisor, issue shell kills or add polling/retries.
 
 Factory deliberately uses at-least-once execution. A later fresh worker must
 inspect current repository reality, finish partially completed work, and avoid

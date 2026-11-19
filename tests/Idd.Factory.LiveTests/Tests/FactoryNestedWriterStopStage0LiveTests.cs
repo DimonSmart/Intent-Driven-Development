@@ -13,7 +13,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
 {
     [LiveFactoryMarketplaceFact]
     [Trait("Category", "LiveFactoryMarketplace")]
-    public async Task Factory_Stage0NativeRootCancellationStopsGrandchildWriter()
+    public async Task Factory_Stage0NativeDescendantFirstCancellationStopsGrandchildWriter()
     {
         var repository = FindRepositoryRoot();
         var runId = "nested-writer-stop-" + Guid.NewGuid().ToString("N");
@@ -22,6 +22,8 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         var home = Path.Combine(temp, "codex-home");
         var artifacts = Path.Combine(repository, "artifacts", "factory-evals", runId);
         var heartbeat = Path.Combine(workspace, "native-worker-heartbeat.txt");
+        var guard = Path.Combine(workspace, "native-writer-once.guard");
+        var naturalCompletion = Path.Combine(workspace, "native-writer-natural-completion.txt");
         var environment = new Dictionary<string, string?> { ["CODEX_HOME"] = home };
         var settings = LiveEvalSettings.Resolve(repository,
             Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_MODEL"),
@@ -38,15 +40,30 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         {
             await File.WriteAllTextAsync(Path.Combine(workspace, "README.md"),
                 "Disposable native cancellation probe; no product files.\n");
+            // Atomic CreateNew prevents a second invocation from generating
+            // misleading extra heartbeats (the old prompt produced 80 lines).
+            await File.WriteAllTextAsync(Path.Combine(workspace, "native-writer-probe.ps1"), """
+                $ErrorActionPreference = 'Stop'
+                $guard = Join-Path (Get-Location) 'native-writer-once.guard'
+                $handle = [IO.File]::Open($guard, [IO.FileMode]::CreateNew,
+                    [IO.FileAccess]::Write, [IO.FileShare]::None)
+                $handle.Dispose()
+                $heartbeat = Join-Path (Get-Location) 'native-worker-heartbeat.txt'
+                for ($i = 1; $i -le 40; $i++) {
+                    Add-Content -LiteralPath $heartbeat -Value $i
+                    Start-Sleep -Seconds 1
+                }
+                Set-Content -LiteralPath (Join-Path (Get-Location) 'native-writer-natural-completion.txt') -Value 'completed'
+                """);
             await InitializeGitRepositoryAsync(workspace, artifacts);
             PrepareCodexHome(home, workspace);
             await RunAsync(codex, ["--version"], repository, environment, null,
                 artifacts, "06-codex-version");
 
-            // No installed Planner/Worker protocol is invoked here. This tests
-            // the native descendant cancellation capability in isolation.
+            // A parent-only interrupt failed to stop its Writer on the
+            // intended Windows host. Verify direct descendant-first stop.
             const string prompt = """
-                Native Codex Stage-0 descendant cancellation safety probe.
+                Native Codex Stage-0 descendant-first cancellation safety probe.
                 Work only inside this disposable project and do not modify
                 other folders. Do not invoke IDD Factory or any installed Skill.
                 Use the native MultiAgentV2 generic child tools.
@@ -55,29 +72,32 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                    idd_factory_root_b0001 with fork_turns "none".
                    Root spawns ONE fresh generic WRITER grandchild task_name
                    idd_factory_worker_b0001_0001 with fork_turns "none".
-                2. The Writer runs exactly one local PowerShell command:
-                   $p = Join-Path (Get-Location) 'native-worker-heartbeat.txt'
-                   for ($i = 1; $i -le 40; $i++) {
-                       Add-Content -LiteralPath $p -Value $i
-                       Start-Sleep -Seconds 1
-                   }
-                   The Writer MUST issue this command before reporting its
-                   terminal result. Root MUST NOT interrupt Writer directly.
-                   Root waits natively for Writer.
-                3. Supervisor must NOT wait for Root terminal result first.
+                2. The Writer must execute exactly ONCE the existing tracked
+                   native-writer-probe.ps1 via ONE local PowerShell command:
+                   pwsh -NoProfile -File ./native-writer-probe.ps1
+                   Do not inline/reimplement its loop or run it twice.
+                   The script has an atomic one-shot guard and writes
+                   40 heartbeat lines over roughly 40 seconds; it writes
+                   native-writer-natural-completion.txt only on full completion.
+                   Root waits natively for Writer, without interrupting it.
+                3. Supervisor must NOT wait for Root's terminal result first.
                    After spawning Root, use ONE bounded local PowerShell
-                   command to wait for at least three lines in
-                   native-worker-heartbeat.txt (stop after 30 seconds if
-                   the file never reaches three lines). Then use the NATIVE
-                   interrupt_agent tool on Root ONLY while Writer is running.
-                   Never use a shell command to kill any process.
-                4. Confirm via native tools that Root has stopped, and that
-                   Writer grandchild is also terminated/quiescent. Never
-                   start a replacement writer. Do not claim stopped if the
-                   host cannot confirm it. Return the terminal phrase
-                   NATIVE_DESCENDANT_STOP_CONFIRMED only after native
-                   descendant quiescence, otherwise return
-                   BLOCKED_NATIVE_DESCENDANT_STOP_UNCONFIRMED.
+                   command to wait until native-worker-heartbeat.txt has at
+                   least three lines (timeout after 30 seconds). If this
+                   never happens, report BLOCKED and do NOT claim success.
+                   While Writer is still writing, call native list_agents,
+                   identify the full native Writer path, and call native
+                   interrupt_agent on WRITER directly, not Root.
+                   Immediately call native interrupt_agent on ROOT next.
+                   Never kill any process by shell or run extra Writer commands.
+                4. Confirm through native agent events that both Writer and
+                   Root are stopped. Confirm that the in-flight PowerShell
+                   process is no longer writing, not merely that a native
+                   agent's status says 'interrupted'. Do not wait for natural
+                   completion to claim cancellation. Return
+                   NATIVE_DESCENDANT_STOP_CONFIRMED only if both agent and
+                   Writer-command quiescence are established; otherwise
+                   return BLOCKED_NATIVE_DESCENDANT_STOP_UNCONFIRMED.
                 """;
 
             var run = await RunAsync(codex, [
@@ -113,38 +133,56 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             Assert.Single(root.Events, item => item.ToolName == "spawn_agent");
             Assert.Contains(writer.Events, item =>
                 item.ToolName is "exec" or "command_execution" &&
-                item.ToolArguments?.Contains("native-worker-heartbeat.txt",
-                    StringComparison.Ordinal) == true &&
-                item.ToolArguments.Contains("Add-Content", StringComparison.Ordinal));
+                item.ToolArguments?.Contains("native-writer-probe.ps1",
+                    StringComparison.OrdinalIgnoreCase) == true);
             Assert.DoesNotContain(supervisor.Events, item =>
                 item.ToolName is "exec" or "command_execution" &&
-                item.ToolArguments?.Contains("Add-Content", StringComparison.Ordinal) == true);
+                item.ToolArguments?.Contains("native-writer-probe.ps1",
+                    StringComparison.OrdinalIgnoreCase) == true);
             Assert.DoesNotContain(root.Events, item =>
                 item.ToolName is "exec" or "command_execution" &&
-                item.ToolArguments?.Contains("Add-Content", StringComparison.Ordinal) == true);
-            Assert.Contains(writer.Events, item => item.Type is
-                "turn_aborted" or "turn.cancelled" or "turn_cancelled");
+                item.ToolArguments?.Contains("native-writer-probe.ps1",
+                    StringComparison.OrdinalIgnoreCase) == true);
             Assert.Contains(supervisor.Events, item => item.ToolName == "spawn_agent" &&
                 HasArgument(item.ToolArguments, "task_name", "idd_factory_root_b0001") &&
                 HasArgument(item.ToolArguments, "fork_turns", "none"));
             Assert.Contains(root.Events, item => item.ToolName == "spawn_agent" &&
                 HasArgument(item.ToolArguments, "task_name", "idd_factory_worker_b0001_0001") &&
                 HasArgument(item.ToolArguments, "fork_turns", "none"));
-            Assert.Contains(supervisor.Events, item =>
+
+            // Compare exact native targets, not a substring: the Writer path
+            // contains the Root path. The previous parent-only interrupt did
+            // not stop this grandchild on the tested Codex host.
+            Assert.False(string.IsNullOrWhiteSpace(root.AgentPath));
+            Assert.False(string.IsNullOrWhiteSpace(writer.AgentPath));
+            var writerInterrupt = Assert.Single(supervisor.Events, item =>
                 item.ToolName == "interrupt_agent" &&
-                (item.ToolArguments?.Contains(root.ThreadId, StringComparison.Ordinal) == true ||
-                 item.ToolArguments?.Contains("idd_factory_root_b0001", StringComparison.Ordinal) == true));
+                HasArgument(item.ToolArguments, "target", writer.AgentPath!));
+            var rootInterrupt = Assert.Single(supervisor.Events, item =>
+                item.ToolName == "interrupt_agent" &&
+                HasArgument(item.ToolArguments, "target", root.AgentPath!));
+            Assert.True(writerInterrupt.Ordinal < rootInterrupt.Ordinal,
+                "The Writer must be interrupted before its parent Root.");
+            Assert.Contains(writer.Events, item => item.Type is
+                "turn_aborted" or "turn.cancelled" or "turn_cancelled");
+            Assert.Contains(root.Events, item => item.Type is
+                "turn_aborted" or "turn.cancelled" or "turn_cancelled");
             Assert.Contains(supervisor.Events, item => item.Role == "assistant" &&
                 item.Text?.Contains("NATIVE_DESCENDANT_STOP_CONFIRMED",
                     StringComparison.Ordinal) == true);
 
-            Assert.True(File.Exists(heartbeat), "Native writer never started.");
+            Assert.True(File.Exists(guard), "One-shot Writer script did not start.");
+            Assert.True(File.Exists(heartbeat), "Native Writer never wrote a heartbeat.");
+            Assert.False(File.Exists(naturalCompletion),
+                "Writer completed all 40 writes naturally; cancellation was not proven.");
             var before = await File.ReadAllTextAsync(heartbeat);
             var lines = before.Split('\n', StringSplitOptions.RemoveEmptyEntries);
             Assert.InRange(lines.Length, 3, 39);
-            await Task.Delay(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromSeconds(8));
             var after = await File.ReadAllTextAsync(heartbeat);
             Assert.Equal(before, after);
+            Assert.False(File.Exists(naturalCompletion),
+                "Writer completed naturally during the observation window.");
 
             await File.WriteAllTextAsync(Path.Combine(artifacts, "stage0-writer-stop.json"),
                 JsonSerializer.Serialize(new
@@ -154,7 +192,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                     rootThread = root.ThreadId,
                     writerThread = writer.ThreadId,
                     writtenLinesBeforeStop = lines.Length,
-                    stableObservationSeconds = 5
+                    stableObservationSeconds = 8
                 }, new JsonSerializerOptions { WriteIndented = true }));
             confirmedQuiescence = true;
         }
