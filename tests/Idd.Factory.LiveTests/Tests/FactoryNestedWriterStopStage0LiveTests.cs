@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Idd.Factory.Report;
 using Xunit;
 
@@ -159,18 +160,17 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             AssertMultiAgentV2(supervisor);
             Assert.Single(supervisor.Events, item => item.ToolName == "spawn_agent");
             Assert.Single(root.Events, item => item.ToolName == "spawn_agent");
-            Assert.Contains(writer.Events, item =>
-                item.ToolName is "exec" or "command_execution" &&
-                item.ToolArguments?.Contains("native-writer-probe.ps1",
-                    StringComparison.OrdinalIgnoreCase) == true);
-            Assert.DoesNotContain(supervisor.Events, item =>
-                item.ToolName is "exec" or "command_execution" &&
-                item.ToolArguments?.Contains("native-writer-probe.ps1",
-                    StringComparison.OrdinalIgnoreCase) == true);
-            Assert.DoesNotContain(root.Events, item =>
-                item.ToolName is "exec" or "command_execution" &&
-                item.ToolArguments?.Contains("native-writer-probe.ps1",
-                    StringComparison.OrdinalIgnoreCase) == true);
+            // The native shell can read/check the probe script without running
+            // it. Reject actual invocation by Supervisor/Root, not textual
+            // references in e.g. Get-Content or Test-Path commands.
+            Assert.Contains(writer.Events, InvokesWriterProbe);
+            var unexpectedParentExecutions = supervisor.Events
+                .Concat(root.Events).Where(InvokesWriterProbe).ToArray();
+            Assert.True(unexpectedParentExecutions.Length == 0,
+                "Supervisor/Root executed the Writer probe instead of the Writer: " +
+                string.Join("; ", unexpectedParentExecutions.Select(item =>
+                    $"thread={item.ThreadId ?? "unknown"} ordinal={item.Ordinal} " +
+                    $"arguments={item.ToolArguments}")));
             Assert.Contains(supervisor.Events, item => item.ToolName == "spawn_agent" &&
                 HasArgument(item.ToolArguments, "task_name", "idd_factory_root_b0001") &&
                 HasArgument(item.ToolArguments, "fork_turns", "none"));
@@ -252,5 +252,64 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_KEEP_TEMP") != "1")
                 try { Directory.Delete(temp, recursive: true); } catch { }
         }
+    }
+
+    // Native CommandExecution.command can be a JSON array. Inspect the
+    // executable command, not every mention of the script's filename.
+    // A parent may legitimately read the script without executing it.
+    private static bool InvokesWriterProbe(CodexEvent item)
+    {
+        if (item.ToolName is not ("exec" or "command_execution") ||
+            string.IsNullOrWhiteSpace(item.ToolArguments))
+            return false;
+
+        var command = item.ToolArguments;
+        try
+        {
+            using var document = JsonDocument.Parse(command);
+            var value = document.RootElement;
+            if (value.ValueKind == JsonValueKind.Object)
+            {
+                if (value.TryGetProperty("command", out var structured))
+                    value = structured;
+                else if (value.TryGetProperty("cmd", out structured))
+                    value = structured;
+            }
+            command = value.ValueKind switch
+            {
+                JsonValueKind.String => value.GetString() ?? "",
+                JsonValueKind.Array => string.Join(" ", value.EnumerateArray()
+                    .Select(part => part.ValueKind == JsonValueKind.String
+                        ? part.GetString() : part.GetRawText())),
+                _ => command
+            };
+        }
+        catch (JsonException)
+        {
+            // A native -Command body is often already plain text.
+        }
+
+        return Regex.IsMatch(command,
+            @"(?ix)
+              (?: \b -File \s+ | (?<!\w) [&.] \s+ | (?<!\w) \.[\\/] )
+              [^\s""';|]* native-writer-probe\.ps1
+              (?= $ | [\s""';|] )",
+            RegexOptions.CultureInvariant);
+    }
+
+    [Theory]
+    [InlineData("""["pwsh.exe","-Command","Get-Content -LiteralPath ./native-writer-probe.ps1"]""", false)]
+    [InlineData("""["pwsh.exe","-Command","Test-Path -LiteralPath ./native-writer-probe.ps1"]""", false)]
+    [InlineData("""["pwsh.exe","-Command","pwsh -NoProfile -File ./native-writer-probe.ps1"]""", true)]
+    [InlineData("""["pwsh.exe","-File","./native-writer-probe.ps1"]""", true)]
+    [InlineData("""["pwsh.exe","-Command","& ./native-writer-probe.ps1"]""", true)]
+    public void Factory_WriterProbeClassifierDistinguishesExecutionFromRead(
+        string toolArguments, bool expected)
+    {
+        Assert.Equal(expected, InvokesWriterProbe(new CodexEvent
+        {
+            ToolName = "command_execution",
+            ToolArguments = toolArguments
+        }));
     }
 }

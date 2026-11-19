@@ -364,7 +364,10 @@ returned BLOCKED. The harness now provides a prewritten
 `native-wait-for-heartbeat.ps1` that prints `HEARTBEAT_READY` and creates
 a readiness marker only after three lines are observed; the test verifies
 the wait tool was invoked before Writer interruption, that the marker exists,
-and that real early quiescence follows. This gate tests direct descendant
+and that real early quiescence follows. Native shell commands that merely
+read or inspect `native-writer-probe.ps1` do not violate Writer isolation;
+a separately unit-tested invocation classifier rejects actual execution of
+that script by Supervisor or Root, including `pwsh -File` and `&`. This gate tests direct descendant
 cancellation, not recursive host cancellation. The synthetic Writer is not a Product Worker and does
 not run Factory Preflight; the earlier read-only Stage-0 installed-Skill
 probe independently checks child Skill loading. If direct descendant stop
