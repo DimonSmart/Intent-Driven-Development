@@ -357,8 +357,15 @@ further writes during an 8-second observation window. A native interrupted
 agent is not sufficient if its launched PowerShell command keeps writing.
 The prior parent-only Root interrupt failed on Windows Codex 0.163.0:
 Writer stayed running and executed the heartbeat loop twice (80 lines).
-This replacement gate tests direct descendant cancellation, not recursive
-host cancellation. The synthetic Writer is not a Product Worker and does
+The first descendant-first attempt interrupted both agents and stopped
+heartbeat at 33 lines without natural completion, but its Supervisor
+generated invalid inline PowerShell during the readiness wait and correctly
+returned BLOCKED. The harness now provides a prewritten
+`native-wait-for-heartbeat.ps1` that prints `HEARTBEAT_READY` and creates
+a readiness marker only after three lines are observed; the test verifies
+the wait tool was invoked before Writer interruption, that the marker exists,
+and that real early quiescence follows. This gate tests direct descendant
+cancellation, not recursive host cancellation. The synthetic Writer is not a Product Worker and does
 not run Factory Preflight; the earlier read-only Stage-0 installed-Skill
 probe independently checks child Skill loading. If direct descendant stop
 or in-flight command quiescence is unproven, the gate MUST fail and the

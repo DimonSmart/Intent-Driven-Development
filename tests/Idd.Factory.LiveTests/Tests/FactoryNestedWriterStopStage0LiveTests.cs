@@ -24,6 +24,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
         var heartbeat = Path.Combine(workspace, "native-worker-heartbeat.txt");
         var guard = Path.Combine(workspace, "native-writer-once.guard");
         var naturalCompletion = Path.Combine(workspace, "native-writer-natural-completion.txt");
+        var heartbeatReady = Path.Combine(workspace, "native-heartbeat-ready.txt");
         var environment = new Dictionary<string, string?> { ["CODEX_HOME"] = home };
         var settings = LiveEvalSettings.Resolve(repository,
             Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_MODEL"),
@@ -55,6 +56,28 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 }
                 Set-Content -LiteralPath (Join-Path (Get-Location) 'native-writer-natural-completion.txt') -Value 'completed'
                 """);
+            // Do not ask an LLM to invent a timed PowerShell loop: on the
+            // intended Codex host its inline command failed with a parser
+            // error, making the cancellation result unprovable.
+            await File.WriteAllTextAsync(Path.Combine(workspace, "native-wait-for-heartbeat.ps1"), """
+                $ErrorActionPreference = 'Stop'
+                $heartbeat = Join-Path $PSScriptRoot 'native-worker-heartbeat.txt'
+                $marker = Join-Path $PSScriptRoot 'native-heartbeat-ready.txt'
+                $deadline = [DateTime]::UtcNow.AddSeconds(30)
+                while ([DateTime]::UtcNow -lt $deadline) {
+                    if (Test-Path -LiteralPath $heartbeat) {
+                        $count = @(Get-Content -LiteralPath $heartbeat).Count
+                        if ($count -ge 3) {
+                            Set-Content -LiteralPath $marker -Value $count
+                            Write-Output "HEARTBEAT_READY count=$count"
+                            exit 0
+                        }
+                    }
+                    Start-Sleep -Milliseconds 250
+                }
+                Write-Error 'HEARTBEAT_NOT_READY: Writer did not emit three lines within 30 seconds'
+                exit 1
+                """);
             await InitializeGitRepositoryAsync(workspace, artifacts);
             PrepareCodexHome(home, workspace);
             await RunAsync(codex, ["--version"], repository, environment, null,
@@ -81,15 +104,20 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                    native-writer-natural-completion.txt only on full completion.
                    Root waits natively for Writer, without interrupting it.
                 3. Supervisor must NOT wait for Root's terminal result first.
-                   After spawning Root, use ONE bounded local PowerShell
-                   command to wait until native-worker-heartbeat.txt has at
-                   least three lines (timeout after 30 seconds). If this
-                   never happens, report BLOCKED and do NOT claim success.
-                   While Writer is still writing, call native list_agents,
-                   identify the full native Writer path, and call native
-                   interrupt_agent on WRITER directly, not Root.
-                   Immediately call native interrupt_agent on ROOT next.
-                   Never kill any process by shell or run extra Writer commands.
+                   After spawning Root, run the EXISTING script using EXACTLY
+                   this native shell command (do not construct or inline a
+                   PowerShell loop or add quotes around the script body):
+                   pwsh -NoProfile -File ./native-wait-for-heartbeat.ps1
+                   This prewritten script waits up to 30 seconds for three
+                   heartbeat lines, writes native-heartbeat-ready.txt ONLY on
+                   success, prints HEARTBEAT_READY and exits 0. If the command
+                   fails, times out or does not print HEARTBEAT_READY, report
+                   BLOCKED and do not claim cancellation was established.
+                   Immediately after success, while Writer is still writing,
+                   call native list_agents, identify the full native Writer
+                   path, and call native interrupt_agent on WRITER directly,
+                   not Root. Immediately interrupt ROOT next.
+                   Never kill a process by shell or run extra Writer commands.
                 4. Confirm through native agent events that both Writer and
                    Root are stopped. Confirm that the in-flight PowerShell
                    process is no longer writing, not merely that a native
@@ -158,6 +186,12 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             var writerInterrupt = Assert.Single(supervisor.Events, item =>
                 item.ToolName == "interrupt_agent" &&
                 HasArgument(item.ToolArguments, "target", writer.AgentPath!));
+            var readyWait = Assert.Single(supervisor.Events, item =>
+                item.ToolName is "exec" or "command_execution" &&
+                item.ToolArguments?.Contains("native-wait-for-heartbeat.ps1",
+                    StringComparison.OrdinalIgnoreCase) == true);
+            Assert.True(readyWait.Ordinal < writerInterrupt.Ordinal,
+                "Successful heartbeat wait must precede the Writer interruption.");
             var rootInterrupt = Assert.Single(supervisor.Events, item =>
                 item.ToolName == "interrupt_agent" &&
                 HasArgument(item.ToolArguments, "target", root.AgentPath!));
@@ -167,10 +201,12 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 "turn_aborted" or "turn.cancelled" or "turn_cancelled");
             Assert.Contains(root.Events, item => item.Type is
                 "turn_aborted" or "turn.cancelled" or "turn_cancelled");
-            Assert.Contains(supervisor.Events, item => item.Role == "assistant" &&
-                item.Text?.Contains("NATIVE_DESCENDANT_STOP_CONFIRMED",
-                    StringComparison.Ordinal) == true);
-
+            Assert.True(File.Exists(heartbeatReady),
+                "The prewritten heartbeat wait did not confirm three lines before cancellation.");
+            var readinessText = (await File.ReadAllTextAsync(heartbeatReady)).Trim();
+            Assert.True(int.TryParse(readinessText, out var readyCount) &&
+                readyCount is >= 3 and < 40,
+                $"Heartbeat readiness marker is invalid: '{readinessText}'.");
             Assert.True(File.Exists(guard), "One-shot Writer script did not start.");
             Assert.True(File.Exists(heartbeat), "Native Writer never wrote a heartbeat.");
             Assert.False(File.Exists(naturalCompletion),
@@ -183,6 +219,9 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             Assert.Equal(before, after);
             Assert.False(File.Exists(naturalCompletion),
                 "Writer completed naturally during the observation window.");
+            Assert.Contains(supervisor.Events, item => item.Role == "assistant" &&
+                item.Text?.Contains("NATIVE_DESCENDANT_STOP_CONFIRMED",
+                    StringComparison.Ordinal) == true);
 
             await File.WriteAllTextAsync(Path.Combine(artifacts, "stage0-writer-stop.json"),
                 JsonSerializer.Serialize(new
@@ -192,6 +231,7 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                     rootThread = root.ThreadId,
                     writerThread = writer.ThreadId,
                     writtenLinesBeforeStop = lines.Length,
+                    observedReadyLines = readyCount,
                     stableObservationSeconds = 8
                 }, new JsonSerializerOptions { WriteIndented = true }));
             confirmedQuiescence = true;
