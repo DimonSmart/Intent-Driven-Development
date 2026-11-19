@@ -7,21 +7,17 @@ packages each protocol from a unique canonical source into both platforms:
 | Internal Skill | Canonical source | Installed relative path |
 | --- | --- | --- |
 | `idd-internal-factory-root` | `src/canonical/factory/root.md` | `skills/idd-internal-factory-root/SKILL.md` |
-| `idd-internal-factory-root` | `src/canonical/factory/root.md` | `skills/idd-internal-factory-root/SKILL.md` |
 | `idd-internal-factory-planner` | `src/canonical/factory/planner.md` | `skills/idd-internal-factory-planner/SKILL.md` |
 | `idd-internal-factory-worker` | `src/canonical/factory/worker.md` | `skills/idd-internal-factory-worker/SKILL.md` |
 
 ## Staged Supervisor migration
 
-The new internal Root is now packaged with its own mandatory references,
-but **the public `idd-factory-run` retains the existing one-level behavior
-until native stop/writer gates and the 10-task / 3-per-batch E2E pass**.
-Do not route user requests into the internal Root directly or interpret
-Skill packaging alone as activation of two-level orchestration. During this
-transitional stage the existing public and internal Root both carry the
-necessary normative references to keep old runs compatible. The public
-command will become the thin Supervisor and surrender those references
-only in the final verified migration.
+The two-level native Supervisor and three internal Skills are
+implemented together on the Factory v2 feature branch. Packaging or a
+Stage-0 smoke test is not evidence of safe production activation.
+Keep the public `main` release on its tested behavior until mandatory
+native descendant-writer-stop and full E2E acceptance gates have
+passed. An internal Root is never a user-facing entrypoint.
 
 ## Normal setup
 
@@ -90,15 +86,19 @@ package; Root must find internal Planner and Worker there. Codex uses
 `idd_factory_root_b0001` and batch-scoped
 `idd_factory_(planner|worker)_b0001_0001` native task names, all with
 `fork_turns: "none"`. Supervisor never runs a Planner or Worker itself.
-On each confirmed checkpoint boundary at the positive
-`max_workers_per_batch` limit (default 8) it starts one brand-new Root;
-otherwise it does not auto-retry. No additional installed agent definitions
+On each CONFIRMED FULL PLAN boundary after the Root reaches or
+exceeds the positive `max_workers_per_batch` target (default 8),
+Supervisor may start one fresh Root; reaching the target in the
+middle of a Planner plan does NOT trigger rotation. Newly generated
+Planner results contain at most 4 Tasks; previous saved plans may
+contain more. Neither an empty plan nor the terminal text alone proves
+successful completion. Supervisor does not auto-retry after a failure. No additional installed agent definitions
 or changes to `.idd/execution.yaml` are needed.
 
 The ordinary Linux/Windows CI proves generator contracts, syntax and report
 fixtures. The user-facing nested architecture MUST additionally pass the
 controlled native writer-stop/descendant-quiescence live gate, effective
-model/effort override, and the explicit 10-task limit-3 four-Root E2E on
+model/effort override, and the explicit 10-task limit-3 plan-safe E2E on
 the intended Codex host. The Stage-0 read-only smoke result alone does not
 prove writer-stop or multi-batch completion. The PR is gated until those
 real-host checks pass; Claude requires separate runtime evidence.

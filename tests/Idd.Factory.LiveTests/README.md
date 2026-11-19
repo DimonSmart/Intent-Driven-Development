@@ -346,9 +346,12 @@ NOT be merged.
 **Ten-step/limit-3 gate:** the test installs a fresh generated Marketplace
 package into a new isolated CODEX_HOME, creates a minimal self-contained
 `.idd/intent/` + .NET project, invokes the public Supervisor ONCE, requires
-four sequential native Root sessions with confirmed batch counts 3/3/3/1,
-10 distinct Worker child threads, exact batch-scoped native task names,
-valid model/effort routing, final `# Done`/Project Verification and ten
+a reproducible first Planner result with FOUR independent Tasks and a
+Root target of 3, verifies that all four Workers finish under the SAME
+Root before rotation, permits `CompletedWorkers > 3`, and also verifies
+10 distinct Worker child threads, exact batch-scoped native task names, plan completion at every normal
+Root rotation regardless of actual Planner grouping, valid model/effort
+routing, final `# Done`/Project Verification and ten
 independently passing xUnit cases. It stores raw native sessions,
 `factory-report.json`, trace, Git status/diff and xUnit TRX under
 `artifacts/factory-evals/batch-ten-*/`.

@@ -121,6 +121,10 @@ IDD-NNNN
 ENG-NNNN
 ```
 
+New Planner output contains no more than **4** complete `# Task`
+sections; an oversized result is invalid before persistence/Worker
+execution and must not be truncated. Choose coherent independent work
+without filler Tasks; existing saved plans larger than four remain valid.
 New planner output requires `ExecutionProfile` exactly once for the immediately
 preceding task. Existing `plan.md` tasks without it use `standard`. Empty,
 repeated, or unknown explicit profiles are invalid. A profile expresses required
@@ -177,24 +181,28 @@ Internal Skill installation and host limitations are documented in
 `idd-factory-run` is a thin public Supervisor. It resolves and validates the
 internal `idd-internal-factory-root/SKILL.md` from the same installed plugin,
 checks real nested native child capability and spawns one fresh Root per batch.
-The effective positive `max_workers_per_batch` is **8** unless overridden
-for this invocation; it is not written into `.idd/execution.yaml`.
+The positive invocation-local `max_workers_per_batch` defaults to **8**
+and is a minimum Worker-count **target** for rotation, not a hard cap
+or a setting saved to `.idd/execution.yaml`.
 
-Each internal Root owns the former public Root's full semantic contract:
-Preflight, Engineering and Product owners, Planner/Worker, pending provenance,
-ExecutionProfile routing, project verification, Intent Refinement Review,
-recovery, and terminal cleanup. Root increments its ephemeral count ONLY
-after a trusted completed Worker and durable checkpoint; at the exact limit it
-returns CONTINUE/BATCH_LIMIT even if the plan is empty. The next new Root
-continues from unchanged `.idd/factory/current/request.md` and remaining
-plan; it does not rerun new-run preflight. Supervisor never performs these
-operations, replays Workers, or reads full child transcripts.
+Each internal Root owns the former public Root's full semantic
+contract: Preflight, Engineering/Product owners, Planner/Worker,
+pending provenance, ExecutionProfile routing, project verification,
+Intent Refinement Review, recovery and cleanup. After every verified
+Worker checkpoint Root increments its local counter. It MUST execute
+the rest of the current Planner plan before a normal `BATCH_LIMIT`
+rotation, even if that leads to `CompletedWorkers > max_workers_per_batch`.
+A confirmed boundary includes all Workers stopped, completed results
+reconciled across `completed.md`, `plan.md` and `provenance.md`,
+and no pending checkpoint. An empty plan is not proof by itself.
+Root returns CONTINUE only at such a boundary with an actual count
+at least the target; the next Root continues the unchanged saved
+request with a fresh Planner (possibly `# Done`), not a transcript.
 
-Root returns strict flat `Status`, `CompletedWorkers`, `Reason` fields
-(and `QuestionFile` only for actual saved questions). A CONTINUE at a
-positive full limit, confirmed checkpoint and idle descendants is the only
-permission to start a new Root. NEEDS_INPUT, COMPLETED, BLOCKED, missing
-evidence or host stop uncertainty end automatic spawning.
+Supervisor never performs these project operations or replays Workers.
+It verifies Root's terminal result and the plan boundary mechanically.
+NEEDS_INPUT, COMPLETED, BLOCKED or ambiguous state/writer-stop
+evidence end automatic spawning.
 
 Codex native task names are batch-scoped; old flat
 `idd_factory_planner_01`/`idd_factory_worker_01` are historical report

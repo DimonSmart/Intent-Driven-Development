@@ -215,13 +215,24 @@ ordinal, the positive `effectiveWorkerLimit` parsed from its own native
 Supervisor spawn assignment, strict terminal `Status/CompletedWorkers/Reason`
 only when that budget and native terminal completion can be verified,
 and a terminal-evidence classification. `metrics` includes
-`factoryRootInvocations` and `supervisorInvocations`.
+`factoryRootInvocations` and `supervisorInvocations`. The positive
+`effectiveWorkerLimit` is a rotation target, NOT a maximum;
+`completedWorkers` may exceed it for any terminal status, and
+`CONTINUE/BATCH_LIMIT` is valid when the count is at least the target.
+Historic pre-plan-boundary v2 traces, including exact-limit rotations,
+remain readable. No schema version bump is needed.
 `run.supervisorThreadId` identifies new two-level runs. Existing fields
 and schema version remain backward compatible.
 
 An ambiguous role or incomplete terminal result remains `unavailable`.
-Never infer a batch checkpoint merely from a child summary, and never
-attribute a Worker in one batch to a Planner from another Root. Total tokens
+Never infer a batch checkpoint or completed Planner plan merely from
+a child summary or from the read-only native event trace. Without
+reliable saved `plan.md`/`completed.md`/`provenance.md` checkpoint
+and native descendant-stop evidence, plan-boundary verification is
+**unavailable** in the report, not falsely asserted as passed.
+The Supervisor, not this reporter, validates the live persisted boundary
+before another Root. Never attribute a Worker in one batch to a
+Planner from another Root (historic v2 traces can span Roots). Total tokens
 sum independent authoritative thread counters once per unique thread;
 overlapping/missing counters remain unavailable rather than double-counted.
 
