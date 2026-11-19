@@ -374,6 +374,22 @@ probe independently checks child Skill loading. If direct descendant stop
 or in-flight command quiescence is unproven, the gate MUST fail and the
 public Supervisor MUST NOT be merged.
 
+**Confirmed host blocker (Windows Codex CLI 0.163.0, 2026-11-19):**
+The full native trace of `nested-writer-stop-f7c88ef66ad942e68f087394e4a3e604`
+shows a successful heartbeat-readiness marker (3 lines), native Writer
+interrupt at 20:41:47Z, Root interrupt at 20:41:49Z and both agent threads
+`turn_aborted`. Nevertheless the Writer's launched PowerShell child continued
+writing: heartbeat rose from 24 to 26 lines after interruption, then from
+38 to 40. A second Writer interrupt at 20:42:13Z returned
+`previous_status: interrupted`; the child command eventually exited 0 and
+the natural-completion marker exists in the saved workspace. This is a
+**real host/process-cancellation failure**, not duplicate trace events.
+The live gate must fail with `HOST_UNSUPPORTED_WRITER_COMMAND_SURVIVED_INTERRUPT`
+rather than a misleading `Assert.Single` failure. Until the host demonstrably
+terminates in-flight writing commands, do not repeat the costly Gate 1 on the
+same host/version, run Gate 2, merge PR #77 or enable two-level Factory. A
+native host fix and fresh real-host Gate 1 are required.
+
 **Ten-step/limit-3 gate:** the test installs a fresh generated Marketplace
 package into a new isolated CODEX_HOME, creates a minimal self-contained
 `.idd/intent/` + .NET project, invokes the public Supervisor ONCE, requires

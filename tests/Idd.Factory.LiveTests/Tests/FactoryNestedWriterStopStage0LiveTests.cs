@@ -183,9 +183,14 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             // not stop this grandchild on the tested Codex host.
             Assert.False(string.IsNullOrWhiteSpace(root.AgentPath));
             Assert.False(string.IsNullOrWhiteSpace(writer.AgentPath));
-            var writerInterrupt = Assert.Single(supervisor.Events, item =>
-                item.ToolName == "interrupt_agent" &&
-                HasArgument(item.ToolArguments, "target", writer.AgentPath!));
+            // A second real native interrupt can be attempted after the first
+            // returned an interrupted agent status. The first call establishes
+            // descendant-first ordering; later calls do not prove that its
+            // already-started shell command was cancelled.
+            var writerInterrupts = FindNativeInterrupts(supervisor.Events, writer.AgentPath!);
+            Assert.True(writerInterrupts.Length > 0,
+                $"No direct native interrupt of Writer {writer.AgentPath} was observed.");
+            var writerInterrupt = writerInterrupts[0];
             // Codex records one shell call as both a host tool wrapper and a
             // native CommandExecution item; ItemStarted and ItemCompleted can
             // also describe the same invocation. Count only completed native
@@ -193,9 +198,10 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             var readyWait = AssertSingleCompletedNativeHeartbeatWait(supervisor.Events);
             Assert.True(readyWait.Ordinal < writerInterrupt.Ordinal,
                 "Successful heartbeat wait must precede the Writer interruption.");
-            var rootInterrupt = Assert.Single(supervisor.Events, item =>
-                item.ToolName == "interrupt_agent" &&
-                HasArgument(item.ToolArguments, "target", root.AgentPath!));
+            var rootInterrupts = FindNativeInterrupts(supervisor.Events, root.AgentPath!);
+            Assert.True(rootInterrupts.Length > 0,
+                $"No direct native interrupt of Root {root.AgentPath} was observed.");
+            var rootInterrupt = rootInterrupts[0];
             Assert.True(writerInterrupt.Ordinal < rootInterrupt.Ordinal,
                 "The Writer must be interrupted before its parent Root.");
             Assert.Contains(writer.Events, item => item.Type is
@@ -210,16 +216,37 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 $"Heartbeat readiness marker is invalid: '{readinessText}'.");
             Assert.True(File.Exists(guard), "One-shot Writer script did not start.");
             Assert.True(File.Exists(heartbeat), "Native Writer never wrote a heartbeat.");
-            Assert.False(File.Exists(naturalCompletion),
-                "Writer completed all 40 writes naturally; cancellation was not proven.");
             var before = await File.ReadAllTextAsync(heartbeat);
             var lines = before.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            var naturalCompletionPresent = File.Exists(naturalCompletion);
+            var writerAbortOrdinal = writer.Events.Where(item => item.Type is
+                    "turn_aborted" or "turn.cancelled" or "turn_cancelled")
+                .Min(item => item.Ordinal);
+            var commandCompletedAfterAbort = writer.Events.Any(item =>
+                item.ItemKind == "CommandExecution" &&
+                item.Lifecycle == "ItemCompleted" &&
+                item.ExitCode == 0 &&
+                item.Ordinal > writerAbortOrdinal &&
+                item.ToolArguments?.Contains("native-writer-probe.ps1",
+                    StringComparison.OrdinalIgnoreCase) == true);
+            Assert.True(!naturalCompletionPresent && lines.Length < 40,
+                "HOST_UNSUPPORTED_WRITER_COMMAND_SURVIVED_INTERRUPT: " +
+                $"after {writerInterrupts.Length} native Writer interrupt call(s) " +
+                $"and a native turn_abort, heartbeat reached {lines.Length}/40 " +
+                $"(readiness marker: {readyCount}) and natural-completion " +
+                $"marker exists={naturalCompletionPresent}. " +
+                $"PowerShell command completed after Writer abort={commandCompletedAfterAbort}. " +
+                "Agent cancellation did not stop the writing process; " +
+                "Factory v2 must remain blocked on this host.");
             Assert.InRange(lines.Length, 3, 39);
             await Task.Delay(TimeSpan.FromSeconds(8));
             var after = await File.ReadAllTextAsync(heartbeat);
-            Assert.Equal(before, after);
-            Assert.False(File.Exists(naturalCompletion),
-                "Writer completed naturally during the observation window.");
+            var afterLineCount = after.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;
+            Assert.True(before == after && !File.Exists(naturalCompletion),
+                "HOST_UNSUPPORTED_WRITER_COMMAND_STILL_WRITING: heartbeat changed " +
+                $"from {lines.Length} to {afterLineCount} lines or the natural " +
+                "completion marker appeared during the 8-second observation " +
+                "after Writer interruption.");
             Assert.Contains(supervisor.Events, item => item.Role == "assistant" &&
                 item.Text?.Contains("NATIVE_DESCENDANT_STOP_CONFIRMED",
                     StringComparison.Ordinal) == true);
@@ -253,6 +280,38 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 Environment.GetEnvironmentVariable("IDD_FACTORY_EVAL_KEEP_TEMP") != "1")
                 try { Directory.Delete(temp, recursive: true); } catch { }
         }
+    }
+
+    private static CodexEvent[] FindNativeInterrupts(
+        IEnumerable<CodexEvent> events, string target) =>
+        events.Where(item =>
+                item.ToolName == "interrupt_agent" &&
+                HasArgument(item.ToolArguments, "target", target))
+            .OrderBy(item => item.Ordinal)
+            .ToArray();
+
+    [Fact]
+    public void Factory_NativeStopUsesFirstInterruptEvenIfLaterRetried()
+    {
+        const string writerPath = "/root/idd_factory_root_b0001/idd_factory_worker_b0001_0001";
+        var events = new[]
+        {
+            new CodexEvent
+            {
+                ToolName = "interrupt_agent",
+                ToolArguments = "{\"target\":\"" + writerPath + "\"}",
+                Ordinal = 35
+            },
+            new CodexEvent
+            {
+                ToolName = "interrupt_agent",
+                ToolArguments = "{\"target\":\"" + writerPath + "\"}",
+                Ordinal = 67
+            }
+        };
+        var calls = FindNativeInterrupts(events, writerPath);
+        Assert.Equal(2, calls.Length);
+        Assert.Equal(35, calls[0].Ordinal);
     }
 
     private static CodexEvent AssertSingleCompletedNativeHeartbeatWait(
