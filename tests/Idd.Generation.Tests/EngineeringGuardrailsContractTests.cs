@@ -21,7 +21,7 @@ public sealed class EngineeringGuardrailsContractTests(GenerationFixture fixture
             ("idd-intent", "idd-intent-lint"),
             ("idd-intent", "idd-engineering-change"),
             ("idd-intent", "idd-intent-import"),
-            ("idd-factory", "idd-factory-run")
+            ("idd-factory", "idd-internal-factory-root")
         };
 
         foreach (var platform in new[] { "claude", "codex" })

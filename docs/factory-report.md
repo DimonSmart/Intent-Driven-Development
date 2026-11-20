@@ -196,3 +196,45 @@ Unknown unrelated Codex events are tolerated. Missing Factory-relevant evidence 
 ## Regression fixture
 
 The test suite includes sanitized native root JSONL fixtures from the three October 16 Live Eval token-counter shapes, with the final usage record following the structured Factory reply, plus a sanitized current-native JSONL fixture preserving `event_msg/item_completed`, `CollabAgentToolCall`, `CommandExecution`, `FileChange`, and `token_usage_record` structures. Synthetic helpers remain appropriate for isolated legacy/parser unit tests.
+
+
+## Two-level native batch reporting
+
+The additive report retains legacy flat Root/Planner/Worker traces unchanged,
+including task names `idd_factory_(planner|worker)_[0-9]+`.
+For new native nested traces, the top-level agent is `supervisor`;
+its direct generic child `idd_factory_root_bNNNN` is `root`, and its
+children `idd_factory_(planner|worker)_bNNNN_NNNN` retain their familiar
+roles. Native parent thread IDs, accepted spawn correlation and matching
+`agent_path` are preferred over names and timestamps.
+
+`agents[]` additionally includes optional `nativeTaskName` and
+`batchOrdinal`. `tasks[]` has optional `batchOrdinal`.
+`batches[]` lists each actual discovered native Root, exact batch
+ordinal, the positive `effectiveWorkerLimit` parsed from its own native
+Supervisor spawn assignment, strict terminal `Status/CompletedWorkers/Reason`
+only when that budget and native terminal completion can be verified,
+and a terminal-evidence classification. `metrics` includes
+`factoryRootInvocations` and `supervisorInvocations`. The positive
+`effectiveWorkerLimit` is a rotation target, NOT a maximum;
+`completedWorkers` may exceed it for any terminal status, and
+`CONTINUE/BATCH_LIMIT` is valid when the count is at least the target.
+Historic pre-plan-boundary v2 traces, including exact-limit rotations,
+remain readable. No schema version bump is needed.
+`run.supervisorThreadId` identifies new two-level runs. Existing fields
+and schema version remain backward compatible.
+
+An ambiguous role or incomplete terminal result remains `unavailable`.
+Never infer a batch checkpoint or completed Planner plan merely from
+a child summary or from the read-only native event trace. Without
+reliable saved `plan.md`/`completed.md`/`provenance.md` checkpoint
+and trusted normal native completion evidence, plan-boundary verification is
+**unavailable** in the report, not falsely asserted as passed.
+Root owns live plan-boundary and checkpoint validation before it returns
+CONTINUE. Supervisor checks the correlated native Root terminal, compact
+status/count and active request marker; neither Supervisor nor reporter
+reconstructs the nested checkpoint. Never attribute a Worker in one batch to a
+Planner from another Root (historic v2 traces can span Roots). Total tokens
+sum independent authoritative thread counters once per unique thread;
+overlapping/missing counters remain unavailable rather than double-counted.
+

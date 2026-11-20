@@ -291,16 +291,61 @@ rejected by **host policy**, independently of the Factory plugin. The same
 host must permit reading the installed Skill through an approved mechanism
 for Stage 0 to pass. Do not simulate the read, silently copy its text into
 spawn prompts, or change the public Factory in response to this blocker.
-The normal-completion probe must not call `interrupt_agent`: cancellation
-and descendant quiescence require a separate dedicated Stage 0 evaluation.
+The normal-completion probe does not test host-owned emergency interruption,
+which is not a prerequisite for ordinary Factory work.
 
 The technical probe intentionally exercises both internal Skills with
 incomplete, read-only assignments, expecting `BLOCKED` from each.
 It does **not** prove simultaneous write safety, full Factory checkpoint
-semantics, forced child cancellation or end-to-end rotation. Those require
-additional live evaluations (including a controlled writer probe and
-10-worker / limit-3 E2E) before the public Supervisor can be shipped.
+semantics or end-to-end rotation. Those require the separate
+10-worker / limit-3 E2E before the public Supervisor can be shipped.
 A green normal CI build, `agents.max_depth=2`, a trace from a different
 host, or an unexecuted smoke test do not satisfy the Stage 0 gate.
 Until verified native nested-spawn evidence exists, preserve the current
 one-level `idd-factory-run` behavior.
+
+## Two-level Supervisor live acceptance (feature branch only)
+
+Before merging the public Supervisor into main, verify real native
+depth-two execution, installed-Skill delivery, sequential Workers,
+trusted normal terminals, complete checkpoints and Root rotation on the
+intended host. Deterministic CI does not execute this token-consuming E2E;
+use an isolated test worktree.
+
+Run in PowerShell from this feature branch:
+
+~~~powershell
+pwsh ./scripts/Verify-FactoryV2-Native.ps1
+~~~
+
+The command directly executes the ten-task, limit-3 E2E. It does not require
+an emergency-cancellation gate or force an alternate shell backend.
+
+An earlier Windows Codex CLI 0.163.0 cancellation experiment found an OS
+PowerShell process surviving an aborted agent. Interruption and OS process
+cleanup are host responsibilities. Factory preserves state and stops
+automatic spawning after uncertain native terminals; a later explicit
+Continue/Restart/Cancel reconciles actual changes after verifying that
+no old operation is still writing. No custom process supervisor is needed.
+
+**Ten-step/limit-3 gate:** the test installs a fresh generated Marketplace
+package into a new isolated CODEX_HOME, creates a minimal self-contained
+`.idd/intent/` + .NET project, invokes the public Supervisor ONCE, requires
+a reproducible first Planner result with FOUR independent Tasks and a
+Root target of 3, verifies that all four Workers finish under the SAME
+Root before rotation, permits `CompletedWorkers > 3`, and also verifies
+10 distinct Worker child threads, exact batch-scoped native task names, plan completion at every normal
+Root rotation regardless of actual Planner grouping, valid model/effort
+routing, final `# Done`/Project Verification and ten
+independently passing xUnit cases. It stores raw native sessions,
+`factory-report.json`, trace, Git status/diff and xUnit TRX under
+`artifacts/factory-evals/batch-ten-*/`.
+A successful code build, synthetic topology fixture or Stage-0 read-only
+smoke does not substitute for this real end-to-end gate. Inspect any failures
+rather than automatically retrying expensive live execution.
+
+For the final acceptance report, also capture and compare equivalent
+one-level vs two-level host/model/snapshot runs with per-thread input/output,
+Supervisor/Root usage, compactions, waits and independently passing project
+tests. Do not claim token savings based on unexecuted experiments or compare
+different project outcomes.

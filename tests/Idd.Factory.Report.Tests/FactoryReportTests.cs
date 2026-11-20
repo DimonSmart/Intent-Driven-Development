@@ -682,7 +682,9 @@ public sealed partial class FactoryReportTests : IDisposable
         Write(Path.Combine(dir, "worker.jsonl"),
         [
             Session(workerId, repo, rootId),
-            User("2026-09-23T10:00:03Z", "Factory child context")
+            User("2026-09-23T10:00:03Z", "Factory child context"),
+            Assistant("2026-09-23T10:00:04Z", "Work completed.")
+            // No native task_complete: the assistant's claim is not terminal evidence.
         ]);
 
         var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
@@ -727,7 +729,8 @@ public sealed partial class FactoryReportTests : IDisposable
         [
             Session(workerId, repo, rootId),
             NativeCommandCompleted("2026-09-23T10:00:20Z", "probe", "dotnet test", 1),
-            Assistant("2026-09-23T10:00:30Z", "Implemented the catalog value type.")
+            Assistant("2026-09-23T10:00:30Z", "Implemented the catalog value type."),
+            NativeTerminal("2026-09-23T10:00:30.001Z")
         ]);
 
         var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
@@ -846,7 +849,8 @@ public sealed partial class FactoryReportTests : IDisposable
             Session(worker1, repo),
             User("2026-09-23T10:00:11Z", "Inherited Factory context mentions idd-factory-decompose-task too."),
             Tokens("2026-09-23T10:00:50Z", 1200, 700, 90),
-            Assistant("2026-09-23T10:01:00Z", "Implemented ProductCode.")
+            Assistant("2026-09-23T10:01:00Z", "Implemented ProductCode."),
+            NativeTerminal("2026-09-23T10:01:00.001Z")
         ]);
 
         Write(Path.Combine(dir, "worker-2.jsonl"),
@@ -854,7 +858,8 @@ public sealed partial class FactoryReportTests : IDisposable
             Session(worker2, repo),
             User("2026-09-23T10:01:11Z", "Inherited Factory context mentions idd-factory-decompose-task too."),
             Tokens("2026-09-23T10:01:50Z", 900, 400, 70),
-            Assistant("2026-09-23T10:02:00Z", "Updated Catalog.")
+            Assistant("2026-09-23T10:02:00Z", "Updated Catalog."),
+            NativeTerminal("2026-09-23T10:02:00.001Z")
         ]);
 
         Write(Path.Combine(dir, "planner-2.jsonl"),
@@ -900,7 +905,8 @@ public sealed partial class FactoryReportTests : IDisposable
         [
             Session(id, cwd, parent),
             User("2026-09-23T10:00:06Z", "Factory child context"),
-            .. events
+            .. events,
+            NativeTerminalAfter(events)
         ]);
     }
 
@@ -1172,6 +1178,21 @@ public sealed partial class FactoryReportTests : IDisposable
             status = "completed"
         }
     };
+
+    private static object NativeTerminal(string timestamp) => new
+    {
+        timestamp, type = "event_msg",
+        payload = new { type = "task_complete" }
+    };
+
+    private static object NativeTerminalAfter(object[] events)
+    {
+        var timestamp = events.Length == 0
+            ? DateTimeOffset.Parse("2026-09-23T10:00:07Z")
+            : DateTimeOffset.Parse(JsonSerializer.SerializeToElement(events[^1])
+                .GetProperty("timestamp").GetString()!);
+        return NativeTerminal(timestamp.AddMilliseconds(1).ToString("O"));
+    }
 
     private static object NativeCommandCompleted(string timestamp, string id, string command, int exitCode) => new
     {

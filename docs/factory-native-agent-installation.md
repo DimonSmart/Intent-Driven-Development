@@ -10,17 +10,22 @@ packages each protocol from a unique canonical source into both platforms:
 | `idd-internal-factory-planner` | `src/canonical/factory/planner.md` | `skills/idd-internal-factory-planner/SKILL.md` |
 | `idd-internal-factory-worker` | `src/canonical/factory/worker.md` | `skills/idd-internal-factory-worker/SKILL.md` |
 
-## Staged Supervisor migration
+Both platform adapters generate Factory Skills directly from their canonical
+sources, adding only platform frontmatter and packaging metadata. They do not
+append behavioral instructions. Platform-native operation and model-parameter
+rules are maintained in the canonical Skills and shared references; generated
+Skill bodies are tested for exact equivalence with those sources.
 
-The new internal Root is now packaged with its own mandatory references,
-but **the public `idd-factory-run` retains the existing one-level behavior
-until native stop/writer gates and the 10-task / 3-per-batch E2E pass**.
-Do not route user requests into the internal Root directly or interpret
-Skill packaging alone as activation of two-level orchestration. During this
-transitional stage the existing public and internal Root both carry the
-necessary normative references to keep old runs compatible. The public
-command will become the thin Supervisor and surrender those references
-only in the final verified migration.
+## Active Factory v2 architecture
+
+On this branch, `idd-factory-run` is the public two-level Supervisor:
+it dispatches fresh internal Factory Roots, and each Root dispatches
+fresh Planner/Worker children. All three roles are installed internal Skills;
+Root is never a user-facing entrypoint. No flat orchestration fallback
+is part of Factory v2.
+
+Packaging or a Stage-0 smoke test does not prove live host compatibility.
+Release acceptance requires real multi-batch E2E evidence before merging this architecture into `main`.
 
 ## Normal setup
 
@@ -36,16 +41,22 @@ manages optional `.idd/execution.yaml` model-selection policy.
 The host must provide ordinary native children with fresh context (no inherited
 parent transcript), shared workspace and access to the installed package,
 bounded task delivery, terminal result, native blocking or event-driven wait,
-and reliable interruption/stop before another writer starts. Exact explicit
-per-child model/effort overrides must be possible for configured policy values.
-Separate per-child sandboxing is optional; Planner must behave read-only and
-prefer host-enforced read-only permissions when possible. Unsupported actual
-capabilities block with a precise diagnostic, without a custom process runtime.
+and trustworthy normal completion before another writer starts.
+Exceptional OS process cleanup is host-owned and does not require a
+forced-cancellation preflight probe. Native model/
+effort override support is not required to start Factory: Root checks it only
+for the selected Worker's explicit `.idd/execution.yaml` mapping, immediately
+before spawn. Inherited mappings need no override support. Separate per-child
+sandboxing is optional; Planner must behave read-only and prefer host-enforced
+read-only permissions when possible. Missing mandatory capabilities block with
+a precise diagnostic, without a custom process runtime.
 
 ## Child Skill delivery
 
-Root derives both internal `SKILL.md` paths from the **actually loaded**
-`idd-factory-run/SKILL.md`, never from the source checkout, current project
+Supervisor derives the internal Root `SKILL.md` from the **actually loaded**
+`idd-factory-run/SKILL.md`. Root derives its sibling Planner and Worker
+`SKILL.md` paths from the **actually loaded internal Root Skill** in the
+same installed plugin version, never from the source checkout, current project
 folder, guessed cache version or global filename search. Root may check path
 existence/access but must not read protocol bodies. Every generic child receives
 its role, the exact accessible path to the installed Skill (use absolute paths,
@@ -54,8 +65,10 @@ bounded phase/task assignment. The child reads its **entire** Skill and any
 mandatory references as its first substantive action, checks completeness and
 returns `BLOCKED` without project work if invalid.
 
-Codex requires `fork_turns: "none"` and uses `task_name` values such as
-`idd_factory_planner_01` for correlation. A session without `agent_type`
+Codex requires `fork_turns: "none"` and uses batch-scoped `task_name`
+values such as `idd_factory_root_b0001`,
+`idd_factory_planner_b0001_0001` and `idd_factory_worker_b0001_0001`
+for correlation. Older flat task names are accepted only by the reporter. A session without `agent_type`
 can run Factory. Do not invent an `agent_type` parameter; if a host requires
 an agent type, use only its built-in generic type. Claude uses a native generic
 subagent/fork with equivalent isolation and lifecycle guarantees. Avoid
@@ -80,3 +93,29 @@ messages, native no-history settings, sequential Writers and independent
 product verification. CLI and Claude compatibility do not prove Desktop
 compatibility; each host must be verified on its own. A real Codex Desktop run
 with no `agent_type` selector is needed to close the original regression.
+
+
+## Two-level execution and native gating
+
+The public Supervisor must find its internal Root in the same installed
+package; Root must find internal Planner and Worker there. Codex uses
+`idd_factory_root_b0001` and batch-scoped
+`idd_factory_(planner|worker)_b0001_0001` native task names, all with
+`fork_turns: "none"`. Supervisor never runs a Planner or Worker itself.
+On each CONFIRMED FULL PLAN boundary after the Root reaches or
+exceeds the positive `max_workers_per_batch` target (default 8),
+Supervisor may start one fresh Root; reaching the target in the
+middle of a Planner plan does NOT trigger rotation. Newly generated
+Planner results contain at most 4 Tasks; previous saved plans may
+contain more. Neither an empty plan nor the terminal text alone proves
+successful completion. Supervisor does not auto-retry after a failure. No additional installed agent definitions
+or changes to `.idd/execution.yaml` are needed.
+
+The ordinary Linux/Windows CI proves generator contracts, syntax and report
+fixtures. The user-facing nested architecture MUST additionally pass the
+effective model/effort override and explicit 10-task limit-3 plan-safe E2E on
+the intended Codex host. The Stage-0 read-only smoke result alone does not
+prove multi-batch completion. Emergency cancellation tests are optional host
+diagnostics, not a release gate. The PR is gated until those
+real-host checks pass; Claude requires separate runtime evidence.
+

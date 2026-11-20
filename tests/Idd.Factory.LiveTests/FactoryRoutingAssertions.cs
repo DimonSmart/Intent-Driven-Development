@@ -139,6 +139,73 @@ internal static class FactoryRoutingAssertions
             IsFactoryWorkerSpawn(spawn) && spawn.SpawnOutcome != "accepted");
     }
 
+    internal static void VerifyNestedNativeSpawns(
+        FactoryRunReport report,
+        CodexRollout supervisor,
+        IReadOnlyList<CodexRollout> roots,
+        IReadOnlyDictionary<string, WorkerExecutionSettings> mappings)
+    {
+        Verify(report, mappings);
+        Assert.Equal(1, report.Metrics.SupervisorInvocations);
+        Assert.Equal(roots.Count, report.Metrics.FactoryRootInvocations);
+        Assert.True(report.Completion.PlannerDone == true,
+            "Nested Factory must finish with a fresh Planner # Done.");
+
+        var byThread = report.Agents.ToDictionary(agent => agent.ThreadId,
+            StringComparer.Ordinal);
+        var ordered = report.Batches.OrderBy(batch => batch.BatchOrdinal).ToArray();
+        Assert.True(ordered.Select(batch => batch.BatchOrdinal)
+            .SequenceEqual(Enumerable.Range(1, ordered.Length).Select(number => (int?)number)));
+
+        var rootSpawns = supervisor.SpawnRecords.Values.ToArray();
+        Assert.Equal(roots.Count, rootSpawns.Length);
+        foreach (var root in roots)
+        {
+            var agent = byThread[root.ThreadId];
+            Assert.Equal("root", agent.Role);
+            Assert.Equal(supervisor.ThreadId, root.ParentThreadId);
+            var spawn = Assert.Single(rootSpawns, item =>
+                item.RequestedTaskName == agent.NativeTaskName);
+            Assert.False(spawn.CorrelationConflict);
+            Assert.NotEqual("rejected", spawn.SpawnOutcome);
+            Assert.Contains(supervisor.Events, item =>
+                item.ToolName == "spawn_agent" && item.ToolId == spawn.CallId &&
+                HasNoHistoryFork(item.ToolArguments));
+        }
+
+        var all = roots.SelectMany(root => root.SpawnRecords.Values
+            .Select(spawn => (Root: root, Spawn: spawn))).ToArray();
+        foreach (var agent in report.Agents.Where(agent => agent.Role is "planner" or "worker"))
+        {
+            var root = Assert.Single(roots, item => item.ThreadId == agent.ParentThreadId);
+            var match = Assert.Single(all, item =>
+                item.Root.ThreadId == root.ThreadId &&
+                item.Spawn.RequestedTaskName == agent.NativeTaskName);
+            var parsed = FactoryBatchTrace.ParseName(agent.NativeTaskName);
+            Assert.NotNull(parsed);
+            Assert.Equal(agent.Role, parsed.Role);
+            Assert.Equal(byThread[root.ThreadId].BatchOrdinal, agent.BatchOrdinal);
+            Assert.False(match.Spawn.CorrelationConflict);
+            Assert.NotEqual("rejected", match.Spawn.SpawnOutcome);
+            Assert.Contains(root.Events, item =>
+                item.ToolName == "spawn_agent" && item.ToolId == match.Spawn.CallId &&
+                HasNoHistoryFork(item.ToolArguments));
+        }
+
+        foreach (var task in report.Tasks)
+        {
+            var expected = mappings[task.ExecutionProfile!];
+            Assert.Equal(expected.Model, task.RequestedModel);
+            Assert.Equal(expected.ReasoningEffort, task.RequestedReasoningEffort);
+            Assert.Equal(expected.Model, task.ActualModel);
+            Assert.Equal(expected.ReasoningEffort, task.ActualReasoningEffort);
+        }
+        Assert.DoesNotContain(all, item => item.Spawn.CorrelationConflict ||
+            IsFactoryWorkerSpawn(item.Spawn) && item.Spawn.SpawnOutcome == "rejected");
+
+
+    }
+
     internal static IEnumerable<SpawnRecord> InRun(CodexRollout root, FactoryRunReport report) =>
         root.SpawnRecords.Values.Where(spawn =>
             spawn.Timestamp is not null &&
@@ -149,13 +216,12 @@ internal static class FactoryRoutingAssertions
         role switch
         {
             "worker" => IsFactoryWorkerSpawn(spawn),
-            "planner" => Regex.IsMatch(spawn.RequestedTaskName ?? "",
-                @"^idd_factory_planner_[0-9]+$"),
+            "planner" => FactoryBatchTrace.ParseName(spawn.RequestedTaskName)?.Role == "planner",
             _ => false
         };
 
     private static bool IsFactoryWorkerSpawn(SpawnRecord spawn) =>
-        Regex.IsMatch(spawn.RequestedTaskName ?? "", @"^idd_factory_worker_[0-9]+$");
+        FactoryBatchTrace.ParseName(spawn.RequestedTaskName)?.Role == "worker";
 
     private static bool IsProvenUnrelated(SpawnRecord spawn) =>
         !string.IsNullOrWhiteSpace(spawn.RequestedTaskName) &&

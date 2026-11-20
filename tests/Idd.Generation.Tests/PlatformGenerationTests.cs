@@ -125,7 +125,7 @@ public sealed class PlatformGenerationTests(GenerationFixture fixture)
                 }
                 else fixture.AssertMissing(Path.Combine(root, "skills", name, "agents", "openai.yaml"));
             }
-            fixture.AssertFile(Path.Combine(root, "skills", "idd-factory-run", "references", "engineering-guardrails.md"));
+            fixture.AssertFile(Path.Combine(root, "skills", "idd-internal-factory-root", "references", "engineering-guardrails.md"));
             using var metadata = JsonDocument.Parse(fixture.ReadText(Path.Combine(root, "idd-plugin.json")));
             Assert.False(metadata.RootElement.TryGetProperty("nativeAgents", out _));
         }

@@ -16,6 +16,7 @@ public sealed class FactoryRunReport
     public RunInfo Run { get; init; } = new();
     public List<AgentReport> Agents { get; init; } = [];
     public List<TaskReport> Tasks { get; init; } = [];
+    public List<FactoryBatchReport> Batches { get; init; } = [];
     public ReportMetrics Metrics { get; init; } = new();
     public List<TimelineEvent> Timeline { get; init; } = [];
     public List<Diagnostic> Diagnostics { get; init; } = [];
@@ -49,6 +50,7 @@ public sealed class CodexCapabilities
 public sealed class RunInfo
 {
     public string RootThreadId { get; init; } = "";
+    public string? SupervisorThreadId { get; init; }
     public int RunIndex { get; init; }
     public DateTimeOffset? StartedAt { get; init; }
     public DateTimeOffset? FinishedAt { get; init; }
@@ -70,6 +72,8 @@ public sealed class AgentReport
     public string ThreadId { get; init; } = "";
     public string? ParentThreadId { get; init; }
     public string Role { get; set; } = "unknown";
+    public string? NativeTaskName { get; init; }
+    public int? BatchOrdinal { get; init; }
     public int Sequence { get; set; }
     public DateTimeOffset? StartedAt { get; init; }
     public DateTimeOffset? FinishedAt { get; init; }
@@ -99,6 +103,7 @@ public sealed class TaskReport
 {
     public int Number { get; init; }
     public string AgentThreadId { get; init; } = "";
+    public int? BatchOrdinal { get; init; }
     public string? Text { get; init; }
     public string? ExecutionProfile { get; init; }
     public string? SpawnExecutionProfile { get; init; }
@@ -194,6 +199,8 @@ public sealed class ReportMetrics
     public long? TotalWorkerWallTimeMilliseconds { get; init; }
     public long? SumAgentDurationsMilliseconds { get; init; }
     public int PlannerInvocations { get; init; }
+    public int FactoryRootInvocations { get; init; }
+    public int SupervisorInvocations { get; init; }
     public int WorkerInvocations { get; init; }
     public int OtherChildAgents { get; init; }
     public int MaximumDepth { get; init; }
@@ -320,6 +327,25 @@ public sealed class CodexStateSnapshot
 
 public sealed class CodexRolloutReader
 {
+    // A message or a completed tool call is not a child-turn terminal.
+    // Keep this host-specific fact separate from diagnostic activity/timing.
+    public static bool HasConfirmedTerminal(CodexRollout rollout)
+    {
+        if (rollout.Diagnostics.Any(d => d.Code is
+            "malformed_rollout_line" or "conflicting_turn_ids"))
+            return false;
+        var terminal = rollout.Events.LastOrDefault(e =>
+            e.Type is "turn.completed" or "turn_completed" or "task_complete" &&
+            (e.ThreadId is null || e.ThreadId == rollout.ThreadId));
+        return terminal is not null &&
+            !rollout.Events.Any(e => e.Ordinal > terminal.Ordinal &&
+                e.Role == "assistant" && !string.IsNullOrWhiteSpace(e.Text)) &&
+            !rollout.Events.Any(e =>
+                e.Type is "turn.failed" or "turn_failed" or "task_failed" ||
+                e.ToolName is null && e.Status is
+                    "failed" or "error" or "cancelled" or "canceled" or "interrupted");
+    }
+
     private static readonly Regex ThreadIdRegex = new(
         @"(?<![0-9a-f])(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{24,40})(?![0-9a-f])",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -1429,8 +1455,16 @@ public sealed class FactoryReportEngine
             return explicitStarts;
 
         // A quoted marker in root dialogue is not proof of a Factory run.
+        // The public Supervisor may be invoked implicitly by routing; its
+        // original user request need not literally contain idd-factory-run.
+        // In a nested trace a native Root spawn with the exact reserved
+        // task_name is sufficient to find the run's derived start boundary.
         var fallback = root.Events.FirstOrDefault(x =>
-            IsNativeSpawn(x) && HasUnambiguousFactoryRole(x.SpawnTask));
+            IsNativeSpawn(x) &&
+            (HasUnambiguousFactoryRole(x.SpawnTask) ||
+             x.ToolId is not null &&
+             root.SpawnRecords.TryGetValue(x.ToolId, out var spawn) &&
+             FactoryTaskNameRole(spawn.RequestedTaskName) == "root"));
         return fallback is null ? [] : [fallback];
     }
 
@@ -1690,9 +1724,16 @@ public sealed class FactoryReportEngine
             });
         }
 
+        var nested = agents.Any(x => x.Role == "root" &&
+            x.ParentThreadId == root.ThreadId && x.BatchOrdinal is not null);
         var rootAgent = BuildRootAgent(root, start, end, terminalEvent, segmentRootEvents, verbose, diagnostics);
+        if (nested)
+            rootAgent.Role = "supervisor";
         agents.Insert(0, rootAgent);
 
+        var batches = BuildBatchReports(agents, byId);
+        if (nested)
+            AddBatchDiagnostics(batches, agents, diagnostics);
         AssignSequences(agents);
         var tasks = workerAgents.Select((x, index) =>
         {
@@ -1708,6 +1749,7 @@ public sealed class FactoryReportEngine
             {
                 Number = index + 1,
                 AgentThreadId = x.ThreadId,
+                BatchOrdinal = x.BatchOrdinal,
                 Text = x.Task,
                 ExecutionProfile = x.ExecutionProfile,
                 SpawnExecutionProfile = x.SpawnExecutionProfile,
@@ -1827,14 +1869,100 @@ public sealed class FactoryReportEngine
         }
 
         AddTopologyDiagnostics(agents, diagnostics);
+        var finalizingBatch = batches.LastOrDefault(item => item.Status == "COMPLETED");
+        var finalizingRollout = finalizingBatch is null ? null :
+            byId.GetValueOrDefault(finalizingBatch.RootThreadId);
+        var completionEvents = nested && finalizingRollout is not null
+            ? finalizingRollout.Events.ToArray() : segmentRootEvents;
+        var completionTerminal = nested && finalizingRollout is not null
+            ? completionEvents.LastOrDefault(item =>
+                item.Role == "assistant" && !string.IsNullOrWhiteSpace(item.Text))
+            : terminalEvent;
+
+        // In a nested run, a Supervisor's own "Factory completed" prose/JSON
+        // cannot override missing, ambiguous or conflicting internal Root
+        // terminal evidence. The completed run must have a contiguous chain of
+        // native Roots ending in a strict COMPLETED Root terminal.
+        var nestedTerminalConfirmed = false;
+        if (nested)
+        {
+            var orderedBatches = batches.OrderBy(batch => batch.BatchOrdinal).ToArray();
+            // Task names may already be reserved in a reused host session.
+            // Require a positive, contiguous native ordinal sequence, not an
+            // unconditional first batch of 1.
+            var firstBatch = orderedBatches.FirstOrDefault()?.BatchOrdinal;
+            var validRotationChain = firstBatch is > 0 &&
+                firstBatch.Value <= int.MaxValue - orderedBatches.Length + 1 &&
+                orderedBatches.Select(batch => batch.BatchOrdinal)
+                    .SequenceEqual(Enumerable.Range(firstBatch.Value, orderedBatches.Length)
+                        .Select(number => (int?)number)) &&
+                orderedBatches.Take(orderedBatches.Length - 1)
+                    .All(batch => batch.Status == "CONTINUE" &&
+                        batch.CompletedWorkers is > 0 &&
+                        batch.Reason == "BATCH_LIMIT");
+            var lastBatch = orderedBatches.LastOrDefault();
+            var nestedResult = validRotationChain ? lastBatch?.Status switch
+            {
+                "COMPLETED" => "completed",
+                "BLOCKED" => "blocked",
+                "NEEDS_INPUT" => "question",
+                _ => "unknown"
+            } : "unknown";
+            nestedTerminalConfirmed = nestedResult != "unknown";
+            if (!validRotationChain)
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "factory", Code = "batch_rotation_chain_invalid",
+                    Message = "Nested Factory batch ordinals, native terminal results or CONTINUE checkpoints are missing/contradictory. The run result cannot be trusted."
+                });
+            if (result is "completed" or "blocked" or "question" &&
+                nestedTerminalConfirmed && result != nestedResult)
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "host-trace", Code = "supervisor_root_terminal_conflict",
+                    Message = $"Supervisor declared {result}, but final nested Factory Root declared {nestedResult}. The run result remains unknown."
+                });
+            else if (result is "completed" or "blocked" or "question" &&
+                     !nestedTerminalConfirmed)
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "host-trace", Code = "supervisor_completion_unverified",
+                    Message = "Supervisor reported a final status without a complete confirmed native Root rotation chain."
+                });
+
+            var conflict = result is "completed" or "blocked" or "question" &&
+                nestedTerminalConfirmed && result != nestedResult;
+            result = nestedTerminalConfirmed && !conflict ? nestedResult : "unknown";
+            resultReason = result == "unknown" ? null : lastBatch?.Reason;
+            resultEvidence.Clear();
+            if (result != "unknown")
+                resultEvidence.Add("native_internal_root_terminal");
+        }
+
         var completionInfo = BuildCompletion(
             agents,
-            segmentRootEvents,
+            completionEvents,
             result,
-            structuredResult is not null,
-            terminalEvent,
+            nested ? nestedTerminalConfirmed && result != "unknown"
+                : structuredResult is not null,
+            completionTerminal,
             verificationPolicy,
             diagnostics);
+        if (nested && result == "completed" &&
+            (completionInfo.PlannerDone != true ||
+             completionInfo.ProjectVerification != "passed" ||
+             completionInfo.ProtocolValidation != "ok"))
+        {
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "warning", Category = "factory",
+                Code = "nested_completed_without_verified_final_gate",
+                Message = "The final native Factory Root declared COMPLETED, but a fresh final Planner # Done and successful project verification were not independently established. The reporter will not attest completed execution."
+            });
+            result = "unknown";
+            resultReason = null;
+            resultEvidence.Clear();
+        }
         if (completionInfo.ProjectVerification == "unavailable")
             diagnostics.Add(new Diagnostic
             {
@@ -1894,6 +2022,7 @@ public sealed class FactoryReportEngine
             Run = new RunInfo
             {
                 RootThreadId = root.ThreadId,
+                SupervisorThreadId = nested ? root.ThreadId : null,
                 RunIndex = runIndex,
                 StartedAt = start.Timestamp,
                 FinishedAt = end,
@@ -1911,6 +2040,7 @@ public sealed class FactoryReportEngine
             },
             Agents = agents,
             Tasks = tasks,
+            Batches = batches,
             Metrics = new ReportMetrics
             {
                 Tokens = tokenMetrics,
@@ -1926,6 +2056,8 @@ public sealed class FactoryReportEngine
                 TotalWorkerWallTimeMilliseconds = workerWall,
                 SumAgentDurationsMilliseconds = sumAgent,
                 PlannerInvocations = plannerAgents.Length,
+                FactoryRootInvocations = batches.Count,
+                SupervisorInvocations = nested ? 1 : 0,
                 WorkerInvocations = workerAgents.Length,
                 OtherChildAgents = otherAgents,
                 MaximumDepth = maxDepth
@@ -1938,6 +2070,108 @@ public sealed class FactoryReportEngine
             FactoryProjectState = stateInfo,
             Completion = completionInfo
         };
+    }
+
+    private static List<FactoryBatchReport> BuildBatchReports(
+        IReadOnlyList<AgentReport> agents,
+        IReadOnlyDictionary<string, CodexRollout> rollouts)
+    {
+        var reports = new List<FactoryBatchReport>();
+        foreach (var root in agents.Where(agent => agent.Role == "root" &&
+                     agent.ParentThreadId is not null && agent.BatchOrdinal is not null)
+                     .OrderBy(agent => agent.BatchOrdinal).ThenBy(agent => agent.StartedAt))
+        {
+            var status = "unavailable";
+            int? completed = null;
+            string? reason = null;
+            var evidence = "no confirmed final native child message";
+            var candidates = root.ParentThreadId is not null &&
+                rollouts.TryGetValue(root.ParentThreadId, out var supervisor)
+                    ? supervisor.SpawnRecords.Values.Where(spawn =>
+                        !spawn.CorrelationConflict &&
+                        spawn.RequestedTaskName == root.NativeTaskName).Take(2).ToArray()
+                    : [];
+            var effectiveLimit = candidates.Length == 1
+                ? FactoryBatchTrace.ParseBatchLimit(candidates[0].Task) : null;
+            if (rollouts.TryGetValue(root.ThreadId, out var rollout))
+            {
+                var finished = rollout.Events.Any(item => item.Type is
+                    "turn.completed" or "turn_completed" or "task_complete");
+                var lastAssistant = rollout.Events.LastOrDefault(item =>
+                    item.Role == "assistant" && !string.IsNullOrWhiteSpace(item.Text));
+                if (finished && lastAssistant is not null && effectiveLimit is > 0 &&
+                    FactoryBatchTrace.TryParseTerminal(lastAssistant.Text, effectiveLimit, out var terminal))
+                {
+                    status = terminal!.Status;
+                    completed = terminal.CompletedWorkers;
+                    reason = terminal.Reason;
+                    evidence = "completed native child turn with strict terminal fields";
+                }
+                else
+                    evidence = effectiveLimit is null
+                        ? "no unambiguous effective max_workers_per_batch in the native Root assignment"
+                        : finished
+                            ? "native turn ended without valid terminal fields for effective batch limit"
+                            : "native Root turn completion unavailable";
+            }
+            reports.Add(new FactoryBatchReport
+            {
+                BatchOrdinal = root.BatchOrdinal,
+                RootThreadId = root.ThreadId,
+                NativeTaskName = root.NativeTaskName,
+                EffectiveWorkerLimit = effectiveLimit,
+                Status = status,
+                CompletedWorkers = completed,
+                Reason = reason,
+                TerminalEvidence = evidence
+            });
+        }
+        return reports;
+    }
+
+    private static void AddBatchDiagnostics(
+        IReadOnlyList<FactoryBatchReport> batches,
+        IReadOnlyList<AgentReport> agents,
+        List<Diagnostic> diagnostics)
+    {
+        foreach (var duplicate in batches.Where(item => item.BatchOrdinal is not null)
+                     .GroupBy(item => item.BatchOrdinal).Where(group => group.Count() > 1))
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = "warning", Category = "host-trace", Code = "duplicate_factory_batch",
+                Message = $"Multiple native Factory Roots use batch ordinal {duplicate.Key}."
+            });
+
+        for (var i = 0; i < batches.Count; i++)
+        {
+            var batch = batches[i];
+            var workers = agents.Where(agent => agent.Role == "worker" &&
+                agent.ParentThreadId == batch.RootThreadId).ToArray();
+            if (batch.Status == "unavailable")
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "host-trace", Code = "batch_terminal_unavailable",
+                    Message = $"Factory Root {batch.RootThreadId}: {batch.TerminalEvidence}."
+                });
+            if (batch.CompletedWorkers is int count && count > workers.Length)
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "factory", Code = "batch_worker_count_unverified",
+                    Message = $"Factory Root {batch.RootThreadId} declares {count} confirmed Workers, but only {workers.Length} native Worker children were discovered. Successful durable checkpoints cannot be inferred from the message."
+                });
+            if (i + 1 < batches.Count && batch.Status != "CONTINUE")
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "factory", Code = "batch_rotation_without_continue",
+                    Message = $"A later Root followed batch {batch.BatchOrdinal} without a confirmed CONTINUE terminal."
+                });
+            foreach (var worker in workers.Where(worker => worker.BatchOrdinal != batch.BatchOrdinal))
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = "warning", Category = "host-trace", Code = "worker_batch_identity_conflict",
+                    Message = $"Worker {worker.ThreadId} has batch {worker.BatchOrdinal?.ToString() ?? "unavailable"} but native parent belongs to batch {batch.BatchOrdinal}."
+                });
+        }
     }
 
     private static bool HasConfirmedExecutionSettingsMismatch(TaskReport task) =>
@@ -2049,6 +2283,9 @@ public sealed class FactoryReportEngine
                 ThreadId = child.ThreadId,
                 ParentThreadId = child.ParentThreadId ?? state.ParentByChild.GetValueOrDefault(child.ThreadId),
                 Role = role,
+                NativeTaskName = spawn?.RequestedTaskName,
+                BatchOrdinal = FactoryBatchTrace.ParseName(spawn?.RequestedTaskName) is { BatchOrdinal: > 0 } batch
+                    ? batch.BatchOrdinal : null,
                 StartedAt = spawn?.Timestamp ?? ActivityStartedAt(child),
                 FinishedAt = ExecutionFinishedAt(child),
                 Task = task,
@@ -2201,10 +2438,7 @@ public sealed class FactoryReportEngine
     {
         if (name is null)
             return null;
-        if (Regex.IsMatch(name, @"\Aidd_factory_planner_[0-9]+\z", RegexOptions.CultureInvariant))
-            return "planner";
-        return Regex.IsMatch(name, @"\Aidd_factory_worker_[0-9]+\z", RegexOptions.CultureInvariant)
-            ? "worker" : null;
+        return FactoryBatchTrace.ParseName(name)?.Role;
     }
 
     private static string? TrustedFactoryRole(string? hint) =>
@@ -2212,6 +2446,7 @@ public sealed class FactoryReportEngine
         {
             "planner" or "factory-planner" or "factory_planner" or "idd-factory-planner" => "planner",
             "worker" or "factory-worker" or "factory_worker" or "idd-factory-worker" => "worker",
+            "factory-root" or "factory_root" or "idd-factory-root" => "root",
             _ => null
         };
 
@@ -2370,6 +2605,10 @@ public sealed class FactoryReportEngine
         var pending = new Queue<PlannedTask>();
         foreach (var agent in agents.OrderBy(x => x.StartedAt).ThenBy(x => x.ThreadId, StringComparer.Ordinal))
         {
+            // A fully validated plan.md batch can legitimately span successive
+            // fresh Roots. Keep the pending Planner-to-Worker queue across
+            // boundaries; ONLY a new real Planner result resets it. This avoids
+            // losing ExecutionProfile provenance in subsequent Root batches.
             if (agent.Role == "planner" && rollouts.TryGetValue(agent.ThreadId, out var planner))
             {
                 pending.Clear();
@@ -2902,10 +3141,7 @@ public sealed class FactoryReportEngine
         TryParseStructuredFactoryResult(e, out _, out _);
 
     private static bool HasTerminalEvidence(CodexRollout rollout) =>
-        rollout.Events.Any(x =>
-            x.Type is "turn.completed" or "turn_completed" or "task_complete") ||
-        rollout.Events.Any(x => string.Equals(x.Role, "assistant", StringComparison.OrdinalIgnoreCase) &&
-                                !string.IsNullOrWhiteSpace(x.Text));
+        CodexRolloutReader.HasConfirmedTerminal(rollout);
 
     private static bool HasThreadFailure(CodexRollout? rollout) =>
         rollout?.Events.Any(x =>
@@ -3052,7 +3288,7 @@ public sealed class FactoryReportEngine
         List<Diagnostic> diagnostics)
     {
         var byId = agents.ToDictionary(x => x.ThreadId, StringComparer.Ordinal);
-        foreach (var agent in agents.Where(x => x.Role != "root"))
+        foreach (var agent in agents.Where(x => x.ParentThreadId is not null))
         {
             if (agent.ParentThreadId is not null && !byId.ContainsKey(agent.ParentThreadId))
             {
@@ -3104,7 +3340,7 @@ public sealed class FactoryReportEngine
         };
 
         var ordinal = start.Ordinal + 1;
-        foreach (var agent in agents.Where(x => x.Role != "root")
+        foreach (var agent in agents.Where(x => x.ParentThreadId is not null)
                      .OrderBy(x => x.StartedAt)
                      .ThenBy(x => x.ThreadId, StringComparer.Ordinal))
         {

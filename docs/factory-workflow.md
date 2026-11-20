@@ -1,17 +1,27 @@
 # Factory Workflow
 
-Factory is lightweight native-agent orchestration for implementation work that
-benefits from decomposition and fresh contexts. Its entry workflow may coordinate
-required durable preparation before orchestration starts; its planner and
-workers preserve the approved product contract; only Factory Worker may add monotonic Intent refinements.
+Factory is lightweight two-level native-agent orchestration for implementation
+work that benefits from decomposition and fresh contexts. The public
+`idd-factory-run` Supervisor dispatches fresh internal Roots sequentially.
+Each Root owns required durable preparation, Planner/Worker orchestration and
+final verification. Planner and Workers preserve the approved product contract;
+only Factory Worker may add monotonic Intent refinements.
 
 ## Entry preflight and initial planning
+
+Supervisor selects the public entry mode and dispatches a fresh Root; Root
+resolves the authoritative saved phase. New performs durable Preflight;
+Continue resumes active/preparation state; Answer must match a saved question;
+Restart is explicit replacement (and cannot bypass the active Engineering
+guard); Cancel affects temporary state only with no known ongoing operation.
+Root, not Supervisor, owns all corresponding state changes.
 
 For a new implementation-capable Factory run:
 
 ```text
 Complete materialized logical request
--> Factory Preflight
+-> public Supervisor -> fresh internal Factory Root
+-> Root-owned Factory Preflight
    -> non-mutating Product Intent analysis and blocker checks
    -> verify managed IDD clean and original Git HEAD (new run only)
    -> persist preparation/request.md, baseline.md and provenance.md BEFORE writes
@@ -27,6 +37,7 @@ Complete materialized logical request
                -> current/plan.md + exact answers
                -> current/request.md LAST [ACTIVE]
 -> sequential native Workers -> fresh Planner -> Question | Done
+-> Root-verified checkpoint and terminal result -> Supervisor dispatch/stop
 ```
 
 Preflight uses the complete materialized request, not summaries, plans or host
@@ -85,7 +96,12 @@ updates Engineering during the active run.
 
 ## Replacement and active-run safety
 
-Continuation of the current run does not repeat preflight.
+Continuation of the current run does not repeat preflight. A new unrelated
+request with active state or recoverable preparation first asks the user to
+choose Continue, Restart or Cancel. Continue may finish work to a normal
+full-plan checkpoint before switching, but never happens implicitly.
+Completed-plan checkpoints are natural opportunities for optional external
+commits/reviews, not automatic Factory actions.
 
 An explicit replacement that needs no Engineering mutation keeps the existing
 replacement semantics: resolve the complete replacement request, complete
@@ -125,7 +141,12 @@ ENG-0004
 # Done
 ```
 
-Exactly one form is used per planner invocation. Blank output is invalid.
+Exactly one form is used per Planner invocation. Blank output is invalid.
+A new `# Task` result may contain **1–4** Tasks; a fifth Task makes the
+whole output invalid BEFORE saving a plan or launching a Worker. No
+truncation or automatic retry. Previously saved plans larger than four
+remain eligible for safe continuation. Tasks must stay coherent and
+independently verifiable; no fabricated dependencies or filler work.
 
 Every newly generated task has exactly one `# ExecutionProfile`: `economy`,
 `standard`, or `strong`. Validate new output before saving it. Existing pending
@@ -145,19 +166,24 @@ trigger silent model substitution.
 When Engineering exists, `TaskRelatedEngineering` contains only
 planner-selected Conditional Rules. The current Always set is mechanically
 enumerated separately before every worker. Workers read supplied Intent and
-Engineering documents but never edit either durable layer.
+Engineering documents; only verified monotonic refinements to existing
+Intent owners are allowed, and Workers never edit Engineering Rules.
 
 ## Temporary state
 
 ```text
 .idd/factory/preparation/
     request.md               # unchanged full base request
+    baseline.md              # immutable original Git HEAD/repo identity
+    provenance.md            # bounded pending/finished owner evidence
     answers.md               # exact chronological Q/A, optional
     question.md              # one pending question, optional
     verification-failure.md  # bounded final check, optional
 
 .idd/factory/current/
     plan.md                  # validated Task batch / remaining tasks
+    baseline.md              # same immutable original Git baseline
+    provenance.md            # preflight and Worker checkpoints
     answers.md               # transferred exact Q/A, optional
     request.md               # ONLY active marker, written LAST
     completed.md             # later worker summaries
@@ -172,16 +198,22 @@ on old agent transcripts. The repository remains the implementation truth.
 A valid first Task batch is not planned a second time merely on activation.
 
 
-## Interruption
+## Interruption and explicit recovery
 
-Factory uses at-least-once execution.
+Normal Worker/Root handoffs require trusted successful native terminal
+results and verified Task/plan checkpoints. Emergency interrupt, timeout
+or failed wait is not a normal handoff.
 
-If a worker may have partially changed the repository and then stops, its task
-remains in `plan.md`. A later fresh worker inspects the current repository and
-finishes from that reality.
+Request native stop/interrupt where available; preserve pending request,
+Task, provenance and Git changes, then end the invocation. The host owns
+OS process cleanup. Factory does not traverse process trees, implement
+shell kills or gate normal work on a forced-cancellation test.
 
-Do not start a replacement writer while the previous child may still be active.
-Use native stop/close when possible and end the invocation.
+The user later explicitly invokes Continue, Restart or Cancel. First ensure
+the old host operation is no longer writing, then reconcile saved state with
+repository reality. If an old Writer may still be active, remain BLOCKED and
+request manual host inspection. A new Worker preserves correct partial work.
+An unrelated new request never silently replaces the unfinished run.
 
 ## Questions, preparation resume, and activation
 
@@ -234,7 +266,7 @@ diagnostic file; root orchestration never repairs checks directly.
 
 A host must provide child spawn, fresh context without parent-history
 inheritance, shared repository access, terminal waiting without model polling,
-final result retrieval, and stop/close lifecycle control.
+final result retrieval, and normal child lifecycle control.
 
 If those properties are unavailable, Factory may be unsupported. Do not recreate
 a packaged C# runtime, MCP transport, process supervisor, or polling protocol.
@@ -249,9 +281,10 @@ utility and is not part of the Factory workflow or plugin runtime.
 
 ## Generic native children and internal Skills
 
-Factory packages two internal Skills from the canonical Planner and Worker
-protocols. Root derives their `SKILL.md` paths from the exact installed
-`idd-factory-run` Skill and checks they are available before durable preflight.
+Factory packages three internal Skills from the canonical Root, Planner and
+Worker protocols. Supervisor resolves the Root `SKILL.md` from its installed
+`idd-factory-run` package; Root resolves Planner/Worker `SKILL.md` paths
+from the exact same installed plugin version before durable preflight.
 For every Planner or Worker it launches a fresh native generic child with no
 inherited history, the correct absolute installed Skill path, an instruction
 to read the entire Skill first, the project path and only a bounded assignment.
@@ -261,8 +294,67 @@ bodies or full Intent/Engineering trees. Workers run sequentially; Root checks
 final verification after the last Planner `# Done`.
 
 No registered Factory `agent_type`, project/user custom agent definitions or
-registration helper is needed. Codex names attempts with `task_name` and uses
+registration helper is needed. Codex uses batch-scoped `idd_factory_root_bNNNN` and
+`idd_factory_(planner|worker)_bNNNN_NNNN` task names with
 `fork_turns: "none"`; these are not proofs that the Skill was read. Actual
 host capabilities (generic spawn, fresh context, file access, terminal wait,
-stop/interrupt and exact configured worker model/effort) remain required.
+trusted normal completion and exact configured worker model/effort) remain
+required. Emergency interruption remains host-owned, not a preflight test.
 Legacy custom agent files are ignored and preserved.
+
+
+## Two levels of Factory orchestration
+
+The public `idd-factory-run` is a lightweight Supervisor:
+
+```text
+Supervisor (one user invocation)
+  -> Factory Root #1 (target 8, not a hard cap)
+       -> Planner #1 -> Worker x3 -> full plan checkpoint
+       -> Planner #2 -> Worker x4 -> full plan checkpoint
+       -> Planner #3 -> Worker x2 -> full plan checkpoint
+       -> CONTINUE / BATCH_LIMIT (CompletedWorkers = 9)
+  -> Factory Root #2 (fresh no-history context)
+       -> fresh Planner -> # Done -> final project verification
+  -> ... until COMPLETED, NEEDS_INPUT or BLOCKED
+```
+
+The Supervisor resolves the installed internal Root Skill, checks real
+nested-native host support and executes only one Root at a time. Each Root
+preserves the entire previously documented Factory Preflight, owner order,
+Planner, Worker, Engineering Guards, immutable baseline, provenance, final
+verification and Intent Refinement Review. No Worker may run concurrently
+with another writing Worker or with a new Root. The Supervisor does not write
+`.idd/factory/` state or revalidate Product Intent itself.
+
+Each Root-local `completed_workers` increments only after a
+successful native Worker result and the COMPLETE verified Worker
+checkpoint (`provenance.md`, `completed.md`, remaining `plan.md`).
+The positive default `max_workers_per_batch = 8` is a minimum
+**rotation target**. All remaining Tasks in a current plan must
+complete even if the count reaches or exceeds the target. Only
+after a fully reconciled plan, trusted normal Worker terminals and closed
+pending checkpoints can Root return `CONTINUE / BATCH_LIMIT`.
+For example, with plans of 3, 4 and 2 Tasks and target 8:
+
+```text
+Status: CONTINUE
+CompletedWorkers: 9
+Reason: BATCH_LIMIT
+```
+
+The next Root starts with no outstanding plan, obtains a fresh Planner
+result and may run final verification after `# Done`. Root owns the
+complete plan/provenance/checkpoint verification before returning CONTINUE.
+Supervisor checks the real successful native Root terminal, strict
+CONTINUE fields/count and existing active request marker, but does not
+read or reconstruct nested checkpoints. Unknown or aborted native
+completion, malformed terminal or absent active marker blocks rotation.
+Root handles checkpoint/model ambiguity using existing BLOCKED/NEEDS_INPUT
+rules and preserves recovery evidence. Successful
+Cancel returns COMPLETED/CANCELLED, distinct from implementation DONE. Restart
+reconciles interrupted preparation before any authorized discard.
+
+The counter and batch ordinal are not durable state. The next Root uses
+Continue with the original saved request and baseline, not a transcript copy.
+

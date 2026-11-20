@@ -168,9 +168,16 @@ rewrite the plan, or reclassify those tasks to continue an active run.
 The root agent must not reconsider task complexity, compare models, optimize
 cost, substitute a stronger/weaker model, or reinterpret user policy.
 
-If the selected mapping is `inherit`, omit Factory-specific model/reasoning
-overrides. If it is explicit, pass exactly the configured model and optional
-reasoning setting through the host's native child-agent controls.
+Model/effort override support is NOT a Supervisor/Preflight host gate.
+Only the Worker being spawned matters: if its selected mapping is `inherit`,
+omit Factory-specific model/reasoning overrides without testing override
+support. If its mapping is explicit, require the native model argument and
+only the optional effort argument actually configured. For Codex,
+`codex.model` maps to native spawn `model`, and optional
+`codex.reasoningEffort` to `reasoning_effort`. For Claude, pass
+`claude.model` and optional `claude.effort` through supported native
+Agent/subagent settings. Never substitute prompt text for a missing native
+override parameter.
 
 An absent policy, an explicit `inherit` policy, or an absent selected mapping
 omits overrides. A policy
