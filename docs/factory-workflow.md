@@ -336,7 +336,10 @@ result and may run final verification after `# Done`. Supervisor
 must mechanically check the saved boundary rather than trusting an
 empty `plan.md` or Root's terminal text. Checkpoint, writer-stop,
 model or terminal ambiguity causes BLOCKED with no automatic new
-Root. NEEDS_INPUT conveys the exact persisted question.
+Root unless the ambiguity is a recoverable user decision: Root preserves
+recovery evidence and returns NEEDS_INPUT with the exact question. Successful
+Cancel returns COMPLETED/CANCELLED, distinct from implementation DONE. Restart
+reconciles interrupted preparation before any authorized discard.
 
 The counter and batch ordinal are not durable state. The next Root uses
 Continue with the original saved request and baseline, not a transcript copy.
