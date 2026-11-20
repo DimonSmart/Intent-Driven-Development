@@ -259,7 +259,7 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
         Assert.Contains("before any authorized discard", supervisor);
         Assert.Contains("NEEDS_INPUT with a concrete", preflight);
         Assert.Contains("NEEDS_INPUT with the precise choice", root);
-        Assert.Contains("it preserves evidence and requests a concrete user decision", intent);
+        Assert.Contains("requests a concrete user decision with NEEDS_INPUT", intent);
         Assert.Contains("Root automatically reconciles only outcomes", preflight);
         Assert.Contains("do not replay uncertain owner actions", root);
     }
