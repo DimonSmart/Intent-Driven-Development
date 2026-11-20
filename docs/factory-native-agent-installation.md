@@ -10,6 +10,12 @@ packages each protocol from a unique canonical source into both platforms:
 | `idd-internal-factory-planner` | `src/canonical/factory/planner.md` | `skills/idd-internal-factory-planner/SKILL.md` |
 | `idd-internal-factory-worker` | `src/canonical/factory/worker.md` | `skills/idd-internal-factory-worker/SKILL.md` |
 
+Both platform adapters generate Factory Skills directly from their canonical
+sources, adding only platform frontmatter and packaging metadata. They do not
+append behavioral instructions. Platform-native operation and model-parameter
+rules are maintained in the canonical Skills and shared references; generated
+Skill bodies are tested for exact equivalence with those sources.
+
 ## Active Factory v2 architecture
 
 On this branch, `idd-factory-run` is the public two-level Supervisor:
