@@ -14,13 +14,8 @@ internal static class FactoryNativeEvidence
 
     internal static string ConfirmedFinalText(CodexRollout rollout)
     {
-        Assert.DoesNotContain(rollout.Diagnostics, diagnostic =>
-            diagnostic.Code is "malformed_rollout_line" or "conflicting_turn_ids");
-        Assert.DoesNotContain(rollout.Events, item =>
-            item.Type is "turn.failed" or "turn_failed" or "task_failed" ||
-            item.Status is "failed" or "error" or "cancelled" or "canceled" or "interrupted" &&
-            item.ToolName is null);
-
+        Assert.True(CodexRolloutReader.HasConfirmedTerminal(rollout),
+            $"No trustworthy native terminal for thread {rollout.ThreadId}.");
         var terminal = rollout.Events.LastOrDefault(item =>
             item.Type is "turn.completed" or "turn_completed" or "task_complete" &&
             (item.ThreadId is null || item.ThreadId == rollout.ThreadId));
@@ -206,6 +201,9 @@ internal static class FactoryNativeEvidence
             }
         }
         Assert.Equal(pending.Length, position);
+        if (FactoryBatchTrace.TryParseTerminal(ConfirmedFinalText(root), 3, out var terminal) &&
+            terminal!.Status == "COMPLETED")
+            Assert.True(done, "A completed Root has no confirmed final Planner # Done.");
         return workers;
     }
 
