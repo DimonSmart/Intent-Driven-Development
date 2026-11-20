@@ -85,6 +85,33 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
     [Theory]
     [InlineData("codex")]
     [InlineData("claude")]
+    public void FactoryNativeWaits_UseLongIntervalsWithoutTreatingTimeoutAsTermination(string platform)
+    {
+        var factorySkills = Path.Combine(fixture.MarketplaceRoot,
+            "plugins", platform, "idd-factory", "skills");
+        var supervisor = fixture.ReadText(Path.Combine(factorySkills,
+            "idd-factory-run", "SKILL.md"));
+        var root = fixture.ReadText(Path.Combine(factorySkills,
+            "idd-internal-factory-root", "SKILL.md"));
+
+        Assert.Contains("timeout_ms: 3600000", supervisor);
+        Assert.Contains("timed_out: true", supervisor);
+        Assert.Contains("A wait timeout alone must", supervisor);
+        Assert.Contains("NEVER cause `interrupt_agent`", supervisor);
+        Assert.Contains("### User-facing recovery guidance", supervisor);
+        Assert.Contains("Cancel temporary Factory state", supervisor);
+
+        Assert.Contains("wait_agent(timeout_ms: 600000)", root);
+        Assert.Contains("A timeout by itself", root);
+        Assert.Contains("must NEVER call `interrupt_agent`", root);
+        Assert.Contains("re-arm its", root);
+        Assert.DoesNotContain(
+            "On timeout, failed wait or emergency interrupt:", root);
+    }
+
+    [Theory]
+    [InlineData("codex")]
+    [InlineData("claude")]
     public void RootReferences_MatchCanonicalSourceFilesExactly(string platform)
     {
         var sources = new (string Source, string Destination)[]

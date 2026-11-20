@@ -201,19 +201,35 @@ A valid first Task batch is not planned a second time merely on activation.
 ## Interruption and explicit recovery
 
 Normal Worker/Root handoffs require trusted successful native terminal
-results and verified Task/plan checkpoints. Emergency interrupt, timeout
-or failed wait is not a normal handoff.
+results and verified Task/plan checkpoints. A completed `wait_agent` tool
+call or `timed_out: true` does not prove that its child completed. For Codex,
+Supervisor requests `timeout_ms: 3600000` (one hour) when waiting for Root;
+Root requests `timeout_ms: 600000` (ten minutes) for Planner/Worker.
+Both are per-call wait intervals, not execution deadlines. Respect the actual
+host-supported maximum and prefer true event-driven waiting when possible.
 
-Request native stop/interrupt where available; preserve pending request,
-Task, provenance and Git changes, then end the invocation. The host owns
-OS process cleanup. Factory does not traverse process trees, implement
-shell kills or gate normal work on a forced-cancellation test.
+When an interval expires while the same child is still running, re-arm
+native long blocking waiting for **that child**. Do not interrupt it,
+start a replacement Writer or return CHILD_UNCONFIRMED just for elapsed wait
+time. Avoid short status/polling loops. Only genuine host errors, explicit
+interruptions or loss of trustworthy child tracking require abnormal-stop
+handling. Preserve pending request, Task, provenance and Git changes; let
+the host own OS process cleanup. Do not implement recursive shell kills.
 
-The user later explicitly invokes Continue, Restart or Cancel. First ensure
-the old host operation is no longer writing, then reconcile saved state with
-repository reality. If an old Writer may still be active, remain BLOCKED and
-request manual host inspection. A new Worker preserves correct partial work.
-An unrelated new request never silently replaces the unfinished run.
+On a real BLOCKED outcome, show an understandable explanation and options:
+Continue the saved request after confirming no old Writer remains (including
+Root-owned reconciliation/replanning); explicitly Restart if replacement
+is safe; Cancel temporary state and then start New only after safe cleanup;
+or manually inspect the old host operation when its termination is unknown.
+These are proposed actions, not automatic resets. The Supervisor cannot
+claim detailed Worker state when Root did not return a trusted terminal.
+
+After a genuine interruption the user explicitly invokes Continue, Restart
+or Cancel. First ensure the old host operation is no longer writing, then
+reconcile saved state with repository reality. If an old Writer may still
+be active, remain BLOCKED and request manual host inspection. A new Worker
+preserves correct partial work. An unrelated new request never silently
+replaces the unfinished run.
 
 ## Questions, preparation resume, and activation
 

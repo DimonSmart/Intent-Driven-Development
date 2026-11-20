@@ -42,6 +42,14 @@ The host must provide ordinary native children with fresh context (no inherited
 parent transcript), shared workspace and access to the installed package,
 bounded task delivery, terminal result, native blocking or event-driven wait,
 and trustworthy normal completion before another writer starts.
+Codex Supervisor requests a one-hour Root `wait_agent(timeout_ms: 3600000)`
+when allowed by the host schema; Root requests 10-minute Planner/Worker waits
+(`timeout_ms: 600000`). If the host supports shorter waits only, use its
+largest supported native blocking interval. These intervals are not overall
+execution limits. On a normal `timed_out: true` result while a child runs,
+re-arm the native wait on that same child, **never interrupt it just because
+one wait expired**. Genuine native failure and uncertain termination still
+block overlapping Writers and require explicit safe recovery.
 Exceptional OS process cleanup is host-owned and does not require a
 forced-cancellation preflight probe. Native model/
 effort override support is not required to start Factory: Root checks it only
