@@ -276,13 +276,28 @@ Cancel:
   actions have stopped; if their outcomes are uncertain, preserve recovery
   evidence and block destructive cleanup;
 - remove pending preparation, or archive/remove the active state as appropriate;
-- never roll back repository or durable-knowledge changes automatically.
+- never roll back repository or durable-knowledge changes automatically;
+- after verified safe cleanup return `Status: COMPLETED` and `Reason: CANCELLED`;
+  this is successful cancellation, not Planner `# Done` or completed implementation.
+  If the outcome is ambiguous and user choice can resolve it, preserve evidence,
+  save the exact question and return NEEDS_INPUT; do not report successful Cancel.
 
 Restart / explicit replacement:
 - preserve existing active replacement semantics and guard;
 - an independent new request cannot silently overwrite pending preparation;
-- on explicit replacement of preparation, discard only that temporary directory
-  and perform new preflight. Existing active runs retain their own rules.
+- on explicit replacement of interrupted preparation, FIRST reconcile saved
+  request, baseline, provenance, pending owner outcomes, repository reality and
+  confirmed writer termination. If unambiguous and discard is authorized,
+  discard only that temporary directory and perform new preflight. Otherwise
+  preserve recovery evidence and return NEEDS_INPUT with the precise choice;
+  do not replay uncertain owner actions or silently discard partial work.
+  Existing active runs retain their own rules.
+
+Recovery is automatic only when saved evidence and repository reality prove a
+single safe outcome. If multiple outcomes remain plausible and a user choice
+would resolve them, persist a concrete question using existing `question.md`
+and return NEEDS_INPUT; if native writer stop cannot be confirmed, return
+BLOCKED without destructive changes. Do not invent new state files or statuses.
 
 These are skill-level operations, not new transport operations or state schemas.
 
@@ -449,9 +464,12 @@ CONTINUE is legal ONLY after full **plan-boundary** checkpoint with
 `CompletedWorkers >= max_workers_per_batch > 0` and Reason BATCH_LIMIT.
 Require the active Factory marker, no Tasks remaining from the current
 plan, no pending checkpoint and confirmed termination of writing descendants;
-neither terminal text nor an empty plan proves this alone. COMPLETED requires existing `# Done`,
-verified Project Verification, Intent Refinement Review and normal
-finalization; Reason DONE. NEEDS_INPUT must preserve a saved question and
+neither terminal text nor an empty plan proves this alone. COMPLETED has two
+mutually exclusive meanings: Reason DONE requires existing `# Done`, verified
+Project Verification, Intent Refinement Review and normal finalization;
+Reason CANCELLED requires an explicit Cancel request, confirmed stopped
+writers/owners and safe temporary-state cleanup, without claiming implementation
+completion or requiring Planner `# Done`/final verification. NEEDS_INPUT must preserve a saved question and
 provide an additional `QuestionFile: .idd/factory/preparation/question.md`
 or `QuestionFile: .idd/factory/current/question.md` when actually present,
 and may omit that field only for a request-level question before any
