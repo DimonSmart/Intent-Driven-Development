@@ -346,6 +346,41 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
             GenerationFixture.NormalizeText(packagedPreflight));
     }
 
+    [Theory]
+    [InlineData("codex")]
+    [InlineData("claude")]
+    public void OptionalModelOverrides_AreCheckedOnlyForExplicitWorkerMappings(string platform)
+    {
+        var supervisor = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "skills", "idd-factory-run.md"));
+        var root = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "factory", "root.md"));
+        var policy = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "methodology", "factory-execution-policy.md"));
+
+        Assert.Contains("Do not require model/effort overrides at Supervisor entry", supervisor);
+        Assert.DoesNotContain("exact model and effort overrides of grandchildren",
+            supervisor.ReplaceLineEndings(" ").Replace("  ", " "));
+        Assert.Contains("model/effort overrides at Root entry", root);
+        Assert.Contains("without checking", root);
+        Assert.Contains("any effort argument actually configured", root);
+        Assert.Contains("Model/effort override support is NOT a Supervisor/Preflight host gate", policy);
+        Assert.Contains("omit Factory-specific model/reasoning overrides without testing override", policy);
+
+        var skills = Path.Combine(fixture.MarketplaceRoot, "plugins", platform,
+            "idd-factory", "skills");
+        var packagedSupervisor = fixture.ReadText(Path.Combine(skills, "idd-factory-run", "SKILL.md"));
+        var packagedRoot = fixture.ReadText(Path.Combine(skills, "idd-internal-factory-root", "SKILL.md"));
+        var packagedPolicy = fixture.ReadText(Path.Combine(skills, "idd-internal-factory-root",
+            "references", "factory-execution-policy.md"));
+
+        Assert.Contains("Do not require model/effort overrides at Supervisor entry",
+            packagedSupervisor);
+        Assert.Contains("any effort argument actually configured", packagedRoot);
+        Assert.Equal(GenerationFixture.NormalizeText(policy),
+            GenerationFixture.NormalizeText(packagedPolicy));
+    }
+
     [Fact]
     public void NativeFactoryRotationContractRequiresCompletePlans()
     {
