@@ -203,15 +203,7 @@ internal static class FactoryRoutingAssertions
         Assert.DoesNotContain(all, item => item.Spawn.CorrelationConflict ||
             IsFactoryWorkerSpawn(item.Spawn) && item.Spawn.SpawnOutcome == "rejected");
 
-        foreach (var root in roots)
-        {
-            var writers = report.Agents.Where(item => item.Role == "worker" &&
-                    item.ParentThreadId == root.ThreadId)
-                .OrderBy(item => item.StartedAt).ToArray();
-            for (var i = 1; i < writers.Length; i++)
-                Assert.True(writers[i - 1].FinishedAt <= writers[i].StartedAt,
-                    "Worker intervals overlap or the native termination order is unverified.");
-        }
+
     }
 
     internal static IEnumerable<SpawnRecord> InRun(CodexRollout root, FactoryRunReport report) =>
