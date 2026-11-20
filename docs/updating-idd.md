@@ -38,6 +38,22 @@ When Factory is installed, reinstall it as well:
 codex plugin add idd-factory@intent-driven-development
 ```
 
+### One-command Codex installation
+
+To build and install both IDD plugins from the **current local development checkout** (including uncommitted changes):
+
+```powershell
+pwsh ./scripts/Install-Idd-Codex-From-Local.ps1
+```
+
+To replace the local installation with both plugins from the **published GitHub marketplace branch**:
+
+```powershell
+pwsh ./scripts/Install-Idd-Codex-From-GitHub.ps1
+```
+
+The local installer uses the separate `idd-local-test` marketplace; the published installer re-registers `intent-driven-development` from `DimonSmart/Intent-Driven-Development` at `marketplace`. The scripts switch the installed plugins without modifying project-owned `.idd/` files. Start a new Codex session after either installation.
+
 After updating Factory, start a **new Codex/Claude session** so the host
 loads the newly packaged internal Planner/Worker Skills. No custom role
 registration, replacement or scope choice is required. Existing project/user
