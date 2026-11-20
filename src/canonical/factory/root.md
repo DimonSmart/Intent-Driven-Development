@@ -383,81 +383,38 @@ retry counters.
 
 ## Orchestration loop
 
-Conceptually:
+Root runs one Planner/Worker step at a time:
 
-```text
-completed_workers = 0
+1. With no executable Task left, verify the full plan boundary. Return
+   `CONTINUE / BATCH_LIMIT` at the Worker target **before** another
+   Planner; otherwise spawn a fresh Planner and validate its terminal form.
+2. A validated Question suspends, Done triggers final verification, and
+   valid Tasks become the next saved plan; failure preserves state.
+3. For the first remaining Task, resolve scope, Engineering and
+   ExecutionProfile, persist pending provenance and spawn one fresh Worker.
+4. After trusted native completion and confirmed writer stop, reconcile
+   after-state, commit the complete Task checkpoint and increment the
+   local Worker counter.
+5. Finish all Tasks of the same Planner plan before rotating, regardless
+   of count. Never overlap writing Workers or rotate on partial evidence.
 
-while true:
-    if waiting for user:
-        stop under existing safe protocol
-
-    if current plan is absent or fully drained:
-        if a plan was just drained:
-            confirm all Workers, descendants, provenance and checkpoints
-            if not trusted: BLOCKED (not BATCH_LIMIT)
-            if completed_workers >= max_workers_per_batch:
-                return CONTINUE / actual CompletedWorkers / BATCH_LIMIT
-
-        run a fresh Planner
-        Question -> persist question.md and stop
-        Done -> existing final verification, review and completion
-        Tasks -> validate whole fresh batch: 1..4 # Task sections,
-                 exactly one ExecutionProfile per Task, other normal rules
-                 on invalid/oversized output BLOCK before any persist/Worker
-                 persist complete plan
-
-    take first remaining task
-    apply existing baseline, provenance, Engineering and ExecutionProfile rules
-    persist pending Worker checkpoint, spawn one fresh native Worker
-    wait natively; confirm successful result and stopped writing descendants
-    if invalid/untrusted/failed: BLOCKED or other existing failure status
-    record bounded after-state and complete the safe Worker checkpoint
-    increment completed_workers
-
-    if tasks remain in this SAME plan:
-        continue regardless of completed_workers
-    confirm complete plan boundary, no pending checkpoint or live writer
-    if completed_workers >= max_workers_per_batch:
-        return CONTINUE / actual CompletedWorkers / BATCH_LIMIT
-    otherwise proceed to the next Planner
-```
-
-This describes semantics, NOT a new programmatic runtime or state machine.
+This is orchestration guidance, not a separate runtime or state machine.
 
 ### Codex MultiAgentV2 spawn identity
 
-This internal Root is already a fresh generic child of Supervisor, named
-`idd_factory_root_bNNNN` by the parent. Use that exact native batch
-ordinal for every descendant Planner/Worker spawn. Task names MUST be:
+Codex uses the Supervisor-assigned `idd_factory_root_bNNNN` batch ordinal
+for all descendant native `task_name` values, e.g.
+`idd_factory_planner_b0001_0001` and
+`idd_factory_worker_b0001_0001`. The suffix identifies a LOCAL attempt;
+rejected attempts consume names, and names never repeat in visible host
+history. Historical flat names are reporter-only.
 
-- `idd_factory_planner_b0001_0001`, `idd_factory_planner_b0001_0002`, ...
-- `idd_factory_worker_b0001_0001`, `idd_factory_worker_b0001_0002`, ...
-
-The batch part is the Supervisor-assigned `b[0-9]+` and the final
-`_[0-9]+` is a LOCAL attempt number (rejected attempts consume an index).
-Digits can exceed four. Ensure uniqueness across visible native host history;
-never reuse a name after rejection. First worker of each new Root starts at
-local attempt 1, but must use the new batch ordinal. Legacy
-`idd_factory_planner_01` and `idd_factory_worker_01` are reporter-only
-historical formats; NEVER emit them from a new internal Root.
-
-The native `task_name` identifies and correlates a child; it is NOT proof
-that a child completed or read its installed Skill. Every spawn also requires
-`fork_turns: "none"`, real installed Skill path and complete bounded
-assignment. Require reliable parent/child thread IDs and no descendants
-alive before moving to the next Worker or returning CONTINUE. No concurrent
-writing Workers and no fallback to flat Factory or CLI processes.
-
-Pass `task_name` in native spawn arguments, **not** in child instructions or
-worker assignments. This is a trace-visible role marker, not evidence that a
-child was accepted, completed or used its requested model. Also explicitly set
-`fork_turns: "none"` for **planner and worker** spawns; a fresh context must
-not inherit the parent or an earlier child's transcript. Apply exact model and
-reasoning overrides when execution policy requires them; if the host cannot
-express a required argument or honor an override, block with a host-compatibility
-diagnostic rather than changing model or backend. Other platform adapters are
-unchanged when they lack `task_name`.
+Pass `task_name` in spawn arguments, **not** in the child's Task packet.
+Every Planner/Worker spawn explicitly sets `fork_turns: "none"`, uses the
+absolute installed Skill path, bounded assignment, and correlated native
+parent/child results. A task name is not proof of Skill load, completion
+or model selection. Explicit model/effort overrides must be honored where
+configured; never substitute a model or switch execution backend.
 
 ### Fresh planner
 
@@ -477,47 +434,17 @@ A missing/unreadable Skill or invalid packet gives `BLOCKED` without planning.
 
 ### Worker execution profile
 
-Immediately before every worker spawn, apply the bounded lookup from
-`references/factory-execution-policy.md`:
+Immediately before each Worker spawn, perform the complete mechanical
+lookup and validation in `references/factory-execution-policy.md`.
+New Tasks require exactly one `ExecutionProfile`; an existing saved Task
+without it defaults to `standard` without rewriting the plan.
+Missing policy/mapping means inherit host model and reasoning settings,
+omitting native overrides without testing their support. For an explicit
+mapping require its native model and any effort argument actually configured;
+malformed or unsupported settings block this Worker without substitution.
 
-```text
-planner ExecutionProfile
--> missing ExecutionProfile in an existing plan.md means standard
--> reject empty, repeated, or unknown explicit profiles
--> re-read one project configuration document when present
--> absent policy or absent profile/platform mapping means inherit
--> otherwise use exact configured active-platform model/settings
--> native child-agent spawn
-```
-
-New planner output must include exactly one canonical profile per task; validate
-it before saving a new batch. When continuing an existing run, pending tasks in
-`.idd/factory/current/plan.md` without `# ExecutionProfile` remain valid and use
-`standard`. Do not require a restart, migrate the plan, or reconsider complexity
-solely because that legacy metadata is absent.
-
-This is a mechanical protocol step. Do not reconsider task complexity, compare
-candidate models, optimize cost, upgrade/downgrade the profile, or choose a
-model that is not the exact configured mapping.
-
-If the file is absent, inherit normal host model/reasoning settings without
-writing a default file. Partial mappings are valid: a missing profile or missing
-active-platform mapping also inherits host model/reasoning settings. Validate
-all present mappings. A malformed existing policy blocks the affected worker
-with a concrete diagnostic, as do unknown profile/platform names and empty or
-repeated explicit task profiles. Inheritance omits Factory-specific model and reasoning
-overrides; it does not copy the current model into the policy.
-
-Malformed explicit configuration blocks the worker spawn with a clear
-diagnostic; never silently fall back to `inherit`. If the native host rejects a
-configured model/reasoning value or cannot honor an explicit per-child override,
-stop without spawning a substitute worker and suggest rerunning
-`idd-factory-configure`.
-
-Model selection changes only native spawn settings. The same canonical Factory
-worker protocol is used for every execution profile; profiles change native
-child-agent settings, never worker instructions. The worker does not choose its
-own model.
+Root alone maps the profile immediately before spawn. Planner and Worker
+do not inspect `.idd/execution.yaml`; all profiles use the same Worker Skill.
 
 ### Fresh worker
 
