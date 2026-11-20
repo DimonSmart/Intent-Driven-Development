@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Idd.Generation.Tests.Infrastructure;
 using Xunit;
 
@@ -91,6 +92,34 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
             Assert.Contains("agent roles or `agent_type` values are not required", preflight);
             Assert.DoesNotContain("both registered", preflight, StringComparison.OrdinalIgnoreCase);
         }
+    }
+
+    [Theory]
+    [InlineData("codex")]
+    [InlineData("claude")]
+    public void GeneratedFactoryInstructions_UseSoftWorkerRotationTarget(string platform)
+    {
+        using var descriptions = JsonDocument.Parse(fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "skills", "skill-descriptions.json")));
+        var description = descriptions.RootElement.GetProperty("idd-internal-factory-root")
+            .GetProperty("description").GetString()!;
+
+        Assert.Contains("rotate at or above", description);
+        Assert.Contains("not a hard cap", description);
+        Assert.DoesNotContain("at most", description, StringComparison.OrdinalIgnoreCase);
+
+        var plugin = Path.Combine(fixture.MarketplaceRoot, "plugins", platform, "idd-factory", "skills");
+        var root = fixture.ReadText(Path.Combine(plugin, "idd-internal-factory-root", "SKILL.md"));
+        var supervisor = fixture.ReadText(Path.Combine(plugin, "idd-factory-run", "SKILL.md"));
+
+        Assert.Contains(description, root);
+        Assert.Contains("minimum target for normal", root);
+        Assert.Contains("CompletedWorkers >= max_workers_per_batch > 0", supervisor);
+        Assert.Contains("not a hard cap", supervisor, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("CompletedWorkers exactly equal to the limit", supervisor,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("CompletedWorkers equal to the effective", supervisor,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
