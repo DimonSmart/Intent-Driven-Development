@@ -266,7 +266,7 @@ diagnostic file; root orchestration never repairs checks directly.
 
 A host must provide child spawn, fresh context without parent-history
 inheritance, shared repository access, terminal waiting without model polling,
-final result retrieval, and stop/close lifecycle control.
+final result retrieval, and normal child lifecycle control.
 
 If those properties are unavailable, Factory may be unsupported. Do not recreate
 a packaged C# runtime, MCP transport, process supervisor, or polling protocol.
@@ -298,7 +298,8 @@ registration helper is needed. Codex uses batch-scoped `idd_factory_root_bNNNN` 
 `idd_factory_(planner|worker)_bNNNN_NNNN` task names with
 `fork_turns: "none"`; these are not proofs that the Skill was read. Actual
 host capabilities (generic spawn, fresh context, file access, terminal wait,
-stop/interrupt and exact configured worker model/effort) remain required.
+trusted normal completion and exact configured worker model/effort) remain
+required. Emergency interruption remains host-owned, not a preflight test.
 Legacy custom agent files are ignored and preserved.
 
 

@@ -276,8 +276,8 @@ plan, no pending checkpoint and trusted normal Worker terminal results;
 neither terminal text nor an empty plan proves this alone. COMPLETED has two
 mutually exclusive meanings: Reason DONE requires existing `# Done`, verified
 Project Verification, Intent Refinement Review and normal finalization;
-Reason CANCELLED requires an explicit Cancel request, confirmed stopped
-writers/owners and safe temporary-state cleanup, without claiming implementation
+Reason CANCELLED requires explicit Cancel, no known ongoing Factory/owner
+operation and safe temporary-state cleanup, without claiming implementation
 completion or requiring Planner `# Done`/final verification. NEEDS_INPUT must preserve a saved question and
 provide an additional `QuestionFile: .idd/factory/preparation/question.md`
 or `QuestionFile: .idd/factory/current/question.md` when actually present,
@@ -306,8 +306,8 @@ Root runs one Planner/Worker step at a time:
    valid Tasks become the next saved plan; failure preserves state.
 3. For the first remaining Task, resolve scope, Engineering and
    ExecutionProfile, persist pending provenance and spawn one fresh Worker.
-4. After trusted native completion and confirmed writer stop, reconcile
-   after-state, commit the complete Task checkpoint and increment the
+4. After trusted normal Worker completion, reconcile the after-state,
+   commit the complete Task checkpoint and increment the
    local Worker counter.
 5. Finish all Tasks of the same Planner plan before rotating, regardless
    of count. Never overlap writing Workers or rotate on partial evidence.

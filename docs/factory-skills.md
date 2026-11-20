@@ -193,7 +193,7 @@ Intent Refinement Review, recovery and cleanup. After every verified
 Worker checkpoint Root increments its local counter. It MUST execute
 the rest of the current Planner plan before a normal `BATCH_LIMIT`
 rotation, even if that leads to `CompletedWorkers > max_workers_per_batch`.
-A confirmed boundary includes all Workers stopped, completed results
+A confirmed boundary includes trusted normal Worker terminal results
 reconciled across `completed.md`, `plan.md` and `provenance.md`,
 and no pending checkpoint. An empty plan is not proof by itself.
 Root returns CONTINUE only at such a boundary with an actual count
