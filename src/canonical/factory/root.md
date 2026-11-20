@@ -54,27 +54,16 @@ interpreting `ExecutionProfile` or `.idd/execution.yaml`.
 
 ## Required host capabilities
 
-Factory requires the platform adapter to provide all of these properties:
+Require native fresh children without inherited transcript, access to
+repository/installed Skills, bounded assignments, reliable terminal wait/results,
+and stop/interrupt with confirmed writer-command quiescence. Planner remains
+read-only; prefer a native read-only sandbox when available. No fallback
+runtime, MCP transport or polling loop.
 
-- spawn a child agent in a fresh isolated semantic context;
-- explicitly avoid inheriting the parent transcript;
-- give the child access to the current repository;
-- wait for a terminal child result without model-driven polling;
-- receive the final child result;
-- stop or close a child when necessary.
-
-Use a read-only planner and workspace-writing workers when the platform can
-express those sandboxes natively. If the host cannot provide the required
-properties, Factory is unsupported on that host. On Windows Codex, disabling
-`unified_exec` BEFORE launching the host is a candidate one-shot execution
-workaround, not a proven fix: it MUST pass the real Writer-command stop
-gate for the exact binary/profile before any write-capable two-level run.
-`turn_aborted` or a stopped Agent alone does not establish process
-termination. Do not recreate the removed
-C# runtime, MCP transport, shell process supervisor, status protocol, or polling
-loop to compensate.
-
-A new thread is not sufficient if it automatically receives the parent history.
+On Windows Codex, `features.unified_exec=false` is only a possible
+workaround for in-flight commands surviving agent interruption. The exact
+host/version/profile MUST pass a real Writer stop test before write-capable
+execution; `turn_aborted` alone is not evidence of command termination.
 
 ## Installed internal Skills and generic child-agent transport
 
@@ -514,111 +503,54 @@ have produced them.
 
 ## Technical autonomy during execution
 
-Planner can select a suitable compliant implementation direction, delegate
-bounded technical choices to Worker, or contract focused research with
-observable evidence. A fresh Planner consumes research results from the
-repository before dependent Tasks are contracted. Multiple viable techniques
-alone do not justify `# Question`; ask only for a genuine user-owned
-product, normative, trust, compatibility or external-obligation decision.
-
-When realistic alternatives left to Worker activate different Conditional
-Rules, Planner semantically supplies the relevant `TaskRelatedEngineering`
-IDs *before* Worker spawn, or first narrows the Task/researches the decision.
-Conditions remain conditional. The root only resolves IDs and enumerates
-Always Rules; no heuristic Conditional rule selection is introduced.
-
-Worker chooses local implementation methods inside the Task and supplied
-Rules. If rules are insufficient for the selected approach or required
-constraints conflict, Worker reports a precise blocker and cannot widen
-the packet, write `# Question`, alter Task, edit Engineering or approved product decisions or
-remove/rename the active marker. Factory handles further planning/stopping. Worker may add only permitted
-monotonic refinements to existing Product Intent owners.
-A new Engineering policy remains forbidden during an active run.
-
+Planner selects compliant technical approaches, relevant Conditional
+Engineering Rules and bounded research; Worker makes local decisions within
+its Task and mandatory Rules. Root only resolves stable IDs and mechanically
+enumerates Always Rules before every Worker. Detailed authority and discovery
+rules live in `references/engineering-guardrails.md` and the child Skills.
+Root never invents new Product/Engineering decisions or broadens Task scope.
 
 ## Planner outcomes
 
-For the three normal `# Task`, `# Question`, `# Done` forms and
-pre-activation handling, use `references/intent-preflight.md` and
-`Preparation planner and activation` above. Planner also has a distinct
-diagnostic failure form, exactly `BLOCKED` on its first line and one
-nonempty single-line `Reason: <diagnostic>` on its second line, with no
-other outcome sections. It is not a fourth planning outcome, a user
-question or a completed request.
+Planner has three normal outcomes (`# Task`, `# Question`, `# Done`) and
+a separate diagnostic failure: exactly `BLOCKED` plus one nonempty
+`Reason:` line. Use the full Planner Skill output contract and the
+pre-activation rules in `references/intent-preflight.md`.
 
-For each fresh Planner in preparation OR active phase, first confirm the
-correlated native child terminal result, read its entire final output and
-validate the complete form. A valid Planner `BLOCKED` means no task
-contract was produced: do not persist a new `question.md`, `plan.md` or
-active marker, start a Worker, perform final verification, or retry the same
-Planner automatically. Preserve all existing preparation/active state and
-provenance, then return the Root's existing `Status: BLOCKED` terminal form
-with `Reason: PLANNER_BLOCKED` and a bounded concrete Planner diagnostic.
-Keep the actual Root-local CompletedWorkers count; do not misreport zero
-after earlier confirmed Workers.
+Trust only a correlated terminal native result and validate the *entire*
+form. Valid Planner BLOCKED returns Root `Status: BLOCKED` with
+`Reason: PLANNER_BLOCKED` and bounded diagnostics, without new plan,
+question, Worker, verification or automatic retry. Malformed, mixed, empty,
+incomplete or oversized outputs are `PLANNER_PROTOCOL_INVALID`.
+Unconfirmed child/descendant termination is `CHILD_UNCONFIRMED`, not
+a trusted Planner result. Preserve state and Keep the actual Root-local CompletedWorkers count.
 
-An empty, mixed, duplicated, malformed or unrecognized Planner output
-(including a `BLOCKED` token without its required diagnostic) is a
-`PLANNER_PROTOCOL_INVALID` blocker, not an invitation to guess or retry.
-An interrupted child, missing native terminal confirmation or unconfirmed
-descendant stop is `CHILD_UNCONFIRMED`, not a trusted Planner `BLOCKED`
-result. Follow the existing descendant-stop gate and preserve state.
-Neither type creates a new persistent Factory state or silently asks the
-user to resolve technical failures.
-New `# Task` contracts require exactly one `ExecutionProfile` per Task
-and at most **four** tasks per fresh Planner result. Validate the
-whole result before persisting or spawning Workers; five Tasks block
-with a protocol diagnostic, without truncation or automatic retry.
-Existing saved plans larger than four remain valid for ordinary recovery.
-Do not reinterpret `# Done` as an empty batch.
+A new Task batch requires 1–4 complete Tasks, one valid ExecutionProfile
+each, current Intent/Conditional Engineering IDs and fresh repository
+evidence. Old persisted plans with more than four Tasks remain valid
+for ordinary recovery. Do not mistake `# Done` for an empty Task batch.
 
-During an **active** run, a Planner `# Question` stops task execution:
-persist exactly one `current/question.md`, then on answer append the
-exact Q/A before a fresh Planner. Ordinary implementation decisions need
-no durable write. Product changes use their authorized outer Intent
-workflow. A **new durable Engineering decision** while
-`current/request.md` exists must pause the run: no direct ENG edit,
-no Engineering owner in the active run, no Worker Task substituting for
-that decision, and no implicit cancellation. Completion/cancellation
-followed by a new complete request is required. Do not resume an old
-child transcript.
+An active `# Question` saves exact `current/question.md`; on Answer
+append exact Q/A before a new Planner. Ordinary technical decisions
+need no user question. Product changes belong to authorized Intent
+owners; new durable Engineering decisions while active require
+completion/cancellation followed by a new complete request.
 
 ## Project verification and completion
 
-Workers perform focused checks needed for their own tasks.
+On genuine Planner `# Done`, apply `references/project-verification.md`
+in `final` context. Workers perform task-local checks separately.
+If any assigned check fails or is unverified, save bounded
+`verification-failure.md` (check, exit result, relevant diagnostic),
+then invoke a fresh Planner. Root never repairs failed checks itself,
+retries unchanged failures or invents a verification engine.
+An unchanged unverified failure blocks with `VERIFICATION_NOT_CONFIRMED`.
 
-When the planner returns `# Done`, use the existing project verification
-configuration if one is configured. Factory does not own a separate verification
-engine.
-
-On verification success, record Implementation Result and perform the bounded
-Intent Refinement Review below. Archive required review context in ignored
-`.idd/factory/results/<run-name-or-time>/` when needed, then remove active
-`current/request.md`. Deferred review never keeps Factory active; if archive
-fails, preserve the only remaining evidence and report the limitation.
-
-On verification failure, write only a bounded diagnostic to
-`verification-failure.md`:
-
-```text
-check/command
-exit result
-bounded relevant diagnostic
-```
-
-Then invoke a fresh planner. The planner decides whether a correction task is
-needed.
-
-This also applies to infrastructure failures such as missing restore assets.
-Do not repair a failed final check directly in the orchestration context and
-retry it without the diagnostic and fresh planner handoff. After any correction,
-wait for a new planner `# Done` and run every configured final check again.
-An exit code of zero without evidence that tests actually executed is not proof
-that those tests passed; report the missing evidence to the planner.
-
-Do not create verification attempts, retry budgets, confirmation state,
-correction workflows, or final-review roles. If project verification is not
-configured, planner `# Done` after ordinary worker checks completes Factory.
+On verified completion, record Implementation Result, perform the Intent
+Refinement Review below and remove `current/request.md`, preserving
+necessary ignored `.idd/factory/results/` review evidence. If no project
+verification is configured, `# Done` after ordinary Worker checks
+suffices per the referenced policy.
 
 ## Intent Refinement Review
 
@@ -649,20 +581,10 @@ active `current/request.md` for deferred review.
 
 ## Design boundary
 
-Semantic relevance belongs to agents. Mechanical operations belong to code or
-the host.
-
-Factory entry preflight coordinates owner workflows for normative Product
-changes; `idd-engineering-change` remains Engineering mutation owner.
-Planner is read-only; Factory Worker may only refine existing Product Intent
-monotonically and never edit Engineering Rules.
-
-Do not solve semantic tasks with deterministic code. Execution-profile
-classification and Conditional Engineering applicability are model decisions.
-Profile-to-model lookup is mechanical and must follow the project policy exactly.
-Conditional Engineering applicability is a model decision. Do not ask an LLM to do simple mechanical
-resolution, persistence, structural validation, or Always-rule enumeration that
-the host can perform directly. When the host has no native non-LLM hook, execute
-those operations as strict protocol steps without semantic selection. Any proposed Factory feature that requires a new lifecycle
-state, retry class, transition type, or recovery protocol should be presumed
-outside Factory unless separately justified.
+Semantics and applicability belong to agents; mechanical ID resolution,
+Always-rule enumeration, validation, persistence and policy lookup belong
+to deterministic host operations. Product mutations belong to authorized
+Intent owners, Engineering Rule mutations to `idd-engineering-change`.
+Planner is read-only; Worker may make only proven monotonic refinements
+to existing Product Intent. Introduce no lifecycle state, retry budget,
+runtime or recovery subsystem without an independently approved contract.
