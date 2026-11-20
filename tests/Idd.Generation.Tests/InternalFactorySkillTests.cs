@@ -233,6 +233,38 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
     }
 
     [Fact]
+    public void FactoryV2_CancelRestartAndRecoveryDecisionsStayConsistent()
+    {
+        var intent = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            ".idd", "intent", "IDD-0001.spec-factory-orchestration.md"));
+        var adr = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            ".idd", "intent", "IDD-0006.adr-native-agent-factory-orchestration.md"));
+        var preflight = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "methodology", "intent-preflight.md"));
+        var root = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "factory", "root.md"));
+        var supervisor = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "skills", "idd-factory-run.md"));
+
+        Assert.Contains("Reason: CANCELLED", root);
+        Assert.Contains("Reason: CANCELLED", supervisor);
+        Assert.Contains("COMPLETED/CANCELLED", preflight);
+        Assert.Contains("COMPLETED/CANCELLED", intent);
+        Assert.Contains("COMPLETED with Reason CANCELLED", adr);
+        Assert.Contains("without claiming implementation", root);
+        Assert.Contains("does not require Planner `# Done`", supervisor);
+
+        Assert.Contains("FIRST reconcile saved", root);
+        Assert.Contains("first reconcile the saved request", preflight);
+        Assert.Contains("before any authorized discard", supervisor);
+        Assert.Contains("NEEDS_INPUT with a concrete", preflight);
+        Assert.Contains("NEEDS_INPUT with the precise choice", root);
+        Assert.Contains("it preserves evidence and requests a concrete user decision", intent);
+        Assert.Contains("Root automatically reconciles only outcomes", preflight);
+        Assert.Contains("do not replay uncertain owner actions", root);
+    }
+
+    [Fact]
     public void FactoryPreflight_SavesRecoverableRequestBeforeDurableOwnerMutation()
     {
         var preflight = fixture.ReadText(Path.Combine(fixture.RepoRoot,
