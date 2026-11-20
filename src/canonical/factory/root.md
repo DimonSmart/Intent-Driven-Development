@@ -345,7 +345,9 @@ native-agent and temporary-file operations, not a second Preflight policy.
    used in active runs with the unchanged request, chronological exact Q/A,
    repository paths, current Engineering discovery context and bounded
    preparation verification failure. No active marker or `completed.md`
-   exists before Workers.
+   exists before Workers. Apply the Planner result validation and `BLOCKED`
+   failure handling defined under `Planner outcomes` below before any
+   preparation question, plan, activation or Worker write.
 2. For `# Question`, require exactly one concrete question, write its
    exact text to `preparation/question.md`, and stop **without** creating
    `current/request.md` or `plan.md` or spawning a Worker. On reply,
@@ -714,10 +716,33 @@ A new Engineering policy remains forbidden during an active run.
 
 ## Planner outcomes
 
-For the legal `# Task`, `# Question`, `# Done` forms and
+For the three normal `# Task`, `# Question`, `# Done` forms and
 pre-activation handling, use `references/intent-preflight.md` and
-`Preparation planner and activation` above. A fresh planner returns
-exactly one of these forms; blank or mixed output is invalid.
+`Preparation planner and activation` above. Planner also has a distinct
+diagnostic failure form, exactly `BLOCKED` on its first line and one
+nonempty single-line `Reason: <diagnostic>` on its second line, with no
+other outcome sections. It is not a fourth planning outcome, a user
+question or a completed request.
+
+For each fresh Planner in preparation OR active phase, first confirm the
+correlated native child terminal result, read its entire final output and
+validate the complete form. A valid Planner `BLOCKED` means no task
+contract was produced: do not persist a new `question.md`, `plan.md` or
+active marker, start a Worker, perform final verification, or retry the same
+Planner automatically. Preserve all existing preparation/active state and
+provenance, then return the Root's existing `Status: BLOCKED` terminal form
+with `Reason: PLANNER_BLOCKED` and a bounded concrete Planner diagnostic.
+Keep the actual Root-local CompletedWorkers count; do not misreport zero
+after earlier confirmed Workers.
+
+An empty, mixed, duplicated, malformed or unrecognized Planner output
+(including a `BLOCKED` token without its required diagnostic) is a
+`PLANNER_PROTOCOL_INVALID` blocker, not an invitation to guess or retry.
+An interrupted child, missing native terminal confirmation or unconfirmed
+descendant stop is `CHILD_UNCONFIRMED`, not a trusted Planner `BLOCKED`
+result. Follow the existing descendant-stop gate and preserve state.
+Neither type creates a new persistent Factory state or silently asks the
+user to resolve technical failures.
 New `# Task` contracts require exactly one `ExecutionProfile` per Task
 and at most **four** tasks per fresh Planner result. Validate the
 whole result before persisting or spawning Workers; five Tasks block
