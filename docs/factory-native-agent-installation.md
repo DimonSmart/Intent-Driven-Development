@@ -10,14 +10,17 @@ packages each protocol from a unique canonical source into both platforms:
 | `idd-internal-factory-planner` | `src/canonical/factory/planner.md` | `skills/idd-internal-factory-planner/SKILL.md` |
 | `idd-internal-factory-worker` | `src/canonical/factory/worker.md` | `skills/idd-internal-factory-worker/SKILL.md` |
 
-## Staged Supervisor migration
+## Active Factory v2 architecture
 
-The two-level native Supervisor and three internal Skills are
-implemented together on the Factory v2 feature branch. Packaging or a
-Stage-0 smoke test is not evidence of safe production activation.
-Keep the public `main` release on its tested behavior until mandatory
-native descendant-writer-stop and full E2E acceptance gates have
-passed. An internal Root is never a user-facing entrypoint.
+On this branch, `idd-factory-run` is the public two-level Supervisor:
+it dispatches fresh internal Factory Roots, and each Root dispatches
+fresh Planner/Worker children. All three roles are installed internal Skills;
+Root is never a user-facing entrypoint. No flat orchestration fallback
+is part of Factory v2.
+
+Packaging or a Stage-0 smoke test does not prove live host compatibility.
+Release acceptance still requires native descendant-writer-stop and full
+multi-batch E2E evidence before merging this architecture into `main`.
 
 ## Normal setup
 
@@ -41,8 +44,10 @@ capabilities block with a precise diagnostic, without a custom process runtime.
 
 ## Child Skill delivery
 
-Root derives both internal `SKILL.md` paths from the **actually loaded**
-`idd-factory-run/SKILL.md`, never from the source checkout, current project
+Supervisor derives the internal Root `SKILL.md` from the **actually loaded**
+`idd-factory-run/SKILL.md`. Root derives its sibling Planner and Worker
+`SKILL.md` paths from the **actually loaded internal Root Skill** in the
+same installed plugin version, never from the source checkout, current project
 folder, guessed cache version or global filename search. Root may check path
 existence/access but must not read protocol bodies. Every generic child receives
 its role, the exact accessible path to the installed Skill (use absolute paths,
@@ -51,8 +56,10 @@ bounded phase/task assignment. The child reads its **entire** Skill and any
 mandatory references as its first substantive action, checks completeness and
 returns `BLOCKED` without project work if invalid.
 
-Codex requires `fork_turns: "none"` and uses `task_name` values such as
-`idd_factory_planner_01` for correlation. A session without `agent_type`
+Codex requires `fork_turns: "none"` and uses batch-scoped `task_name`
+values such as `idd_factory_root_b0001`,
+`idd_factory_planner_b0001_0001` and `idd_factory_worker_b0001_0001`
+for correlation. Older flat task names are accepted only by the reporter. A session without `agent_type`
 can run Factory. Do not invent an `agent_type` parameter; if a host requires
 an agent type, use only its built-in generic type. Claude uses a native generic
 subagent/fork with equivalent isolation and lifecycle guarantees. Avoid
@@ -79,9 +86,9 @@ compatibility; each host must be verified on its own. A real Codex Desktop run
 with no `agent_type` selector is needed to close the original regression.
 
 
-## Two-level migration and native gating
+## Two-level execution and native gating
 
-The new public Supervisor must find its internal Root in the same installed
+The public Supervisor must find its internal Root in the same installed
 package; Root must find internal Planner and Worker there. Codex uses
 `idd_factory_root_b0001` and batch-scoped
 `idd_factory_(planner|worker)_b0001_0001` native task names, all with
