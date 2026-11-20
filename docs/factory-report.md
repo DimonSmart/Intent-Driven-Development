@@ -230,8 +230,10 @@ a child summary or from the read-only native event trace. Without
 reliable saved `plan.md`/`completed.md`/`provenance.md` checkpoint
 and trusted normal native completion evidence, plan-boundary verification is
 **unavailable** in the report, not falsely asserted as passed.
-The Supervisor, not this reporter, validates the live persisted boundary
-before another Root. Never attribute a Worker in one batch to a
+Root owns live plan-boundary and checkpoint validation before it returns
+CONTINUE. Supervisor checks the correlated native Root terminal, compact
+status/count and active request marker; neither Supervisor nor reporter
+reconstructs the nested checkpoint. Never attribute a Worker in one batch to a
 Planner from another Root (historic v2 traces can span Roots). Total tokens
 sum independent authoritative thread counters once per unique thread;
 overlapping/missing counters remain unavailable rather than double-counted.

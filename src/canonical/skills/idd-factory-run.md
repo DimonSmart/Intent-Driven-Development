@@ -55,9 +55,10 @@ provenance/logs. Supervisor never spawns Planner or Worker itself.
 
 Wait natively (event-driven/blocking) for a correlated **genuine terminal**
 Root result; never interpret partial messages/tool output as completion.
-For normal handoff require trusted successful Root and Worker native terminal
-results and checked Task/plan boundaries. An aborted or timed-out child never
-counts as successfully completed.
+For normal handoff require a correlated, trustworthy successful native Root
+terminal. Root alone confirms its Worker terminals and full plan checkpoint;
+Supervisor does not inspect Worker transcripts or redo checkpoint validation.
+An aborted or timed-out Root never counts as successfully completed.
 
 ### Exceptional interruption
 
@@ -81,25 +82,29 @@ Require exactly one each of these separate **plain-text** final fields:
     CompletedWorkers: <nonnegative confirmed Root-local integer>
     Reason: <short nonempty reason>
 
-The local count can exceed the target. `CONTINUE / BATCH_LIMIT` requires
-`CompletedWorkers >= max_workers_per_batch > 0` AND a fully completed
-current Planner plan. **Independently validate** trusted normal Root/Worker terminals, the active
-`current/request.md` marker, and consistency of `plan.md`, `completed.md`,
-`provenance.md` and native results: no remaining executable Task from the
-current plan and no pending checkpoint. Neither text, count nor an empty
-plan alone proves this. Uncertain/aborted native completion BLOCKS rotation;
-a separate proof of OS process-tree termination is not required.
+The local count can exceed the target. Accept `CONTINUE / BATCH_LIMIT`
+only from a correlated, trustworthy successful native Root terminal with
+`CompletedWorkers >= max_workers_per_batch > 0`, the exact terminal fields
+and an existing active `.idd/factory/current/request.md` marker.
+Root is responsible for verifying its own Worker terminals, closing pending
+checkpoints and confirming the entire Planner plan is complete before it
+returns CONTINUE. Supervisor neither reads `plan.md`, `completed.md` or
+`provenance.md` for this decision, nor reinterprets Worker results.
+Malformed fields, an absent active marker or uncertain/aborted native Root
+completion BLOCK rotation; Root's text alone is never a native terminal.
+No separate proof of OS process-tree termination is required.
 
 Only after valid CONTINUE, increment the ordinal and spawn **one fresh Root**
 in Continue mode with a new zero local counter and no prior transcripts.
 A plan crossing the soft Worker target must finish in its original Root;
 the next Root may receive `# Done` and finalize.
 
-`COMPLETED / DONE` requires credible normal closure after genuine Planner
-`# Done`, successful Project Verification and Intent Refinement Review.
-`COMPLETED / CANCELLED` requires explicit Cancel with no known ongoing Factory/owner operation and safe temporary-state cleanup, **not** implementation
-completion or final verification. Never accept CANCELLED from another mode;
-Supervisor does not rerun final verification.
+`COMPLETED / DONE` is Root's attestation that Planner returned genuine
+`# Done`, Project Verification passed and Intent Refinement Review finished.
+`COMPLETED / CANCELLED` is Root's attestation of explicit Cancel, no known
+ongoing Factory/owner operation and safe temporary-state cleanup, **not**
+implementation completion. Reject CANCELLED from another entry mode.
+Supervisor does not rerun or independently certify Root's inner work.
 
 `NEEDS_INPUT` returns the exact question. If `QuestionFile` is present,
 allow only an existing `.idd/factory/preparation/question.md` or

@@ -37,7 +37,7 @@ Complete materialized logical request
                -> current/plan.md + exact answers
                -> current/request.md LAST [ACTIVE]
 -> sequential native Workers -> fresh Planner -> Question | Done
--> Root terminal result -> Supervisor checkpoint/rotation or stop
+-> Root-verified checkpoint and terminal result -> Supervisor dispatch/stop
 ```
 
 Preflight uses the complete materialized request, not summaries, plans or host
@@ -344,12 +344,14 @@ Reason: BATCH_LIMIT
 ```
 
 The next Root starts with no outstanding plan, obtains a fresh Planner
-result and may run final verification after `# Done`. Supervisor
-must mechanically check the saved boundary rather than trusting an
-empty `plan.md` or Root's terminal text. Checkpoint, model or
-native terminal ambiguity causes BLOCKED with no automatic new
-Root unless the ambiguity is a recoverable user decision: Root preserves
-recovery evidence and returns NEEDS_INPUT with the exact question. Successful
+result and may run final verification after `# Done`. Root owns the
+complete plan/provenance/checkpoint verification before returning CONTINUE.
+Supervisor checks the real successful native Root terminal, strict
+CONTINUE fields/count and existing active request marker, but does not
+read or reconstruct nested checkpoints. Unknown or aborted native
+completion, malformed terminal or absent active marker blocks rotation.
+Root handles checkpoint/model ambiguity using existing BLOCKED/NEEDS_INPUT
+rules and preserves recovery evidence. Successful
 Cancel returns COMPLETED/CANCELLED, distinct from implementation DONE. Restart
 reconciles interrupted preparation before any authorized discard.
 

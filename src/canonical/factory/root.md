@@ -223,7 +223,9 @@ that **the whole plan is finished**: all Workers returned trusted normal
 successful native terminals; no Task or pending checkpoint remains;
 `completed.md`, `plan.md` and `provenance.md` agree with those results
 and no contradictory external-unknown changes remain. An empty `plan.md`
-ALONE is not sufficient.
+ALONE is not sufficient. Root owns this complete checkpoint verification;
+the Supervisor cannot and must not reconstruct it from nested traces or
+revalidate the plan/provenance files.
 
 At this verified plan boundary:
 - If `completed_workers >= max_workers_per_batch`, do NOT start
@@ -288,7 +290,11 @@ VERIFICATION_NOT_CONFIRMED or PREFLIGHT_DECISION. Never emit conflicting
 intermediate terminal fields, a false completed result, a full transcript,
 unbounded logs or internal Skill bodies.
 
-The fields describe this Root's local successful Workers, not historical
+The fields are Root's attestation of its own confirmed checkpoints. Supervisor
+checks the correlated successful native Root terminal, field syntax/count and
+active request marker; it does not certify individual Worker outcomes or
+reinspect `plan.md`, `completed.md` or `provenance.md`.
+They describe this Root's local successful Workers, not historical
 completed entries from earlier Roots. Do not generate CONTINUE from a
 saved `completed.md` count or from empty tasks; count only completed and
 verified Workers launched in this native Root. Preserve all the existing
