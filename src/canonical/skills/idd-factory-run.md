@@ -60,8 +60,12 @@ A saved question takes precedence over silently treating a user reply as a
 new request. Do not silently merge an independent request into a pending run.
 Pass the exact full original request, including materialized attachment text,
 for New/Restart; do not replace it with an LLM summary. For Answer supply the
-exact user answer and the saved question path. Let Root validate request
-identity, authorization, scope, owner rules, recovery and provenance.
+exact user answer and the saved question path; if no question was saved,
+do not invent Q/A or infer the missing original request from a reply.
+For Cancel/Restart supply the exact existing active or preparation paths
+when present and the explicit mode; only Root may reconcile and mutate
+those files. Let Root validate request identity, authorization, scope,
+owner rules, recovery and provenance.
 
 ## Sequential batch dispatch
 

@@ -263,7 +263,18 @@ Continue:
 - incomplete preparation blocks automatic execution. Explain which source is
   missing rather than reconstructing it from memory.
 
+Answer:
+- require the exact saved `preparation/question.md` or
+  `current/question.md` and the unchanged original request;
+- bind the verbatim user answer to that question, persist chronological Q/A
+  and follow the matching inactive/active continuation and owner rules;
+- without a saved question, do not invent earlier context or treat an isolated
+  answer as permission to start or replace a run.
+
 Cancel:
+- confirm native descendants, in-flight writing commands and pending owner
+  actions have stopped; if their outcomes are uncertain, preserve recovery
+  evidence and block destructive cleanup;
 - remove pending preparation, or archive/remove the active state as appropriate;
 - never roll back repository or durable-knowledge changes automatically.
 

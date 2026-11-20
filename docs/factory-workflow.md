@@ -9,6 +9,13 @@ only Factory Worker may add monotonic Intent refinements.
 
 ## Entry preflight and initial planning
 
+Supervisor selects the public entry mode and dispatches a fresh Root; Root
+resolves the authoritative saved phase. New performs durable Preflight;
+Continue resumes active/preparation state; Answer must match a saved question;
+Restart is explicit replacement (and cannot bypass the active Engineering
+guard); Cancel affects temporary state only after safe writer termination.
+Root, not Supervisor, owns all corresponding state changes.
+
 For a new implementation-capable Factory run:
 
 ```text
@@ -154,19 +161,24 @@ trigger silent model substitution.
 When Engineering exists, `TaskRelatedEngineering` contains only
 planner-selected Conditional Rules. The current Always set is mechanically
 enumerated separately before every worker. Workers read supplied Intent and
-Engineering documents but never edit either durable layer.
+Engineering documents; only verified monotonic refinements to existing
+Intent owners are allowed, and Workers never edit Engineering Rules.
 
 ## Temporary state
 
 ```text
 .idd/factory/preparation/
     request.md               # unchanged full base request
+    baseline.md              # immutable original Git HEAD/repo identity
+    provenance.md            # bounded pending/finished owner evidence
     answers.md               # exact chronological Q/A, optional
     question.md              # one pending question, optional
     verification-failure.md  # bounded final check, optional
 
 .idd/factory/current/
     plan.md                  # validated Task batch / remaining tasks
+    baseline.md              # same immutable original Git baseline
+    provenance.md            # preflight and Worker checkpoints
     answers.md               # transferred exact Q/A, optional
     request.md               # ONLY active marker, written LAST
     completed.md             # later worker summaries

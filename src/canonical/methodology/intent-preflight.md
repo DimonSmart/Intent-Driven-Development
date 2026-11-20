@@ -5,8 +5,9 @@ Factory entry workflow. For a new Factory run, the entry workflow wraps it in a
 broader durable preflight that may also coordinate explicit Engineering
 management before active Factory state exists.
 
-Factory preflight is not a planner task, worker task, runtime, state machine, or
-transaction subsystem.
+The internal Factory Root, never the public Supervisor, owns Factory Preflight
+and coordinates its authorized durable owners. Factory preflight is not a
+planner task, worker task, runtime, state machine, or transaction subsystem.
 
 ## Logical request
 
@@ -51,6 +52,34 @@ Continue:
 A legacy `.idd/factory/current/state.json` is not an active state-machine
 contract. Do not interpret or migrate it. The active simplified-run marker is
 `.idd/factory/current/request.md`.
+
+The public Supervisor selects New, Continue, Answer, Restart or Cancel
+as a transport mode; **Root** applies the semantic modes above:
+
+- `New` maps to New. It cannot overwrite active state or unresolved preparation.
+- `Continue` maps to Continue, including trusted interrupted Preflight.
+- `Answer` maps to Continue with the exact saved
+  `preparation/question.md` or `current/question.md`. Root must bind the
+  verbatim answer to that question and the unchanged base request, record Q/A
+  before a new Planner, and revalidate authorized owner decisions and coverage
+  when the answer affects them. No saved question means no inferred Q/A:
+  a request-level blocker that wrote no preparation requires a complete
+  request with its clarification on a new invocation.
+- `Restart` is an explicit replacement, not a synonym for Continue. With an
+  active marker, apply Replacement and retain the old active state until
+  authorized replacement Preflight/coverage succeeds. With recoverable
+  preparation but no marker, require an explicitly authorized discard and
+  apply the existing preparation-replacement contract; never silently merge
+  requests or reinterpret a partial activation as an active run. With neither,
+  apply New and its cleanliness/baseline gate.
+- `Cancel` is Root-owned temporary-state cleanup, **not** an alternative
+  Engineering/Product mutation path or a new Preflight. Before removing the
+  only recovery evidence, native writers and pending owner actions must be
+  confirmed quiescent; uncertainty blocks destructive cleanup. Cancel never
+  rolls back Product Intent, Engineering or implementation changes.
+
+Supervisor supplies the mode and exact user input, but does not independently
+classify the request, execute owner workflows or delete temporary state.
 
 ## Requested scope
 

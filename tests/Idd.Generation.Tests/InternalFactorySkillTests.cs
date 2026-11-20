@@ -192,6 +192,90 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
         Assert.DoesNotContain("For a new run, `idd-factory-run` materializes", intent);
     }
 
+
+    [Fact]
+    public void FactoryV2_EntryModesAndPhaseOwnersAgreeAcrossNormativeSources()
+    {
+        var intent = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            ".idd", "intent", "IDD-0001.spec-factory-orchestration.md"));
+        var adr = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            ".idd", "intent", "IDD-0006.adr-native-agent-factory-orchestration.md"));
+        var preflight = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "methodology", "intent-preflight.md"));
+        var root = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "factory", "root.md"));
+        var supervisor = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "skills", "idd-factory-run.md"));
+        var workflow = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "docs", "factory-workflow.md"));
+
+        Assert.Contains("The internal Factory Root, never the public Supervisor", preflight);
+        Assert.Contains("Root owns the existing Preflight", adr);
+        Assert.Contains("## Phase ownership and public entry modes", intent);
+        Assert.Contains("Supervisor owns **no** edits", supervisor);
+        Assert.Contains("Root, not Supervisor, owns all corresponding state changes", workflow);
+
+        foreach (var mode in new[] { "New", "Continue", "Answer", "Restart", "Cancel" })
+        {
+            Assert.Contains(mode, supervisor);
+            Assert.Contains(mode, root);
+            Assert.Contains(mode, preflight);
+            Assert.Contains(mode, intent);
+        }
+
+        Assert.Contains("a request-level blocker that wrote no preparation", preflight);
+        Assert.Contains("if no question was saved", supervisor);
+        Assert.Contains("if their outcomes are uncertain, preserve recovery", root);
+        Assert.Contains("only verified monotonic refinements", workflow);
+        Assert.DoesNotContain("never edit either durable layer", workflow);
+        Assert.Contains("baseline.md              # same immutable original Git baseline", workflow);
+        Assert.Contains("provenance.md            # preflight and Worker checkpoints", workflow);
+    }
+
+    [Fact]
+    public void FactoryPreflight_SavesRecoverableRequestBeforeDurableOwnerMutation()
+    {
+        var preflight = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "methodology", "intent-preflight.md"));
+        var intent = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            ".idd", "intent", "IDD-0001.spec-factory-orchestration.md"));
+        var root = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "factory", "root.md"));
+
+        static void Ordered(string content, params string[] phases)
+        {
+            var previous = -1;
+            foreach (var phase in phases)
+            {
+                var index = content.IndexOf(phase, StringComparison.Ordinal);
+                Assert.True(index > previous, $"Missing or out-of-order Preflight phase: {phase}");
+                previous = index;
+            }
+        }
+
+        Ordered(preflight,
+            "3. detect request-level blockers before any write or preparation",
+            "5. persist complete preparation/request.md, baseline.md, provenance.md",
+            "6. checkpoint BEFORE mutating Engineering owner workflow",
+            "8. checkpoint and execute authorized Product Intent owner workflows",
+            "9. validate durable coverage",
+            "13. create current/request.md LAST");
+
+        Ordered(root,
+            "2. Evaluate **all determinable request-level blockers**",
+            "4. Persist `preparation/request.md`, `baseline.md` and `provenance.md`",
+            "5. Invoke `idd-engineering-change`",
+            "6. Validate durable coverage",
+            "8. Only after validated executable Tasks");
+
+        Ordered(intent,
+            "-> reject request-level blockers before any durable write",
+            "-> persist preparation/request.md + baseline.md + provenance.md BEFORE owner mutations",
+            "-> checkpoint and invoke Engineering owner when required",
+            "-> checkpoint and invoke Product Intent owner when required",
+            "-> validate durable coverage");
+    }
+
     [Fact]
     public void NativeFactoryRotationContractRequiresCompletePlans()
     {
