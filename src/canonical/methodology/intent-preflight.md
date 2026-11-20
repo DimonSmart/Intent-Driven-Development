@@ -212,11 +212,16 @@ no new Factory state
 
 ## New-run ordering
 
-Before any durable owner or Factory write, the Factory Root also checks that the
-host supports isolated native children and that **both registered** Planner
-and Worker roles resolve unambiguously. The operational role-identity, spawn
-transport and readiness checks belong to `idd-factory-run.md`; they are
-prerequisites to (not substitutes for) the following normative phases.
+Before any durable owner or Factory write, the Factory Root checks that
+the host supports fresh generic native children and that the installed
+`idd-internal-factory-planner/SKILL.md` and
+`idd-internal-factory-worker/SKILL.md` are accessible from the same
+`idd-factory` package version as the Root. Registered Factory-specific
+agent roles or `agent_type` values are not required. The public Supervisor
+checks nested native dispatch and the installed Root Skill; the internal Root
+checks Planner/Worker Skill paths and native spawn readiness under its own
+protocol. These checks are prerequisites to (not substitutes for) the
+following normative phases.
 
 ```text
 1. materialize complete logical request
