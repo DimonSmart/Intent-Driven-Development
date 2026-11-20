@@ -132,67 +132,30 @@ to prove a future child has already read its Skill before spawning it.
 
 ## Factory Preflight — Root entrypoint
 
-`references/intent-preflight.md` is the **sole detailed normative contract**
-for logical request identity, Requested scope, Product classification,
-Factory-level Engineering disposition, request-level blockers, Git baseline,
-owner order, durable coverage, preparation recovery, initial Planner outcomes,
-activation and replacement. Read it **in full** before starting/replacing a
-run. Do not reconstruct its protocol from this abbreviated Root checklist.
-If unavailable, stop as an incomplete installation.
+`references/intent-preflight.md` is the sole normative contract for request
+identity, modes, scope, owner calls, durable coverage, baseline, preparation,
+recovery, questions, activation and replacement. Read it **in full** before
+starting, recovering or replacing a run. Root owns Preflight; Supervisor only
+dispatches it.
 
-Factory is implementation-capable only: `route-only` and `intent-only`
-stop before Factory orchestration; `intent-preserving` cannot authorize
-mutating Product/Engineering preflight. A direct invocation bypassing
-`idd-route` does not bypass Preflight. For new, continuing, recovering,
-cancelled or explicitly replaced runs, select the applicable mode from
-`intent-preflight.md`, not a fabricated new state machine.
+Before any durable owner/Factory write, verify native child capabilities and
+the same-version installed Planner/Worker Skills. A missing registered
+`agent_type` does not block. Direct invocation without `idd-route` does not
+bypass scope restrictions.
 
-**Before any durable owner/Factory write**, Root must validate the actual native
-child-agent capabilities and both installed internal Skill paths described
-above. Missing required tools/files block before preparation; an absent
-`agent_type` or unregistered legacy Factory role does not. Recheck the
-chosen Skill path and required capabilities before each spawn.
+For New, follow the reference's ordered phases: classify the full request and
+request-level blockers **before writes**; check managed IDD cleanliness and
+real original Git HEAD; save complete `preparation/` request, baseline and
+provenance **before** mutating owners; checkpoint Engineering owner before
+Product owner; validate durable coverage; spawn a fresh initial Planner while
+inactive. Write `current/request.md` LAST only after a validated Task batch.
+Question, Done, BLOCKED, malformed Planner results or unresolved owner actions
+never activate Factory.
 
-For a **new independent end-to-end run**, execute these named Preflight
-phases in the normative order, with Root responsible for the concrete actions:
-
-1. Materialize the FULL self-contained original request, including
-   explicitly included textual attachments; resolve Requested scope and
-   independently analyze Product Intent and Engineering dispositions.
-2. Evaluate **all determinable request-level blockers** before ANY
-   durable write: missing normative decisions, contradictions, forbidden
-   scope mutation, incomplete input and prohibited active replacement.
-   On a blocker, do not invoke an owner or create `preparation/`.
-3. Check clean managed IDD paths and the original real `HEAD^{commit}`
-   using the exact Git gate in the reference. A dirty unrelated code tree
-   alone is not a blocker. Never auto-commit or invent a baseline.
-4. Persist `preparation/request.md`, `baseline.md` and `provenance.md`
-   BEFORE invoking a potentially mutating owner. Record bounded pending
-   provenance and verify trusted after-state for each owner action.
-5. Invoke `idd-engineering-change` (only when required) before the
-   authorized Product Intent owner; pass the complete request, not a
-   summary. `success`/`no-op` continue; `ambiguous`/`blocked`
-   or an unknown after-state stop and preserve recoverable preparation.
-6. Validate durable coverage against full request, exact Q/A, both
-   applicable durable layers, safety, compatibility and explicit non-goals.
-   Record the verified boundary in provenance.
-7. Spawn a fresh generic child for the initial Planner while inactive, using the
-   ordinary bounded assignment. Handle `# Question`, `# Done` or a
-   complete validated `# Task` batch according to the Preflight reference
-   and the operational activation section below. No Planner outcome
-   overrides a request-level blocker.
-8. Only after validated executable Tasks and transfer of verified plan,
-   exact answers, baseline and provenance, write
-   `current/request.md` **LAST**. Then enter the sequential Worker loop.
-
-Do not re-run the new-independent-run cleanliness/baseline gate on an
-active continuation, valid preparation recovery or genuine active
-replacement. For recovery reconcile exact saved request/Q/A and pending
-evidence before retrying a mutating action; never blindly replay owners.
-For explicit active replacement, preserve old active state until authorized
-replacement preflight/coverage succeeds, and block any Engineering-changing
-replacement before writing. Timeouts or interrupted owners are not proof of
-termination, success, authorization, or safe rollback.
+For Continue, Answer, Cancel and Restart, follow the reference's distinct
+recovery and authorization rules. Never apply the new-run cleanliness gate
+to continuation, silently combine requests, replay uncertain owner actions,
+reset the original baseline, or roll back durable changes.
 
 ## Minimal temporary state
 
