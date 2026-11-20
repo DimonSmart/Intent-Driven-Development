@@ -134,8 +134,11 @@ internal sealed class CodexPlatformAdapter : PlatformPluginBuilder
                     invoke separate Codex CLI processes.
 
                     Wait natively for the Root's genuine terminal child result.
-                    CONTINUE requires a fully confirmed checkpoint, idle descendants,
-                    BATCH_LIMIT and CompletedWorkers exactly equal to the limit.
+                    CONTINUE requires a confirmed full Planner-plan checkpoint,
+                    idle descendants, BATCH_LIMIT and
+                    CompletedWorkers >= max_workers_per_batch > 0. The target is
+                    not a hard cap: finish the entire current plan before rotation,
+                    even when its confirmed Worker count exceeds the target.
                     Only then spawn ONE new fresh Root with mode Continue. A new
                     Root starts from existing .idd/factory state, not Supervisor's
                     summary. Keep all Preflight, verification and implementation
