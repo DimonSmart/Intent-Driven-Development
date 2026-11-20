@@ -60,20 +60,36 @@ provenance/logs. Supervisor never spawns Planner or Worker itself.
 
 Wait natively (event-driven/blocking) for a correlated **genuine terminal**
 Root result; never interpret partial messages/tool output as completion.
+For Codex, request a **one-hour native Root wait** (`timeout_ms: 3600000`)
+when supported by the actual host tool schema; otherwise request the longest
+supported blocking wait and disclose the limitation. Prefer a true event-driven
+terminal wait when available. One hour is a **wait interval**, not a deadline
+that kills a Root or declares the Factory task failed.
+
+A native wait that returns `timed_out: true`, or whose own tool action says
+`completed` without a correlated Root terminal, has only ended that wait.
+It is NOT evidence of child failure, cancellation or terminal completion.
+When the same Root remains active, re-arm a long native blocking wait for
+that Root; never spawn a replacement Root or Writer. Avoid short periodic
+status checks and model-driven progress polling. A wait timeout alone must
+NEVER cause `interrupt_agent` or `BLOCKED / CHILD_UNCONFIRMED`.
 For normal handoff require a correlated, trustworthy successful native Root
 terminal. Root alone confirms its Worker terminals and full plan checkpoint;
 Supervisor does not inspect Worker transcripts or redo checkpoint validation.
-An aborted or timed-out Root never counts as successfully completed.
+An aborted or unconfirmed Root never counts as successfully completed.
 
 ### Exceptional interruption
 
-If waiting fails, times out or is interrupted, ask the host to interrupt the
-tracked child when possible; end this invocation without further spawns.
+For a genuine host wait/transport failure, an explicitly requested stop,
+unavailable child identity or confirmed abnormal termination, do not start
+another Root. Request host-native interruption only when a stop is actually
+needed and appropriate; never interrupt solely because a wait interval elapsed.
 The host owns descendant and OS-process termination. Do not traverse process
-trees, issue shell kills, poll for quiescence or implement a retry engine.
+trees, issue shell kills, repeatedly poll for quiescence or implement a retry
+engine. If native waiting cannot be resumed safely, stop this invocation as
+`BLOCKED / CHILD_UNCONFIRMED` while preserving all state and explain whether
+the child may still be running.
 
-Preserve pending plans, request, provenance and existing Git changes. Report
-BLOCKED / CHILD_UNCONFIRMED if normal native completion is not established.
 A later explicit Continue/Restart/Cancel requires the previous host operation
 to have stopped and Root to reconcile saved state with repository reality.
 If an old Writer might still be active, remain BLOCKED and request manual
@@ -121,6 +137,22 @@ not an invented saved file.
 checkpoint or uncertain native completion stops immediately, preserving
 Factory state. Report the specific blocker; do not retry or spawn another
 Root. **Every result other than CONTINUE ends this invocation.**
+
+### User-facing recovery guidance
+
+On any `BLOCKED` outcome, explain in ordinary language what failed, what
+was confirmed, what remains unknown and which state/Git changes were preserved.
+Then offer **safe next actions**, with prerequisites rather than unsupported
+promises: Continue the saved request after confirming the old host operation
+has stopped (Root reconciles Git and can replan pending work); explicitly
+Restart/replan from the complete saved request when Root can safely reconcile
+replacement; Cancel temporary Factory state and then submit a New request
+only after safe cleanup; or inspect the host/old Writer when termination is
+uncertain. If the Root never returned a trusted terminal, these are generic
+options, NOT claims that the Supervisor inspected Planner/Worker state. Do
+not offer destructive reset as immediately safe, auto-run these options or
+change existing entry-mode/replacement guards. The user's explicit choice
+starts a later invocation.
 
 ## Scope and integrity
 

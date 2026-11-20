@@ -345,10 +345,12 @@ missing baseline for a known-new run is corruption. If original Git objects
 are unavailable, report and block autonomous refinements rather than
 fabricating a replacement SHA. Validate orphaned partial activation plan,
 baseline, provenance and answers before writing the sole active marker
-`current/request.md` last. A timeout does not imply a child writer ended. End this invocation without
-restarting work. On explicit recovery require no ongoing host operation,
-reconcile pending checkpoints and partial Git changes, and block if an old
-writer may still be active.
+`current/request.md` last. A nonterminal native wait timeout does not imply a child writer ended
+or failed: re-arm a long native wait for the same running child without
+interrupting it or creating a new Writer. On actual host failure or explicit
+interruption, end this invocation without replacement work. On later explicit
+recovery require no ongoing old host operation, reconcile pending checkpoints
+and partial Git changes, and block if an old writer may still be active.
 
 ## Durable coverage validation
 

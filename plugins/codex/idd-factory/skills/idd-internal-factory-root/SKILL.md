@@ -76,11 +76,13 @@ the absolute installed child Skill path and an instruction to read its
 bounded packet, not parent/other child transcripts, entire Intent trees or
 protocol bodies. Invalid Skill, reference or packet returns BLOCKED.
 
-On failed wait or emergency interruption, ask the host to interrupt the
-tracked child if possible, preserve the pending Task and end this invocation
-as BLOCKED / CHILD_UNCONFIRMED. Do not start another Writer/Root in the
-same invocation. The host owns descendant and OS process cleanup; no shell
-kills, process-tree tracking, status polling or automated retries.
+An elapsed native wait interval alone is not a child failure. Re-arm a
+long native wait for the SAME active Planner/Worker; do not interrupt, replace
+or start another Writer solely because `timed_out: true` was returned.
+On a genuine host failure, explicit interruption or unconfirmed termination,
+preserve the pending Task and end as BLOCKED / CHILD_UNCONFIRMED if native
+waiting cannot safely continue. The host owns descendant/OS process cleanup;
+no shell kills, process-tree tracking, short status polling or retry engine.
 Later explicit recovery reconciles saved state and requires no active Writer.
 
 ## Factory Preflight — Root entrypoint
@@ -414,19 +416,38 @@ the Task pending; no replacement Writer starts on uncertain completion.
 
 ### Waiting and interruption
 
-Use blocking/event-driven native waits; Worker duration must not create
-repeated parent-model turns. On timeout, failed wait or emergency interrupt:
+Use native blocking/event-driven terminal waits for Planner and Worker; do
+not wake the Root for frequent model-driven progress checks. In Codex request
+`wait_agent(timeout_ms: 600000)` (10 minutes) when supported, otherwise the
+longest blocking interval supported by the actual host schema. Prefer genuine
+event-driven indefinite waiting if available. This is one wait interval, not
+a Planner/Worker execution deadline.
 
-1. Ask the host to interrupt the tracked child when possible.
-2. Preserve the pending Task, provenance and actual Git changes.
-3. End this invocation as BLOCKED / CHILD_UNCONFIRMED; spawn no more Writers.
+A wait returning `timed_out: true`, or a completed wait tool call without a
+correlated successful child terminal, does NOT establish child completion,
+failure or cancellation. If the same child is still running, re-arm its
+long native wait, keeping every other Writer stopped. A timeout by itself
+must NEVER call `interrupt_agent`, reset a Task, launch a new child or end
+as `CHILD_UNCONFIRMED`. Do not use rapid status polling, shell loops or
+an alternate process runtime to implement waiting.
 
-Do not implement recursive process termination, shell kills, OS polling,
-automatic retries or an alternative runtime. A later **explicit**
-Continue/Restart/Cancel requires no ongoing host operation and reconciles
-the actual repository with saved checkpoints. If an old Writer might still
-be active, remain BLOCKED and request manual host inspection. A new Worker
-may retain correct partial work and finish the pending Task.
+Only on a genuine wait/transport failure, explicit user cancellation,
+confirmed abnormal child termination or lost/unverifiable native child
+identity, stop starting Writers. Request host-native interruption only when
+a stop is actually required; never use timeout alone as justification.
+Preserve the pending Task, provenance and actual Git changes. If waiting
+cannot safely be re-established, end this invocation as
+`BLOCKED / CHILD_UNCONFIRMED` with a concrete reason and no replacement
+Writer. The host owns exceptional cancellation and OS process cleanup.
+
+A later **explicit** Continue/Restart/Cancel requires no ongoing host
+operation and reconciles the actual repository with saved checkpoints.
+If an old Writer might still be active, remain BLOCKED and request manual
+host inspection. A fresh Worker may retain correct partial work and finish
+the pending Task; a new Planner may replan only after reconciliation.
+For a genuine blocker, keep Root's strict terminal fields unchanged and
+make `Reason` specific enough for Supervisor to explain the safest user
+options without claiming knowledge of an unconfirmed child.
 
 ## Technical autonomy during execution
 
