@@ -26,20 +26,8 @@ intent.
 
 ## Interpret the request and authorization
 
-Read the original request, not just a router summary. Direct invocation does
-not require `idd-route`. For model-policy requests recognize these modes:
-
-For **model-policy** requests, first read `references/factory-execution-policy.md`.
-Do not read or change `.idd/factory/current/`, Product Intent, Engineering Rules,
-the Factory runtime, planner classification, or existing child agents.
-Configuration is operational policy, not durable product or engineering intent.
-
-## Interpret the request and authorization
-
 Read the original user request, not merely a router summary. Direct invocation
-of this skill does not require `idd-route`. Native-agent registration in Codex
-is handled before model-policy mode selection; for model-policy requests,
-recognize these modes:
+does not require `idd-route`. For model-policy requests, recognize these modes:
 
 - **Initial setup:** Factory is being explicitly configured, the policy is absent,
   and no strategy was chosen previously. Ask one blocking strategy choice below.
@@ -247,18 +235,3 @@ The only project-owned model policy is optional `.idd/execution.yaml`.
 Do not modify `.idd/factory/current/`, run Factory, spawn workers, migrate
 valid policies, or introduce a second persistence service. Git provides
 configuration history.
-
-## Claude Factory model configuration
-
-Use native `AskUserQuestion` for blocking configuration choices
-when it is available; do not reproduce its tool schema. Prefer a
-native host model/capability catalog when available, then current
-platform-provided model information or current documentation/
-knowledge, and finally concrete model IDs supplied by the user.
-Do not claim account-specific availability unless the host can
-verify it.
-
-Persist Claude mappings under the `claude` platform key with a
-concrete `model` and optional `effort`. Never embed a recommended
-concrete model ID in generated guidance, and never save an
-automatically proposed mapping before user confirmation.

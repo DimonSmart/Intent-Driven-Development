@@ -5,8 +5,9 @@ Factory entry workflow. For a new Factory run, the entry workflow wraps it in a
 broader durable preflight that may also coordinate explicit Engineering
 management before active Factory state exists.
 
-Factory preflight is not a planner task, worker task, runtime, state machine, or
-transaction subsystem.
+The internal Factory Root, never the public Supervisor, owns Factory Preflight
+and coordinates its authorized durable owners. Factory preflight is not a
+planner task, worker task, runtime, state machine, or transaction subsystem.
 
 ## Logical request
 
@@ -29,7 +30,8 @@ handoff, durable coverage validation, and eventual
 ## Modes
 
 New:
-- no active simplified Factory run is being continued;
+- no active run or recoverable preparation may be silently displaced;
+  if one exists, ask explicitly whether to Continue, Restart or Cancel;
 - run durable preflight on the materialized current request;
 - save recoverable preparation BEFORE mutating preflight; activate only
   after verified coverage and a valid initial Planner Task batch.
@@ -51,6 +53,57 @@ Continue:
 A legacy `.idd/factory/current/state.json` is not an active state-machine
 contract. Do not interpret or migrate it. The active simplified-run marker is
 `.idd/factory/current/request.md`.
+
+The public Supervisor selects New, Continue, Answer, Restart or Cancel
+as a transport mode; **Root** applies the semantic modes above:
+
+- `New` maps to New only if neither active state nor unresolved preparation
+  exists. Otherwise explain unfinished work and explicitly ask whether to
+  Continue (possibly to a normal plan checkpoint), Restart or Cancel. Never
+  silently merge requests or turn unrelated New into replacement.
+- `Continue` maps to Continue, including trusted interrupted Preflight.
+- `Answer` maps to Continue with the exact saved
+  `preparation/question.md` or `current/question.md`. Root must bind the
+  verbatim answer to that question and the unchanged base request, record Q/A
+  before a new Planner, and revalidate authorized owner decisions and coverage
+  when the answer affects them. No saved question means no inferred Q/A:
+  a request-level blocker that wrote no preparation requires a complete
+  request with its clarification on a new invocation.
+- `Restart` is an explicit replacement, not a synonym for Continue. With an
+  active marker, apply Replacement and retain the old active state until
+  authorized replacement Preflight/coverage succeeds. With recoverable
+  preparation but no marker, first reconcile the saved request, immutable
+  baseline, provenance, pending owner actions and actual repository changes.
+  Require no known ongoing host operation or unresolved owner action. Only
+  when the old preparation's
+  outcome is unambiguous AND discard is explicitly authorized may Root discard
+  temporary preparation and apply the existing replacement contract. When
+  evidence is ambiguous, preserve it and return NEEDS_INPUT with a concrete
+  decision question; never silently merge requests, blindly replay owners or
+  reinterpret a partial activation as an active run. With neither,
+  apply New and its cleanliness/baseline gate.
+- `Cancel` is Root-owned temporary-state cleanup, **not** an alternative
+  Engineering/Product mutation path or a new Preflight. Before removing the
+  only recovery evidence, no known ongoing host operation or unresolved owner actions must be
+  established; uncertainty blocks destructive cleanup. The host owns
+  descendant/OS process cleanup, not Factory. Cancel never
+  rolls back Product Intent, Engineering or implementation changes. A fully
+  successful Cancel returns COMPLETED/CANCELLED, without `# Done` or final
+  implementation verification. If a user decision is required, preserve
+  evidence and return NEEDS_INPUT with the precise question; otherwise an
+  unrecoverable safety/protocol blocker returns BLOCKED.
+
+Root automatically reconciles only outcomes established unambiguously by
+saved provenance, Git/repository reality and trusted normal terminal results.
+After interruption, a later explicit invocation must ensure the previous host
+operation is no longer writing; an aborted agent status is not that proof.
+When multiple plausible outcomes would require different mutations, do not
+guess, retry or delete evidence: save an exact question in the existing
+preparation/current `question.md` when applicable and return NEEDS_INPUT.
+Do not introduce a new lifecycle status, state file or retry counter.
+
+Supervisor supplies the mode and exact user input, but does not independently
+classify the request, execute owner workflows or delete temporary state.
 
 ## Requested scope
 
@@ -212,11 +265,16 @@ no new Factory state
 
 ## New-run ordering
 
-Before any durable owner or Factory write, the Factory Root also checks that the
-host supports isolated native children and that **both registered** Planner
-and Worker roles resolve unambiguously. The operational role-identity, spawn
-transport and readiness checks belong to `idd-factory-run.md`; they are
-prerequisites to (not substitutes for) the following normative phases.
+Before any durable owner or Factory write, the Factory Root checks that
+the host supports fresh generic native children and that the installed
+`idd-internal-factory-planner/SKILL.md` and
+`idd-internal-factory-worker/SKILL.md` are accessible from the same
+`idd-factory` package version as the Root. Registered Factory-specific
+agent roles or `agent_type` values are not required. The public Supervisor
+checks nested native dispatch and the installed Root Skill; the internal Root
+checks Planner/Worker Skill paths and native spawn readiness under its own
+protocol. These checks are prerequisites to (not substitutes for) the
+following normative phases.
 
 ```text
 1. materialize complete logical request
@@ -233,6 +291,7 @@ prerequisites to (not substitutes for) the following normative phases.
 12. Question -> save exact Q/A and checkpoint newly authorized owner changes
     Done -> final verification with no activation
     Tasks -> verify full batch and transfer plan, answers, baseline, provenance
+    BLOCKED/invalid output -> preserve preparation; no activation or automatic retry
 13. create current/request.md LAST; then sequential Workers
 ```
 
@@ -286,7 +345,10 @@ missing baseline for a known-new run is corruption. If original Git objects
 are unavailable, report and block autonomous refinements rather than
 fabricating a replacement SHA. Validate orphaned partial activation plan,
 baseline, provenance and answers before writing the sole active marker
-`current/request.md` last. A timeout does not imply a child writer ended.
+`current/request.md` last. A timeout does not imply a child writer ended. End this invocation without
+restarting work. On explicit recovery require no ongoing host operation,
+reconcile pending checkpoints and partial Git changes, and block if an old
+writer may still be active.
 
 ## Durable coverage validation
 
@@ -328,9 +390,15 @@ a plan, a preflight report or a rewrite.
 
 ## Preparation questions and renewed coverage
 
-The initial Planner is the ordinary read-only Factory Planner with the normal
-`# Task`, `# Question`, and `# Done` outcomes. A valid single Question
-before activation remains in `preparation/question.md`; record exact
+The initial Planner is the ordinary read-only Factory Planner with three
+normal `# Task`, `# Question`, and `# Done` outcomes and a distinct
+diagnostic `BLOCKED` failure form (`BLOCKED` followed by one nonempty
+`Reason:` line). A valid Planner `BLOCKED`, malformed output or
+unconfirmed native child terminal result stops Root with a precise existing
+`Status: BLOCKED` diagnostic, preserving preparation, without creating a
+question, plan or active marker or automatically retrying. Only a genuine
+`# Question` can initiate saved Q/A. A valid single Question before
+activation remains in `preparation/question.md`; record exact
 chronological Q/A in `preparation/answers.md`. Classify the whole base request
 plus every applicable clarification, not the last answer alone. Before any new
 durable mutation, repeat request-level blocker checks, including conflicts and

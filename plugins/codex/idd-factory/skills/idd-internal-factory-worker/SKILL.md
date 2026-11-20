@@ -1,6 +1,6 @@
 ---
 name: idd-internal-factory-worker
-description: Internal Factory Worker protocol. Use only inside a fresh child context spawned by idd-factory-run with exactly one complete Task and verified scope/provenance; otherwise return BLOCKED.
+description: Internal Factory Worker protocol. Use only inside a fresh generic child spawned by the internal Factory Root with exactly one complete Task and verified scope/provenance; otherwise return BLOCKED.
 ---
 
 # IDD Factory Worker Protocol
