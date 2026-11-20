@@ -42,11 +42,13 @@ manages optional `.idd/execution.yaml` model-selection policy.
 The host must provide ordinary native children with fresh context (no inherited
 parent transcript), shared workspace and access to the installed package,
 bounded task delivery, terminal result, native blocking or event-driven wait,
-and reliable interruption/stop before another writer starts. Exact explicit
-per-child model/effort overrides must be possible for configured policy values.
-Separate per-child sandboxing is optional; Planner must behave read-only and
-prefer host-enforced read-only permissions when possible. Unsupported actual
-capabilities block with a precise diagnostic, without a custom process runtime.
+and reliable interruption/stop before another writer starts. Native model/
+effort override support is not required to start Factory: Root checks it only
+for the selected Worker's explicit `.idd/execution.yaml` mapping, immediately
+before spawn. Inherited mappings need no override support. Separate per-child
+sandboxing is optional; Planner must behave read-only and prefer host-enforced
+read-only permissions when possible. Missing mandatory capabilities block with
+a precise diagnostic, without a custom process runtime.
 
 ## Child Skill delivery
 
