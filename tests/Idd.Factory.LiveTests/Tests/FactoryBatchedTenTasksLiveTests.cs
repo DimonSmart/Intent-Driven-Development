@@ -94,10 +94,12 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             Assert.Equal(1, report.Metrics.SupervisorInvocations);
             Assert.InRange(report.Metrics.FactoryRootInvocations, 2, 10);
             Assert.Equal("completed", report.Run.Result);
+            Assert.Equal("passed", report.Completion.ProjectVerification);
+            Assert.False(report.FactoryProjectState.CurrentRequestPresent);
+
             var ordered = report.Batches.OrderBy(item => item.BatchOrdinal).ToArray();
             Assert.True(ordered.Select(item => item.BatchOrdinal).SequenceEqual(
-                Enumerable.Range(1, ordered.Length).Select(n => (int?)n)),
-                "Native Root ordinals must be sequential.");
+                Enumerable.Range(1, ordered.Length).Select(n => (int?)n)));
             Assert.All(ordered.SkipLast(1), batch =>
             {
                 Assert.Equal("CONTINUE", batch.Status);
@@ -106,69 +108,39 @@ public sealed partial class NativeFactoryEndToEndLiveTests
             });
             Assert.Equal("COMPLETED", ordered[^1].Status);
             Assert.Equal(10, ordered.Sum(batch => batch.CompletedWorkers ?? 0));
-            Assert.Equal(10, report.Metrics.WorkerInvocations);
-            Assert.Equal(10, report.Tasks.Count);
-            Assert.All(report.Tasks, item => Assert.Equal("completed", item.Status));
-            Assert.Equal("passed", report.Completion.ProjectVerification);
-            Assert.False(report.FactoryProjectState.CurrentRequestPresent);
 
-            var readers = new CodexRolloutReader();
+            var reader = new CodexRolloutReader();
             var rollouts = Directory.EnumerateFiles(Path.Combine(home, "sessions"),
-                "*.jsonl", SearchOption.AllDirectories).Select(path => readers.Read(path)).ToArray();
+                "*.jsonl", SearchOption.AllDirectories).Select(path => reader.Read(path)).ToArray();
             var supervisor = Assert.Single(rollouts, item => item.ThreadId == report.Run.RootThreadId);
             AssertMultiAgentV2(supervisor);
             var roots = ordered.Select(batch =>
                 Assert.Single(rollouts, item => item.ThreadId == batch.RootThreadId)).ToArray();
-            Assert.All(roots, root => Assert.Equal(supervisor.ThreadId, root.ParentThreadId));
-            foreach (var batch in ordered)
-            {
-                var root = Assert.Single(roots, candidate => candidate.ThreadId == batch.RootThreadId);
-                Assert.Equal($"idd_factory_root_b{batch.BatchOrdinal:0000}",
-                    root.AgentPath?.Split('/').Last());
-                var workers = report.Agents.Where(item => item.Role == "worker" &&
-                    item.ParentThreadId == root.ThreadId).OrderBy(item => item.StartedAt).ToArray();
-                Assert.Equal(batch.CompletedWorkers, (int?)workers.Length);
-                Assert.All(workers, item => Assert.Equal(batch.BatchOrdinal, item.BatchOrdinal));
-                for (var i = 1; i < workers.Length; i++)
-                    Assert.True(workers[i - 1].FinishedAt <= workers[i].StartedAt,
-                        "Two writing Workers overlapped or native completion order was unknown.");
-            }
-            // Reconstruct every Planner's accepted Task plan from real native
-            // final messages. A normal Root rotation must never interrupt one.
-            var planners = report.Agents.Where(agent => agent.Role == "planner").ToArray();
-            var planCounts = new Dictionary<string, int>(StringComparer.Ordinal);
-            foreach (var planner in planners)
-            {
-                var rollout = Assert.Single(rollouts, item => item.ThreadId == planner.ThreadId);
-                var lastText = rollout.Events.LastOrDefault(item =>
-                    item.Role == "assistant" && !string.IsNullOrWhiteSpace(item.Text))?.Text ?? "";
-                var count = System.Text.RegularExpressions.Regex.Matches(lastText,
-                    @"(?m)^# Task\s*$").Count;
-                Assert.InRange(count, 0, 4);
-                planCounts[planner.ThreadId] = count;
-            }
-            Assert.Contains(planCounts.Values, count => count == 4);
+            CorrelateNativeSpawnsForAssertions(supervisor, home, report);
             foreach (var root in roots)
+                CorrelateNativeSpawnsForAssertions(root, home, report);
+            FactoryNativeEvidence.VerifyRoots(supervisor, roots);
+
+            var confirmedWorkers = 0;
+            for (var i = 0; i < roots.Length; i++)
             {
-                var pendingTasks = 0;
-                var children = report.Agents.Where(item => item.ParentThreadId == root.ThreadId &&
-                    item.Role is "planner" or "worker").OrderBy(item => item.StartedAt).ToArray();
-                foreach (var child in children)
-                {
-                    if (child.Role == "planner")
-                    {
-                        Assert.Equal(0, pendingTasks);
-                        pendingTasks = planCounts[child.ThreadId];
-                    }
-                    else
-                    {
-                        Assert.True(pendingTasks > 0,
-                            "A Worker started without a currently active Planner Task.");
-                        pendingTasks--;
-                    }
-                }
-                Assert.Equal(0, pendingTasks);
+                var root = roots[i];
+                var children = rollouts.Where(item => item.ParentThreadId == root.ThreadId &&
+                    FactoryBatchTrace.ParseName(item.AgentPath?.Split('/').Last())?.Role
+                        is "planner" or "worker").ToArray();
+                confirmedWorkers += FactoryNativeEvidence.VerifyPlans(root, children);
+                Assert.Equal(ordered[i].CompletedWorkers,
+                    children.Count(item => FactoryBatchTrace.ParseName(
+                        item.AgentPath?.Split('/').Last())?.Role == "worker"));
+                if (i == roots.Length - 1)
+                    Assert.Contains(children, child =>
+                        FactoryBatchTrace.ParseName(child.AgentPath?.Split('/').Last())?.Role == "planner" &&
+                        FactoryNativeEvidence.ConfirmedFinalText(child) == "# Done");
             }
+            Assert.Equal(10, confirmedWorkers);
+            Assert.Equal(10, report.Metrics.WorkerInvocations);
+            Assert.Equal(10, report.Tasks.Count);
+            Assert.All(report.Tasks, task => Assert.Equal("completed", task.Status));
             foreach (var step in Enumerable.Range(1, 10))
                 Assert.True(File.Exists(Path.Combine(workspace, "src", "TenTasks",
                     $"Step{step:00}.cs")), $"Missing implementation Step{step:00}");
