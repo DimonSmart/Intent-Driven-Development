@@ -256,7 +256,7 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
 
         Assert.Contains("FIRST reconcile saved", root);
         Assert.Contains("first reconcile the saved request", preflight);
-        Assert.Contains("before any authorized discard", supervisor);
+        Assert.Contains("Reject a CANCELLED reason for non-Cancel modes", supervisor);
         Assert.Contains("NEEDS_INPUT with a concrete", preflight);
         Assert.Contains("NEEDS_INPUT with the precise choice", root);
         Assert.Contains("requests a concrete user decision with NEEDS_INPUT", intent);
