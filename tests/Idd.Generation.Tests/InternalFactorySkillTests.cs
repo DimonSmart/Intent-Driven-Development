@@ -298,7 +298,7 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
         Assert.Contains("provenance **before** mutating owners", root);
         Assert.Contains("Engineering owner before", root);
         Assert.Contains("Product owner", root);
-        Assert.Contains("write `current/request.md` LAST", root);
+        Assert.Contains("Write `current/request.md` LAST", root);
 
         Ordered(intent,
             "-> reject request-level blockers before any durable write",
@@ -401,7 +401,7 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
         Assert.DoesNotContain("git status --porcelain=v1", root);
         Assert.Contains("Status: CONTINUE|COMPLETED|NEEDS_INPUT|BLOCKED", root);
         Assert.Contains("CompletedWorkers: <nonnegative actual confirmed Root-local integer>", root);
-        Assert.Contains("current/request.md` **LAST**", root);
+        Assert.Contains("**LAST** before the Worker loop", root);
         Assert.Contains("all writing", root, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Intent Refinement Review", root);
     }
