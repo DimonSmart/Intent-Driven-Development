@@ -1,9 +1,11 @@
 # Factory Workflow
 
-Factory is lightweight native-agent orchestration for implementation work that
-benefits from decomposition and fresh contexts. Its entry workflow may coordinate
-required durable preparation before orchestration starts; its planner and
-workers preserve the approved product contract; only Factory Worker may add monotonic Intent refinements.
+Factory is lightweight two-level native-agent orchestration for implementation
+work that benefits from decomposition and fresh contexts. The public
+`idd-factory-run` Supervisor dispatches fresh internal Roots sequentially.
+Each Root owns required durable preparation, Planner/Worker orchestration and
+final verification. Planner and Workers preserve the approved product contract;
+only Factory Worker may add monotonic Intent refinements.
 
 ## Entry preflight and initial planning
 
@@ -11,7 +13,8 @@ For a new implementation-capable Factory run:
 
 ```text
 Complete materialized logical request
--> Factory Preflight
+-> public Supervisor -> fresh internal Factory Root
+-> Root-owned Factory Preflight
    -> non-mutating Product Intent analysis and blocker checks
    -> verify managed IDD clean and original Git HEAD (new run only)
    -> persist preparation/request.md, baseline.md and provenance.md BEFORE writes
@@ -27,6 +30,7 @@ Complete materialized logical request
                -> current/plan.md + exact answers
                -> current/request.md LAST [ACTIVE]
 -> sequential native Workers -> fresh Planner -> Question | Done
+-> Root terminal result -> Supervisor checkpoint/rotation or stop
 ```
 
 Preflight uses the complete materialized request, not summaries, plans or host
@@ -254,9 +258,10 @@ utility and is not part of the Factory workflow or plugin runtime.
 
 ## Generic native children and internal Skills
 
-Factory packages two internal Skills from the canonical Planner and Worker
-protocols. Root derives their `SKILL.md` paths from the exact installed
-`idd-factory-run` Skill and checks they are available before durable preflight.
+Factory packages three internal Skills from the canonical Root, Planner and
+Worker protocols. Supervisor resolves the Root `SKILL.md` from its installed
+`idd-factory-run` package; Root resolves Planner/Worker `SKILL.md` paths
+from the exact same installed plugin version before durable preflight.
 For every Planner or Worker it launches a fresh native generic child with no
 inherited history, the correct absolute installed Skill path, an instruction
 to read the entire Skill first, the project path and only a bounded assignment.
@@ -266,7 +271,8 @@ bodies or full Intent/Engineering trees. Workers run sequentially; Root checks
 final verification after the last Planner `# Done`.
 
 No registered Factory `agent_type`, project/user custom agent definitions or
-registration helper is needed. Codex names attempts with `task_name` and uses
+registration helper is needed. Codex uses batch-scoped `idd_factory_root_bNNNN` and
+`idd_factory_(planner|worker)_bNNNN_NNNN` task names with
 `fork_turns: "none"`; these are not proofs that the Skill was read. Actual
 host capabilities (generic spawn, fresh context, file access, terminal wait,
 stop/interrupt and exact configured worker model/effort) remain required.
