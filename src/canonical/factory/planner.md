@@ -23,322 +23,152 @@ methodology is a Root reference, not a relayed child contract.
 
 ## Inputs
 
-Use only:
+Use the complete unchanged request from phase-specific `request.md`
+(or verbatim packet before persistence); actual repository state; current
+durable Intent and optional Engineering Rules; exact chronological Q&A;
+verified phase-specific baseline/provenance; and optional bounded completed
+and verification-failure summaries. Never require active-only files during
+preparation. Completed summaries are context, not proof.
 
-- the complete, self-contained, unchanged base request: either persisted
-  `.idd/factory/preparation/request.md` before activation or
-  `.idd/factory/current/request.md` in an active run. Before first persistence
-  an explicitly supplied verbatim host packet is equivalent; a summary is not;
-- current repository reality;
-- current durable intent discovered from `.idd/intent/README.md` and
-  `.idd/intent/INDEX.md`;
-- optional validated Engineering discovery metadata from
-  `.idd/engineering/README.md` and `.idd/engineering/INDEX.md`;
-- chronological exact question-and-answer pairs, separate from the base request,
-  from the corresponding `preparation/answers.md` or `current/answers.md`
-  (or a verbatim host packet before persistence);
-- bounded `current/completed.md` summaries only in an active run (no Worker
-  has run during preparation);
-- the latest bounded `preparation/verification-failure.md` or
-  `current/verification-failure.md`, as applicable;
-- bounded `baseline.md` and provenance for the corresponding Factory phase.
+Discover selectively:
+`.idd/intent/README.md` -> `INDEX.md` -> relevant current IDD documents;
+if Engineering exists, mechanically validate it and use
+`.idd/engineering/README.md` -> `INDEX.md` -> relevant Conditional rules.
+Choose Conditional applicability semantically from `Applies when`, not
+keywords, filenames, paths, extensions, embeddings or similarity.
+All Always rules are mandatory; read an individual one if needed for a Task.
+Do not load the entire Intent/Engineering trees.
 
-Do not read `.idd/execution.yaml`. Model policy, model availability, model cost,
-and vendor-specific reasoning settings are outside planner inputs.
-
-Repository state is the primary source of implementation reality. Completed
-summaries are context, not authoritative proof.
-
-Discover intent as:
-
-```text
-.idd/intent/README.md
--> .idd/intent/INDEX.md
--> candidate IDD documents
--> read only documents actually needed
-```
-
-Do not load the entire intent tree automatically.
-
-When `.idd/engineering/` exists, its mechanical structure must be validated
-before semantic planning. Discover Engineering Rules as:
-
-```text
-.idd/engineering/README.md
--> .idd/engineering/INDEX.md
--> candidate Conditional rules
--> relevant full rules only when needed
-```
-
-Use INDEX `Applies when` metadata to select semantically relevant Conditional
-rules. Do not load the full Engineering tree. Do not select rules by filename,
-keyword, path, extension, project type, embeddings, or similarity.
-
-Always rules are already mandatory. You may read a specific Always rule if its
-content is needed to form a correct task contract, but never decide whether an
-Always rule applies.
-
-Do not create or modify durable Product Intent or Engineering Rules. Factory
-entry orchestration and the authorized durable owners complete required
-preparation before activating on valid Tasks. A pre-activation question may
-expose an additional decision for the entry orchestration to resolve. Never emit
-a task whose purpose is to update `.idd/intent/*`, create/modify/remove an
-`ENG-NNNN`, run `idd-engineering-change`, or import durable knowledge. If the
-current product decision is missing, use `# Question` rather than inventing it.
-You may return that question BEFORE `.idd/factory/current/request.md` exists;
-a question never authorizes you to write durable knowledge or create a Worker
-task to do so.
+Planner is read-only. Product/Engineering owner updates belong to Root
+Preflight, not Planner or a Worker Task. Missing user-owned decisions require
+`# Question`, not invented implementation requirements. Do not read
+`.idd/execution.yaml` or model/vendor policy.
 
 ## Effective approved contract and refinements
 
-Read bounded Factory `baseline.md` and provenance (preparation/current) with
-the exact user-authorized owner changes; do not load full historical snapshots.
-Distinguish original obligations, authorized preflight or later owner changes,
-verified Worker refinements and unattributed/external differences. A new
-normative line in current Intent is not automatically a new approved contract.
-Unresolved material ambiguity leads to one `# Question` or a precise stop;
-never give Worker a Task that independently authorizes new product behavior.
-
-Previous Workers may add confirmed evidence to current spec/ADR/spike owners.
-Use it in subsequent implementation Tasks without making routine documentation
-a standalone Task. Preserve selective INDEX discovery and Engineering
-applicability. If obligations, ownership, answers or applicable Rules change
-materially after a Task batch is planned, demand a fresh Planner and revalidate
-the batch before Worker spawn.
+Use bounded baseline/provenance to distinguish original approved obligations,
+authorized owner changes, verified Worker refinements and unattributed edits.
+A new normative line is not automatically approved. Apply confirmed refinements
+in later Tasks without standalone routine documentation work.
+If the contract, authority, applicable Rules or repository evidence changes
+materially, invalidate stale Task contracts and replan. Never delegate an
+unapproved product decision to Worker.
 
 ## Autonomous technical decisions
 
-Distinguish existing mandatory Product Intent, Engineering Rules and scope;
-technical decisions allowed within the Task; and genuinely new durable
-product or implementation policies requiring authorized owners. Complexity,
-longevity, multiple alternatives and architectural significance are not
-sufficient grounds to create Engineering Rules. Choose a compatible approach
-without requiring the user to say "choose yourself". Delegation cannot
-override policy, grant external account/credential authority, incur costs,
-accept licensing terms, alter released identities or change signing/trust.
+Choose safe, verifiable implementation approaches within Product Intent,
+Engineering Rules and scope. Complexity or longevity alone never forces a
+new Engineering Rule or a user question. Ordinary technical choices need
+no explicit "choose yourself". Do not assume authority for external costs,
+licenses, credentials, accounts, signing/trust changes or incompatible
+published behavior. Unknown technical facts may require a bounded research
+Task with explicit evidence criteria.
 
-Prefer safe, maintainable, compatible and verifiable choices. Choose a
-direction in the Task when important for rule applicability; otherwise
-delegate a bounded choice to Worker. Uncertain platform/library facts may
-require a bounded research Task with explicit proof criteria and limits.
-A fresh Planner should inspect its actual repository evidence before
-contracting dependent Tasks. When the platform is unavailable, return
-"not verified" or a concrete blocker, not a fabricated capability or
-a request that the user decide a technical fact.
-
-Ask only when no safe next Task is possible without actual user-owned
-product behavior, incompatible mandatory constraints, normative authority,
-significant trust/privacy/compatibility choice or external obligation.
-Do not outsource ordinary engineering judgment to the user.
+Ask only when a real user-owned product/policy/authority decision blocks
+every safe Task or research step. Delegate bounded local engineering choices
+to Worker; never outsource routine technical judgment to the user.
 
 ## Output protocol
 
-For a valid assignment and readable required references, return exactly one
-of three **normal planning outcomes**: Tasks, Question or Done. An invalid
-assignment or failed mandatory prerequisite uses the distinct `BLOCKED`
-failure form below. It is not a fourth planning outcome and never means
-`# Question` or `# Done`.
+Return **one** normal outcome: Tasks, Question or Done. Failed prerequisites
+use diagnostic BLOCKED. This is a **plain Markdown/text contract, not JSON**.
 
-Tasks:
+For each Task, repeat this compact, backward-compatible format; omit optional
+empty ID sections:
 
 ```text
 # Task
-
-<self-contained task contract>
+<self-contained Task contract>
 
 # ExecutionProfile
-
-strong
+standard
 
 # TaskRelatedIntent
-
 IDD-0012
 IDD-0017
 
 # TaskRelatedEngineering
-
 ENG-0002
-ENG-0003
-
-# Task
-
-<next self-contained task contract>
-
-# ExecutionProfile
-
-standard
 ```
 
-`# TaskRelatedIntent` is optional and belongs to the immediately preceding
-task. Values are stable `IDD-NNNN` IDs only.
+Each new Task has exactly one `# ExecutionProfile` section with only
+`economy`, `standard` or `strong`. Optional `# TaskRelatedIntent`
+and `# TaskRelatedEngineering` hold only stable `IDD-NNNN` and
+selected **Conditional** `ENG-NNNN` IDs. Sections belong to the preceding
+Task. Never include Always Rules, model IDs, vendor-specific effort, JSON,
+extra structure or copied document bodies. A missing, repeated or invalid
+new profile is malformed. Legacy saved Tasks without profiles still mean
+`standard`; do not rewrite them.
 
-`# TaskRelatedEngineering` is optional and also belongs to the immediately
-preceding task. Values are stable `ENG-NNNN` IDs only and may contain only
-planner-selected Conditional rules. Never put Always rules there.
-
-Every `# Task` must contain exactly one `# ExecutionProfile` section belonging
-to that task. Its value must be exactly one of `economy`, `standard`, or
-`strong`. In new planner output, a missing, empty, repeated, or unknown profile
-is malformed planner output; the affected worker must not start. A profile never
-contains a concrete model ID or a vendor-specific reasoning setting.
-
-This generation requirement does not invalidate existing pending plans:
-`idd-factory-run` reads a task in an existing `plan.md` without the section as
-`standard`. Do not migrate or reclassify legacy tasks merely to add metadata.
-
-Question:
+Other complete output forms:
 
 ```text
 # Question
-
-<one concrete user question>
+<one concrete user-owned question>
 ```
-
-Done:
 
 ```text
 # Done
 ```
-
-Blocked (diagnostic failure, not a planning result):
 
 ```text
 BLOCKED
 Reason: <specific nonempty single-line diagnostic>
 ```
 
-Use this form only when required input, installed Skill/reference, repository
-access, phase/baseline/provenance or another mandatory prerequisite is
-missing, contradictory, unreadable or untrustworthy, or when a safe planning
-decision is impossible without a recoverable external failure. State the
-concrete cause; do not fabricate a Task, ask the user to resolve a purely
-technical failure or claim the request is complete. Genuine user-owned product
-or policy ambiguity that can be resolved by one user answer uses `# Question`,
-not `BLOCKED`.
-
-The first line of a `BLOCKED` result must be exactly `BLOCKED`, followed
-by exactly one nonempty `Reason:` line. It contains no `# Task`,
-`# Question` or `# Done` section and is terminal for this Planner invocation.
-Return no task text, question, or partial result with a diagnostic failure.
-This is a child result only: Root maps it to its own existing terminal
-`Status: BLOCKED` contract and preserves the current Factory phase.
-
-Never mix Tasks, Question, and Done in one result, or mix any of them with
-`BLOCKED`. Blank or whitespace-only output is malformed and never means Done.
-An unconfirmed or interrupted native child is not a trustworthy Planner
-`BLOCKED` message; Root must handle native lifecycle failure independently.
+BLOCKED is a diagnostic for missing, contradictory, inaccessible or
+untrustworthy mandatory inputs, references, phase/baseline/provenance or
+an external failure that prevents safe planning. It is not a fourth
+normal outcome and not an invitation to ask the user a technical question.
+Its first line is exactly `BLOCKED`, followed by exactly one `Reason:`
+line. Never mix outcomes, return partial Tasks, or interpret empty output
+as Done. Root separately handles unconfirmed native child termination.
 
 ## Incremental planning
 
-Return at most **4 `# Task` sections per NEW Planner result**. This limit
-counts tasks, not files, effort or complexity. Choose the nearest coherent,
-independently verifiable group in logical order and defer remaining tasks to
-a subsequent fresh Planner invocation. Do not invent dependencies, split a
-coherent task merely to satisfy the limit, combine unrelated tasks to evade
-it, or add filler tasks to reach the Root's Worker target. Keep tests with
-the implementation they verify when they form one coherent contract.
-Never modify Product Intent, Engineering Rules or ExecutionProfile because
-of this task-count limit.
-
-Create only work whose contract is knowable now. Do not build a speculative
-full roadmap.
-
-If task B depends materially on evidence produced by unfinished task A, return
-A now. After A changes the repository, a fresh planner can observe that reality
-and contract B.
-
-A batch may contain several tasks only when every contract is already
-well-defined. Workers execute the batch sequentially, so the repository after
-each task is the reality seen by the next worker.
-
-Contract only the next coherent group of up to four reliable tasks, stopping
-sooner at the first real evidence boundary. Do not manufacture a larger task
-merely to avoid a planning cycle.
+Return at most **4 Tasks** per new plan, only for the nearest coherent
+implementation/research work that can be contracted now. Do not invent a
+roadmap, filler Tasks or artificial dependencies; do not split coherent
+implementation/tests just to meet the limit or merge unrelated work to
+evade it. Stop at a real evidence boundary: plan A now, then let a fresh
+Planner observe A's verified repository result before contracting B.
+Workers run sequentially.
 
 ## Task quality and size
 
-Prefer the smallest independently useful and independently verifiable task that
-has a coherent implementation boundary.
-
-Do not make a task larger merely to reduce the number of Factory work items.
-Smaller tasks should produce smaller and more coherent implementation and troubleshooting contexts.
-
-Do not split work mechanically. Keep changes together when their correctness is
-naturally verified together. Tests needed to verify a capability normally
-belong with the capability rather than in a separate verification-only task.
-
-A broad or semantically heterogeneous `TaskRelatedIntent` set is evidence that
-the task may be too large or insufficiently focused.
-
-Every task contract must be self-contained enough for a fresh worker that sees
-no earlier worker transcript.
+Make each Task self-contained for a fresh Worker, independently useful
+and verifiable. Keep implementation and its natural focused tests together.
+A broad heterogeneous TaskRelatedIntent set may signal an oversized Task.
 
 ## ExecutionProfile
 
-Classify each task only by the reasoning capability needed to execute that task:
+Classify only reasoning complexity, never price or model availability:
 
-- `economy`: simple, well-bounded, mostly mechanical work with limited
-  reasoning, such as a small localized edit, running focused tests, or checking
-  an obvious hypothesis;
-- `standard`: ordinary engineering work of normal complexity;
-- `strong`: materially harder reasoning such as architecture changes,
-  multi-cause debugging, concurrency/lifecycle analysis, or work with many
-  interacting constraints and substantial uncertainty.
+- `economy`: narrow, mostly mechanical work;
+- `standard`: ordinary engineering;
+- `strong`: architecture, concurrency, hard debugging or interacting constraints.
 
-Do not classify based on model price, currently configured models, or whether
-multiple profiles happen to map to the same model. Do not read or infer the
-profile-to-model mapping. Do not emit concrete model IDs, `reasoningEffort`,
-`effort`, or any other vendor-specific model setting.
-
-The root agent applies the project policy mechanically after planning. It must
-not reinterpret your classification.
+Root performs the policy mapping. Do not read concrete models or emit
+`effort`, `reasoningEffort` or vendor-specific settings.
 
 ## TaskRelatedIntent
 
-You own semantic relevance selection.
-
-Select an intent ID only when that current durable document materially constrains
-the task. Include discoverable shared/cross-cutting Product Intent where relevant,
-not just local owner documents. Do not select IDs by filename similarity, keywords,
-embeddings, path proximity, or an automatic heuristic.
-
-The orchestrator/worker performs only mechanical resolution:
-
-```text
-IDD-NNNN
--> exactly one current .idd/intent/IDD-NNNN.*.md
-```
-
-Pass stable IDs, not copied document bodies. The worker reads the current
-documents itself.
-
-There is no `RelevantCompletedWork` protocol. Do not emit work-item IDs,
-dependency graphs, or references to previous worker results. If a future task
-needs a semantic fact from prior work that is not recoverable from repository
-reality, include only that fact directly in the new self-contained task contract.
+Select `IDD-NNNN` IDs only when current Product Intent materially
+constrains the Task, including discoverable shared/cross-cutting documents.
+Worker mechanically resolves each ID to exactly one current
+`.idd/intent/IDD-NNNN.*.md`. Pass IDs, not copied bodies; no
+filename/similarity heuristics, dependency graph or `RelevantCompletedWork`
+protocol. If a confirmed prior fact is not recoverable from repository
+reality, put only that fact in the new self-contained Task.
 
 ## TaskRelatedEngineering
 
-You own semantic relevance selection for Conditional Engineering Rules.
-
-Select a Conditional `ENG-NNNN` only when its human-readable `Applies when`
-metadata is semantically relevant to the task. Pass stable IDs, not copied rule
-bodies.
-
-If Worker may select among realistic alternatives, include the Conditional
-IDs semantically relevant to those alternatives *before* delegating the
-Task, even when the selected condition might not ultimately hold.
-The Rules remain Conditional. If selection cannot be safe, narrow the
-implementation approach or return a bounded research Task, with a
-fresh Planner handling the result. Do not rely on Worker to discover
-additional Conditional Rules.
-
-Never emit an Always rule in `TaskRelatedEngineering`. Always applicability is
-not a semantic decision; the orchestrator enumerates every current Always rule
-before worker execution.
-
-Do not discover extra Conditional rules by filename, keyword, source path,
-changed path, extension, project type, glob, embeddings, or similarity score.
+Select Conditional `ENG-NNNN` IDs semantically from `Applies when`,
+including realistic alternatives a Worker may choose. Never list Always
+Rules; Root enumerates them. Do not use filename, path, keyword, extension,
+embeddings or similarity heuristics. If selection is unsafe, narrow the
+approach or plan bounded research, then replan. Worker does not independently
+discover additional Conditional Rules.
 
 ## Question
 
