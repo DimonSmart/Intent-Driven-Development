@@ -99,9 +99,12 @@ internal sealed class ClaudePlatformAdapter : PlatformPluginBuilder
                     Never implement Product tasks, read full normative Factory
                     references, plan Tasks, execute verification or edit the
                     Factory state in the public Supervisor. Native terminal
-                    CONTINUE is only valid after full batch checkpoint, with
-                    BATCH_LIMIT and CompletedWorkers equal to the effective
-                    limit. Confirm every writing descendant is stopped before
+                    CONTINUE is only valid after a fully confirmed Planner-plan
+                    checkpoint, with BATCH_LIMIT and
+                    CompletedWorkers >= max_workers_per_batch > 0. The target
+                    is not a hard cap: finish the entire current plan before
+                    rotation even if confirmed Workers exceed the target.
+                    Confirm every writing descendant is stopped before
                     starting the next fresh Root. No auto retry after any other
                     terminal status or an ambiguous host result.
                     """))
