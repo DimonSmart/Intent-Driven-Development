@@ -123,6 +123,34 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
     }
 
     [Fact]
+    public void FactoryV2Documentation_DescribesSupervisorAndInternalRootAsCurrentArchitecture()
+    {
+        var skills = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "docs", "factory-skills.md"));
+        Assert.Contains("The public `idd-factory-run` is a two-level Supervisor.", skills);
+        Assert.Contains("the **internal Root** performs Factory Preflight", skills);
+        Assert.DoesNotContain("existing one-level orchestration directly", skills);
+        Assert.DoesNotContain("For a new run it performs Factory Preflight", skills);
+
+        var workflow = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "docs", "factory-workflow.md"));
+        Assert.Contains("Factory packages three internal Skills", workflow);
+        Assert.Contains("Supervisor resolves the Root `SKILL.md`", workflow);
+        Assert.DoesNotContain("Factory packages two internal Skills", workflow);
+
+        var installation = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "docs", "factory-native-agent-installation.md"));
+        Assert.Contains("## Active Factory v2 architecture", installation);
+        Assert.DoesNotContain("## Staged Supervisor migration", installation);
+        Assert.Contains("Root derives its sibling Planner and Worker", installation);
+
+        var intent = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            ".idd", "intent", "IDD-0001.spec-factory-orchestration.md"));
+        Assert.Contains("Root: materialize request", intent);
+        Assert.DoesNotContain("For a new run, `idd-factory-run` materializes", intent);
+    }
+
+    [Fact]
     public void NativeFactoryRotationContractRequiresCompletePlans()
     {
         var root = fixture.ReadText(Path.Combine(fixture.RepoRoot,
