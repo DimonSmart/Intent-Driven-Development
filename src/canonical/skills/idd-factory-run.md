@@ -169,11 +169,21 @@ perform final verification. Eight completed Workers at limit eight ending a
 plan require another Root for finalization; a plan crossing the target must
 first finish within the original Root.
 
-`COMPLETED` requires a completed native Root result, credible normal Factory
-closure (including inactive-preparation `# Done`), the Root's completed
-Project Verification and Intent Refinement Review, and consistent active
-marker/review evidence. Do NOT rerun verification in Supervisor or spawn
-another Root. Report the short terminal summary.
+`COMPLETED` with `Reason: DONE` requires a completed native Root result,
+credible normal Factory closure (including inactive-preparation `# Done`),
+the Root's completed Project Verification and Intent Refinement Review, and
+consistent active marker/review evidence. `COMPLETED` with `Reason: CANCELLED`
+is valid only for an explicit Cancel entry mode after Root confirms native
+writer/owner quiescence and safe temporary-state cleanup. It does NOT mean
+implementation completion, and does not require Planner `# Done` or final
+project verification. Reject a CANCELLED reason for non-Cancel modes or when
+cleanup/writer-stop evidence is uncertain. Do NOT rerun verification in
+Supervisor or spawn another Root. Report the short terminal summary.
+
+`NEEDS_INPUT` also covers ambiguous recovery or interrupted-preflight Restart
+when a specific user decision is needed; Root preserves existing recovery
+evidence and records the precise question using the existing question file
+when applicable. Supervisor must not infer a choice or start another Root.
 
 `NEEDS_INPUT` ends this invocation with the exact question. If
 `QuestionFile` is present, it must be exactly one of
