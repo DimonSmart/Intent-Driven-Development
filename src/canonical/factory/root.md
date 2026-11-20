@@ -93,13 +93,12 @@ files exist and are accessible, and verify any statically declared mandatory
 references. Root may inspect paths, file attributes and package metadata, but
 MUST NOT read, summarize, quote or relay the full child protocols.
 
-Inspect the actual top-level host-native child-agent schema, including direct
-operations that might not appear inside a nested helper tool list. Require
-fresh child context without inherited history, child access to installed files
-and the shared project working copy, bounded task delivery, final result,
-native blocking/event-driven waiting, stop/interrupt and confirmation that a
-writer has stopped, and exact model/effort overrides when required by policy.
-Absence of a Factory-specific `agent_type` argument is NOT a failure.
+Inspect the actual host-native child-agent schema. Require fresh context
+without inherited history, installed Skill and repository access, bounded
+assignment, terminal wait/result, and reliable writer stop. Do not require
+model/effort overrides at Root entry; check those native arguments only
+immediately before a Worker whose resolved policy mapping explicitly needs
+them. Absence of a Factory-specific `agent_type` argument is NOT a failure.
 If the host requires a type, use its builtin generic child type, not a
 custom registered Factory role. A per-child read-only sandbox for Planner is
 preferred, not mandatory; a textual rule is not a technical sandbox.
@@ -642,8 +641,10 @@ installed `idd-internal-factory-worker/SKILL.md` path and instruct the child
 to read it entirely first, validate the one-Task packet and required references,
 then implement only that Task. The Skill is the Worker's protocol; Root never
 reads or relays its body. The worker never selects a model or reads execution
-policy. Use exact policy-resolved native model/effort arguments or omit both
-when inheriting; never silently substitute.
+policy. For an inherited mapping omit model/effort overrides without checking
+whether the host supports them. For an explicit mapping, require only the
+native model argument and any effort argument actually configured; block
+that Worker if the host cannot honor either. Never silently substitute.
 
 Use this bounded task structure (omit empty optional sections):
 
