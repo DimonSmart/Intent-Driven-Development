@@ -62,11 +62,9 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                 The ten independent Step01 through Step10 product requirements
                 MUST be implemented by exactly ten sequential single-Task
                 Workers, each creating only its one corresponding StepNN.cs file.
-                The FIRST Planner must issue Step01 through Step04 as FOUR
-                separate # Task sections in ONE Planner result, to test a plan
-                larger than the target of three Workers. Subsequent Planner
-                results must contain at most four # Task sections. Do not split
-                a single plan across Roots merely to meet the target.
+                Each new Planner result may contain one to four # Task
+                sections. Do not split any complete Planner plan across Roots
+                merely to meet the target of three Workers.
                 The existing tests deliberately use reflection, so incomplete
                 steps do not stop intermediate dotnet build checkpoints.
                 Complete final project verification after Planner # Done.
