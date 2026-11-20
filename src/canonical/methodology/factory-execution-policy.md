@@ -170,7 +170,12 @@ cost, substitute a stronger/weaker model, or reinterpret user policy.
 
 If the selected mapping is `inherit`, omit Factory-specific model/reasoning
 overrides. If it is explicit, pass exactly the configured model and optional
-reasoning setting through the host's native child-agent controls.
+reasoning setting through the host's native child-agent controls. For Codex,
+`codex.model` maps to native spawn `model`, and optional
+`codex.reasoningEffort` to `reasoning_effort`. For Claude, pass
+`claude.model` and optional `claude.effort` through supported native
+Agent/subagent settings. Never substitute prompt text for a missing native
+override parameter.
 
 An absent policy, an explicit `inherit` policy, or an absent selected mapping
 omits overrides. A policy
