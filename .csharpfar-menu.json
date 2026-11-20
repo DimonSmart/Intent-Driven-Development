@@ -1,0 +1,10 @@
+[
+  {
+    "title": "Setup local plugin",
+    "command": "pwsh ./scripts/Install-Idd-Codex-From-Local.ps1"
+  },
+  {
+    "title": "Setup published plugin",
+    "command": "pwsh ./scripts/Install-Idd-Codex-From-GitHub.ps1"
+  }
+]
