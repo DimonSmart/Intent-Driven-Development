@@ -261,7 +261,7 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
         Assert.Contains("NEEDS_INPUT with the precise choice", root);
         Assert.Contains("requests a concrete user decision with NEEDS_INPUT", intent);
         Assert.Contains("Root automatically reconciles only outcomes", preflight);
-        Assert.Contains("do not replay uncertain owner actions", root);
+        Assert.Contains("uncertain owner actions", root);
     }
 
     [Fact]
@@ -293,12 +293,12 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
             "9. validate durable coverage",
             "13. create current/request.md LAST");
 
-        Ordered(root,
-            "2. Evaluate **all determinable request-level blockers**",
-            "4. Persist `preparation/request.md`, `baseline.md` and `provenance.md`",
-            "5. Invoke `idd-engineering-change`",
-            "6. Validate durable coverage",
-            "8. Only after validated executable Tasks");
+        Assert.Contains("`references/intent-preflight.md` is the sole normative contract", root);
+        Assert.Contains("request-level blockers **before writes**", root);
+        Assert.Contains("provenance **before** mutating owners", root);
+        Assert.Contains("Engineering owner before", root);
+        Assert.Contains("Product owner", root);
+        Assert.Contains("write `current/request.md` LAST", root);
 
         Ordered(intent,
             "-> reject request-level blockers before any durable write",
@@ -382,6 +382,31 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
     }
 
     [Fact]
+    public void Root_RemainsCompactAndDelegatesDetailedPoliciesToCanonicalReferences()
+    {
+        var root = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "factory", "root.md"));
+
+        Assert.True(root.Split('\n').Length <= 650,
+            "Root should orchestrate; detailed Preflight, model policy and verification belong in references.");
+        foreach (var reference in new[]
+        {
+            "references/intent-preflight.md",
+            "references/factory-execution-policy.md",
+            "references/project-verification.md",
+            "references/engineering-guardrails.md"
+        })
+            Assert.Contains(reference, root);
+
+        Assert.DoesNotContain("git status --porcelain=v1", root);
+        Assert.Contains("Status: CONTINUE|COMPLETED|NEEDS_INPUT|BLOCKED", root);
+        Assert.Contains("CompletedWorkers: <nonnegative actual confirmed Root-local integer>", root);
+        Assert.Contains("current/request.md` **LAST**", root);
+        Assert.Contains("all writing", root, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Intent Refinement Review", root);
+    }
+
+    [Fact]
     public void NativeFactoryRotationContractRequiresCompletePlans()
     {
         var root = fixture.ReadText(Path.Combine(fixture.RepoRoot,
@@ -394,7 +419,7 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
         Assert.Contains("at most **4 `# Task`", planner);
         Assert.Contains("five or more", root, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("previously persisted plan", root);
-        Assert.Contains("complete plan boundary", root);
+        Assert.Contains("the whole plan is finished", root);
         Assert.Contains("CompletedWorkers >= max_workers_per_batch > 0", supervisor);
         Assert.DoesNotContain("cannot exceed the effective per-batch limit", supervisor);
         Assert.DoesNotContain("immediately return Status CONTINUE", root);
