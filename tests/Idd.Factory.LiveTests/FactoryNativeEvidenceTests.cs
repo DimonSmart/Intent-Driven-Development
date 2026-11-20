@@ -112,6 +112,21 @@ public sealed class FactoryNativeEvidenceTests : IDisposable
             children.Add(Read(id, workerLines));
         }
 
+        if (!hasSecondRoot)
+        {
+            const string donePlannerId = "11111111-0000-4000-8000-000000000009";
+            const string doneName = "idd_factory_planner_b0001_0002";
+            Spawn(rootLines, "planner-done", doneName, donePlannerId,
+                "Read installed Planner SKILL.md");
+            Wait(rootLines, "planner-done-wait", donePlannerId);
+            children.Add(Read(donePlannerId,
+            [
+                Session(donePlannerId, rootId, "/root/idd_factory_root_b0001/" + doneName),
+                Message("# Done"),
+                Complete()
+            ]));
+        }
+
         rootLines.Add(Message(hasSecondRoot
             ? "Status: CONTINUE\nCompletedWorkers: 4\nReason: BATCH_LIMIT"
             : $"Status: COMPLETED\nCompletedWorkers: {count}\nReason: DONE"));
