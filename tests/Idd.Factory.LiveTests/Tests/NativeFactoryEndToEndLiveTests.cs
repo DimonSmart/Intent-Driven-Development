@@ -263,7 +263,10 @@ public sealed partial class NativeFactoryEndToEndLiveTests
                     item.ParentThreadId == factoryRoot.ThreadId &&
                     FactoryBatchTrace.ParseName(item.AgentPath?.Split('/').Last())?.Role
                         is "planner" or "worker").ToArray();
-                FactoryNativeEvidence.VerifyPlans(factoryRoot, children);
+                var confirmedWorkers = FactoryNativeEvidence.VerifyPlans(factoryRoot, children);
+                var batch = Assert.Single(factoryReport.Batches, item =>
+                    item.RootThreadId == factoryRoot.ThreadId);
+                Assert.Equal(batch.CompletedWorkers, (int?)confirmedWorkers);
             }
             Assert.Equal("completed", factoryReport.Run.Result);
             Assert.Equal("passed", factoryReport.Completion.ProjectVerification);
