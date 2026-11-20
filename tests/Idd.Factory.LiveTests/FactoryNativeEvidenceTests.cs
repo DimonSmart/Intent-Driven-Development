@@ -71,7 +71,7 @@ public sealed class FactoryNativeEvidenceTests : IDisposable
         var plannerLines = new List<string>
         {
             Session(plannerId, rootId, "/root/idd_factory_root_b0001/idd_factory_planner_b0001_0001"),
-            Message(fault == "intermediate-task-only" ? plan : plan)
+            Message(plan)
         };
         if (fault == "intermediate-task-only")
             plannerLines.Add(Message("# Done"));
@@ -90,11 +90,8 @@ public sealed class FactoryNativeEvidenceTests : IDisposable
             Spawn(rootLines, $"worker-{i + 1}", name,
                 fault == "conflicting-child-identity" && i == 0 ? workerIds[1] : id,
                 prompt);
-            if (fault == "overlapping-workers" && i == 0)
-            {
-                // The second spawn is emitted before worker 1's wait result.
-            }
-            else
+            // An overlapping worker is spawned before the previous wait completes.
+            if (fault != "overlapping-workers" || i != 0)
             {
                 if (fault == "overlapping-workers" && i == 1)
                     Wait(rootLines, "wait-worker-1", workerIds[0]);
