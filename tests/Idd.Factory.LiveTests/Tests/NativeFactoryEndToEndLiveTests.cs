@@ -256,6 +256,15 @@ public sealed partial class NativeFactoryEndToEndLiveTests
 
             FactoryRoutingAssertions.VerifyNestedNativeSpawns(factoryReport, rootRollout,
                 internalRoots, settings.ExecutionProfiles);
+            FactoryNativeEvidence.VerifyRoots(rootRollout, internalRoots);
+            foreach (var factoryRoot in internalRoots)
+            {
+                var children = rollouts.Where(item =>
+                    item.ParentThreadId == factoryRoot.ThreadId &&
+                    FactoryBatchTrace.ParseName(item.AgentPath?.Split('/').Last())?.Role
+                        is "planner" or "worker").ToArray();
+                FactoryNativeEvidence.VerifyPlans(factoryRoot, children);
+            }
             Assert.Equal("completed", factoryReport.Run.Result);
             Assert.Equal("passed", factoryReport.Completion.ProjectVerification);
             Assert.Equal("ok", factoryReport.Completion.ProtocolValidation);
