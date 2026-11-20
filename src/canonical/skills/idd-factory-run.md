@@ -8,201 +8,105 @@ verification live exclusively in the installed internal Factory Root Skill.
 
 ## Before the first spawn
 
-Resolve the real, currently installed absolute path of THIS
-`idd-factory-run/SKILL.md`. From the same installed `idd-factory` plugin,
-resolve `skills/idd-internal-factory-root/SKILL.md` and the two version marker
-files at `references/methodology-version.json` beside public and Root Skills.
-They must exist, be readable, and have equal complete version contents.
-Do not substitute repository source files, guessed cache paths, a different
-installed version or a stale legacy agent registration. You may read the
-markers and check the Root Skill's availability, but MUST NOT read or forward
-the Root Skill body, full Product Intent, Engineering Rules or Worker logs.
+Resolve the real installed absolute paths of THIS public Skill and its
+sibling internal Root Skill. Verify that both
+`references/methodology-version.json` markers exist, are readable and
+match exactly. Never use guessed cache/source paths, read or relay Root's
+protocol, full Intent or Worker logs.
 
-Inspect the actual native host tools for generic fresh child spawn,
-`fork_turns: "none"` or equivalent no-history semantics, depth-two nested
-generic children, shared project cwd and installed Skill access, native
-event-driven terminal waiting, visibility and direct native interruption
-of **every active descendant** (including grandchildren), confirmed
-termination of their in-flight writing commands, and real terminal result
-correlation. Do not require model/effort overrides at Supervisor entry:
-Root checks them only when an explicit mapping is selected for a Worker.
-Parent-only interruption
-does NOT imply descendant cancellation. A host where direct grandchild
-interruption or command quiescence cannot be demonstrated is unsupported. Do not equate a depth
-setting or absence of custom `agent_type` with proof of capability. For Codex,
-use the native MultiAgentV2 operations and require known compatible host
-capabilities; a proven Stage-0 smoke test for the host/configuration is needed.
-For Claude and other hosts, require independent real evidence of these same
-capabilities. On Windows Codex, the native unified-exec backend has been
-observed to leave a writing PowerShell command running after
-`interrupt_agent(Writer)` and a native `turn_aborted`. A candidate host
-profile is `features.unified_exec=false` (one-shot shell execution),
-configured BEFORE the Codex session starts. This flag is NOT evidence of
-safe cancellation: the exact host/version/profile must still PASS a real
-descendant-first Writer process-stop gate before Factory is supported.
-Do not change the current session's tools or silently assume the profile
-can be changed from within this Skill. If mandatory capabilities or
-version evidence are unavailable,
-return BLOCKED without launching Factory or using a local CLI/workflow-engine
-fallback. A child stop is not enough while a grandchild writer may still run.
+Require actual host-native fresh generic nested children (depth two),
+no inherited transcripts, shared repository and installed Skill access,
+correlated terminal waiting, direct native visibility/interruption of
+**every descendant**, and confirmed stop of their in-flight writing
+commands/processes. Agent `turn_aborted` or a configured depth alone
+does not prove safety. On Windows Codex, unified exec has left PowerShell
+writers running after interruption; `features.unified_exec=false` is an
+**unverified** candidate requiring an actual descendant-first Writer-stop
+PASS for the precise host/version/profile. Do not change host session
+settings, guess capabilities or substitute a polling/runtime fallback.
+Missing safety or version evidence means BLOCKED before any Factory write.
 
-Resolve `max_workers_per_batch` once for THIS invocation. Default: **8**.
-A user may explicitly override it with one unambiguous positive integer.
-Reject non-positive, fractional, contradictory or otherwise invalid limits
-before spawning or writing. This is not a persistent setting, and MUST NOT be
-added to `.idd/execution.yaml` or `.idd/factory/`.
-
-Choose the entry mode only: New, Continue, Answer, Cancel or Restart.
-Recognize existing `.idd/factory/current/request.md` or
-`.idd/factory/preparation/request.md`, and a saved
-`preparation/question.md` or `current/question.md` when present.
-Do not perform the semantic Preflight yourself. Never treat the existence of
-`current/` or `current/plan.md` without `current/request.md` as an active run.
-A saved question takes precedence over silently treating a user reply as a
-new request. Do not silently merge an independent request into a pending run.
-Pass the exact full original request, including materialized attachment text,
-for New/Restart; do not replace it with an LLM summary. For Answer supply the
-exact user answer and the saved question path; if no question was saved,
-do not invent Q/A or infer the missing original request from a reply.
-For Cancel/Restart supply the exact existing active or preparation paths
-when present and the explicit mode; only Root may reconcile and mutate
-those files. Let Root validate request identity, authorization, scope,
-owner rules, recovery and provenance.
+Resolve positive integer `max_workers_per_batch` once (default **8**).
+Reject invalid, conflicting, fractional or non-positive overrides; never
+persist it. Choose only New / Continue / Answer / Cancel / Restart from
+canonical `current/request.md`, `preparation/request.md` and any saved
+question. A directory or plan without `current/request.md` is not active.
+An existing question precedes an inferred new request. Supply complete
+verbatim New/Restart requests including attachment text, exact unchanged
+saved request paths for continuation and exact Q&A where applicable.
+Root alone decides semantic Preflight, authorization and recovery.
 
 ## Sequential batch dispatch
 
-Use only native generic child agents. Keep ephemeral variables
-`batch_ordinal` (initially 1) and `previous_terminal` in this invocation;
-do not create any durable Supervisor state. Before selecting an ordinal,
-inspect visible native task names: previously used identifiers in the shared
-host namespace cannot be reused.
+Use **one native generic Root at a time**. Keep only transient
+`batch_ordinal` (initially 1) and prior terminal; never create Supervisor
+state. For Codex use an unused native `task_name` such as
+`idd_factory_root_b0001`, then b0002, etc.; check visible names first.
 
-For Codex the Root task name is `idd_factory_root_b0001`, then
-`idd_factory_root_b0002`, etc.; use more digits as needed. Every native
-Supervisor → Root spawn explicitly sets `fork_turns: "none"`, one unique
-`task_name`, and contains ONLY:
+Every spawn explicitly uses `fork_turns: "none"`, a unique task name,
+installed absolute Root Skill path and an instruction to read its entire
+Skill/references before work; shared absolute repository cwd, mode,
+unambiguous literal `batch_ordinal: <positive integer>` and
+`max_workers_per_batch: <positive integer>` assignment lines; complete
+New/Restart request or exact `current/request.md` for subsequent Continue;
+and exact question/answer when applicable. Do not send contradictory
+limits, previous Root/Worker transcripts, pasted protocols or large
+provenance/logs. Supervisor never spawns Planner or Worker itself.
 
-- Role = Factory Root; the absolute installed Root SKILL.md path and a command
-  to read its entire content plus all required references BEFORE project work;
-- the shared absolute project cwd, explicit entry mode, and these
-  unambiguous literal standalone assignment lines:
-  `batch_ordinal: <positive decimal ordinal>` and
-  `max_workers_per_batch: <positive decimal limit>` (for example
-  `max_workers_per_batch: 3`). Do not write another conflicting limit,
-  embed contradictory examples, or omit the effective value;
-- the complete original self-contained request for New/Restart, OR for
-  subsequent batches the exact active path
-  `.idd/factory/current/request.md` and entry mode Continue;
-- the exact saved question and user answer when applicable;
-- instructions to execute the canonical Root protocol with strict terminal
-  result fields and to use native child operations only.
-
-Do not pass Root protocol text, prior Root transcripts, Worker logs or large
-`completed.md`/provenance contents. On subsequent batches, do not rephrase
-the original request; continue from the already materialized unchanged file.
-Do not spawn any Planner or Worker directly.
-
-Wait natively (blocking/event-driven, not a short-poll model loop) for a
-correlated, terminal Factory Root response. Do not interpret intermediate
-assistant messages, tool output, embedded examples or partial structured text
-as the terminal result. Require explicit native confirmation that the Root
-and its descendants, including any writing Worker, have completed/closed.
+Wait natively (event-driven/blocking) for a correlated **genuine terminal**
+Root result; never interpret partial messages/tool output as completion.
+Confirm Root and all descendants have closed before a safe handoff.
 
 ### Descendant-first stop on failed wait, cancellation or replacement
 
-Native `interrupt_agent(Root)` is NOT a recursive stop contract: a nested
-Worker may continue writing after Root is interrupted. If a Root wait fails,
-times out, or the Root must be cancelled, first use `list_agents` or the
-host's equivalent native agent graph to identify every still-active descendant
-and its exact native target path. Interrupt active descendants deepest-first
-(Worker/Planner before Root), explicitly targeting each via native
-`interrupt_agent` or equivalent. Do not interrupt Root first and assume
-its descendants were stopped. Do not rely on Root to stop children after
-Root itself was interrupted.
-
-Confirm each relevant agent stopped and, for any Worker with an in-flight
-command, confirm the writing process/command is no longer executing before
-another writer or Root can start. A native agent's `interrupted` status
-alone does NOT prove its shell/process stopped. Eventual natural completion
-of a Writer, an idle-looking worktree, a terminal phrase or an agent status
-claim is not proof of timely cancellation. If the host cannot enumerate or
-directly interrupt a grandchild, cannot verify a running command has stopped,
-or cancellation leaves command execution uncertain, return
-`BLOCKED / CHILD_UNCONFIRMED`, preserve state and NEVER start another Root
-or mutating Worker. Never kill processes manually or add a shell supervisor,
-process runtime, polling engine or retry loop as a fallback.
-Do not automatically retry failed or rejected Root spawns.
+On failed wait, timeout, Cancel or replacement, inspect the native child
+graph and interrupt every active descendant **deepest-first**, then Root.
+Independently verify all in-flight writing **processes/commands** stopped.
+Agent `interrupted`/`turn_aborted`, a quiet worktree or eventual natural
+completion is not proof of timely cancellation. If discovery, direct
+interruption or writer quiescence is unavailable/uncertain, preserve state
+and return `BLOCKED / CHILD_UNCONFIRMED`; never start another Root/Worker.
+No shell kills, custom process runtime, status polling or automatic retries.
 
 ## Terminal contract from Factory Root
 
-The terminal native child response must contain exactly one each of these
-plain-text fields, on separate lines, with no ambiguous duplicate status:
+Require exactly one each of these separate **plain-text** final fields:
 
     Status: CONTINUE|COMPLETED|NEEDS_INPUT|BLOCKED
-    CompletedWorkers: <nonnegative decimal integer>
-    Reason: <nonempty short reason>
+    CompletedWorkers: <nonnegative confirmed Root-local integer>
+    Reason: <short nonempty reason>
 
-The counter `CompletedWorkers` includes only confirmed successful Workers
-of THIS Root; it may exceed the positive effective target in ANY terminal
-status. Only `CONTINUE` accepts `Reason: BATCH_LIMIT`; it requires
-`CompletedWorkers >= max_workers_per_batch > 0`, a fully completed
-current Planner plan and full trusted checkpoint. BATCH_LIMIT is never
-an empty planning loop, retry or verification result.
+The local count can exceed the target. `CONTINUE / BATCH_LIMIT` requires
+`CompletedWorkers >= max_workers_per_batch > 0` AND a fully completed
+current Planner plan. **Independently validate** native Root/descendant
+and writing-command termination, active `current/request.md` marker,
+and consistency of `plan.md`, `completed.md`, `provenance.md` and
+trusted native results: no remaining executable Task from the current
+plan and no pending checkpoint. Neither text, count nor empty plan alone
+proves this. Any uncertainty BLOCKS rotation.
 
-After confirming native Root/descendant termination, BEFORE spawning another
-Root, mechanically verify the active marker
-`.idd/factory/current/request.md`, and consistency of the preserved
-`plan.md`, `completed.md`, `provenance.md` and trusted native
-results: no remaining executable tasks from the current Planner plan, no
-open pending checkpoint and all writing descendants quiescent. Never
-infer a full plan boundary solely from the terminal text, empty plan or
-Worker count. If saved state contradicts the result or evidence is
-insufficient, BLOCKED and do not start another Root. The Supervisor does
-not semantically interpret tasks, Product Intent or Engineering Rules;
-the Root remains responsible for older saved plans (including >4 Tasks)
-under existing recovery and continuation rules.
+Only after valid CONTINUE, increment the ordinal and spawn **one fresh Root**
+in Continue mode with a new zero local counter and no prior transcripts.
+A plan crossing the soft Worker target must finish in its original Root;
+the next Root may receive `# Done` and finalize.
 
-On a valid CONTINUE, and only then, increment the ephemeral batch ordinal and
-spawn ONE NEW fresh Root with mode Continue. The new Root must start with its
-own zero completed-Worker count. No Planner/Worker history passes between
-batches. A Root reaching or exceeding its target rotates ONLY at a fully confirmed
-plan boundary. The NEXT Root may run a fresh Planner, obtain `# Done` and
-perform final verification. Eight completed Workers at limit eight ending a
-plan require another Root for finalization; a plan crossing the target must
-first finish within the original Root.
+`COMPLETED / DONE` requires credible normal closure after genuine Planner
+`# Done`, successful Project Verification and Intent Refinement Review.
+`COMPLETED / CANCELLED` requires explicit Cancel plus confirmed safe
+writer/owner stop and temporary-state cleanup, **not** implementation
+completion or final verification. Never accept CANCELLED from another mode;
+Supervisor does not rerun final verification.
 
-`COMPLETED` with `Reason: DONE` requires a completed native Root result,
-credible normal Factory closure (including inactive-preparation `# Done`),
-the Root's completed Project Verification and Intent Refinement Review, and
-consistent active marker/review evidence. `COMPLETED` with `Reason: CANCELLED`
-is valid only for an explicit Cancel entry mode after Root confirms native
-writer/owner quiescence and safe temporary-state cleanup. It does NOT mean
-implementation completion, and does not require Planner `# Done` or final
-project verification. Reject a CANCELLED reason for non-Cancel modes or when
-cleanup/writer-stop evidence is uncertain. Do NOT rerun verification in
-Supervisor or spawn another Root. Report the short terminal summary.
+`NEEDS_INPUT` returns the exact question. If `QuestionFile` is present,
+allow only an existing `.idd/factory/preparation/question.md` or
+`.idd/factory/current/question.md`, and read/relay it exactly. A
+request-level question before preparation uses the actual diagnostic text,
+not an invented saved file.
 
-`NEEDS_INPUT` also covers ambiguous recovery or interrupted-preflight Restart
-when a specific user decision is needed; Root preserves existing recovery
-evidence and records the precise question using the existing question file
-when applicable. Supervisor must not infer a choice or start another Root.
-
-`NEEDS_INPUT` ends this invocation with the exact question. If
-`QuestionFile` is present, it must be exactly one of
-`.idd/factory/preparation/question.md` or
-`.idd/factory/current/question.md`; verify that the actual file exists,
-then read and return its exact contents. A request-level question before
-preparation has no `QuestionFile` and must be included as short diagnostic
-text; never invent a stored question. No automatic next batch before an answer.
-
-`BLOCKED`, an invalid terminal response, a missing/mismatched Skill, an
-unconfirmed child/writer stop, an inconsistent checkpoint, a refused model
-override, or any unsupported host feature stops the invocation. Preserve
-Factory state and return a concise, specific diagnostic. Do not start a fresh
-Root to work around the failure.
-
-For any terminal result other than CONTINUE, do not spawn another Root.
-Do not automatically retry the same work or claim exactly-once execution.
+`BLOCKED`, malformed result, unavailable native capability, inconsistent
+checkpoint or unconfirmed writing command stops immediately, preserving
+Factory state. Report the specific blocker; do not retry or spawn another
+Root. **Every result other than CONTINUE ends this invocation.**
 
 ## Scope and integrity
 
