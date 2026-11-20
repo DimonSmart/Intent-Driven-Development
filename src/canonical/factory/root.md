@@ -523,7 +523,7 @@ form. Valid Planner BLOCKED returns Root `Status: BLOCKED` with
 question, Worker, verification or automatic retry. Malformed, mixed, empty,
 incomplete or oversized outputs are `PLANNER_PROTOCOL_INVALID`.
 Unconfirmed child/descendant termination is `CHILD_UNCONFIRMED`, not
-a trusted Planner result. Preserve state and Keep the actual Root-local CompletedWorkers count.
+a trusted Planner result. Preserve state. Keep the actual Root-local CompletedWorkers count.
 
 A new Task batch requires 1–4 complete Tasks, one valid ExecutionProfile
 each, current Intent/Conditional Engineering IDs and fresh repository
