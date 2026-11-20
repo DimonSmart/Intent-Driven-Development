@@ -68,15 +68,31 @@ as a transport mode; **Root** applies the semantic modes above:
 - `Restart` is an explicit replacement, not a synonym for Continue. With an
   active marker, apply Replacement and retain the old active state until
   authorized replacement Preflight/coverage succeeds. With recoverable
-  preparation but no marker, require an explicitly authorized discard and
-  apply the existing preparation-replacement contract; never silently merge
-  requests or reinterpret a partial activation as an active run. With neither,
+  preparation but no marker, first reconcile the saved request, immutable
+  baseline, provenance, pending owner actions and actual repository changes.
+  Confirm native writers/owners have stopped. Only when the old preparation's
+  outcome is unambiguous AND discard is explicitly authorized may Root discard
+  temporary preparation and apply the existing replacement contract. When
+  evidence is ambiguous, preserve it and return NEEDS_INPUT with a concrete
+  decision question; never silently merge requests, blindly replay owners or
+  reinterpret a partial activation as an active run. With neither,
   apply New and its cleanliness/baseline gate.
 - `Cancel` is Root-owned temporary-state cleanup, **not** an alternative
   Engineering/Product mutation path or a new Preflight. Before removing the
   only recovery evidence, native writers and pending owner actions must be
   confirmed quiescent; uncertainty blocks destructive cleanup. Cancel never
-  rolls back Product Intent, Engineering or implementation changes.
+  rolls back Product Intent, Engineering or implementation changes. A fully
+  successful Cancel returns COMPLETED/CANCELLED, without `# Done` or final
+  implementation verification. If a user decision is required, preserve
+  evidence and return NEEDS_INPUT with the precise question; otherwise an
+  unrecoverable safety/protocol blocker returns BLOCKED.
+
+Root automatically reconciles only outcomes established unambiguously by
+saved provenance, Git/repository reality and confirmed native writer stops.
+When multiple plausible outcomes would require different mutations, do not
+guess, retry or delete evidence: save an exact question in the existing
+preparation/current `question.md` when applicable and return NEEDS_INPUT.
+Do not introduce a new lifecycle status, state file or retry counter.
 
 Supervisor supplies the mode and exact user input, but does not independently
 classify the request, execute owner workflows or delete temporary state.
