@@ -327,6 +327,25 @@ public sealed class CodexStateSnapshot
 
 public sealed class CodexRolloutReader
 {
+    // A message or a completed tool call is not a child-turn terminal.
+    // Keep this host-specific fact separate from diagnostic activity/timing.
+    public static bool HasConfirmedTerminal(CodexRollout rollout)
+    {
+        if (rollout.Diagnostics.Any(d => d.Code is
+            "malformed_rollout_line" or "conflicting_turn_ids"))
+            return false;
+        var terminal = rollout.Events.LastOrDefault(e =>
+            e.Type is "turn.completed" or "turn_completed" or "task_complete" &&
+            (e.ThreadId is null || e.ThreadId == rollout.ThreadId));
+        return terminal is not null &&
+            !rollout.Events.Any(e => e.Ordinal > terminal.Ordinal &&
+                e.Role == "assistant" && !string.IsNullOrWhiteSpace(e.Text)) &&
+            !rollout.Events.Any(e =>
+                e.Type is "turn.failed" or "turn_failed" or "task_failed" ||
+                e.ToolName is null && e.Status is
+                    "failed" or "error" or "cancelled" or "canceled" or "interrupted");
+    }
+
     private static readonly Regex ThreadIdRegex = new(
         @"(?<![0-9a-f])(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{24,40})(?![0-9a-f])",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -3122,10 +3141,7 @@ public sealed class FactoryReportEngine
         TryParseStructuredFactoryResult(e, out _, out _);
 
     private static bool HasTerminalEvidence(CodexRollout rollout) =>
-        rollout.Events.Any(x =>
-            x.Type is "turn.completed" or "turn_completed" or "task_complete") ||
-        rollout.Events.Any(x => string.Equals(x.Role, "assistant", StringComparison.OrdinalIgnoreCase) &&
-                                !string.IsNullOrWhiteSpace(x.Text));
+        CodexRolloutReader.HasConfirmedTerminal(rollout);
 
     private static bool HasThreadFailure(CodexRollout? rollout) =>
         rollout?.Events.Any(x =>
