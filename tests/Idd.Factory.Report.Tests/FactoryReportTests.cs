@@ -906,7 +906,7 @@ public sealed partial class FactoryReportTests : IDisposable
             Session(id, cwd, parent),
             User("2026-09-23T10:00:06Z", "Factory child context"),
             .. events,
-            NativeTerminal("2026-09-23T10:00:30.001Z")
+            NativeTerminalAfter(events)
         ]);
     }
 
