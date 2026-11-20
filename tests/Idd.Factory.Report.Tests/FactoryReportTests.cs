@@ -730,7 +730,7 @@ public sealed partial class FactoryReportTests : IDisposable
             Session(workerId, repo, rootId),
             NativeCommandCompleted("2026-09-23T10:00:20Z", "probe", "dotnet test", 1),
             Assistant("2026-09-23T10:00:30Z", "Implemented the catalog value type."),
-            NativeTerminal()
+            NativeTerminal("2026-09-23T10:00:30.001Z")
         ]);
 
         var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
@@ -850,7 +850,7 @@ public sealed partial class FactoryReportTests : IDisposable
             User("2026-09-23T10:00:11Z", "Inherited Factory context mentions idd-factory-decompose-task too."),
             Tokens("2026-09-23T10:00:50Z", 1200, 700, 90),
             Assistant("2026-09-23T10:01:00Z", "Implemented ProductCode."),
-            NativeTerminal()
+            NativeTerminal("2026-09-23T10:01:00.001Z")
         ]);
 
         Write(Path.Combine(dir, "worker-2.jsonl"),
@@ -859,7 +859,7 @@ public sealed partial class FactoryReportTests : IDisposable
             User("2026-09-23T10:01:11Z", "Inherited Factory context mentions idd-factory-decompose-task too."),
             Tokens("2026-09-23T10:01:50Z", 900, 400, 70),
             Assistant("2026-09-23T10:02:00Z", "Updated Catalog."),
-            NativeTerminal()
+            NativeTerminal("2026-09-23T10:02:00.001Z")
         ]);
 
         Write(Path.Combine(dir, "planner-2.jsonl"),
@@ -906,7 +906,7 @@ public sealed partial class FactoryReportTests : IDisposable
             Session(id, cwd, parent),
             User("2026-09-23T10:00:06Z", "Factory child context"),
             .. events,
-            NativeTerminal()
+            NativeTerminal("2026-09-23T10:00:30.001Z")
         ]);
     }
 
@@ -1179,12 +1179,20 @@ public sealed partial class FactoryReportTests : IDisposable
         }
     };
 
-    private static object NativeTerminal() => new
+    private static object NativeTerminal(string timestamp) => new
     {
-        timestamp = "2026-09-23T10:59:00Z",
-        type = "event_msg",
+        timestamp, type = "event_msg",
         payload = new { type = "task_complete" }
     };
+
+    private static object NativeTerminalAfter(object[] events)
+    {
+        var timestamp = events.Length == 0
+            ? DateTimeOffset.Parse("2026-09-23T10:00:07Z")
+            : DateTimeOffset.Parse(JsonSerializer.SerializeToElement(events[^1])
+                .GetProperty("timestamp").GetString()!);
+        return NativeTerminal(timestamp.AddMilliseconds(1).ToString("O"));
+    }
 
     private static object NativeCommandCompleted(string timestamp, string id, string command, int exitCode) => new
     {
