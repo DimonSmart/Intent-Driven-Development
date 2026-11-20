@@ -88,4 +88,16 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         var ids = scenarios.Select(x => x.GetProperty("id").GetString()).ToArray();
         Assert.Equal(ids.Length, ids.Distinct(StringComparer.Ordinal).Count());
     }
+    [Fact]
+    public void GoldenExamples_ExpectedCfpEqualsMovementCount()
+    {
+        using var fixtureJson = JsonDocument.Parse(fixture.ReadText(Path.Combine(
+            fixture.RepoRoot, "tests", "Idd.Cosmic.Tests", "golden-cases.json")));
+        foreach (var example in fixtureJson.RootElement.GetProperty("cases").EnumerateArray())
+        {
+            var movements = example.GetProperty("movements").EnumerateArray().ToArray();
+            Assert.Equal(movements.Length, example.GetProperty("expectedCfp").GetInt32());
+        }
+    }
+
 }
