@@ -19,20 +19,8 @@ intent.
 
 ## Interpret the request and authorization
 
-Read the original request, not just a router summary. Direct invocation does
-not require `idd-route`. For model-policy requests recognize these modes:
-
-For **model-policy** requests, first read `references/factory-execution-policy.md`.
-Do not read or change `.idd/factory/current/`, Product Intent, Engineering Rules,
-the Factory runtime, planner classification, or existing child agents.
-Configuration is operational policy, not durable product or engineering intent.
-
-## Interpret the request and authorization
-
 Read the original user request, not merely a router summary. Direct invocation
-of this skill does not require `idd-route`. Native-agent registration in Codex
-is handled before model-policy mode selection; for model-policy requests,
-recognize these modes:
+does not require `idd-route`. For model-policy requests, recognize these modes:
 
 - **Initial setup:** Factory is being explicitly configured, the policy is absent,
   and no strategy was chosen previously. Ask one blocking strategy choice below.
