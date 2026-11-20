@@ -249,7 +249,7 @@
     }
   },
   "idd-internal-factory-root": {
-    "description": "Internal Factory Root protocol: fresh generic child of the Supervisor, own canonical Preflight, Planner/Worker, Engineering, checkpoint, recovery, project verification and concise terminal result; complete at most the assigned number of confirmed Workers per batch.",
+    "description": "Internal Factory Root protocol: fresh Supervisor child owning Preflight, Planner/Worker, Engineering, checkpoints, recovery, project verification and concise terminal result; finish the current Planner plan and rotate at or above the confirmed-Worker target, not a hard cap.",
     "exposure": "internal"
   }
 }
