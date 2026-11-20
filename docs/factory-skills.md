@@ -3,42 +3,43 @@
 IDD Factory exposes two registered user commands: `idd-factory-run` and
 `idd-factory-configure`. Configure can also be selected automatically by the agent;
 selection alone never authorizes a write.
-The Factory Root, Planner and Worker are internal Skills shipped in the
-same installed Factory package, not additional public commands. The canonical
-internal Root is staged for two-level orchestration; until the complete
-migration passes its host and E2E gates, `idd-factory-run` still performs the
-existing one-level orchestration directly. Each ordinary native Planner/Worker
-child loads its full Skill from the same installed Factory package.
+The public `idd-factory-run` is a two-level Supervisor. Factory Root, Planner
+and Worker are three internal Skills shipped in the same installed Factory
+package, not additional public commands. The Supervisor launches fresh Roots;
+each Root launches fresh native Planner/Worker children. Every child loads its
+full internal Skill from the installed package without inheriting transcripts.
 Automatic Intent workflows remain available to the agent and are hidden from
 the Claude Code slash menu. Codex currently has no equivalent documented
 visibility switch, so its automatic workflows may remain visible.
 
 ## `idd-factory-run`
 
-This is the public Supervisor entry point. The detailed preflight and implementation semantics below are owned by the internal Factory Root.
+This is the public Supervisor entry point. It validates the installed internal
+Root Skill and nested native host capabilities, selects the entry mode, and
+dispatches one fresh Root at a time. On `CONTINUE / BATCH_LIMIT`, it verifies
+the complete plan-boundary checkpoint and stopped descendants before dispatching
+the next Root. It never performs Preflight, plans Tasks, launches Planner/Worker,
+edits Factory state or runs final project verification.
 
-For a new run it performs Factory Preflight: materialize the complete logical
-request, analyze Product Intent, hand explicit durable Engineering decisions to
-`idd-engineering-change` when required, apply required Product Intent through
-normal Intent workflows, and validate durable coverage. It then saves the full
-base request in `.idd/factory/preparation/request.md` and invokes a fresh
-initial Planner WHILE FACTORY IS INACTIVE. Initial `# Question` saves exact
-Q/A, reclassifies the full context under the requested scope, invokes only
-authorized durable owners and starts a new fresh Planner. Initial `# Done`
-runs existing final verification without creating an active run. Initial valid
-Tasks are saved to `current/plan.md`; only then is
-`current/request.md` written LAST, enabling sequential Workers. Active
-Planner questions and Engineering guardrails keep their existing restrictions.
+For a new run the **internal Root** performs Factory Preflight: it materializes
+the complete request, analyzes Product Intent, coordinates authorized Engineering
+and Product owner workflows, and validates durable coverage. Root saves the
+request in `.idd/factory/preparation/request.md` before owner mutations and
+invokes a fresh initial Planner WHILE FACTORY IS INACTIVE. Initial `# Question`
+saves exact Q/A and triggers renewed authorized preparation before a fresh
+Planner. Initial `# Done` runs configured final verification without activating
+Factory. Initial valid Tasks are saved in `current/plan.md`; Root writes
+`current/request.md` LAST, then executes Workers sequentially.
 
-Immediately before each worker spawn it mechanically maps the task's
+Immediately before each Worker spawn, **Root** mechanically maps its
 `ExecutionProfile` through optional `.idd/execution.yaml`. New planner output
-requires one canonical profile per task. Existing pending tasks in `plan.md`
-without the section use `standard`. An absent policy or missing profile/platform
-mapping inherits host settings. Partial mappings are valid; malformed existing
-mappings block execution. Explicit overrides are applied exactly.
+requires one canonical profile per Task; existing pending Tasks with no profile
+use `standard`. An absent policy or missing profile/platform mapping inherits
+host settings. Malformed explicit mappings block; valid overrides apply exactly.
 
-It does not launch a packaged runtime, use Factory MCP tools, supervise child
-processes, poll status, maintain retry budgets, or own a workflow state machine.
+Neither Supervisor nor Root launches a packaged runtime, uses Factory MCP
+transport, supervises external child processes, polls status, maintains retry
+budgets or owns a new workflow state machine.
 
 ## `idd-factory-configure`
 
@@ -90,9 +91,9 @@ from model names.
 
 ## Internal planner protocol
 
-The Planner is not a standalone public command. `idd-factory-run` resolves
-its installed internal `SKILL.md` alongside the currently loaded Factory Run
-Skill and spawns a fresh generic child with that exact path and bounded
+The Planner is not a standalone public command. The internal Root resolves
+the installed Planner `SKILL.md` from its own installed Factory package
+and spawns a fresh generic child with that exact path and bounded
 request/phase/baseline/provenance packet. The child reads its entire protocol
 before planning and rejects incomplete packets with `BLOCKED`.
 
@@ -185,8 +186,8 @@ The positive invocation-local `max_workers_per_batch` defaults to **8**
 and is a minimum Worker-count **target** for rotation, not a hard cap
 or a setting saved to `.idd/execution.yaml`.
 
-Each internal Root owns the former public Root's full semantic
-contract: Preflight, Engineering/Product owners, Planner/Worker,
+Each internal Root owns the Factory execution contract:
+Preflight, Engineering/Product owners, Planner/Worker,
 pending provenance, ExecutionProfile routing, project verification,
 Intent Refinement Review, recovery and cleanup. After every verified
 Worker checkpoint Root increments its local counter. It MUST execute
