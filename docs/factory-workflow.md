@@ -13,7 +13,7 @@ Supervisor selects the public entry mode and dispatches a fresh Root; Root
 resolves the authoritative saved phase. New performs durable Preflight;
 Continue resumes active/preparation state; Answer must match a saved question;
 Restart is explicit replacement (and cannot bypass the active Engineering
-guard); Cancel affects temporary state only after safe writer termination.
+guard); Cancel affects temporary state only with no known ongoing operation.
 Root, not Supervisor, owns all corresponding state changes.
 
 For a new implementation-capable Factory run:
@@ -96,7 +96,12 @@ updates Engineering during the active run.
 
 ## Replacement and active-run safety
 
-Continuation of the current run does not repeat preflight.
+Continuation of the current run does not repeat preflight. A new unrelated
+request with active state or recoverable preparation first asks the user to
+choose Continue, Restart or Cancel. Continue may finish work to a normal
+full-plan checkpoint before switching, but never happens implicitly.
+Completed-plan checkpoints are natural opportunities for optional external
+commits/reviews, not automatic Factory actions.
 
 An explicit replacement that needs no Engineering mutation keeps the existing
 replacement semantics: resolve the complete replacement request, complete
@@ -193,16 +198,22 @@ on old agent transcripts. The repository remains the implementation truth.
 A valid first Task batch is not planned a second time merely on activation.
 
 
-## Interruption
+## Interruption and explicit recovery
 
-Factory uses at-least-once execution.
+Normal Worker/Root handoffs require trusted successful native terminal
+results and verified Task/plan checkpoints. Emergency interrupt, timeout
+or failed wait is not a normal handoff.
 
-If a worker may have partially changed the repository and then stops, its task
-remains in `plan.md`. A later fresh worker inspects the current repository and
-finishes from that reality.
+Request native stop/interrupt where available; preserve pending request,
+Task, provenance and Git changes, then end the invocation. The host owns
+OS process cleanup. Factory does not traverse process trees, implement
+shell kills or gate normal work on a forced-cancellation test.
 
-Do not start a replacement writer while the previous child may still be active.
-Use native stop/close when possible and end the invocation.
+The user later explicitly invokes Continue, Restart or Cancel. First ensure
+the old host operation is no longer writing, then reconcile saved state with
+repository reality. If an old Writer may still be active, remain BLOCKED and
+request manual host inspection. A new Worker preserves correct partial work.
+An unrelated new request never silently replaces the unfinished run.
 
 ## Questions, preparation resume, and activation
 
@@ -321,7 +332,7 @@ checkpoint (`provenance.md`, `completed.md`, remaining `plan.md`).
 The positive default `max_workers_per_batch = 8` is a minimum
 **rotation target**. All remaining Tasks in a current plan must
 complete even if the count reaches or exceeds the target. Only
-after a fully reconciled plan, stopped writing descendants and closed
+after a fully reconciled plan, trusted normal Worker terminals and closed
 pending checkpoints can Root return `CONTINUE / BATCH_LIMIT`.
 For example, with plans of 3, 4 and 2 Tasks and target 8:
 
@@ -334,8 +345,8 @@ Reason: BATCH_LIMIT
 The next Root starts with no outstanding plan, obtains a fresh Planner
 result and may run final verification after `# Done`. Supervisor
 must mechanically check the saved boundary rather than trusting an
-empty `plan.md` or Root's terminal text. Checkpoint, writer-stop,
-model or terminal ambiguity causes BLOCKED with no automatic new
+empty `plan.md` or Root's terminal text. Checkpoint, model or
+native terminal ambiguity causes BLOCKED with no automatic new
 Root unless the ambiguity is a recoverable user decision: Root preserves
 recovery evidence and returns NEEDS_INPUT with the exact question. Successful
 Cancel returns COMPLETED/CANCELLED, distinct from implementation DONE. Restart

@@ -30,7 +30,8 @@ handoff, durable coverage validation, and eventual
 ## Modes
 
 New:
-- no active simplified Factory run is being continued;
+- no active run or recoverable preparation may be silently displaced;
+  if one exists, ask explicitly whether to Continue, Restart or Cancel;
 - run durable preflight on the materialized current request;
 - save recoverable preparation BEFORE mutating preflight; activate only
   after verified coverage and a valid initial Planner Task batch.
@@ -56,7 +57,10 @@ contract. Do not interpret or migrate it. The active simplified-run marker is
 The public Supervisor selects New, Continue, Answer, Restart or Cancel
 as a transport mode; **Root** applies the semantic modes above:
 
-- `New` maps to New. It cannot overwrite active state or unresolved preparation.
+- `New` maps to New only if neither active state nor unresolved preparation
+  exists. Otherwise explain unfinished work and explicitly ask whether to
+  Continue (possibly to a normal plan checkpoint), Restart or Cancel. Never
+  silently merge requests or turn unrelated New into replacement.
 - `Continue` maps to Continue, including trusted interrupted Preflight.
 - `Answer` maps to Continue with the exact saved
   `preparation/question.md` or `current/question.md`. Root must bind the
@@ -70,7 +74,8 @@ as a transport mode; **Root** applies the semantic modes above:
   authorized replacement Preflight/coverage succeeds. With recoverable
   preparation but no marker, first reconcile the saved request, immutable
   baseline, provenance, pending owner actions and actual repository changes.
-  Confirm native writers/owners have stopped. Only when the old preparation's
+  Require no known ongoing host operation or unresolved owner action. Only
+  when the old preparation's
   outcome is unambiguous AND discard is explicitly authorized may Root discard
   temporary preparation and apply the existing replacement contract. When
   evidence is ambiguous, preserve it and return NEEDS_INPUT with a concrete
@@ -79,8 +84,9 @@ as a transport mode; **Root** applies the semantic modes above:
   apply New and its cleanliness/baseline gate.
 - `Cancel` is Root-owned temporary-state cleanup, **not** an alternative
   Engineering/Product mutation path or a new Preflight. Before removing the
-  only recovery evidence, native writers and pending owner actions must be
-  confirmed quiescent; uncertainty blocks destructive cleanup. Cancel never
+  only recovery evidence, no known ongoing host operation or unresolved owner actions must be
+  established; uncertainty blocks destructive cleanup. The host owns
+  descendant/OS process cleanup, not Factory. Cancel never
   rolls back Product Intent, Engineering or implementation changes. A fully
   successful Cancel returns COMPLETED/CANCELLED, without `# Done` or final
   implementation verification. If a user decision is required, preserve
@@ -88,7 +94,9 @@ as a transport mode; **Root** applies the semantic modes above:
   unrecoverable safety/protocol blocker returns BLOCKED.
 
 Root automatically reconciles only outcomes established unambiguously by
-saved provenance, Git/repository reality and confirmed native writer stops.
+saved provenance, Git/repository reality and trusted normal terminal results.
+After interruption, a later explicit invocation must ensure the previous host
+operation is no longer writing; an aborted agent status is not that proof.
 When multiple plausible outcomes would require different mutations, do not
 guess, retry or delete evidence: save an exact question in the existing
 preparation/current `question.md` when applicable and return NEEDS_INPUT.
@@ -337,7 +345,10 @@ missing baseline for a known-new run is corruption. If original Git objects
 are unavailable, report and block autonomous refinements rather than
 fabricating a replacement SHA. Validate orphaned partial activation plan,
 baseline, provenance and answers before writing the sole active marker
-`current/request.md` last. A timeout does not imply a child writer ended.
+`current/request.md` last. A timeout does not imply a child writer ended. End this invocation without
+restarting work. On explicit recovery require no ongoing host operation,
+reconcile pending checkpoints and partial Git changes, and block if an old
+writer may still be active.
 
 ## Durable coverage validation
 

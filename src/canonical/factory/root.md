@@ -42,16 +42,12 @@ interpreting `ExecutionProfile` or `.idd/execution.yaml`.
 
 ## Required host capabilities
 
-Require native fresh children without inherited transcript, access to
-repository/installed Skills, bounded assignments, reliable terminal wait/results,
-and stop/interrupt with confirmed writer-command quiescence. Planner remains
-read-only; prefer a native read-only sandbox when available. No fallback
-runtime, MCP transport or polling loop.
-
-On Windows Codex, `features.unified_exec=false` is only a possible
-workaround for in-flight commands surviving agent interruption. The exact
-host/version/profile MUST pass a real Writer stop test before write-capable
-execution; `turn_aborted` alone is not evidence of command termination.
+Require native fresh children without inherited transcript, shared project
+and installed Skill access, bounded assignments and reliable blocking
+terminal results. Planner is read-only; native read-only sandboxing is
+preferred when available. The host owns emergency interruption and OS
+process cleanup, which are not preflight Factory gates. No fallback runtime,
+MCP transport or polling loop.
 
 ## Installed internal Skills and generic child-agent transport
 
@@ -64,8 +60,8 @@ copy, quote or relay the full child protocols.
 
 Inspect the actual native child-agent schema. Require fresh generic children
 without inherited transcript, installed Skill/repository access, bounded
-assignment, correlated native terminal waits and confirmed descendant and
-writing-command stop. Factory-specific `agent_type` is not required.
+assignment, correlated trustworthy native terminal waits. Factory-specific
+`agent_type` is not required.
 Check model/effort override support only for a Worker whose explicit policy
 mapping needs it. Prefer a real read-only sandbox for Planner.
 
@@ -75,11 +71,12 @@ the absolute installed child Skill path and an instruction to read its
 bounded packet, not parent/other child transcripts, entire Intent trees or
 protocol bodies. Invalid Skill, reference or packet returns BLOCKED.
 
-On failed wait, interrupt every active descendant deepest-first. Independently
-confirm in-flight writing commands and processes have stopped; agent
-interruption alone is insufficient. If targets or process quiescence cannot be
-confirmed, preserve pending state, return `BLOCKED / CHILD_UNCONFIRMED`
-and never launch another writer/Root. No polling, retry or fallback runtime.
+On failed wait or emergency interruption, ask the host to interrupt the
+tracked child if possible, preserve the pending Task and end this invocation
+as BLOCKED / CHILD_UNCONFIRMED. Do not start another Writer/Root in the
+same invocation. The host owns descendant and OS process cleanup; no shell
+kills, process-tree tracking, status polling or automated retries.
+Later explicit recovery reconciles saved state and requires no active Writer.
 
 ## Factory Preflight — Root entrypoint
 
@@ -152,7 +149,7 @@ Follow `references/intent-preflight.md`:
 - **New:** prepare durable knowledge and activate only a validated Task batch.
 - **Continue:** reconcile saved request, exact Q&A, Git and provenance.
 - **Answer:** require a saved question, append exact Q&A, then replan.
-- **Cancel:** confirm descendants, writing commands and pending owners stopped;
+- **Cancel:** require no known ongoing Factory operation or uncertain owner action;
   return `COMPLETED / CANCELLED` only after safe cleanup, preserving uncertain
   evidence and without undoing changes or claiming implementation completion.
 - **Restart:** reconcile state BEFORE replacing it; preserve the active run
@@ -209,24 +206,24 @@ and MUST NOT be truncated solely due to this new limit.
 Increment `completed_workers` ONLY after the existing trusted checkpoint:
 
 1. Persist pending provenance before each Worker; wait for its genuinely
-   successful terminal native result and stopped writing descendants.
+   successful normal terminal native result (not an abort or timeout).
 2. Verify the Worker after-state, authorized scope, immutable baseline and
    bounded provenance. A process exit or changed files alone is not proof.
 3. Append the verified bounded summary to `completed.md` and remove its
    Task from `plan.md` in the existing safe checkpoint order.
 4. Confirm the pending checkpoint is closed; all corresponding provenance,
    `completed.md` and remaining `plan.md` entries agree; that Task
-   cannot be replayed in an ordinary Continue; no writer remains alive.
+   cannot be replayed in an ordinary Continue; no Writer is known active.
 5. ONLY NOW increase the Root-local counter by one. Never count a Planner,
    unsuccessful/interrupted Worker, project verification or other action.
 
 After EVERY Worker checkpoint, proceed with any remaining tasks of the
 CURRENT plan regardless of the counter. Only after its last Task, confirm
-that **the whole plan is finished**: all its necessary Workers succeeded
-and have stopped; no plan Task remains, no pending checkpoint is open,
-`completed.md`, `plan.md` and `provenance.md` agree with trusted native
-results, no contradictory external-unknown changes remain and all writing
-descendants are quiescent. An empty `plan.md` ALONE is not sufficient.
+that **the whole plan is finished**: all Workers returned trusted normal
+successful native terminals; no Task or pending checkpoint remains;
+`completed.md`, `plan.md` and `provenance.md` agree with those results
+and no contradictory external-unknown changes remain. An empty `plan.md`
+ALONE is not sufficient.
 
 At this verified plan boundary:
 - If `completed_workers >= max_workers_per_batch`, do NOT start
@@ -251,8 +248,8 @@ remaining task, unknown writer status, missing capability or insufficient
 Root context must follow the EXISTING safe BLOCKED/NEEDS_INPUT recovery
 rules, NOT BATCH_LIMIT, even when the target has been reached. Preserve
 the remaining Tasks and confirmed checkpoints; never claim completion or
-force an invalid Task merely to finish the plan. Native stop uncertainty
-forbids any subsequent writer/Root. Do not automatically roll back,
+force an invalid Task merely to finish the plan. Uncertain native completion
+forbids any subsequent writer/Root in this invocation. Do not automatically roll back,
 replace state, retry, or introduce a plan transaction. The at-least-once
 execution/reconciliation semantics remain unchanged.
 
@@ -275,7 +272,7 @@ supported by actual confirmed Worker checkpoints in this Root.
 CONTINUE is legal ONLY after full **plan-boundary** checkpoint with
 `CompletedWorkers >= max_workers_per_batch > 0` and Reason BATCH_LIMIT.
 Require the active Factory marker, no Tasks remaining from the current
-plan, no pending checkpoint and confirmed termination of writing descendants;
+plan, no pending checkpoint and trusted normal Worker terminal results;
 neither terminal text nor an empty plan proves this alone. COMPLETED has two
 mutually exclusive meanings: Reason DONE requires existing `# Done`, verified
 Project Verification, Intent Refinement Review and normal finalization;
@@ -402,32 +399,23 @@ Use this bounded task structure (omit empty optional sections):
 Each Worker mechanically resolves its supplied Intent/Engineering IDs, performs
 focused task-local checks, and returns a short semantic result. Workers share
 the working copy and execute sequentially. A failed Skill load or guard keeps
-the Task pending, with no replacement writer until termination is confirmed.
+the Task pending; no replacement Writer starts on uncertain completion.
 
 ### Waiting and interruption
 
-Use the platform's longest appropriate blocking or event-driven native wait.
-Worker duration by itself must not create repeated parent model turns.
+Use blocking/event-driven native waits; Worker duration must not create
+repeated parent-model turns. On timeout, failed wait or emergency interrupt:
 
-If native waiting ends with a host timeout or error:
+1. Ask the host to interrupt the tracked child when possible.
+2. Preserve the pending Task, provenance and actual Git changes.
+3. End this invocation as BLOCKED / CHILD_UNCONFIRMED; spawn no more Writers.
 
-1. do not start another Worker for the same Task or begin status polling;
-2. identify the exact active child thread and any descendants via native tools;
-3. interrupt each active descendant deepest-first, then the direct child;
-4. require native termination evidence AND proof that every in-flight writing
-   command/process has stopped; `interrupt_agent` alone is insufficient;
-5. leave the Task first in `plan.md` and end the invocation. If command
-   termination is unavailable or uncertain, return BLOCKED / CHILD_UNCONFIRMED.
-
-A completed shell command after a cancellation request does NOT retroactively
-prove safe cancellation. Never run a replacement writer while the previous
-child or any started command may still be writing to the same workspace.
-Do not create a process supervisor, issue shell kills or add polling/retries.
-
-Factory deliberately uses at-least-once execution. A later fresh worker must
-inspect current repository reality, finish partially completed work, and avoid
-reverting correct existing changes merely because an interrupted execution may
-have produced them.
+Do not implement recursive process termination, shell kills, OS polling,
+automatic retries or an alternative runtime. A later **explicit**
+Continue/Restart/Cancel requires no ongoing host operation and reconciles
+the actual repository with saved checkpoints. If an old Writer might still
+be active, remain BLOCKED and request manual host inspection. A new Worker
+may retain correct partial work and finish the pending Task.
 
 ## Technical autonomy during execution
 

@@ -291,115 +291,42 @@ rejected by **host policy**, independently of the Factory plugin. The same
 host must permit reading the installed Skill through an approved mechanism
 for Stage 0 to pass. Do not simulate the read, silently copy its text into
 spawn prompts, or change the public Factory in response to this blocker.
-The normal-completion probe must not call `interrupt_agent`: cancellation
-and descendant quiescence require a separate dedicated Stage 0 evaluation.
+The normal-completion probe does not test host-owned emergency interruption,
+which is not a prerequisite for ordinary Factory work.
 
 The technical probe intentionally exercises both internal Skills with
 incomplete, read-only assignments, expecting `BLOCKED` from each.
 It does **not** prove simultaneous write safety, full Factory checkpoint
-semantics, forced child cancellation or end-to-end rotation. Those require
-additional live evaluations (including a controlled writer probe and
-10-worker / limit-3 E2E) before the public Supervisor can be shipped.
+semantics or end-to-end rotation. Those require the separate
+10-worker / limit-3 E2E before the public Supervisor can be shipped.
 A green normal CI build, `agents.max_depth=2`, a trace from a different
 host, or an unexecuted smoke test do not satisfy the Stage 0 gate.
 Until verified native nested-spawn evidence exists, preserve the current
 one-level `idd-factory-run` behavior.
 
-## Two-level Supervisor acceptance gates (feature branch only)
+## Two-level Supervisor live acceptance (feature branch only)
 
-Before merging the public Factory Supervisor into main, run these **real native
-Codex host tests** on the same supported host used for the successful Stage-0
-nested-smoke gate. Normal Linux/Windows CI does NOT run either live test.
-Tests consume Codex tokens and write only disposable temporary workspaces.
-Use a separate working branch/worktree rather than switching away from active
-user project modifications. The intended host must be able to invoke real
-native depth-2 generic agents, deliver installed Skills, run a write-capable
-child and attest full child/descendant stop.
+Before merging the public Supervisor into main, verify real native
+depth-two execution, installed-Skill delivery, sequential Workers,
+trusted normal terminals, complete checkpoints and Root rotation on the
+intended host. Deterministic CI does not execute this token-consuming E2E;
+use an isolated test worktree.
 
-On Windows Codex, the test harness now explicitly passes
-`-c features.unified_exec=false` to BOTH Gate 1 and Gate 2. This selects
-a candidate one-shot execution backend to address the observed
-`turn_aborted`-but-still-writing shell process. The option is not
-a substitute for process termination evidence, and no compatible host
-is declared until the real Gate 1 completes successfully. The harness
-does not modify the user's normal Codex settings.
-
-In PowerShell, from a checkout of the feature branch (Gate 2 only runs when
-Gate 1 passes):
+Run in PowerShell from this feature branch:
 
 ~~~powershell
 pwsh ./scripts/Verify-FactoryV2-Native.ps1
 ~~~
 
-For the Writer gate alone:
+The command directly executes the ten-task, limit-3 E2E. It does not require
+an emergency-cancellation gate or force an alternate shell backend.
 
-~~~powershell
-pwsh ./scripts/Verify-FactoryV2-Native.ps1 -WriterOnly
-~~~
-
-Equivalent manual commands:
-
-~~~powershell
-$env:IDD_RUN_LIVE_FACTORY_MARKETPLACE_EVALS = "1"
-$env:IDD_FACTORY_EVAL_STANDARD_MODEL = "gpt-6.1-terra"
-$env:IDD_FACTORY_EVAL_TIMEOUT_MINUTES = "15"
-
-dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj --filter "FullyQualifiedName~Factory_Stage0NativeDescendantFirstCancellationStopsGrandchildWriter"
-
-$env:IDD_FACTORY_EVAL_TIMEOUT_MINUTES = "60"
-dotnet test tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj --filter "FullyQualifiedName~Factory_NativeTenTasksRotatesOnlyAtPlanBoundariesWithLimitThree"
-
-Remove-Item Env:IDD_RUN_LIVE_FACTORY_MARKETPLACE_EVALS -ErrorAction SilentlyContinue
-Remove-Item Env:IDD_FACTORY_EVAL_STANDARD_MODEL -ErrorAction SilentlyContinue
-Remove-Item Env:IDD_FACTORY_EVAL_TIMEOUT_MINUTES -ErrorAction SilentlyContinue
-~~~
-
-**Controlled writer/stop gate:** the technical test creates a disposable Git
-repository, launches a native Supervisor → Root → synthetic Writer, and
-executes a tracked, single-use 40-second heartbeat script (atomic CreateNew
-guard rejects accidental reruns). It deliberately interrupts the *Writer
-directly first*, then the Root. It independently requires exact native
-interrupt targets in descendant-first order, aborted native child turns,
-fewer than 40 written heartbeat lines, no natural-completion marker and no
-further writes during an 8-second observation window. A native interrupted
-agent is not sufficient if its launched PowerShell command keeps writing.
-The prior parent-only Root interrupt failed on Windows Codex 0.163.0:
-Writer stayed running and executed the heartbeat loop twice (80 lines).
-The first descendant-first attempt interrupted both agents and stopped
-heartbeat at 33 lines without natural completion, but its Supervisor
-generated invalid inline PowerShell during the readiness wait and correctly
-returned BLOCKED. The harness now provides a prewritten
-`native-wait-for-heartbeat.ps1` that prints `HEARTBEAT_READY` and creates
-a readiness marker only after three lines are observed; the test verifies
-the wait tool was invoked before Writer interruption, that the marker exists,
-and that real early quiescence follows. Native shell commands that merely
-read or inspect `native-writer-probe.ps1` do not violate Writer isolation;
-a separately unit-tested invocation classifier rejects actual execution of
-that script by Supervisor or Root, including `pwsh -File` and `&`. This gate tests direct descendant
-cancellation, not recursive host cancellation. The synthetic Writer is not a Product Worker and does
-not run Factory Preflight; the earlier read-only Stage-0 installed-Skill
-probe independently checks child Skill loading. If direct descendant stop
-or in-flight command quiescence is unproven, the gate MUST fail and the
-public Supervisor MUST NOT be merged.
-
-**Confirmed host blocker (Windows Codex CLI 0.163.0, 2026-11-19):**
-The full native trace of `nested-writer-stop-f7c88ef66ad942e68f087394e4a3e604`
-shows a successful heartbeat-readiness marker (3 lines), native Writer
-interrupt at 20:41:47Z, Root interrupt at 20:41:49Z and both agent threads
-`turn_aborted`. Nevertheless the Writer's launched PowerShell child continued
-writing: heartbeat rose from 24 to 26 lines after interruption, then from
-38 to 40. A second Writer interrupt at 20:42:13Z returned
-`previous_status: interrupted`; the child command eventually exited 0 and
-the natural-completion marker exists in the saved workspace. This is a
-**real host/process-cancellation failure**, not duplicate trace events.
-The live gate must fail with `HOST_UNSUPPORTED_WRITER_COMMAND_SURVIVED_INTERRUPT`
-rather than a misleading `Assert.Single` failure. Until the host demonstrably
-terminates in-flight writing commands, do not repeat the costly Gate 1
-with the SAME unified-exec profile, run Gate 2, merge PR #77 or enable
-two-level Factory. The new opt-in `features.unified_exec=false` profile
-is materially different and may be tested once; only a successful real-host
-Gate 1 demonstrates that it stops the command. If it still fails, a native
-host fix or another verified host is required.
+An earlier Windows Codex CLI 0.163.0 cancellation experiment found an OS
+PowerShell process surviving an aborted agent. Interruption and OS process
+cleanup are host responsibilities. Factory preserves state and stops
+automatic spawning after uncertain native terminals; a later explicit
+Continue/Restart/Cancel reconciles actual changes after verifying that
+no old operation is still writing. No custom process supervisor is needed.
 
 **Ten-step/limit-3 gate:** the test installs a fresh generated Marketplace
 package into a new isolated CODEX_HOME, creates a minimal self-contained

@@ -5,7 +5,7 @@ namespace Idd.Factory.Report;
 /// <summary>
 /// Read-only native Factory batch trace interpretation. These methods do not
 /// decide whether the next Root is safe to start: the native Supervisor must
-/// independently confirm stopped descendants and durable checkpoints.
+/// independently confirm trusted normal native terminals and durable checkpoints.
 /// </summary>
 public static partial class FactoryBatchTrace
 {

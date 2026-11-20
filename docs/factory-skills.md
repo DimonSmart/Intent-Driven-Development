@@ -17,7 +17,7 @@ visibility switch, so its automatic workflows may remain visible.
 This is the public Supervisor entry point. It validates the installed internal
 Root Skill and nested native host capabilities, selects the entry mode, and
 dispatches one fresh Root at a time. On `CONTINUE / BATCH_LIMIT`, it verifies
-the complete plan-boundary checkpoint and stopped descendants before dispatching
+the complete plan-boundary checkpoint and trusted normal terminal results before dispatching
 the next Root. It never performs Preflight, plans Tasks, launches Planner/Worker,
 edits Factory state or runs final project verification.
 
@@ -202,8 +202,9 @@ request with a fresh Planner (possibly `# Done`), not a transcript.
 
 Supervisor never performs these project operations or replays Workers.
 It verifies Root's terminal result and the plan boundary mechanically.
-NEEDS_INPUT, COMPLETED, BLOCKED or ambiguous state/writer-stop
-evidence end automatic spawning.
+NEEDS_INPUT, COMPLETED, BLOCKED or ambiguous state/native completion
+evidence end automatic spawning. Abnormal interruption requires a later
+explicit safe recovery.
 
 Codex native task names are batch-scoped; old flat
 `idd_factory_planner_01`/`idd_factory_worker_01` are historical report

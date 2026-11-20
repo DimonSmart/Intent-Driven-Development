@@ -25,8 +25,7 @@ Root is never a user-facing entrypoint. No flat orchestration fallback
 is part of Factory v2.
 
 Packaging or a Stage-0 smoke test does not prove live host compatibility.
-Release acceptance still requires native descendant-writer-stop and full
-multi-batch E2E evidence before merging this architecture into `main`.
+Release acceptance requires real multi-batch E2E evidence before merging this architecture into `main`.
 
 ## Normal setup
 
@@ -42,7 +41,9 @@ manages optional `.idd/execution.yaml` model-selection policy.
 The host must provide ordinary native children with fresh context (no inherited
 parent transcript), shared workspace and access to the installed package,
 bounded task delivery, terminal result, native blocking or event-driven wait,
-and reliable interruption/stop before another writer starts. Native model/
+and trustworthy normal completion before another writer starts.
+Exceptional OS process cleanup is host-owned and does not require a
+forced-cancellation preflight probe. Native model/
 effort override support is not required to start Factory: Root checks it only
 for the selected Worker's explicit `.idd/execution.yaml` mapping, immediately
 before spawn. Inherited mappings need no override support. Separate per-child
@@ -112,9 +113,9 @@ or changes to `.idd/execution.yaml` are needed.
 
 The ordinary Linux/Windows CI proves generator contracts, syntax and report
 fixtures. The user-facing nested architecture MUST additionally pass the
-controlled native writer-stop/descendant-quiescence live gate, effective
-model/effort override, and the explicit 10-task limit-3 plan-safe E2E on
+effective model/effort override and explicit 10-task limit-3 plan-safe E2E on
 the intended Codex host. The Stage-0 read-only smoke result alone does not
-prove writer-stop or multi-batch completion. The PR is gated until those
+prove multi-batch completion. Emergency cancellation tests are optional host
+diagnostics, not a release gate. The PR is gated until those
 real-host checks pass; Claude requires separate runtime evidence.
 

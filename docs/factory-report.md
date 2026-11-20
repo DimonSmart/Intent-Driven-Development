@@ -228,7 +228,7 @@ An ambiguous role or incomplete terminal result remains `unavailable`.
 Never infer a batch checkpoint or completed Planner plan merely from
 a child summary or from the read-only native event trace. Without
 reliable saved `plan.md`/`completed.md`/`provenance.md` checkpoint
-and native descendant-stop evidence, plan-boundary verification is
+and trusted normal native completion evidence, plan-boundary verification is
 **unavailable** in the report, not falsely asserted as passed.
 The Supervisor, not this reporter, validates the live persisted boundary
 before another Root. Never attribute a Worker in one batch to a

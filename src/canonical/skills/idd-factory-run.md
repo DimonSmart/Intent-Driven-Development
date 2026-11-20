@@ -14,26 +14,26 @@ sibling internal Root Skill. Verify that both
 match exactly. Never use guessed cache/source paths, read or relay Root's
 protocol, full Intent or Worker logs.
 
-Require actual host-native fresh generic nested children (depth two),
-no inherited transcripts, shared repository and installed Skill access,
-correlated terminal waiting, direct native visibility/interruption of
-**every descendant**, and confirmed stop of their in-flight writing
-commands/processes. Agent `turn_aborted` or a configured depth alone
-does not prove safety. On Windows Codex, unified exec has left PowerShell
-writers running after interruption; `features.unified_exec=false` is an
-**unverified** candidate requiring an actual descendant-first Writer-stop
-PASS for the precise host/version/profile. Do not change host session
-settings, guess capabilities or substitute a polling/runtime fallback.
-Missing safety or version evidence means BLOCKED before any Factory write.
+Require host-native fresh generic nested children (depth two), isolated
+transcripts, shared repository/Skill access, reliable blocking terminal results
+and normal native child lifecycle support. Successful normal completion and
+verified checkpoints permit rotation; aborts/timeouts never do. The host owns
+emergency interruption and OS process cleanup. No forced-cancellation
+preflight probe, alternate shell backend, polling or custom runtime is required.
 
 Resolve positive integer `max_workers_per_batch` once (default **8**).
 Reject invalid, conflicting, fractional or non-positive overrides; never
 persist it. Choose only New / Continue / Answer / Cancel / Restart from
 canonical `current/request.md`, `preparation/request.md` and any saved
 question. A directory or plan without `current/request.md` is not active.
-An existing question precedes an inferred new request. Supply complete
-verbatim New/Restart requests including attachment text, exact unchanged
-saved request paths for continuation and exact Q&A where applicable.
+An existing question precedes an inferred new request. When active state or
+recoverable preparation exists, an unrelated New request must elicit an
+explicit choice: Continue the current work (optionally to the next complete
+plan checkpoint), Restart or Cancel. Do not displace state, silently resume
+old work, or spawn a Root for that unrelated New request. An explicit Restart
+authorizes replacement under the normal Root preflight/Engineering guards.
+Supply complete verbatim New/Restart requests including attachment text,
+exact unchanged saved request paths for continuation and exact Q&A.
 Root alone decides semantic Preflight, authorization and recovery.
 
 ## Sequential batch dispatch
@@ -55,18 +55,23 @@ provenance/logs. Supervisor never spawns Planner or Worker itself.
 
 Wait natively (event-driven/blocking) for a correlated **genuine terminal**
 Root result; never interpret partial messages/tool output as completion.
-Confirm Root and all descendants have closed before a safe handoff.
+For normal handoff require trusted successful Root and Worker native terminal
+results and checked Task/plan boundaries. An aborted or timed-out child never
+counts as successfully completed.
 
-### Descendant-first stop on failed wait, cancellation or replacement
+### Exceptional interruption
 
-On failed wait, timeout, Cancel or replacement, inspect the native child
-graph and interrupt every active descendant **deepest-first**, then Root.
-Independently verify all in-flight writing **processes/commands** stopped.
-Agent `interrupted`/`turn_aborted`, a quiet worktree or eventual natural
-completion is not proof of timely cancellation. If discovery, direct
-interruption or writer quiescence is unavailable/uncertain, preserve state
-and return `BLOCKED / CHILD_UNCONFIRMED`; never start another Root/Worker.
-No shell kills, custom process runtime, status polling or automatic retries.
+If waiting fails, times out or is interrupted, ask the host to interrupt the
+tracked child when possible; end this invocation without further spawns.
+The host owns descendant and OS-process termination. Do not traverse process
+trees, issue shell kills, poll for quiescence or implement a retry engine.
+
+Preserve pending plans, request, provenance and existing Git changes. Report
+BLOCKED / CHILD_UNCONFIRMED if normal native completion is not established.
+A later explicit Continue/Restart/Cancel requires the previous host operation
+to have stopped and Root to reconcile saved state with repository reality.
+If an old Writer might still be active, remain BLOCKED and request manual
+host/process inspection; never overlap Writers.
 
 ## Terminal contract from Factory Root
 
@@ -78,12 +83,12 @@ Require exactly one each of these separate **plain-text** final fields:
 
 The local count can exceed the target. `CONTINUE / BATCH_LIMIT` requires
 `CompletedWorkers >= max_workers_per_batch > 0` AND a fully completed
-current Planner plan. **Independently validate** native Root/descendant
-and writing-command termination, active `current/request.md` marker,
-and consistency of `plan.md`, `completed.md`, `provenance.md` and
-trusted native results: no remaining executable Task from the current
-plan and no pending checkpoint. Neither text, count nor empty plan alone
-proves this. Any uncertainty BLOCKS rotation.
+current Planner plan. **Independently validate** trusted normal Root/Worker terminals, the active
+`current/request.md` marker, and consistency of `plan.md`, `completed.md`,
+`provenance.md` and native results: no remaining executable Task from the
+current plan and no pending checkpoint. Neither text, count nor an empty
+plan alone proves this. Uncertain/aborted native completion BLOCKS rotation;
+a separate proof of OS process-tree termination is not required.
 
 Only after valid CONTINUE, increment the ordinal and spawn **one fresh Root**
 in Continue mode with a new zero local counter and no prior transcripts.
@@ -92,8 +97,7 @@ the next Root may receive `# Done` and finalize.
 
 `COMPLETED / DONE` requires credible normal closure after genuine Planner
 `# Done`, successful Project Verification and Intent Refinement Review.
-`COMPLETED / CANCELLED` requires explicit Cancel plus confirmed safe
-writer/owner stop and temporary-state cleanup, **not** implementation
+`COMPLETED / CANCELLED` requires explicit Cancel with no known ongoing Factory/owner operation and safe temporary-state cleanup, **not** implementation
 completion or final verification. Never accept CANCELLED from another mode;
 Supervisor does not rerun final verification.
 
@@ -104,7 +108,7 @@ request-level question before preparation uses the actual diagnostic text,
 not an invented saved file.
 
 `BLOCKED`, malformed result, unavailable native capability, inconsistent
-checkpoint or unconfirmed writing command stops immediately, preserving
+checkpoint or uncertain native completion stops immediately, preserving
 Factory state. Report the specific blocker; do not retry or spawn another
 Root. **Every result other than CONTINUE ends this invocation.**
 
