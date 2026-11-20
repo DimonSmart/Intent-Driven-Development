@@ -682,7 +682,9 @@ public sealed partial class FactoryReportTests : IDisposable
         Write(Path.Combine(dir, "worker.jsonl"),
         [
             Session(workerId, repo, rootId),
-            User("2026-09-23T10:00:03Z", "Factory child context")
+            User("2026-09-23T10:00:03Z", "Factory child context"),
+            Assistant("2026-09-23T10:00:04Z", "Work completed.")
+            // No native task_complete: the assistant's claim is not terminal evidence.
         ]);
 
         var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
