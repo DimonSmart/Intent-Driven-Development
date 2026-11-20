@@ -92,4 +92,29 @@ if ($IsWindows) {
     }
 }
 
-Write-Host 'Codex plugin switcher syntax and contracts: OK'
+# Validate both one-command installation entrypoints without invoking Codex.
+$installers = @(
+    @{ Path = 'scripts/Install-Idd-Codex-From-Local.ps1'; Expected = @('Switch-Idd-Codex.ps1', '-Source Local', '-WithFactory') },
+    @{ Path = 'scripts/Install-Idd-Codex-From-GitHub.ps1'; Expected = @('DimonSmart/Intent-Driven-Development', "'plugin', 'marketplace', 'remove'", "'plugin', 'marketplace', 'add'", "'--ref', 'marketplace'", 'idd-intent', 'idd-factory') }
+)
+foreach ($installer in $installers) {
+    $path = Join-Path $repoRoot $installer.Path
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        throw "Missing Codex installer: $path"
+    }
+    $installerTokens = $null
+    $installerErrors = $null
+    [void][System.Management.Automation.Language.Parser]::ParseFile(
+        $path, [ref] $installerTokens, [ref] $installerErrors)
+    if (@($installerErrors).Count -gt 0) {
+        throw "PowerShell syntax errors in $path : $($installerErrors -join '; ')"
+    }
+    $installerText = Get-Content -LiteralPath $path -Raw
+    foreach ($phrase in $installer.Expected) {
+        if (-not $installerText.Contains($phrase)) {
+            throw "$path must contain: $phrase"
+        }
+    }
+}
+
+Write-Host 'Codex plugin switcher and installer syntax and contracts: OK'
