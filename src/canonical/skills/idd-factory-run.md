@@ -18,13 +18,15 @@ installed version or a stale legacy agent registration. You may read the
 markers and check the Root Skill's availability, but MUST NOT read or forward
 the Root Skill body, full Product Intent, Engineering Rules or Worker logs.
 
-Inspect the actual native host tools for a generic fresh child spawn,
+Inspect the actual native host tools for generic fresh child spawn,
 `fork_turns: "none"` or equivalent no-history semantics, depth-two nested
-generic children, shared project cwd and installed Skill access, exact model
-and effort overrides of grandchildren, native event-driven terminal waiting,
-visibility and direct native interruption of **every active descendant**
-(including grandchildren), confirmed termination of their in-flight writing
-commands, and real terminal result correlation. Parent-only interruption
+generic children, shared project cwd and installed Skill access, native
+event-driven terminal waiting, visibility and direct native interruption
+of **every active descendant** (including grandchildren), confirmed
+termination of their in-flight writing commands, and real terminal result
+correlation. Do not require model/effort overrides at Supervisor entry:
+Root checks them only when an explicit mapping is selected for a Worker.
+Parent-only interruption
 does NOT imply descendant cancellation. A host where direct grandchild
 interruption or command quiescence cannot be demonstrated is unsupported. Do not equate a depth
 setting or absence of custom `agent_type` with proof of capability. For Codex,
