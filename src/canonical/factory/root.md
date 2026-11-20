@@ -208,143 +208,74 @@ replacement request and may archive the old directory for diagnostics.
 
 ## User-level operations
 
-New:
-- materialize the full logical base request and resolve requested scope;
-- execute existing durable preflight and coverage validation;
-- persist preparation, run the fresh initial planner and handle its result;
-- activate only on a validated Task batch, then enter the worker loop.
+Apply the semantic mode contracts in `references/intent-preflight.md`
+to the Supervisor's New, Continue, Answer, Cancel or Restart assignment:
 
-Continue:
-- if `current/request.md` exists, use ordinary active-run continuation
-  without repeating entry preflight or initial planning;
-- otherwise if `preparation/request.md` exists, restore the full base request,
-  exact Q/A and pending question without depending on parent transcript;
-- treat a precise reply as the answer to the saved `question.md`; when a new
-  independent request appears, ask whether to continue or explicitly replace
-  the pending preparation instead of silently combining two requests;
-- incomplete preparation blocks automatic execution. Explain which source is
-  missing rather than reconstructing it from memory.
+- **New:** materialize the full request, perform durable Preflight, and
+  activate only on a verified Task batch.
+- **Continue:** recover active state or saved preparation from exact
+  request, Q/A and provenance; incomplete preparation never authorizes
+  reconstruction from an old transcript.
+- **Answer:** require a saved `question.md`; bind exact answer to that
+  question and unchanged request before replanning.
+- **Cancel:** confirm all descendants, writing commands and pending owners
+  stopped; if their outcomes are uncertain, preserve recovery evidence.
+  After safe cleanup return `Status: COMPLETED` and `Reason: CANCELLED`,
+  without claiming implementation completion or undoing durable writes.
+- **Restart:** FIRST reconcile saved request, baseline, provenance, pending
+  owner actions and repository reality before discarding preparation.
+  Preserve an active run until authorized replacement Preflight succeeds.
+  If ambiguous, return NEEDS_INPUT with the precise choice; do not replay
+  uncertain owner actions.
 
-Answer:
-- require the exact saved `preparation/question.md` or
-  `current/question.md` and the unchanged original request;
-- bind the verbatim user answer to that question, persist chronological Q/A
-  and follow the matching inactive/active continuation and owner rules;
-- without a saved question, do not invent earlier context or treat an isolated
-  answer as permission to start or replace a run.
-
-Cancel:
-- confirm native descendants, in-flight writing commands and pending owner
-  actions have stopped; if their outcomes are uncertain, preserve recovery
-  evidence and block destructive cleanup;
-- remove pending preparation, or archive/remove the active state as appropriate;
-- never roll back repository or durable-knowledge changes automatically;
-- after verified safe cleanup return `Status: COMPLETED` and `Reason: CANCELLED`;
-  this is successful cancellation, not Planner `# Done` or completed implementation.
-  If the outcome is ambiguous and user choice can resolve it, preserve evidence,
-  save the exact question and return NEEDS_INPUT; do not report successful Cancel.
-
-Restart / explicit replacement:
-- preserve existing active replacement semantics and guard;
-- an independent new request cannot silently overwrite pending preparation;
-- on explicit replacement of interrupted preparation, FIRST reconcile saved
-  request, baseline, provenance, pending owner outcomes, repository reality and
-  confirmed writer termination. If unambiguous and discard is authorized,
-  discard only that temporary directory and perform new preflight. Otherwise
-  preserve recovery evidence and return NEEDS_INPUT with the precise choice;
-  do not replay uncertain owner actions or silently discard partial work.
-  Existing active runs retain their own rules.
-
-Recovery is automatic only when saved evidence and repository reality prove a
-single safe outcome. If multiple outcomes remain plausible and a user choice
-would resolve them, persist a concrete question using existing `question.md`
-and return NEEDS_INPUT; if native writer stop cannot be confirmed, return
-BLOCKED without destructive changes. Do not invent new state files or statuses.
-
-These are skill-level operations, not new transport operations or state schemas.
-
+Automatically reconcile only one proven safe outcome. User-owned ambiguity
+uses existing `question.md`/NEEDS_INPUT; uncertain writer termination is
+BLOCKED, never destructive cleanup.
 
 ## Original Git baseline and bounded provenance — Root operations
 
-Follow `Original Git baseline and preflight provenance`, `Request
-identity`, and `Replacement semantics` in
-`references/intent-preflight.md`. The concrete new-independent-run
-commands from the repository root are:
+Use `Original Git baseline and preflight provenance`, `Request identity`
+and `Replacement semantics` in `references/intent-preflight.md`. Its
+NUL-delimited managed-IDD Git status gate and real `HEAD^{commit}`
+apply to New only; the original baseline never moves on continuation.
+Dirty unrelated code alone is not a blocker.
 
-```text
-git status --porcelain=v1 -z --untracked-files=all -- .idd/intent/ .idd/engineering/
-git rev-parse --verify "HEAD^{commit}"
-```
-
-Parse the status as **NUL-delimited**, including paired rename paths;
-check staged, unstaged, untracked and deleted managed files. Missing
-`.idd/engineering/` is valid; changes outside the managed paths are not
-by themselves a blocker. Require a full real HEAD SHA. Preserve the
-original baseline on recovery/continuation/replacement.
-
-Before each mutating owner or Worker, durably checkpoint the bounded
-pending action and original authorization in `provenance.md`; after a
-trusted result record affected paths and before/after evidence.
-`external-unknown` is not confirmed authorization. An unavailable
-original Git object, ambiguous provenance or partial activation blocks
-unsafe writes/refinement: preserve evidence and diagnose; no automatic
-rollback or baseline reset. Validate inactive plan, answers and
-provenance before writing the sole active marker
-`current/request.md` last. Neither a stray `current/plan.md` nor
-legacy `state.json` marks an active run.
-
+Persist bounded pending provenance before each mutating owner/Worker;
+record authorized before/after evidence only after trusted completion.
+`external-unknown` or partial activation preserves recovery evidence:
+never blindly replay an owner, reset a baseline, undo changes, or infer
+an active run without `current/request.md`.
 
 ## Preparation planner and activation — Root operations
 
-Use `New-run ordering`, `Durable coverage validation`, `Preparation
-questions and renewed coverage`, and `Request identity` in
-`references/intent-preflight.md`. This section specifies Root's
-native-agent and temporary-file operations, not a second Preflight policy.
+Use `New-run ordering`, `Preparation questions and renewed coverage`
+and `Request identity` from `references/intent-preflight.md`.
+Root performs these concrete dispatch and state operations:
 
-1. After approved durable coverage and saved
-   `preparation/{request,baseline,provenance}.md`, recheck the installed
-   Planner Skill path. Spawn a fresh generic child as Planner
-   used in active runs with the unchanged request, chronological exact Q/A,
-   repository paths, current Engineering discovery context and bounded
-   preparation verification failure. No active marker or `completed.md`
-   exists before Workers. Apply the Planner result validation and `BLOCKED`
-   failure handling defined under `Planner outcomes` below before any
-   preparation question, plan, activation or Worker write.
-2. For `# Question`, require exactly one concrete question, write its
-   exact text to `preparation/question.md`, and stop **without** creating
-   `current/request.md` or `plan.md` or spawning a Worker. On reply,
-   append exact question AND answer chronologically to
-   `preparation/answers.md`, remove the pending question, and perform
-   the renewed blocker/owner/coverage checks from Preflight before a
-   NEW isolated Planner. Never inherit the previous child's transcript.
-3. For `# Done` before activation, run project verification in the
-   `final` context. Success removes preparation and completes with
-   **no active marker and no empty plan**. Failure writes only bounded
-   `preparation/verification-failure.md` and goes to a fresh Planner.
-   Do not call an unverified check success, retry unchanged failure
-   endlessly, or run fixes from Root.
-4. For `# Task`, validate the WHOLE fresh executable batch:
-   self-contained contracts, one explicit `ExecutionProfile` from
-   `economy | standard | strong` per new Task, unique existing
-   `TaskRelatedIntent` owners, existing unique Conditional
-   `TaskRelatedEngineering` owners (not Always), structural Engineering
-   validity and durable/repository freshness, and **1–4 complete `# Task`
-   sections** in a fresh Planner result. Five or more tasks is a blocking
-   protocol diagnostic BEFORE writing the plan or launching any Worker.
-   Never truncate an oversized plan, select the first four, or automatically
-   retry it. Malformed, mixed, empty, stale or unresolved output also blocks.
-5. Recheck no `current/request.md` exists. Reconcile orphaned inactive
-   files with trusted preparation evidence; write `current/plan.md` from
-   the validated batch and transfer exact Q/A, immutable baseline and
-   provenance. Write the complete original `current/request.md` LAST
-   (prefer a same-directory atomic rename). Only then launch the normal
-   Worker loop. Never claim multi-file atomicity or overwrite a competing
-   active marker.
+1. After approved coverage and saved
+   `preparation/{request,baseline,provenance}.md`, spawn a fresh Planner
+   with full request, exact Q/A, repository, preparation phase and bounded
+   verification context. Before any write, validate its entire genuine
+   terminal result using `Planner outcomes` below. No active marker
+   or `completed.md` exists yet.
+2. `# Question`: save exact `preparation/question.md`, stop without
+   activation. On Answer, append exact chronological Q/A, renew authorized
+   owners/coverage, then spawn a NEW Planner.
+3. `# Done`: perform `final` verification without activation; on
+   success remove preparation. On failure record a bounded
+   `preparation/verification-failure.md` and invoke a fresh Planner,
+   never run a repair in Root.
+4. `# Task`: validate the *entire* new executable batch, 1–4 Tasks,
+   exactly one valid ExecutionProfile per Task, current Intent and
+   Conditional Engineering IDs and repository freshness. Five or more,
+   malformed or stale Tasks block; do not truncate or automatically retry.
+5. Reconcile partial inactive files, transfer validated plan, Q/A,
+   original baseline and provenance, then create `current/request.md`
+   **LAST** before the Worker loop.
 
-An unfinished legacy run with explicit implementation-only scope keeps
-its no-Intent-write boundary; ambiguous legacy scope/provenance forbids
-Worker Intent writes. The installed plugin version does not grant permission.
-A clarification cannot silently expand `intent-preserving` scope.
+Old saved plans over four Tasks remain valid for conservative recovery.
+Legacy implementation-only scope and uncertain provenance do not authorize
+new durable Product/Engineering decisions.
 
 ## Per-Root worker checkpoint target and safe plan boundary
 
