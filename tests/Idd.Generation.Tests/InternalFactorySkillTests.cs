@@ -73,6 +73,26 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
             "idd-internal-factory-root", "agents", "openai.yaml"));
     }
 
+    [Theory]
+    [InlineData("codex")]
+    [InlineData("claude")]
+    public void Preflight_RequiresInstalledPlannerWorkerSkills_NotRegisteredRoles(string platform)
+    {
+        var canonical = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "methodology", "intent-preflight.md"));
+        var packaged = fixture.ReadText(Path.Combine(fixture.MarketplaceRoot,
+            "plugins", platform, "idd-factory", "skills", "idd-internal-factory-root",
+            "references", "intent-preflight.md"));
+
+        foreach (var preflight in new[] { canonical, packaged })
+        {
+            Assert.Contains("idd-internal-factory-planner/SKILL.md", preflight);
+            Assert.Contains("idd-internal-factory-worker/SKILL.md", preflight);
+            Assert.Contains("agent roles or `agent_type` values are not required", preflight);
+            Assert.DoesNotContain("both registered", preflight, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     [Fact]
     public void NativeFactoryRotationContractRequiresCompletePlans()
     {
