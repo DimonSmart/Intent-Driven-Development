@@ -125,12 +125,14 @@ public sealed partial class FactoryReportTests
         Write(Path.Combine(sessions, "planner.jsonl"),
         [
             Session(TestPlannerId, repo, TestRootId, "/root/idd_factory_planner_01"),
-            Assistant("2026-10-16T10:00:02Z", plannerOutput)
+            Assistant("2026-10-16T10:00:02Z", plannerOutput),
+            NativeTerminal("2026-10-16T10:00:02.001Z")
         ]);
         Write(Path.Combine(sessions, "worker.jsonl"),
         [
             Session(TestWorkerId, repo, TestRootId, "/root/idd_factory_worker_01"),
-            Assistant("2026-10-16T10:00:30Z", "Done.")
+            Assistant("2026-10-16T10:00:30Z", "Done."),
+            NativeTerminal("2026-10-16T10:00:30.001Z")
         ]);
         var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, home));
         var task = Assert.Single(report.Tasks);
