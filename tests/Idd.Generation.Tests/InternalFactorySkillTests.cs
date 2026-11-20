@@ -115,11 +115,53 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
         Assert.Contains(description, root);
         Assert.Contains("minimum target for normal", root);
         Assert.Contains("CompletedWorkers >= max_workers_per_batch > 0", supervisor);
-        Assert.Contains("not a hard cap", supervisor, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("may exceed the positive effective target", supervisor);
         Assert.DoesNotContain("CompletedWorkers exactly equal to the limit", supervisor,
             StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("CompletedWorkers equal to the effective", supervisor,
             StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("codex")]
+    [InlineData("claude")]
+    public void FactoryAdapters_GenerateCanonicalSkillBodiesWithoutInstructionAppendices(string platform)
+    {
+        var cases = new (string Skill, string Source)[]
+        {
+            ("idd-factory-run", "src/canonical/skills/idd-factory-run.md"),
+            ("idd-factory-configure", "src/canonical/skills/idd-factory-configure.md"),
+            ("idd-internal-factory-root", "src/canonical/factory/root.md"),
+            ("idd-internal-factory-planner", "src/canonical/factory/planner.md"),
+            ("idd-internal-factory-worker", "src/canonical/factory/worker.md")
+        };
+
+        foreach (var (skillName, canonicalPath) in cases)
+        {
+            var canonical = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+                canonicalPath.Replace('/', Path.DirectorySeparatorChar)));
+            var generated = fixture.ReadText(Path.Combine(fixture.MarketplaceRoot,
+                "plugins", platform, "idd-factory", "skills", skillName, "SKILL.md"))
+                .ReplaceLineEndings("\n");
+
+            Assert.StartsWith("---\n", generated);
+            var frontMatterEnd = generated.IndexOf("\n---\n", 4, StringComparison.Ordinal);
+            Assert.True(frontMatterEnd >= 0, $"Missing frontmatter terminator in {platform}/{skillName}.");
+            var generatedBody = generated[(frontMatterEnd + "\n---\n".Length)..].Trim();
+
+            Assert.Equal(canonical.ReplaceLineEndings("\n").Trim(), generatedBody);
+        }
+
+        var policy = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "methodology", "factory-execution-policy.md"));
+        Assert.Contains("`codex.reasoningEffort` to `reasoning_effort`", policy);
+        Assert.Contains("`claude.model` and optional `claude.effort`", policy);
+
+        var packagedPolicy = fixture.ReadText(Path.Combine(fixture.MarketplaceRoot,
+            "plugins", platform, "idd-factory", "skills", "idd-internal-factory-root",
+            "references", "factory-execution-policy.md"));
+        Assert.Equal(GenerationFixture.NormalizeText(policy),
+            GenerationFixture.NormalizeText(packagedPolicy));
     }
 
     [Fact]
