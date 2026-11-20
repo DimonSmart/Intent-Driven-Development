@@ -308,6 +308,44 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
             "-> validate durable coverage");
     }
 
+    [Theory]
+    [InlineData("codex")]
+    [InlineData("claude")]
+    public void PlannerBlocked_IsDiagnosticFailure_NotAFourthPlanningOutcome(string platform)
+    {
+        var planner = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "factory", "planner.md"));
+        var root = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "factory", "root.md"));
+        var preflight = fixture.ReadText(Path.Combine(fixture.RepoRoot,
+            "src", "canonical", "methodology", "intent-preflight.md"));
+
+        Assert.Contains("three **normal planning outcomes**", planner);
+        Assert.Contains("BLOCKED\nReason: <specific nonempty single-line diagnostic>", planner);
+        Assert.Contains("not a fourth planning outcome", planner);
+        Assert.Contains("not `BLOCKED`", planner);
+        Assert.Contains("PLANNER_BLOCKED", root);
+        Assert.Contains("PLANNER_PROTOCOL_INVALID", root);
+        Assert.Contains("CHILD_UNCONFIRMED", root);
+        Assert.Contains("Keep the actual Root-local CompletedWorkers count", root);
+        Assert.Contains("without creating a\nquestion, plan or active marker or automatically retrying", preflight);
+
+        var plugin = Path.Combine(fixture.MarketplaceRoot,
+            "plugins", platform, "idd-factory", "skills");
+        var packagedPlanner = fixture.ReadText(Path.Combine(plugin,
+            "idd-internal-factory-planner", "SKILL.md"));
+        var packagedRoot = fixture.ReadText(Path.Combine(plugin,
+            "idd-internal-factory-root", "SKILL.md"));
+        var packagedPreflight = fixture.ReadText(Path.Combine(plugin,
+            "idd-internal-factory-root", "references", "intent-preflight.md"));
+
+        Assert.Contains("BLOCKED\nReason: <specific nonempty single-line diagnostic>",
+            packagedPlanner.ReplaceLineEndings("\n"));
+        Assert.Contains("PLANNER_PROTOCOL_INVALID", packagedRoot);
+        Assert.Equal(GenerationFixture.NormalizeText(preflight),
+            GenerationFixture.NormalizeText(packagedPreflight));
+    }
+
     [Fact]
     public void NativeFactoryRotationContractRequiresCompletePlans()
     {
