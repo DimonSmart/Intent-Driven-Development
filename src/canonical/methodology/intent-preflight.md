@@ -283,6 +283,7 @@ following normative phases.
 12. Question -> save exact Q/A and checkpoint newly authorized owner changes
     Done -> final verification with no activation
     Tasks -> verify full batch and transfer plan, answers, baseline, provenance
+    BLOCKED/invalid output -> preserve preparation; no activation or automatic retry
 13. create current/request.md LAST; then sequential Workers
 ```
 
@@ -378,9 +379,15 @@ a plan, a preflight report or a rewrite.
 
 ## Preparation questions and renewed coverage
 
-The initial Planner is the ordinary read-only Factory Planner with the normal
-`# Task`, `# Question`, and `# Done` outcomes. A valid single Question
-before activation remains in `preparation/question.md`; record exact
+The initial Planner is the ordinary read-only Factory Planner with three
+normal `# Task`, `# Question`, and `# Done` outcomes and a distinct
+diagnostic `BLOCKED` failure form (`BLOCKED` followed by one nonempty
+`Reason:` line). A valid Planner `BLOCKED`, malformed output or
+unconfirmed native child terminal result stops Root with a precise existing
+`Status: BLOCKED` diagnostic, preserving preparation, without creating a
+question, plan or active marker or automatically retrying. Only a genuine
+`# Question` can initiate saved Q/A. A valid single Question before
+activation remains in `preparation/question.md`; record exact
 chronological Q/A in `preparation/answers.md`. Classify the whole base request
 plus every applicable clarification, not the last answer alone. Before any new
 durable mutation, repeat request-level blocker checks, including conflicts and
