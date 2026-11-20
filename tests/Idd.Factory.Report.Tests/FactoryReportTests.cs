@@ -727,7 +727,8 @@ public sealed partial class FactoryReportTests : IDisposable
         [
             Session(workerId, repo, rootId),
             NativeCommandCompleted("2026-09-23T10:00:20Z", "probe", "dotnet test", 1),
-            Assistant("2026-09-23T10:00:30Z", "Implemented the catalog value type.")
+            Assistant("2026-09-23T10:00:30Z", "Implemented the catalog value type."),
+            NativeTerminal()
         ]);
 
         var report = Assert.Single(new FactoryReportEngine().FindRuns(repo, codex));
@@ -846,7 +847,8 @@ public sealed partial class FactoryReportTests : IDisposable
             Session(worker1, repo),
             User("2026-09-23T10:00:11Z", "Inherited Factory context mentions idd-factory-decompose-task too."),
             Tokens("2026-09-23T10:00:50Z", 1200, 700, 90),
-            Assistant("2026-09-23T10:01:00Z", "Implemented ProductCode.")
+            Assistant("2026-09-23T10:01:00Z", "Implemented ProductCode."),
+            NativeTerminal()
         ]);
 
         Write(Path.Combine(dir, "worker-2.jsonl"),
@@ -854,7 +856,8 @@ public sealed partial class FactoryReportTests : IDisposable
             Session(worker2, repo),
             User("2026-09-23T10:01:11Z", "Inherited Factory context mentions idd-factory-decompose-task too."),
             Tokens("2026-09-23T10:01:50Z", 900, 400, 70),
-            Assistant("2026-09-23T10:02:00Z", "Updated Catalog.")
+            Assistant("2026-09-23T10:02:00Z", "Updated Catalog."),
+            NativeTerminal()
         ]);
 
         Write(Path.Combine(dir, "planner-2.jsonl"),
@@ -900,7 +903,8 @@ public sealed partial class FactoryReportTests : IDisposable
         [
             Session(id, cwd, parent),
             User("2026-09-23T10:00:06Z", "Factory child context"),
-            .. events
+            .. events,
+            NativeTerminal()
         ]);
     }
 
@@ -1171,6 +1175,13 @@ public sealed partial class FactoryReportTests : IDisposable
             receiver_thread_ids = new[] { childId },
             status = "completed"
         }
+    };
+
+    private static object NativeTerminal() => new
+    {
+        timestamp = "2026-09-23T10:59:00Z",
+        type = "event_msg",
+        payload = new { type = "task_complete" }
     };
 
     private static object NativeCommandCompleted(string timestamp, string id, string command, int exitCode) => new
