@@ -14,8 +14,9 @@ Before reading project data, require the complete original request (or an
 accessible verbatim request file), explicit preparation/active phase, valid
 phase-appropriate immutable baseline and verified provenance, repository root,
 and all required accessible references. In preparation, active-only files do
-not exist and must not be demanded. Return `BLOCKED` with the missing or
-ambiguous input if any mandatory data is absent; perform no planning or writes.
+not exist and must not be demanded. Return the diagnostic `BLOCKED`
+failure form defined below, identifying the missing or ambiguous input,
+if any mandatory data is absent; perform no planning or writes.
 Do not inherit parent history or assume a registered role supplies instructions.
 This Skill includes the compact Engineering obligations; the full general
 methodology is a Root reference, not a relayed child contract.
@@ -132,7 +133,11 @@ Do not outsource ordinary engineering judgment to the user.
 
 ## Output protocol
 
-Return exactly one of three forms.
+For a valid assignment and readable required references, return exactly one
+of three **normal planning outcomes**: Tasks, Question or Done. An invalid
+assignment or failed mandatory prerequisite uses the distinct `BLOCKED`
+failure form below. It is not a fourth planning outcome and never means
+`# Question` or `# Done`.
 
 Tasks:
 
@@ -195,8 +200,33 @@ Done:
 # Done
 ```
 
-Never mix Tasks, Question, and Done in one result. Blank or whitespace-only
-output is malformed and never means Done.
+Blocked (diagnostic failure, not a planning result):
+
+```text
+BLOCKED
+Reason: <specific nonempty single-line diagnostic>
+```
+
+Use this form only when required input, installed Skill/reference, repository
+access, phase/baseline/provenance or another mandatory prerequisite is
+missing, contradictory, unreadable or untrustworthy, or when a safe planning
+decision is impossible without a recoverable external failure. State the
+concrete cause; do not fabricate a Task, ask the user to resolve a purely
+technical failure or claim the request is complete. Genuine user-owned product
+or policy ambiguity that can be resolved by one user answer uses `# Question`,
+not `BLOCKED`.
+
+The first line of a `BLOCKED` result must be exactly `BLOCKED`, followed
+by exactly one nonempty `Reason:` line. It contains no `# Task`,
+`# Question` or `# Done` section and is terminal for this Planner invocation.
+Return no task text, question, or partial result with a diagnostic failure.
+This is a child result only: Root maps it to its own existing terminal
+`Status: BLOCKED` contract and preserves the current Factory phase.
+
+Never mix Tasks, Question, and Done in one result, or mix any of them with
+`BLOCKED`. Blank or whitespace-only output is malformed and never means Done.
+An unconfirmed or interrupted native child is not a trustworthy Planner
+`BLOCKED` message; Root must handle native lifecycle failure independently.
 
 ## Incremental planning
 
