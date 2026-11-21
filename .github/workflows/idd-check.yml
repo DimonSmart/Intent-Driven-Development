@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -40,6 +42,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -78,6 +82,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -90,5 +96,5 @@ jobs:
           set -euo pipefail
           cp -a agent-trace "$RUNNER_TEMP/agent-trace"
           cd "$RUNNER_TEMP/agent-trace"
-          dotnet build AgentTrace.slnx --nologo
-          dotnet test AgentTrace.slnx --no-build --nologo
+          dotnet build CodexTrace.slnx --nologo
+          dotnet test CodexTrace.slnx --no-build --nologo

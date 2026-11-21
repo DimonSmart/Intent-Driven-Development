@@ -290,8 +290,13 @@ a packaged C# runtime, MCP transport, process supervisor, or polling protocol.
 ## Post-run diagnostics
 
 For deterministic post-run diagnostics and statistics over the host-owned trace,
-see [`idd-factory-report`](../agent-trace/docs/factory-report.md). The reporter is a development
-utility and is not part of the Factory workflow or plugin runtime.
+see [`CodexTrace`](https://github.com/DimonSmart/CodexTrace/blob/main/docs/factory-report.md).
+The reporter is a development utility, not part of the Factory workflow or
+plugin runtime. IDD pins the separate CodexTrace repository as the
+`agent-trace/` Git submodule. For a local IDD checkout run
+`git submodule update --init --recursive`; CI initializes it automatically.
+Changes to CodexTrace are integrated in IDD only when the submodule commit
+is explicitly advanced and IDD checks pass.
 
 
 

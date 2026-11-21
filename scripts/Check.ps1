@@ -62,8 +62,17 @@ function Resolve-ValidationVersion {
     return $Matches.version
 }
 
+function Assert-CodexTraceCheckout {
+    $project = Join-Path $repoRoot "agent-trace/src/Idd.Factory.Report/Idd.Factory.Report.csproj"
+    if (-not (Test-Path -LiteralPath $project -PathType Leaf)) {
+        throw "CodexTrace submodule is not initialized. Run: git submodule update --init --recursive"
+    }
+}
+
 function Invoke-FastValidation {
     param([Parameter(Mandatory = $true)][string] $ValidationVersion)
+
+    Assert-CodexTraceCheckout
 
     $previousGenerationVersion = $env:IDD_GENERATION_TEST_VERSION
     $env:IDD_GENERATION_TEST_VERSION = $ValidationVersion
@@ -135,6 +144,8 @@ function Invoke-LiveValidation {
         [bool] $OverrideModel,
         [bool] $OverrideReasoning
     )
+
+    Assert-CodexTraceCheckout
 
     $names = @(
         "IDD_RUN_LIVE_FACTORY_EVALS",
