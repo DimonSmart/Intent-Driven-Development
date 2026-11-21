@@ -181,10 +181,11 @@ unavailable evidence.
 ## Usage
 
 ```text
-dotnet run --project tools/idd-factory-report -- latest
-dotnet run --project tools/idd-factory-report -- list
-dotnet run --project tools/idd-factory-report -- <thread-id>
-dotnet run --project tools/idd-factory-report -- <thread-id> --run 2
+# Run from the agent-trace/ directory
+dotnet run --project src/Idd.Factory.Report -- latest
+dotnet run --project src/Idd.Factory.Report -- list
+dotnet run --project src/Idd.Factory.Report -- <thread-id>
+dotnet run --project src/Idd.Factory.Report -- <thread-id> --run 2
 ```
 
 Options: `--repo`, `--codex-home`, `--run`, `--json`, `--markdown`, `--verbose`.

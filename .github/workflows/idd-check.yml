@@ -72,3 +72,23 @@ jobs:
           name: fast-validation-log
           path: check.log
           if-no-files-found: error
+
+  agent-trace-isolated:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build and test copied AgentTrace directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -a agent-trace "$RUNNER_TEMP/agent-trace"
+          cd "$RUNNER_TEMP/agent-trace"
+          dotnet build AgentTrace.slnx --nologo
+          dotnet test AgentTrace.slnx --no-build --nologo

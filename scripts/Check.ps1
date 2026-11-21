@@ -76,7 +76,7 @@ function Invoke-FastValidation {
         Invoke-CheckedNative -FilePath "pwsh" -Arguments @("-NoProfile", "-File", "tests/VisualIntentGallery.Tests.ps1")
         Invoke-CheckedNative -FilePath "dotnet" -Arguments @("build", "Intent-Driven-Development.slnx", "--nologo")
         Invoke-CheckedNative -FilePath "dotnet" -Arguments @("test", "tests/Idd.Generation.Tests/Idd.Generation.Tests.csproj", "--no-build", "--nologo")
-        Invoke-CheckedNative -FilePath "dotnet" -Arguments @("test", "tests/Idd.Factory.Report.Tests/Idd.Factory.Report.Tests.csproj", "--no-build", "--nologo")
+        Invoke-CheckedNative -FilePath "dotnet" -Arguments @("test", "agent-trace/tests/Idd.Factory.Report.Tests/Idd.Factory.Report.Tests.csproj", "--no-build", "--nologo")
         Invoke-CheckedNative -FilePath "dotnet" -Arguments @("test", "tests/Idd.Factory.LiveTests/Idd.Factory.LiveTests.csproj", "--no-build", "--nologo", "--filter", "Category!=LiveFactoryEval")
     }
     finally {
@@ -214,7 +214,7 @@ function Invoke-LiveValidation {
         else {
             $markdown = Join-Path $env:IDD_FACTORY_EVAL_ARTIFACT_DIR "factory-report.md"
             $json = Join-Path $env:IDD_FACTORY_EVAL_ARTIFACT_DIR "factory-report.json"
-            & dotnet run --project tools/idd-factory-report/Idd.Factory.Report.csproj -- latest --repo $workspace --codex-home $codexHome --json $json --markdown $markdown | Out-Host
+            & dotnet run --project agent-trace/src/Idd.Factory.Report/Idd.Factory.Report.csproj -- latest --repo $workspace --codex-home $codexHome --json $json --markdown $markdown | Out-Host
             $reportExitCode = $LASTEXITCODE
             if ($reportExitCode -eq 0) {
                 if (Test-Path -LiteralPath $markdown -PathType Leaf) {

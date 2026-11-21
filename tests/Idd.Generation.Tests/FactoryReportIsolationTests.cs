@@ -18,5 +18,7 @@ public sealed class FactoryReportIsolationTests(GenerationFixture fixture)
 
         Assert.DoesNotContain(entries,
             path => path.Contains("idd-factory-report", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(entries,
+            path => path.Contains("agent-trace", StringComparison.OrdinalIgnoreCase));
     }
 }
