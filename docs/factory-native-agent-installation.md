@@ -49,7 +49,14 @@ largest supported native blocking interval. These intervals are not overall
 execution limits. On a normal `timed_out: true` result while a child runs,
 re-arm the native wait on that same child, **never interrupt it just because
 one wait expired**. Genuine native failure and uncertain termination still
-block overlapping Writers and require explicit safe recovery.
+block overlapping Writers within that invocation. After a quota-exhausted
+top-level turn, an explicit Continue checks host-native liveness, not just
+whether the last Worker checkpoint was closed. If the old turn ended and no
+surviving Writer is reported, Root reconciles saved Task/provenance with Git
+and resumes the remainder without default manual OS process inspection.
+An active old Writer or specifically unresolved host liveness still blocks
+replacement. Missing terminal evidence never counts the interrupted Worker
+as successful.
 Exceptional OS process cleanup is host-owned and does not require a
 forced-cancellation preflight probe. Native model/
 effort override support is not required to start Factory: Root checks it only
