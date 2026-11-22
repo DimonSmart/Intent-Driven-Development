@@ -95,12 +95,25 @@ as a transport mode; **Root** applies the semantic modes above:
 
 Root automatically reconciles only outcomes established unambiguously by
 saved provenance, Git/repository reality and trusted normal terminal results.
-After interruption, a later explicit invocation must ensure the previous host
-operation is no longer writing; an aborted agent status is not that proof.
-When multiple plausible outcomes would require different mutations, do not
-guess, retry or delete evidence: save an exact question in the existing
-preparation/current `question.md` when applicable and return NEEDS_INPUT.
-Do not introduce a new lifecycle status, state file or retry counter.
+A fresh explicit Continue after a previous top-level host turn ended (including
+quota/usage exhaustion or transport loss) is authorized recovery, not a New
+run. Use the ended host invocation and available native child-status evidence
+to establish no prior Writer remains active. An aborted child transcript,
+missing successful terminal or pending provenance checkpoint alone cannot
+establish that a Writer is still alive. Do not require manual OS inspection
+in their absence. If the host actually reports a surviving Writer, the old
+top-level invocation remains active, or host liveness is specifically
+unresolved, block before a new Writer and explain the observed conflict.
+
+Writer absence establishes ONLY re-entry safety, not Task success. Reconcile
+pending `plan.md`, `completed.md`, provenance and Git before proceeding;
+preserve verified completed Tasks and all partial edits, and replan or finish
+only uncompleted work. Never mark an interrupted Worker successful based on
+its file changes or a stopped host turn. When multiple plausible outcomes
+would require different mutations, do not guess, retry or delete evidence:
+save an exact question in the existing preparation/current `question.md`
+when applicable and return NEEDS_INPUT. Do not introduce a new lifecycle
+status, state file or retry counter.
 
 Supervisor supplies the mode and exact user input, but does not independently
 classify the request, execute owner workflows or delete temporary state.
@@ -348,9 +361,13 @@ baseline, provenance and answers before writing the sole active marker
 `current/request.md` last. A nonterminal native wait timeout does not imply a child writer ended
 or failed: re-arm a long native wait for the same running child without
 interrupting it or creating a new Writer. On actual host failure or explicit
-interruption, end this invocation without replacement work. On later explicit
-recovery require no ongoing old host operation, reconcile pending checkpoints
-and partial Git changes, and block if an old writer may still be active.
+interruption, end THIS invocation without replacement work. On later explicit
+Continue after the top-level host turn ended, verify no live old Writer
+through the host lifecycle/native child evidence, then reconcile pending
+checkpoints and partial Git changes. An unclosed checkpoint is NOT evidence
+of writer liveness, and manual process inspection is not a routine recovery
+step. Block a new Writer only on an observed active old Writer or specifically
+unresolved host liveness, never solely on an unconfirmed Task result.
 
 ## Durable coverage validation
 
