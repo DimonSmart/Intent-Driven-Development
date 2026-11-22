@@ -90,10 +90,24 @@ engine. If native waiting cannot be resumed safely, stop this invocation as
 `BLOCKED / CHILD_UNCONFIRMED` while preserving all state and explain whether
 the child may still be running.
 
-A later explicit Continue/Restart/Cancel requires the previous host operation
-to have stopped and Root to reconcile saved state with repository reality.
-If an old Writer might still be active, remain BLOCKED and request manual
-host/process inspection; never overlap Writers.
+A later explicit Continue/Restart/Cancel starts a NEW recovery invocation,
+not a retry of the failed native wait. In particular, quota/usage exhaustion,
+context loss or a disconnected top-level turn can leave an unclosed Worker
+checkpoint without leaving a live Writer. Confirm the previous top-level host
+invocation ended and consult available native child/receiver status for a
+surviving active Writer. A pending checkpoint, missing trusted terminal or
+aborted transcript by itself is NOT evidence that a Writer is still running.
+When the host's ended-turn lifecycle and available native evidence show no
+active managed Writer, dispatch one fresh Root in Continue mode: Root must
+reconcile the saved Task and Git changes before any new Writer. Do not make
+manual OS-process inspection a default prerequisite for such recovery.
+
+If the host reports a still-active prior Writer, the previous top-level
+operation is still live, or host lifecycle evidence specifically leaves an
+old Writer potentially active, stop as BLOCKED with the concrete evidence and
+required host-side action. Never spawn overlapping Writers. Do not infer that
+an interrupted Worker succeeded merely because recovery can start; neither
+Supervisor nor Root may count it without a trusted completed checkpoint.
 
 ## Terminal contract from Factory Root
 

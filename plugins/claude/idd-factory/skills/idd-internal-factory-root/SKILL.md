@@ -85,7 +85,13 @@ On a genuine host failure, explicit interruption or unconfirmed termination,
 preserve the pending Task and end as BLOCKED / CHILD_UNCONFIRMED if native
 waiting cannot safely continue. The host owns descendant/OS process cleanup;
 no shell kills, process-tree tracking, short status polling or retry engine.
-Later explicit recovery reconciles saved state and requires no active Writer.
+Later explicit recovery distinguishes an active Writer from an incomplete
+checkpoint: an aborted Worker or pending Task is not proof of a live process.
+A new Continue after the prior host turn has ended may reconcile and resume
+when host-native evidence shows no surviving active Writer. Do not demand
+manual process inspection solely because a quota error left provenance pending.
+Block only on concrete active-writer evidence or unresolved host liveness;
+the host still owns exceptional descendant/OS-process cleanup.
 
 ## Factory Preflight — Root entrypoint
 
@@ -165,8 +171,15 @@ Follow `references/intent-preflight.md`:
   until authorized replacement preparation succeeds.
 
 Automatically reconcile only unambiguous outcomes. Genuine user-owned
-ambiguity returns NEEDS_INPUT; uncertain writer termination returns BLOCKED.
-No new lifecycle state or retry counter.
+ambiguity returns NEEDS_INPUT; a specifically unresolved live Writer returns
+BLOCKED. On explicit Continue after the old top-level invocation ended, treat
+a missing Worker terminal, quota error or unclosed checkpoint as unconfirmed
+TASK COMPLETION, not automatically as unconfirmed WRITER LIVENESS. Inspect
+saved plan/completed/provenance and current Git changes; preserve verified
+results, and replan or finish only the remaining work with a fresh Worker.
+Do not blindly replay partially applied edits or promote an interrupted
+Worker to completed. The host owns proof of active native children and
+emergency cleanup, not Factory. No new lifecycle state or retry counter.
 
 ## Original Git baseline and bounded provenance — Root operations
 
