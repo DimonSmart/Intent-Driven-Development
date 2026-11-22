@@ -225,11 +225,18 @@ These are proposed actions, not automatic resets. The Supervisor cannot
 claim detailed Worker state when Root did not return a trusted terminal.
 
 After a genuine interruption the user explicitly invokes Continue, Restart
-or Cancel. First ensure the old host operation is no longer writing, then
-reconcile saved state with repository reality. If an old Writer may still
-be active, remain BLOCKED and request manual host inspection. A new Worker
-preserves correct partial work. An unrelated new request never silently
-replaces the unfinished run.
+or Cancel. In particular, a quota-exhausted turn followed by explicit Continue
+must not fail merely because a Worker checkpoint remains pending. Check the
+previous top-level host turn ended and available native child evidence shows
+no surviving active Writer; then reconcile the saved plan, completed Tasks,
+provenance and repository changes before resuming remaining work. Missing
+Worker terminal evidence prevents counting it as completed, but is not proof
+that its process remains live. Do not require manual process inspection merely
+because the interrupted checkpoint is still open. If the host actually
+reports a live Writer or its liveness is specifically unresolved, block with
+the concrete evidence; never overlap Writers. A new Worker must preserve
+correct partial work. An unrelated new request never silently replaces the
+unfinished run.
 
 ## Questions, preparation resume, and activation
 
