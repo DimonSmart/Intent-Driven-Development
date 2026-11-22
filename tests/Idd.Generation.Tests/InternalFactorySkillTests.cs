@@ -112,6 +112,37 @@ public sealed class InternalFactorySkillTests(GenerationFixture fixture)
     [Theory]
     [InlineData("codex")]
     [InlineData("claude")]
+    public void FactoryContinueAfterQuota_SeparatesWriterLivenessFromTaskCompletion(string platform)
+    {
+        var skills = Path.Combine(fixture.MarketplaceRoot,
+            "plugins", platform, "idd-factory", "skills");
+        var supervisor = fixture.ReadText(Path.Combine(skills,
+            "idd-factory-run", "SKILL.md"));
+        var root = fixture.ReadText(Path.Combine(skills,
+            "idd-internal-factory-root", "SKILL.md"));
+        var preflight = fixture.ReadText(Path.Combine(skills,
+            "idd-internal-factory-root", "references", "intent-preflight.md"));
+
+        Assert.Contains("quota/usage exhaustion", supervisor);
+        Assert.Contains("pending checkpoint, missing trusted terminal", supervisor);
+        Assert.Contains("without a trusted completed checkpoint", supervisor);
+        Assert.Contains("If the host reports a still-active prior Writer", supervisor);
+
+        Assert.Contains("pending Task is not proof of a live process", root);
+        Assert.Contains("unconfirmed", root);
+        Assert.Contains("replan or finish only the remaining work", root);
+
+        Assert.Contains("a previous top-level host turn ended", preflight);
+        Assert.Contains("An aborted child transcript", preflight);
+        Assert.Contains("Writer absence establishes ONLY re-entry safety", preflight);
+        Assert.Contains("Never mark an interrupted Worker successful", preflight,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("block before a new Writer", preflight);
+    }
+
+    [Theory]
+    [InlineData("codex")]
+    [InlineData("claude")]
     public void RootReferences_MatchCanonicalSourceFilesExactly(string platform)
     {
         var sources = new (string Source, string Destination)[]
