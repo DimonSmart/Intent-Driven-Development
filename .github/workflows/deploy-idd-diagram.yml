@@ -27,12 +27,12 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -40,7 +40,7 @@ jobs:
           node-version: 22
 
       - name: Checkout pinned Archify
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: tt-a1i/archify
           ref: 7f483b61e8f68d0d5c3219d2c943c5381c8db0b1
@@ -50,10 +50,10 @@ jobs:
         run: node scripts/Build-Idd-Diagram-Site.mjs --archify .archify/archify/bin/archify.mjs
 
       - name: Upload generated site
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
