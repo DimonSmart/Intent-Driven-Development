@@ -7,6 +7,10 @@ on:
       - main
       - feature/visual-intent-brainstorm
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   fast-linux:
     runs-on: ubuntu-latest
