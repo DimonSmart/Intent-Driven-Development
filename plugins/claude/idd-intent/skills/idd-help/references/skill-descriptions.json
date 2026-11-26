@@ -229,12 +229,12 @@
     "exposure": "internal"
   },
   "idd-intent-cosmic": {
-    "description": "Measure COSMIC v5.0 functional size from current Product Intent with evidence-backed E/X/R/W, in-skill semantic self-review, and explicit coverage gates; read-only and independent of business complexity.",
+    "description": "Estimate COSMIC-based functional size and indicative person-hours from Product Intent using E/X/R/W, conventional assumptions and functional-area breakdown; strict measurement on request; read-only.",
     "invocation": "auto",
     "exposure": "command",
     "interface": {
       "displayName": "IDD COSMIC Functional Size",
-      "shortDescription": "Measure COSMIC function points from Product Intent"
+      "shortDescription": "Estimate COSMIC size and person-hours from Product Intent"
     },
     "adapters": {
       "claude": {
@@ -242,7 +242,7 @@
           "context": "fork",
           "agent": "general-purpose",
           "background": false,
-          "argument-hint": "[product area or IDD-NNNN IDs; default: current documented intent]",
+          "argument-hint": "[scope or IDD IDs; optional strict mode or person-hours per CFP]",
           "allowed-tools": "Read Glob Grep Agent Write"
         }
       }
