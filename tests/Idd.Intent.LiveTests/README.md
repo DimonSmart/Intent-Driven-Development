@@ -202,11 +202,11 @@ Claude/Codex package metadata. Run a manual Claude smoke on a disposable
 project with only current specs; do not report success until it is actually
 observed. Host unavailability is **not evaluated**, not "pass".
 
-## COSMIC v5.0 hierarchical reader-cache evaluations
+## COSMIC approximate sizing, effort and optional cache evaluations
 
-`CosmicFunctionalSizeLiveTests` are separate **opt-in real-LLM** evaluations of the installed Codex/Claude skill. They are not included in normal CI. A real host with native child-agent and file access is required.
+`CosmicFunctionalSizeLiveTests` are separate **opt-in real-LLM** evaluations of the installed Codex/Claude skill. They are not included in normal CI. A real installed host with file access is required; native child agents are optional.
 
-The fixture provides one external, persistent **per-case numbered cache directory**, which the agent can access without editing the target project. It tests natural language behaviors:
+The fixture provides one optional external **per-case numbered cache directory** and verifies target-project immutability. It tests natural language behaviors:
 
 - `C03-shared-fur`, `C21-multiple-owners`: each process has exactly one normative owner; external specs are LINK references.
 - `C23-hierarchical-60-specs`: 60 documents, 20 owners, 40 non-owning connector specs.
@@ -215,10 +215,12 @@ The fixture provides one external, persistent **per-case numbered cache director
 - **`C26-numbered-cache-scoped-reuse`**: seed two finished `IDD-NNNN.cosmic.md` packets, measure selected 2/3 sources, verify the existing packets stay unchanged, do not measure the third source, and disclose that reused source freshness is unverified.
 - **`C27-numbered-cache-explicit-refresh`**: seed a stale but identity-matching old extract, explicitly refresh, verify the cache entry changes, and measure the updated requirement rather than the old cached behavior.
 
-To run targeted scenarios, set `IDD_RUN_LIVE_COSMIC_EVALS=1`, `IDD_COSMIC_EVAL_CASE_IDS=C26-numbered-cache-scoped-reuse,C27-numbered-cache-explicit-refresh`, then run:
+- `C28-default-assumptions`–`C34-no-persistence`: defaults, user rate, functional-area reconciliation, rate range, strict mode, invalid rate, partial scope and explicit no-persistence constraints.
+
+To run targeted scenarios, set `IDD_RUN_LIVE_COSMIC_EVALS=1`, `IDD_COSMIC_EVAL_CASE_IDS=C28-default-assumptions,C29-user-rate-and-areas,C30-rate-range`, then run:
 
 ```sh
 dotnet test tests/Idd.Intent.LiveTests/Idd.Intent.LiveTests.csproj --filter 'Category=LiveCosmicEval'
 ```
 
-The live harness uses host-native file operations, supports a separate cache folder, and checks the target workspace for changes. It does **not** execute extra COSMIC scripts, Python checkers or hash-based resume logic. A full acceptance run should also review native subagent traces and behavior on a substantial real project; scenario presence alone is not a live result.
+The live harness uses host-native file operations, supports a separate cache folder, and checks the target workspace for changes. It does **not** execute extra COSMIC scripts, Python checkers or hash-based resume logic. A full acceptance run should also review coverage, optional native subagent traces and behavior on a substantial real project; scenario presence alone is not a live result.

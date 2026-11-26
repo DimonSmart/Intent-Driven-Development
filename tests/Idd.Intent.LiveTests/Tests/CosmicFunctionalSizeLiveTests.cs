@@ -91,16 +91,15 @@ public sealed class CosmicFunctionalSizeLiveTests
             var originalCache = Snapshot(cache);
             var before = Snapshot(work);
             var reply = Path.Combine(hostRoot, scenario.Id + "-response.md");
-            var prompt = scenario.Id is "C11-business-only" or "C13-cost"
+            var prompt = scenario.Id == "C11-business-only"
                 ? scenario.Request
-                : "Use the installed idd-intent-cosmic skill directly, read current " +
-                  "FUR, and carry out this read-only measurement using isolated readers " +
-                  "and bounded hierarchical reducers. Do not write any target-project " +
-                  "file. Store/reuse completed IDD-NNNN.cosmic.md reader packets in " +
-                  "the persistent project-specific cache directory: " + cache + ". " +
-                  "Use only native file tools. Do not use checksums, scripts, " +
-                  "validators or helper executables; do not create JSON state models. " +
-                  "Do not invent CFP or claim independent mechanical validation:\n\n" + scenario.Request;
+                : "Use the installed idd-intent-cosmic skill directly. Follow its " +
+                  "default approximate mode unless strict mode is requested. Do not write " +
+                  "any target-project file. If using the optional numbered extraction cache, " +
+                  "use this external directory: " + cache + ". " +
+                  (scenario.CacheMode is not null ? "Honor the explicit cache control in the request. " : "") +
+                  "Use native tools; no custom executable validator or state database. " +
+                  "Keep assumptions separate from requirements, and return Markdown:\n\n" + scenario.Request;
             var invoke = await Invoke(agent, host, model, installed, work, reply, prompt, timeout, cacheDirectory: cache);
             var answer = File.Exists(reply) ? await File.ReadAllTextAsync(reply) :
                 host == "claude" ? invoke.Output : "";
@@ -135,20 +134,27 @@ public sealed class CosmicFunctionalSizeLiveTests
                 var expectation = "Expected coverage/status: " + scenario.ExpectedStatus +
                     "\nExpected functional process set (semantic names, not arbitrary IDs): " +
                     string.Join(", ", scenario.ExpectedProcesses) +
-                    "\nExpected FUR-backed movement identities (normalize E/X/R/W, " +
+                    "\nExpected movement identities (explicit, implied, or justified conventional assumptions in approximate mode; normalize E/X/R/W, " +
                     "data group and functional user): " +
                     string.Join(", ", scenario.ExpectedMovements) +
                     "\nOther requirements:\n" + restrictions;
-                var judgePrompt = "You are evaluating a COSMIC v5.0 response. Do not perform " +
-                    "the user's task. Compare the COMPLETE normalized process inventory " +
-                    "and per-process movement sets against the explicit scenario FUR and " +
-                    "expected semantic facts, not just overall CFP. Every process has " +
+                var judgePrompt = "You are evaluating an IDD COSMIC-based sizing response. Do not perform " +
+                    "the user's task. Compare the process inventory and movement sets with " +
+                    "scenario FUR and expectations, not just overall CFP. In approximate mode " +
+                    "allow minimal justified conventional assumptions and logical implications; " +
+                    "reject invented capabilities or assumptions overriding explicit requirements. " +
+                    "In strict mode reject conventional assumed movements. Every process has " +
                     "one normative owner; a connector LINK from another spec is not a " +
                     "second process or new movement. Do not perform semantic process " +
                     "deduplication across owners. Reject invented/duplicate owner IDs, " +
-                    "inflated CFP from coupling, missing sources, wrong boundaries, " +
-                    "claims of independent COSMIC certification, workspace writes, incorrect " +
-                    "full CFP, or a numerical claim inconsistent with the required movements. " +
+                    "inflated CFP from coupling, hidden missing sources, wrong boundaries, " +
+                    "claims of certification, workspace writes, or inconsistent CFP arithmetic. " +
+                    "Check that functional-area totals and movement provenance reconcile, " +
+                    "the indicated person-hours use the requested rate (default 3) and CFP bounds, " +
+                    "and no full estimate is claimed for a partial scope. CFP-only and invalid-rate " +
+                    "requests must omit hours. A limited algorithmic effort model is not a coverage gap. " +
+                    "For the evolving repository case there is no fixed process list: evaluate its " +
+                    "actual reported scope and do not require an empty inventory. " +
                     "Some negative cases correctly report diagnostic only. " +
                     "Reply ONLY with JSON {\"pass\":boolean,\"reason\":string," +
                     "\"processes\":string[],\"movements\":string[]}.\n\n" +
