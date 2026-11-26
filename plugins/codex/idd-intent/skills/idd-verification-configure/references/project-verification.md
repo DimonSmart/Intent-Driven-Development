@@ -52,8 +52,10 @@ Factory does not own a verification engine, retry budget, attempt lifecycle, or
 verification evidence graph.
 
 When a fresh planner returns exactly `# Done`, the orchestration layer runs the
-configured project `final` verification when available. On success, Factory
-completes. On failure, persist only a bounded diagnostic containing the failed
+configured project `final` verification, or discovers and runs the applicable
+repository/platform fallback when no policy exists. On success, Factory
+continues to its normal finalization. On failure, persist only a bounded
+diagnostic containing the failed
 check/command, exit result, and relevant output, then invoke a fresh planner.
 That planner decides whether a correction task is required.
 
@@ -62,5 +64,10 @@ not repair and retry a failed final check directly. After correction and a new
 planner `# Done`, repeat every assigned final check. A test command that exits
 zero without executing tests does not establish successful test verification.
 
-If no project verification policy is configured, `# Done` after normal worker
-checks is sufficient for Factory completion.
+If no policy exists and successful discovery using the fallback order above
+finds no applicable final check, explicitly report that no project-level
+check was available or executed. Only then may `# Done` with conclusive
+required task-local evidence (or a genuine no-work `# Done`) suffice.
+Incomplete discovery or a discovered/configured check that cannot run,
+is refused, fails or is `Not verified` must not be treated as absence of
+a check. An invalid existing policy blocks loading; never fall back from it.

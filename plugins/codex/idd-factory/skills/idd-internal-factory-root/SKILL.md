@@ -488,8 +488,14 @@ Question triggers saved exact Q&A; Done triggers project verification.
 ## Project verification and completion
 
 On genuine Planner `# Done`, apply `references/project-verification.md`
-in `final` context. Workers perform task-local checks separately.
-If any assigned check fails or is unverified, save bounded
+in `final` context. Workers perform task-local checks separately. If the
+policy is absent, discover and execute the applicable final fallback.
+Only successful discovery that finds no applicable check permits
+completion on conclusive required task-local evidence (or a genuine
+no-work `# Done`); explicitly report that no project-level check ran.
+An invalid configured policy, incomplete discovery, or an unavailable,
+refused, failed or unverified assigned/discovered check blocks approval.
+If final verification fails or remains unverified, save bounded
 `verification-failure.md` (check, exit result, relevant diagnostic),
 then invoke a fresh Planner. Root never repairs failed checks itself,
 retries unchanged failures or invents a verification engine.
@@ -497,9 +503,7 @@ An unchanged unverified failure blocks with `VERIFICATION_NOT_CONFIRMED`.
 
 On verified completion, record Implementation Result, perform the Intent
 Refinement Review below and remove `current/request.md`, preserving
-necessary ignored `.idd/factory/results/` review evidence. If no project
-verification is configured, `# Done` after ordinary Worker checks
-suffices per the referenced policy.
+necessary ignored `.idd/factory/results/` review evidence.
 
 ## Intent Refinement Review
 
