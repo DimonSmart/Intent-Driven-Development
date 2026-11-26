@@ -15,7 +15,7 @@ here.
 | IDD-0008 | Spec | Engineering guardrails | Durable Engineering Rules, ownership, allocator and mutation boundaries |
 | IDD-0009 | Spec | Intent inspection | Lint, semantic structure audit and implementation drift audit |
 | IDD-0010 | Spec | Business complexity assessment | Qualitative scope, complexity, confidence and COSMIC preparation |
-| IDD-0011 | Spec | COSMIC functional size | Process ownership, extraction snapshots, measurement and coverage |
+| IDD-0011 | Spec | COSMIC functional size | Approximate/strict sizing, conventional assumptions, functional areas and indicative effort |
 | IDD-0012 | Spec | Factory recovery and refinement | Temporary state, immutable baseline, provenance, interruption, recovery and refinement review |
 | IDD-0013 | Spec | Factory model policy | Execution profiles, configuration, inheritance and Worker model mapping |
 
