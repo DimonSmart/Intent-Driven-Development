@@ -89,6 +89,25 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         Assert.Equal(ids.Length, ids.Distinct(StringComparer.Ordinal).Count());
     }
     [Fact]
+    public void PracticalSizingContract_IsPackagedWithRateOverrideAndReadOnlyAssumptions()
+    {
+        var canonical = Path.Combine(fixture.RepoRoot, "src", "canonical");
+        var skill = fixture.ReadText(Path.Combine(canonical, "skills", "idd-intent-cosmic.md"));
+        var guide = fixture.ReadText(Path.Combine(canonical, "methodology", "cosmic-measurement-guide.md"));
+        var delegation = fixture.ReadText(Path.Combine(canonical, "methodology", "cosmic-delegation-protocol.md"));
+        var cache = fixture.ReadText(Path.Combine(canonical, "methodology", "cosmic-execution-state.md"));
+        Assert.Contains("Default to **Approximate**", skill);
+        Assert.Contains("3 person-hours/CFP", skill);
+        Assert.Contains("positive finite scalar rate", skill);
+        Assert.Contains("Functional areas", skill);
+        Assert.Contains("Explicit / Implied / Assumed", skill);
+        Assert.Contains("No team size", skill);
+        Assert.Contains("Strict mode", guide);
+        Assert.Contains("optional optimizations", delegation);
+        Assert.Contains("Never persist conventional assumptions", cache);
+    }
+
+    [Fact]
     public void GoldenExamples_ExpectedCfpEqualsMovementCount()
     {
         using var fixtureJson = JsonDocument.Parse(fixture.ReadText(Path.Combine(
