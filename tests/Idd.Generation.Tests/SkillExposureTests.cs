@@ -66,6 +66,14 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
                     var yaml = ParseYaml(GenerationFixture.ReadFrontMatter(skill));
                     AssertScalar(yaml, "user-invocable", Commands.Contains(name) ? "true" : "false");
                     AssertScalar(yaml, "disable-model-invocation", Manual.Contains(name) ? "true" : "false");
+                    if (description.Adapters is { } adapters &&
+                        adapters.TryGetValue("claude", out var claude) &&
+                        claude.Frontmatter is { } frontmatter &&
+                        frontmatter.TryGetValue("argument-hint", out var hint))
+                    {
+                        // Verify generation preserves canonical metadata, not its wording.
+                        AssertScalar(yaml, "argument-hint", hint.GetString()!);
+                    }
                     if (ClaudeForked.Contains(name))
                     {
                         AssertScalar(yaml, "context", "fork");
@@ -73,25 +81,19 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
                             ? "general-purpose" : "Explore");
                         if (name == "idd-intent-lint")
                         {
-                            AssertScalar(yaml, "argument-hint", "[scope] [mode: check|fix]");
                             AssertScalar(yaml, "allowed-tools", "Read Glob Grep Edit Write Bash");
                         }
                         if (name == "idd-route")
                         {
                             AssertScalar(yaml, "allowed-tools", "Read Glob Grep");
-                            AssertScalar(yaml, "argument-hint", "[request or workflow question]");
                         }
                         if (name == "idd-intent-cosmic")
                         {
                             AssertScalar(yaml, "allowed-tools", "Read Glob Grep Agent Write");
-                            AssertScalar(yaml, "argument-hint",
-                                "[scope or IDD IDs; optional strict mode or person-hours per CFP]");
                         }
                         if (name == "idd-intent-estimate")
                         {
                             AssertScalar(yaml, "allowed-tools", "Read Glob Grep");
-                            AssertScalar(yaml, "argument-hint",
-                                "[product area or IDD-NNNN IDs; default: available current intent]");
                         }
                         AssertScalar(yaml, "background", "false");
                         var background = Assert.IsType<YamlScalarNode>(yaml.Children[new YamlScalarNode("background")]);
