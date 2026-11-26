@@ -85,7 +85,7 @@ public sealed class SkillExposureTests(GenerationFixture fixture)
                         {
                             AssertScalar(yaml, "allowed-tools", "Read Glob Grep Agent Write");
                             AssertScalar(yaml, "argument-hint",
-                                "[product area or IDD-NNNN IDs; default: current documented intent]");
+                                "[scope or IDD IDs; optional strict mode or person-hours per CFP]");
                         }
                         if (name == "idd-intent-estimate")
                         {
