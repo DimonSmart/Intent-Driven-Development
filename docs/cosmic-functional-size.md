@@ -90,3 +90,7 @@ COSMIC measures movements, not internal algorithm or AI complexity. A small CFP 
 - [IDD scope diagnostic example](examples/cosmic-idd-diagnostic.md).
 
 Also see the [official measurement process](https://cosmic-sizing.org/cosmic-sizing/intro/measurement-process/). The skill is not COSMIC certification, an implementation audit or a cost/schedule forecast.
+
+## Refresh after Intent ownership changes
+
+If a specification is split or requirements move between owners, explicitly refresh all affected extraction packets before measuring the reorganized current Intent. Reusing an unchanged-path old packet alongside newly extracted owners can double-count processes or misattribute them. For IDD's own ownership normalization, refresh IDD-0001, IDD-0003 and IDD-0006 (or refresh all); the new IDs are extracted normally. This is user-controlled refresh, not automatic cache invalidation.

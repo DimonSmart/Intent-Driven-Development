@@ -13,7 +13,7 @@ This is a conservative read-only **preparation trial**, not a claim of executing
 - .idd/intent/IDD-0006.adr-native-agent-factory-orchestration.md — current accepted Factory architecture, not a new independent FUR.
 - No active numbered Spike listed in the source tree at this inspection.
 
-The INDEX refers to IDD-0001, IDD-0003 and IDD-0006. No additional numbered Intent was observed in this snapshot. This is an inventory of documented material, not evidence that every functional requirement in the real IDD product has been recorded or decomposed into processes.
+The [INDEX at the time of this historical preparation trial](https://github.com/DimonSmart/Intent-Driven-Development/blob/fe0c85948fa639bf83debd713489a57ba4cd727d/.idd/intent/INDEX.md) referred to IDD-0001, IDD-0003 and IDD-0006. The current INDEX has since been split by ownership; this trial is not a current inventory. No additional numbered Intent was observed in this snapshot. This is an inventory of documented material, not evidence that every functional requirement in the real IDD product has been recorded or decomposed into processes.
 
 ## Strategy and measurement blockers
 

@@ -9,9 +9,15 @@ here.
 
 | Document | Role | Area | Notes |
 | --- | --- | --- | --- |
-| IDD-0001 | Spec | Factory orchestration | Generic native-child/internal-Skill planner/worker lifecycle, model policies, durable preflight, verification and at-least-once behavior |
-| IDD-0003 | Spec | IDD core and distribution | Current Intent, Engineering, lint/audit, generation, import and self-hosting contracts |
-| IDD-0006 | ADR | Factory architecture | Native generic subagents with internal Skills; non-polling waits, at-least-once recovery and findings from the former custom-runtime experiment |
+| IDD-0001 | Spec | Factory orchestration | Supervisor/Root, preflight, Planner/Worker lifecycle, task knowledge and final verification |
+| IDD-0003 | Spec | IDD core and distribution | Current Intent, Visual Intent, initialization, distribution and self-hosting |
+| IDD-0006 | ADR | Factory architecture | Native generic subagents and internal Skills; rationale, alternatives and experimental evidence |
+| IDD-0008 | Spec | Engineering guardrails | Durable Engineering Rules, ownership, allocator and mutation boundaries |
+| IDD-0009 | Spec | Intent inspection | Lint, semantic structure audit and implementation drift audit |
+| IDD-0010 | Spec | Business complexity assessment | Qualitative scope, complexity, confidence and COSMIC preparation |
+| IDD-0011 | Spec | COSMIC functional size | Process ownership, extraction snapshots, measurement and coverage |
+| IDD-0012 | Spec | Factory recovery and refinement | Temporary state, immutable baseline, provenance, interruption, recovery and refinement review |
+| IDD-0013 | Spec | Factory model policy | Execution profiles, configuration, inheritance and Worker model mapping |
 
 The `Document` column contains stable `IDD-NNNN` identifiers only. Resolve
 each ID to the unique current `.idd/intent/IDD-NNNN.*.md` document. Deleted IDs
