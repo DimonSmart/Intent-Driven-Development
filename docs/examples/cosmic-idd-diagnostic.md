@@ -1,5 +1,7 @@
 # COSMIC experimental measurement: Intent-Driven-Development (13 Nov 2026)
 
+> Historical preparation trial under the previous strict-only workflow. This is not an example of the current default approximate report. See [the current report example](../cosmic-functional-size.md#example-markdown-report-illustrative).
+
 Status: **Diagnostic only — no defensible CFP measurement in this preparation trial**.
 
 This is a conservative read-only **preparation trial**, not a claim of executing the generated skill with an active local Coding Agent. The document records the visible normative sources and the unresolved questions before any defensible full measurement. Running the installed idd-intent-cosmic skill with complete workspace FUR access and semantic self-review is still needed for a defensible numerical report. No executable validator is required.
