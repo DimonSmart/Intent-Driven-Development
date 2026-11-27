@@ -198,6 +198,11 @@
           "skill": "idd-intent-cosmic",
           "source": "src/canonical/methodology/cosmic-execution-state.md",
           "destination": "cosmic-execution-state.md"
+        },
+        {
+          "skill": "idd-intent-cosmic",
+          "source": "src/canonical/methodology/cosmic-report-template.md",
+          "destination": "cosmic-report-template.md"
         }
       ],
       "assets": [

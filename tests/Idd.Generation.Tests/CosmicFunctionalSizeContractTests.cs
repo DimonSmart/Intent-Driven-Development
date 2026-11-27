@@ -24,7 +24,7 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
             .Where(x => x.GetProperty("skill").GetString() == "idd-intent-cosmic")
             .Select(x => x.GetProperty("destination").GetString()).ToArray();
         Assert.Equal(new[] { "cosmic-measurement-guide.md", "cosmic-delegation-protocol.md",
-            "cosmic-execution-state.md" }, references);
+            "cosmic-execution-state.md", "cosmic-report-template.md" }, references);
 
         using var descriptions = JsonDocument.Parse(fixture.ReadText(Path.Combine(
             fixture.RepoRoot, "src", "canonical", "skills", "skill-descriptions.json")));
@@ -49,6 +49,7 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
             "idd-intent", "skills", "idd-intent-cosmic");
         var generated = fixture.ReadText(Path.Combine(skill, "SKILL.md"));
         var sourceSkill = fixture.ReadText(Path.Combine(canonical, "skills", "idd-intent-cosmic.md"));
+        Assert.Contains("references/cosmic-report-template.md", sourceSkill);
         Assert.Contains(sourceSkill.ReplaceLineEndings("\n").Trim(),
             generated.ReplaceLineEndings("\n"));
 
@@ -56,7 +57,8 @@ public sealed class CosmicFunctionalSizeContractTests(GenerationFixture fixture)
         {
             "cosmic-measurement-guide.md",
             "cosmic-delegation-protocol.md",
-            "cosmic-execution-state.md"
+            "cosmic-execution-state.md",
+            "cosmic-report-template.md"
         })
         {
             var source = fixture.ReadText(Path.Combine(canonical, "methodology", filename));
