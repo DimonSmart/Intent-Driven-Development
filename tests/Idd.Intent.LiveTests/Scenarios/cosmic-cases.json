@@ -912,6 +912,55 @@
       ],
       "additionalIndexIds": [],
       "source": null
+    },
+    {
+      "id": "C35-cross-process-memory-state",
+      "request": "Quick approximate functional size of the documented trainer behavior.",
+      "documents": {
+        "IDD-0001.spec-arm.md": "# Arm trainer\nThe owner sets whether training is armed. The setting is retained in memory between functional processes until changed. No display or confirmation is required.",
+        "IDD-0002.spec-clock.md": "# Scheduled training\nAt the scheduled clock event the app reads the retained armed setting. If armed, it sends a start command to an external trainer device. No other response is required."
+      },
+      "expectedStatus": "Complete",
+      "expectedProcesses": [
+        "Set armed state",
+        "Respond to scheduled clock event"
+      ],
+      "expectedMovements": [
+        "E Armed setting from owner",
+        "W Armed setting",
+        "E Clock event",
+        "R Armed setting",
+        "X Start command to trainer device"
+      ],
+      "expectedRestrictions": [
+        "5 CFP; retained state is logically persistent despite being in memory",
+        "No additional UI/control processes; no claim that undocumented product functionality was assessed"
+      ],
+      "additionalIndexIds": [],
+      "source": null
+    },
+    {
+      "id": "C36-required-external-exchange",
+      "request": "Quick approximate functional size. Boundary is the application, external catalog service and human user are functional users.",
+      "documents": {
+        "IDD-0001.spec-catalog.md": "# Browse catalog\nWhen the user requests a catalog by category, the application sends that category to the external catalog service, receives matching items and displays them to the user. Expanding or collapsing the filter panel only changes presentation. No data is stored."
+      },
+      "expectedStatus": "Complete",
+      "expectedProcesses": [
+        "Browse catalog"
+      ],
+      "expectedMovements": [
+        "E Category from user",
+        "X Category request to external catalog service",
+        "E Matching items from external catalog service",
+        "X Matching items to user"
+      ],
+      "expectedRestrictions": [
+        "4 CFP; no R/W or independent expand/collapse process",
+        "Count both required directions of external exchange, not internal API calls"
+      ],
+      "additionalIndexIds": [],
+      "source": null
     }
   ]
 }

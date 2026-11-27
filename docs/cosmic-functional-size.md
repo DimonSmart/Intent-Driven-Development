@@ -10,7 +10,7 @@
 - "Strict COSMIC measurement, CFP only."
 - "Show detailed movement evidence and coupling for the import process."
 
-Default boundary: the whole documented product, including internal clients/services and logical storage. An explicit selected scope/boundary takes precedence. The skill reads all accessible current normative specs, identifies owner-defined processes and counts logical Entry, Exit, Read and Write movements. References to an owner are not extra processes or movements.
+Default boundary: the whole documented product, including internal clients/services and logical storage. An explicit selected scope/boundary takes precedence. The skill reads all accessible current normative specs, identifies owner-defined processes and counts logical Entry, Exit, Read and Write movements. References to an owner are not extra processes or movements. A quick consistency pass checks functional behavior, logical groups, external exchanges and state retained between processes (even in memory); no exhaustive audit or separate data-group catalog is required.
 
 ## Reasonable defaults
 
@@ -50,4 +50,4 @@ Native child agents, bounded reduction and an external project-specific numbered
 
 When using cache, reuse completed `IDD-NNNN.cosmic.md` extraction packets with matching ID/path. Write new extracts through `.cosmic.partial.md` and publish by rename. Packets contain facts and candidates, never normative assumptions or authoritative CFP/hours. Recompute each request; reused packets carry the warning `Cached input — source freshness not verified`. Explicitly refresh or clear selected/all packets when desired. No hashes, watchers or executable validator are required. If cache unavailable, analyze directly.
 
-Read all accessible sources; state fresh/reused coverage, actual unread/missing paths and unestimated functionality. Use Complete for fully assessed documented scope, Partial for an assessed subtotal, Diagnostic only if no defensible numeric result exists. Missing sources are not zero size. Algorithms can be small in CFP and large in implementation difficulty. Coupling belongs primarily to the separate qualitative assessment; it can be requested as a detailed non-COSMIC appendix and never increases CFP.
+Read all accessible sources; state fresh/reused coverage, actual unread/missing paths and unestimated functionality. Use Complete for fully assessed documented scope (not proof that the product is fully specified), Partial for an assessed subtotal, Diagnostic only if no defensible numeric result exists. Missing sources are not zero size. Algorithms can be small in CFP and large in implementation difficulty. Coupling belongs primarily to the separate qualitative assessment; it can be requested as a detailed non-COSMIC appendix and never increases CFP.
