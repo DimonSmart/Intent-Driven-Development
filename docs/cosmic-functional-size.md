@@ -9,6 +9,7 @@
 - "Estimate the document module using 2–4 hours per CFP."
 - "Strict COSMIC measurement, CFP only."
 - "Show detailed movement evidence and coupling for the import process."
+- "Export the assessment as a standalone HTML report."
 
 Default boundary: the whole documented product, including internal clients/services and logical storage. An explicit selected scope/boundary takes precedence. The skill reads all accessible current normative specs, identifies owner-defined processes and counts logical Entry, Exit, Read and Write movements. References to an owner are not extra processes or movements. A quick consistency pass checks functional behavior, logical groups, external exchanges and state retained between processes (even in memory); no exhaustive audit or separate data-group catalog is required.
 
@@ -24,25 +25,53 @@ Default: **3 person-hours/CFP**, an illustrative uncalibrated IDD heuristic, not
 
 ## Example Markdown report (illustrative)
 
-**Scope:** Document editor, whole product. **Mode:** Approximate. **Coverage:** 2/2 current specs. **Status:** Complete.
+### Document editor — Functional size assessment
 
-**Functional size:** approximately 7 CFP (7–8). **Functional processes:** 3. **Indicative effort:** 21 person-hours (21–24), default 3 person-hours/CFP.
+*Intent-Driven Development · COSMIC v5.0 · Approximate*
+
+**7 CFP** · **21 person-hours**
+
+| Metric | Result |
+| --- | ---: |
+| Functional size range | 7–8 CFP |
+| Effort range | 21–24 hours |
+| Functional processes | 3 |
+| Source coverage | 2/2 (fresh) |
+| Effort rate | 3 hours/CFP (IDD default) |
+
+**Scope:** Document editor, documented whole product.  
+**Status:** Complete.
+
+#### 1. Functional breakdown
 
 | Functional area | Processes | CFP | Person-hours |
 | --- | ---: | ---: | ---: |
 | Document storage | 2 | 5 (5–6) | 15 (15–18) |
 | Document preview | 1 | 2 | 6 |
-| Total | 3 | 7 (7–8) | 21 (21–24) |
+| **Total** | **3** | **7 (7–8)** | **21 (21–24)** |
+
+#### 2. Measurement profile
+
+| Entry (E) | Exit (X) | Read (R) | Write (W) | Total CFP |
+| ---: | ---: | ---: | ---: | ---: |
+| 3 | 2 | 1 | 1 | **7** |
+
+**Evidence:** 4 explicit · 2 implied · 1 assumed movements (illustrative).
+
+#### 3. Functional processes
 
 | Owner | Process | Logical movements | CFP |
 | --- | --- | --- | ---: |
-| IDD-0001 | Save | E document, W document | 2 (2–3) |
-| IDD-0001 | Open | E request, R document, X document | 3 |
-| IDD-0002 | Preview uploaded file | E file, X preview | 2 |
+| IDD-0001 | Save | E document; W document | 2 (2–3) |
+| IDD-0001 | Open | E request; R document; X document | 3 |
+| IDD-0002 | Preview uploaded file | E file; X preview | 2 |
+| **Total** | | | **7 (7–8)** |
 
-**Basis:** 4 explicit + 2 implied + 1 assumed = 7 central CFP (illustrative classification). Save assumes ordinary persistent storage; optional human confirmation explains the upper bound. No extra versioning/audit is assumed. Effort is a heuristic, not a calendar commitment.
+#### 4. Assumptions and limitations
 
-Reports use ordinary Markdown in the conversation, with detailed source evidence or an external Markdown export on request. No report is written inside the target project by default.
+Save assumes ordinary persistent storage; optional human confirmation explains the upper bound. No extra versioning/audit is assumed. Effort uses an uncalibrated heuristic, not a calendar commitment.
+
+The [report template](../src/canonical/methodology/cosmic-report-template.md) is packaged with the skill independently of the counting rules. Ordinary Markdown is the default; an external Markdown or standalone HTML export is available on explicit request. HTML uses the same numbers, with optional charts, system light/dark theme and print styling. No report is automatically written inside the target project.
 
 ## Scaling, caching and limitations
 
